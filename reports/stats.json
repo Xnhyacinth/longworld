@@ -1,0 +1,81 @@
+{
+  "n_rows": 45564,
+  "n_question_slots": 7594,
+  "n_worlds": 210,
+  "by_split": {
+    "train": 32184,
+    "eval": 13380
+  },
+  "by_view": {
+    "full": 7594,
+    "cf": 7594,
+    "minimal": 7594,
+    "distractor_only": 7594,
+    "trajectory": 7594,
+    "memory": 7594
+  },
+  "by_query_type": {
+    "current_state": 8568,
+    "multi_hop": 2856,
+    "version_diff": 2856,
+    "counterfactual": 8568,
+    "fork_join": 5616,
+    "delayed_effect": 5676,
+    "contradiction": 5712,
+    "hidden_bridge": 5712
+  },
+  "by_timing": {
+    "first": 22782,
+    "late": 22782
+  },
+  "by_position": {
+    "middle": 42708,
+    "back": 2856
+  },
+  "by_length": {
+    "8k": 13404,
+    "32k": 13404,
+    "64k": 13404,
+    "128k": 2676,
+    "256k": 2676
+  },
+  "by_cf_op": {
+    "version": 28560,
+    "amount": 2856,
+    "score": 14148
+  },
+  "token_buckets": {
+    "8k-ish": 8936,
+    "<4k": 15188,
+    "32k-ish": 8936,
+    "64k-ish": 8936,
+    "128k+": 3568
+  },
+  "mean_proof_depth": 2.3760863839873583,
+  "mean_evidence_distance": 52021.889781406375,
+  "n_unique_full_answers": 1012,
+  "n_clone_rows": 0,
+  "by_domain": {
+    "company": 11424,
+    "codeforge": 17136,
+    "researchlab": 17004
+  },
+  "by_motif": {
+    "supersession": 8568,
+    "fork_join": 8472,
+    "chain": 2856,
+    "counterfactual_supersession": 8568,
+    "delayed_effect": 5676,
+    "contradiction": 5712,
+    "hidden_bridge": 5712
+  },
+  "n_topology_ids": 1115,
+  "n_topology_families": 16,
+  "by_length_distance": {
+    "128k": 126865.5,
+    "256k": 254879.0,
+    "32k": 30877.6,
+    "64k": 62874.5,
+    "8k": 6872.9
+  }
+}

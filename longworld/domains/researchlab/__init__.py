@@ -1,0 +1,1 @@
+"""ResearchLab domain."""

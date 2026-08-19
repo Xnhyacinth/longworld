@@ -1,0 +1,28 @@
+schema_version: p1.1
+n_worlds: 210
+n_parallel: 3
+n_pulses: 16
+extra_filler_worlds: 32
+train_ratio: 0.8
+surface_min: 0.82
+keep_one_position: true
+domains: [company, researchlab, codeforge]
+length_buckets:
+  "8k": 8000
+  "32k": 32000
+  "64k": 64000
+eval_length_buckets:
+  "128k": 128000
+  "256k": 256000
+min_evidence_frac:
+  "8k": 0.20
+  "32k": 0.30
+  "64k": 0.35
+  "128k": 0.35
+  "256k": 0.35
+query_timings: ["first", "late"]
+position_buckets: ["front", "middle", "back"]
+backbone: Qwen2.5-7B-Instruct
+max_seq_len: 65536
+sft_conditions: ["B1", "B2", "B3", "B4", "B5"]
+train_framework: llamafactory

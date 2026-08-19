@@ -1,0 +1,24 @@
+# Meeting notes — {{ meeting_title }}
+Doc-id: {{ artifact_id }}
+Date: {{ date }}
+Project: {{ project }}
+Owner: {{ owner }}
+Attendees: {{ attendees | join(", ") }}
+Department: {{ department }}
+Company: {{ company }}
+
+## Agenda
+{% for item in agenda %}
+{{ loop.index }}. {{ item }}
+{% endfor %}
+
+## Discussion
+{{ discussion }}
+
+## Action items
+{% for item in actions %}
+- {{ item }}
+{% endfor %}
+
+## Parking lot
+{{ parking }}

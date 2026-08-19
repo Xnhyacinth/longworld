@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "longworld"
+version = "0.2.0"
+description = "Event-sourced worlds for CausalTwin long-context data (company, researchlab, codeforge)"
+requires-python = ">=3.10"
+dependencies = [
+  "pydantic>=2.6",
+  "networkx>=3.2",
+  "jinja2>=3.1",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+train = [
+  "datasets>=2.20",
+  "peft>=0.12",
+  "accelerate>=0.33",
+  "trl>=0.9",
+]
+
+[tool.setuptools.packages.find]
+include = ["longworld*"]
+
+[tool.setuptools.package-data]
+longworld = ["domains/company/templates/*.j2"]

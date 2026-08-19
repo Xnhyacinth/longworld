@@ -1,0 +1,28 @@
+# Generated datasets and checkpoints (multi-GB jsonl)
+data/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Python / test
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Training artifacts
+LLaMA-Factory/
+wandb/
+outputs/
+saves/
+*.pt
+*.bin
+*.safetensors
+*.gguf
+
+# Local secrets
+.env
+.env.*
+*.pem
