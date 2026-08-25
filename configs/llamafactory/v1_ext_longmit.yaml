@@ -1,0 +1,28 @@
+### LLaMA-Factory v1 SFT: Ulysses CP (SP=2). Same lr / GBS / steps as v1_ext_acc.
+model: /workspace/wynckeliao/longworld/data/models/Qwen3.5-4B
+trust_remote_code: false
+model_class: llm
+flash_attn: flash_attention_2
+
+dist_config:
+  name: fsdp2
+  dcp_path: null
+
+cp_mode: ulysses
+cp_size: 2
+
+train_dataset: configs/llamafactory/v1_data_longmit.yaml
+
+output_dir: data/sft/lf_ext_longmit_sp2
+micro_batch_size: 1
+global_batch_size: 16
+cutoff_len: 133120
+learning_rate: 1.0e-5
+max_steps: 680
+bf16: true
+enable_activation_checkpointing: true
+batching_workers: 32
+logging_steps: 5
+save_steps: 100
+save_total_limit: 2
+seed: 42

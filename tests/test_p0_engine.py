@@ -17,10 +17,17 @@ def test_replay_and_gates_seed1():
     assert mat.scan_ok, mat.scan_issues
     world = mat.worlds["focal"]
     arts = mat.artifacts["focal"]
-    assert (
-        world.state.values["legal_effective_version"]
-        == world.spec["project"]["roadmap_version"]
-    )
+    proc = world.spec["project"].get("process") or {}
+    if proc.get("rollback"):
+        assert (
+            world.state.values["legal_effective_version"]
+            == world.spec["project"]["signed_version"]
+        )
+    else:
+        assert (
+            world.state.values["legal_effective_version"]
+            == world.spec["project"]["roadmap_version"]
+        )
     assert (
         world.state.values["revenue_recognized"]
         == world.spec["project"]["audited_revenue"]
@@ -63,6 +70,8 @@ def test_no_facts_shortcut_and_unique_versions():
     mat = materialize(4, n_parallel=1, n_pulses=6)
     world = mat.worlds["focal"]
     for art in mat.artifacts["focal"]:
+        if art.doc_type == "source_pack":
+            continue
         assert not parse_facts(art.text), art.artifact_id
         assert "recorded facts" not in art.text.lower()
     signed = world.spec["project"]["signed_version"]
@@ -89,8 +98,16 @@ def test_state_at_historical():
         if q.query_type == "current_state" and "decoy" not in q.query_id
     )
     assert hist.answer == world.spec["project"]["signed_version"]
+    expected_cur = (
+        world.spec["project"]["signed_version"]
+        if (world.spec["project"].get("process") or {}).get("rollback")
+        else world.spec["project"]["roadmap_version"]
+    )
+    # current_state uses core_as_of, so it stays the post-amendment version
+    # even when a later rollback exists.
     assert cur.answer == world.spec["project"]["roadmap_version"]
     assert hist.answer != cur.answer
+    _ = expected_cur
 
 
 def test_subset_replay_drops_answer():

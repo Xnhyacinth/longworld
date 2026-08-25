@@ -39,6 +39,24 @@ def min_sufficient_subgraph(world: SimulatedWorld, spec: QuerySpec) -> nx.DiGrap
     return g.subgraph(keep).copy()
 
 
+def hop_count(world: SimulatedWorld, spec: QuerySpec) -> int:
+    """SearchArt-style depth: longest path on the sufficient/essential subgraph."""
+    sub = min_sufficient_subgraph(world, spec)
+    nodes = [e for e in spec.sufficient_event_ids if e in sub]
+    if len(nodes) <= 1:
+        nodes = [e for e in spec.essential_event_ids if e in sub]
+    if len(nodes) <= 1:
+        return 1
+    longest = 1
+    for a in nodes:
+        for b in nodes:
+            if a == b:
+                continue
+            if nx.has_path(sub, a, b):
+                longest = max(longest, nx.shortest_path_length(sub, a, b) + 1)
+    return longest
+
+
 def proof_depth(world: SimulatedWorld, spec: QuerySpec) -> int:
     """Longest directed path among essential events (1 if a singleton)."""
     sub = min_sufficient_subgraph(world, spec)
@@ -167,6 +185,8 @@ def graph_stats(world: SimulatedWorld, spec: QuerySpec) -> dict[str, Any]:
         "n_min_subgraph": sub.number_of_nodes(),
         "n_min_edges": sub.number_of_edges(),
         "proof_depth": proof_depth(world, spec),
+        "hop_count": hop_count(world, spec),
+        "searchart_width": len(spec.essential_artifact_ids),
         "n_essential_events": len(spec.essential_event_ids),
         "n_essential_artifacts": len(spec.essential_artifact_ids),
     }

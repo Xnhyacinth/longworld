@@ -1,0 +1,12 @@
+acc_search:
+  path: data/external/llamafactory/acc_search.jsonl
+  source: local
+  converter: sharegpt
+acc_swe:
+  path: data/external/llamafactory/acc_swe.jsonl
+  source: local
+  converter: sharegpt
+acc_sql:
+  path: data/external/llamafactory/acc_sql.jsonl
+  source: local
+  converter: sharegpt

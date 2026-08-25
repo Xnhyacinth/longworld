@@ -1,0 +1,94 @@
+schema_version: p3.0
+data_product: worldlong_multidomain_probe_v1
+data_stage: candidate
+release_profile_id: p4-multidomain-probe-12-v1
+trust_scope: local_probe
+required_seed_start: 1
+
+# Candidate worlds are balanced explicitly. This is a local engineering probe,
+# not the p3-production-48 release identity.
+n_worlds: 18
+target_promoted_worlds: 12
+domains: [company, researchlab, codeforge]
+domain_world_quotas:
+  company: 6
+  researchlab: 6
+  codeforge: 6
+n_parallel: 2
+n_pulses: 0
+domain_n_workstreams:
+  company: 36
+  researchlab: 88
+  codeforge: 36
+include_program_joins: false
+
+# Strict generation cannot lengthen dossiers with unrelated background worlds.
+n_anchors: 0
+n_source_pack: 0
+extra_filler_worlds: 0
+min_semantic_tokens: 800
+surface_min: 0.82
+keep_one_position: true
+
+# With the deterministic round-robin schedule and seed-start=1, seed 3 is the
+# first CodeForge world. Only that world receives the verified public bundle.
+real_workflow_bundle: configs/public_repo_episodes_v2.json
+real_workflow_seeds: [3]
+real_workflow_query_types:
+  [
+    version_selection,
+    ci_regression_origin,
+    license_compatibility,
+    cross_repo_release_dependency,
+  ]
+real_workflow_length_buckets: [16k, 32k, 64k]
+real_workflow_query_length_buckets:
+  version_selection: [16k, 32k, 64k]
+  ci_regression_origin: [16k]
+  license_compatibility: [16k]
+  cross_repo_release_dependency: [32k]
+real_workflow_views: [full, cf, ordered_artifact_view]
+exact_tokenizer:
+  model_id: Qwen/Qwen3.5-4B
+  revision: a7b0d22b993d71000cf2eadfb37222a67cee521e
+  local_files_only: true
+
+training_objective: sft
+composition_method: causal_timeline
+require_verified_sources: false
+allow_legacy_sources: false
+strict_semantic_verification: true
+strict_cf_replay: true
+require_producer_attestation: true
+
+train_ratio: 0.75
+split_strategy: world
+split_seed: 42
+length_buckets:
+  "16k": 16000
+  "32k": 32768
+  "64k": 65536
+# Research prose has a lower heuristic-token density than code/log artifacts.
+# Its 64K packing cap is raised within the <80K 64K label boundary; the release
+# gate still recounts every row with the pinned Qwen tokenizer and requires
+# >=64,000 exact tokens.
+domain_length_buckets:
+  company:
+    "64k": 58000
+  researchlab:
+    "64k": 71500
+  codeforge:
+    "64k": 44500
+eval_length_buckets: {}
+query_timings: [first, late]
+position_buckets: [front, middle, back]
+min_evidence_tokens:
+  "64k": 22000
+release_min_evidence_tokens:
+  "16k": 8000
+  "32k": 16000
+  "64k": 22000
+  "128k": 44000
+  "256k": 80000
+min_internal_growth: 4096
+max_generic_growth_share: 0.20

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Equal-token CausalTwin SFT (Qwen2.5-7B-Instruct LoRA).
+"""Unsigned single-GPU diagnostic SFT for a validated LongWorld release.
 
 Fairness: same backbone, max_steps, batch, max_length, packing.
 Conditions differ only by which CausalTwin views (and query timing) are eligible.
@@ -11,9 +11,9 @@ Conditions differ only by which CausalTwin views (and query timing) are eligible
   B5 four-view, first+late
   B6 B5 + 15% short (minimal) replay
 
-GPU:
-  bash /workspace/wynckeliao/ops/gpu/hold.sh wrap 0 -- \\
-    uv run python scripts/train_sft.py --condition B4
+This path is deliberately not a release exporter and cannot create a signed
+training manifest. The release path is export_llamafactory.py followed by the
+manifest-validating LLaMA-Factory or Swift launcher.
 """
 
 from __future__ import annotations
@@ -27,6 +27,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+
+from longworld.core.attestation import (
+    ATTESTATION_ENV,
+    ATTESTATION_ENVIRONMENT_ENV,
+    PREDECESSOR_GATE_KEY_ENV,
+    PREDECESSOR_GATE_KEY_ID_ENV,
+    ROLE_KEY_ENVS,
+    ROLE_KEY_ID_ENVS,
+)
+from longworld.core.record_contract import sft_row_errors
+from scripts.quality_gate import load_release_product
 
 COND_VIEWS = {
     "B1": {"full"},
@@ -48,15 +59,23 @@ def iter_jsonl(path: Path):
 
 def filter_rows(rows: list[dict], condition: str, length_bucket: str) -> list[dict]:
     views = COND_VIEWS[condition]
-    out = [
-        r
-        for r in rows
-        if r["view"] in views and r.get("length_bucket", "8k") == length_bucket
-    ]
+    long_buckets = {"32k", "64k", "128k", "256k"}
+    out = []
+    for r in rows:
+        if sft_row_errors(r):
+            continue
+        if r["view"] not in views:
+            continue
+        if r.get("length_bucket", "8k") != length_bucket:
+            continue
+        if (
+            length_bucket in long_buckets
+            and r.get("dependency_class") == "local_or_mixed"
+        ):
+            continue
+        out.append(r)
     if condition in {"B1", "B2", "B3", "B4"}:
-        first = [r for r in out if r["query_timing"] == "first"]
-        if first:
-            out = first
+        out = [r for r in out if r["query_timing"] == "first"]
     if condition == "B6":
         shorts = [r for r in out if r["view"] == "minimal"]
         n_short = max(1, int(0.15 * len(out)))
@@ -88,6 +107,59 @@ def to_messages(row: dict) -> dict:
     }
 
 
+def _render_chat(tokenizer, messages: list[dict], *, generation_prompt: bool) -> str:
+    if tokenizer.chat_template:
+        try:
+            return tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=generation_prompt,
+                enable_thinking=False,
+            )
+        except TypeError:
+            return tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=generation_prompt,
+            )
+    text = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
+    if generation_prompt:
+        text += "\nassistant:"
+    return text
+
+
+def tokenize_assistant_only(tokenizer, messages: list[dict], max_length: int) -> dict:
+    """Supervise only a complete answer; reject any source/query truncation."""
+    if not messages or messages[-1].get("role") != "assistant":
+        raise ValueError("messages must end with an assistant answer")
+    prompt = _render_chat(tokenizer, messages[:-1], generation_prompt=True)
+    full = _render_chat(tokenizer, messages, generation_prompt=False)
+    encoded = tokenizer(full, truncation=False, padding=False)
+    prompt_encoded = tokenizer(prompt, truncation=False, padding=False)
+    full_ids = list(encoded["input_ids"])
+    prompt_ids = list(prompt_encoded["input_ids"])
+    prefix_len = 0
+    for prompt_id, full_id in zip(prompt_ids, full_ids):
+        if prompt_id != full_id:
+            break
+        prefix_len += 1
+    if prefix_len == 0 or prefix_len >= len(full_ids):
+        raise ValueError("chat template did not expose an assistant answer boundary")
+    answer_ids = full_ids[prefix_len:]
+    if len(answer_ids) >= max_length:
+        raise ValueError("assistant answer exceeds the training sequence length")
+    source_budget = max_length - len(answer_ids)
+    source_ids = full_ids[:prefix_len]
+    if len(source_ids) > source_budget:
+        raise ValueError("source and query exceed the training sequence length")
+    input_ids = source_ids + answer_ids
+    return {
+        "input_ids": input_ids,
+        "attention_mask": [1] * len(input_ids),
+        "labels": [-100] * len(source_ids) + answer_ids,
+    }
+
+
 def write_condition_jsonl(
     rows: list[dict], dest: Path, token_budget: int | None
 ) -> dict:
@@ -114,18 +186,30 @@ def main() -> None:
     ap.add_argument("--condition", required=True, choices=list(COND_VIEWS))
     ap.add_argument("--data", type=Path, default=ROOT / "data" / "p0")
     ap.add_argument("--out-dir", type=Path, default=ROOT / "data" / "sft")
-    ap.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
+    ap.add_argument("--model", default="Qwen/Qwen3.5-4B")
     ap.add_argument("--max-seq-len", type=int, default=8192)
     ap.add_argument("--max-steps", type=int, default=80)
-    ap.add_argument("--lr", type=float, default=1e-4)
+    ap.add_argument("--lr", type=float, default=1e-5)
     ap.add_argument("--token-budget", type=int, default=None)
     ap.add_argument("--length-bucket", default="8k")
     ap.add_argument("--prepare-only", action="store_true")
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--min-free-gb", type=float, default=24.0)
+    ap.add_argument("--release-profile", required=True)
+    ap.add_argument("--diagnostic-only", action="store_true")
     args = ap.parse_args()
 
-    train_path = args.data / "train.jsonl"
-    rows = list(iter_jsonl(train_path))
+    if not args.diagnostic_only:
+        raise SystemExit(
+            "--diagnostic-only is required; signed release training must use "
+            "export_llamafactory.py and a manifest-validating launcher"
+        )
+
+    try:
+        product = load_release_product(args.data, args.release_profile)
+    except (TypeError, ValueError) as error:
+        raise SystemExit(str(error)) from error
+    rows = list(product.train_rows)
     filtered = filter_rows(rows, args.condition, args.length_bucket)
     rng = random.Random(7)
     rng.shuffle(filtered)
@@ -137,48 +221,71 @@ def main() -> None:
         "model": "sshleifer/tiny-gpt2" if args.smoke else args.model,
         "max_steps": 2 if args.smoke else args.max_steps,
         "max_seq_len": 256 if args.smoke else args.max_seq_len,
+        "data_stage": "diagnostic",
+        "signed_release_artifact": False,
+        "release_profile_id": args.release_profile,
         **stats,
     }
-    (args.out_dir / f"{args.condition}.meta.json").write_text(
-        json.dumps(meta, indent=2)
-    )
+    meta_path = args.out_dir / f"{args.condition}.meta.json"
+    meta_path.write_text(json.dumps(meta, indent=2))
+    prepared_bytes = prepared.read_bytes()
+    prepared_rows = [
+        json.loads(line) for line in prepared_bytes.splitlines() if line.strip()
+    ]
     print(json.dumps(meta, indent=2))
     if args.prepare_only:
         return
 
+    # Verification is complete; never expose the producer signing secret to model code.
+    for name in (
+        ATTESTATION_ENV,
+        ATTESTATION_ENVIRONMENT_ENV,
+        *ROLE_KEY_ENVS.values(),
+        *ROLE_KEY_ID_ENVS.values(),
+        PREDECESSOR_GATE_KEY_ENV,
+        PREDECESSOR_GATE_KEY_ID_ENV,
+    ):
+        os.environ.pop(name, None)
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-    os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
+    if args.smoke:
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+    else:
+        os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
 
     import subprocess
     import time
 
-    if not args.smoke:
-        phys = int(os.environ["CUDA_VISIBLE_DEVICES"].split(",")[0])
-        for _ in range(90):
-            used = int(
-                subprocess.check_output(
-                    [
-                        "nvidia-smi",
-                        "--query-gpu=memory.used",
-                        "--format=csv,noheader,nounits",
-                        "-i",
-                        str(phys),
-                    ],
-                    text=True,
-                )
-                .strip()
-                .split()[0]
-            )
-            print(f"nvidia-smi gpu {phys} used={used}MiB", flush=True)
-            if used < 2500:
-                break
-            time.sleep(2)
-        else:
-            raise SystemExit(f"GPU {phys} did not vacate before torch init")
+    vis = os.environ.get("CUDA_VISIBLE_DEVICES", "0")
+    if not args.smoke and vis not in {"", "-1"}:
+        phys = vis.split(",")[0].strip()
+        if phys.isdigit():
+            for _ in range(90):
+                try:
+                    used = int(
+                        subprocess.check_output(
+                            [
+                                "nvidia-smi",
+                                "--query-gpu=memory.used",
+                                "--format=csv,noheader,nounits",
+                                "-i",
+                                phys,
+                            ],
+                            text=True,
+                        )
+                        .strip()
+                        .split()[0]
+                    )
+                except (FileNotFoundError, subprocess.CalledProcessError):
+                    break
+                print(f"nvidia-smi gpu {phys} used={used}MiB", flush=True)
+                if used < 2500:
+                    break
+                time.sleep(2)
+            else:
+                raise SystemExit(f"GPU {phys} did not vacate before torch init")
 
     import torch
-    from datasets import load_dataset
-    from peft import LoraConfig, get_peft_model
+    from datasets import Dataset
     from transformers import (
         AutoModelForCausalLM,
         AutoTokenizer,
@@ -188,24 +295,15 @@ def main() -> None:
     )
 
     model_name = "sshleifer/tiny-gpt2" if args.smoke else args.model
-    tok = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+    tok = AutoTokenizer.from_pretrained(model_name, trust_remote_code=False)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
     tok.padding_side = "right"
-    ds = load_dataset("json", data_files=str(prepared), split="train")
+    ds = Dataset.from_list(prepared_rows)
     max_len = 256 if args.smoke else args.max_seq_len
 
     def to_text(ex):
-        msgs = ex["messages"]
-        if tok.chat_template:
-            text = tok.apply_chat_template(
-                msgs, tokenize=False, add_generation_prompt=False
-            )
-        else:
-            text = "\n".join(f"{m['role']}: {m['content']}" for m in msgs)
-        enc = tok(text, truncation=True, max_length=max_len, padding=False)
-        enc["labels"] = list(enc["input_ids"])
-        return enc
+        return tokenize_assistant_only(tok, ex["messages"], max_len)
 
     ds = ds.map(to_text, remove_columns=ds.column_names, num_proc=1)
 
@@ -215,35 +313,35 @@ def main() -> None:
         print(
             f"cuda free={free / 1024**3:.1f}GiB / {total / 1024**3:.1f}GiB", flush=True
         )
-        if free < 40 * 1024**3:
+        if free < args.min_free_gb * 1024**3:
             raise SystemExit(
-                f"visible cuda device only has {free / 1024**3:.1f} GiB free"
+                f"visible cuda device only has {free / 1024**3:.1f} GiB free "
+                f"(need {args.min_free_gb:g}; pass --min-free-gb)"
             )
 
     dtype = torch.float32 if args.smoke else torch.bfloat16
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        dtype=dtype,
-        trust_remote_code=True,
-        attn_implementation="eager",
-        device_map="cuda:0" if torch.cuda.is_available() and not args.smoke else None,
-    )
+    load_kw = {
+        "dtype": dtype,
+        "trust_remote_code": False,
+        "attn_implementation": "eager",
+        "device_map": (
+            "cuda:0" if torch.cuda.is_available() and not args.smoke else None
+        ),
+    }
+    try:
+        model = AutoModelForCausalLM.from_pretrained(model_name, **load_kw)
+    except ValueError:
+        from transformers import AutoModelForImageTextToText
+
+        model = AutoModelForImageTextToText.from_pretrained(model_name, **load_kw)
     if not args.smoke:
-        peft_cfg = LoraConfig(
-            r=16,
-            lora_alpha=32,
-            lora_dropout=0.05,
-            bias="none",
-            task_type="CAUSAL_LM",
-            target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
-        )
-        model = get_peft_model(model, peft_cfg)
-        model.enable_input_require_grads()
         model.config.use_cache = False
         model.gradient_checkpointing_enable(
             gradient_checkpointing_kwargs={"use_reentrant": True}
         )
-        model.print_trainable_parameters()
+        n_params = sum(p.numel() for p in model.parameters())
+        n_train = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print(f"full FT trainable {n_train}/{n_params}", flush=True)
 
     out_ckpt = args.out_dir / f"ckpt_{args.condition}"
     targs = TrainingArguments(

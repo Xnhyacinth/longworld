@@ -4,6 +4,8 @@ import random
 from datetime import date, timedelta
 from typing import Any
 
+from longworld.core.grounded import pick_anchors
+from longworld.core.process import assign_register, attach_roles, sample_process
 from longworld.domains.company.names import (
     DEPARTMENTS,
     FIRST,
@@ -29,6 +31,16 @@ EVENT_TYPES = [
     "legal_reminder",
     "standup_notes",
     "status_pulse",
+    "renewal_roadmap",
+    "renewal_amendment",
+    "renewal_release",
+    "renewal_close",
+    "renewal_audit",
+    "cycle_plan",
+    "cycle_failure",
+    "cycle_recovery",
+    "cycle_release",
+    "cycle_audit",
 ]
 
 ARTIFACT_KEYS_CORE = [
@@ -44,6 +56,12 @@ ARTIFACT_KEYS_CORE = [
     "legal_reminder",
     "client_followup",
     "finance_preview",
+    "announce_hold",
+    "renewal_roadmap",
+    "renewal_amendment",
+    "renewal_release",
+    "renewal_close",
+    "renewal_audit",
 ]
 
 
@@ -66,9 +84,14 @@ def _person(rng: random.Random, used: set[str]) -> str:
 
 
 def sample_world_spec(
-    seed: int, n_parallel: int = 2, n_pulses: int = 14
+    seed: int,
+    n_parallel: int = 2,
+    n_pulses: int = 0,
+    n_workstreams: int = 0,
 ) -> dict[str, Any]:
     """Fully deterministic world definition. Parallel projects share the seed family."""
+    if not 0 <= n_workstreams <= 64:
+        raise ValueError("n_workstreams must be between 0 and 64")
     rng = random.Random(seed)
     used_names: set[str] = set()
     used_projects: set[str] = set()
@@ -77,7 +100,7 @@ def sample_world_spec(
 
     start = date(2026, 1, 6) + timedelta(days=rng.randrange(0, 14))
 
-    def offsets() -> dict[str, int]:
+    def offsets(renewal_rng: random.Random) -> dict[str, int]:
         # Strict order with gaps so historical_state has a clean cut.
         return {
             "sign_contract": 0,
@@ -92,6 +115,18 @@ def sample_world_spec(
             "finance_preview": rng.randint(84, 86),
             "legal_reminder": rng.randint(100, 108),
             "standup_notes": rng.randint(72, 78),
+            "carveout": 59,
+            "announce_hold": 82,
+            "rollback_amendment": rng.randint(124, 132),
+            "latent_seed": 8,
+            "latent_ack": 99,
+            "latent_reopen": 136,
+            "latent_ratify": 150,
+            "renewal_roadmap": renewal_rng.randint(178, 190),
+            "renewal_amendment": renewal_rng.randint(208, 220),
+            "renewal_release": renewal_rng.randint(236, 248),
+            "renewal_close": renewal_rng.randint(270, 282),
+            "renewal_audit": renewal_rng.randint(306, 320),
         }
 
     def pulse_offsets(core: dict[str, int], n: int) -> list[int]:
@@ -110,6 +145,9 @@ def sample_world_spec(
         return out
 
     def one_project(kind: str, is_focal: bool) -> dict[str, Any]:
+        renewal_rng = random.Random(
+            f"company-renewal:{seed}:{kind}:{len(used_projects)}"
+        )
         pm = _person(rng, used_names)
         counsel = _person(rng, used_names)
         auditor = _person(rng, used_names)
@@ -133,6 +171,14 @@ def sample_world_spec(
         while cf_version in {signed_version, roadmap_version}:
             cf_version = f"RV-{code}{rng.randint(100, 999)}-X"
         beta_tag = f"BT-{code}{rng.randint(1000, 9999)}"
+        renewal_roadmap_version = f"RV-{code}{renewal_rng.randint(100, 999)}-N"
+        while renewal_roadmap_version in {
+            signed_version,
+            roadmap_version,
+            cf_version,
+        }:
+            renewal_roadmap_version = f"RV-{code}{renewal_rng.randint(100, 999)}-N"
+        renewal_beta_tag = f"BT-{code}{renewal_rng.randint(1000, 9999)}-N"
         supplement_version = (
             roadmap_version
             if is_focal
@@ -151,25 +197,99 @@ def sample_world_spec(
         if not is_focal:
             mis = 200000 + rng.randint(11000, 33000) + rng.choice([11, 19])
             corrected = mis - rng.randint(15000, 40000) - rng.choice([3, 7])
+        renewal_mis = (
+            corrected + renewal_rng.randint(42000, 78000) + renewal_rng.choice([13, 29])
+        )
+        renewal_corrected = (
+            renewal_mis - renewal_rng.randint(9000, 26000) - renewal_rng.choice([7, 17])
+        )
 
         contract_id = f"C-{rng.randint(4100, 9899)}-{code}"
-        off = offsets()
+        off = offsets(renewal_rng)
         pulses = pulse_offsets(off, n_pulses)
+        people = {
+            "pm": pm,
+            "counsel": counsel,
+            "auditor": auditor,
+            "csm": csm,
+            "finance": finance,
+            "eng": eng,
+            "customer_contact": customer_contact,
+        }
+        workstream_kinds = (
+            "contract-migration",
+            "privacy-remediation",
+            "billing-recovery",
+            "supplier-transition",
+            "security-hardening",
+            "data-residency",
+            "platform-upgrade",
+            "audit-remediation",
+        )
+        failure_modes = (
+            "acceptance-suite regression",
+            "regional policy conflict",
+            "billing reconciliation mismatch",
+            "supplier certification lapse",
+            "security control regression",
+            "residency routing violation",
+            "upgrade compatibility break",
+            "audit evidence gap",
+        )
+        workstreams = []
+        if is_focal:
+            for index in range(n_workstreams):
+                stream_rng = random.Random(
+                    f"company-cycle:{seed}:{project}:{contract_id}:{index}"
+                )
+                stream_kind = workstream_kinds[index % len(workstream_kinds)]
+                close_amount = (
+                    corrected + 23000 + index * 977 + stream_rng.randint(101, 899)
+                )
+                audit_amount = close_amount - stream_rng.randint(1300, 8700)
+                workstreams.append(
+                    {
+                        "index": index,
+                        "id": f"{stream_kind}-{index + 1:03d}",
+                        "kind": stream_kind,
+                        "agreement_id": (
+                            f"AGR-{code}-{index + 1:03d}-{stream_rng.randint(100, 999)}"
+                        ),
+                        "plan_version": (
+                            f"PLN-{code}-{index + 1:03d}-{stream_rng.randint(1000, 9999)}"
+                        ),
+                        "candidate_token": (
+                            f"RC-{code}-{index + 1:03d}-{stream_rng.randint(1000, 9999)}"
+                        ),
+                        "incident_token": (
+                            f"INC-{code}-{index + 1:03d}-{stream_rng.randint(1000, 9999)}"
+                        ),
+                        "failure_mode": failure_modes[index % len(failure_modes)],
+                        "resolution_token": (
+                            f"FIX-{code}-{index + 1:03d}-{stream_rng.randint(1000, 9999)}"
+                        ),
+                        "release_token": (
+                            f"REL-{code}-{index + 1:03d}-{stream_rng.randint(1000, 9999)}"
+                        ),
+                        "audit_amount": audit_amount,
+                        "close_amount": close_amount,
+                    }
+                )
         return {
             "kind": kind,
             "is_focal": is_focal,
             "company": company,
             "project": project,
             "customer": customer,
-            "people": {
-                "pm": pm,
-                "counsel": counsel,
-                "auditor": auditor,
-                "csm": csm,
-                "finance": finance,
-                "eng": eng,
-                "customer_contact": customer_contact,
-            },
+            "people": people,
+            "org": attach_roles(
+                people,
+                {
+                    "customer_contact": "csm",
+                },
+            ),
+            "process": sample_process(rng, "company"),
+            "carveout_jurisdiction": f"J-{code}{rng.randint(10, 99)}",
             "departments": {
                 "legal": dept_legal,
                 "revenue": dept_rev,
@@ -180,19 +300,29 @@ def sample_world_spec(
             "roadmap_version": roadmap_version,
             "cf_version": cf_version,
             "beta_tag": beta_tag,
+            "renewal_roadmap_version": renewal_roadmap_version,
+            "renewal_beta_tag": renewal_beta_tag,
             "supplement_version": supplement_version,
             "v2_deliverable": v2_deliv,
             "v3_deliverable": v3_deliv,
             "misrecorded_revenue": mis,
             "audited_revenue": corrected,
+            "renewal_misrecorded_revenue": renewal_mis,
+            "renewal_audited_revenue": renewal_corrected,
             "event_offsets": off,
             "pulse_offsets": pulses,
             "n_pulses": n_pulses,
             "start": start.isoformat(),
+            "latent_token": f"LT-{code}{rng.randint(1000, 9999)}",
+            "decoy_latent_token": f"LD-{code}{rng.randint(1000, 9999)}",
+            **pick_anchors(rng),
+            "docket_token": f"DK-{code}{rng.randint(1000, 9999)}",
+            "workstreams": workstreams,
         }
 
     focal = one_project("focal", True)
     parallels = [one_project("parallel", False) for _ in range(n_parallel)]
+    assign_register(seed, focal, parallels)
     world_id = f"w{seed:06d}-{focal['project'].lower()}"
     return {
         "world_id": world_id,
@@ -205,4 +335,5 @@ def sample_world_spec(
         "focal": focal,
         "parallels": parallels,
         "n_parallel": n_parallel,
+        "n_workstreams": n_workstreams,
     }

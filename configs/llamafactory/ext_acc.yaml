@@ -1,0 +1,61 @@
+### ACC compiled Search+SWE+SQL QA (Su et al. 2605.21850).
+### 128k SFT baseline: packing off; cutoff 133120 (~130k).
+### Shared recipe with ext_longtrace / ext_longmit: lr 1e-5, GBS 16 on 2 GPUs
+### (per_device 1 × accum 8). ACC paper Table 1: seq 131072, GBS 16, lr 1e-5,
+### 4 epochs — we keep 1-epoch compute so the three baselines share a step budget.
+### max_steps 680 ≈ ACC 10802/16 (1 epoch).
+### bash scripts/train_llamafactory.sh ext_acc
+###   GPUS=6,7 GBS=16
+model_name_or_path: Qwen/Qwen3.5-4B
+trust_remote_code: false
+
+stage: sft
+do_train: true
+finetuning_type: full
+deepspeed: configs/llamafactory/ds_z3_config.json
+
+dataset_dir: data/external/llamafactory
+dataset: acc_search,acc_swe,acc_sql
+template: qwen3_5_nothink
+cutoff_len: 133120
+overwrite_cache: false
+preprocessing_num_workers: 32
+dataloader_num_workers: 2
+tokenized_path: data/sft/tokenized/ext_acc
+packing: false
+neat_packing: false
+
+output_dir: data/sft/lf_ext_acc
+logging_steps: 5
+save_steps: 100
+eval_strategy: steps
+eval_steps: 100
+save_total_limit: 2
+save_only_model: false
+load_best_model_at_end: true
+metric_for_best_model: eval_loss
+greater_is_better: false
+plot_loss: true
+overwrite_output_dir: false
+report_to: wandb
+run_name: longworld-baseline-acc-qwen35-4b-128k
+seed: 42
+
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+learning_rate: 1.0e-5
+num_train_epochs: 1.0
+max_steps: 680
+lr_scheduler_type: cosine
+warmup_ratio: 0.05
+bf16: true
+tf32: true
+flash_attn: fa3
+gradient_checkpointing: true
+use_unsloth_gc: true
+ddp_timeout: 180000000
+optim: adamw_torch
+max_grad_norm: 1.0
+
+val_size: 32
+per_device_eval_batch_size: 1

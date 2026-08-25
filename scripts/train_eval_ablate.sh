@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Equal-token 7B LoRA for B1–B5, then causal eval. Must run under hold.sh wrap.
+# Equal-token Qwen3.5-4B full-parameter SFT for B1–B5, then causal eval.
+# Other machines: CUDA_VISIBLE_DEVICES=0 SKIP_GPU_WAIT=1 bash scripts/train_eval_ablate.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -8,10 +9,16 @@ STEPS="${STEPS:-80}"
 EVAL_N="${EVAL_N:-12}"
 OUT="${OUT:-$ROOT/data/sft}"
 GPU="${GPU:-0}"
+HOLD="${HOLD_SH:-}"
+if [[ -z "$HOLD" && -x /workspace/wynckeliao/ops/gpu/hold.sh ]]; then
+  HOLD="/workspace/wynckeliao/ops/gpu/hold.sh"
+fi
+UV=(uv run --extra train python)
 
 wait_gpu_free() {
   local idx="$1"
   local i used
+  command -v nvidia-smi >/dev/null 2>&1 || return 0
   for i in $(seq 1 45); do
     used="$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits -i "$idx" | tr -d ' ')"
     echo "gpu_hold wait: gpu $idx used=${used}MiB"
@@ -24,26 +31,29 @@ wait_gpu_free() {
   return 1
 }
 
-# Prevent watchdog from re-holding the training GPU while we wait.
-bash /workspace/wynckeliao/ops/gpu/hold.sh watchdog-stop || true
-wait_gpu_free "$GPU"
+if [[ -n "$HOLD" && -x "$HOLD" ]]; then
+  bash "$HOLD" watchdog-stop || true
+fi
+if [[ "${SKIP_GPU_WAIT:-0}" != "1" ]]; then
+  wait_gpu_free "$GPU"
+fi
 
 for c in B1 B2 B3 B4 B5; do
   echo "===== train $c ====="
-  uv run python scripts/train_sft.py --condition "$c" --data data/p0 --out-dir "$OUT" --max-steps "$STEPS"
+  "${UV[@]}" scripts/train_sft.py --condition "$c" --data data/p0 --out-dir "$OUT" --max-steps "$STEPS"
 done
 
 echo "===== eval B0 base ====="
-uv run python scripts/eval_causal.py --data data/p0 --model-dir Qwen/Qwen2.5-7B-Instruct \
+"${UV[@]}" scripts/eval_causal.py --data data/p0 --model-dir Qwen/Qwen3.5-4B \
   --max-examples "$EVAL_N" --out "$OUT/eval_B0.json"
 
 for c in B1 B2 B3 B4 B5; do
   echo "===== eval $c ====="
-  uv run python scripts/eval_causal.py --data data/p0 --model-dir "$OUT/ckpt_${c}/final" \
+  "${UV[@]}" scripts/eval_causal.py --data data/p0 --model-dir "$OUT/ckpt_${c}/final" \
     --max-examples "$EVAL_N" --out "$OUT/eval_${c}.json"
 done
 
-uv run python - <<'PY'
+"${UV[@]}" - <<'PY'
 import json
 from pathlib import Path
 out = Path("data/sft")

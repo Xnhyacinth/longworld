@@ -3,6 +3,7 @@ import random
 from longworld.core.causal import build_causal_graph
 from longworld.core.engine import answer_from_artifacts
 from longworld.core.graph import min_sufficient_subgraph, typed_walk_event_ids
+from longworld.core.prose import SENTENCE_BANK
 from longworld.core.sampler import materialize
 from longworld.core.verify import verify_question
 from longworld.core.views import render_cf_view
@@ -56,3 +57,10 @@ def test_lab_final_score_not_in_release_note():
     assert final not in rel.text
     cur = next(q for q in mat.queries if q.query_type == "current_state")
     assert cur.answer == str(world.spec["project"]["final_score"])
+
+
+def test_lab_renderer_does_not_append_prose_bank():
+    mat = materialize(22, n_parallel=1, n_pulses=0, domain="researchlab")
+    blob = "\n".join(a.text for a in mat.artifacts["focal"])
+    assert not any(s in blob for s in SENTENCE_BANK)
+    assert not any(e.type == "status_pulse" for e in mat.worlds["focal"].events)

@@ -25,6 +25,7 @@ def _patch_events(
                 visibility=list(ev.visibility),
                 preconditions=list(ev.preconditions),
                 causal_inputs=list(ev.causal_inputs),
+                required_inputs=list(ev.required_inputs),
                 relation_kinds=dict(ev.relation_kinds),
             )
         )
@@ -65,20 +66,24 @@ def split_views(
     minimal = [a for a in focal_artifacts if a.artifact_id in ess]
     dist_only = [a for a in full if a.artifact_id not in ess]
     cf_full = list(cf_artifacts) + list(parallel_artifacts)
-    trajectory = sorted(full, key=lambda a: (a.time, a.artifact_id))
+    ordered = sorted(full, key=lambda a: (a.time, a.artifact_id))
     return {
         "full": full,
         "minimal": minimal,
         "cf": cf_full,
         "distractor_only": dist_only,
-        "trajectory": trajectory,
+        "ordered_artifact_view": ordered,
+        # Deprecated alias: chronological documents, not an ACC trace.
+        "trajectory": ordered,
     }
 
 
 def view_answer(spec: QuerySpec, view: str) -> str:
     if view == "cf":
         return spec.cf_answer
-    if view == "distractor_only":
+    # Calendar card / distractors cannot support the gold. Training the long
+    # answer here is unverified and (for memory) fake long-context length.
+    if view in {"distractor_only", "memory"}:
         return "unanswerable"
     return spec.answer
 
@@ -89,8 +94,10 @@ def memory_card(world: SimulatedWorld, spec: QuerySpec) -> str:
     lines = [
         f"# Working notebook for {world.spec.get('world_id')}",
         f"As of {as_of}. Motif {spec.motif or spec.query_type}.",
-        "This card records process flags and the event calendar. It does not "
-        "dump field assignments. Reconstruct numerals and hashes from cited artifacts.",
+        (
+            "This card records process flags and the event calendar. It does not "
+            "dump field assignments. Reconstruct numerals and hashes from cited artifacts."
+        ),
         "Calendar:",
     ]
     for ev in world.events:

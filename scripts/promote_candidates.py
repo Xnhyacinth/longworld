@@ -1,0 +1,612 @@
+#!/usr/bin/env python3
+"""Audit external dense rankings and promote strictly replayed SFT candidates."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import multiprocessing
+import os
+import tempfile
+from concurrent.futures import ProcessPoolExecutor
+from itertools import groupby
+from pathlib import Path
+from typing import Any
+
+from longworld.core.attestation import (
+    PREDECESSOR_GATE_KEY_ENV,
+    PREDECESSOR_GATE_KEY_ID_ENV,
+    attestation_key_from_env,
+)
+from longworld.core.promotion import (
+    PromotionError,
+    candidate_sha256,
+    create_dense_audit,
+    create_train_ready_report,
+    promote_candidate,
+    select_release_worlds,
+)
+from longworld.core.release_profile import release_profile
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    with path.open(encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            if not line.strip():
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise ValueError(f"{path}:{line_number}: invalid JSON") from error
+            if not isinstance(value, dict):
+                raise TypeError(f"{path}:{line_number}: expected a JSON object")
+            rows.append(value)
+    return rows
+
+
+def _index(
+    rows: list[dict[str, Any]], *, label: str, key_field: str
+) -> dict[str, dict[str, Any]]:
+    indexed: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        identity = str(row.get(key_field) or "")
+        if not identity:
+            raise ValueError(f"{label} row has no {key_field}")
+        if identity in indexed:
+            raise ValueError(f"duplicate {label} {key_field}: {identity}")
+        indexed[identity] = row
+    return indexed
+
+
+def _write_jsonl_atomic(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            for row in rows:
+                handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_name, path)
+    except BaseException:
+        try:
+            os.unlink(temporary_name)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def _candidate_sort_key(candidate: dict[str, Any]) -> tuple[str, str, str, str]:
+    return (
+        str(candidate.get("world_id") or ""),
+        str(candidate.get("query_id") or ""),
+        str(candidate.get("view") or ""),
+        candidate_sha256(candidate),
+    )
+
+
+def _world_batches(
+    candidates: list[dict[str, Any]], receipts: dict[str, dict[str, Any]]
+) -> list[list[tuple[dict[str, Any], dict[str, Any]]]]:
+    ordered = sorted(candidates, key=_candidate_sort_key)
+    if any(not str(candidate.get("world_id") or "") for candidate in ordered):
+        raise ValueError("candidate row has no world_id")
+    return [
+        [
+            (candidate, receipts[candidate_sha256(candidate)])
+            for candidate in world_candidates
+        ]
+        for _world_id, world_candidates in groupby(
+            ordered, key=lambda candidate: str(candidate["world_id"])
+        )
+    ]
+
+
+def _audit_world(
+    batch: list[tuple[dict[str, Any], dict[str, Any]]],
+    k: int,
+    episode_bundle_path: Path | None,
+    source_bundle_path: Path | None,
+    candidate_key: bytes,
+    ranking_key: bytes,
+    audit_key: bytes,
+    source_key: bytes | None,
+    filter_mode: bool,
+) -> tuple[list[dict[str, Any]], list[str], list[dict[str, Any]]]:
+    audits: list[dict[str, Any]] = []
+    errors: dict[str, str] = {}
+    for candidate, ranking in batch:
+        digest = candidate_sha256(candidate)
+        try:
+            audits.append(
+                create_dense_audit(
+                    candidate,
+                    ranking,
+                    k=k,
+                    episode_bundle_path=episode_bundle_path,
+                    source_bundle_path=source_bundle_path,
+                    candidate_attestation_key=candidate_key,
+                    ranking_attestation_key=ranking_key,
+                    audit_attestation_key=audit_key,
+                    episode_attestation_key=source_key,
+                    source_attestation_key=source_key,
+                )
+            )
+        except PromotionError as error:
+            errors[digest] = str(error)
+    if not errors:
+        accepted_ids = (
+            [candidate_sha256(candidate) for candidate, _ranking in batch]
+            if filter_mode
+            else []
+        )
+        return audits, accepted_ids, []
+
+    world_id = str(batch[0][0]["world_id"])
+    summary = "; ".join(
+        f"{digest}:{reason}" for digest, reason in sorted(errors.items())
+    )
+    if not filter_mode:
+        raise PromotionError(f"world {world_id} dense audit failed: {summary}")
+    rejects = []
+    for candidate, _ranking in batch:
+        digest = candidate_sha256(candidate)
+        rejects.append(
+            {
+                "schema_version": "dense-audit-reject-v1",
+                "candidate_sha256": digest,
+                "world_id": world_id,
+                "query_id": str(candidate.get("query_id") or ""),
+                "reason": errors.get(
+                    digest,
+                    f"world atomic rejection after sibling failure: {summary}",
+                ),
+            }
+        )
+    return [], [], rejects
+
+
+def _promote_world(
+    batch: list[tuple[dict[str, Any], dict[str, Any]]],
+    episode_bundle_path: Path | None,
+    source_bundle_path: Path | None,
+    candidate_key: bytes,
+    audit_key: bytes,
+    promotion_key: bytes,
+    source_key: bytes | None,
+    expected_split: str | None,
+    release_selection: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    promoted: list[dict[str, Any]] = []
+    errors: dict[str, str] = {}
+    for candidate, audit in batch:
+        digest = candidate_sha256(candidate)
+        try:
+            promoted.append(
+                promote_candidate(
+                    candidate,
+                    audit,
+                    episode_bundle_path=episode_bundle_path,
+                    source_bundle_path=source_bundle_path,
+                    candidate_attestation_key=candidate_key,
+                    audit_attestation_key=audit_key,
+                    promotion_attestation_key=promotion_key,
+                    episode_attestation_key=source_key,
+                    source_attestation_key=source_key,
+                    expected_split=expected_split,
+                    release_selection_receipt=release_selection,
+                )
+            )
+        except PromotionError as error:
+            errors[digest] = str(error)
+    if errors:
+        world_id = str(batch[0][0]["world_id"])
+        summary = "; ".join(
+            f"{digest}:{reason}" for digest, reason in sorted(errors.items())
+        )
+        raise PromotionError(f"world {world_id} promotion failed: {summary}")
+    return promoted
+
+
+def _matched_inputs(
+    candidates_path: Path, receipts_path: Path, *, receipt_label: str
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+    candidates = _read_jsonl(candidates_path)
+    if not candidates:
+        raise ValueError("candidate input is empty")
+    candidate_ids: dict[str, dict[str, Any]] = {}
+    for candidate in candidates:
+        identity = candidate_sha256(candidate)
+        if identity in candidate_ids:
+            raise ValueError(f"duplicate candidate candidate_sha256: {identity}")
+        candidate_ids[identity] = candidate
+    receipts = _index(
+        _read_jsonl(receipts_path),
+        label=receipt_label,
+        key_field="candidate_sha256",
+    )
+    missing = sorted(set(candidate_ids) - set(receipts))
+    extra = sorted(set(receipts) - set(candidate_ids))
+    if missing or extra:
+        raise ValueError(
+            f"{receipt_label} coverage mismatch: missing={missing}, extra={extra}"
+        )
+    return candidates, receipts
+
+
+def audit_rankings(
+    candidates_path: Path,
+    rankings_path: Path,
+    output_path: Path,
+    *,
+    k: int,
+    episode_bundle_path: Path | None = None,
+    source_bundle_path: Path | None = None,
+    accepted_candidates_path: Path | None = None,
+    rejects_path: Path | None = None,
+    release_profile_id: str | None = None,
+    workers: int = 1,
+) -> int:
+    if workers < 1:
+        raise ValueError("workers must be at least 1")
+    if release_profile_id is not None:
+        required_k = release_profile(release_profile_id).dense_top_k
+        if k != required_k:
+            raise ValueError(
+                f"release profile {release_profile_id} requires dense top-k={required_k}"
+            )
+    candidate_key = attestation_key_from_env("candidate_row")
+    ranking_key = attestation_key_from_env("dense_ranking")
+    audit_key = attestation_key_from_env("dense_retrieval_audit")
+    source_key = attestation_key_from_env("episode_replay_bundle")
+    if candidate_key is None or ranking_key is None or audit_key is None:
+        raise ValueError("candidate, ranker, and auditor attestation keys are required")
+    candidates, rankings = _matched_inputs(
+        candidates_path, rankings_path, receipt_label="ranking"
+    )
+    filter_mode = accepted_candidates_path is not None or rejects_path is not None
+    if filter_mode and (accepted_candidates_path is None or rejects_path is None):
+        raise ValueError(
+            "accepted_candidates_path and rejects_path must be provided together"
+        )
+    batches = _world_batches(candidates, rankings)
+    if workers == 1:
+        results = [
+            _audit_world(
+                batch,
+                k,
+                episode_bundle_path,
+                source_bundle_path,
+                candidate_key,
+                ranking_key,
+                audit_key,
+                source_key,
+                filter_mode,
+            )
+            for batch in batches
+        ]
+    else:
+        with ProcessPoolExecutor(
+            max_workers=min(workers, len(batches)),
+            mp_context=multiprocessing.get_context("spawn"),
+        ) as executor:
+            futures = [
+                executor.submit(
+                    _audit_world,
+                    batch,
+                    k,
+                    episode_bundle_path,
+                    source_bundle_path,
+                    candidate_key,
+                    ranking_key,
+                    audit_key,
+                    source_key,
+                    filter_mode,
+                )
+                for batch in batches
+            ]
+            results = [future.result() for future in futures]
+    audits = [audit for result in results for audit in result[0]]
+    candidates_by_digest = {
+        candidate_sha256(candidate): candidate for candidate in candidates
+    }
+    accepted = [
+        candidates_by_digest[digest] for result in results for digest in result[1]
+    ]
+    rejects = [reject for result in results for reject in result[2]]
+    _write_jsonl_atomic(output_path, audits)
+    if filter_mode:
+        assert accepted_candidates_path is not None and rejects_path is not None
+        _write_jsonl_atomic(accepted_candidates_path, accepted)
+        _write_jsonl_atomic(rejects_path, rejects)
+    return len(audits)
+
+
+def promote_rows(
+    candidates_path: Path,
+    audits_path: Path,
+    output_path: Path,
+    *,
+    episode_bundle_path: Path | None = None,
+    source_bundle_path: Path | None = None,
+    expected_split: str | None = None,
+    release_selection_path: Path | None = None,
+    workers: int = 1,
+) -> int:
+    if workers < 1:
+        raise ValueError("workers must be at least 1")
+    candidate_key = attestation_key_from_env("candidate_row")
+    audit_key = attestation_key_from_env("dense_retrieval_audit")
+    promotion_key = attestation_key_from_env("sft_row")
+    source_key = attestation_key_from_env("episode_replay_bundle")
+    if candidate_key is None or audit_key is None or promotion_key is None:
+        raise ValueError(
+            "candidate, auditor, and promotion attestation keys are required"
+        )
+    candidates, audits = _matched_inputs(
+        candidates_path, audits_path, receipt_label="dense audit"
+    )
+    release_selection = None
+    if release_selection_path is not None:
+        release_selection = json.loads(
+            release_selection_path.read_text(encoding="utf-8")
+        )
+        if not isinstance(release_selection, dict):
+            raise TypeError("release selection receipt must be a JSON object")
+    batches = _world_batches(candidates, audits)
+    if workers == 1:
+        results = [
+            _promote_world(
+                batch,
+                episode_bundle_path,
+                source_bundle_path,
+                candidate_key,
+                audit_key,
+                promotion_key,
+                source_key,
+                expected_split,
+                release_selection,
+            )
+            for batch in batches
+        ]
+    else:
+        with ProcessPoolExecutor(
+            max_workers=min(workers, len(batches)),
+            mp_context=multiprocessing.get_context("spawn"),
+        ) as executor:
+            futures = [
+                executor.submit(
+                    _promote_world,
+                    batch,
+                    episode_bundle_path,
+                    source_bundle_path,
+                    candidate_key,
+                    audit_key,
+                    promotion_key,
+                    source_key,
+                    expected_split,
+                    release_selection,
+                )
+                for batch in batches
+            ]
+            results = [future.result() for future in futures]
+    promoted = [row for result in results for row in result]
+    _write_jsonl_atomic(output_path, promoted)
+    return len(promoted)
+
+
+def write_train_ready_report(
+    candidate_report_path: Path,
+    candidate_paths: list[Path],
+    row_paths: list[Path],
+    output_path: Path,
+    release_selection_path: Path | None = None,
+) -> int:
+    report_key = attestation_key_from_env("quality_report")
+    candidate_key = attestation_key_from_env("candidate_row")
+    promotion_key = attestation_key_from_env("sft_row")
+    if report_key is None or candidate_key is None or promotion_key is None:
+        raise ValueError(
+            "report, candidate, and promotion attestation keys are required"
+        )
+    candidate_report = json.loads(candidate_report_path.read_text(encoding="utf-8"))
+    if not isinstance(candidate_report, dict):
+        raise TypeError("candidate quality report must be a JSON object")
+    candidates = [row for path in candidate_paths for row in _read_jsonl(path)]
+    rows = [row for path in row_paths for row in _read_jsonl(path)]
+    release_selection = None
+    if release_selection_path is not None:
+        release_selection = json.loads(
+            release_selection_path.read_text(encoding="utf-8")
+        )
+        if not isinstance(release_selection, dict):
+            raise TypeError("release selection receipt must be a JSON object")
+    report = create_train_ready_report(
+        candidate_report,
+        candidates,
+        rows,
+        report_attestation_key=report_key,
+        candidate_attestation_key=candidate_key,
+        promotion_attestation_key=promotion_key,
+        selection_attestation_key=attestation_key_from_env("release_world_selection"),
+        release_selection_receipt=release_selection,
+    )
+    _write_jsonl_atomic(output_path, [report])
+    return len(rows)
+
+
+def select_worlds(
+    candidate_paths: list[Path],
+    audit_paths: list[Path],
+    *,
+    release_profile_id: str,
+    train_candidates_path: Path,
+    eval_candidates_path: Path,
+    train_audits_path: Path,
+    eval_audits_path: Path,
+    receipt_path: Path,
+    predecessor_gate_receipt_path: Path | None = None,
+) -> int:
+    candidate_key = attestation_key_from_env("candidate_row")
+    audit_key = attestation_key_from_env("dense_retrieval_audit")
+    if candidate_key is None or audit_key is None:
+        raise ValueError("candidate and auditor attestation keys are required")
+    predecessor_gate_receipt = None
+    if predecessor_gate_receipt_path is not None:
+        predecessor_gate_receipt = json.loads(
+            predecessor_gate_receipt_path.read_text(encoding="utf-8")
+        )
+        if not isinstance(predecessor_gate_receipt, dict):
+            raise TypeError("predecessor gate receipt must be a JSON object")
+    candidates = [row for path in candidate_paths for row in _read_jsonl(path)]
+    audits = [row for path in audit_paths for row in _read_jsonl(path)]
+    selected, receipt = select_release_worlds(
+        candidates,
+        audits,
+        release_profile_id,
+        candidate_attestation_key=candidate_key,
+        audit_attestation_key=audit_key,
+        predecessor_gate_receipt=predecessor_gate_receipt,
+        predecessor_gate_attestation_key=(
+            os.environ.get(PREDECESSOR_GATE_KEY_ENV, "").encode() or None
+        ),
+        predecessor_gate_key_id=os.environ.get(PREDECESSOR_GATE_KEY_ID_ENV, "").strip(),
+    )
+    splits = receipt["split_by_world"]
+    selected_ids = {candidate_sha256(candidate) for candidate in selected}
+    selected_audits = [
+        audit
+        for audit in audits
+        if str(audit.get("candidate_sha256") or "") in selected_ids
+    ]
+    audits_by_id = {str(audit["candidate_sha256"]): audit for audit in selected_audits}
+    train_candidates = [
+        candidate
+        for candidate in selected
+        if splits[str(candidate["world_id"])] == "train"
+    ]
+    eval_candidates = [
+        candidate
+        for candidate in selected
+        if splits[str(candidate["world_id"])] == "eval"
+    ]
+    _write_jsonl_atomic(train_candidates_path, train_candidates)
+    _write_jsonl_atomic(eval_candidates_path, eval_candidates)
+    _write_jsonl_atomic(
+        train_audits_path,
+        [audits_by_id[candidate_sha256(row)] for row in train_candidates],
+    )
+    _write_jsonl_atomic(
+        eval_audits_path,
+        [audits_by_id[candidate_sha256(row)] for row in eval_candidates],
+    )
+    _write_jsonl_atomic(receipt_path, [receipt])
+    return len(selected)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    audit = subparsers.add_parser(
+        "audit", help="validate external dense rankings and sign replay receipts"
+    )
+    audit.add_argument("--candidates", type=Path, required=True)
+    audit.add_argument("--rankings", type=Path, required=True)
+    audit.add_argument("--output", type=Path, required=True)
+    audit.add_argument("--top-k", type=int, default=3)
+    audit.add_argument("--release-profile", required=True)
+    audit.add_argument("--episode-bundle", type=Path)
+    audit.add_argument("--source-bundle", type=Path)
+    audit.add_argument("--accepted-candidates", type=Path)
+    audit.add_argument("--rejects", type=Path)
+    audit.add_argument("--workers", type=int, default=1)
+
+    promote = subparsers.add_parser(
+        "promote", help="strictly replay audited candidates and sign train-ready rows"
+    )
+    promote.add_argument("--candidates", type=Path, required=True)
+    promote.add_argument("--audits", type=Path, required=True)
+    promote.add_argument("--output", type=Path, required=True)
+    promote.add_argument("--episode-bundle", type=Path)
+    promote.add_argument("--source-bundle", type=Path)
+    promote.add_argument("--expected-split", choices=("train", "eval"), required=True)
+    promote.add_argument("--release-selection", type=Path, required=True)
+    promote.add_argument("--workers", type=int, default=1)
+
+    select = subparsers.add_parser(
+        "select", help="select complete audited worlds and assign release splits"
+    )
+    select.add_argument("--candidates", type=Path, nargs="+", required=True)
+    select.add_argument("--audits", type=Path, nargs="+", required=True)
+    select.add_argument("--release-profile", required=True)
+    select.add_argument("--train-candidates", type=Path, required=True)
+    select.add_argument("--eval-candidates", type=Path, required=True)
+    select.add_argument("--train-audits", type=Path, required=True)
+    select.add_argument("--eval-audits", type=Path, required=True)
+    select.add_argument("--receipt", type=Path, required=True)
+    select.add_argument("--predecessor-gate-receipt", type=Path)
+
+    report = subparsers.add_parser(
+        "report", help="sign the exact promoted train/eval row set"
+    )
+    report.add_argument("--candidate-report", type=Path, required=True)
+    report.add_argument("--candidates", type=Path, nargs="+", required=True)
+    report.add_argument("--rows", type=Path, nargs="+", required=True)
+    report.add_argument("--output", type=Path, required=True)
+    report.add_argument("--release-selection", type=Path, required=True)
+
+    args = parser.parse_args()
+    if args.command == "audit":
+        count = audit_rankings(
+            args.candidates,
+            args.rankings,
+            args.output,
+            k=args.top_k,
+            episode_bundle_path=args.episode_bundle,
+            source_bundle_path=args.source_bundle,
+            accepted_candidates_path=args.accepted_candidates,
+            rejects_path=args.rejects,
+            release_profile_id=args.release_profile,
+            workers=args.workers,
+        )
+    elif args.command == "promote":
+        count = promote_rows(
+            args.candidates,
+            args.audits,
+            args.output,
+            episode_bundle_path=args.episode_bundle,
+            source_bundle_path=args.source_bundle,
+            expected_split=args.expected_split,
+            release_selection_path=args.release_selection,
+            workers=args.workers,
+        )
+    elif args.command == "select":
+        count = select_worlds(
+            args.candidates,
+            args.audits,
+            release_profile_id=args.release_profile,
+            train_candidates_path=args.train_candidates,
+            eval_candidates_path=args.eval_candidates,
+            train_audits_path=args.train_audits,
+            eval_audits_path=args.eval_audits,
+            receipt_path=args.receipt,
+            predecessor_gate_receipt_path=args.predecessor_gate_receipt,
+        )
+    else:
+        count = write_train_ready_report(
+            args.candidate_report,
+            args.candidates,
+            args.rows,
+            args.output,
+            args.release_selection,
+        )
+    output = args.receipt if args.command == "select" else args.output
+    print(json.dumps({"command": args.command, "rows": count, "output": str(output)}))
+
+
+if __name__ == "__main__":
+    main()

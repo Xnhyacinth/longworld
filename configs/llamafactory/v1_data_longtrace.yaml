@@ -1,0 +1,4 @@
+longtracerl:
+  path: data/external/llamafactory/longtracerl.jsonl
+  source: local
+  converter: sharegpt

@@ -1,0 +1,35 @@
+schema_version: p1.2
+data_product: causalcore_v0
+n_worlds: 12
+n_parallel: 2
+n_pulses: 0
+n_anchors: 8
+n_source_pack: 24
+extra_filler_worlds: 6
+min_semantic_tokens: 800
+train_ratio: 0.75
+surface_min: 0.82
+keep_one_position: true
+domains: [company, researchlab, codeforge]
+# Caps, not fill targets. 128k/256k emit only if the unique pool is long enough.
+length_buckets:
+  "16k": 16000
+  "32k": 32000
+  "64k": 64000
+  "128k": 128000
+  "256k": 256000
+eval_length_buckets: {}
+min_evidence_frac:
+  "16k": 0.0
+  "32k": 0.0
+  "64k": 0.0
+  "128k": 0.0
+  "256k": 0.0
+query_timings: ["first", "late"]
+position_buckets: ["front", "middle", "back"]
+min_evidence_tokens:
+  "16k": 8000
+  "32k": 16000
+  "64k": 22000
+  "128k": 44000
+  "256k": 80000

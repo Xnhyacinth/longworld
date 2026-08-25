@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import random
 
-_SENTENCES = [
+# Frozen bank. Used only as a *detector* after Phase A; renderers must not
+# append these sentences to pad length.
+SENTENCE_BANK = [
     "The weekly review did not restate private hashes, scores, or SPDX tokens.",
     "Scheduling notes mention only process, never the authoritative channel.",
     "A reader who wants numerals must open the artifact that actually wrote them.",
@@ -29,7 +31,8 @@ _SENTENCES = [
 
 
 def unique_prose(salt: str, n: int = 10) -> str:
+    """Deprecated length-pad helper. Do not call from renderers or packers."""
     rng = random.Random(salt)
     n = max(4, n)
-    parts = [rng.choice(_SENTENCES) for _ in range(n)]
+    parts = [rng.choice(SENTENCE_BANK) for _ in range(n)]
     return " ".join(parts)

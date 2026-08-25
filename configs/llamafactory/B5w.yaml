@@ -1,37 +1,24 @@
-### Method + Route 3 lite: four-view + late + distance upsampling.
-model_name_or_path: Qwen/Qwen2.5-7B-Instruct
-trust_remote_code: true
+### B5w uses LLaMA-Factory v1's dataset-index sampler; JSON rows stay unique.
+model: Qwen/Qwen3.5-4B
+model_class: llm
 
-stage: sft
-do_train: true
-finetuning_type: lora
-lora_rank: 16
-lora_alpha: 32
-lora_target: q_proj,k_proj,v_proj,o_proj
+kernel_config:
+  name: auto
 
-dataset_dir: data/sft/llamafactory
-dataset: causaltwin_b5w
-template: qwen
-cutoff_len: 65536
-overwrite_cache: true
-preprocessing_num_workers: 8
-packing: true
-neat_packing: true
+dist_config:
+  name: deepspeed
+  config_file: configs/llamafactory/ds_z3_config.json
+
+train_dataset: data/sft/llamafactory/B5w.datasets.yaml
 
 output_dir: data/sft/lf_B5w
+micro_batch_size: 1
+cutoff_len: 262144
+learning_rate: 1.0e-5
+num_train_epochs: 1
 logging_steps: 5
 save_steps: 100
-plot_loss: true
-overwrite_output_dir: true
-
-per_device_train_batch_size: 1
-gradient_accumulation_steps: 8
-learning_rate: 1.0e-4
-num_train_epochs: 1.0
-lr_scheduler_type: cosine
-warmup_ratio: 0.05
+save_total_limit: 2
 bf16: true
-flash_attn: fa2
-gradient_checkpointing: true
-ddp_timeout: 180000000
-val_size: 0.0
+enable_activation_checkpointing: true
+seed: 42

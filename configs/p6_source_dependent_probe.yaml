@@ -1,0 +1,101 @@
+schema_version: p3.0
+data_product: worldlong_source_dependent_probe_v1
+data_stage: candidate
+release_profile_id: p6-source-dependent-probe-12-v1
+trust_scope: local_probe
+required_seed_start: 1
+
+n_worlds: 18
+target_promoted_worlds: 12
+domains: [company, researchlab, codeforge]
+domain_world_quotas:
+  company: 6
+  researchlab: 6
+  codeforge: 6
+n_parallel: 2
+n_pulses: 0
+domain_n_workstreams:
+  company: 36
+  researchlab: 88
+  codeforge: 36
+include_program_joins: false
+
+n_anchors: 0
+n_source_pack: 0
+extra_filler_worlds: 0
+min_semantic_tokens: 800
+surface_min: 0.82
+keep_one_position: true
+
+# Seed 2 is the first ResearchLab world in the deterministic round-robin schedule.
+source_workflow_bundle: data/source_inventory/arxiv_p6_mlrc_source_v3/source_workflow_bundle.json
+source_workflow_seeds: [2]
+source_workflow_query_types: [real_revision_added_text]
+# The two semantic LaTeX bodies already contain about 64.6K exact Qwen tokens.
+# This tighter pack cap prevents unrelated workflow events from pushing the
+# factual view above the 64K curriculum range; it excludes only LaTeX preambles,
+# not manuscript content sections.
+source_workflow_bucket_targets:
+  "64k": 54600
+
+# Seed 3 is the first CodeForge world and replays the verified GitHub bundle.
+real_workflow_bundle: configs/public_repo_episodes_v2.json
+real_workflow_seeds: [3]
+real_workflow_query_types:
+  [
+    version_selection,
+    ci_regression_origin,
+    license_compatibility,
+    cross_repo_release_dependency,
+    release_supersession_trace,
+  ]
+real_workflow_length_buckets: [16k, 32k, 64k]
+real_workflow_query_length_buckets:
+  real_revision_added_text: [64k]
+  version_selection: [16k, 32k, 64k]
+  ci_regression_origin: [16k]
+  license_compatibility: [16k]
+  cross_repo_release_dependency: [32k]
+  release_supersession_trace: [64k]
+real_workflow_views: [full, cf, ordered_artifact_view]
+
+exact_tokenizer:
+  model_id: Qwen/Qwen3.5-4B
+  revision: a7b0d22b993d71000cf2eadfb37222a67cee521e
+  local_files_only: true
+
+training_objective: sft
+composition_method: causal_timeline
+require_verified_sources: false
+allow_legacy_sources: false
+strict_semantic_verification: true
+strict_cf_replay: true
+require_producer_attestation: true
+
+train_ratio: 0.75
+split_strategy: world
+split_seed: 42
+length_buckets:
+  "16k": 16000
+  "32k": 32768
+  "64k": 65536
+domain_length_buckets:
+  company:
+    "64k": 58000
+  researchlab:
+    "64k": 71500
+  codeforge:
+    "64k": 44500
+eval_length_buckets: {}
+query_timings: [first, late]
+position_buckets: [front, middle, back]
+min_evidence_tokens:
+  "64k": 22000
+release_min_evidence_tokens:
+  "16k": 8000
+  "32k": 16000
+  "64k": 22000
+  "128k": 44000
+  "256k": 80000
+min_internal_growth: 4096
+max_generic_growth_share: 0.20

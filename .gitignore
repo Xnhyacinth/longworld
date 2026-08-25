@@ -1,6 +1,7 @@
 # Generated datasets and checkpoints (multi-GB jsonl)
 data/
 .venv/
+.vendor/
 *.egg-info/
 dist/
 build/

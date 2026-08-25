@@ -32,6 +32,14 @@ def handlers(world: SimulatedWorld):
 
 
 def eval_answer(world: SimulatedWorld, spec, values: dict[str, Any]) -> str:
+    if getattr(spec, "query_type", "") == "program_join":
+        from longworld.core.proofprog import eval_program
+
+        return eval_program(world, spec, values)
+    if getattr(spec, "query_type", "") == "source_choice":
+        from longworld.core.grounded import eval_source_choice
+
+        return eval_source_choice(values)
     name = domain_name(world)
     if name == "researchlab":
         from longworld.domains.researchlab.queries import eval_answer as fn

@@ -1,0 +1,4 @@
+longmit:
+  path: data/external/llamafactory/longmit.jsonl
+  source: local
+  converter: sharegpt

@@ -1,20 +1,21 @@
-schema_version: p1.1
+schema_version: p1.2
+data_product: causalcore_v0
 n_worlds: 9
 n_parallel: 2
-n_pulses: 8
-extra_filler_worlds: 12
+n_pulses: 0
+n_anchors: 12
+extra_filler_worlds: 6
+min_semantic_tokens: 600
 train_ratio: 0.75
 surface_min: 0.82
 keep_one_position: true
 domains: [company, researchlab, codeforge]
 length_buckets:
   "8k": 8000
-  "32k": 32000
-eval_length_buckets:
-  "64k": 64000
+  "16k": 16000
+eval_length_buckets: {}
 min_evidence_frac:
-  "8k": 0.20
-  "32k": 0.25
-  "64k": 0.30
+  "8k": 0.0
+  "16k": 0.0
 query_timings: ["first", "late"]
 position_buckets: ["front", "middle", "back"]

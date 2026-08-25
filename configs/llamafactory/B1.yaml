@@ -1,21 +1,19 @@
-model_name_or_path: Qwen/Qwen2.5-7B-Instruct
-trust_remote_code: true
+model_name_or_path: Qwen/Qwen3.5-4B
+trust_remote_code: false
 
 stage: sft
 do_train: true
-finetuning_type: lora
-lora_rank: 16
-lora_alpha: 32
-lora_target: q_proj,k_proj,v_proj,o_proj
+finetuning_type: full
+deepspeed: configs/llamafactory/ds_z3_config.json
 
 dataset_dir: data/sft/llamafactory
 dataset: causaltwin_b1
-template: qwen
-cutoff_len: 65536
+template: qwen3_5_nothink
+cutoff_len: 262144
 overwrite_cache: true
 preprocessing_num_workers: 8
-packing: true
-neat_packing: true
+packing: false
+neat_packing: false
 
 output_dir: data/sft/lf_B1
 logging_steps: 5
@@ -25,12 +23,12 @@ overwrite_output_dir: true
 
 per_device_train_batch_size: 1
 gradient_accumulation_steps: 8
-learning_rate: 1.0e-4
+learning_rate: 1.0e-5
 num_train_epochs: 1.0
 lr_scheduler_type: cosine
 warmup_ratio: 0.05
 bf16: true
-flash_attn: fa2
+flash_attn: auto
 gradient_checkpointing: true
 ddp_timeout: 180000000
 val_size: 0.0

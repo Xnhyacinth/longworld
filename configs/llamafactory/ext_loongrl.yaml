@@ -1,0 +1,36 @@
+### LoongRL / KeyChain train split (~16k).
+### bash scripts/train_llamafactory.sh ext_loongrl
+model_name_or_path: Qwen/Qwen3.5-4B
+trust_remote_code: false
+
+stage: sft
+do_train: true
+finetuning_type: full
+deepspeed: configs/llamafactory/ds_z3_config.json
+
+dataset_dir: data/external/llamafactory
+dataset: loongrl
+template: qwen3_5_nothink
+cutoff_len: 16384
+overwrite_cache: true
+preprocessing_num_workers: 8
+packing: true
+neat_packing: true
+
+output_dir: data/sft/lf_ext_loongrl
+logging_steps: 5
+save_steps: 100
+plot_loss: true
+overwrite_output_dir: true
+
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+learning_rate: 1.0e-5
+num_train_epochs: 1.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.05
+bf16: true
+flash_attn: auto
+gradient_checkpointing: true
+ddp_timeout: 180000000
+val_size: 0.0

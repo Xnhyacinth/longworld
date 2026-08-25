@@ -1,0 +1,51 @@
+### LongMIT-128K SFT baseline (Chen et al. 2409.01893).
+### Aligned 128k recipe: configs/swift/recipe.env. Subsample 10802 (seed 42) to match ACC n.
+model: data/models/Qwen3.5-4B
+use_hf: true
+torch_dtype: bfloat16
+tuner_type: full
+freeze_llm: false
+freeze_vit: true
+freeze_aligner: true
+add_non_thinking_prefix: true
+loss_scale: ignore_empty_think
+attn_impl: flash_attn
+sequence_parallel_size: 2
+
+dataset:
+  - data/external/swift/longmit.jsonl
+val_dataset:
+  - data/external/swift/longmit_val.jsonl
+load_from_cache_file: true
+lazy_tokenize: true
+packing: false
+padding_free: true
+use_logits_to_keep: false
+max_length: 133120
+dataset_num_proc: 32
+dataloader_num_workers: 4
+split_dataset_ratio: 0.0
+
+output_dir: data/sft/swift_ext_longmit
+logging_steps: 5
+save_steps: 100
+eval_strategy: steps
+eval_steps: 100
+save_total_limit: 2
+save_only_model: false
+load_best_model_at_end: true
+metric_for_best_model: loss
+report_to: wandb
+run_name: longworld-baseline-longmit-qwen35-4b-128k-sp2
+seed: 42
+
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 16
+learning_rate: 1.0e-5
+num_train_epochs: 1.0
+max_steps: 680
+lr_scheduler_type: cosine
+warmup_ratio: 0.05
+gradient_checkpointing: true
+max_grad_norm: 1.0

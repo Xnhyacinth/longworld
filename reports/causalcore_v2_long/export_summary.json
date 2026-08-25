@@ -1,0 +1,55 @@
+{
+  "conditions": [
+    {
+      "n": 4530,
+      "tokens_est": 333066044,
+      "path": "data/sft/causalcore_v2_long/B5.json",
+      "by_view": {
+        "minimal": 906,
+        "full": 906,
+        "distractor_only": 906,
+        "ordered_artifact_view": 906,
+        "cf": 906
+      },
+      "by_length": {
+        "16k": 1170,
+        "32k": 840,
+        "128k": 840,
+        "64k": 840,
+        "256k": 840
+      },
+      "by_timing": {
+        "late": 2265,
+        "first": 2265
+      },
+      "upsample": false,
+      "condition": "B5"
+    },
+    {
+      "n": 4144,
+      "tokens_est": 333037374,
+      "path": "data/sft/causalcore_v2_long/B5w.json",
+      "by_view": {
+        "minimal": 532,
+        "full": 1030,
+        "distractor_only": 524,
+        "ordered_artifact_view": 1026,
+        "cf": 1032
+      },
+      "by_length": {
+        "16k": 1070,
+        "32k": 758,
+        "128k": 769,
+        "64k": 779,
+        "256k": 768
+      },
+      "by_timing": {
+        "late": 2078,
+        "first": 2066
+      },
+      "upsample": true,
+      "condition": "B5w"
+    }
+  ],
+  "token_spread": 0.0001
+}

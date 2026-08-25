@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -16,6 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from longworld.core.attestation import attestation_environment_names
 from longworld.core.engine import answer_from_artifacts
 from longworld.core.sampler import materialize
 
@@ -37,7 +39,7 @@ def exact(pred: str, gold: str) -> bool:
 def engine_oracle_metrics(eval_path: Path) -> dict:
     rows = [r for r in iter_jsonl(eval_path) if r["view"] == "full"]
     worlds = sorted({r["seed"] for r in rows})
-    stats = defaultdict(int)
+    stats: defaultdict[str, int] = defaultdict(int)
     n = 0
     for seed in worlds:
         mat = materialize(seed, n_parallel=2)
@@ -85,26 +87,61 @@ def engine_oracle_metrics(eval_path: Path) -> dict:
 
 
 def load_model(model_dir: str):
+    for name in attestation_environment_names():
+        os.environ.pop(name, None)
+    import json
+
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    tok = AutoTokenizer.from_pretrained(model_dir, trust_remote_code=True)
+    adapter = Path(model_dir) / "adapter_config.json"
+    tok_src = model_dir
+    base = model_dir
+    if adapter.exists():
+        cfg = json.loads(adapter.read_text())
+        base = cfg.get("base_model_name_or_path") or "Qwen/Qwen3.5-4B"
+    tok = AutoTokenizer.from_pretrained(tok_src, trust_remote_code=False)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
-    model = AutoModelForCausalLM.from_pretrained(
-        model_dir,
-        torch_dtype=torch.bfloat16,
-        device_map="auto",
-        trust_remote_code=True,
-    )
+    load_kw = {
+        "torch_dtype": torch.bfloat16,
+        "device_map": "auto",
+        "trust_remote_code": False,
+    }
+    try:
+        model = AutoModelForCausalLM.from_pretrained(base, **load_kw)
+    except ValueError:
+        from transformers import AutoModelForImageTextToText
+
+        model = AutoModelForImageTextToText.from_pretrained(base, **load_kw)
+    if adapter.exists():
+        from peft import PeftModel
+
+        model = PeftModel.from_pretrained(model, model_dir)
     model.eval()
     return tok, model
+
+
+def _to_prompt(tok, prompt: str) -> str:
+    if not getattr(tok, "chat_template", None):
+        return prompt
+    msgs = [{"role": "user", "content": prompt}]
+    try:
+        return tok.apply_chat_template(
+            msgs,
+            tokenize=False,
+            add_generation_prompt=True,
+            enable_thinking=False,
+        )
+    except TypeError:
+        return tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
 
 
 def generate(tok, model, prompt: str, max_new: int = 48) -> str:
     import torch
 
-    ids = tok(prompt, return_tensors="pt", truncation=True, max_length=7800)
+    text = _to_prompt(tok, prompt)
+    ids = tok(text, return_tensors="pt", truncation=True, max_length=7800)
     ids = {k: v.to(model.device) for k, v in ids.items()}
     with torch.no_grad():
         out = model.generate(
@@ -134,9 +171,11 @@ def eval_model(eval_path: Path, model_dir: str, max_examples: int) -> dict:
         k for k in grouped if grouped[k].get("full", {}).get("query_timing") == "first"
     ]
     keys = keys[:max_examples]
-    hits = defaultdict(int)
+    hits: defaultdict[str, int] = defaultdict(int)
     n = 0
-    by_type = defaultdict(lambda: defaultdict(int))
+    by_type: defaultdict[str, defaultdict[str, int]] = defaultdict(
+        lambda: defaultdict(int)
+    )
     for key in keys:
         views = grouped[key]
         if "full" not in views or "cf" not in views:

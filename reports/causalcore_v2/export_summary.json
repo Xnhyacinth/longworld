@@ -1,0 +1,128 @@
+{
+  "conditions": [
+    {
+      "n": 285,
+      "tokens_est": 9850275,
+      "path": "data/sft/causalcore_v2/B1.json",
+      "by_view": {
+        "full": 285
+      },
+      "by_length": {
+        "64k": 84,
+        "16k": 117,
+        "32k": 84
+      },
+      "by_timing": {
+        "first": 285
+      },
+      "upsample": false,
+      "condition": "B1"
+    },
+    {
+      "n": 551,
+      "tokens_est": 9823953,
+      "path": "data/sft/causalcore_v2/B2.json",
+      "by_view": {
+        "minimal": 276,
+        "full": 275
+      },
+      "by_length": {
+        "16k": 227,
+        "64k": 164,
+        "32k": 160
+      },
+      "by_timing": {
+        "first": 551
+      },
+      "upsample": false,
+      "condition": "B2"
+    },
+    {
+      "n": 283,
+      "tokens_est": 9800261,
+      "path": "data/sft/causalcore_v2/B3.json",
+      "by_view": {
+        "cf": 141,
+        "full": 142
+      },
+      "by_length": {
+        "16k": 120,
+        "64k": 86,
+        "32k": 77
+      },
+      "by_timing": {
+        "first": 283
+      },
+      "upsample": false,
+      "condition": "B3"
+    },
+    {
+      "n": 375,
+      "tokens_est": 9828635,
+      "path": "data/sft/causalcore_v2/B4.json",
+      "by_view": {
+        "distractor_only": 94,
+        "minimal": 84,
+        "cf": 102,
+        "full": 95
+      },
+      "by_length": {
+        "16k": 165,
+        "32k": 101,
+        "64k": 109
+      },
+      "by_timing": {
+        "first": 375
+      },
+      "upsample": false,
+      "condition": "B4"
+    },
+    {
+      "n": 345,
+      "tokens_est": 9839173,
+      "path": "data/sft/causalcore_v2/B5.json",
+      "by_view": {
+        "cf": 82,
+        "distractor_only": 68,
+        "minimal": 64,
+        "full": 63,
+        "ordered_artifact_view": 68
+      },
+      "by_length": {
+        "32k": 93,
+        "16k": 144,
+        "64k": 108
+      },
+      "by_timing": {
+        "late": 178,
+        "first": 167
+      },
+      "upsample": false,
+      "condition": "B5"
+    },
+    {
+      "n": 321,
+      "tokens_est": 9802698,
+      "path": "data/sft/causalcore_v2/B5w.json",
+      "by_view": {
+        "cf": 90,
+        "distractor_only": 43,
+        "minimal": 33,
+        "full": 81,
+        "ordered_artifact_view": 74
+      },
+      "by_length": {
+        "32k": 84,
+        "16k": 142,
+        "64k": 95
+      },
+      "by_timing": {
+        "late": 156,
+        "first": 165
+      },
+      "upsample": true,
+      "condition": "B5w"
+    }
+  ],
+  "token_spread": 0.0051
+}

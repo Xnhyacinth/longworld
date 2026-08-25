@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
+from longworld.core.asof import find_event, world_as_of
 from longworld.core.world import Event, SimulatedWorld, WorldSimulator
 from longworld.domains.codeforge.events import apply_event, check_preconditions
 from longworld.domains.company.queries import (
@@ -53,26 +55,195 @@ def eval_answer(
         if not lic or not state_values.get("release_published"):
             return "unknown"
         return str(lic)
+    if spec.query_type == "cross_stream":
+        spdx = state_values.get("rollback_spdx")
+        if spdx is None or state_values.get("rollback_head") is None:
+            return "unknown"
+        return str(spdx)
+    if spec.query_type == "release_eligibility":
+        policy = state_values.get("workflow_release_policy")
+        if policy == "approved":
+            streams = [str(item["id"]) for item in world.spec["project"]["workstreams"]]
+            eligibility_required = (
+                "review_token",
+                "ci_token",
+                "clearance_token",
+                "merge_token",
+                "integrated",
+            )
+            if any(
+                state_values.get(f"ws:{stream}:{key}") is None
+                for stream in streams
+                for key in eligibility_required
+            ):
+                return "unknown"
+            versions = [
+                state_values.get(f"ws:{stream}:integrated") for stream in streams
+            ]
+            if not versions or any(version is None for version in versions):
+                return "unknown"
+            return " | ".join(str(version) for version in versions)
+        if policy == "blocked":
+            docket = state_values.get("release_docket")
+            return f"BLOCKED-{docket}" if docket else "unknown"
+        return "unknown"
+    if spec.query_type in {"release_ci_matrix", "release_license_matrix"}:
+        policy = state_values.get("workflow_release_policy")
+        if policy == "blocked":
+            return (
+                "BLOCKED-CI"
+                if spec.query_type == "release_ci_matrix"
+                else "BLOCKED-LICENSE"
+            )
+        if policy != "approved":
+            return "unknown"
+        streams = [str(item["id"]) for item in world.spec["project"]["workstreams"]]
+        matrix_required = (
+            "version",
+            "review_token",
+            "ci_token",
+            "clearance_token",
+            "merge_token",
+            "integrated",
+        )
+        if any(
+            state_values.get(f"ws:{stream}:{key}") is None
+            for stream in streams
+            for key in matrix_required
+        ):
+            return "unknown"
+        value_key = (
+            "ci_token" if spec.query_type == "release_ci_matrix" else "clearance_token"
+        )
+        return " | ".join(
+            str(state_values[f"ws:{stream}:{value_key}"]) for stream in streams
+        )
+    if spec.query_type == "version_selection":
+        prefix = spec.answer_key
+        tag = state_values.get(f"{prefix}:tag")
+        status = state_values.get(f"{prefix}:status")
+        if not tag:
+            return "unknown"
+        if status == "blocked":
+            return f"BLOCKED-{tag}"
+        if status != "published":
+            return "unknown"
+        package = state_values.get(f"{prefix}:package")
+        version = state_values.get(f"{prefix}:version")
+        commit = state_values.get(f"{prefix}:commit")
+        if package and version:
+            return f"{package}@{version} -> {tag}"
+        if commit:
+            return f"{commit} -> {tag}"
+        return "unknown"
+    if spec.query_type == "release_supersession_trace":
+        selections: list[str] = []
+        for record_key in spec.answer_key.split("|"):
+            prefix = f"real:release:{record_key}"
+            tag = state_values.get(f"{prefix}:tag")
+            status = state_values.get(f"{prefix}:status")
+            if not tag:
+                return "unknown"
+            if status == "blocked":
+                selections.append(f"BLOCKED-{tag}")
+                continue
+            if status != "published":
+                return "unknown"
+            package = state_values.get(f"{prefix}:package")
+            version = state_values.get(f"{prefix}:version")
+            commit = state_values.get(f"{prefix}:commit")
+            if package and version:
+                selections.append(f"{package}@{version} -> {tag}")
+            elif commit:
+                selections.append(f"{commit} -> {tag}")
+            else:
+                return "unknown"
+        return " | ".join(selections)
+    if spec.query_type == "ci_regression_origin":
+        prefix = spec.answer_key
+        status = state_values.get(f"{prefix}:status")
+        run = state_values.get(f"{prefix}:run")
+        if status == "passed" and run:
+            return f"NO-REGRESSION-{run}"
+        commit = state_values.get(f"{prefix}:commit")
+        test = state_values.get(f"{prefix}:test")
+        if (
+            status == "failed"
+            and commit
+            and test
+            and state_values.get(f"{prefix}:recovered") is True
+        ):
+            return f"{commit} :: {test}"
+        return "unknown"
+    if spec.query_type == "license_compatibility":
+        prefix = spec.answer_key
+        package = state_values.get(f"{prefix}:package")
+        version = state_values.get(f"{prefix}:version")
+        license_id = state_values.get(f"{prefix}:license")
+        compatible = state_values.get(f"{prefix}:compatible")
+        commit = state_values.get(f"{prefix}:commit")
+        if (
+            not license_id
+            or compatible is None
+            or not ((package and version) or commit)
+        ):
+            return "unknown"
+        if compatible is False:
+            selected = f"{package}@{version}" if package and version else str(commit)
+            return f"INCOMPATIBLE-{selected} :: {license_id}"
+        if state_values.get(f"{prefix}:status") not in {"published", "approved"}:
+            return "unknown"
+        selected = f"{package}@{version}" if package and version else str(commit)
+        return f"{selected} :: {license_id} :: compatible"
+    if spec.query_type == "cross_repo_release_dependency":
+        status = state_values.get("cross_repo:status")
+        if status == "blocked":
+            policy_id = state_values.get("cross_repo:policy_id")
+            return f"BLOCKED-{policy_id}" if policy_id else "unknown"
+        if status != "approved":
+            return "unknown"
+        tag = state_values.get("cross_repo:tag")
+        commit = state_values.get("cross_repo:commit")
+        license_id = state_values.get("cross_repo:license")
+        if not tag or not commit or not license_id:
+            return "unknown"
+        return f"{tag} :: {commit} :: {license_id}"
+    if spec.query_type == "failure_recovery_release_trace":
+        broken = state_values.get("broken_hash")
+        flake = state_values.get("flake_token")
+        failure = state_values.get("fail_token")
+        hotfix = state_values.get("hotfix_hash")
+        authoritative = state_values.get("authoritative_head")
+        license_id = state_values.get("ship_spdx")
+        if not all(
+            (broken, flake, failure, hotfix, authoritative, license_id)
+        ) or not state_values.get("release_published"):
+            return "unknown"
+        return f"{broken}[{flake}+{failure}] -> {hotfix}#{authoritative}@{license_id}"
     if val is None or val is False:
         return "unknown"
     return str(val)
 
 
 def gold_from_full(world: SimulatedWorld, spec: QuerySpec) -> str:
+    from longworld.core.domain import eval_answer as deval
+
     st = _sim_for(world).replay_events(
         world.events, up_to=spec.as_of, param_overrides=_merge_overrides(spec)
     )
-    return eval_answer(world, spec, st.values)
+    return deval(world, spec, st.values)
 
 
 def cf_from_full(world: SimulatedWorld, spec: QuerySpec) -> str:
+    from longworld.core.domain import eval_answer as deval
+
     extra = {spec.cf_event_id: spec.cf_param_updates}
     st = _sim_for(world).replay_events(
         world.events,
         up_to=spec.as_of,
         param_overrides=_merge_overrides(spec, extra),
     )
-    return eval_answer(world, spec, st.values)
+    return deval(world, spec, st.values)
 
 
 def _event(world: SimulatedWorld, suffix: str) -> Event:
@@ -269,6 +440,75 @@ def build_code_queries(world: SimulatedWorld) -> list[QuerySpec]:
     )
     queries.append(q_hid)
 
+    q_failure_recovery = QuerySpec(
+        query_id=f"{qid}:failure_recovery_release_trace",
+        query_type="failure_recovery_release_trace",
+        question=(
+            f"For {repo}, reconstruct the broken commit, the paired CI and issue "
+            "failure tokens, the hotfix, the commit adopted by the release tag, and "
+            "the shipped SPDX identifier. Reply exactly as "
+            "<broken>[<ci_token>+<issue_token>] -> <hotfix>#<released_head>@<SPDX>. "
+            "No single artifact contains the complete trace."
+        ),
+        answer="",
+        as_of=as_of_now,
+        answer_key="authoritative_head",
+        essential_event_ids=[
+            broken.id,
+            ci.id,
+            issue.id,
+            hotfix.id,
+            lic.id,
+            tag.id,
+        ],
+        essential_artifact_ids=[
+            _aid(world, "broken_commit"),
+            _aid(world, "ci_log"),
+            _aid(world, "github_issue"),
+            _aid(world, "hotfix_commit"),
+            _aid(world, "license_note"),
+            _aid(world, "tag_release"),
+        ],
+        sufficient_event_ids=[
+            broken.id,
+            ci.id,
+            issue.id,
+            hotfix.id,
+            lic.id,
+            tag.id,
+        ],
+        cf_event_id=hotfix.id,
+        cf_param_updates={"commit": p["hotfix_hash"][:3] + "fff"},
+        cf_answer="",
+        invariance_event_id=log.id,
+        invariance_param_updates={"quoted_hash": "fffffff"},
+        gold_expression=(
+            "FOLLOW(broken, ci, issue, hotfix, tag, license) then "
+            "FORMAT(failure_recovery_release_trace)"
+        ),
+        proof_depth=6,
+        cf_op="version",
+        motif="failure_recovery_release_trace",
+        topology_id=instance_topology(
+            "code.failure_recovery_release_trace",
+            repo,
+            p["broken_hash"],
+            p["hotfix_hash"],
+        ),
+        domain="codeforge",
+        truth_regime="synthetic_executable",
+        program_ops=[
+            {"op": "PAIR_CI_AND_ISSUE_FAILURE"},
+            {"op": "FOLLOW_HOTFIX_RECOVERY"},
+            {"op": "RESOLVE_TAGGED_HEAD"},
+            {"op": "ATTACH_SHIPPED_LICENSE"},
+            {"op": "FORMAT_FAILURE_RECOVERY_RELEASE"},
+        ],
+        preferred_length_buckets=["32k", "64k"],
+        semantic_growth_group="codeforge_failure_recovery_release",
+    )
+    queries.append(q_failure_recovery)
+
     q_cf = QuerySpec(
         query_id=f"{qid}:counterfactual",
         query_type="counterfactual",
@@ -305,9 +545,891 @@ def build_code_queries(world: SimulatedWorld) -> list[QuerySpec]:
     )
     queries.append(q_cf)
 
+    rb = find_event(world, "rollback_hotfix")
+    if rb is not None:
+        q_rb = QuerySpec(
+            query_id=f"{qid}:rollback_state",
+            query_type="rollback_state",
+            question=(
+                f"After the emergency revert on {repo}, which git object is HEAD? "
+                f"The revert note does not reprint a hash. Reply with the short "
+                f"hash only."
+            ),
+            answer="",
+            as_of=world_as_of(world),
+            answer_key="rollback_head",
+            essential_event_ids=[broken.id, rb.id],
+            essential_artifact_ids=[
+                _aid(world, "broken_commit"),
+                _aid(world, "rollback_note"),
+            ],
+            sufficient_event_ids=[broken.id, rb.id],
+            cf_event_id=broken.id,
+            cf_param_updates={"commit": p["broken_hash"][:3] + "eee"},
+            cf_answer="",
+            invariance_event_id=ci.id,
+            invariance_param_updates={"flake_token": "FLAKE11"},
+            gold_expression="rollback_head copies broken_hash",
+            proof_depth=2,
+            cf_op="version",
+            motif="rollback",
+            topology_id=instance_topology(
+                "code.hotfix_reverted", repo, p["broken_hash"]
+            ),
+            domain="codeforge",
+            truth_regime="real_schema_synthetic_instance",
+        )
+        queries.append(q_rb)
+
+        q_xs = QuerySpec(
+            query_id=f"{qid}:cross_stream",
+            query_type="cross_stream",
+            question=(
+                f"After the hotfix revert for {repo}, which SPDX was in force at "
+                f"rollback? Reconstruct from LICENSE plus the revert note. Reply "
+                f"SPDX only."
+            ),
+            answer="",
+            as_of=world_as_of(world),
+            answer_key="rollback_spdx",
+            essential_event_ids=[lic.id, rb.id],
+            essential_artifact_ids=[
+                _aid(world, "license_note"),
+                _aid(world, "rollback_note"),
+            ],
+            sufficient_event_ids=[lic.id, rb.id],
+            cf_event_id=lic.id,
+            cf_param_updates={"spdx": f"BSD-3-X{p['spdx'][-4:]}"},
+            cf_answer="",
+            invariance_event_id=ci.id,
+            invariance_param_updates={"flake_token": "FLAKE22"},
+            gold_expression="rollback_spdx copied at rollback from pending license",
+            proof_depth=2,
+            cf_op="version",
+            motif="cross_workstream",
+            topology_id=instance_topology(
+                "code.rollback_under_license", repo, p["spdx"]
+            ),
+            domain="codeforge",
+            truth_regime="real_schema_synthetic_instance",
+        )
+        queries.append(q_xs)
+
+    workstreams = list(p.get("workstreams") or [])
+    release = find_event(world, "workflow_release_decision")
+    if workstreams and release is not None:
+        essential_event_ids: list[str] = []
+        essential_artifact_ids: list[str] = []
+        for i, _workstream in enumerate(workstreams):
+            for stage in ("request", "review", "ci", "license", "merge"):
+                essential_event_ids.append(_event(world, f"workflow_{i}_{stage}").id)
+                essential_artifact_ids.append(_aid(world, f"workflow_{i}_{stage}"))
+        essential_event_ids.append(release.id)
+        essential_artifact_ids.append(_aid(world, "workflow_release_decision"))
+        q_release = QuerySpec(
+            query_id=f"{qid}:release_eligibility",
+            query_type="release_eligibility",
+            question=(
+                f"At the final release gate for {repo}, were all dependency "
+                f"workstreams eligible? If approved, return the integrated versions "
+                f"in the gate's listed workstream order separated by ` | `. If the "
+                f"derived outcome blocked release, return `BLOCKED-` followed by the release "
+                f"docket from the original requests."
+            ),
+            answer="",
+            as_of=world_as_of(world),
+            answer_key="workflow_release_policy",
+            essential_event_ids=essential_event_ids,
+            essential_artifact_ids=essential_artifact_ids,
+            sufficient_event_ids=list(essential_event_ids),
+            cf_event_id=_event(world, "workflow_0_ci").id,
+            cf_param_updates={"passed": False},
+            cf_answer="",
+            invariance_event_id=log.id,
+            invariance_param_updates={"quoted_hash": "fffffff"},
+            gold_expression=(
+                "REQUIRE_ALL(request,review,ci,license,merge) then "
+                "FORMAT(integrated_versions)"
+            ),
+            proof_depth=6,
+            cf_op="status",
+            motif="cross_stream_release_gate",
+            topology_id=instance_topology(
+                "code.release_eligibility",
+                repo,
+                len(workstreams),
+                *(str(item["id"]) for item in workstreams),
+            ),
+            domain="codeforge",
+            truth_regime="real_schema_synthetic_instance",
+            program_ops=[
+                {"op": "FOLLOW_REQUIRED_INPUTS"},
+                {"op": "REQUIRE_ALL", "streams": len(workstreams)},
+                {"op": "FORMAT_INTEGRATED_VERSIONS"},
+            ],
+        )
+        queries.append(q_release)
+        matrix_tasks = (
+            (
+                "release_ci_matrix",
+                "CI run receipts",
+                "ci",
+                "FORMAT_CI_RECEIPTS",
+                "cross_stream_ci_matrix",
+            ),
+            (
+                "release_license_matrix",
+                "license clearance receipts",
+                "license",
+                "FORMAT_LICENSE_CLEARANCES",
+                "cross_stream_license_matrix",
+            ),
+        )
+        for query_type, label, cf_stage, format_op, motif in matrix_tasks:
+            queries.append(
+                QuerySpec(
+                    query_id=f"{qid}:{query_type}",
+                    query_type=query_type,
+                    question=(
+                        f"At the final release gate for {repo}, reconstruct every "
+                        f"workstream before returning its {label} in the gate's "
+                        "listed workstream order separated by ` | `. If the "
+                        f"derived outcome is blocked, reply "
+                        f"`{'BLOCKED-CI' if cf_stage == 'ci' else 'BLOCKED-LICENSE'}`."
+                    ),
+                    answer="",
+                    as_of=world_as_of(world),
+                    answer_key="workflow_release_policy",
+                    essential_event_ids=list(essential_event_ids),
+                    essential_artifact_ids=list(essential_artifact_ids),
+                    sufficient_event_ids=list(essential_event_ids),
+                    cf_event_id=_event(world, f"workflow_0_{cf_stage}").id,
+                    cf_param_updates={"passed": False}
+                    if cf_stage == "ci"
+                    else {"compatible": False},
+                    cf_answer="",
+                    invariance_event_id=log.id,
+                    invariance_param_updates={"quoted_hash": "fffffff"},
+                    gold_expression=(
+                        f"REQUIRE_ALL(request,review,ci,license,merge) then {format_op}"
+                    ),
+                    proof_depth=6,
+                    cf_op="status",
+                    motif=motif,
+                    topology_id=instance_topology(
+                        f"code.{query_type}",
+                        repo,
+                        len(workstreams),
+                        *(str(item["id"]) for item in workstreams),
+                    ),
+                    domain="codeforge",
+                    truth_regime="real_schema_synthetic_instance",
+                    program_ops=[
+                        {"op": "FOLLOW_REQUIRED_INPUTS"},
+                        {"op": "REQUIRE_ALL", "streams": len(workstreams)},
+                        {"op": format_op},
+                    ],
+                )
+            )
+
+    queries.extend(_build_real_repo_queries(world, log))
+
+    from longworld.core.cascade import (
+        build_docket_control_query,
+        build_ratification_query,
+        build_revisitation_query,
+    )
+    from longworld.core.grounded import (
+        build_content_grounded_query,
+        build_source_choice_query,
+        build_source_grounded_query,
+    )
+
+    q_g = build_source_grounded_query(
+        world,
+        ci.id,
+        {"flake_token": "FLAKE33"},
+    )
+    if q_g is not None:
+        queries.append(q_g)
+    q_content = build_content_grounded_query(
+        world,
+        ci.id,
+        {"flake_token": "FLAKE33"},
+    )
+    if q_content is not None:
+        queries.append(q_content)
+    q_choice = build_source_choice_query(world, ci.id, {"flake_token": "FLAKE33"})
+    if q_choice is not None:
+        queries.append(q_choice)
+
+    q_rev = build_revisitation_query(world, ci.id, {"flake_token": "FLAKE33"})
+    if q_rev is not None:
+        queries.append(q_rev)
+    q_rat = build_ratification_query(world, ci.id, {"flake_token": "FLAKE33"})
+    if q_rat is not None:
+        queries.append(q_rat)
+    q_dock = build_docket_control_query(world, ci.id, {"flake_token": "FLAKE33"})
+    if q_dock is not None:
+        queries.append(q_dock)
+
     out: list[QuerySpec] = []
     for q in queries:
         q.answer = gold_from_full(world, q)
         q.cf_answer = cf_from_full(world, q)
+        if q.query_type in {
+            "version_selection",
+            "release_supersession_trace",
+            "ci_regression_origin",
+            "license_compatibility",
+            "cross_repo_release_dependency",
+        }:
+            _minimize_real_semantic_proof(world, q)
         out.append(q)
     return out
+
+
+def _event_artifact_id(world: SimulatedWorld, event: Event) -> str:
+    return f"{world.spec['world_id']}.{event.visibility[0]}"
+
+
+def _required_closure(world: SimulatedWorld, target: Event) -> list[Event]:
+    by_id = {event.id: event for event in world.events}
+    selected: set[str] = set()
+
+    def visit(event: Event) -> None:
+        if event.id in selected:
+            return
+        for parent_id in event.required_inputs:
+            parent = by_id.get(parent_id)
+            if parent is not None:
+                visit(parent)
+        selected.add(event.id)
+
+    visit(target)
+    return [event for event in world.events if event.id in selected]
+
+
+def _proof_depth(events: list[Event], target: Event) -> int:
+    selected = {event.id: event for event in events}
+    memo: dict[str, int] = {}
+
+    def depth(event_id: str) -> int:
+        if event_id in memo:
+            return memo[event_id]
+        event = selected[event_id]
+        parents = [parent for parent in event.required_inputs if parent in selected]
+        memo[event_id] = 1 + max((depth(parent) for parent in parents), default=0)
+        return memo[event_id]
+
+    return depth(target.id)
+
+
+def _repo_kind(event: Event, kind: str) -> bool:
+    return event.type == "repo_record" and event.params.get("record_kind") == kind
+
+
+def _minimize_real_semantic_proof(world: SimulatedWorld, spec: QuerySpec) -> None:
+    """Keep only body events whose removal changes the real-task answer."""
+    event_index = {event.id: event for event in world.events}
+    selected = list(spec.essential_event_ids)
+    changed = True
+    while changed:
+        changed = False
+        for event_id in list(selected):
+            remaining = [item for item in selected if item != event_id]
+            state = _sim_for(world).replay_events(
+                [event_index[item] for item in remaining if item in event_index],
+                up_to=spec.as_of,
+                enforce_preconditions=False,
+            )
+            if eval_answer(world, spec, state.values) == spec.answer:
+                selected = remaining
+                changed = True
+                break
+    spec.essential_event_ids = selected
+    spec.essential_artifact_ids = [
+        _event_artifact_id(world, event_index[event_id])
+        for event_id in selected
+        if event_id in event_index
+    ]
+
+
+def _build_real_repo_queries(
+    world: SimulatedWorld, invariance_event: Event
+) -> list[QuerySpec]:
+    releases = [event for event in world.events if _repo_kind(event, "release")]
+    qid = world.spec["world_id"].split(":")[0]
+    repo = world.spec["project"]["repo"]
+    queries: list[QuerySpec] = []
+    release = None
+    release_prefix = ""
+    release_events: list[Event] = []
+    release_event_ids: list[str] = []
+    release_artifact_ids: list[str] = []
+    if releases:
+        release = max(
+            releases,
+            key=lambda event: (event.time, event.id),
+        )
+        release_repo = str(release.params.get("source_url") or repo)
+        release_key = str(release.params["record_key"])
+        release_prefix = f"real:release:{release_key}"
+        release_events = _required_closure(world, release)
+        release_event_ids = [event.id for event in release_events]
+        release_artifact_ids = [
+            _event_artifact_id(world, event) for event in release_events
+        ]
+    if release is not None:
+        raw_same_repo_releases = sorted(
+            [
+                event
+                for event in releases
+                if event.params.get("source_url") == release.params.get("source_url")
+            ],
+            key=lambda event: (event.time, event.id),
+        )
+        release_closures = {
+            event.id: _required_closure(world, event)
+            for event in raw_same_repo_releases
+        }
+        event_index = {event.id: event for event in world.events}
+
+        def release_cycle_closure(target: Event) -> list[Event]:
+            selected: set[str] = set()
+
+            def visit(event: Event) -> None:
+                if event.id in selected:
+                    return
+                for parent_id in event.required_inputs:
+                    if event.relation_kinds.get(parent_id) == "supersedes":
+                        continue
+                    parent = event_index.get(parent_id)
+                    if parent is not None:
+                        visit(parent)
+                selected.add(event.id)
+
+            visit(target)
+            return [event for event in world.events if event.id in selected]
+
+        def release_richness(event: Event) -> tuple[int, int, Any, str]:
+            closure = release_closures[event.id]
+            return (
+                len(closure),
+                sum(len(str(item.params.get("body_text") or "")) for item in closure),
+                event.time,
+                event.id,
+            )
+
+        def release_is_executable(event: Event) -> bool:
+            prefix = f"real:release:{event.params['record_key']}"
+            release_ci = [
+                item
+                for item in release_cycle_closure(event)
+                if _repo_kind(item, "ci_run")
+            ]
+            return bool(
+                release_ci
+                and all(item.params.get("result") == "passed" for item in release_ci)
+                and world.state.values.get(f"{prefix}:status") == "published"
+                and world.state.values.get(f"{prefix}:tag")
+                and (
+                    world.state.values.get(f"{prefix}:version")
+                    or world.state.values.get(f"{prefix}:commit")
+                )
+            )
+
+        releases_by_tag: dict[str, list[Event]] = {}
+        for event in raw_same_repo_releases:
+            tag_key = str(event.params.get("tag") or "").strip().lower()
+            if tag_key:
+                releases_by_tag.setdefault(tag_key, []).append(event)
+        same_repo_releases = sorted(
+            [
+                max(
+                    [event for event in tagged if release_is_executable(event)]
+                    or tagged,
+                    key=release_richness,
+                )
+                for tagged in releases_by_tag.values()
+            ],
+            key=lambda event: (event.time, event.id),
+        )
+        latest_release = same_repo_releases[-1]
+        prior_releases = [
+            event for event in same_repo_releases[:-1] if release_is_executable(event)
+        ]
+        selected_releases = []
+        if prior_releases:
+            selected_releases.append(max(prior_releases, key=release_richness))
+        if release_is_executable(latest_release):
+            selected_releases.append(latest_release)
+        for selected_release in selected_releases:
+            selected_key = str(selected_release.params["record_key"])
+            selected_prefix = f"real:release:{selected_key}"
+            selected_events = release_closures[selected_release.id]
+            selected_event_ids = [event.id for event in selected_events]
+            selected_artifact_ids = [
+                _event_artifact_id(world, event) for event in selected_events
+            ]
+            selected_ci = [
+                event
+                for event in selected_events
+                if _repo_kind(event, "ci_run")
+                and event.params.get("result") == "passed"
+            ]
+            selected_tag = world.state.values.get(f"{selected_prefix}:tag")
+            selected_version_value = world.state.values.get(
+                f"{selected_prefix}:version"
+            )
+            selected_commit_value = world.state.values.get(f"{selected_prefix}:commit")
+            if not (
+                selected_tag
+                and (selected_version_value or selected_commit_value)
+                and selected_ci
+            ):
+                continue
+            direct_inputs = set(selected_release.required_inputs)
+            cf_ci = next(
+                (event for event in selected_ci if event.id in direct_inputs),
+                selected_ci[-1],
+            )
+            is_latest = selected_release.id == same_repo_releases[-1].id
+            release_label = "latest release" if is_latest else f"release {selected_tag}"
+            if len(same_repo_releases) == 1:
+                preferred_buckets = ["16k"]
+            elif is_latest:
+                preferred_buckets = ["64k"]
+            else:
+                preferred_buckets = ["16k", "32k"]
+            queries.append(
+                QuerySpec(
+                    query_id=(
+                        f"{qid}:version_selection:"
+                        f"{selected_release.params['record_id']}"
+                    ),
+                    query_type="version_selection",
+                    question=(
+                        f"For the {release_label} from {release_repo}, follow the "
+                        "body-linked candidate, every CI gate, and the required "
+                        "supersession chain. Which package version, or validated "
+                        "commit when no package version is stated, was selected? "
+                        "Reply `package@version -> tag` or `commit -> tag`. If a "
+                        "linked CI gate fails, reply `BLOCKED-tag`."
+                    ),
+                    answer="",
+                    as_of=world_as_of(world),
+                    answer_key=selected_prefix,
+                    essential_event_ids=selected_event_ids,
+                    essential_artifact_ids=selected_artifact_ids,
+                    sufficient_event_ids=list(selected_event_ids),
+                    cf_event_id=cf_ci.id,
+                    cf_param_updates={"result": "failed"},
+                    cf_answer="",
+                    invariance_event_id=invariance_event.id,
+                    invariance_param_updates={"quoted_hash": "fffffff"},
+                    gold_expression=(
+                        "FOLLOW(release.required_inputs, supersession, ci, candidate) "
+                        "then FORMAT(selection, tag)"
+                    ),
+                    proof_depth=_proof_depth(selected_events, selected_release),
+                    cf_op="status",
+                    motif="version_selection",
+                    topology_id=instance_topology(
+                        "code.real_version_selection",
+                        *world.spec["project"].get("real_workflow_ids", []),
+                        selected_release.params["record_id"],
+                    ),
+                    domain="codeforge",
+                    truth_regime="real_workflow_hybrid_executable",
+                    program_ops=[
+                        {"op": "FOLLOW_REQUIRED_INPUTS"},
+                        {"op": "FOLLOW_RELEASE_SUPERSESSION"},
+                        {"op": "REQUIRE_ALL_CI"},
+                        {"op": "SELECT_RELEASE_REVISION"},
+                    ],
+                    preferred_length_buckets=preferred_buckets,
+                    semantic_growth_group=f"{release_repo}|version_selection",
+                )
+            )
+
+        if len(selected_releases) >= 2:
+            trace_releases = selected_releases[-2:]
+            trace_event_ids = {
+                event.id
+                for selected_release in trace_releases
+                for event in release_closures[selected_release.id]
+            }
+            trace_events = [
+                event for event in world.events if event.id in trace_event_ids
+            ]
+            latest_trace_release = trace_releases[-1]
+            latest_direct_inputs = set(latest_trace_release.required_inputs)
+            latest_ci = [
+                event
+                for event in release_closures[latest_trace_release.id]
+                if _repo_kind(event, "ci_run")
+                and event.params.get("result") == "passed"
+            ]
+            trace_cf_ci = next(
+                (event for event in latest_ci if event.id in latest_direct_inputs),
+                latest_ci[-1],
+            )
+            trace_keys = [str(event.params["record_key"]) for event in trace_releases]
+            queries.append(
+                QuerySpec(
+                    query_id=f"{qid}:release_supersession_trace",
+                    query_type="release_supersession_trace",
+                    question=(
+                        f"For the two latest executable release cycles from "
+                        f"{release_repo}, follow each body-linked candidate, its CI "
+                        "gates, and the real supersession edge. Report both selections "
+                        "in chronological order as `package@version -> tag | "
+                        "package@version -> tag`; use `commit -> tag` when no package "
+                        "version is stated and `BLOCKED-tag` for a failed cycle."
+                    ),
+                    answer="",
+                    as_of=world_as_of(world),
+                    answer_key="|".join(trace_keys),
+                    essential_event_ids=[event.id for event in trace_events],
+                    essential_artifact_ids=[
+                        _event_artifact_id(world, event) for event in trace_events
+                    ],
+                    sufficient_event_ids=[event.id for event in trace_events],
+                    cf_event_id=trace_cf_ci.id,
+                    cf_param_updates={"result": "failed"},
+                    cf_answer="",
+                    invariance_event_id=invariance_event.id,
+                    invariance_param_updates={"quoted_hash": "fffffff"},
+                    gold_expression=(
+                        "FOLLOW_TWO_RELEASE_CYCLES then FOLLOW_SUPERSESSION then "
+                        "REQUIRE_EACH_CI then FORMAT_CHRONOLOGICAL_SELECTIONS"
+                    ),
+                    proof_depth=_proof_depth(trace_events, latest_trace_release),
+                    cf_op="latest_cycle_status",
+                    motif="release_supersession_trace",
+                    topology_id=instance_topology(
+                        "code.real_release_supersession_trace",
+                        *world.spec["project"].get("real_workflow_ids", []),
+                        *[event.params["record_id"] for event in trace_releases],
+                    ),
+                    domain="codeforge",
+                    truth_regime="real_workflow_hybrid_executable",
+                    program_ops=[
+                        {"op": "FOLLOW_REQUIRED_INPUTS"},
+                        {"op": "FOLLOW_RELEASE_SUPERSESSION"},
+                        {"op": "REQUIRE_EACH_RELEASE_CI"},
+                        {"op": "ORDER_RELEASE_CYCLES"},
+                        {"op": "FORMAT_RELEASE_SELECTION_TRACE"},
+                    ],
+                    preferred_length_buckets=["64k"],
+                    semantic_growth_group=(
+                        f"{release_repo}|release_supersession_trace"
+                    ),
+                )
+            )
+
+    failed_ci = [
+        event
+        for event in world.events
+        if _repo_kind(event, "ci_run") and event.params.get("result") == "failed"
+    ]
+    recovered_failures: list[tuple[Event, Event]] = []
+    passed_ci = [
+        event
+        for event in world.events
+        if _repo_kind(event, "ci_run") and event.params.get("result") == "passed"
+    ]
+    for failure in failed_ci:
+        recovery = next(
+            (
+                event
+                for event in passed_ci
+                if int(event.params.get("source_order") or 0)
+                > int(failure.params.get("source_order") or 0)
+                and event.params.get("workflow_id") == failure.params.get("workflow_id")
+                and event.params.get("test") == failure.params.get("test")
+            ),
+            None,
+        )
+        if recovery is not None:
+            recovered_failures.append((failure, recovery))
+    if recovered_failures:
+        cross_commit = [
+            pair
+            for pair in recovered_failures
+            if pair[0].params.get("commit") != pair[1].params.get("commit")
+        ]
+        ranked_recoveries = sorted(
+            cross_commit or recovered_failures,
+            key=lambda pair: (
+                int(pair[1].params.get("source_order") or 0)
+                - int(pair[0].params.get("source_order") or 0),
+                sum(
+                    len(str(event.params.get("body_text") or ""))
+                    for target in pair
+                    for event in _required_closure(world, target)
+                ),
+                pair[0].id,
+                pair[1].id,
+            ),
+            reverse=True,
+        )
+        emitted_regressions = 0
+        for failure, recovery in ranked_recoveries:
+            regression_key = str(failure.params["record_key"])
+            regression_prefix = f"real:regression:{regression_key}"
+            origin_commit = world.state.values.get(f"{regression_prefix}:commit")
+            if (
+                origin_commit
+                and world.state.values.get(f"{regression_prefix}:test")
+                and world.state.values.get(f"{regression_prefix}:status") == "failed"
+                and world.state.values.get(f"{regression_prefix}:recovered") is True
+            ):
+                selected_ids = {
+                    event.id
+                    for target in (failure, recovery)
+                    for event in _required_closure(world, target)
+                }
+                failure_events = [
+                    event for event in world.events if event.id in selected_ids
+                ]
+                origin_event = next(
+                    event
+                    for event in reversed(failure_events)
+                    if event.params.get("commit") == origin_commit
+                    and dict(event.params.get("source_body_facts") or {}).get("commit")
+                    == origin_commit
+                )
+                queries.append(
+                    QuerySpec(
+                        query_id=(
+                            f"{qid}:ci_regression_origin:{failure.params['record_id']}"
+                        ),
+                        query_type="ci_regression_origin",
+                        question=(
+                            f"In the real {repo} workflow, which linked commit "
+                            "originated the named failing CI check that a later "
+                            "same-name check recovered? Reply `commit :: check`."
+                        ),
+                        answer="",
+                        as_of=world_as_of(world),
+                        answer_key=regression_prefix,
+                        essential_event_ids=[event.id for event in failure_events],
+                        essential_artifact_ids=[
+                            _event_artifact_id(world, event) for event in failure_events
+                        ],
+                        sufficient_event_ids=[event.id for event in failure_events],
+                        cf_event_id=origin_event.id,
+                        cf_param_updates={
+                            "commit": hashlib.sha1(
+                                (f"longworld-counterfactual:{origin_commit}").encode()
+                            ).hexdigest()
+                            if len(str(origin_commit)) == 40
+                            else f"cf-{origin_commit}"
+                        },
+                        cf_answer="",
+                        invariance_event_id=invariance_event.id,
+                        invariance_param_updates={"quoted_hash": "fffffff"},
+                        gold_expression=(
+                            "FOLLOW(failed_ci.links, commit) then "
+                            "REQUIRE(same_name_recovery) then FORMAT(commit, check)"
+                        ),
+                        proof_depth=_proof_depth(failure_events, recovery),
+                        cf_op="origin_commit",
+                        motif="ci_regression_origin",
+                        topology_id=instance_topology(
+                            "code.real_ci_regression",
+                            failure.params["workflow_id"],
+                            failure.params["record_id"],
+                        ),
+                        domain="codeforge",
+                        truth_regime="real_workflow_hybrid_executable",
+                        program_ops=[
+                            {"op": "FOLLOW_REQUIRED_INPUTS"},
+                            {"op": "REQUIRE_SAME_NAME_RECOVERY"},
+                            {"op": "JOIN_CI_TEST_WITH_COMMIT"},
+                        ],
+                    )
+                )
+                emitted_regressions += 1
+                if emitted_regressions == 2:
+                    break
+
+    compatible = world.state.values.get(f"{release_prefix}:compatible")
+    license_id = world.state.values.get(f"{release_prefix}:license")
+    package = world.state.values.get(f"{release_prefix}:package")
+    version = world.state.values.get(f"{release_prefix}:version")
+    licenses = [event for event in release_events if _repo_kind(event, "license")]
+    if (
+        release is not None
+        and compatible is True
+        and license_id
+        and package
+        and version
+        and licenses
+    ):
+        license_event = licenses[-1]
+        queries.append(
+            QuerySpec(
+                query_id=f"{qid}:license_compatibility:{release.params['record_id']}",
+                query_type="license_compatibility",
+                question=(
+                    f"For the final real {repo} release, combine the linked dependency "
+                    "candidate, license decision, CI gates, and release record. Reply "
+                    "`package@version :: SPDX :: compatible`; if the license decision "
+                    "is incompatible, reply `INCOMPATIBLE-package@version :: SPDX`."
+                ),
+                answer="",
+                as_of=world_as_of(world),
+                answer_key=release_prefix,
+                essential_event_ids=release_event_ids,
+                essential_artifact_ids=release_artifact_ids,
+                sufficient_event_ids=list(release_event_ids),
+                cf_event_id=license_event.id,
+                cf_param_updates={"compatible": False},
+                cf_answer="",
+                invariance_event_id=invariance_event.id,
+                invariance_param_updates={"quoted_hash": "fffffff"},
+                gold_expression="JOIN(candidate, license, ci, release)",
+                proof_depth=_proof_depth(release_events, release),
+                cf_op="status",
+                motif="license_compatibility",
+                topology_id=instance_topology(
+                    "code.real_license_compatibility",
+                    license_event.params["workflow_id"],
+                    release.params["record_id"],
+                ),
+                domain="codeforge",
+                truth_regime="real_workflow_hybrid_executable",
+                program_ops=[
+                    {"op": "FOLLOW_REQUIRED_INPUTS"},
+                    {"op": "JOIN_VERSION_LICENSE_RELEASE"},
+                ],
+            )
+        )
+    merges = [event for event in world.events if _repo_kind(event, "merge")]
+    if merges:
+        merge = merges[-1]
+        decision_key = str(merge.params["record_key"])
+        decision_prefix = f"real:license_decision:{decision_key}"
+        decision_events = _required_closure(world, merge)
+        compatibility_sources = [
+            event for event in decision_events if event.params.get("compatible") is True
+        ]
+        decision_license = world.state.values.get(f"{decision_prefix}:license")
+        decision_commit = world.state.values.get(f"{decision_prefix}:commit")
+        if compatibility_sources and decision_license and decision_commit:
+            compatibility_source = compatibility_sources[-1]
+            queries.append(
+                QuerySpec(
+                    query_id=f"{qid}:license_compatibility:{merge.params['record_id']}",
+                    query_type="license_compatibility",
+                    question=(
+                        f"For the real merged {repo} workflow, combine the pull-request "
+                        "license decision, approved review, merged commit, and repository "
+                        "license when separately recorded. Reply "
+                        "`commit :: SPDX :: compatible`; if the decision is incompatible, "
+                        "reply `INCOMPATIBLE-commit :: SPDX`."
+                    ),
+                    answer="",
+                    as_of=world_as_of(world),
+                    answer_key=decision_prefix,
+                    essential_event_ids=[event.id for event in decision_events],
+                    essential_artifact_ids=[
+                        _event_artifact_id(world, event) for event in decision_events
+                    ],
+                    sufficient_event_ids=[event.id for event in decision_events],
+                    cf_event_id=compatibility_source.id,
+                    cf_param_updates={"compatible": False},
+                    cf_answer="",
+                    invariance_event_id=invariance_event.id,
+                    invariance_param_updates={"quoted_hash": "fffffff"},
+                    gold_expression=(
+                        "JOIN(merge, pull_license_decision, approved_review, commit, "
+                        "repo_license_if_recorded)"
+                    ),
+                    proof_depth=_proof_depth(decision_events, merge),
+                    cf_op="status",
+                    motif="license_compatibility",
+                    topology_id=instance_topology(
+                        "code.real_license_compatibility_merge",
+                        merge.params["workflow_id"],
+                        merge.params["record_id"],
+                    ),
+                    domain="codeforge",
+                    truth_regime="real_workflow_hybrid_executable",
+                    program_ops=[
+                        {"op": "FOLLOW_REQUIRED_INPUTS"},
+                        {"op": "REQUIRE_APPROVED_REVIEW"},
+                        {"op": "JOIN_COMMIT_LICENSE_DECISION"},
+                    ],
+                )
+            )
+    cross_repo = next(
+        (event for event in world.events if event.type == "cross_repo_integration"),
+        None,
+    )
+    if cross_repo is not None:
+        cross_events = _required_closure(world, cross_repo)
+        merge_event = next(
+            event
+            for event in cross_events
+            if _repo_kind(event, "merge")
+            and event.params["record_key"] == cross_repo.params["merge_record_key"]
+        )
+        original_commit = str(merge_event.params.get("commit") or "")
+        if original_commit:
+            alternate_commit = original_commit[:3] + "f" * max(
+                4, len(original_commit) - 3
+            )
+            queries.append(
+                QuerySpec(
+                    query_id=f"{qid}:cross_repo_release_dependency",
+                    query_type="cross_repo_release_dependency",
+                    question=(
+                        f"Under simulated integration policy "
+                        f"{cross_repo.params['policy_id']}, combine the controlling "
+                        f"real release from {cross_repo.params['release_source_url']} "
+                        f"with the approved real merge and license from "
+                        f"{cross_repo.params['merge_source_url']}. Reply "
+                        "`tag :: commit :: SPDX`; if the integration policy is "
+                        "blocked, reply `BLOCKED-policy-id`."
+                    ),
+                    answer="",
+                    as_of=world_as_of(world),
+                    answer_key="cross_repo:status",
+                    essential_event_ids=[event.id for event in cross_events],
+                    essential_artifact_ids=[
+                        _event_artifact_id(world, event) for event in cross_events
+                    ],
+                    sufficient_event_ids=[event.id for event in cross_events],
+                    cf_event_id=merge_event.id,
+                    cf_param_updates={"commit": alternate_commit},
+                    cf_answer="",
+                    invariance_event_id=invariance_event.id,
+                    invariance_param_updates={"quoted_hash": "fffffff"},
+                    gold_expression=(
+                        "JOIN(real_release, simulated_cross_repo_policy, "
+                        "real_approved_merge, real_license)"
+                    ),
+                    proof_depth=_proof_depth(cross_events, cross_repo),
+                    cf_op="version",
+                    motif="cross_repo_release_dependency",
+                    topology_id=instance_topology(
+                        "code.cross_repo_release_dependency",
+                        cross_repo.params["release_source_url"],
+                        cross_repo.params["merge_source_url"],
+                    ),
+                    domain="codeforge",
+                    truth_regime="real_workflow_hybrid_executable",
+                    program_ops=[
+                        {"op": "FOLLOW_REQUIRED_INPUTS"},
+                        {"op": "REQUIRE_CROSS_REPO_POLICY"},
+                        {"op": "JOIN_RELEASE_MERGE_LICENSE"},
+                    ],
+                    preferred_length_buckets=["32k"],
+                    semantic_growth_group="cross_repo_release_dependency",
+                )
+            )
+    return queries

@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
+from longworld.core.attestation import (
+    attach_attestation,
+    attestation_key_from_env,
+    verify_attestation,
+)
 from longworld.core.world import Event, SimulatedWorld
 from longworld.domains.company.templates_env import jinja_env
 
@@ -23,6 +29,7 @@ class Artifact:
     is_focal: bool = True
     intentional_stale: bool = False
     stale_event_id: str | None = None
+    role: str = ""
 
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
@@ -50,6 +57,26 @@ def _ground_values(ev: Event) -> list[str]:
         if p.get("adopt_roadmap"):
             return []
         return [str(p["version"])]
+    if t == "carveout":
+        return [str(p["jurisdiction"])]
+    if t == "rollback_amendment":
+        return ["amendment-withdrawn"]
+    if t == "announce_hold":
+        return ["announcement-held"]
+    if t == "adopt_public":
+        return ["public-norm-adopted"]
+    if t == "seed_latent":
+        return [str(p["token"])]
+    if t == "seed_decoy":
+        return [str(p["token"])]
+    if t == "seed_docket":
+        return [str(p["token"])]
+    if t == "ack_latent":
+        return ["latent-acked"]
+    if t == "reopen_latent":
+        return ["case-reopened"]
+    if t == "ratify_latent":
+        return ["case-ratified"]
     if t == "release_beta":
         return [str(p["version"])]
     if t in {"misrecord_revenue", "audit_correction", "finance_preview"}:
@@ -63,7 +90,6 @@ def _body_for(kind: str, project: dict[str, Any], ev: Event) -> dict[str, Any]:
     people = project["people"]
     company = project["company"]
     t = ev.type
-    date_s = ev.time.isoformat()
     if t == "sign_contract":
         return {
             "doc_type": "email",
@@ -308,27 +334,322 @@ def _body_for(kind: str, project: dict[str, Any], ev: Event) -> dict[str, Any]:
             "department": project["departments"]["legal"],
             "thread_id": f"thr-{project['contract_id']}-hygiene",
         }
+    if t == "carveout":
+        j = ev.params["jurisdiction"]
+        return {
+            "doc_type": "email",
+            "subject": f"Jurisdictional carve-out {j} for {project['contract_id']}",
+            "sender": people["counsel"],
+            "recipient": people["pm"],
+            "dest_domain": "internal.example",
+            "greeting": f"{people['pm']},",
+            "body": (
+                f"Exception filing for jurisdiction {j}. In that jurisdiction the "
+                f"originally executed packet remains the governing instrument and "
+                f"the later amendment does not control. This memo does not reprint "
+                f"the signed version token; reconstruct it from the executed packet."
+            ),
+            "closing": "— counsel",
+            "department": project["departments"]["legal"],
+            "thread_id": f"thr-{project['contract_id']}-carveout-{j}",
+        }
+    if t == "rollback_amendment":
+        return {
+            "doc_type": "email",
+            "subject": f"Amendment withdrawn for {project['contract_id']}",
+            "sender": people["counsel"],
+            "recipient": people["pm"],
+            "dest_domain": "internal.example",
+            "greeting": f"{people['pm']},",
+            "body": (
+                "Status: amendment-withdrawn. The numbered supplement is pulled. "
+                "Reconstruct the legally effective delivery version from the "
+                "originally executed packet. This withdrawal memo does not reprint "
+                "a version token."
+            ),
+            "closing": "— counsel",
+            "department": project["departments"]["legal"],
+            "thread_id": f"thr-{project['contract_id']}-rollback",
+        }
+    if t == "announce_hold":
+        return {
+            "doc_type": "email",
+            "subject": f"Public announcement held for {project['project']}",
+            "sender": people["pm"],
+            "recipient": people["csm"],
+            "dest_domain": "internal.example",
+            "greeting": f"{people['csm']},",
+            "body": (
+                "Status: announcement-held. A jurisdictional exception filed "
+                "earlier now blocks the customer-facing announcement. This hold "
+                "notice does not reprint the jurisdiction token. Reconstruct it "
+                "from the carve-out instrument. Do not treat customer belief "
+                "email as the hold authority."
+            ),
+            "closing": "— program",
+            "department": project["departments"]["product"],
+            "thread_id": f"thr-{project['contract_id']}-announce-hold",
+        }
+    if t == "adopt_public":
+        return {
+            "doc_type": "email",
+            "subject": f"Public normative file adopted for {project['project']}",
+            "sender": people["counsel"],
+            "recipient": people["pm"],
+            "dest_domain": "internal.example",
+            "greeting": f"{people['pm']},",
+            "body": (
+                "Status: public-norm-adopted. The standards desk adopted the "
+                "previously ingested public file as the external normative "
+                "reference for this workspace. This memo does not reprint the "
+                "public-document stem. Reconstruct the stem from the ingested "
+                "file. Alternate public files on the desk are not adopted."
+            ),
+            "closing": "— counsel",
+            "department": project["departments"]["legal"],
+            "thread_id": f"thr-{project['contract_id']}-norm-adopt",
+        }
+    if t == "seed_latent":
+        return {
+            "doc_type": "email",
+            "subject": f"Dormant filing for {project['project']}",
+            "sender": people["counsel"],
+            "recipient": people["auditor"],
+            "dest_domain": "internal.example",
+            "greeting": f"{people['auditor']},",
+            "body": (
+                f"A dormant file-code {ev.params['token']} is recorded for later "
+                f"reopen. This filing is not a delivery version, not revenue, and "
+                f"not a customer belief. Do not treat standup notes as the code."
+            ),
+            "closing": "— counsel",
+            "department": project["departments"]["legal"],
+            "thread_id": f"thr-{project['contract_id']}-latent-seed",
+        }
+    if t == "seed_decoy":
+        return {
+            "doc_type": "email",
+            "subject": f"Unused dormant filing for {project['project']}",
+            "sender": people["eng"],
+            "recipient": people["counsel"],
+            "dest_domain": "internal.example",
+            "greeting": f"{people['counsel']},",
+            "body": (
+                f"A second dormant file-code {ev.params['token']} was parked "
+                f"and then abandoned. Engineering did not acknowledge it. Do "
+                f"not treat this unused filing as the later reopen authority."
+            ),
+            "closing": "— engineering",
+            "department": project["departments"]["product"],
+            "thread_id": f"thr-{project['contract_id']}-latent-decoy",
+        }
+    if t == "seed_docket":
+        return {
+            "doc_type": "email",
+            "subject": f"Docket filing for {project['project']}",
+            "sender": people["counsel"],
+            "recipient": people["pm"],
+            "dest_domain": "internal.example",
+            "greeting": f"{people['pm']},",
+            "body": (
+                f"A docket-code {ev.params['token']} is filed separately from "
+                f"the dormant file-code. This docket is not a delivery version "
+                f"and not customer belief. It is not controlling until a later "
+                f"ratify instrument writes it."
+            ),
+            "closing": "— counsel",
+            "department": project["departments"]["legal"],
+            "thread_id": f"thr-{project['contract_id']}-docket-seed",
+        }
+    if t == "ack_latent":
+        return {
+            "doc_type": "email",
+            "subject": f"Latent filing acknowledged for {project['project']}",
+            "sender": people["eng"],
+            "recipient": people["counsel"],
+            "dest_domain": "internal.example",
+            "greeting": f"{people['counsel']},",
+            "body": (
+                "Status: latent-acked. Engineering acknowledged the dormant "
+                "filing. This ack does not reprint the file-code. Reconstruct "
+                "it from the earlier dormant filing if a later reopen asks."
+            ),
+            "closing": "— engineering",
+            "department": project["departments"]["product"],
+            "thread_id": f"thr-{project['contract_id']}-latent-ack",
+        }
+    if t == "reopen_latent":
+        return {
+            "doc_type": "email",
+            "subject": f"Case reopened for {project['project']}",
+            "sender": people["auditor"],
+            "recipient": people["pm"],
+            "dest_domain": "internal.example",
+            "greeting": f"{people['pm']},",
+            "body": (
+                "Status: case-reopened. The dormant filing that operations "
+                "acknowledged is now the active file-code. This memo does not "
+                "reprint the code. Reconstruct it from the seed filing via the "
+                "ack. Customer email is not the reopen authority."
+            ),
+            "closing": "— audit",
+            "department": "Internal Audit",
+            "thread_id": f"thr-{project['contract_id']}-latent-reopen",
+        }
+    if t == "ratify_latent":
+        return {
+            "doc_type": "email",
+            "subject": f"Case ratified for {project['project']}",
+            "sender": people["counsel"],
+            "recipient": people["pm"],
+            "dest_domain": "internal.example",
+            "greeting": f"{people['pm']},",
+            "body": (
+                "Status: case-ratified. Reopen made a file-code active; this "
+                "instrument makes it controlling and adopts the early docket "
+                "as the controlling docket-code. This memo does not reprint "
+                "the file-code or the docket-code. Reconstruct both from their "
+                "seed filings via ack and reopen. Customer email is not the "
+                "ratify authority."
+            ),
+            "closing": "— counsel",
+            "department": project["departments"]["legal"],
+            "thread_id": f"thr-{project['contract_id']}-latent-ratify",
+        }
     raise KeyError(t)
 
 
+_EVENT_SLOT = {
+    "sign_contract": "counsel",
+    "change_roadmap": "pm",
+    "client_cite_old": "csm",
+    "client_followup": "csm",
+    "legal_supplement": "counsel",
+    "carveout": "counsel",
+    "rollback_amendment": "counsel",
+    "announce_hold": "pm",
+    "adopt_public": "counsel",
+    "seed_latent": "counsel",
+    "seed_decoy": "eng",
+    "seed_docket": "counsel",
+    "ack_latent": "eng",
+    "reopen_latent": "auditor",
+    "ratify_latent": "counsel",
+    "grant_access": "eng",
+    "release_beta": "eng",
+    "standup_notes": "eng",
+    "status_pulse": "pm",
+    "finance_preview": "finance",
+    "misrecord_revenue": "finance",
+    "audit_correction": "auditor",
+    "legal_reminder": "counsel",
+}
+
+
+def _author_role(project: dict[str, Any], event_type: str) -> str:
+    org = project.get("org") or {}
+    slot = _EVENT_SLOT.get(event_type)
+    if slot and isinstance(org.get(slot), dict):
+        return str(org[slot].get("role") or "")
+    return ""
+
+
+def _audience_role(event_type: str) -> str:
+    if event_type in {
+        "sign_contract",
+        "legal_supplement",
+        "carveout",
+        "rollback_amendment",
+        "announce_hold",
+        "adopt_public",
+        "seed_latent",
+        "seed_decoy",
+        "seed_docket",
+        "ack_latent",
+        "reopen_latent",
+        "ratify_latent",
+    }:
+        return "program_manager"
+    if event_type in {"misrecord_revenue", "audit_correction"}:
+        return "internal_auditor"
+    return "internal"
+
+
+def _discourse_pack(sim: SimulatedWorld, artifacts: list[Artifact]) -> list[Artifact]:
+    from longworld.core.discourse import expand_discourse, stamp_register
+    from longworld.core.grounded import bind_source_packs
+
+    reg = str((sim.spec.get("project") or {}).get("register") or "instrument")
+    rendered = bind_source_packs(sim, expand_discourse(stamp_register(artifacts, reg)))
+    return stamp_text_integrity(rendered)
+
+
+def stamp_text_integrity(artifacts: list[Artifact]) -> list[Artifact]:
+    """Bind the checksum after the last authorized text transformation."""
+    key = attestation_key_from_env("source_manifest")
+    for artifact in artifacts:
+        artifact.slots = {
+            **(artifact.slots or {}),
+            "semantic_text_sha256": hashlib.sha256(artifact.text.encode()).hexdigest(),
+        }
+        if key is not None:
+            bound = attach_attestation(
+                artifact_semantic_payload(artifact),
+                key,
+                purpose="artifact_semantics",
+            )
+            artifact.slots["semantic_attestation"] = bound["attestation"]
+    return artifacts
+
+
+def artifact_semantic_payload(artifact: Artifact) -> dict[str, Any]:
+    slots = artifact.slots or {}
+    return {
+        "artifact_id": artifact.artifact_id,
+        "text": artifact.text,
+        "reveals_events": list(artifact.reveals_events),
+        "event_type": slots.get("event_type"),
+        "ground_values": list(slots.get("ground_values") or []),
+        "params": dict(slots.get("params") or {}),
+    }
+
+
+def semantic_attestation_valid(artifact: Artifact) -> bool:
+    attestation = (artifact.slots or {}).get("semantic_attestation")
+    if not isinstance(attestation, dict):
+        return False
+    payload = artifact_semantic_payload(artifact)
+    payload["attestation"] = attestation
+    return verify_attestation(
+        payload,
+        attestation_key_from_env("source_manifest"),
+        purpose="artifact_semantics",
+    )
+
+
 def render_world(sim: SimulatedWorld) -> list[Artifact]:
+    from longworld.core.grounded import SKIP_RENDER_TYPES
+
     domain = sim.spec.get("domain")
     if domain == "researchlab":
         from longworld.domains.researchlab.render import render_lab
 
-        return render_lab(sim)
+        return _discourse_pack(sim, render_lab(sim))
     if domain == "codeforge":
         from longworld.domains.codeforge.render import render_code
 
-        return render_code(sim)
+        return _discourse_pack(sim, render_code(sim))
+    if domain == "company":
+        from longworld.domains.company.render import render_company
+
+        return _discourse_pack(sim, render_company(sim))
     env = jinja_env()
     project = sim.spec["project"]
     prefix = sim.spec["prefix"]
     is_focal = bool(project.get("is_focal", prefix == "focal"))
-    people = project["people"]
     artifacts: list[Artifact] = []
     for ev in sim.events:
-        if ev.skipped:
+        if ev.skipped or ev.type in SKIP_RENDER_TYPES:
             continue
         meta = _body_for(ev.type, project, ev)
         facts: list[str] = []
@@ -402,11 +723,14 @@ def render_world(sim: SimulatedWorld) -> list[Artifact]:
                     "event_type": ev.type,
                     "params": dict(ev.params),
                     "ground_values": ground,
+                    "author_role": _author_role(project, ev.type),
+                    "audience_role": _audience_role(ev.type),
                 },
                 is_focal=is_focal,
                 intentional_stale=bool(meta.get("intentional_stale")),
                 stale_event_id=ev.id if meta.get("intentional_stale") else None,
+                role=_author_role(project, ev.type),
             )
         )
     artifacts.sort(key=lambda a: (a.time, a.artifact_id))
-    return artifacts
+    return _discourse_pack(sim, artifacts)

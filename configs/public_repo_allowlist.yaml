@@ -1,0 +1,22 @@
+schema_version: longworld.repo-allowlist.v1
+repositories:
+  psf/requests:
+    visibility: public
+    license: Apache-2.0
+    authorization:
+      record_id: PUBLIC-GITHUB-TERMS-2026-08
+      scope: read-only workflow export
+      basis: public repository under recorded license
+      reviewed_at: 2026-08-23T00:00:00Z
+    allowed_record_kinds:
+      [pull_request, review, commit, ci_run, merge, release, license]
+  opensearch-project/opensearch-php:
+    visibility: public
+    license: Apache-2.0
+    authorization:
+      record_id: PUBLIC-GITHUB-TERMS-2026-08
+      scope: read-only workflow export
+      basis: public repository under recorded license
+      reviewed_at: 2026-08-23T00:00:00Z
+    allowed_record_kinds:
+      [pull_request, review, commit, ci_run, merge, release, license]

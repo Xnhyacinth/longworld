@@ -55,6 +55,21 @@ def main() -> None:
     report = {
         "n_rows": len(rows),
         "n_question_slots": len(questions),
+        "n_unique_base_tasks": len(
+            {r.get("base_task_id") for r in rows if r.get("base_task_id")}
+        ),
+        "n_unique_executable_proofs": len(
+            {r.get("executable_proof_id") for r in rows if r.get("executable_proof_id")}
+        ),
+        "n_unique_source_relations": len(
+            {r.get("source_relation_id") for r in rows if r.get("source_relation_id")}
+        ),
+        "n_unique_answer_programs": len(
+            {r.get("answer_program_id") for r in rows if r.get("answer_program_id")}
+        ),
+        "n_unique_content_hashes": len(
+            {r.get("content_hash") for r in rows if r.get("content_hash")}
+        ),
         "n_worlds": len({r["world_id"] for r in rows}),
         "by_split": count("split"),
         "by_view": count("view"),
@@ -76,8 +91,37 @@ def main() -> None:
         "n_clone_rows": sum(1 for r in rows if r.get("n_clones", 0)),
         "by_domain": dict(Counter(r.get("domain") or "?" for r in rows)),
         "by_motif": dict(Counter(r.get("motif") or "?" for r in rows)),
+        "n_program_join_rows": sum(bool(r.get("program_join")) for r in rows),
+        "n_compositional_dependency_rows": sum(
+            bool(r.get("compositional_dependency")) for r in rows
+        ),
+        "by_training_objective": dict(
+            Counter(r.get("training_objective") or "?" for r in rows)
+        ),
+        "by_composition_method": dict(
+            Counter(r.get("composition_method") or "?" for r in rows)
+        ),
         "n_topology_ids": len({r.get("topology_id") for r in rows}),
         "n_topology_families": len({r.get("topology_family") for r in rows}),
+        "n_canonical_topologies": len({r.get("canonical_topology") for r in rows}),
+        "mean_boilerplate_token_ratio": round(
+            sum(
+                float(r.get("boilerplate_token_ratio") or 0)
+                for r in rows
+                if r.get("view") == "full"
+            )
+            / max(1, sum(1 for r in rows if r.get("view") == "full")),
+            4,
+        ),
+        "mean_pulse_doc_ratio": round(
+            sum(
+                float(r.get("pulse_doc_ratio") or 0)
+                for r in rows
+                if r.get("view") == "full"
+            )
+            / max(1, sum(1 for r in rows if r.get("view") == "full")),
+            4,
+        ),
         "by_length_distance": {
             b: round(
                 sum(
