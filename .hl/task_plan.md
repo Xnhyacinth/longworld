@@ -107,6 +107,33 @@ all long rows preserve causal evidence and strict replay; production unseen
 manifests bind signed inputs; GitHub and the new private HF dataset point to the
 same immutable release digest.
 
+## P7 source-rich expansion
+
+Do not scale the current 8.1% authentic-source row share by copying worlds or
+adding background. First produce a second 12-world source-rich release; only
+then merge into a 48-world batch. Every promoted source-rich world must bind
+authentic body text into state and at least one answer program. Synthetic events
+may add counterfactuals, delayed effects, or workflow closure, but may not
+replace source evidence or provenance.
+
+| Phase | Objective                                                              | Status  | Exit gate                                                                    |
+| ----- | ---------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------- |
+| P7.0  | Freeze source-rich profile and source/task taxonomy                    | planned | 12 real-source worlds; 4 source families; train and eval both contain real   |
+| P7.1  | Complete live scholarly, SEC, Wikipedia/KB, and GitHub episode streams | planned | bounded source manifests; license/retrieval lineage; no surrogate provenance |
+| P7.2  | Add domain-specific state transitions and answer programs              | planned | at least 12 new program/operator signatures; no filename-derived answer      |
+| P7.3  | Grow multi-cycle 64K/128K/256K workflow histories                      | planned | events, evidence, causal edges, proof depth, and source relations co-grow    |
+| P7.4  | Shard and cache ranking/replay/filter by immutable world digest        | planned | deterministic worker counts; bounded memory; identical row-set SHA           |
+| P7.5  | Run source-rich 12 candidate→audit→promotion release                   | planned | at least 200 real-grounded rows and 48 real exact-64K rows; all gates green  |
+| P7.6  | Merge and rerun 48 worlds                                              | blocked | P7.5 receipt plus unseen source/domain coverage                              |
+| P7.7  | Activate production KMS approval and external unseen evaluation        | blocked | independent signer/trust root and benchmark evidence                         |
+
+Priority task families are: release/security/dependency history for CodeForge;
+revision-review-response and benchmark reproduction for ResearchLab; filing
+amendment, restatement, segment reconciliation, and guidance eligibility for
+SEC/company; revision/redirect history, temporal claims, and cross-page entity
+disambiguation for Wikipedia/KB. Cross-domain tasks are admitted only when an
+explicit source relation and executable answer program join the streams.
+
 ## Historical P2 record
 
 | Phase     | Objective                                                  | Status   | Validator                                                   |
