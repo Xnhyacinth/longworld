@@ -283,3 +283,8 @@
   GitHub sync remains pending final commit; HF upload remains blocked because
   `hf auth whoami` is not authenticated. OpenReview live source and independent
   production KMS approval remain honest external blockers.
+- 2026-08-25 GitHub publication completed: reviewed source, configs, tests, and
+  audit records were pushed to `Xnhyacinth/longworld` main at
+  `828c0ead4c223469e5d4dba6e91757c2f4b09416`. Generated release data stayed
+  ignored. HF remained untouched because `hf auth whoami` returned `Not logged
+in`; no private-repository or upload claim was made.

@@ -95,11 +95,12 @@ verification chain; it does not manufacture the missing independent KMS event.
 
 ## Publication boundary
 
-GitHub may receive reviewed code, configs, tests, and this report. The generated
-JSONL/source inventories remain ignored by Git. Hugging Face may receive only
-the committed private staging package after `hf auth whoami` identifies
-`Xnhyacinth`. Until authentication succeeds, no dataset repository or upload is
-claimed.
+GitHub `Xnhyacinth/longworld` received the reviewed code, configs, tests, and
+this report in commit `828c0ead4c223469e5d4dba6e91757c2f4b09416`. The
+generated JSONL/source inventories remain ignored by Git. Hugging Face may
+receive only the committed private staging package after `hf auth whoami`
+identifies `Xnhyacinth`. Until authentication succeeds, no dataset repository
+or upload is claimed.
 
 ## Final validation
 
