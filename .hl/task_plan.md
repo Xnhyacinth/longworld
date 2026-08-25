@@ -99,7 +99,7 @@ Complexity is 10/10 (breadth, depth, dependency, uncertainty, validation all
 | P6.4  | Run fresh 12-world candidate→ranking→audit→promotion→quality/unseen release | complete    | 542 rows; 16 real 64K; v2 gate green; partial local unseen readiness       |
 | P6.5  | Record release inventory, lineage, filters, exclusions, and reproducibility | complete    | committed local package; exact hashes/counts and data card recorded        |
 | P6.6  | Independent code/security review and complete validation                    | complete    | no P0; 571 tests and targeted lint/type/package checks pass                |
-| P6.7  | Sync GitHub and create/upload Xnhyacinth private HF dataset                 | blocked     | Git main 828c0ea synced; HF auth currently absent                          |
+| P6.7  | Sync GitHub and create/upload Xnhyacinth private HF dataset                 | complete    | Git main synced; private HF commit 32b5dcd verified                        |
 
 P6 success criterion: the promoted 12-world dataset contains authentic
 source-dependent answers from more than GitHub, including live scholarly data;

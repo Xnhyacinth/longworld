@@ -288,3 +288,10 @@
   `828c0ead4c223469e5d4dba6e91757c2f4b09416`. Generated release data stayed
   ignored. HF remained untouched because `hf auth whoami` returned `Not logged
 in`; no private-repository or upload claim was made.
+- 2026-08-25 HF authentication later became available and resolved to
+  `Xnhyacinth`. Created private dataset
+  `Xnhyacinth/LongWorld-Real-Workflows` and uploaded only the 19-file committed
+  `08_hf_private_stage_v2` package. Hub commit is
+  `32b5dcd274c301300826be20f7a698b4d9b09f7d`; unauthenticated API access returns
+  HTTP 401. Remote dry-run shows exactly those 19 files plus Hub-generated
+  `.gitattributes`, totalling 260.0 MB decimal.

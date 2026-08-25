@@ -97,10 +97,13 @@ verification chain; it does not manufacture the missing independent KMS event.
 
 GitHub `Xnhyacinth/longworld` received the reviewed code, configs, tests, and
 this report in commit `828c0ead4c223469e5d4dba6e91757c2f4b09416`. The
-generated JSONL/source inventories remain ignored by Git. Hugging Face may
-receive only the committed private staging package after `hf auth whoami`
-identifies `Xnhyacinth`. Until authentication succeeds, no dataset repository
-or upload is claimed.
+generated JSONL/source inventories remain ignored by Git. Hugging Face identity
+was subsequently verified as `Xnhyacinth`, and only the committed private
+staging package was uploaded to
+`Xnhyacinth/LongWorld-Real-Workflows` at immutable Hub commit
+`32b5dcd274c301300826be20f7a698b4d9b09f7d`. An unauthenticated API request
+returned HTTP 401, confirming that the dataset is private. The remote tree has
+the 19 committed local release files plus the Hub-generated `.gitattributes`.
 
 ## Final validation
 
