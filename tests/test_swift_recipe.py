@@ -47,10 +47,12 @@ def test_recipe_wandb_and_128k_knobs():
     assert rec["GBS"] == "16"
     assert rec["PACKING"] == "false"
     assert rec["SEQUENCE_PARALLEL_SIZE"] == "2"
+    assert rec["SEQUENCE_PARALLEL_SIZE_128K"] == "4"
     assert rec["DEEPSPEED"] == "none"
     assert rec["ATTN_IMPL"] == "flash_attn"
     assert rec["USE_LOGITS_TO_KEEP"] == "false"
-    assert rec["WANDB_RUN_GROUP_128K"] == "longworld-128k-sft"
+    assert rec["WANDB_RUN_GROUP_128K"] == "longworld-128k-sft-8gpu"
+    assert rec["MICRO"] == "1"
 
 
 def test_aligned_yamls_match_recipe():
@@ -70,14 +72,14 @@ def test_aligned_yamls_match_recipe():
         assert y["padding_free"] == rec["PADDING_FREE"]
         assert y["use_logits_to_keep"] == rec["USE_LOGITS_TO_KEEP"]
         assert y["attn_impl"] == rec["ATTN_IMPL"]
-        assert y["sequence_parallel_size"] == rec["SEQUENCE_PARALLEL_SIZE"]
-        assert y["gradient_accumulation_steps"] == "16"
+        assert y["sequence_parallel_size"] == rec["SEQUENCE_PARALLEL_SIZE_128K"]
+        assert y["gradient_accumulation_steps"] == "8"
         assert y["save_steps"] == rec["SAVE_STEPS"]
         assert y["eval_steps"] == rec["EVAL_STEPS"]
         assert y["save_total_limit"] == rec["SAVE_TOTAL_LIMIT"]
         assert y["load_best_model_at_end"] == "true"
         assert y["run_name"].startswith("longworld-baseline-")
-        assert y["run_name"].endswith("-128k-sp2")
+        assert "-128k-sp4-8gpu" in y["run_name"]
     assert len(set(names)) == 3
 
 

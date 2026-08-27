@@ -13,6 +13,6 @@ uv run --extra train python scripts/export_swift.py
 echo
 echo "Next (GPU machine):"
 echo "  INSTALL_SWIFT=1 bash scripts/setup_swift.sh"
-echo "  SKIP_HOLD=1 GPUS=6,7 bash scripts/train_baselines_128k.sh"
+echo "  GPUS=0,1,2,3,4,5,6,7 bash scripts/train_baselines_128k.sh"
 echo "  GPUS=0,1,2,3 bash scripts/train_swift.sh B5"
 echo "  GPUS=0,1,2,3 bash scripts/train_swift.sh ext_acc"

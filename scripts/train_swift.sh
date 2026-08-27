@@ -86,14 +86,21 @@ if [[ -f "$ROOT/configs/swift/recipe.env" ]]; then
 fi
 export WANDB_ENTITY="${WANDB_ENTITY:-wyncke}"
 export WANDB_PROJECT="${WANDB_PROJECT:-longworld}"
+export WANDB_WATCH="${WANDB_WATCH:-false}"
 export CELOSS_PARALLEL_SIZE="${CELOSS_PARALLEL_SIZE:-1024}"
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
+export CUDA_DEVICE_MAX_CONNECTIONS="${CUDA_DEVICE_MAX_CONNECTIONS:-1}"
+export NCCL_P2P_DISABLE="${NCCL_P2P_DISABLE:-0}"
+export NCCL_NVLS_ENABLE="${NCCL_NVLS_ENABLE:-0}"
+export NCCL_CUMEM_ENABLE="${NCCL_CUMEM_ENABLE:-0}"
+export MASTER_PORT="${MASTER_PORT:-29580}"
+export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 
 ALIGN_128K=0
 case "$COND" in
   ext_acc|ext_longtrace|ext_longmit)
     ALIGN_128K=1
-    export WANDB_RUN_GROUP="${WANDB_RUN_GROUP:-${WANDB_RUN_GROUP_128K:-longworld-128k-sft}}"
+    export WANDB_RUN_GROUP="${WANDB_RUN_GROUP:-${WANDB_RUN_GROUP_128K:-longworld-128k-sft-8gpu}}"
     ;;
   B*)
     export WANDB_RUN_GROUP="${WANDB_RUN_GROUP:-longworld-causaltwin}"
@@ -166,6 +173,9 @@ ATTN="${FLASH_ATTN_OVERRIDE:-}"
 GBS="${GBS:-16}"
 MICRO="${MICRO:-1}"
 SP="${SEQUENCE_PARALLEL_SIZE:-2}"
+if [[ "$ALIGN_128K" == "1" ]]; then
+  SP="${SEQUENCE_PARALLEL_SIZE_128K:-4}"
+fi
 if (( NPROC_PER_NODE % SP != 0 )); then
   echo "nproc=$NPROC_PER_NODE is not divisible by sequence_parallel_size=$SP" >&2
   exit 1
@@ -174,8 +184,8 @@ if [[ "$ALIGN_128K" == "1" && "$SP" -lt 2 ]]; then
   echo "128k Qwen3.5 SFT needs sequence_parallel_size>=2 (got $SP)" >&2
   exit 1
 fi
-if [[ "$ALIGN_128K" == "1" && "$NPROC_PER_NODE" -lt 2 ]]; then
-  echo "128k SP=2 needs 2 GPUs (GPUS=$GPUS)" >&2
+if [[ "$ALIGN_128K" == "1" && "$NPROC_PER_NODE" -lt "$SP" ]]; then
+  echo "128k SP=$SP needs at least $SP GPUs (GPUS=$GPUS)" >&2
   exit 1
 fi
 if [[ "$ALIGN_128K" == "1" ]]; then
@@ -218,6 +228,7 @@ EXTRA=(
   "--add_non_thinking_prefix" "${ADD_NON_THINKING_PREFIX:-true}"
   "--max_grad_norm" "${MAX_GRAD_NORM:-1.0}"
   "--torch_dtype" "bfloat16"
+  "--optim" "adamw_torch_fused"
   "--freeze_llm" "false"
   "--freeze_vit" "true"
   "--freeze_aligner" "true"
@@ -232,6 +243,9 @@ if [[ "$ALIGN_128K" == "1" ]]; then
     "--load_best_model_at_end" "true"
     "--metric_for_best_model" "loss"
     "--per_device_eval_batch_size" "1"
+    "--dataloader_persistent_workers" "true"
+    "--dataloader_pin_memory" "true"
+    "--dataloader_prefetch_factor" "2"
   )
 fi
 DS="${DEEPSPEED:-}"
@@ -254,16 +268,22 @@ else
 fi
 
 cd "$ROOT"
-echo "swift SFT $COND gpus=$CUDA_VISIBLE_DEVICES nproc=$NPROC_PER_NODE sp=$SP dp=$DP micro=$MICRO accum=$ACCUM true_gbs=$((MICRO * ACCUM * DP)) attn=$ATTN ds=$DS celoss=$CELOSS_PARALLEL_SIZE fla=on wandb=$WANDB_ENTITY/$WANDB_PROJECT group=${WANDB_RUN_GROUP:-none}"
+echo "swift SFT $COND gpus=$CUDA_VISIBLE_DEVICES nproc=$NPROC_PER_NODE sp=$SP dp=$DP micro=$MICRO accum=$ACCUM true_gbs=$((MICRO * ACCUM * DP)) attn=$ATTN ds=$DS celoss=$CELOSS_PARALLEL_SIZE fla=on wandb=$WANDB_ENTITY/$WANDB_PROJECT group=${WANDB_RUN_GROUP:-none} watch=${WANDB_WATCH:-false}"
 if [[ -n "$HOLD" && -x "$HOLD" ]]; then
   bash "$HOLD" wrap "$GPUS" -- env \
     NPROC_PER_NODE="$NPROC_PER_NODE" \
     WANDB_ENTITY="$WANDB_ENTITY" \
     WANDB_PROJECT="$WANDB_PROJECT" \
-    WANDB_API_KEY="${WANDB_API_KEY:-}" \
     WANDB_RUN_GROUP="${WANDB_RUN_GROUP:-}" \
+    WANDB_WATCH="$WANDB_WATCH" \
     CELOSS_PARALLEL_SIZE="$CELOSS_PARALLEL_SIZE" \
     PYTORCH_CUDA_ALLOC_CONF="$PYTORCH_CUDA_ALLOC_CONF" \
+    CUDA_DEVICE_MAX_CONNECTIONS="$CUDA_DEVICE_MAX_CONNECTIONS" \
+    NCCL_P2P_DISABLE="$NCCL_P2P_DISABLE" \
+    NCCL_NVLS_ENABLE="$NCCL_NVLS_ENABLE" \
+    NCCL_CUMEM_ENABLE="$NCCL_CUMEM_ENABLE" \
+    MASTER_PORT="$MASTER_PORT" \
+    TOKENIZERS_PARALLELISM="$TOKENIZERS_PARALLELISM" \
     LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}" \
     "${CLI[@]}"
 else

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Sequential 128k SFT baselines on the last two GPUs: ACC → LongTraceRL → LongMIT.
-# ms-swift full SFT, Ulysses SP=2, packing off, flash_attn, no DeepSpeed (official Qwen3.5 SP).
-# Same lr / GBS / steps. 4B then 2B on OOM.
-# Usage: SKIP_HOLD=1 bash scripts/train_baselines_128k.sh
+# Sequential 128k SFT baselines on 8 GPUs: ACC → LongTraceRL → LongMIT.
+# ms-swift full SFT, Ulysses SP=4 / DP=2, packing off, flash_attn, no DeepSpeed.
+# Same lr / GBS / steps. 4B then 2B on OOM unless SKIP_SIZE_FALLBACK=1.
+# Usage: GPUS=0,1,2,3,4,5,6,7 bash scripts/train_baselines_128k.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -29,10 +29,12 @@ unset LONGWORLD_PROMOTION_ATTESTATION_KEY LONGWORLD_PROMOTION_ATTESTATION_KEY_ID
 unset LONGWORLD_REPORT_ATTESTATION_KEY LONGWORLD_REPORT_ATTESTATION_KEY_ID
 unset LONGWORLD_PREDECESSOR_GATE_ATTESTATION_KEY LONGWORLD_PREDECESSOR_GATE_ATTESTATION_KEY_ID
 
-GPUS="${GPUS:-6,7}"
+GPUS="${GPUS:-0,1,2,3,4,5,6,7}"
 GBS="${GBS:-16}"
-SEQUENCE_PARALLEL_SIZE="${SEQUENCE_PARALLEL_SIZE:-2}"
-SKIP_HOLD="${SKIP_HOLD:-1}"
+SEQUENCE_PARALLEL_SIZE="${SEQUENCE_PARALLEL_SIZE_128K:-4}"
+MICRO="${MICRO:-1}"
+SKIP_HOLD="${SKIP_HOLD:-0}"
+SKIP_SIZE_FALLBACK="${SKIP_SIZE_FALLBACK:-1}"
 DEEPSPEED="${DEEPSPEED:-none}"
 MODEL="${MODEL:-}"
 if [[ -z "$MODEL" ]]; then
@@ -55,8 +57,10 @@ mkdir -p "$LOG_DIR"
 
 export WANDB_ENTITY="${WANDB_ENTITY:-wyncke}"
 export WANDB_PROJECT="${WANDB_PROJECT:-longworld}"
-export WANDB_RUN_GROUP="${WANDB_RUN_GROUP:-${WANDB_RUN_GROUP_128K:-longworld-128k-sft}}"
-export GPUS GBS SEQUENCE_PARALLEL_SIZE SKIP_HOLD DEEPSPEED WANDB_RUN_GROUP
+export WANDB_WATCH="${WANDB_WATCH:-false}"
+export WANDB_RUN_GROUP="${WANDB_RUN_GROUP:-${WANDB_RUN_GROUP_128K:-longworld-128k-sft-8gpu}}"
+export MASTER_PORT="${MASTER_PORT:-29580}"
+export GPUS GBS SEQUENCE_PARALLEL_SIZE MICRO SKIP_HOLD DEEPSPEED WANDB_RUN_GROUP WANDB_WATCH MASTER_PORT
 
 wait_gpus_free() {
   local ids used busy
@@ -94,12 +98,14 @@ run_one() {
     out="$ROOT/data/sft/swift_${cond}_2b"
   fi
   local tag="${cond#ext_}"
-  local run="longworld-baseline-${tag}-qwen35-${size}-128k-sp${SEQUENCE_PARALLEL_SIZE}"
-  local log="$LOG_DIR/swift_${cond}-${size}.log"
+  local nproc
+  nproc="$(awk -F, '{print NF}' <<<"$GPUS")"
+  local run="longworld-baseline-${tag}-qwen35-${size}-128k-sp${SEQUENCE_PARALLEL_SIZE}-${nproc}gpu"
+  local log="$LOG_DIR/swift_${cond}-${size}-${nproc}gpu.log"
   echo "===== train $cond model=$model out=$out ====="
   set +e
   GPUS="$GPUS" GBS="$GBS" SEQUENCE_PARALLEL_SIZE="$SEQUENCE_PARALLEL_SIZE" \
-    SKIP_HOLD="$SKIP_HOLD" DEEPSPEED="$DEEPSPEED" \
+    MICRO="$MICRO" SKIP_HOLD="$SKIP_HOLD" DEEPSPEED="$DEEPSPEED" \
     bash "$ROOT/scripts/train_swift.sh" "$cond" \
     --model "$model" \
     --output_dir "$out" \
@@ -119,9 +125,14 @@ for cond in "${CONDS[@]}"; do
     echo "===== $cond finished ok ====="
     continue
   fi
-  log="$LOG_DIR/swift_${cond}-4b.log"
+  nproc="$(awk -F, '{print NF}' <<<"$GPUS")"
+  log="$LOG_DIR/swift_${cond}-4b-${nproc}gpu.log"
   if [[ ! -f "$log" ]] || ! is_oom "$log"; then
     echo "===== $cond 4B failed (not OOM); see $log =====" >&2
+    exit 1
+  fi
+  if [[ "${SKIP_SIZE_FALLBACK:-1}" == "1" ]]; then
+    echo "===== $cond 4B OOM; SKIP_SIZE_FALLBACK=1 so not retrying 2B. see $log =====" >&2
     exit 1
   fi
   echo "$cond 4B OOM; retry 2B"
@@ -130,7 +141,7 @@ for cond in "${CONDS[@]}"; do
     echo "===== $cond finished on $model ====="
     continue
   fi
-  log="$LOG_DIR/swift_${cond}-2b.log"
+  log="$LOG_DIR/swift_${cond}-2b-${nproc}gpu.log"
   if [[ -f "$log" ]] && is_oom "$log"; then
     echo "$cond OOM on $model; retry DeepSpeed ZeRO-2"
     DEEPSPEED=zero2

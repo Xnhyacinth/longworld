@@ -1,7 +1,7 @@
 ### ACC compiled Search+SWE+SQL QA (Su et al. 2605.21850).
 ### Aligned 128k recipe: configs/swift/recipe.env (launcher CLI re-applies lr/steps/wandb).
-### GBS 16 = SP=2, DP=1, micro=1, accum=16. max_steps 680 ≈ 1 ACC epoch.
-### wandb: wyncke/longworld, group longworld-128k-sft.
+### 8x H200: GBS 16 = SP=4, DP=2, micro=1, accum=8. max_steps 680 ≈ 1 ACC epoch.
+### wandb: wyncke/longworld, group longworld-128k-sft-8gpu.
 model: data/models/Qwen3.5-4B
 use_hf: true
 torch_dtype: bfloat16
@@ -12,7 +12,7 @@ freeze_aligner: true
 add_non_thinking_prefix: true
 loss_scale: ignore_empty_think
 attn_impl: flash_attn
-sequence_parallel_size: 2
+sequence_parallel_size: 4
 
 dataset:
   - data/external/swift/acc.jsonl
@@ -26,6 +26,8 @@ use_logits_to_keep: false
 max_length: 133120
 dataset_num_proc: 32
 dataloader_num_workers: 4
+dataloader_persistent_workers: true
+dataloader_pin_memory: true
 split_dataset_ratio: 0.0
 
 output_dir: data/sft/swift_ext_acc
@@ -38,12 +40,12 @@ save_only_model: false
 load_best_model_at_end: true
 metric_for_best_model: loss
 report_to: wandb
-run_name: longworld-baseline-acc-qwen35-4b-128k-sp2
+run_name: longworld-baseline-acc-qwen35-4b-128k-sp4-8gpu
 seed: 42
 
 per_device_train_batch_size: 1
 per_device_eval_batch_size: 1
-gradient_accumulation_steps: 16
+gradient_accumulation_steps: 8
 learning_rate: 1.0e-5
 num_train_epochs: 1.0
 max_steps: 680

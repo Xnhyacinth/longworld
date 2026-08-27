@@ -17,13 +17,18 @@ real-schema anchors
 
 Scale unit is **dependency topology**, not QA count.
 
-Status snapshot (p1.2, 2026-08-19): causal engine kept; **length is no longer a
-fill target**. p1.1 `data/p0` is frozen as a CausalTwin diagnostic dump
+Current publication and qualification status is tracked in
+[`docs/CURRENT_RELEASE.md`](docs/CURRENT_RELEASE.md). The private HF dataset
+contains the historical 542-row P6 local-engineering release; no P7/P8 row is
+currently qualified under the stricter readable-source/raw-span gate.
+
+Historical snapshot (p1.2, 2026-08-19): causal engine kept; **length is no
+longer a fill target**. p1.1 `data/p0` is frozen as a CausalTwin diagnostic dump
 (`reports/causalcore_v0/FREEZE.md`). New generation uses `configs/causalcore.yaml`.
 
 The 6GB jsonl is **not** checked in (`data/` is gitignored).
 
-## P3 correctness gate (2026-08-24)
+## Historical P3 correctness gate (2026-08-24)
 
 The existing p1/v2 data remains diagnostic and is not approved for training.
 The new contract is documented in [`docs/DATA_CONTRACT.md`](docs/DATA_CONTRACT.md)
@@ -32,7 +37,7 @@ WorldLong-CPT, requires verified source lineage, derives real-source answers
 from document bodies, recomputes metrics per view, replays CF twins, and rejects
 random concatenation and duplicate-row upsampling.
 
-The current local probe freshly re-exported **80/80** allowlisted public GitHub
+That local probe freshly re-exported **80/80** allowlisted public GitHub
 episodes under scanner-v2 and pinned policy/client receipts: 2,232 records in
 `configs/public_repo_episodes_v2.json`. The completed 20-candidate run retained
 574 signed candidates; dense audit accepted 574/574, and world-atomic selection
@@ -339,8 +344,8 @@ python scripts/quality_gate.py --data data/smoke
 ## Train (full-parameter SFT)
 
 CausalTwin and the external baselines use **full-parameter SFT**, not LoRA.
-Backbone is **Qwen/Qwen3.5-4B** (native 256K). Training uses `add_non_thinking_prefix` (no-think) and **Ulysses sequence parallel** (`sequence_parallel_size=2` on 2 GPUs). `max_length` is a **cap**, not a fill; the immutable LongWorld release contains actual 16k/32k/64k samples with `packing: false`. External baselines retain their own separately reported length distributions. `padding_free` is FlashAttention varlen, not packing.
-Aligned hyperparameters and wandb live in `configs/swift/recipe.env` (entity `wyncke`, project `longworld`, 128k group `longworld-128k-sft`). Method yamls only change data / `run_name`; the launcher re-applies the recipe on the CLI so ACC, LongTrace, and LongMIT stay comparable.
+Backbone is **Qwen/Qwen3.5-4B** (native 256K). Training uses `add_non_thinking_prefix` (no-think) and **Ulysses sequence parallel** (`sequence_parallel_size=4` on 8 GPUs, DP=2). `max_length` is a **cap**, not a fill; the immutable LongWorld release contains actual 16k/32k/64k samples with `packing: false`. External baselines retain their own separately reported length distributions. `padding_free` is FlashAttention varlen, not packing.
+Aligned hyperparameters and wandb live in `configs/swift/recipe.env` (entity `wyncke`, project `longworld`, 128k group `longworld-128k-sft-8gpu`). Method yamls only change data / `run_name`; the launcher re-applies the recipe on the CLI so ACC, LongTrace, and LongMIT stay comparable.
 Do not start 4B jobs on a box whose GPUs are already held. The signed LongWorld
 release path starts from the profile-bound LLaMA-Factory export; Swift is an
 optional second, manifest-bound conversion for B1/B3/B5.
@@ -355,8 +360,8 @@ uv run --extra train python scripts/export_external_llamafactory.py
 uv run --extra train python scripts/export_swift.py \
   --release-profile p3-probe-12-v1
 
-# 128k related-work baselines (ACC → LongTraceRL → LongMIT), 2 GPU SP=2.
-SKIP_HOLD=1 GPUS=6,7 bash scripts/train_baselines_128k.sh
+# 128k related-work baselines (ACC → LongTraceRL → LongMIT), 8 GPU SP=4 DP=2.
+GPUS=0,1,2,3,4,5,6,7 bash scripts/train_baselines_128k.sh
 
 # cutoff 256k is the native cap; signed B5 samples are 16k/32k/64k (packing off).
 LONGWORLD_RELEASE_PROFILE=p3-probe-12-v1 \
