@@ -27,3 +27,15 @@ saves/
 .env
 .env.*
 *.pem
+*.key
+*.p12
+*.pfx
+.netrc
+.hf/
+.longworld-trust/
+
+# Local planning state (canonical project status lives in .hl/)
+.planning/
+
+# Local source-bundle construction intermediates
+configs/public_repo_episodes_v2_pre_*.json
