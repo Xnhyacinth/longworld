@@ -5,13 +5,13 @@ from typing import Any
 
 from longworld.core.cascade import apply_cascade, check_cascade
 from longworld.core.grounded import apply_grounded, check_grounded
-from longworld.core.scholarly import format_revision_funding_delta
+from longworld.core.scholarly import format_revision_added_delta
 from longworld.core.state import WorldState
 from longworld.core.world import Event
 
 
 def _format_revision_delta(value: str) -> str:
-    return format_revision_funding_delta(value)
+    return format_revision_added_delta(value)
 
 
 def init_values(project: dict[str, Any]) -> dict[str, Any]:
@@ -67,6 +67,7 @@ def init_values(project: dict[str, Any]) -> dict[str, Any]:
         "source_record_metadata": {},
         "real_revision_delta_candidate": None,
         "real_revision_added_text": None,
+        "wiki_claims": {},
     }
 
 
@@ -93,6 +94,23 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
     if t == "arxiv_revision_decision":
         if not state.values.get("real_revision_delta_candidate"):
             return False, "source_revision_relation_missing"
+        return True, None
+    if t == "wiki_source_section":
+        return True, None
+    if t == "wiki_claim_answer":
+        if str(ev.params.get("compose") or "compute") == "copy":
+            if not state.values.get(
+                str(ev.params.get("prerequisite_answer_key") or "")
+            ):
+                return False, "wiki_claim_prerequisite_missing"
+            return True, None
+        record_id = str(ev.params.get("record_id") or "")
+        claims = dict((state.values.get("wiki_claims") or {}).get(record_id) or {})
+        required = ev.params.get("required_roles") or []
+        if not isinstance(required, list) or any(
+            str(role) not in claims for role in required
+        ):
+            return False, "wiki_claim_roles_missing"
         return True, None
     if t in {"commit_tokenizer", "log_stale_cache", "issue_testset", "status_pulse"}:
         if state.values.get("reported_score") is None:
@@ -250,6 +268,77 @@ def apply_event(state: WorldState, ev: Event) -> None:
         prior_date = str(candidate.get("prior_date") or "")
         if answer and prior_date:
             state.set("real_revision_added_text", f"{prior_date} | {answer}", eid, day)
+    elif t == "wiki_source_section":
+        text = str(p.get("text") or "")
+        if hashlib.sha256(text.encode()).hexdigest() != p.get("text_sha256"):
+            return
+        record_id = str(p.get("record_id") or "")
+        if not record_id:
+            return
+        claims = dict(state.values.get("wiki_claims") or {})
+        record_claims = dict(claims.get(record_id) or {})
+        for span in p.get("fact_spans") or []:
+            if not isinstance(span, dict):
+                return
+            start = span.get("char_start")
+            end = span.get("char_end")
+            quote = str(span.get("evidence_quote") or "")
+            role = str(span.get("role") or "")
+            value = str(span.get("value") or "")
+            if (
+                isinstance(start, bool)
+                or isinstance(end, bool)
+                or not isinstance(start, int)
+                or not isinstance(end, int)
+                or start < 0
+                or end <= start
+                or text[start:end] != quote
+                or not role
+                or not value
+            ):
+                return
+            record_claims[role] = value
+        claims[record_id] = record_claims
+        state.set("wiki_claims", claims, eid, day)
+    elif t == "wiki_claim_answer":
+        record_id = str(p.get("record_id") or "")
+        answer_key = str(p.get("answer_key") or "")
+        if not record_id or not answer_key:
+            return
+        if str(p.get("compose") or "compute") == "copy":
+            prior = state.values.get(str(p.get("prerequisite_answer_key") or ""))
+            if not isinstance(prior, str) or not prior:
+                return
+            state.set(answer_key, prior, eid, day)
+            return
+        tier = str(p.get("control_tier") or "")
+        claims = dict((state.values.get("wiki_claims") or {}).get(record_id) or {})
+        required = p.get("required_roles")
+        if not isinstance(required, list) or any(
+            str(role) not in claims for role in required
+        ):
+            return
+        prerequisite_key = str(p.get("prerequisite_answer_key") or "")
+        prior = state.values.get(prerequisite_key) if prerequisite_key else ""
+        if prerequisite_key and not isinstance(prior, str):
+            return
+        if tier == "16k":
+            parts = [f"BORN:{claims['born']}"]
+        elif tier == "32k":
+            if not prior:
+                return
+            parts = [
+                str(prior),
+                f"COMM:{claims['commemoration']}",
+                f"ENTITY:{claims['entity']}",
+            ]
+        elif tier == "64k":
+            if not prior:
+                return
+            parts = [str(prior), f"POP:{claims['popular_culture']}"]
+        else:
+            return
+        state.set(answer_key, "||".join(parts), eid, day)
     elif t == "report_v1":
         state.set("reported_score", p["score"], eid, day)
         state.set("authoritative_score", p["score"], eid, day)

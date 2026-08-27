@@ -8,9 +8,9 @@ from typing import Any
 from longworld.core.attestation import attestation_key_from_env, verify_attestation
 from longworld.core.realworkflow import EPISODE_REPLAY_BUNDLE_SCHEMA
 from longworld.core.sourcebundle import (
-    SOURCE_WORKFLOW_ADAPTER_REVISION,
     SOURCE_WORKFLOW_BUNDLE_SCHEMA,
 )
+from longworld.core.sourceworkflow import SOURCE_WORKFLOW_ADAPTER_REVISIONS
 
 _SFT_COMPOSITIONS = {
     "causal_timeline",
@@ -43,6 +43,7 @@ _SOURCE_ORIGINS = {
 }
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _COMMIT_SHA = re.compile(r"[0-9a-f]{40}")
+STRICT_REPLAY_REVISION = "longworld-strict-replay-v5"
 _DENSE_PROMOTION_CONTRACT = {
     "dense_model_provider": "huggingface",
     "dense_model_id": "sentence-transformers/all-MiniLM-L6-v2",
@@ -90,7 +91,7 @@ def replay_bundle_binding_valid(row: dict[str, Any]) -> bool:
         "binding_digest",
     } and (
         top_level.get("schema_version") == SOURCE_WORKFLOW_BUNDLE_SCHEMA
-        and top_level.get("adapter_revision") == SOURCE_WORKFLOW_ADAPTER_REVISION
+        and top_level.get("adapter_revision") in SOURCE_WORKFLOW_ADAPTER_REVISIONS
         and _SHA256.fullmatch(str(top_level.get("sha256") or "")) is not None
         and _SHA256.fullmatch(str(top_level.get("binding_digest") or "")) is not None
     )
@@ -154,7 +155,7 @@ def sft_row_errors(
         and promotion.get("dense_chunking") == _DENSE_CHUNKING_CONTRACT
         and isinstance(promotion.get("dense_top_k"), int)
         and int(promotion["dense_top_k"]) == 3
-        and promotion.get("strict_replay_revision") == "longworld-strict-replay-v3"
+        and promotion.get("strict_replay_revision") == STRICT_REPLAY_REVISION
         and str(promotion.get("strict_replay_answer") or "")
         == str(row.get("answer") or "")
     )

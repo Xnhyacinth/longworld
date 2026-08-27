@@ -778,6 +778,76 @@ def test_version_selection_falls_back_from_invalid_richest_prior_release() -> No
         "BLOCKED-v1.0.0",
         "BLOCKED-v3.0.0",
     ]
+
+
+def test_version_selection_ignores_skipped_ci_when_a_gate_passed() -> None:
+    def release_episode(version: str, month: int) -> RealWorkflow:
+        return _workflow(
+            [
+                WorkflowRecord(
+                    f"commit:{version}",
+                    "commit",
+                    f"2025-{month:02d}-01T00:00:00Z",
+                    f"Commit sha-{version} selects parser-core version {version}.",
+                    (),
+                    {
+                        "commit": f"sha-{version}",
+                        "package": "parser-core",
+                        "version": version,
+                    },
+                ),
+                WorkflowRecord(
+                    f"ci:{version}:skipped",
+                    "ci_run",
+                    f"2025-{month:02d}-02T00:00:00Z",
+                    f"CI check skip-matrix for sha-{version} conclusion=skipped",
+                    (f"commit:{version}",),
+                    {"run": f"skip-{version}", "conclusion": "skipped"},
+                ),
+                WorkflowRecord(
+                    f"ci:{version}",
+                    "ci_run",
+                    f"2025-{month:02d}-02T00:01:00Z",
+                    f"CI check linux for sha-{version} conclusion=success",
+                    (f"commit:{version}",),
+                    {"run": version, "result": "passed"},
+                ),
+                WorkflowRecord(
+                    f"release:v{version}",
+                    "release",
+                    f"2025-{month:02d}-03T00:00:00Z",
+                    f"Release v{version} published.",
+                    (f"ci:{version}", f"ci:{version}:skipped"),
+                    {"tag": f"v{version}"},
+                ),
+            ]
+        )
+
+    queries = [
+        query
+        for query in build_code_queries(
+            simulate_code(
+                sample_code_spec(
+                    73,
+                    n_parallel=0,
+                    real_workflows=[
+                        release_episode("1.0.0", 1),
+                        release_episode("2.0.0", 2),
+                    ],
+                )
+            )["focal"]
+        )
+        if query.query_type == "version_selection"
+    ]
+
+    assert [query.preferred_length_buckets for query in queries] == [
+        ["16k", "32k"],
+        ["64k"],
+    ]
+    assert [query.answer for query in queries] == [
+        "parser-core@1.0.0 -> v1.0.0",
+        "parser-core@2.0.0 -> v2.0.0",
+    ]
     assert [query.preferred_length_buckets for query in queries] == [
         ["16k", "32k"],
         ["64k"],

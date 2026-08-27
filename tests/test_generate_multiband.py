@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,9 +13,13 @@ from generate import (
     _views_for_band,
     apply_source_workflow_bucket_targets,
     counterfactual_text_reject_reason,
+    emit_records,
     exact_64k_reject_reason,
+    exact_token_metadata_for_band,
+    retune_pack_target_for_exact_64k,
 )
 
+from longworld.core.promotion import exact_token_band_reject_reason
 from longworld.core.render import Artifact
 
 
@@ -192,6 +197,78 @@ def test_exact_64k_generation_range_is_closed_on_both_sides() -> None:
     assert exact_64k_reject_reason(64_000) is None
     assert exact_64k_reject_reason(65_536) is None
     assert exact_64k_reject_reason(65_537) == "exact_64k_out_of_range:65537"
+
+
+def test_exact_token_band_ranges_are_closed_and_do_not_relax() -> None:
+    assert exact_token_band_reject_reason("16k", 15_999) == (
+        "exact_16k_out_of_range:15999"
+    )
+    assert exact_token_band_reject_reason("16k", 16_000) is None
+    assert exact_token_band_reject_reason("16k", 16_384) is None
+    assert exact_token_band_reject_reason("16k", 16_385) == (
+        "exact_16k_out_of_range:16385"
+    )
+    assert exact_token_band_reject_reason("32k", 32_000) is None
+    assert exact_token_band_reject_reason("32k", 32_768) is None
+    assert exact_token_band_reject_reason("64k", 64_000) is None
+    assert exact_token_band_reject_reason("64k", 65_536) is None
+    assert exact_token_band_reject_reason("8k", 8_192) is None
+
+
+def test_exact_token_metadata_is_written_for_each_strict_long_band() -> None:
+    class FakeTokenizer:
+        def encode(self, text: str, *, add_special_tokens: bool) -> list[int]:
+            assert add_special_tokens is False
+            return [1] * int(text)
+
+    cache: dict[str, int] = {}
+    for band, tokens in (("16k", 16_100), ("32k", 32_200), ("64k", 64_300)):
+        metadata, reason = exact_token_metadata_for_band(
+            str(tokens),
+            band,
+            model_id="pinned/model",
+            revision="a" * 40,
+            tokenizer=FakeTokenizer(),
+            cache=cache,
+        )
+        assert reason is None
+        assert metadata == {
+            "tokenizer_context_tokens": tokens,
+            "tokenizer_model_id": "pinned/model",
+            "tokenizer_revision": "a" * 40,
+        }
+
+    metadata, reason = exact_token_metadata_for_band(
+        "9000",
+        "8k",
+        model_id="pinned/model",
+        revision="a" * 40,
+        tokenizer=FakeTokenizer(),
+        cache=cache,
+    )
+    assert metadata == {}
+    assert reason is None
+
+
+def test_emit_records_routes_every_strict_long_band_through_exact_counting() -> None:
+    source = inspect.getsource(emit_records)
+
+    assert "metrics.length_bucket in EXACT_TOKEN_BAND_RANGES" in source
+
+
+def test_exact_64k_pack_retune_scales_shared_window_from_observed_wraps() -> None:
+    assert retune_pack_target_for_exact_64k(44_500, (56_165, 57_065)) == 50_906
+    assert retune_pack_target_for_exact_64k(50_200, (65_901,)) == 49_336
+    assert retune_pack_target_for_exact_64k(49_300, (64_976, 64_965)) == 49_300
+
+
+def test_exact_64k_pack_retune_fails_when_first_and_late_cannot_share_a_cap() -> None:
+    try:
+        retune_pack_target_for_exact_64k(44_500, (50_000, 70_000))
+    except ValueError as error:
+        assert "cannot share one pack target" in str(error)
+    else:
+        raise AssertionError("expected first/late wrap conflict")
 
 
 def test_strict_long_product_excludes_shallow_company_version_diff() -> None:

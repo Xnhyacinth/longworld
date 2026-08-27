@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import hashlib
+import json
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 from typing import Any
 
@@ -41,6 +43,7 @@ class QuerySpec:
     program_ops: list[dict[str, Any]] = field(default_factory=list)
     preferred_length_buckets: list[str] = field(default_factory=list)
     semantic_growth_group: str = ""
+    base_task_group: str = ""
 
 
 def _sim_for(world: SimulatedWorld) -> WorldSimulator:
@@ -167,6 +170,128 @@ def _aid(world: SimulatedWorld, suffix: str) -> str:
     return f"{world.spec['world_id']}.{world.spec['prefix']}.{suffix}"
 
 
+def _financial_program_ops(
+    control_tier: str, extra_128k: tuple[str, ...] = ()
+) -> list[dict[str, Any]]:
+    ops: list[dict[str, Any]] = [
+        {"op": "READ_XBRL_FACT", "role": "product_revenue"},
+        {"op": "READ_XBRL_FACT", "role": "service_revenue"},
+        {"op": "READ_XBRL_FACT", "role": "total_revenue"},
+        {"op": "COMPUTE_MIX"},
+    ]
+    if control_tier in {"32k", "64k", "128k"}:
+        ops.extend(
+            [
+                {"op": "READ_XBRL_FACT", "role": "category_mix"},
+                {"op": "READ_XBRL_FACT", "role": "geographic_mix"},
+                {"op": "COMPUTE_CATEGORY_GEO"},
+            ]
+        )
+    if control_tier in {"64k", "128k"}:
+        ops.extend(
+            [
+                {"op": "READ_XBRL_FACT", "role": "prior_geographic_mix"},
+                {"op": "COMPUTE_GEOGRAPHIC_YOY"},
+                {"op": "READ_XBRL_FACT", "role": "balance_sheet"},
+                {"op": "READ_CERTIFICATION"},
+                {"op": "COMPUTE_BS_CERT"},
+            ]
+        )
+    if control_tier == "128k":
+        last_role = "operating_income" if "note10_segment_oi" in extra_128k else "debt"
+        last_compute = (
+            "COMPUTE_CF_TAX_LEASE_OI"
+            if last_role == "operating_income"
+            else "COMPUTE_CF_TAX_LEASE_DEBT"
+        )
+        ops.extend(
+            [
+                {"op": "READ_XBRL_FACT", "role": "cash_flow"},
+                {"op": "READ_XBRL_FACT", "role": "income_tax"},
+                {"op": "READ_XBRL_FACT", "role": "leases"},
+                {"op": "READ_XBRL_FACT", "role": last_role},
+                {"op": last_compute},
+            ]
+        )
+    return ops
+
+
+def _financial_cf_updates(ops: Event) -> dict[str, Any]:
+    original = str(ops.params.get("text") or "")
+    product = next(
+        (
+            span
+            for span in ops.params.get("fact_spans") or []
+            if isinstance(span, dict) and span.get("role") == "product_revenue"
+        ),
+        None,
+    )
+    if not isinstance(product, dict):
+        return {"text": original}
+    start = product.get("char_start")
+    end = product.get("char_end")
+    quote = str(product.get("evidence_quote") or "")
+    if (
+        isinstance(start, bool)
+        or isinstance(end, bool)
+        or not isinstance(start, int)
+        or not isinstance(end, int)
+        or original[start:end] != quote
+        or len(quote) != 7
+    ):
+        return {"text": original}
+    mutated_quote = (
+        str(int(quote[0]) - 1) + quote[1:]
+        if quote[0].isdigit() and quote[0] != "0"
+        else quote
+    )
+    if mutated_quote == quote:
+        return {"text": original}
+    mutated = original[:start] + mutated_quote + original[end:]
+    spans = []
+    for span in ops.params.get("fact_spans") or []:
+        if not isinstance(span, dict):
+            continue
+        updated = dict(span)
+        if span is product or (
+            span.get("role") == "product_revenue"
+            and span.get("evidence_quote") == quote
+        ):
+            updated["evidence_quote"] = mutated_quote
+            raw_scale = span.get("scale")
+            try:
+                scale = int(raw_scale) if isinstance(raw_scale, (int, str)) else 6
+            except (TypeError, ValueError):
+                scale = 6
+            updated["numeric_value"] = int(mutated_quote.replace(",", "")) * (10**scale)
+        spans.append(updated)
+    parent_provenance_id = str(ops.params.get("provenance_id") or "")
+    provenance_payload = {
+        "operation": "sec-financial-counterfactual-splice-v1",
+        "parent_provenance_id": parent_provenance_id,
+        "event_id": ops.id,
+        "text_sha256": hashlib.sha256(mutated.encode()).hexdigest(),
+    }
+    return {
+        "text": mutated,
+        "text_sha256": hashlib.sha256(mutated.encode()).hexdigest(),
+        "section_sha256": hashlib.sha256(
+            mutated.removeprefix("SEC source section\n").encode()
+        ).hexdigest(),
+        "fact_spans": spans,
+        "ground_values": [mutated_quote],
+        "source_origin": "synthetic_world",
+        "parent_provenance_id": parent_provenance_id,
+        "provenance_operation": provenance_payload["operation"],
+        "provenance_id": "synthetic-sha256:"
+        + hashlib.sha256(
+            json.dumps(
+                provenance_payload, sort_keys=True, separators=(",", ":")
+            ).encode()
+        ).hexdigest(),
+    }
+
+
 def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
     """Six programmatic question types. Answers come from replay, never from an LLM."""
     project = world.spec["project"]
@@ -182,6 +307,403 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
 
     qid = world.spec["world_id"].split(":")[0]
     queries: list[QuerySpec] = []
+
+    for source in [event for event in world.events if event.type == "sec_filing"]:
+        policy = next(
+            event
+            for event in world.events
+            if event.type == "sec_filing_eligibility_policy"
+            and event.params.get("source_record_event_id") == source.id
+        )
+        approval = next(
+            event
+            for event in world.events
+            if event.type == "sec_filing_approval"
+            and event.params.get("policy_event_id") == policy.id
+        )
+        ratifications = sorted(
+            (
+                event
+                for event in world.events
+                if event.type == "sec_filing_publication_ratification"
+                and event.params.get("source_approval_event_id") == approval.id
+            ),
+            key=lambda event: event.time,
+        )
+        if len(ratifications) != 3:
+            continue
+        ratification = ratifications[0]
+        initial_control_stage = str(ratification.params["control_stage"])
+        form_fact = next(
+            (
+                fact
+                for fact in source.params.get("fact_spans") or []
+                if fact.get("field") == "form"
+            ),
+            None,
+        )
+        if not isinstance(form_fact, dict):
+            continue
+        text = str(source.params["text"])
+        quote_start = int(form_fact["char_start"])
+        value_start = quote_start + int(form_fact["value_offset"])
+        value_end = value_start + int(form_fact["value_length"])
+        form = text[value_start:value_end]
+        if form not in {"10-K", "10-K/A", "10-Q", "10-Q/A"}:
+            continue
+        cf_form = (
+            form.replace("10-K", "10-Q")
+            if "10-K" in form
+            else form.replace("10-Q", "10-K")
+        )
+        cf_text = text[:value_start] + cf_form + text[value_end:]
+        cf_fact_spans = []
+        for fact in source.params.get("fact_spans") or []:
+            copied = dict(fact)
+            if copied.get("field") == "form":
+                quote = str(copied["evidence_quote"])
+                offset = int(copied["value_offset"])
+                copied["evidence_quote"] = (
+                    quote[:offset]
+                    + cf_form
+                    + quote[offset + int(copied["value_length"]) :]
+                )
+            cf_fact_spans.append(copied)
+        cf_text_sha256 = hashlib.sha256(cf_text.encode()).hexdigest()
+        cf_provenance = hashlib.sha256(
+            json.dumps(
+                {
+                    "operation": "counterfactual_sec_form",
+                    "parent_provenance_id": source.params["provenance_id"],
+                    "text_sha256": cf_text_sha256,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        source_key = hashlib.sha256(
+            f"{source.params['workflow_id']}:{source.params['record_id']}".encode()
+        ).hexdigest()[:12]
+        queries.append(
+            QuerySpec(
+                query_id=f"{qid}:sec_filing_eligibility:{source_key}:16k",
+                query_type="sec_filing_eligibility",
+                question=(
+                    "Follow the verified SEC filing body through its linked release-"
+                    "eligibility policy and subsequent committee approval. Report the "
+                    "computed publication status, the filing's reporting period, and "
+                    "its accession. Reply exactly as <APPROVED|BLOCKED> | YYYY-MM-DD | "
+                    "<accession>. Do not infer filing facts from the policy or approval "
+                    "memo. Decision checkpoint: "
+                    f"{initial_control_stage}."
+                ),
+                answer="",
+                as_of=ratification.time,
+                answer_key=str(ratification.params["answer_key"]),
+                essential_event_ids=[
+                    source.id,
+                    policy.id,
+                    approval.id,
+                    ratification.id,
+                ],
+                essential_artifact_ids=[
+                    f"{world.spec['world_id']}.{source.visibility[0]}",
+                    f"{world.spec['world_id']}.{policy.visibility[0]}",
+                    f"{world.spec['world_id']}.{approval.visibility[0]}",
+                    f"{world.spec['world_id']}.{ratification.visibility[0]}",
+                ],
+                sufficient_event_ids=[
+                    source.id,
+                    policy.id,
+                    approval.id,
+                    ratification.id,
+                ],
+                cf_event_id=source.id,
+                cf_param_updates={
+                    "text": cf_text,
+                    "text_sha256": cf_text_sha256,
+                    "source_origin": "real_derived",
+                    "parent_provenance_id": source.params["provenance_id"],
+                    "provenance_id": f"derived-sha256:{cf_provenance}",
+                    "provenance_operation": "counterfactual_sec_form",
+                    "fact_spans": cf_fact_spans,
+                    "ground_values": [
+                        cf_form if value == form else value
+                        for value in source.params.get("ground_values") or []
+                    ],
+                },
+                cf_answer="",
+                invariance_event_id=source.id,
+                invariance_param_updates={
+                    "retrieval_url": "https://www.sec.gov/Archives/"
+                },
+                gold_expression=(
+                    "READ_SOURCE_SPANS(accession, form, filing_date, report_date) "
+                    "THEN APPLY_ELIGIBILITY_POLICY(form, filing_date, report_date) "
+                    "THEN APPLY_COMMITTEE_APPROVAL THEN RATIFY_PUBLICATION"
+                ),
+                proof_depth=4,
+                cf_op="filing_body",
+                motif="real_filing_policy_approval",
+                topology_id=instance_topology(
+                    "company.real_sec_policy_approval",
+                    source.params["workflow_id"],
+                    form,
+                ),
+                domain="company",
+                truth_regime="real_source_derived",
+                program_ops=[
+                    {"op": "READ_SOURCE_SPAN", "field": "accession"},
+                    {"op": "READ_SOURCE_SPAN", "field": "form"},
+                    {"op": "READ_SOURCE_SPAN", "field": "filing_date"},
+                    {"op": "READ_SOURCE_SPAN", "field": "report_date"},
+                    {"op": "APPLY_FILING_ELIGIBILITY_POLICY"},
+                    {"op": "APPLY_COMMITTEE_APPROVAL"},
+                    {"op": "RATIFY_PUBLICATION", "tier": "16k"},
+                ],
+                preferred_length_buckets=["16k"],
+                semantic_growth_group="company_real_sec_policy_approval",
+                base_task_group=f"sec_filing_eligibility:{source_key}",
+            )
+        )
+        primary = queries[-1]
+        for index, later_ratification in enumerate(ratifications[1:], start=1):
+            control_tier = str(later_ratification.params["control_tier"])
+            control_stage = str(later_ratification.params["control_stage"])
+            required_ratifications = ratifications[: index + 1]
+            required_events = [
+                source.id,
+                policy.id,
+                approval.id,
+                *(event.id for event in required_ratifications),
+            ]
+            queries.append(
+                replace(
+                    primary,
+                    query_id=(
+                        f"{qid}:sec_filing_eligibility:{source_key}:{control_tier}"
+                    ),
+                    question=primary.question.replace(
+                        f"Decision checkpoint: {initial_control_stage}.",
+                        f"Decision checkpoint: {control_stage}.",
+                    ),
+                    as_of=later_ratification.time,
+                    answer_key=str(later_ratification.params["answer_key"]),
+                    essential_event_ids=required_events,
+                    essential_artifact_ids=[
+                        f"{world.spec['world_id']}.{source.visibility[0]}",
+                        f"{world.spec['world_id']}.{policy.visibility[0]}",
+                        f"{world.spec['world_id']}.{approval.visibility[0]}",
+                        *(
+                            f"{world.spec['world_id']}.{event.visibility[0]}"
+                            for event in required_ratifications
+                        ),
+                    ],
+                    sufficient_event_ids=required_events,
+                    gold_expression=(
+                        "READ_SOURCE_SPANS(accession, form, filing_date, report_date) "
+                        "THEN APPLY_ELIGIBILITY_POLICY(form, filing_date, report_date) "
+                        "THEN APPLY_COMMITTEE_APPROVAL THEN "
+                        + " THEN ".join(
+                            f"RATIFY_PUBLICATION({event.params['control_tier']})"
+                            for event in required_ratifications
+                        )
+                    ),
+                    proof_depth=4 + index,
+                    topology_id=instance_topology(
+                        "company.real_sec_policy_approval",
+                        source.params["workflow_id"],
+                        form,
+                        control_tier,
+                    ),
+                    program_ops=[
+                        *primary.program_ops[:-1],
+                        *(
+                            {
+                                "op": "RATIFY_PUBLICATION",
+                                "tier": str(event.params["control_tier"]),
+                            }
+                            for event in required_ratifications
+                        ),
+                    ],
+                    preferred_length_buckets=[control_tier],
+                )
+            )
+
+    computes: dict[str, dict[str, Event]] = {}
+    sections: dict[str, dict[str, Event]] = {}
+    for event in world.events:
+        record_id = str(event.params.get("record_id") or "")
+        if not record_id:
+            continue
+        if event.type == "sec_financial_answer":
+            tier = str(event.params.get("control_tier") or "")
+            if str(event.params.get("compose") or "compute") != "copy" and tier:
+                computes.setdefault(record_id, {})[tier] = event
+        elif event.type == "sec_source_section":
+            section_id = str(event.params.get("section_id") or "")
+            if section_id:
+                sections.setdefault(record_id, {})[section_id] = event
+            section_alias = str(event.params.get("section_alias") or "")
+            if section_alias:
+                sections.setdefault(record_id, {})[section_alias] = event
+            financial_role = str(event.params.get("financial_role") or "")
+            if financial_role:
+                sections.setdefault(record_id, {})[
+                    f"item8_operations_{financial_role}"
+                ] = event
+    for record_id, by_tier in computes.items():
+        if "16k" not in by_tier:
+            continue
+        by_section = sections.get(record_id) or {}
+        operation_sections = (
+            "item8_operations_product_revenue",
+            "item8_operations_service_revenue",
+            "item8_operations_total_revenue",
+        )
+        ops = by_section.get(operation_sections[0])
+        if ops is None:
+            continue
+        source_key = record_id.replace(":", "_")
+        extra_128k: tuple[str, ...] = ()
+        apple_128k = (
+            "item8_cash_flow",
+            "note7_income_taxes",
+            "note8_leases",
+            "note9_debt",
+        )
+        amazon_128k = (
+            "item8_cash_flow",
+            "note4_leases",
+            "note9_income_taxes",
+            "note10_segment_oi",
+        )
+        if all(name in by_section for name in apple_128k):
+            extra_128k = apple_128k
+        elif all(name in by_section for name in amazon_128k):
+            extra_128k = amazon_128k
+        staged = [
+            ("16k", 2, operation_sections, ("16k",)),
+            (
+                "32k",
+                3,
+                (*operation_sections, "note2_revenue", "note13_segments"),
+                ("16k", "32k"),
+            ),
+            (
+                "64k",
+                4,
+                (
+                    *operation_sections,
+                    "note2_revenue",
+                    "note13_segments",
+                    "note13_prior_segments",
+                    "item8_balance_sheet",
+                    "ex_31_1",
+                    "ex_31_2",
+                    "ex_32_1",
+                    *(("ex_32_2",) if "ex_32_2" in by_section else ()),
+                ),
+                ("16k", "32k", "64k"),
+            ),
+        ]
+        staged = [item for item in staged if item[0] in by_tier]
+        if (
+            "128k" in by_tier
+            and extra_128k
+            and all(name in by_section for name in extra_128k)
+        ):
+            staged.append(
+                (
+                    "128k",
+                    5,
+                    (
+                        *operation_sections,
+                        "note2_revenue",
+                        "note13_segments",
+                        "note13_prior_segments",
+                        "item8_balance_sheet",
+                        "ex_31_1",
+                        "ex_31_2",
+                        "ex_32_1",
+                        *(("ex_32_2",) if "ex_32_2" in by_section else ()),
+                        *extra_128k,
+                    ),
+                    ("16k", "32k", "64k", "128k"),
+                )
+            )
+        for (
+            control_tier,
+            proof_depth,
+            needed_names,
+            extra_answers,
+        ) in staged:
+            answer_event = by_tier[control_tier]
+            needed_sections = [by_section.get(name) for name in needed_names]
+            needed_answers = [by_tier.get(name) for name in extra_answers]
+            if any(item is None for item in (*needed_sections, *needed_answers)):
+                continue
+            essential_events = [
+                item for item in (*needed_sections, *needed_answers) if item is not None
+            ]
+            essential_ids = [event.id for event in essential_events]
+            queries.append(
+                QuerySpec(
+                    query_id=(
+                        f"{qid}:sec_financial_reconstruction:{source_key}:"
+                        f"{control_tier}"
+                    ),
+                    query_type="sec_financial_reconstruction",
+                    question=(
+                        "Reconstruct the tagged financial program for this issuer "
+                        f"through the {control_tier} control stage using only the "
+                        "itemized statements, notes, and certifications in context. "
+                        "Do not use identity-header fields as substitutes for "
+                        "statement amounts."
+                    ),
+                    answer="",
+                    as_of=answer_event.time,
+                    answer_key=str(answer_event.params["answer_key"]),
+                    essential_event_ids=essential_ids,
+                    essential_artifact_ids=[
+                        f"{world.spec['world_id']}.{event.visibility[0]}"
+                        for event in essential_events
+                    ],
+                    sufficient_event_ids=essential_ids,
+                    cf_event_id=ops.id,
+                    cf_param_updates=_financial_cf_updates(ops),
+                    cf_answer="",
+                    invariance_event_id=ops.id,
+                    invariance_param_updates={
+                        "retrieval_url": (
+                            "https://www.sec.gov/Archives/edgar/data/0/noise.htm"
+                        )
+                    },
+                    gold_expression=(
+                        (
+                            "tagged MIX/CAT/GEO/BS/CERT/CF/TAX/LEASE/OI reconstruction"
+                            if "note10_segment_oi" in extra_128k
+                            else "tagged MIX/CAT/GEO/BS/CERT/CF/TAX/LEASE/DEBT reconstruction"
+                        )
+                        if control_tier == "128k"
+                        else "tagged MIX/CAT/GEO/BS/CERT reconstruction"
+                    ),
+                    proof_depth=proof_depth,
+                    cf_op="numeric",
+                    motif="source-financial-program",
+                    topology_id=instance_topology(
+                        "company.sec_financial_reconstruction",
+                        record_id,
+                        control_tier,
+                    ),
+                    domain="company",
+                    truth_regime="real_source_derived",
+                    program_ops=_financial_program_ops(control_tier, extra_128k),
+                    preferred_length_buckets=[control_tier],
+                    semantic_growth_group="company_real_sec_financial_reconstruction",
+                    base_task_group=f"sec_financial_reconstruction:{source_key}",
+                )
+            )
 
     # Core questions stop before process extensions (rollback).
     as_of_now = core_as_of(world)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
 from longworld.core.render import (
@@ -12,6 +13,12 @@ from longworld.core.render import (
 )
 from longworld.core.render import (
     _ground_values as _core_ground_values,
+)
+from longworld.core.taxonomy import (
+    EvidenceRole,
+    SourceOrigin,
+    WorkflowKind,
+    classify_artifact,
 )
 from longworld.core.world import Event, SimulatedWorld
 from longworld.domains.company.templates_env import jinja_env
@@ -283,6 +290,124 @@ def render_company(sim: SimulatedWorld) -> list[Artifact]:
     artifacts: list[Artifact] = []
     for event in sim.events:
         if event.skipped or event.type in SKIP_RENDER_TYPES:
+            continue
+        if event.type in {
+            "sec_filing",
+            "sec_filing_eligibility_policy",
+            "sec_filing_approval",
+            "sec_filing_publication_ratification",
+            "sec_source_section",
+            "sec_financial_answer",
+        }:
+            params = event.params
+            artifact_id = f"{sim.spec['world_id']}.{event.visibility[0]}"
+            if event.type == "sec_filing" or event.type == "sec_source_section":
+                text = str(params["text"])
+                source_origin = SourceOrigin(str(params["source_origin"]))
+                workflow_kind = WorkflowKind.HYBRID_CAUSAL
+                provenance_id = str(params["provenance_id"])
+                evidence_role = EvidenceRole.CAUSAL_SUPPORTING
+                real_record = True
+            elif event.type == "sec_filing_eligibility_policy":
+                accepted = ", ".join(str(item) for item in params["accepted_forms"])
+                text = (
+                    "SEC filing release-eligibility policy\n"
+                    f"Accepted annual forms: {accepted}.\n"
+                    "Filing window: no later than "
+                    f"{params['max_days_after_report']} days after the reported "
+                    "period end.\n"
+                    "The policy engine must read the selected filing body to determine "
+                    "its actual form, filing date, reporting period, and accession. This "
+                    "memo does not restate those filing-specific facts."
+                )
+                source_origin = SourceOrigin.SYNTHETIC_WORLD
+                workflow_kind = WorkflowKind.HYBRID_CAUSAL
+                provenance_id = (
+                    "derived-sha256:" + hashlib.sha256(text.encode()).hexdigest()
+                )
+                evidence_role = EvidenceRole.CAUSAL_SUPPORTING
+                real_record = False
+            elif event.type == "sec_filing_approval":
+                text = (
+                    "SEC filing release committee decision\n"
+                    "Status: committee-approved. The committee authorizes publication "
+                    "of the result produced by the eligibility policy. This decision "
+                    "does not repeat the filing form, dates, accession, or computed "
+                    "eligibility status."
+                )
+                source_origin = SourceOrigin.SYNTHETIC_WORLD
+                workflow_kind = WorkflowKind.HYBRID_CAUSAL
+                provenance_id = (
+                    "derived-sha256:" + hashlib.sha256(text.encode()).hexdigest()
+                )
+                evidence_role = EvidenceRole.CAUSAL_SUPPORTING
+                real_record = False
+            elif event.type == "sec_financial_answer":
+                text = (
+                    "SEC financial answer. "
+                    f"Checkpoint: {params['control_stage']}. "
+                    "Status: financial-reconstructed. Reconstruct the tagged program "
+                    "from cited statements, notes, and certifications. This memo does "
+                    "not restate amounts."
+                )
+                source_origin = SourceOrigin.SYNTHETIC_WORLD
+                workflow_kind = WorkflowKind.HYBRID_CAUSAL
+                provenance_id = (
+                    "derived-sha256:" + hashlib.sha256(text.encode()).hexdigest()
+                )
+                evidence_role = EvidenceRole.CAUSAL_GOLD
+                real_record = False
+            else:
+                text = (
+                    "SEC filing publication ratification\n"
+                    f"Decision checkpoint: {params['control_stage']}. "
+                    "Status: publication-ratified. This control activates the "
+                    "committee's prior decision without repeating the filing form, "
+                    "dates, accession, or computed eligibility result."
+                )
+                source_origin = SourceOrigin.SYNTHETIC_WORLD
+                workflow_kind = WorkflowKind.HYBRID_CAUSAL
+                provenance_id = (
+                    "derived-sha256:" + hashlib.sha256(text.encode()).hexdigest()
+                )
+                evidence_role = EvidenceRole.CAUSAL_SUPPORTING
+                real_record = False
+            artifact = Artifact(
+                artifact_id=artifact_id,
+                doc_type=event.type,
+                time=event.time,
+                project=project["project"],
+                prefix=prefix,
+                reveals_events=[event.id],
+                text=text,
+                facts=[],
+                slots={
+                    "event_type": event.type,
+                    "params": dict(params),
+                    "ground_values": list(params.get("ground_values") or []),
+                    "author_role": "sec_release_committee",
+                    "audience_role": "sec_release_committee",
+                    "real_workflow_record": real_record,
+                    "source_workflow_id": str(params["workflow_id"]),
+                    "source_record_id": str(params.get("record_id") or ""),
+                    "parent_provenance_id": str(
+                        params.get("parent_provenance_id") or ""
+                    ),
+                    "source_url": str(params.get("source_url") or ""),
+                    "source_family": str(params.get("source_family") or ""),
+                },
+                is_focal=is_focal,
+                role="sec_release_committee",
+            )
+            classify_artifact(
+                artifact,
+                source_origin=source_origin,
+                workflow_kind=workflow_kind,
+                evidence_role=evidence_role,
+                workflow_id=sim.spec["world_id"],
+                provenance_id=provenance_id,
+            )
+            artifacts.append(artifact)
             continue
         if event.type in renewal_types:
             meta = _renewal_meta(project, event)

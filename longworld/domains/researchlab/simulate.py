@@ -7,12 +7,53 @@ from typing import Any
 
 from longworld.core.cascade import cascade_events
 from longworld.core.grounded import grounded_events
+from longworld.core.provenance import ProvenanceError
+from longworld.core.sourceworkflow import PAPER_SOURCE_KIND, WIKIMEDIA_SOURCE_KIND
+from longworld.core.wikiparse import (
+    WIKI_ENTITY_VIEW_PREFIX,
+    WIKI_SECTION_VIEW_PREFIX,
+    parse_wiki_claim_program,
+)
 from longworld.core.world import Event, SimulatedWorld, WorldSimulator
 from longworld.domains.researchlab.events import (
     apply_event,
     check_preconditions,
     init_values,
 )
+
+_WIKI_SECTION_OFFSETS = {
+    "early_work": 0,
+    "commemoration": 8,
+    "wikidata_entity": 8,
+    "popular_culture": 401,
+    "appendix_rest": 402,
+}
+_WIKI_CLAIM_TIERS = (
+    (
+        "16k",
+        (
+            (5, "compute", "birth-date reconstruction"),
+            (6, "copy", "interim birth confirmation"),
+            (7, "copy", "initial birth publication"),
+        ),
+        ("early_work",),
+    ),
+    (
+        "32k",
+        ((400, "compute", "commemoration and entity resolution"),),
+        ("early_work", "commemoration", "wikidata_entity"),
+    ),
+    (
+        "64k",
+        ((800, "compute", "popular-culture reconstruction"),),
+        ("early_work", "commemoration", "popular_culture", "wikidata_entity"),
+    ),
+)
+_WIKI_TIER_ROLES = {
+    "16k": ("born",),
+    "32k": ("born", "commemoration", "entity"),
+    "64k": ("born", "commemoration", "entity", "popular_culture"),
+}
 
 
 def _date(start: date, months: int, extra_days: int = 0) -> date:
@@ -73,9 +114,166 @@ def _semantic_arxiv_body(record: Any) -> tuple[str, str, list[str]]:
     return body, f"derived-sha256:{provenance}", excluded_paths
 
 
+def _wiki_section_fact_spans(section: Any, *, shift: int) -> list[dict[str, Any]]:
+    return [fact.to_span(shift=shift) for fact in section.facts]
+
+
+def _wikipedia_source_workflow_events(
+    workflow: Any, prefix: str, workflow_index: int
+) -> list[Event]:
+    wiki_records = [
+        record for record in workflow.records if record.kind == "wikipedia_revision"
+    ]
+    entity_records = [
+        record
+        for record in workflow.records
+        if record.kind == "wikidata_entity_revision"
+    ]
+    if len(wiki_records) != 2 or len(entity_records) != 1:
+        return []
+    later = max(wiki_records, key=lambda record: (record.occurred_at, record.record_id))
+    entity = entity_records[0]
+    wiki_hash = hashlib.sha256(later.text.encode()).hexdigest()
+    entity_hash = hashlib.sha256(entity.text.encode()).hexdigest()
+    if wiki_hash != later.text_sha256 or entity_hash != entity.text_sha256:
+        return []
+    try:
+        program = parse_wiki_claim_program(
+            wikipedia_text=later.text,
+            entity_text=entity.text,
+            wikipedia_parent_hash=wiki_hash,
+            entity_parent_hash=entity_hash,
+        )
+    except ProvenanceError:
+        return []
+    later_day = date.fromisoformat(later.occurred_at[:10])
+    events: list[Event] = []
+    section_ids: dict[str, str] = {}
+    for section in program.sections:
+        record = entity if section.section_id == "wikidata_entity" else later
+        prefix_text = (
+            WIKI_ENTITY_VIEW_PREFIX
+            if section.section_id == "wikidata_entity"
+            else WIKI_SECTION_VIEW_PREFIX
+        )
+        section_text = prefix_text + section.wikitext
+        event_id = (
+            f"{prefix}.wiki_section_{section.section_id}_{workflow_index}_"
+            f"{later.record_id}"
+        )
+        section_ids[section.section_id] = event_id
+        events.append(
+            Event(
+                id=event_id,
+                type="wiki_source_section",
+                time=later_day
+                + timedelta(days=_WIKI_SECTION_OFFSETS[section.section_id]),
+                params={
+                    "workflow_id": workflow.workflow_id,
+                    "record_id": later.record_id,
+                    "section_record_id": record.record_id,
+                    "section_id": section.section_id,
+                    "text": section_text,
+                    "text_sha256": hashlib.sha256(section_text.encode()).hexdigest(),
+                    "source_sha256": record.source_sha256,
+                    "parent_source_sha256": section.parent_sha256,
+                    "section_sha256": section.section_sha256,
+                    "parent_provenance_id": record.provenance_id,
+                    "provenance_id": section.provenance_id,
+                    "source_origin": "real_derived",
+                    "source_family": record.source_family,
+                    "source_url": record.source_url,
+                    "retrieval_url": record.retrieval_url,
+                    "fact_spans": _wiki_section_fact_spans(
+                        section, shift=len(prefix_text)
+                    ),
+                    "ground_values": [section.ground_value],
+                },
+                visibility=[event_id],
+            )
+        )
+    prior_id = ""
+    prior_key = ""
+    compute_keys: dict[str, str] = {}
+    used_sections: set[str] = set()
+    for control_tier, rungs, needed_sections in _WIKI_CLAIM_TIERS:
+        new_sections = [name for name in needed_sections if name not in used_sections]
+        for rung_index, (offset, compose, stage) in enumerate(rungs):
+            event_id = (
+                f"{prefix}.wiki_claim_{control_tier}_{compose}_{rung_index}_"
+                f"{workflow_index}_{later.record_id}"
+            )
+            if compose == "copy":
+                parents = [prior_id] if prior_id else []
+                answer_key = (
+                    f"wiki_claim_reconstruction:{later.record_id}:"
+                    f"{control_tier}_rung{rung_index}"
+                )
+                required_roles: list[str] = []
+            else:
+                # Continue the published chain. Re-attaching ancestor sections
+                # as parallel parents shortens shortest-path proof depth.
+                parents = [prior_id] if prior_id else []
+                parents.extend(section_ids[name] for name in new_sections)
+                answer_key = (
+                    f"wiki_claim_reconstruction:{later.record_id}:{control_tier}"
+                )
+                required_roles = list(_WIKI_TIER_ROLES[control_tier])
+            relation_kinds = {
+                parent: ("extends" if parent == prior_id else "reads_section")
+                for parent in parents
+            }
+            events.append(
+                Event(
+                    id=event_id,
+                    type="wiki_claim_answer",
+                    time=later_day + timedelta(days=offset),
+                    params={
+                        "workflow_id": workflow.workflow_id,
+                        "record_id": later.record_id,
+                        "control_tier": control_tier,
+                        "control_stage": stage,
+                        "compose": compose,
+                        "answer_key": answer_key,
+                        "prerequisite_answer_key": prior_key
+                        if compose == "copy"
+                        else (
+                            compute_keys["16k"]
+                            if control_tier == "32k"
+                            else compute_keys.get("32k", "")
+                            if control_tier == "64k"
+                            else ""
+                        ),
+                        "required_roles": required_roles,
+                        "section_event_ids": [
+                            section_ids[name] for name in needed_sections
+                        ],
+                        "ground_values": ["wiki-reconstructed", stage],
+                    },
+                    visibility=[event_id],
+                    causal_inputs=parents,
+                    required_inputs=parents,
+                    relation_kinds=relation_kinds,
+                )
+            )
+            prior_id = event_id
+            prior_key = answer_key
+            if compose == "compute":
+                compute_keys[control_tier] = answer_key
+        used_sections.update(needed_sections)
+    return events
+
+
 def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]:
     events: list[Event] = []
     for workflow_index, workflow in enumerate(project.get("source_workflows") or []):
+        if workflow.source_kind == WIKIMEDIA_SOURCE_KIND:
+            events.extend(
+                _wikipedia_source_workflow_events(workflow, prefix, workflow_index)
+            )
+            continue
+        if workflow.source_kind != PAPER_SOURCE_KIND:
+            continue
         record_event_ids: dict[str, str] = {}
         record_bodies: dict[str, str] = {}
         records = {record.record_id: record for record in workflow.records}

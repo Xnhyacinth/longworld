@@ -46,10 +46,10 @@ def sample_lab_spec(
     workflows = list(source_workflows or [])
     if any(
         workflow.target_domain != "researchlab"
-        or workflow.source_kind != "paper_workflow"
+        or workflow.source_kind not in {"paper_workflow", "wikimedia"}
         for workflow in workflows
     ):
-        raise ValueError("researchlab requires paper source workflows")
+        raise ValueError("researchlab requires paper or Wikimedia source workflows")
     rng = random.Random(seed)
     used: set[str] = set()
     start = date(2026, 1, 8) + timedelta(days=rng.randrange(0, 10))

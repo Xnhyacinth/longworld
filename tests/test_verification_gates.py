@@ -162,6 +162,7 @@ def test_counterfactual_task_gate_enforces_hard_preconditions(monkeypatch):
         return spec.answer
 
     monkeypatch.setattr("longworld.core.verify.answer_from_artifacts", replay)
+    monkeypatch.setattr("longworld.core.verify.semantic_answer_from_artifacts", replay)
     verification, notes = verify_question(
         world,
         spec,

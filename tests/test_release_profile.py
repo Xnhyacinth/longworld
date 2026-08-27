@@ -46,6 +46,41 @@ def test_release_profiles_fix_scale_and_real_data_growth() -> None:
     )
 
 
+def test_p7_source_rich_profile_requires_every_world_to_be_real() -> None:
+    profile = release_profile("p7-source-rich-probe-12-v1")
+
+    assert profile.environment == "probe"
+    assert profile.predecessor_profile_id == "p6-source-dependent-probe-12-v1"
+    assert profile.expected_promoted_worlds == 12
+    assert (profile.min_train_worlds, profile.min_eval_worlds) == (10, 2)
+    assert (profile.min_real_train_worlds, profile.min_real_eval_worlds) == (10, 2)
+    assert profile.min_source_families == 4
+    assert profile.min_real_base_tasks == 12
+    assert profile.min_real_source_relations == 12
+    assert profile.min_real_64k_rows == 48
+    assert profile.min_unique_real_source_workflows == 12
+    assert dict(profile.min_real_exact_64k_rows_by_domain) == {
+        "company": 12,
+        "researchlab": 12,
+        "codeforge": 12,
+    }
+    assert dict(profile.min_exact_64k_rows_by_domain) == {
+        "company": 12,
+        "researchlab": 12,
+        "codeforge": 12,
+    }
+    assert dict(profile.min_real_exact_64k_worlds_by_domain) == {
+        "company": 4,
+        "researchlab": 4,
+        "codeforge": 4,
+    }
+    assert dict(profile.promoted_domain_world_quotas) == {
+        "company": 4,
+        "researchlab": 4,
+        "codeforge": 4,
+    }
+
+
 def test_release_profile_digest_binds_every_gate_value(monkeypatch) -> None:
     profile_id = "p3-probe-12-v1"
     original = release_profile_sha256(profile_id)
@@ -57,3 +92,42 @@ def test_release_profile_digest_binds_every_gate_value(monkeypatch) -> None:
 
     assert len(original) == 64
     assert release_profile_sha256(profile_id) != original
+
+
+def test_new_p7_gates_do_not_rewrite_frozen_p6_profile_digest() -> None:
+    assert release_profile_sha256("p6-source-dependent-probe-12-v1") == (
+        "68601a08ceabc7e6c5dec0a49a398318ebb596a1da65a3ac4bcdc35b5585b495"
+    )
+
+
+def test_p7_sec_slice_is_an_explicit_one_world_engineering_gate() -> None:
+    profile = release_profile("p7-sec-source-slice-1-v1")
+
+    assert profile.expected_promoted_worlds == 1
+    assert profile.promoted_domain_world_quotas == (("company", 1),)
+    assert profile.min_real_source_relations == 0
+    assert profile.min_unique_real_source_workflows == 1
+    assert profile.min_real_exact_64k_rows_by_domain == (("company", 1),)
+    assert profile.min_real_exact_64k_worlds_by_domain == (("company", 1),)
+
+
+def test_p7_wiki_slice_is_an_explicit_one_world_engineering_gate() -> None:
+    profile = release_profile("p7-wiki-source-slice-1-v1")
+
+    assert profile.expected_promoted_worlds == 1
+    assert profile.promoted_domain_world_quotas == (("researchlab", 1),)
+    assert profile.min_real_source_relations == 0
+    assert profile.min_unique_real_source_workflows == 1
+    assert profile.min_real_exact_64k_rows_by_domain == (("researchlab", 1),)
+    assert profile.min_real_exact_64k_worlds_by_domain == (("researchlab", 1),)
+
+
+def test_p7_github_slice_is_an_explicit_one_world_engineering_gate() -> None:
+    profile = release_profile("p7-github-source-slice-1-v1")
+
+    assert profile.expected_promoted_worlds == 1
+    assert profile.promoted_domain_world_quotas == (("codeforge", 1),)
+    assert profile.min_real_source_relations == 0
+    assert profile.min_unique_real_source_workflows == 1
+    assert profile.min_real_exact_64k_rows_by_domain == (("codeforge", 1),)
+    assert profile.min_real_exact_64k_worlds_by_domain == (("codeforge", 1),)

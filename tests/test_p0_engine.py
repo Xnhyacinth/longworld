@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from longworld.core import graph as graph_module
 from longworld.core.consist import parse_facts
 from longworld.core.engine import answer_from_artifacts, answer_from_events
-from longworld.core.graph import min_sufficient_subgraph, proof_depth
+from longworld.core.graph import graph_stats, min_sufficient_subgraph, proof_depth
 from longworld.core.sampler import materialize
 from longworld.core.verify import shortcut_free, verify_question
 from longworld.core.views import render_cf_view, split_views
@@ -37,7 +38,7 @@ def test_replay_and_gates_seed1():
     for spec in mat.queries:
         gold = gold_from_full(world, spec)
         assert spec.answer == gold
-        cf_w, cf_arts = render_cf_view(world, spec)
+        _, cf_arts = render_cf_view(world, spec)
         ver, notes = verify_question(world, spec, arts, cf_artifacts=cf_arts)
         if spec.query_id.endswith(":decoy_invariance"):
             assert (
@@ -133,3 +134,28 @@ def test_min_subgraph_nonempty():
     sub = min_sufficient_subgraph(world, spec)
     assert sub.number_of_nodes() >= 2
     assert proof_depth(world, spec) >= 2
+
+
+def test_graph_stats_builds_the_world_graph_once(monkeypatch):
+    mat = materialize(6, n_parallel=1)
+    world = mat.worlds["focal"]
+    spec = next(
+        q
+        for q in mat.queries
+        if q.query_type == "current_state" and "decoy" not in q.query_id
+    )
+    original = graph_module.build_causal_graph
+    calls = 0
+
+    def counted_build(current_world):
+        nonlocal calls
+        calls += 1
+        return original(current_world)
+
+    monkeypatch.setattr(graph_module, "build_causal_graph", counted_build)
+
+    stats = graph_stats(world, spec)
+
+    assert calls == 1
+    assert stats["proof_depth"] >= 2
+    assert stats["hop_count"] >= stats["proof_depth"]

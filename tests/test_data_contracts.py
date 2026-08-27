@@ -26,7 +26,7 @@ from longworld.core.pack import (
     dependency_class_for_view,
     pack_view,
 )
-from longworld.core.promotion import promoted_row_set_sha256
+from longworld.core.promotion import STRICT_REPLAY_REVISION, promoted_row_set_sha256
 from longworld.core.provenance import ProvenanceError
 from longworld.core.record_contract import replay_bundle_binding_valid, sft_row_errors
 from longworld.core.release_profile import release_profile_sha256
@@ -77,6 +77,8 @@ from generate import (
     real_workflow_bundle_for_seed,
     real_workflow_corridor_ids,
     resolve_world_targets,
+    source_workflow_artifacts_for_query,
+    source_workflow_bundle_for_seed,
     stable_digest,
     strict_view_evidence_reject_reason,
     tokenizer_token_count,
@@ -111,6 +113,19 @@ ROOT = Path(__file__).resolve().parents[1]
 @pytest.fixture(autouse=True)
 def _attestation_key(monkeypatch) -> None:
     monkeypatch.setenv(ATTESTATION_ENV, TEST_ATTESTATION_KEY.decode())
+
+
+def test_source_workflow_seed_routing_is_domain_typed_not_researchlab_only() -> None:
+    configured = "data/source_inventory/sec/source-bundle.json"
+    cfg = {
+        "source_workflow_bundle": configured,
+        "source_workflow_seeds": [7],
+    }
+
+    assert source_workflow_bundle_for_seed(cfg, seed=7, domain="company") == (
+        ROOT / configured
+    )
+    assert source_workflow_bundle_for_seed(cfg, seed=8, domain="company") is None
 
 
 def test_training_does_not_expose_the_producer_attestation_key() -> None:
@@ -435,6 +450,24 @@ def test_real_workflow_task_families_use_honest_length_buckets() -> None:
     assert real_workflow_buckets_for_query(
         buckets, "cross_repo_release_dependency", routing
     ) == {"32k": 32_768}
+    assert (
+        real_workflow_buckets_for_query(
+            buckets,
+            "version_selection",
+            routing,
+            preferred=["128k"],
+        )
+        == {}
+    )
+    assert (
+        real_workflow_buckets_for_query(
+            buckets,
+            "sec_filing_eligibility",
+            {"sec_filing_eligibility": ["16k"]},
+            ["32k"],
+        )
+        == {}
+    )
 
 
 def test_real_query_pool_excludes_unrelated_repository_episodes() -> None:
@@ -483,6 +516,96 @@ def test_real_query_pool_keeps_explicit_synthetic_hybrid_policy() -> None:
     assert {artifact.artifact_id for artifact in selected} == {
         release.artifact_id,
         policy.artifact_id,
+    }
+
+
+def test_source_workflow_query_pool_excludes_future_documents() -> None:
+    before = _artifact("w.before", "known before checkpoint", event="before")
+    before.time = date(2025, 1, 1)
+    after = _artifact("w.after", "future control", event="after")
+    after.time = date(2025, 3, 1)
+    spec = _spec(before.artifact_id, query_type="sec_filing_eligibility")
+    spec.as_of = date(2025, 2, 1)
+
+    selected = source_workflow_artifacts_for_query([before, after], spec)
+
+    assert [artifact.artifact_id for artifact in selected] == [before.artifact_id]
+
+
+def test_source_workflow_query_pool_excludes_unbound_source_packs() -> None:
+    section = _artifact("w.wiki_section_early_work", "authentic body", event="early")
+    leftover = _artifact(
+        "w.wiki_section_appendix_rest", "legacy leftover", event="rest"
+    )
+    rfc = _artifact("w.source.rfc9110.full", "unbound RFC leftover file")
+    rfc.doc_type = "source_pack"
+    rfc.reveals_events = []
+    spec = _spec(section.artifact_id, query_type="wiki_claim_reconstruction")
+    spec.as_of = date(2026, 12, 31)
+
+    selected = source_workflow_artifacts_for_query([section, leftover, rfc], spec)
+
+    assert [artifact.artifact_id for artifact in selected] == [
+        section.artifact_id,
+        leftover.artifact_id,
+    ]
+
+
+def test_sec_financial_query_pool_excludes_unrelated_company_cycle() -> None:
+    def sec_artifact(
+        artifact_id: str, event_type: str, workflow_id: str, *, essential: bool = False
+    ) -> Artifact:
+        artifact = _artifact(artifact_id, event_type, event=artifact_id)
+        artifact.doc_type = event_type
+        artifact.slots.update(
+            event_type=event_type,
+            source_workflow_id=workflow_id,
+            real_workflow_record=event_type in {"sec_filing", "sec_source_section"},
+        )
+        if essential:
+            classify_artifact(
+                artifact,
+                source_origin=SourceOrigin.REAL_DERIVED,
+                workflow_kind=WorkflowKind.HYBRID_CAUSAL,
+                evidence_role=EvidenceRole.CAUSAL_GOLD,
+                workflow_id="world",
+                provenance_id=f"derived-sha256:{artifact_id}",
+            )
+        return artifact
+
+    statement = sec_artifact(
+        "w.sec.statement", "sec_source_section", "sec:apple", essential=True
+    )
+    note = sec_artifact("w.sec.note", "sec_source_section", "sec:apple")
+    control = sec_artifact(
+        "w.sec.control", "sec_financial_answer", "sec:apple", essential=True
+    )
+    other_filing = sec_artifact("w.sec.other", "sec_source_section", "sec:amazon")
+    cycle = _artifact("w.cycle_roadmap", "unrelated company renewal cycle")
+    hard_negative = _artifact("w.sec.hard", "nearby issuer decoy")
+    classify_artifact(
+        hard_negative,
+        source_origin=SourceOrigin.REAL_PUBLIC,
+        workflow_kind=WorkflowKind.HYBRID_CAUSAL,
+        evidence_role=EvidenceRole.STRUCTURAL_HARD_NEGATIVE,
+        workflow_id="world",
+        provenance_id="sec:hard-negative",
+    )
+    spec = _spec(
+        statement.artifact_id,
+        control.artifact_id,
+        query_type="sec_financial_reconstruction",
+    )
+
+    selected = source_workflow_artifacts_for_query(
+        [statement, note, control, other_filing, cycle, hard_negative], spec
+    )
+
+    assert {artifact.artifact_id for artifact in selected} == {
+        statement.artifact_id,
+        note.artifact_id,
+        control.artifact_id,
+        hard_negative.artifact_id,
     }
 
 
@@ -633,7 +756,7 @@ def test_b5w_uses_weight_without_duplicate_rows(tmp_path: Path) -> None:
                 "aggregation": "max_similarity",
             },
             "dense_top_k": 3,
-            "strict_replay_revision": "longworld-strict-replay-v3",
+            "strict_replay_revision": STRICT_REPLAY_REVISION,
             "strict_replay_answer": "RV-1001",
         },
         "artifact_classification": [
@@ -786,7 +909,7 @@ def test_sharegpt_export_keeps_full_cf_dossier_twins_atomic_under_cap(
                 "aggregation": "max_similarity",
             },
             "dense_top_k": 3,
-            "strict_replay_revision": "longworld-strict-replay-v3",
+            "strict_replay_revision": STRICT_REPLAY_REVISION,
             "strict_replay_answer": "RV-1001",
         },
         "artifact_classification": [
@@ -1354,6 +1477,7 @@ def test_intrinsic_long_source_does_not_require_artificial_truncation() -> None:
         "evidence_span_tokens": 54500,
         "strict_support_event_count": 4,
         "difficulty": {"proof_depth": 4},
+        "graph": {"proof_depth": 4, "hop_count": 4},
         "semantic_growth_group_id": "intrinsic-paper-growth",
         "semantic_tokens": {
             "event_bearing": 54500,
@@ -1374,6 +1498,95 @@ def test_intrinsic_long_source_does_not_require_artificial_truncation() -> None:
     )
 
     assert not any("real_64k_missing_lower_band" in error for error in result["errors"])
+
+
+def test_intrinsic_long_source_compares_exact_span_in_exact_token_units() -> None:
+    row = {
+        "base_task_id": "intrinsic-exact-base",
+        "world_id": "exact-world",
+        "query_timing": "late",
+        "view": "full",
+        "context": "complete authentic workflow bodies",
+        "question": "q",
+        "answer": "a",
+        "split": "train",
+        "length_bucket": "64k",
+        "actual_context_tokens": 55_000,
+        "tokenizer_context_tokens": 64_700,
+        "tokenizer_evidence_span_tokens": 50_000,
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "a" * 40,
+        "real_source_verified": True,
+        "real_source_token_ratio": 0.98,
+        "context_source_relation_count": 1,
+        "evidence_span_tokens": 54_500,
+        "strict_support_event_count": 4,
+        "difficulty": {"proof_depth": 4},
+        "graph": {"proof_depth": 4, "hop_count": 4},
+        "semantic_growth_group_id": "intrinsic-exact-growth",
+        "semantic_tokens": {
+            "event_bearing": 54_500,
+            "internal": 0,
+            "generic_background": 0,
+        },
+    }
+
+    result = evaluate_quality(
+        {"retention": 0.5, "n_worlds": 1},
+        [row],
+        min_retention=0.0,
+        max_retention=1.0,
+        max_boilerplate=1.0,
+        max_pulse=1.0,
+        min_internal_growth=4096,
+        max_generic_growth_share=0.2,
+    )
+
+    assert any("real_64k_missing_lower_band" in error for error in result["errors"])
+
+
+def test_sec_intrinsic_long_source_requires_raw_exact_span() -> None:
+    row = {
+        "base_task_id": "sec-exact-base",
+        "world_id": "sec-world",
+        "query_type": "sec_financial_reconstruction",
+        "query_timing": "late",
+        "view": "full",
+        "context": "readable filing workflow",
+        "question": "q",
+        "answer": "a",
+        "split": "train",
+        "length_bucket": "64k",
+        "actual_context_tokens": 55_000,
+        "tokenizer_context_tokens": 64_700,
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "a" * 40,
+        "real_source_verified": True,
+        "real_source_token_ratio": 0.98,
+        "context_source_relation_count": 1,
+        "evidence_span_tokens": 54_500,
+        "strict_support_event_count": 4,
+        "graph": {"proof_depth": 4, "hop_count": 4},
+        "semantic_growth_group_id": "sec-exact-growth",
+        "semantic_tokens": {
+            "event_bearing": 54_500,
+            "internal": 0,
+            "generic_background": 0,
+        },
+    }
+
+    result = evaluate_quality(
+        {"retention": 0.5, "n_worlds": 1},
+        [row],
+        min_retention=0.0,
+        max_retention=1.0,
+        max_boilerplate=1.0,
+        max_pulse=1.0,
+        min_internal_growth=4096,
+        max_generic_growth_share=0.2,
+    )
+
+    assert any("real_64k_missing_lower_band" in error for error in result["errors"])
 
 
 def test_real_band_growth_requires_more_replayed_causal_history() -> None:
@@ -1398,6 +1611,7 @@ def test_real_band_growth_requires_more_replayed_causal_history() -> None:
         "context_source_relation_count": 3,
         "strict_support_event_count": 4,
         "difficulty": {"proof_depth": 3},
+        "graph": {"proof_depth": 3, "hop_count": 3},
     }
     lower = {**base, "length_bucket": "16k", "actual_context_tokens": 16000}
     higher = {
@@ -1410,6 +1624,7 @@ def test_real_band_growth_requires_more_replayed_causal_history() -> None:
             "event_bearing": 60000,
         },
         "difficulty": {"proof_depth": 3},
+        "graph": {"proof_depth": 3, "hop_count": 3},
     }
 
     result = evaluate_quality(
@@ -1428,6 +1643,7 @@ def test_real_band_growth_requires_more_replayed_causal_history() -> None:
     higher["context_source_relation_count"] = 8
     higher["strict_support_event_count"] = 9
     higher["difficulty"] = {"proof_depth": 7}
+    higher["graph"] = {"proof_depth": 7, "hop_count": 7}
     result = evaluate_quality(
         {"retention": 0.5, "n_worlds": 1},
         [lower, higher],
@@ -1440,6 +1656,92 @@ def test_real_band_growth_requires_more_replayed_causal_history() -> None:
     )
 
     assert not any("real_causal_history_growth" in error for error in result["errors"])
+    assert any("real_proof_token_growth" in error for error in result["errors"])
+
+    higher["semantic_tokens"] = {
+        **higher["semantic_tokens"],
+        "proof_bearing": 2200,
+        "causal_supporting": 3100,
+    }
+    result = evaluate_quality(
+        {"retention": 0.5, "n_worlds": 1},
+        [lower, higher],
+        min_retention=0.0,
+        max_retention=1.0,
+        max_boilerplate=1.0,
+        max_pulse=1.0,
+        min_internal_growth=1,
+        max_generic_growth_share=0.3,
+    )
+
+    assert not any("real_proof_token_growth" in error for error in result["errors"])
+
+
+def test_p7_real_growth_rejects_nominal_proof_increment_over_background_growth() -> (
+    None
+):
+    base = {
+        "base_task_id": "p7-real-base",
+        "world_id": "p7-world",
+        "query_timing": "first",
+        "view": "full",
+        "split": "train",
+        "real_source_verified": True,
+        "semantic_growth_group_id": "p7-real-growth",
+        "context_source_relation_count": 3,
+        "strict_support_event_count": 4,
+        "difficulty": {"proof_depth": 4},
+        "graph": {"proof_depth": 4, "hop_count": 4},
+        "semantic_tokens": {
+            "event_bearing": 10000,
+            "internal": 0,
+            "generic_background": 0,
+            "proof_bearing": 8200,
+            "causal_supporting": 100,
+        },
+    }
+    lower = {**base, "length_bucket": "16k", "actual_context_tokens": 16000}
+    higher = {
+        **base,
+        "length_bucket": "32k",
+        "actual_context_tokens": 32000,
+        "context_source_relation_count": 4,
+        "strict_support_event_count": 5,
+        "difficulty": {"proof_depth": 5},
+        "graph": {"proof_depth": 5, "hop_count": 5},
+        "semantic_tokens": {
+            **base["semantic_tokens"],
+            "event_bearing": 26000,
+            "causal_supporting": 180,
+        },
+    }
+
+    errors = quality_gate._semantic_growth_errors(
+        [lower, higher],
+        min_internal_growth=1,
+        max_generic_growth_share=0.2,
+        require_substantial_real_proof_growth=True,
+    )
+
+    assert any("real_proof_growth_share" in error for error in errors)
+
+
+def test_real_exact_64k_domain_coverage_counts_worlds_not_view_rows() -> None:
+    rows = [
+        {
+            "world_id": "company-world-1",
+            "domain": "company",
+            "base_task_id": "same-task",
+            "view": view,
+            "query_timing": timing,
+        }
+        for view in ("full", "cf", "ordered_artifact_view")
+        for timing in ("first", "late")
+    ]
+
+    assert quality_gate._real_exact_64k_worlds_by_domain(rows, ["company"]) == {
+        "company": 1
+    }
 
 
 def test_quality_gate_rejects_only_the_selected_world_split_axis() -> None:
@@ -1951,7 +2253,7 @@ def test_quality_gate_rejects_a_tampered_target_report_without_skipping_scale_ga
     assert "dense_promotion_incomplete=8/8" in result["errors"]
 
 
-def test_twelve_world_gate_requires_long_rows_and_real_source_relations() -> None:
+def test_twelve_world_gate_requires_long_rows_and_authentic_source_relations() -> None:
     result = evaluate_quality(
         {
             "data_stage": "candidate",
@@ -1972,7 +2274,7 @@ def test_twelve_world_gate_requires_long_rows_and_real_source_relations() -> Non
         max_generic_growth_share=1.0,
     )
     assert "need nonzero 64k rows" in result["errors"]
-    assert "need nonzero real/hybrid source relations" in result["errors"]
+    assert "need nonzero authentic source relations" in result["errors"]
     assert "dense_promotion_incomplete=1/1" in result["errors"]
     assert "world_retention=0/12" in result["errors"]
     assert "need >=2 domains" in result["errors"]
@@ -2170,6 +2472,139 @@ def test_release_64k_metadata_uses_the_fixed_tokenizer_and_recounts_context(
         expected_model_id="Qwen/Qwen3.5-4B",
         expected_revision="a7b0d22b993d71000cf2eadfb37222a67cee521e",
     )
+
+
+def test_release_metadata_recounts_every_strict_long_band(monkeypatch) -> None:
+    expected = {"16k": 16_100, "32k": 32_200, "64k": 64_300}
+    monkeypatch.setattr(
+        quality_gate,
+        "_tokenizer_context_tokens",
+        lambda context, _model, _revision: expected[context],
+    )
+
+    for band, tokens in expected.items():
+        row = {
+            "length_bucket": band,
+            "context": band,
+            "tokenizer_context_tokens": tokens,
+            "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+            "tokenizer_revision": "a" * 40,
+        }
+        assert quality_gate._has_exact_band_metadata(
+            row,
+            expected_model_id="Qwen/Qwen3.5-4B",
+            expected_revision="a" * 40,
+        )
+        row["tokenizer_context_tokens"] += 1
+        assert not quality_gate._has_exact_band_metadata(
+            row,
+            expected_model_id="Qwen/Qwen3.5-4B",
+            expected_revision="a" * 40,
+        )
+
+
+def test_strict_exact_band_gate_rejects_missing_or_mislabeled_metadata(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        quality_gate,
+        "_tokenizer_context_tokens",
+        lambda _context, _model, _revision: 16_100,
+    )
+    missing = {"query_id": "missing", "length_bucket": "16k", "context": "a"}
+    mislabeled = {
+        "query_id": "mislabeled",
+        "length_bucket": "32k",
+        "context": "b",
+        "tokenizer_context_tokens": 16_100,
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "a" * 40,
+    }
+
+    errors = quality_gate._exact_band_metadata_errors(
+        [missing, mislabeled],
+        expected_model_id="Qwen/Qwen3.5-4B",
+        expected_revision="a" * 40,
+    )
+
+    assert errors == [
+        "invalid_exact_16k:missing",
+        "invalid_exact_32k:mislabeled",
+    ]
+
+
+def test_proof_metadata_gate_requires_graph_authority() -> None:
+    good = {
+        "query_id": "good",
+        "graph": {"proof_depth": 4, "hop_count": 6},
+        "difficulty": {"proof_depth": 4},
+        "hop_count": 6,
+    }
+    wrong_depth = {
+        **good,
+        "query_id": "depth",
+        "difficulty": {"proof_depth": 99},
+    }
+    wrong_hops = {**good, "query_id": "hops", "hop_count": 99}
+    missing = {"query_id": "missing", "difficulty": {"proof_depth": 4}}
+
+    assert quality_gate._proof_metadata_errors(
+        [good, wrong_depth, wrong_hops, missing]
+    ) == [
+        "graph_proof_depth_mismatch:depth",
+        "graph_hop_count_mismatch:hops",
+        "missing_graph_metadata:missing",
+    ]
+
+
+def test_semantic_growth_uses_replayed_graph_depth_not_difficulty_copy() -> None:
+    base = {
+        "base_task_id": "graph-growth",
+        "world_id": "w-graph",
+        "query_timing": "first",
+        "view": "full",
+        "split": "train",
+        "real_source_verified": True,
+        "semantic_growth_group_id": "graph-growth",
+        "context_source_relation_count": 2,
+        "strict_support_event_count": 2,
+        "difficulty": {"proof_depth": 99},
+        "semantic_tokens": {
+            "event_bearing": 15_000,
+            "internal": 0,
+            "generic_background": 0,
+            "proof_bearing": 8_000,
+            "causal_supporting": 100,
+        },
+    }
+    lower = {
+        **base,
+        "length_bucket": "16k",
+        "actual_context_tokens": 16_000,
+        "graph": {"proof_depth": 3, "hop_count": 3},
+    }
+    higher = {
+        **base,
+        "length_bucket": "32k",
+        "actual_context_tokens": 32_000,
+        "context_source_relation_count": 3,
+        "strict_support_event_count": 3,
+        "difficulty": {"proof_depth": 100},
+        "graph": {"proof_depth": 3, "hop_count": 3},
+        "semantic_tokens": {
+            **base["semantic_tokens"],
+            "event_bearing": 31_000,
+            "proof_bearing": 9_000,
+        },
+    }
+
+    errors = quality_gate._semantic_growth_errors(
+        [lower, higher],
+        min_internal_growth=1,
+        max_generic_growth_share=0.2,
+    )
+
+    assert any(error.startswith("real_proof_depth_growth:") for error in errors)
 
 
 def test_exact_64k_metadata_rejects_rows_above_the_bucket_ceiling() -> None:

@@ -6,6 +6,10 @@ import re
 from typing import Any
 
 from longworld.core.asof import find_event, world_as_of
+from longworld.core.scholarly import (
+    format_revision_added_delta,
+    format_revision_funding_delta,
+)
 from longworld.core.world import Event, SimulatedWorld, WorldSimulator
 from longworld.domains.company.queries import (
     QuerySpec,
@@ -92,6 +96,9 @@ def eval_answer(
     if spec.query_type == "real_revision_added_text":
         value = state_values.get("real_revision_added_text")
         return str(value) if value else "unknown"
+    if spec.query_type == "wiki_claim_reconstruction":
+        value = state_values.get(spec.answer_key)
+        return str(value) if value else "unknown"
     if val is None or val is False:
         return "unknown"
     return str(val)
@@ -148,6 +155,70 @@ def _counterfactual_revision_text(text: str, value: str) -> tuple[str, str]:
     return text.replace(value, changed_value), changed_value
 
 
+def _wiki_program_ops(control_tier: str) -> list[dict[str, Any]]:
+    ops: list[dict[str, Any]] = [{"op": "READ_WIKI_FACT", "role": "born"}]
+    if control_tier in {"32k", "64k"}:
+        ops.extend(
+            [
+                {"op": "READ_WIKI_FACT", "role": "commemoration"},
+                {"op": "READ_WIKI_FACT", "role": "entity"},
+            ]
+        )
+    if control_tier == "64k":
+        ops.append({"op": "READ_WIKI_FACT", "role": "popular_culture"})
+    return ops
+
+
+def _wiki_cf_updates(section: Event) -> dict[str, Any]:
+    original = str(section.params.get("text") or "")
+    born = next(
+        (
+            span
+            for span in section.params.get("fact_spans") or []
+            if isinstance(span, dict) and span.get("role") == "born"
+        ),
+        None,
+    )
+    if not isinstance(born, dict):
+        return {"text": original}
+    start = born.get("char_start")
+    end = born.get("char_end")
+    quote = str(born.get("evidence_quote") or "")
+    value = str(born.get("value") or "")
+    if (
+        isinstance(start, bool)
+        or isinstance(end, bool)
+        or not isinstance(start, int)
+        or not isinstance(end, int)
+        or original[start:end] != quote
+        or len(value) < 10
+    ):
+        return {"text": original}
+    year = value[:4]
+    if not year.isdigit() or quote.count(year) != 1:
+        return {"text": original}
+    mutated_year = str(int(year) + 1).zfill(4)
+    mutated_quote = quote.replace(year, mutated_year, 1)
+    mutated_value = mutated_year + value[4:]
+    mutated = original[:start] + mutated_quote + original[end:]
+    spans = []
+    for span in section.params.get("fact_spans") or []:
+        if not isinstance(span, dict):
+            continue
+        updated = dict(span)
+        if span is born or (
+            span.get("role") == "born" and span.get("evidence_quote") == quote
+        ):
+            updated["evidence_quote"] = mutated_quote
+            updated["value"] = mutated_value
+        spans.append(updated)
+    return {
+        "text": mutated,
+        "text_sha256": hashlib.sha256(mutated.encode()).hexdigest(),
+        "fact_spans": spans,
+    }
+
+
 def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
     if world.spec.get("prefix") != "focal":
         return []
@@ -201,6 +272,9 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
         length = int(relation.params["fact_value_length"])
         quote = str(source.params["text"])[start:end]
         value = quote[offset : offset + length]
+        if not format_revision_added_delta(value):
+            continue
+        funding = format_revision_funding_delta(value)
         cf_text, cf_value = _counterfactual_revision_text(
             str(source.params["text"]), value
         )
@@ -219,18 +293,41 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
         relation_key = hashlib.sha256(
             str(relation.params["relation_id"]).encode()
         ).hexdigest()[:12]
+        if funding:
+            question = (
+                "Compare the two authentic arXiv manuscript bodies connected by "
+                f"the verified revision relation for {relation.params['work_id']}. "
+                "Report the original submission date and the funding disclosure "
+                "newly added by the later body and selected by the subsequent "
+                "revision-resolution workflow. Reply exactly as YYYY-MM-DD | "
+                "<first_funder> | <agency_acronym> | NSF <grant_id>."
+            )
+            gold_expression = (
+                "READ_DATE(earlier) AND READ_SOURCE_SPAN(later) AND "
+                "ABSENT_FROM(earlier) THEN "
+                "PARSE_FUNDING_DISCLOSURE AND FOLLOW(revision_of, resolution)"
+            )
+            parse_op = "PARSE_FUNDING_DISCLOSURE"
+        else:
+            question = (
+                "Compare the two authentic arXiv manuscript bodies connected by "
+                f"the verified revision relation for {relation.params['work_id']}. "
+                "Report the original submission date and the unique semantic "
+                "sentence newly added by the later body and selected by the "
+                "subsequent revision-resolution workflow. Reply exactly as "
+                "YYYY-MM-DD | <added_sentence>."
+            )
+            gold_expression = (
+                "READ_DATE(earlier) AND READ_SOURCE_SPAN(later) AND "
+                "ABSENT_FROM(earlier) THEN "
+                "SELECT_UNIQUE_SEMANTIC_DELTA AND FOLLOW(revision_of, resolution)"
+            )
+            parse_op = "SELECT_UNIQUE_SEMANTIC_DELTA"
         queries.append(
             QuerySpec(
                 query_id=f"{qid}:real_revision_added_text:{relation_key}",
                 query_type="real_revision_added_text",
-                question=(
-                    "Compare the two authentic arXiv manuscript bodies connected by "
-                    f"the verified revision relation for {relation.params['work_id']}. "
-                    "Report the original submission date and the funding disclosure "
-                    "newly added by the later body and selected by the subsequent "
-                    "revision-resolution workflow. Reply exactly as YYYY-MM-DD | "
-                    "<first_funder> | <agency_acronym> | NSF <grant_id>."
-                ),
+                question=question,
                 answer="",
                 as_of=as_of_now,
                 answer_key="real_revision_added_text",
@@ -266,11 +363,7 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                 cf_answer="",
                 invariance_event_id=tok.id,
                 invariance_param_updates={"commit": "ab00ab"},
-                gold_expression=(
-                    "READ_DATE(earlier) AND READ_SOURCE_SPAN(later) AND "
-                    "ABSENT_FROM(earlier) THEN "
-                    "PARSE_FUNDING_DISCLOSURE AND FOLLOW(revision_of, resolution)"
-                ),
+                gold_expression=gold_expression,
                 proof_depth=4,
                 cf_op="revision_text",
                 motif="real_revision_semantic_delta",
@@ -286,13 +379,125 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                     {"op": "READ_PRIOR_SUBMISSION_DATE"},
                     {"op": "VERIFY_ABSENT_FROM_PRIOR_REVISION"},
                     {"op": "FOLLOW_REVISION_OF"},
-                    {"op": "PARSE_FUNDING_DISCLOSURE"},
+                    {"op": parse_op},
                     {"op": "APPLY_REVISION_RESOLUTION"},
                 ],
                 preferred_length_buckets=["64k"],
                 semantic_growth_group="researchlab_real_revision_delta",
             )
         )
+
+    computes: dict[str, dict[str, Event]] = {}
+    copies_16k: dict[str, list[Event]] = {}
+    wiki_sections: dict[str, dict[str, Event]] = {}
+    for event in world.events:
+        record_id = str(event.params.get("record_id") or "")
+        if not record_id:
+            continue
+        if event.type == "wiki_claim_answer":
+            tier = str(event.params.get("control_tier") or "")
+            if str(event.params.get("compose") or "compute") == "copy":
+                if tier == "16k":
+                    copies_16k.setdefault(record_id, []).append(event)
+            elif tier:
+                computes.setdefault(record_id, {})[tier] = event
+        elif event.type == "wiki_source_section":
+            section_id = str(event.params.get("section_id") or "")
+            if section_id:
+                wiki_sections.setdefault(record_id, {})[section_id] = event
+    for record_id, by_tier in computes.items():
+        if any(tier not in by_tier for tier in ("16k", "32k", "64k")):
+            continue
+        copies = sorted(copies_16k.get(record_id) or [], key=lambda event: event.time)
+        if len(copies) < 2:
+            continue
+        publish = copies[-1]
+        by_section = wiki_sections.get(record_id) or {}
+        early = by_section.get("early_work")
+        if early is None:
+            continue
+        source_key = record_id.replace(":", "_")
+        for control_tier, proof_depth, needed_names, extra_answers, extra_copies in (
+            ("16k", 4, ("early_work",), ("16k",), copies),
+            (
+                "32k",
+                5,
+                ("early_work", "commemoration", "wikidata_entity"),
+                ("16k",),
+                (),
+            ),
+            (
+                "64k",
+                6,
+                (
+                    "early_work",
+                    "commemoration",
+                    "popular_culture",
+                    "wikidata_entity",
+                ),
+                ("16k", "32k"),
+                (),
+            ),
+        ):
+            answer_event = publish if control_tier == "16k" else by_tier[control_tier]
+            needed_sections = [by_section.get(name) for name in needed_names]
+            needed_answers = [by_tier.get(name) for name in extra_answers]
+            if any(item is None for item in (*needed_sections, *needed_answers)):
+                continue
+            essential_events = [
+                *needed_sections,
+                *needed_answers,
+                *extra_copies,
+            ]
+            if control_tier != "16k":
+                essential_events.append(answer_event)
+            essential_ids = [event.id for event in essential_events]
+            queries.append(
+                QuerySpec(
+                    query_id=(
+                        f"{qid}:wiki_claim_reconstruction:{source_key}:{control_tier}"
+                    ),
+                    query_type="wiki_claim_reconstruction",
+                    question=(
+                        "Reconstruct the tagged Wikipedia/Wikidata claim program "
+                        f"through the {control_tier} control stage using only the "
+                        "cited revision sections and entity record in context. "
+                        "Do not use identity-header fields as substitutes for "
+                        "body claims."
+                    ),
+                    answer="",
+                    as_of=answer_event.time,
+                    answer_key=str(answer_event.params["answer_key"]),
+                    essential_event_ids=essential_ids,
+                    essential_artifact_ids=[
+                        f"{world.spec['world_id']}.{event.visibility[0]}"
+                        for event in essential_events
+                    ],
+                    sufficient_event_ids=essential_ids,
+                    cf_event_id=early.id,
+                    cf_param_updates=_wiki_cf_updates(early),
+                    cf_answer="",
+                    invariance_event_id=early.id,
+                    invariance_param_updates={
+                        "retrieval_url": "https://en.wikipedia.org/w/index.php?oldid=0"
+                    },
+                    gold_expression="tagged BORN/COMM/ENTITY/POP reconstruction",
+                    proof_depth=proof_depth,
+                    cf_op="numeric",
+                    motif="source-wiki-claim-program",
+                    topology_id=instance_topology(
+                        "lab.wiki_claim_reconstruction",
+                        record_id,
+                        control_tier,
+                    ),
+                    domain="researchlab",
+                    truth_regime="real_source_derived",
+                    program_ops=_wiki_program_ops(control_tier),
+                    preferred_length_buckets=[control_tier],
+                    semantic_growth_group="researchlab_real_wiki_claim_reconstruction",
+                    base_task_group=f"wiki_claim_reconstruction:{source_key}",
+                )
+            )
 
     q_cur = QuerySpec(
         query_id=f"{qid}:current_state",

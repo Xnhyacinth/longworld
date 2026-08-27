@@ -10,6 +10,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -32,6 +34,7 @@ SEC_SCANNER = "longworld-public-secret-patterns"
 SEC_SCANNER_REVISION = "v2"
 MAX_SEC_FILINGS = 512
 MAX_SEC_MANIFEST_BYTES = 32_000_000
+SEC_FILING_COMPONENT_REVISION = "sec-sgml-component-v1"
 
 _ACCESSION = re.compile(r"^\d{10}-\d{2}-\d{6}$")
 _CIK = re.compile(r"^\d{10}$")
@@ -58,6 +61,44 @@ _SOURCE_STATUSES = {
 _SEC_FAIR_ACCESS_URL = (
     "https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data"
 )
+SEC_IDENTITY_FIELDS = ("accession", "form", "filing_date", "report_date")
+SEC_REQUIRED_COMPONENT_TYPES = ("10-K", "EX-31.1", "EX-31.2", "EX-32.1")
+SEC_OPTIONAL_COMPONENT_TYPES = ("EX-32.2",)
+SEC_EXTRACTABLE_COMPONENT_TYPES = (
+    *SEC_REQUIRED_COMPONENT_TYPES,
+    *SEC_OPTIONAL_COMPONENT_TYPES,
+)
+SEC_HYBRID_CHILD_EVENT_TYPES = frozenset(
+    {
+        "sec_filing_eligibility_policy",
+        "sec_filing_approval",
+        "sec_filing_publication_ratification",
+        "sec_financial_answer",
+    }
+)
+
+_SEC_DOCUMENT_BLOCK = re.compile(
+    r"^<DOCUMENT>[^\S\n]*\n.*?^</DOCUMENT>[^\S\n]*(?:\n|$)",
+    re.MULTILINE | re.DOTALL,
+)
+
+
+@dataclass(frozen=True)
+class SecFilingComponent:
+    """Hash-bound coordinates for one component of an SEC submission.
+
+    Component text deliberately remains in the parent submission. Consumers use the
+    validated coordinates to take a view without storing or serializing a second copy.
+    """
+
+    component_type: str
+    sequence: int
+    filename: str
+    char_start: int
+    char_end: int
+    parent_source_sha256: str
+    component_sha256: str
+    provenance_id: str
 
 
 def _payload_strings(value: Any):
@@ -79,6 +120,170 @@ def _reject_secrets(text: str) -> None:
 def _sanitize_source_text(text: str) -> tuple[str, int]:
     _reject_secrets(text)
     return _EMAIL.sub("[redacted-email]", text), len(_EMAIL.findall(text))
+
+
+def _sec_component_header(block: str) -> tuple[str, int, str]:
+    text_marker = re.search(r"(?m)^<TEXT>[^\S\n]*$", block)
+    if text_marker is None:
+        raise ProvenanceError("SEC filing component has no TEXT boundary")
+    header = block[: text_marker.start()]
+
+    def value(tag: str) -> str:
+        matches = re.findall(
+            rf"(?m)^<{re.escape(tag)}>[ \t]*([^\r\n<]+?)[ \t\r]*$", header
+        )
+        if len(matches) != 1 or not matches[0].strip():
+            raise ProvenanceError(f"SEC filing component has invalid {tag}")
+        return matches[0].strip()
+
+    component_type = value("TYPE")
+    raw_sequence = value("SEQUENCE")
+    filename = value("FILENAME")
+    if not raw_sequence.isdigit() or int(raw_sequence) <= 0:
+        raise ProvenanceError("SEC filing component has invalid SEQUENCE")
+    if Path(filename).name != filename or Path(filename).is_absolute():
+        raise ProvenanceError("SEC filing component has unsafe FILENAME")
+    return component_type, int(raw_sequence), filename
+
+
+def _sec_component_provenance(
+    *,
+    component_type: str,
+    sequence: int,
+    filename: str,
+    char_start: int,
+    char_end: int,
+    parent_source_sha256: str,
+    component_sha256: str,
+) -> str:
+    payload = {
+        "operation": SEC_FILING_COMPONENT_REVISION,
+        "component_type": component_type,
+        "sequence": sequence,
+        "filename": filename,
+        "char_start": char_start,
+        "char_end": char_end,
+        "parent_source_sha256": parent_source_sha256,
+        "component_sha256": component_sha256,
+    }
+    return (
+        "derived-sha256:"
+        + hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+    )
+
+
+def validate_sec_filing_component(
+    source_text: str, component: SecFilingComponent
+) -> None:
+    """Validate component coordinates and lineage against the complete submission."""
+    parent_source_sha256 = hashlib.sha256(source_text.encode()).hexdigest()
+    if (
+        not isinstance(component.parent_source_sha256, str)
+        or _SHA256.fullmatch(component.parent_source_sha256) is None
+        or component.parent_source_sha256 != parent_source_sha256
+    ):
+        raise ProvenanceError("SEC filing component parent source hash mismatch")
+    if (
+        isinstance(component.char_start, bool)
+        or isinstance(component.char_end, bool)
+        or not isinstance(component.char_start, int)
+        or not isinstance(component.char_end, int)
+        or component.char_start < 0
+        or component.char_end <= component.char_start
+        or component.char_end > len(source_text)
+    ):
+        raise ProvenanceError("SEC filing component range is invalid")
+    block = source_text[component.char_start : component.char_end]
+    if _SEC_DOCUMENT_BLOCK.fullmatch(block) is None:
+        raise ProvenanceError("SEC filing component range is not a DOCUMENT block")
+    component_sha256 = hashlib.sha256(block.encode()).hexdigest()
+    if (
+        not isinstance(component.component_sha256, str)
+        or _SHA256.fullmatch(component.component_sha256) is None
+        or component.component_sha256 != component_sha256
+    ):
+        raise ProvenanceError("SEC filing component hash mismatch")
+    component_type, sequence, filename = _sec_component_header(block)
+    if (
+        component_type not in SEC_EXTRACTABLE_COMPONENT_TYPES
+        or isinstance(component.sequence, bool)
+        or not isinstance(component.sequence, int)
+        or component.component_type != component_type
+        or component.sequence != sequence
+        or component.filename != filename
+    ):
+        raise ProvenanceError("SEC filing component header metadata mismatch")
+    expected_provenance = _sec_component_provenance(
+        component_type=component_type,
+        sequence=sequence,
+        filename=filename,
+        char_start=component.char_start,
+        char_end=component.char_end,
+        parent_source_sha256=parent_source_sha256,
+        component_sha256=component_sha256,
+    )
+    if component.provenance_id != expected_provenance:
+        raise ProvenanceError("SEC filing component provenance mismatch")
+
+
+def parse_sec_filing_components(
+    source_text: str, parent_source_sha256: str
+) -> tuple[SecFilingComponent, ...]:
+    """Parse the main filing and certifications from an SEC complete submission."""
+    if (
+        _SHA256.fullmatch(parent_source_sha256) is None
+        or hashlib.sha256(source_text.encode()).hexdigest() != parent_source_sha256
+    ):
+        raise ProvenanceError("SEC filing component parent source hash mismatch")
+    blocks = list(_SEC_DOCUMENT_BLOCK.finditer(source_text))
+    start_count = len(re.findall(r"(?m)^<DOCUMENT>[^\S\n]*$", source_text))
+    end_count = len(re.findall(r"(?m)^</DOCUMENT>[^\S\n]*$", source_text))
+    if not blocks or len(blocks) != start_count or len(blocks) != end_count:
+        raise ProvenanceError("SEC filing submission has invalid DOCUMENT boundaries")
+
+    required = set(SEC_REQUIRED_COMPONENT_TYPES)
+    extractable = set(SEC_EXTRACTABLE_COMPONENT_TYPES)
+    components: list[SecFilingComponent] = []
+    seen_types: set[str] = set()
+    seen_sequences: set[int] = set()
+    for match in blocks:
+        block = match.group()
+        component_type, sequence, filename = _sec_component_header(block)
+        if component_type not in extractable:
+            continue
+        if component_type in seen_types or sequence in seen_sequences:
+            raise ProvenanceError("SEC filing component identity is duplicated")
+        component_sha256 = hashlib.sha256(block.encode()).hexdigest()
+        component = SecFilingComponent(
+            component_type=component_type,
+            sequence=sequence,
+            filename=filename,
+            char_start=match.start(),
+            char_end=match.end(),
+            parent_source_sha256=parent_source_sha256,
+            component_sha256=component_sha256,
+            provenance_id=_sec_component_provenance(
+                component_type=component_type,
+                sequence=sequence,
+                filename=filename,
+                char_start=match.start(),
+                char_end=match.end(),
+                parent_source_sha256=parent_source_sha256,
+                component_sha256=component_sha256,
+            ),
+        )
+        validate_sec_filing_component(source_text, component)
+        components.append(component)
+        seen_types.add(component_type)
+        seen_sequences.add(sequence)
+    missing = required - seen_types
+    if missing:
+        raise ProvenanceError(
+            f"SEC filing submission is missing required components: {sorted(missing)}"
+        )
+    return tuple(components)
 
 
 def _validate_final_payload(payload: dict[str, Any]) -> None:
@@ -264,6 +469,75 @@ def _validate_public_identity_facts(
         expected["report_date"] = report_date.replace("-", "")
     if any(values.get(field) != value for field, value in expected.items()):
         raise ProvenanceError("SEC public source facts do not bind filing identity")
+
+
+def parse_sec_identity_spans(text: str, raw_facts: object) -> dict[str, str] | None:
+    """Parse filing identity only from exact, replayed body spans.
+
+    Event replay uses this consumer-side check instead of trusting copied manifest
+    values. Invalid or incomplete spans fail closed so a corrupted filing body cannot
+    write downstream workflow state.
+    """
+    if not isinstance(raw_facts, Sequence) or isinstance(raw_facts, (str, bytes)):
+        return None
+    parsed: dict[str, str] = {}
+    for raw in raw_facts:
+        if not isinstance(raw, Mapping):
+            return None
+        field = str(raw.get("field") or "")
+        quote = str(raw.get("evidence_quote") or "")
+        start = raw.get("char_start")
+        end = raw.get("char_end")
+        offset = raw.get("value_offset")
+        length = raw.get("value_length")
+        if not all(
+            isinstance(value, int) and not isinstance(value, bool)
+            for value in (start, end, offset, length)
+        ):
+            return None
+        assert isinstance(start, int)
+        assert isinstance(end, int)
+        assert isinstance(offset, int)
+        assert isinstance(length, int)
+        if (
+            field not in SEC_IDENTITY_FIELDS
+            or field in parsed
+            or not quote
+            or start < 0
+            or end <= start
+            or offset < 0
+            or length <= 0
+            or text[start:end] != quote
+            or offset + length > len(quote)
+        ):
+            return None
+        parsed[field] = quote[offset : offset + length]
+    if set(parsed) != set(SEC_IDENTITY_FIELDS):
+        return None
+    if (
+        _ACCESSION.fullmatch(parsed["accession"]) is None
+        or _FORM.fullmatch(parsed["form"]) is None
+        or not re.fullmatch(r"\d{8}", parsed["filing_date"])
+        or not re.fullmatch(r"\d{8}", parsed["report_date"])
+    ):
+        return None
+    try:
+        filing_date = date.fromisoformat(
+            f"{parsed['filing_date'][:4]}-{parsed['filing_date'][4:6]}-"
+            f"{parsed['filing_date'][6:]}"
+        )
+        report_date = date.fromisoformat(
+            f"{parsed['report_date'][:4]}-{parsed['report_date'][4:6]}-"
+            f"{parsed['report_date'][6:]}"
+        )
+    except ValueError:
+        return None
+    return {
+        "accession": parsed["accession"],
+        "form": parsed["form"],
+        "filing_date": filing_date.isoformat(),
+        "report_date": report_date.isoformat(),
+    }
 
 
 def _filing_relations(filings: list[dict[str, Any]]) -> list[dict[str, Any]]:

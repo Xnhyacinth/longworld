@@ -23,6 +23,7 @@ from longworld.core.production_trust import (
     canonical_approval_statement,
     verify_production_approval_from_env,
 )
+from longworld.core.promotion import RELEASE_GATE_REVISION
 from longworld.core.release_profile import release_profile_sha256
 from longworld.core.unseen import (
     build_unseen_splits,
@@ -139,7 +140,7 @@ def _production_release(
     return attach_attestation(
         {
             "schema_version": "longworld-release-gate-pass-v1",
-            "gate_revision": "longworld-quality-gate-v2",
+            "gate_revision": RELEASE_GATE_REVISION,
             "release_profile_id": release_profile_id,
             "release_profile_sha256": (
                 release_profile_digest or release_profile_sha256(release_profile_id)

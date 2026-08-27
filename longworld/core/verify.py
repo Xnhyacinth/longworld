@@ -8,7 +8,11 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from longworld.core.consist import artifact_text_issues, is_real_workflow_body
-from longworld.core.engine import answer_from_artifacts, answer_from_events
+from longworld.core.engine import (
+    answer_from_artifacts,
+    answer_from_events,
+    semantic_answer_from_artifacts,
+)
 from longworld.core.render import Artifact, semantic_attestation_valid
 from longworld.core.retrieve import (
     bm25_top1_insufficient,
@@ -16,6 +20,7 @@ from longworld.core.retrieve import (
     contiguous_windows_insufficient,
     embedding_topk_insufficient,
     lexical_tfidf_topk_insufficient,
+    raw_token_fact_windows_insufficient,
 )
 from longworld.core.world import SimulatedWorld
 from longworld.domains.company.queries import QuerySpec, gold_from_full
@@ -126,12 +131,16 @@ def verify_rendered_view(
     essential = [index.get(artifact_id) for artifact_id in spec.essential_artifact_ids]
     essential_present = bool(essential) and all(essential)
     essential_artifacts = [artifact for artifact in essential if artifact is not None]
-    text_grounded = essential_present and not artifact_text_issues(
-        world,
-        essential_artifacts,
-        require_attestation=(
-            base_verification.production_mode or base_verification.candidate_mode
-        ),
+    text_grounded = (
+        essential_present
+        and not artifact_text_issues(
+            world,
+            essential_artifacts,
+            require_attestation=(
+                base_verification.production_mode or base_verification.candidate_mode
+            ),
+        )
+        and not _sec_essential_evidence_issues(world, spec, essential_artifacts)
     )
     overrides = {spec.cf_event_id: spec.cf_param_updates} if view_name == "cf" else None
     strict_answer = answer_from_artifacts(
@@ -188,6 +197,42 @@ class SampleRecord(BaseModel):
 
 def _by_id(artifacts: list[Artifact]) -> dict[str, Artifact]:
     return {a.artifact_id: a for a in artifacts}
+
+
+def _sec_essential_evidence_issues(
+    world: SimulatedWorld, spec: QuerySpec, artifacts: list[Artifact]
+) -> list[str]:
+    """Reject SEC source nodes that are only structural, not answer-bearing."""
+    if spec.query_type != "sec_financial_reconstruction":
+        return []
+    events = {event.id: event for event in world.events}
+    required_roles = {
+        str(role)
+        for event_id in spec.sufficient_event_ids
+        if event_id in events and events[event_id].type == "sec_financial_answer"
+        for role in events[event_id].params.get("required_roles") or []
+    }
+    issues: list[str] = []
+    for artifact in artifacts:
+        if artifact.artifact_id not in spec.essential_artifact_ids:
+            continue
+        source_events = [
+            events[event_id]
+            for event_id in artifact.reveals_events
+            if event_id in events and events[event_id].type == "sec_source_section"
+        ]
+        for event in source_events:
+            relevant = any(
+                isinstance(span, dict)
+                and (
+                    span.get("kind") == "certification"
+                    or str(span.get("role") or "") in required_roles
+                )
+                for span in event.params.get("fact_spans") or []
+            )
+            if not relevant:
+                issues.append(artifact.artifact_id)
+    return issues
 
 
 def closed_book_rule(answer: str) -> bool:
@@ -292,6 +337,7 @@ def counterfactual_shortcuts_insufficient(
     *,
     retrieval_top_k: int = 3,
     contiguous_window_sizes: tuple[int, ...] = (4000, 8000, 16000),
+    raw_window_tokenizer: Any | None = None,
 ) -> tuple[bool, dict[str, Any]]:
     """Replay all cheap shortcut gates against the actual counterfactual dossier."""
     overrides = {spec.cf_event_id: spec.cf_param_updates}
@@ -362,6 +408,21 @@ def counterfactual_shortcuts_insufficient(
         expected_answer=spec.cf_answer,
         extra_overrides=overrides,
     )
+    raw_windows = True
+    raw_window_notes: dict[str, Any] = {
+        "applicable": False,
+        "proof_mode": "tokenizer_not_supplied",
+    }
+    if raw_window_tokenizer is not None:
+        raw_windows, raw_window_notes = raw_token_fact_windows_insufficient(
+            world,
+            spec,
+            counterfactual,
+            raw_window_tokenizer,
+            contiguous_window_sizes,
+            expected_answer=spec.cf_answer,
+            extra_overrides=overrides,
+        )
     all_green = all(
         (
             bool(essential),
@@ -372,6 +433,7 @@ def counterfactual_shortcuts_insufficient(
             bm25_topk,
             tfidf_topk,
             windows,
+            raw_windows,
         )
     )
     return all_green, {
@@ -381,6 +443,7 @@ def counterfactual_shortcuts_insufficient(
         "bm25_topk": bm25_topk_notes,
         "lexical_tfidf_topk": tfidf_topk_notes,
         "contiguous_windows": window_notes,
+        "raw_token_fact_windows": raw_window_notes,
         "all_green": all_green,
     }
 
@@ -398,6 +461,8 @@ def verify_question(
     embedding_model_id: str | None = None,
     contiguous_window_sizes: tuple[int, ...] = (4000, 8000, 16000),
     verification_mode: str = "legacy",
+    raw_window_tokenizer: Any | None = None,
+    require_raw_token_windows: bool | None = None,
 ) -> tuple[Verification, dict[str, Any]]:
     if verification_mode not in {"production", "candidate", "legacy", "diagnostic"}:
         raise ValueError(f"unknown verification_mode: {verification_mode}")
@@ -425,8 +490,11 @@ def verify_question(
         if verification_mode in {"production", "candidate"}
         else min_arts
     )
-    semantic_min_ans = answer_from_artifacts(world, spec, semantic_min_artifacts)
+    semantic_min_ans = semantic_answer_from_artifacts(
+        world, spec, semantic_min_artifacts
+    )
     notes["semantic_min_ans"] = semantic_min_ans
+    notes["semantic_proof_scope"] = "attested_artifact_bytes_and_params"
 
     sufficient_event_ids = set(spec.sufficient_event_ids)
     strict_proof_artifacts = [
@@ -476,7 +544,10 @@ def verify_question(
         min_arts,
         require_attestation=verification_mode in {"production", "candidate"},
     )
-    v.essential_text_grounded = bool(min_arts) and not text_issues
+    sec_evidence_issues = _sec_essential_evidence_issues(world, spec, min_arts)
+    v.essential_text_grounded = (
+        bool(min_arts) and not text_issues and not sec_evidence_issues
+    )
     v.semantic_sufficient = semantic_min_ans == gold and v.essential_text_grounded
     notes["essential_text_issues"] = [
         {
@@ -486,6 +557,7 @@ def verify_question(
         }
         for issue in text_issues
     ]
+    notes["sec_essential_evidence_issues"] = sec_evidence_issues
 
     remove_ok = True
     remove_notes = []
@@ -493,7 +565,7 @@ def verify_question(
         remove_ok = False
     for aid in spec.essential_artifact_ids:
         remaining = [a for a in min_arts if a.artifact_id != aid]
-        semantic_ans = answer_from_artifacts(world, spec, remaining)
+        semantic_ans = semantic_answer_from_artifacts(world, spec, remaining)
         strict_ans = answer_from_artifacts(
             world, spec, remaining, enforce_preconditions=True
         )
@@ -528,7 +600,7 @@ def verify_question(
             cf_min_artifacts,
             require_attestation=verification_mode in {"production", "candidate"},
         )
-        cf_replay_ans = answer_from_artifacts(
+        cf_replay_ans = semantic_answer_from_artifacts(
             world,
             spec,
             cf_artifacts,
@@ -580,6 +652,29 @@ def verify_question(
         necessary_artifact_ids=set(spec.essential_artifact_ids),
         necessary_set_proven=(v.remove_one_fails and v.strict_executable_sufficient),
     )
+    if raw_window_tokenizer is not None:
+        raw_windows_ok, raw_window_notes = raw_token_fact_windows_insufficient(
+            world,
+            spec,
+            artifacts,
+            raw_window_tokenizer,
+            contiguous_window_sizes,
+        )
+        contiguous_ok = contiguous_ok and raw_windows_ok
+        notes["raw_token_fact_windows"] = raw_window_notes
+    elif (
+        (
+            verification_mode in {"candidate", "production"}
+            and spec.query_type == "sec_financial_reconstruction"
+        )
+        if require_raw_token_windows is None
+        else require_raw_token_windows
+    ):
+        contiguous_ok = False
+        notes["raw_token_fact_windows"] = {
+            "applicable": True,
+            "error": "pinned_tokenizer_required",
+        }
     v.contiguous_windows_insufficient = contiguous_ok
     notes["contiguous_windows"] = contiguous_notes
 
@@ -662,6 +757,7 @@ def verify_packed_question(
     embedding_model_id: str | None = None,
     contiguous_window_sizes: tuple[int, ...] = (4000, 8000, 16000),
     verification_mode: str = "legacy",
+    raw_window_tokenizer: Any | None = None,
 ) -> tuple[Verification, dict[str, Any]]:
     """Reuse a global proof while recomputing gates that depend on the packed view."""
     if verification_mode not in {"production", "candidate", "legacy", "diagnostic"}:
@@ -693,4 +789,5 @@ def verify_packed_question(
         embedding_model_id=embedding_model_id,
         contiguous_window_sizes=contiguous_window_sizes,
         verification_mode=verification_mode,
+        raw_window_tokenizer=raw_window_tokenizer,
     )

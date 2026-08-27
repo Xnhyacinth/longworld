@@ -31,7 +31,10 @@ from longworld.core.attestation import (
     attach_attestation,
     attestation_key_from_env,
 )
-from longworld.core.realworkflow import GIT_WORKFLOW_SCHEMA
+from longworld.core.realworkflow import (
+    GIT_WORKFLOW_SCHEMA,
+    approved_public_policy_digests,
+)
 
 FetchJSON = Callable[[str], Any]
 EMAIL_RE = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}(?![\w.-])")
@@ -586,13 +589,16 @@ def main() -> None:
         raise ValueError("public exports require the canonical repository allowlist")
     allowlist_raw = allowlist.read_bytes()
     policy_sha256 = hashlib.sha256(allowlist_raw).hexdigest()
-    expected_policy_sha256 = (
-        os.environ.get(PUBLIC_POLICY_SHA256_ENV, "").strip().lower()
-    )
+    try:
+        approved_policy = approved_public_policy_digests()
+    except ValueError as error:
+        raise ValueError(
+            "repository allowlist digest does not match the trusted pin"
+        ) from error
     environment = os.environ.get(ATTESTATION_ENVIRONMENT_ENV, "").strip().lower()
-    if expected_policy_sha256 and expected_policy_sha256 != policy_sha256:
+    if approved_policy and policy_sha256 not in approved_policy:
         raise ValueError("repository allowlist digest does not match the trusted pin")
-    if environment in {"probe", "production"} and not expected_policy_sha256:
+    if environment in {"probe", "production"} and not approved_policy:
         raise ValueError(f"{PUBLIC_POLICY_SHA256_ENV} is required in release mode")
     policy = load_public_policy(allowlist, args.repo, _verified_raw=allowlist_raw)
     key = attestation_key_from_env("git_workflow")

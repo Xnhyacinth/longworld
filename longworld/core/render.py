@@ -32,6 +32,7 @@ class Artifact:
     role: str = ""
 
 
+ARTIFACT_SEMANTIC_REVISION = "artifact-semantics-v2"
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 
 
@@ -591,6 +592,7 @@ def stamp_text_integrity(artifacts: list[Artifact]) -> list[Artifact]:
         artifact.slots = {
             **(artifact.slots or {}),
             "semantic_text_sha256": hashlib.sha256(artifact.text.encode()).hexdigest(),
+            "semantic_attestation_revision": ARTIFACT_SEMANTIC_REVISION,
         }
         if key is not None:
             bound = attach_attestation(
@@ -604,7 +606,7 @@ def stamp_text_integrity(artifacts: list[Artifact]) -> list[Artifact]:
 
 def artifact_semantic_payload(artifact: Artifact) -> dict[str, Any]:
     slots = artifact.slots or {}
-    return {
+    payload = {
         "artifact_id": artifact.artifact_id,
         "text": artifact.text,
         "reveals_events": list(artifact.reveals_events),
@@ -612,10 +614,25 @@ def artifact_semantic_payload(artifact: Artifact) -> dict[str, Any]:
         "ground_values": list(slots.get("ground_values") or []),
         "params": dict(slots.get("params") or {}),
     }
+    if slots.get("semantic_attestation_revision") == ARTIFACT_SEMANTIC_REVISION:
+        payload["semantic_attestation_revision"] = ARTIFACT_SEMANTIC_REVISION
+        payload["time"] = artifact.time.isoformat()
+    return payload
 
 
-def semantic_attestation_valid(artifact: Artifact) -> bool:
-    attestation = (artifact.slots or {}).get("semantic_attestation")
+def semantic_attestation_valid(
+    artifact: Artifact, *, allow_legacy: bool = False
+) -> bool:
+    """Verify artifact semantics; legacy payloads require release-bound opt-in."""
+
+    slots = artifact.slots or {}
+    revision = slots.get("semantic_attestation_revision")
+    if revision is None:
+        if not allow_legacy:
+            return False
+    elif revision != ARTIFACT_SEMANTIC_REVISION:
+        return False
+    attestation = slots.get("semantic_attestation")
     if not isinstance(attestation, dict):
         return False
     payload = artifact_semantic_payload(artifact)

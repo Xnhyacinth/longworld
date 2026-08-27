@@ -28,6 +28,7 @@ from longworld.core.filingworkflow import (
 from longworld.core.provenance import ProvenanceError, _read_regular_file
 from longworld.core.sourcebundle import (
     SOURCE_WORKFLOW_ADAPTER_REVISION,
+    SOURCE_WORKFLOW_ADAPTER_REVISION_LATEST,
     SOURCE_WORKFLOW_BUNDLE_PURPOSE,
     SOURCE_WORKFLOW_BUNDLE_SCHEMA,
     LoadedSourceWorkflowBundle,
@@ -42,7 +43,7 @@ _CONTRACTS = {
     ),
     "sec_filing": ("company", {SEC_FILING_MANIFEST_SCHEMA}, MAX_SEC_MANIFEST_BYTES),
     "wikimedia": (
-        "knowledgebase",
+        "researchlab",
         {WIKIPEDIA_WORKFLOW_MANIFEST_SCHEMA},
         MAX_DOCUMENT_MANIFEST_BYTES,
     ),
@@ -54,6 +55,7 @@ def build_source_workflow_bundle(
     output_path: Path,
     *,
     attestation_key: bytes | None = None,
+    adapter_revision: str = SOURCE_WORKFLOW_ADAPTER_REVISION,
 ) -> LoadedSourceWorkflowBundle:
     """Write atomically, then reload the exact signed bundle before promotion use."""
     if not manifests:
@@ -91,7 +93,7 @@ def build_source_workflow_bundle(
                 "path": manifest_path.name,
                 "sha256": hashlib.sha256(raw).hexdigest(),
                 "schema_version": str(schema),
-                "adapter_revision": SOURCE_WORKFLOW_ADAPTER_REVISION,
+                "adapter_revision": adapter_revision,
             }
         )
         seen_paths.add(manifest_path.name)
@@ -134,13 +136,23 @@ def main() -> None:
     parser.add_argument("--sec-manifest", action="append", type=Path, default=[])
     parser.add_argument("--wikimedia-manifest", action="append", type=Path, default=[])
     parser.add_argument("--out", required=True, type=Path)
+    parser.add_argument(
+        "--adapter-revision",
+        choices=(
+            SOURCE_WORKFLOW_ADAPTER_REVISION,
+            SOURCE_WORKFLOW_ADAPTER_REVISION_LATEST,
+        ),
+        default=SOURCE_WORKFLOW_ADAPTER_REVISION,
+    )
     args = parser.parse_args()
     manifests = [
         *(("paper_workflow", path) for path in args.paper_manifest),
         *(("sec_filing", path) for path in args.sec_manifest),
         *(("wikimedia", path) for path in args.wikimedia_manifest),
     ]
-    build_source_workflow_bundle(manifests, args.out)
+    build_source_workflow_bundle(
+        manifests, args.out, adapter_revision=args.adapter_revision
+    )
     print(args.out)
 
 

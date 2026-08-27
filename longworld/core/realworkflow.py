@@ -40,6 +40,33 @@ MAX_WORKFLOW_RECORD_CHARS = 1_000_000
 MAX_EPISODE_BUNDLE_BYTES = 1_000_000
 MAX_EPISODES = 1_000
 _SHA256 = re.compile(r"[0-9a-f]{64}")
+
+
+def approved_public_policy_digests(raw: str | None = None) -> frozenset[str]:
+    """Return active allowlist pins, including historical hashes after growth.
+
+    Probe and production may list comma-separated SHA-256 digests so adding a
+    repository to the canonical allowlist does not invalidate already-signed
+    public episode exports that still embed the previous digest.
+    """
+    text = (
+        (os.environ.get(PUBLIC_POLICY_SHA256_ENV, "") if raw is None else raw)
+        .strip()
+        .lower()
+    )
+    if not text:
+        return frozenset()
+    digests: set[str] = set()
+    for part in text.replace(";", ",").split(","):
+        item = part.strip()
+        if not item:
+            continue
+        if _SHA256.fullmatch(item) is None:
+            raise ValueError("public policy pin contains an invalid digest")
+        digests.add(item)
+    return frozenset(digests)
+
+
 _GIT_SHA = re.compile(r"[0-9a-f]{40}")
 _RFC_NUMBER = re.compile(r"(?mi)^Request for Comments:\s*(\d+)\b")
 _RFC_STD = re.compile(r"(?mi)^STD:\s*(\d+)\b")
@@ -215,11 +242,16 @@ def _validate_public_export_governance(payload: dict[str, Any]) -> None:
         raise ProvenanceError("public export source client receipt is invalid")
     environment = os.environ.get(ATTESTATION_ENVIRONMENT_ENV, "").strip().lower()
     if environment in {"probe", "production"}:
-        expected_policy = os.environ.get(PUBLIC_POLICY_SHA256_ENV, "").strip().lower()
+        try:
+            approved_policy = approved_public_policy_digests()
+        except ValueError as error:
+            raise ProvenanceError(
+                "public export trust pins do not match active policy"
+            ) from error
         expected_client = os.environ.get(GH_BINARY_SHA256_ENV, "").strip().lower()
         if (
-            not expected_policy
-            or public_policy.get("sha256") != expected_policy
+            not approved_policy
+            or public_policy.get("sha256") not in approved_policy
             or not expected_client
             or source_client.get("sha256") != expected_client
         ):

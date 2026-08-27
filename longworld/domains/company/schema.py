@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 from datetime import date, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from longworld.core.grounded import pick_anchors
 from longworld.core.process import assign_register, attach_roles, sample_process
@@ -14,6 +14,9 @@ from longworld.domains.company.names import (
     sample_customer,
     sample_project_name,
 )
+
+if TYPE_CHECKING:
+    from longworld.core.sourceworkflow import SourceWorkflow
 
 SCHEMA_VERSION = "p1.1"
 
@@ -41,6 +44,12 @@ EVENT_TYPES = [
     "cycle_recovery",
     "cycle_release",
     "cycle_audit",
+    "sec_filing",
+    "sec_filing_eligibility_policy",
+    "sec_filing_approval",
+    "sec_filing_publication_ratification",
+    "sec_source_section",
+    "sec_financial_answer",
 ]
 
 ARTIFACT_KEYS_CORE = [
@@ -88,10 +97,17 @@ def sample_world_spec(
     n_parallel: int = 2,
     n_pulses: int = 0,
     n_workstreams: int = 0,
+    source_workflows: list[SourceWorkflow] | None = None,
 ) -> dict[str, Any]:
     """Fully deterministic world definition. Parallel projects share the seed family."""
     if not 0 <= n_workstreams <= 64:
         raise ValueError("n_workstreams must be between 0 and 64")
+    workflows = list(source_workflows or [])
+    if any(
+        workflow.target_domain != "company" or workflow.source_kind != "sec_filing"
+        for workflow in workflows
+    ):
+        raise ValueError("company requires SEC filing source workflows")
     rng = random.Random(seed)
     used_names: set[str] = set()
     used_projects: set[str] = set()
@@ -321,6 +337,8 @@ def sample_world_spec(
         }
 
     focal = one_project("focal", True)
+    focal["source_workflows"] = workflows
+    focal["source_workflow_ids"] = [workflow.workflow_id for workflow in workflows]
     parallels = [one_project("parallel", False) for _ in range(n_parallel)]
     assign_register(seed, focal, parallels)
     world_id = f"w{seed:06d}-{focal['project'].lower()}"
@@ -329,7 +347,11 @@ def sample_world_spec(
         "seed": seed,
         "schema_version": SCHEMA_VERSION,
         "domain": "company",
-        "truth_regime": "real_schema_synthetic_instance",
+        "truth_regime": (
+            "verified_real_content_hybrid"
+            if workflows
+            else "real_schema_synthetic_instance"
+        ),
         "n_pulses": n_pulses,
         "start": start.isoformat(),
         "focal": focal,

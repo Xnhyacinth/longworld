@@ -10,12 +10,19 @@ import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from longworld.core.realworkflow import RealWorkflow
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from longworld.core.attestation import attach_attestation, attestation_key_from_env
-from longworld.core.documentworkflow import build_wikipedia_workflow_manifest
+from longworld.core.documentworkflow import (
+    build_wikipedia_workflow_manifest,
+    load_wikipedia_real_workflow_episode,
+)
 from longworld.core.provenance import (
     MAX_MANIFEST_BYTES,
     ProvenanceError,
@@ -46,7 +53,7 @@ def export_wikipedia_workflow(
     *,
     attestation_key: bytes | None = None,
     generated_at: str | None = None,
-) -> None:
+) -> RealWorkflow | None:
     """Validate, source-attest, and write one Wikimedia workflow inventory."""
     try:
         raw = _read_regular_file(input_path, MAX_MANIFEST_BYTES)
@@ -67,7 +74,26 @@ def export_wikipedia_workflow(
         input_payload, input_path.parent, generated_at=timestamp
     )
     signed = attach_attestation(manifest, key, purpose="source_manifest")
+    if input_payload.get("source_status") == "public_api_export":
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            dir=output_path.parent,
+            prefix=f".{output_path.name}.",
+            suffix=".stage",
+            delete=False,
+        ) as handle:
+            staged_path = Path(handle.name)
+        try:
+            _write_json_atomic(staged_path, signed)
+            load_wikipedia_real_workflow_episode(staged_path, attestation_key=key)
+            os.replace(staged_path, output_path)
+            return load_wikipedia_real_workflow_episode(
+                output_path, attestation_key=key
+            )
+        finally:
+            staged_path.unlink(missing_ok=True)
     _write_json_atomic(output_path, signed)
+    return None
 
 
 def main() -> None:

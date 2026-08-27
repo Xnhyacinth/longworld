@@ -355,7 +355,7 @@ def _apply_repo_record(state: WorldState, ev: Event) -> None:
             "failed"
             if "failed" in ci_results
             else "passed"
-            if ci_results and all(item == "passed" for item in ci_results)
+            if any(item == "passed" for item in ci_results)
             else state.values.get(f"{prefix}:resolved:result")
         )
         license_results = [

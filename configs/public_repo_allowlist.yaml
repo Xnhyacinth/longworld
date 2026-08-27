@@ -10,6 +10,76 @@ repositories:
       reviewed_at: 2026-08-23T00:00:00Z
     allowed_record_kinds:
       [pull_request, review, commit, ci_run, merge, release, license]
+  astral-sh/uv:
+    visibility: public
+    license: Apache-2.0
+    authorization:
+      record_id: PUBLIC-GITHUB-TERMS-2026-08
+      scope: read-only workflow export
+      basis: public repository under recorded license
+      reviewed_at: 2026-08-26T10:00:00Z
+    allowed_record_kinds:
+      [pull_request, review, commit, ci_run, merge, release, license]
+  oxc-project/oxc:
+    visibility: public
+    license: MIT
+    authorization:
+      record_id: PUBLIC-GITHUB-TERMS-2026-08
+      scope: read-only workflow export
+      basis: public repository under recorded license
+      reviewed_at: 2026-08-26T13:40:00Z
+    allowed_record_kinds:
+      [pull_request, review, commit, ci_run, merge, release, license]
+  bytecodealliance/wasmtime:
+    visibility: public
+    license: Apache-2.0
+    authorization:
+      record_id: PUBLIC-GITHUB-TERMS-2026-08
+      scope: read-only workflow export
+      basis: public repository under recorded license
+      reviewed_at: 2026-08-26T15:00:00Z
+    allowed_record_kinds:
+      [pull_request, review, commit, ci_run, merge, release, license]
+  denoland/deno:
+    visibility: public
+    license: MIT
+    authorization:
+      record_id: PUBLIC-GITHUB-TERMS-2026-08
+      scope: read-only workflow export
+      basis: public repository under recorded license
+      reviewed_at: 2026-08-26T16:00:00Z
+    allowed_record_kinds:
+      [pull_request, review, commit, ci_run, merge, release, license]
+  astral-sh/ruff:
+    visibility: public
+    license: MIT
+    authorization:
+      record_id: PUBLIC-GITHUB-TERMS-2026-08
+      scope: read-only workflow export
+      basis: public repository under recorded license
+      reviewed_at: 2026-08-26T16:50:00Z
+    allowed_record_kinds:
+      [pull_request, review, commit, ci_run, merge, release, license]
+  dprint/dprint:
+    visibility: public
+    license: MIT
+    authorization:
+      record_id: PUBLIC-GITHUB-TERMS-2026-08
+      scope: read-only workflow export
+      basis: public repository under recorded license
+      reviewed_at: 2026-08-27T04:00:00Z
+    allowed_record_kinds:
+      [pull_request, review, commit, ci_run, merge, release, license]
+  pulumi/pulumi:
+    visibility: public
+    license: Apache-2.0
+    authorization:
+      record_id: PUBLIC-GITHUB-TERMS-2026-08
+      scope: read-only workflow export
+      basis: public repository under recorded license
+      reviewed_at: 2026-08-27T06:20:00Z
+    allowed_record_kinds:
+      [pull_request, review, commit, ci_run, merge, release, license]
   opensearch-project/opensearch-php:
     visibility: public
     license: Apache-2.0

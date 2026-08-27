@@ -930,7 +930,10 @@ def _build_real_repo_queries(
             ]
             return bool(
                 release_ci
-                and all(item.params.get("result") == "passed" for item in release_ci)
+                and any(item.params.get("result") == "passed" for item in release_ci)
+                and not any(
+                    item.params.get("result") == "failed" for item in release_ci
+                )
                 and world.state.values.get(f"{prefix}:status") == "published"
                 and world.state.values.get(f"{prefix}:tag")
                 and (

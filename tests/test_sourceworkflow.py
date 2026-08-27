@@ -9,6 +9,8 @@ from longworld.core.provenance import ProvenanceError
 from longworld.core.sourceworkflow import (
     PAPER_SOURCE_KIND,
     SEC_SOURCE_KIND,
+    SOURCE_WORKFLOW_ADAPTER_REVISION_V1,
+    SOURCE_WORKFLOW_ADAPTER_REVISION_V2,
     WIKIMEDIA_SOURCE_KIND,
     adapt_paper_manifest,
     adapt_sec_manifest,
@@ -349,6 +351,39 @@ def test_sec_adapter_preserves_exact_facts_and_builds_component_identity() -> No
     assert revenue.char_end == revenue.char_start + len(revenue.evidence_quote)
 
 
+def test_sec_adapter_accepts_one_authentic_filing_without_inventing_a_relation() -> (
+    None
+):
+    manifest = _sec_manifest()
+    manifest["filings"] = manifest["filings"][:1]
+    manifest["filing_relations"] = []
+    manifest["n"] = 1
+
+    [workflow] = adapt_sec_manifest(
+        manifest,
+        signed_bundle_authorized=True,
+        adapter_revision=SOURCE_WORKFLOW_ADAPTER_REVISION_V2,
+    )
+
+    assert len(workflow.records) == 1
+    assert workflow.relations == ()
+    assert workflow.records[0].facts
+
+
+def test_v1_sec_adapter_keeps_rejecting_relationless_singletons() -> None:
+    manifest = _sec_manifest()
+    manifest["filings"] = manifest["filings"][:1]
+    manifest["filing_relations"] = []
+    manifest["n"] = 1
+
+    with pytest.raises(ProvenanceError, match="relations.*non-empty"):
+        adapt_sec_manifest(
+            manifest,
+            signed_bundle_authorized=True,
+            adapter_revision=SOURCE_WORKFLOW_ADAPTER_REVISION_V1,
+        )
+
+
 def test_component_identity_ignores_filename_and_caller_labels() -> None:
     original = _paper_manifest()
     [first] = adapt_paper_manifest(original, signed_bundle_authorized=True)
@@ -487,7 +522,7 @@ def test_wikimedia_family_is_derived_from_verified_record_kind() -> None:
     )
 
     assert workflow.source_kind == WIKIMEDIA_SOURCE_KIND
-    assert workflow.target_domain == "knowledgebase"
+    assert workflow.target_domain == "researchlab"
     assert workflow.source_families == (
         "wikidata_entity_revision",
         "wikipedia_revision",

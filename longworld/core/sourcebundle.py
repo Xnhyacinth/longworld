@@ -49,6 +49,9 @@ from longworld.core.provenance import ProvenanceError, _read_regular_file
 from longworld.core.sourceworkflow import (
     PAPER_SOURCE_KIND,
     SEC_SOURCE_KIND,
+    SOURCE_WORKFLOW_ADAPTER_REVISION_V1,
+    SOURCE_WORKFLOW_ADAPTER_REVISION_V2,
+    SOURCE_WORKFLOW_ADAPTER_REVISIONS,
     WIKIMEDIA_SOURCE_KIND,
     SourceWorkflow,
     adapt_source_manifest,
@@ -56,7 +59,8 @@ from longworld.core.sourceworkflow import (
 
 SOURCE_WORKFLOW_BUNDLE_SCHEMA = "longworld.source-workflow-bundle.v1"
 SOURCE_WORKFLOW_BUNDLE_PURPOSE = "source_workflow_bundle"
-SOURCE_WORKFLOW_ADAPTER_REVISION = "sourceworkflow@1"
+SOURCE_WORKFLOW_ADAPTER_REVISION = SOURCE_WORKFLOW_ADAPTER_REVISION_V1
+SOURCE_WORKFLOW_ADAPTER_REVISION_LATEST = SOURCE_WORKFLOW_ADAPTER_REVISION_V2
 MAX_SOURCE_WORKFLOW_BUNDLE_BYTES = 2_000_000
 MAX_SOURCE_WORKFLOW_ENTRIES = 512
 
@@ -83,7 +87,7 @@ _KIND_CONTRACTS = {
         MAX_DOCUMENT_MANIFEST_BYTES,
     ),
     WIKIMEDIA_SOURCE_KIND: (
-        "knowledgebase",
+        "researchlab",
         frozenset({WIKIPEDIA_WORKFLOW_MANIFEST_SCHEMA}),
         MAX_DOCUMENT_MANIFEST_BYTES,
     ),
@@ -105,6 +109,7 @@ class SourceBundleBinding:
 class LoadedSourceWorkflowBundle:
     bundle_sha256: str
     binding_digest: str
+    adapter_revision: str
     bindings: tuple[SourceBundleBinding, ...]
     workflows: tuple[SourceWorkflow, ...]
 
@@ -157,7 +162,7 @@ def _entry_from_raw(raw: object) -> _Entry:
     if (
         target_domain != expected_domain
         or schema_version not in expected_schemas
-        or adapter_revision != SOURCE_WORKFLOW_ADAPTER_REVISION
+        or adapter_revision not in SOURCE_WORKFLOW_ADAPTER_REVISIONS
         or not _is_sha256(declared_sha256)
     ):
         raise ProvenanceError("source workflow bundle entry contract is invalid")
@@ -324,6 +329,9 @@ def load_source_workflow_bundle(
         raise ProvenanceError("source workflow bundle entry count is invalid")
 
     entries = [_entry_from_raw(raw) for raw in raw_entries]
+    adapter_revisions = {entry.adapter_revision for entry in entries}
+    if len(adapter_revisions) != 1:
+        raise ProvenanceError("source workflow bundle mixes adapter revisions")
     paths = [entry.path for entry in entries]
     if len(set(paths)) != len(paths):
         raise ProvenanceError("source workflow entry path is duplicated")
@@ -348,6 +356,7 @@ def load_source_workflow_bundle(
             manifest,
             source_kind=entry.kind,
             signed_bundle_authorized=True,
+            adapter_revision=entry.adapter_revision,
         )
         component_digests = tuple(
             sorted(workflow.component_digest for workflow in entry_workflows)
@@ -372,6 +381,7 @@ def load_source_workflow_bundle(
     return LoadedSourceWorkflowBundle(
         bundle_sha256=hashlib.sha256(raw_bundle).hexdigest(),
         binding_digest=_binding_digest(immutable_bindings),
+        adapter_revision=adapter_revisions.pop(),
         bindings=immutable_bindings,
         workflows=tuple(sorted(workflows, key=lambda workflow: workflow.workflow_id)),
     )

@@ -23,14 +23,27 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from longworld.core.attestation import attestation_key_from_env, verify_attestation
+from longworld.core.attestation import (
+    attestation_key_from_env,
+    canonical_attested_payload,
+    verify_attestation,
+)
 from longworld.core.provenance import (
     MAX_SOURCE_BYTES,
     ProvenanceError,
+    SourceLineage,
     _parse_timestamp,
     _read_regular_file,
 )
-from longworld.core.scholarly import format_revision_funding_delta
+from longworld.core.realworkflow import (
+    MAX_WORKFLOW_RECORD_CHARS,
+    MAX_WORKFLOW_RECORDS,
+    RealWorkflow,
+    WorkflowFact,
+    WorkflowRecord,
+)
+from longworld.core.scholarly import format_revision_added_delta
+from longworld.core.taxonomy import SourceOrigin
 
 PAPER_WORKFLOW_INPUT_SCHEMA = "longworld.paper-workflow-input.v1"
 PAPER_WORKFLOW_MANIFEST_SCHEMA = "longworld.paper-workflow-manifest.v1"
@@ -102,6 +115,10 @@ _PAPER_RELATION_ROLES = {
     "reproduces_result": ("benchmark_report", "manuscript_revision"),
 }
 _WIKIMEDIA_KINDS = {"wikipedia_revision", "wikidata_entity_revision"}
+_WIKIMEDIA_CONTENT_LICENSES = {
+    "wikipedia_revision": "CC BY-SA 4.0; GFDL",
+    "wikidata_entity_revision": "CC0-1.0",
+}
 _WIKIMEDIA_RELATION_KINDS = {
     "revision_of",
     "page_describes_entity",
@@ -483,7 +500,7 @@ def _revision_added_text_fact(
             if (
                 normalized in previous
                 or current_record_text.count(candidate) != 1
-                or not format_revision_funding_delta(candidate)
+                or not format_revision_added_delta(candidate)
             ):
                 continue
             candidates.append((_semantic_candidate_rank(candidate), path, candidate))
@@ -2154,6 +2171,13 @@ def _audit_manifest(
             or _EMAIL.search(text)
         ):
             raise ProvenanceError("document workflow privacy review is invalid")
+        if (
+            privacy["email_redaction_count"] == 0
+            and source_hash != record["text_sha256"]
+        ):
+            raise ProvenanceError(
+                "document workflow manifest source binding is invalid"
+            )
         _reject_secrets(text)
         if "derived_facts" in record:
             _audit_derived_facts(
@@ -2421,3 +2445,276 @@ def load_wikipedia_workflow_manifest(
     elif "fetch_receipt" in payload:
         raise ProvenanceError("non-public Wikimedia manifest has a fetch receipt")
     return payload
+
+
+def _wikimedia_body_fact(
+    *,
+    key: str,
+    record_id: str,
+    text: str,
+    field: str,
+    value: str | int,
+) -> WorkflowFact:
+    encoded = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    pattern = re.compile(rf'"{re.escape(field)}"\s*:\s*(?P<value>{re.escape(encoded)})')
+    matches = list(pattern.finditer(text))
+    if len(matches) != 1:
+        raise ProvenanceError(f"Wikimedia source body does not uniquely bind {field}")
+    match = matches[0]
+    start, end = match.span("value")
+    decoded = json.loads(match.group("value"))
+    if isinstance(decoded, str):
+        start += 1
+        end -= 1
+    if text[start:end] != str(decoded):
+        raise ProvenanceError(f"Wikimedia source body does not losslessly bind {field}")
+    return WorkflowFact(
+        key=key,
+        value=str(decoded),
+        record_id=record_id,
+        char_start=start,
+        char_end=end,
+        source_quote=match.group(0),
+    )
+
+
+def _wikimedia_relation_fact(
+    relation: dict[str, Any], records: dict[str, dict[str, Any]]
+) -> WorkflowFact:
+    target = records[relation["target_record_id"]]
+    if relation["kind"] == "revision_of":
+        value = str(target["revision_id"])
+    elif relation["kind"] == "page_describes_entity":
+        value = str(target["entity_id"])
+    else:
+        value = str(target["title"])
+    quote = relation["evidence_quote"]
+    offset = quote.find(value)
+    if offset < 0 or quote.find(value, offset + len(value)) >= 0:
+        raise ProvenanceError(
+            "Wikimedia relation evidence does not uniquely bind its target"
+        )
+    start = relation["evidence_char_start"] + offset
+    return WorkflowFact(
+        key=f"relation:{relation['relation_id']}:target",
+        value=value,
+        record_id=relation["evidence_record_id"],
+        char_start=start,
+        char_end=start + len(value),
+        source_quote=quote,
+    )
+
+
+def _wikipedia_real_workflow_episode(
+    payload: dict[str, Any], *, source_path: Path
+) -> RealWorkflow:
+    """Convert one verified public Wikimedia manifest into a replay episode."""
+    if payload.get("source_status") != "public_api_export":
+        raise ProvenanceError(
+            "only an authenticated public Wikimedia API export is a real episode"
+        )
+    raw_records = payload["records"]
+    if len(raw_records) > MAX_WORKFLOW_RECORDS:
+        raise ProvenanceError("Wikimedia workflow contains too many replay records")
+    records_by_id = {record["record_id"]: record for record in raw_records}
+    ordered = sorted(
+        raw_records,
+        key=lambda record: (
+            _parse_timestamp(record["occurred_at"], "record occurred_at"),
+            record["source_sha256"],
+            record["record_id"],
+        ),
+    )
+    order = {record["record_id"]: index for index, record in enumerate(ordered)}
+    relations_by_source: dict[str, list[dict[str, Any]]] = {
+        record_id: [] for record_id in records_by_id
+    }
+    neighbors: dict[str, set[str]] = {record_id: set() for record_id in records_by_id}
+    for relation in payload["relations"]:
+        source_id = relation["source_record_id"]
+        target_id = relation["target_record_id"]
+        clean_relation = {
+            "relation_id": relation["relation_id"],
+            "kind": relation["kind"],
+            "source_record_id": source_id,
+            "target_record_id": target_id,
+            "evidence_record_id": relation["evidence_record_id"],
+            "evidence_quote": relation["evidence_quote"],
+            "evidence_char_start": relation["evidence_char_start"],
+            "evidence_char_end": relation["evidence_char_start"]
+            + len(relation["evidence_quote"]),
+            "source_sha256": relation["source_sha256"],
+        }
+        relations_by_source[source_id].append(clean_relation)
+        neighbors[source_id].add(target_id)
+        neighbors[target_id].add(source_id)
+
+    facts: dict[str, WorkflowFact] = {}
+    workflow_records: list[WorkflowRecord] = []
+    for record in ordered:
+        record_id = record["record_id"]
+        text = record["text"]
+        if len(text) > MAX_WORKFLOW_RECORD_CHARS:
+            raise ProvenanceError(f"Wikimedia workflow record {record_id} is too large")
+        fact_fields: tuple[tuple[str, str, str | int | None], ...]
+        if record["kind"] == "wikipedia_revision":
+            fact_fields = (
+                ("revision_id", "revid", record["revision_id"]),
+                ("page_id", "pageid", record["page_id"]),
+                ("title", "title", record["title"]),
+                ("parent_revision_id", "parentid", record["parent_revision_id"]),
+                ("occurred_at", "timestamp", record["occurred_at"]),
+            )
+        else:
+            fact_fields = (
+                ("revision_id", "lastrevid", record["revision_id"]),
+                ("entity_id", "id", record["entity_id"]),
+                ("occurred_at", "modified", record["occurred_at"]),
+            )
+        for name, body_field, value in fact_fields:
+            if value is None:
+                continue
+            key = f"record:{record_id}:{name}"
+            facts[key] = _wikimedia_body_fact(
+                key=key,
+                record_id=record_id,
+                text=text,
+                field=body_field,
+                value=value,
+            )
+        attributes = {
+            key: record[key]
+            for key in (
+                "kind",
+                "revision_id",
+                "page_id",
+                "title",
+                "parent_revision_id",
+                "entity_id",
+                "source_url",
+                "retrieval_url",
+                "source_sha256",
+                "text_sha256",
+                "provenance_id",
+                "parser",
+            )
+            if record.get(key) is not None
+        }
+        attributes["content_license"] = _WIKIMEDIA_CONTENT_LICENSES[record["kind"]]
+        attributes["source_relations"] = tuple(
+            sorted(
+                relations_by_source[record_id],
+                key=lambda relation: (
+                    relation["kind"],
+                    relation["target_record_id"],
+                    relation["relation_id"],
+                ),
+            )
+        )
+        workflow_records.append(
+            WorkflowRecord(
+                record_id=record_id,
+                kind=record["kind"],
+                occurred_at=record["occurred_at"],
+                text=text,
+                links=tuple(
+                    sorted(
+                        (
+                            related
+                            for related in neighbors[record_id]
+                            if order[related] < order[record_id]
+                        ),
+                        key=order.__getitem__,
+                    )
+                ),
+                attributes=attributes,
+                source_pointer=f"{source_path}#/records/{raw_records.index(record)}/text",
+            )
+        )
+    for relation in payload["relations"]:
+        fact = _wikimedia_relation_fact(relation, records_by_id)
+        facts[fact.key] = fact
+
+    signature_records = [
+        {
+            "kind": record["kind"],
+            "occurred_at": record["occurred_at"],
+            "source_url": record["source_url"],
+            "retrieval_url": record["retrieval_url"],
+            "source_sha256": record["source_sha256"],
+            "text_sha256": record["text_sha256"],
+        }
+        for record in ordered
+    ]
+    signature_relations = [
+        {
+            "kind": relation["kind"],
+            "source_sha256": records_by_id[relation["source_record_id"]][
+                "source_sha256"
+            ],
+            "target_sha256": records_by_id[relation["target_record_id"]][
+                "source_sha256"
+            ],
+            "evidence_source_sha256": relation["source_sha256"],
+            "evidence_quote": relation["evidence_quote"],
+            "evidence_char_start": relation["evidence_char_start"],
+        }
+        for relation in payload["relations"]
+    ]
+    signature = {
+        "records": sorted(
+            signature_records,
+            key=lambda value: json.dumps(
+                value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            ),
+        ),
+        "relations": sorted(
+            signature_relations,
+            key=lambda value: json.dumps(
+                value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            ),
+        ),
+    }
+    digest = hashlib.sha256(
+        json.dumps(
+            signature, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode()
+    ).hexdigest()
+    content_licenses = {
+        _WIKIMEDIA_CONTENT_LICENSES[str(record["kind"])] for record in ordered
+    }
+    retrieved_at = max(
+        ordered,
+        key=lambda record: _parse_timestamp(
+            record["retrieved_at"], "record retrieved_at"
+        ),
+    )["retrieved_at"]
+    page_records = [
+        record for record in ordered if record["kind"] == "wikipedia_revision"
+    ]
+    lineage_digest = hashlib.sha256(canonical_attested_payload(payload)).hexdigest()
+    return RealWorkflow(
+        workflow_id=f"wikimedia:{digest[:24]}",
+        source_kind="wikimedia",
+        source_origin=SourceOrigin.REAL_PUBLIC,
+        lineage=SourceLineage(
+            provenance_id=f"sha256:{lineage_digest}",
+            url=page_records[-1]["source_url"],
+            license="; ".join(sorted(content_licenses)),
+            retrieved_at=retrieved_at,
+            parser="wikipedia_workflow_manifest@2",
+            sha256=lineage_digest,
+            revision=",".join(str(record["revision_id"]) for record in ordered),
+            source_path=str(source_path),
+        ),
+        records=tuple(workflow_records),
+        facts=facts,
+    )
+
+
+def load_wikipedia_real_workflow_episode(
+    path: Path, *, attestation_key: bytes | None = None
+) -> RealWorkflow:
+    """Verify and adapt a public Wikipedia/Wikidata manifest for deterministic replay."""
+    payload = load_wikipedia_workflow_manifest(path, attestation_key=attestation_key)
+    return _wikipedia_real_workflow_episode(payload, source_path=path)

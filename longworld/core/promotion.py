@@ -17,10 +17,12 @@ from urllib.parse import urlparse
 from longworld.core.attestation import (
     attach_attestation,
     canonical_attested_payload,
+    sanitized_attestation_environment,
     verify_attestation,
     verify_attestation_identity,
 )
 from longworld.core.engine import answer_from_artifacts
+from longworld.core.filingworkflow import SEC_HYBRID_CHILD_EVENT_TYPES
 from longworld.core.graph import graph_stats
 from longworld.core.pack import (
     SEP,
@@ -38,7 +40,7 @@ from longworld.core.realworkflow import (
     EPISODE_REPLAY_BUNDLE_SCHEMA,
     load_episode_replay_bundle,
 )
-from longworld.core.record_contract import sft_row_errors
+from longworld.core.record_contract import STRICT_REPLAY_REVISION, sft_row_errors
 from longworld.core.release_profile import (
     release_profile,
     release_profile_sha256,
@@ -51,10 +53,10 @@ from longworld.core.semantic import (
     sentence_near_dup_ratio,
 )
 from longworld.core.sourcebundle import (
-    SOURCE_WORKFLOW_ADAPTER_REVISION,
     SOURCE_WORKFLOW_BUNDLE_SCHEMA,
     load_source_workflow_bundle,
 )
+from longworld.core.sourceworkflow import SOURCE_WORKFLOW_ADAPTER_REVISIONS
 from longworld.core.taxonomy import artifact_classification
 from longworld.core.topology import canonical_topology, topology_family
 from longworld.core.verify import (
@@ -64,6 +66,7 @@ from longworld.core.verify import (
     verify_question,
 )
 from longworld.core.views import render_cf_view
+from longworld.core.wikiparse import WIKI_HYBRID_CHILD_EVENT_TYPES
 from longworld.domains.company.queries import QuerySpec
 
 DENSE_AUDIT_PURPOSE = "dense_retrieval_audit"
@@ -71,15 +74,20 @@ DENSE_RANKING_PURPOSE = "dense_ranking"
 CANDIDATE_ATTESTATION_PURPOSE = "candidate_row"
 DENSE_RANKING_SCHEMA = "dense-ranking-v2"
 PROMOTION_SCHEMA = "train-ready-promotion-v1"
-STRICT_REPLAY_REVISION = "longworld-strict-replay-v3"
 REAL_REPLAY_BUNDLE_PURPOSE = "episode_replay_bundle"
 QUALITY_REPORT_PURPOSE = "quality_report"
-QUALITY_REPORT_BINDING_REVISION = "longworld-quality-binding-v2"
+QUALITY_REPORT_BINDING_REVISION = "longworld-quality-binding-v3"
 RELEASE_SELECTION_SCHEMA = "longworld-release-world-selection-v1"
 RELEASE_SELECTION_PURPOSE = "release_world_selection"
 RELEASE_GATE_SCHEMA = "longworld-release-gate-pass-v1"
 RELEASE_GATE_PURPOSE = "release_gate_pass"
-RELEASE_GATE_REVISION = "longworld-quality-gate-v2"
+RELEASE_GATE_REVISION = "longworld-quality-gate-v5"
+
+EXACT_TOKEN_BAND_RANGES: dict[str, tuple[int, int]] = {
+    "16k": (16_000, 16_384),
+    "32k": (32_000, 32_768),
+    "64k": (64_000, 65_536),
+}
 
 _HEX_REVISION = re.compile(r"[0-9a-f]{40}", re.IGNORECASE)
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -90,6 +98,12 @@ _APPROVED_DENSE_MODELS = {
         "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
         "sentence-transformers-6.0.0",
         "dot_product",
+    )
+}
+_APPROVED_EXACT_TOKENIZERS = {
+    (
+        "Qwen/Qwen3.5-4B",
+        "a7b0d22b993d71000cf2eadfb37222a67cee521e",
     )
 }
 
@@ -132,6 +146,17 @@ _COMPOSITION_BY_VIEW = {
 
 class PromotionError(ValueError):
     """A candidate or audit cannot be promoted without weakening a gate."""
+
+
+def exact_token_band_reject_reason(length_bucket: str, tokens: int) -> str | None:
+    """Return a stable reject reason when an exact-token band is mislabeled."""
+    bounds = EXACT_TOKEN_BAND_RANGES.get(length_bucket)
+    if bounds is None:
+        return None
+    lower, upper = bounds
+    if not lower <= tokens <= upper:
+        return f"exact_{length_bucket}_out_of_range:{tokens}"
+    return None
 
 
 def _sha256_text(value: str) -> str:
@@ -1056,7 +1081,8 @@ def _reconstruct_candidate(
         }
         if (
             source_binding["schema_version"] != SOURCE_WORKFLOW_BUNDLE_SCHEMA
-            or source_binding["adapter_revision"] != SOURCE_WORKFLOW_ADAPTER_REVISION
+            or source_binding["adapter_revision"]
+            not in SOURCE_WORKFLOW_ADAPTER_REVISIONS
             or _SHA256.fullmatch(source_binding["sha256"]) is None
             or _SHA256.fullmatch(source_binding["binding_digest"]) is None
         ):
@@ -1074,6 +1100,7 @@ def _reconstruct_candidate(
         if (
             loaded.bundle_sha256 != source_binding["sha256"]
             or loaded.binding_digest != source_binding["binding_digest"]
+            or loaded.adapter_revision != source_binding["adapter_revision"]
         ):
             raise PromotionError(
                 "source workflow bundle digest does not match candidate"
@@ -1309,6 +1336,19 @@ def _parallel_dossiers(
     return factual, counterfactual
 
 
+@lru_cache(maxsize=2)
+def _load_replay_tokenizer(model_id: str, revision: str):
+    with sanitized_attestation_environment():
+        from transformers import AutoTokenizer
+
+        return AutoTokenizer.from_pretrained(
+            model_id,
+            revision=revision,
+            trust_remote_code=False,
+            local_files_only=True,
+        )
+
+
 def _independent_verification_replay(
     candidate: dict[str, Any],
     world: Any,
@@ -1317,6 +1357,49 @@ def _independent_verification_replay(
     counterpart: list[Artifact],
 ) -> tuple[Verification, dict[str, Any]]:
     factual, counterfactual = _parallel_dossiers(candidate, artifacts, counterpart)
+    tokenizer = None
+    tokenizer_model_id = str(candidate.get("tokenizer_model_id") or "")
+    tokenizer_revision = str(candidate.get("tokenizer_revision") or "")
+    exact_metadata: dict[str, Any] | None = None
+    if str(candidate.get("length_bucket") or "") in EXACT_TOKEN_BAND_RANGES:
+        if (tokenizer_model_id, tokenizer_revision) not in _APPROVED_EXACT_TOKENIZERS:
+            raise PromotionError("candidate exact tokenizer pin is not approved")
+        try:
+            tokenizer = _load_replay_tokenizer(tokenizer_model_id, tokenizer_revision)
+        except (ImportError, OSError, RuntimeError, ValueError) as error:
+            raise PromotionError(
+                "candidate exact tokenizer cannot be loaded"
+            ) from error
+        loaded_revision = str(
+            getattr(tokenizer, "init_kwargs", {}).get("_commit_hash") or ""
+        )
+        if loaded_revision != tokenizer_revision:
+            raise PromotionError("loaded exact tokenizer revision does not match pin")
+        reconstructed_context = wrap_prompt(
+            spec.question,
+            join_artifacts(artifacts),
+            str(candidate["query_timing"]),
+        )
+        with sanitized_attestation_environment():
+            replayed_tokens = len(
+                tokenizer.encode(reconstructed_context, add_special_tokens=False)
+            )
+        try:
+            declared_tokens = int(candidate.get("tokenizer_context_tokens") or 0)
+        except (TypeError, ValueError) as error:
+            raise PromotionError("candidate exact token count is invalid") from error
+        if replayed_tokens != declared_tokens:
+            raise PromotionError("candidate exact token count does not replay")
+        exact_reject = exact_token_band_reject_reason(
+            str(candidate["length_bucket"]), replayed_tokens
+        )
+        if exact_reject:
+            raise PromotionError(exact_reject)
+        exact_metadata = {
+            "tokenizer_context_tokens": replayed_tokens,
+            "tokenizer_model_id": tokenizer_model_id,
+            "tokenizer_revision": tokenizer_revision,
+        }
     verification, notes = verify_question(
         world,
         spec,
@@ -1329,7 +1412,10 @@ def _independent_verification_replay(
         ),
         retrieval_top_k=3,
         verification_mode="candidate",
+        raw_window_tokenizer=tokenizer,
     )
+    if exact_metadata is not None:
+        notes["exact_token_replay"] = exact_metadata
     if not verification.all_green():
         failed = [
             name
@@ -1342,7 +1428,11 @@ def _independent_verification_replay(
             "independent verification replay failed: " + ",".join(failed)
         )
     cf_shortcuts_green, cf_shortcut_notes = counterfactual_shortcuts_insufficient(
-        world, spec, counterfactual, retrieval_top_k=3
+        world,
+        spec,
+        counterfactual,
+        retrieval_top_k=3,
+        raw_window_tokenizer=tokenizer,
     )
     notes["counterfactual_shortcuts"] = cf_shortcut_notes
     if candidate.get("view") == "cf" and not cf_shortcuts_green:
@@ -1379,6 +1469,7 @@ def _replayed_source_family_ids(artifacts: list[Artifact]) -> list[str]:
 def _replayed_task_metadata(
     candidate: dict[str, Any], world: Any, spec: QuerySpec, artifacts: list[Artifact]
 ) -> dict[str, Any]:
+    replayed_graph = graph_stats(world, spec)
     proof_id = _sha256_text(
         json.dumps(
             {
@@ -1394,7 +1485,7 @@ def _replayed_task_metadata(
             {
                 "query_type": spec.query_type,
                 "program_ops": list(spec.program_ops or []),
-                "proof_depth": int(spec.proof_depth or 0),
+                "proof_depth": int(replayed_graph["proof_depth"]),
                 "cf_op": spec.cf_op,
             },
             sort_keys=True,
@@ -1418,7 +1509,9 @@ def _replayed_task_metadata(
         "topology_family": topology_family(spec),
         "executable_proof_id": proof_id,
         "answer_program_id": program_id,
-        "base_task_id": _sha256_text(f"{world.world_id}|{spec.query_id}")[:20],
+        "base_task_id": _sha256_text(
+            f"{world.world_id}|{spec.base_task_group or spec.query_id}"
+        )[:20],
         "dossier_id": dossier,
         "semantic_growth_group_id": semantic_growth_group_id,
         "strict_support_event_count": len(
@@ -1433,8 +1526,8 @@ def _replayed_task_metadata(
             "cf_event_id": spec.cf_event_id,
             "cf_op": spec.cf_op,
         },
-        "graph": graph_stats(world, spec),
-        "hop_count": int(spec.proof_depth or 0),
+        "graph": replayed_graph,
+        "hop_count": int(replayed_graph["hop_count"]),
         "searchart_width": len(spec.essential_artifact_ids),
         "program_ops": list(spec.program_ops or []),
         "window_artifact_ids": query_adjacent_window_artifact_ids(
@@ -1461,6 +1554,8 @@ def _validate_replayed_task_metadata(
         "cf_answer": "counterfactual answer",
         "cf_op": "counterfactual operator",
         "proof_graph": "proof graph",
+        "graph": "graph statistics",
+        "hop_count": "graph hop count",
     }
     for field, label in labels.items():
         if field == "dossier_id" and candidate.get("view") in {"full", "cf"}:
@@ -1549,6 +1644,7 @@ def _replayed_source_metadata(
                     "relation": str(
                         child.relation_kinds.get(parent_id) or "causal_input"
                     ),
+                    "relation_provenance": "authentic_source",
                     "parent_source_url": str(parent.params["source_url"]),
                     "child_source_url": str(child.params["source_url"]),
                 }
@@ -1561,12 +1657,36 @@ def _replayed_source_metadata(
                 "parent_record_id": str(relation.params.get("target_record_id") or ""),
                 "child_record_id": str(relation.params.get("source_record_id") or ""),
                 "relation": str(relation.params.get("relation_kind") or ""),
+                "relation_provenance": "authentic_source",
                 "parent_source_url": str(
                     relation.params.get("target_source_url") or ""
                 ),
                 "child_source_url": str(relation.params.get("source_url") or ""),
             }
         )
+    for child in all_events.values():
+        if (
+            child.type
+            not in SEC_HYBRID_CHILD_EVENT_TYPES | WIKI_HYBRID_CHILD_EVENT_TYPES
+        ):
+            continue
+        for parent_id in child.causal_inputs:
+            parent = all_events.get(parent_id)
+            if parent is None:
+                continue
+            edges.append(
+                {
+                    "parent_record_id": parent.id,
+                    "child_record_id": child.id,
+                    "source_record_id": str(child.params.get("record_id") or ""),
+                    "relation": str(
+                        child.relation_kinds.get(parent_id) or "causal_input"
+                    ),
+                    "relation_provenance": "synthetic_executable",
+                    "parent_source_url": str(parent.params.get("source_url") or ""),
+                    "child_source_url": str(child.params.get("source_url") or ""),
+                }
+            )
     proof_artifact_ids = set(spec.essential_artifact_ids) | {
         artifact.artifact_id
         for artifact in artifacts
@@ -1574,6 +1694,7 @@ def _replayed_source_metadata(
     }
     real_origins = {"real_public", "real_private_export", "real_derived"}
     real_families: set[str] = set()
+    real_workflow_ids: set[str] = set()
     for artifact in artifacts:
         classification = artifact_classification(artifact)
         slots = artifact.slots or {}
@@ -1588,17 +1709,40 @@ def _replayed_source_metadata(
             and family
         ):
             real_families.add(family)
+            workflow_id = str(slots.get("source_workflow_id") or "").strip()
+            if workflow_id:
+                real_workflow_ids.add(workflow_id)
     relation_id = (
         _sha256_text(json.dumps(edges, sort_keys=True, ensure_ascii=False))[:20]
         if edges
         else ""
     )
+    authentic_edges = [
+        edge for edge in edges if edge["relation_provenance"] == "authentic_source"
+    ]
+    hybrid_edges = [
+        edge for edge in edges if edge["relation_provenance"] == "synthetic_executable"
+    ]
+    authentic_relation_id = (
+        _sha256_text(json.dumps(authentic_edges, sort_keys=True, ensure_ascii=False))[
+            :20
+        ]
+        if authentic_edges
+        else ""
+    )
     return {
         "real_source_verified": bool(edges and real_families),
         "real_source_family_ids": sorted(real_families),
+        "real_source_workflow_ids": sorted(real_workflow_ids),
         "source_relation_edges": edges,
         "source_relation_id": relation_id,
-        "base_task_id": _sha256_text(f"{world.world_id}|{spec.query_id}")[:20],
+        "authentic_source_relation_edges": authentic_edges,
+        "authentic_source_relation_id": authentic_relation_id,
+        "hybrid_causal_edges": hybrid_edges,
+        "context_source_relation_count": len(edges),
+        "base_task_id": _sha256_text(
+            f"{world.world_id}|{spec.base_task_group or spec.query_id}"
+        )[:20],
     }
 
 
@@ -1607,6 +1751,7 @@ def _replayed_quality_metrics(
     world: Any,
     spec: QuerySpec,
     artifacts: list[Artifact],
+    verification_notes: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Recompute serialized-view quality fields without trusting candidate values."""
     document_context = join_artifacts(artifacts)
@@ -1662,12 +1807,13 @@ def _replayed_quality_metrics(
         if classification.source_origin.value in real_origins:
             real_source_tokens += tokens
 
+    replayed_graph = graph_stats(world, spec)
     difficulty = dict(candidate.get("difficulty") or {})
     difficulty.update(
         {
             "context_tokens": metrics.context_tokens,
             "max_evidence_distance": metrics.max_evidence_distance,
-            "proof_depth": int(spec.proof_depth or 0),
+            "proof_depth": int(replayed_graph["proof_depth"]),
             "state_updates": len(world.state.history),
             "query_delay": 1 if candidate.get("query_timing") == "late" else 0,
             "visibility_gap": len(
@@ -1697,7 +1843,14 @@ def _replayed_quality_metrics(
         and all(parent_id in visible_real_events for parent_id in event.required_inputs)
         for event in visible_real_events.values()
     )
-    return {
+    raw_fact_windows = (verification_notes or {}).get("raw_token_fact_windows")
+    tokenizer_evidence_span_tokens = (
+        int(raw_fact_windows["tokenizer_evidence_span_tokens"])
+        if isinstance(raw_fact_windows, dict)
+        and isinstance(raw_fact_windows.get("tokenizer_evidence_span_tokens"), int)
+        else None
+    )
+    replayed = {
         "context": context,
         "document_context": document_context,
         "difficulty": difficulty,
@@ -1725,6 +1878,12 @@ def _replayed_quality_metrics(
             real_source_tokens / max(1, metrics.context_tokens), 4
         ),
     }
+    exact_token_replay = (verification_notes or {}).get("exact_token_replay")
+    if isinstance(exact_token_replay, dict):
+        replayed.update(exact_token_replay)
+    if tokenizer_evidence_span_tokens is not None:
+        replayed["tokenizer_evidence_span_tokens"] = tokenizer_evidence_span_tokens
+    return replayed
 
 
 def _validate_candidate_gates(
@@ -1899,7 +2058,9 @@ def create_dense_audit(
     replayed_verification, replayed_notes = _independent_verification_replay(
         candidate, world, spec, artifacts, counterpart
     )
-    replayed_quality = _replayed_quality_metrics(candidate, world, spec, artifacts)
+    replayed_quality = _replayed_quality_metrics(
+        candidate, world, spec, artifacts, replayed_notes
+    )
     verification_replay_sha256 = _canonical_sha256(
         {
             "verification": replayed_verification.model_dump(),
@@ -2000,7 +2161,9 @@ def promote_candidate(
     )
     if dense_audit.get("verification_replay_sha256") != verification_replay_sha256:
         raise PromotionError("dense audit verification replay binding mismatch")
-    replayed_quality = _replayed_quality_metrics(candidate, world, spec, artifacts)
+    replayed_quality = _replayed_quality_metrics(
+        candidate, world, spec, artifacts, replayed_notes
+    )
     if (
         _audited_near_dup_sentence_ratio(dense_audit)
         != replayed_quality["near_dup_sentence_ratio"]

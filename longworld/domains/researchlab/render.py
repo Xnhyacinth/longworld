@@ -130,6 +130,10 @@ def _ground(ev: Event) -> list[str]:
         return [str(p["relation_kind"]), str(p["target_revision_id"])]
     if t == "arxiv_revision_decision":
         return []
+    if t == "wiki_source_section":
+        return [str(value) for value in p.get("ground_values") or []]
+    if t == "wiki_claim_answer":
+        return []
     return []
 
 
@@ -159,6 +163,24 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
                 "rule": (
                     "accept the exact semantic delta only after both revision bodies "
                     "and their verified revision_of relation replay"
+                ),
+                "answer_disclosure": "omitted",
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        ) + "\n"
+    if t == "wiki_source_section":
+        return "wiki", str(ev.params["text"])
+    if t == "wiki_claim_answer":
+        return "json", json.dumps(
+            {
+                "kind": "wiki_claim_answer",
+                "checkpoint": ev.params["control_stage"],
+                "status": "wiki-reconstructed",
+                "rule": (
+                    "reconstruct tagged Wikipedia/Wikidata claims from cited "
+                    "section bodies; this memo does not restate those claims"
                 ),
                 "answer_disclosure": "omitted",
             },
@@ -539,6 +561,42 @@ def render_lab(sim: SimulatedWorld) -> list[Artifact]:
                 ),
                 evidence_role=EvidenceRole.CAUSAL_SUPPORTING,
                 workflow_id=str(ev.params["workflow_id"]),
+                provenance_id=provenance_id,
+            )
+        elif ev.type in {"wiki_source_section", "wiki_claim_answer"}:
+            is_section = ev.type == "wiki_source_section"
+            source_origin = (
+                SourceOrigin.REAL_DERIVED
+                if is_section
+                else SourceOrigin.SYNTHETIC_WORLD
+            )
+            provenance_id = (
+                str(ev.params["provenance_id"])
+                if is_section
+                else "derived-sha256:"
+                + hashlib.sha256(artifact.text.encode()).hexdigest()
+            )
+            artifact.slots = {
+                **artifact.slots,
+                "real_workflow_record": is_section,
+                "source_workflow_id": str(ev.params["workflow_id"]),
+                "source_record_id": str(ev.params.get("record_id") or ""),
+                "parent_provenance_id": str(
+                    ev.params.get("parent_provenance_id") or ""
+                ),
+                "source_url": str(ev.params.get("source_url") or ""),
+                "source_family": str(ev.params.get("source_family") or ""),
+            }
+            classify_artifact(
+                artifact,
+                source_origin=source_origin,
+                workflow_kind=WorkflowKind.HYBRID_CAUSAL,
+                evidence_role=(
+                    EvidenceRole.CAUSAL_SUPPORTING
+                    if is_section
+                    else EvidenceRole.CAUSAL_GOLD
+                ),
+                workflow_id=sim.spec["world_id"],
                 provenance_id=provenance_id,
             )
         artifacts.append(artifact)

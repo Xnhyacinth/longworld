@@ -76,8 +76,10 @@ def materialize(
 ) -> MaterializedWorld:
     if real_workflows and domain != "codeforge":
         raise ValueError("real repository workflows require the codeforge domain")
-    if source_workflows and domain != "researchlab":
-        raise ValueError("paper source workflows require the researchlab domain")
+    if source_workflows and any(
+        workflow.target_domain != domain for workflow in source_workflows
+    ):
+        raise ValueError("source workflow target domain does not match materialization")
     if domain == "researchlab":
         from longworld.domains.researchlab.queries import build_lab_queries
         from longworld.domains.researchlab.schema import sample_lab_spec
@@ -112,6 +114,7 @@ def materialize(
             n_parallel=n_parallel,
             n_pulses=n_pulses,
             n_workstreams=n_workstreams,
+            source_workflows=source_workflows,
         )
         worlds = simulate_company(spec)
         query_fn = build_queries

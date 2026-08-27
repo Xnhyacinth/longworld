@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import random
 import sys
 from collections import Counter
@@ -33,6 +34,7 @@ from longworld.core.attestation import (
     sanitized_attestation_environment,
 )
 from longworld.core.causal import build_causal_graph
+from longworld.core.filingworkflow import SEC_HYBRID_CHILD_EVENT_TYPES
 from longworld.core.graph import (
     graph_stats,
     random_walk_event_ids,
@@ -50,6 +52,8 @@ from longworld.core.pack import (
     wrap_prompt,
 )
 from longworld.core.promotion import (
+    EXACT_TOKEN_BAND_RANGES,
+    exact_token_band_reject_reason,
     row_digest_set_sha256,
     serialized_row_sha256,
     stable_dossier_id,
@@ -64,7 +68,6 @@ from longworld.core.render import Artifact
 from longworld.core.sampler import balanced_domain_schedule, materialize
 from longworld.core.semantic import sentence_near_dup_ratio
 from longworld.core.sourcebundle import (
-    SOURCE_WORKFLOW_ADAPTER_REVISION,
     SOURCE_WORKFLOW_BUNDLE_SCHEMA,
     load_source_workflow_bundle,
 )
@@ -96,6 +99,9 @@ from longworld.core.verify import (
     verify_rendered_view,
 )
 from longworld.core.views import memory_card, render_cf_view, split_views, view_answer
+from longworld.core.wikiparse import WIKI_HYBRID_CHILD_EVENT_TYPES
+
+HYBRID_CHILD_EVENT_TYPES = SEC_HYBRID_CHILD_EVENT_TYPES | WIKI_HYBRID_CHILD_EVENT_TYPES
 
 
 def load_cfg(path: Path) -> dict:
@@ -410,9 +416,67 @@ def band_growth_reject_reason(
 
 
 def exact_64k_reject_reason(tokens: int) -> str | None:
-    if not 64_000 <= tokens <= 65_536:
-        return f"exact_64k_out_of_range:{tokens}"
-    return None
+    return exact_token_band_reject_reason("64k", tokens)
+
+
+def exact_token_metadata_for_band(
+    prompt: str,
+    length_bucket: str,
+    *,
+    model_id: str,
+    revision: str,
+    tokenizer: object,
+    cache: dict[str, int],
+) -> tuple[dict[str, object], str | None]:
+    """Recount a strict long view and bind it to one pinned tokenizer."""
+    if length_bucket not in EXACT_TOKEN_BAND_RANGES:
+        return {}, None
+    context_digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    if context_digest not in cache:
+        cache[context_digest] = tokenizer_token_count(prompt, tokenizer)
+    tokens = cache[context_digest]
+    return (
+        {
+            "tokenizer_context_tokens": tokens,
+            "tokenizer_model_id": model_id,
+            "tokenizer_revision": revision,
+        },
+        exact_token_band_reject_reason(length_bucket, tokens),
+    )
+
+
+def retune_pack_target_for_exact_64k(
+    current_target: int,
+    observed_wraps: tuple[int, ...],
+    *,
+    lo: int = 64_000,
+    hi: int = 65_536,
+    bucket: int = 65_536,
+) -> int:
+    """Scale a pack cap so observed tokenizer wraps share the exact-64K window.
+
+    The packer fills to the cap, so shrinking leftover text does not lower wrap
+    when other documents still fill the remaining budget. Observed wraps at the
+    current target are treated as proportional to that target.
+    """
+    if current_target <= 0:
+        raise ValueError("pack target must be positive")
+    if not observed_wraps:
+        raise ValueError("observed wraps are required")
+    if any(wrap <= 0 for wrap in observed_wraps):
+        raise ValueError("observed wrap must be positive")
+    if all(lo <= wrap <= hi for wrap in observed_wraps):
+        return current_target
+    lower = max(lo * current_target / wrap for wrap in observed_wraps)
+    upper = min(hi * current_target / wrap for wrap in observed_wraps)
+    if lower > upper:
+        raise ValueError("observed wraps cannot share one pack target in exact-64K")
+    target = (math.ceil(lower) + math.floor(upper)) // 2
+    if target > bucket:
+        raise ValueError("source body cannot fill exact-64K inside the bucket cap")
+    if target < 1:
+        raise ValueError("retuned pack target must be positive")
+    return target
 
 
 def strict_view_evidence_reject_reason(
@@ -579,7 +643,7 @@ def source_workflow_bundle_for_seed(
     cfg: dict, *, seed: int, domain: str
 ) -> Path | None:
     configured = str(cfg.get("source_workflow_bundle") or "").strip()
-    if not configured or domain != "researchlab":
+    if not configured:
         return None
     seeds = cfg.get("source_workflow_seeds")
     if not isinstance(seeds, list) or not all(isinstance(item, int) for item in seeds):
@@ -635,8 +699,6 @@ def real_workflow_buckets_for_query(
         selected = {
             name: target for name, target in selected.items() if name in preferred
         }
-    if not selected:
-        raise ValueError(f"real workflow length routing is empty for {query_type}")
     return selected
 
 
@@ -744,6 +806,53 @@ def real_workflow_artifacts_for_query(
     return selected
 
 
+def source_workflow_artifacts_for_query(
+    artifacts: list[Artifact], spec: object
+) -> list[Artifact]:
+    """Restrict source-grounded workflow artifacts to the query checkpoint.
+
+    Unbound RFC leftover files that ``bind_source_packs`` attaches to every
+    focal world must not consume authentic wiki/SEC pack budget. Length is a
+    cap, so those files make leftover retune a no-op and discrete-skip the
+    exact-64K window.
+    """
+    as_of = getattr(spec, "as_of", None)
+    selected = [
+        artifact
+        for artifact in artifacts
+        if (as_of is None or artifact.time <= as_of)
+        and artifact.doc_type != "source_pack"
+    ]
+    essential_ids = set(getattr(spec, "essential_artifact_ids", []))
+    if getattr(spec, "query_type", "") == "sec_financial_reconstruction":
+        source_workflow_ids = {
+            str((artifact.slots or {}).get("source_workflow_id") or "")
+            for artifact in selected
+            if artifact.artifact_id in essential_ids
+        }
+        source_workflow_ids.discard("")
+        if len(source_workflow_ids) != 1:
+            raise ValueError("SEC financial proof must bind one source workflow")
+        source_workflow_id = next(iter(source_workflow_ids))
+        sec_event_types = {"sec_filing", "sec_source_section", "sec_financial_answer"}
+        selected = [
+            artifact
+            for artifact in selected
+            if (
+                str((artifact.slots or {}).get("source_workflow_id") or "")
+                == source_workflow_id
+                and str((artifact.slots or {}).get("event_type") or artifact.doc_type)
+                in sec_event_types
+            )
+            or artifact_classification(artifact).evidence_role
+            == EvidenceRole.STRUCTURAL_HARD_NEGATIVE
+        ]
+    selected_ids = {artifact.artifact_id for artifact in selected}
+    if not essential_ids.issubset(selected_ids):
+        raise ValueError("source workflow proof references a future artifact")
+    return selected
+
+
 def real_workflow_corridor_ids(artifacts: list[Artifact], spec: object) -> set[str]:
     """Return authentic records between the real CI failure and recovery proof."""
     if getattr(spec, "query_type", "") != "ci_regression_origin":
@@ -826,6 +935,7 @@ def real_source_relation_edges(
                     "relation": str(
                         child.relation_kinds.get(parent_id) or "causal_input"
                     ),
+                    "relation_provenance": "authentic_source",
                     "parent_source_url": str(parent.params["source_url"]),
                     "child_source_url": str(child.params["source_url"]),
                 }
@@ -838,20 +948,45 @@ def real_source_relation_edges(
                 "parent_record_id": str(relation.params.get("target_record_id") or ""),
                 "child_record_id": str(relation.params.get("source_record_id") or ""),
                 "relation": str(relation.params.get("relation_kind") or ""),
+                "relation_provenance": "authentic_source",
                 "parent_source_url": str(
                     relation.params.get("target_source_url") or ""
                 ),
                 "child_source_url": str(relation.params.get("source_url") or ""),
             }
         )
+    for child in all_events.values():
+        if child.type not in HYBRID_CHILD_EVENT_TYPES:
+            continue
+        for parent_id in child.causal_inputs:
+            parent = all_events.get(parent_id)
+            if parent is None:
+                continue
+            edges.append(
+                {
+                    "parent_record_id": parent.id,
+                    "child_record_id": child.id,
+                    "source_record_id": str(child.params.get("record_id") or ""),
+                    "relation": str(
+                        child.relation_kinds.get(parent_id) or "causal_input"
+                    ),
+                    "relation_provenance": "synthetic_executable",
+                    "parent_source_url": str(parent.params.get("source_url") or ""),
+                    "child_source_url": str(child.params.get("source_url") or ""),
+                }
+            )
     return edges
 
 
-def context_source_relation_count(world: object, artifacts: list[Artifact]) -> int:
+def context_source_relation_count(
+    world: object, artifacts: list[Artifact], *, spec: object | None = None
+) -> int:
     """Count replayable real-event edges whose endpoints occur in this exact view."""
     visible_event_ids = {
         event_id for artifact in artifacts for event_id in artifact.reveals_events
     }
+    if spec is not None:
+        visible_event_ids &= set(getattr(spec, "sufficient_event_ids", []))
     events = {
         event.id: event
         for event in getattr(world, "events", [])
@@ -868,7 +1003,13 @@ def context_source_relation_count(world: object, artifacts: list[Artifact]) -> i
         and all(parent_id in events for parent_id in event.required_inputs)
         for event in events.values()
     )
-    return repo_edges + source_relations
+    sec_edges = sum(
+        parent_id in events
+        for event in events.values()
+        if event.type in HYBRID_CHILD_EVENT_TYPES
+        for parent_id in event.causal_inputs
+    )
+    return repo_edges + source_relations + sec_edges
 
 
 def emit_records(
@@ -915,7 +1056,7 @@ def emit_records(
             raise ValueError("source workflow bundle has no workflow for domain")
         source_replay_binding = {
             "schema_version": SOURCE_WORKFLOW_BUNDLE_SCHEMA,
-            "adapter_revision": SOURCE_WORKFLOW_ADAPTER_REVISION,
+            "adapter_revision": loaded_source_bundle.adapter_revision,
             "sha256": loaded_source_bundle.bundle_sha256,
             "binding_digest": loaded_source_bundle.binding_digest,
         }
@@ -953,6 +1094,12 @@ def emit_records(
     ):
         raise ValueError("exact_tokenizer requires a model id and 40-char revision")
     exact_tokenizer = None
+    if strict_generation and exact_settings:
+        exact_tokenizer = _load_exact_tokenizer(
+            exact_model_id,
+            exact_revision,
+            bool(exact_settings.get("local_files_only", True)),
+        )
     exact_token_cache: dict[str, int] = {}
     stats: dict[str, Any] = {
         "attempts": 0,
@@ -1117,6 +1264,15 @@ def emit_records(
             cf_arts = real_workflow_artifacts_for_query(cf_arts, spec)
             query_parallel_arts = []
             query_unique_pool = []
+        elif source_workflows is not None:
+            query_focal_arts = source_workflow_artifacts_for_query(focal_arts, spec)
+            cf_arts = source_workflow_artifacts_for_query(cf_arts, spec)
+            query_parallel_arts = [
+                artifact
+                for artifact in parallel_arts
+                if spec.as_of is None or artifact.time <= spec.as_of
+            ]
+            query_unique_pool = []
         corridor_ids = real_workflow_corridor_ids(query_focal_arts, spec)
         views = split_views(query_focal_arts, query_parallel_arts, spec, cf_arts)
         ver, notes = verify_question(
@@ -1126,6 +1282,7 @@ def emit_records(
             cf_artifacts=cf_arts + query_parallel_arts,
             surface_min=surface_min,
             verification_mode=verification_mode,
+            require_raw_token_windows=False,
         )
         stats["attempts"] += 1
         if not prepack_verification_green(ver):
@@ -1187,6 +1344,8 @@ def emit_records(
                 dict(cfg.get("real_workflow_query_length_buckets") or {}),
                 list(spec.preferred_length_buckets),
             )
+            if not query_buckets:
+                continue
         for timing in timings:
             prev_tokens = -1
             for bname, target in sorted(
@@ -1211,6 +1370,12 @@ def emit_records(
                         }
                     elif spec.query_type == "source_choice":
                         prefer = set(spec.essential_artifact_ids)
+                    prefer |= {
+                        artifact.artifact_id
+                        for artifact in query_focal_arts
+                        if "wiki_section_appendix_rest" in artifact.artifact_id
+                        and artifact.artifact_id not in spec.essential_artifact_ids
+                    }
                     packed = pack_view(
                         views["full"],
                         spec,
@@ -1301,6 +1466,7 @@ def emit_records(
                         cf_artifacts=cf_arts,
                         window_ids=packed.window_ids,
                         verification_mode=verification_mode,
+                        raw_window_tokenizer=exact_tokenizer,
                     )
                     if not ver2.all_green():
                         rejects.append(
@@ -1427,7 +1593,8 @@ def emit_records(
                         artifacts=views["minimal"],
                     )
                     base_task_id = stable_digest(
-                        f"{focal_w.world_id}|{spec.query_id}", size=20
+                        f"{focal_w.world_id}|{spec.base_task_group or spec.query_id}",
+                        size=20,
                     )
                     dossier = stable_dossier_id(
                         focal_w.world_id,
@@ -1463,7 +1630,7 @@ def emit_records(
                             {
                                 "query_type": spec.query_type,
                                 "program_ops": list(spec.program_ops or []),
-                                "proof_depth": int(spec.proof_depth or 0),
+                                "proof_depth": int(gstat["proof_depth"]),
                                 "cf_op": spec.cf_op,
                             },
                             sort_keys=True,
@@ -1582,6 +1749,12 @@ def emit_records(
                         exact_verification = ver2
                         exact_notes: dict = {}
                         if strict_generation:
+                            if exact_settings and exact_tokenizer is None:
+                                exact_tokenizer = _load_exact_tokenizer(
+                                    exact_model_id,
+                                    exact_revision,
+                                    bool(exact_settings.get("local_files_only", True)),
+                                )
                             factual_map = {
                                 artifact.artifact_id: artifact
                                 for artifact in packed.artifacts
@@ -1619,6 +1792,7 @@ def emit_records(
                                 surface_min=surface_min,
                                 retrieval_top_k=3,
                                 verification_mode=verification_mode,
+                                raw_window_tokenizer=exact_tokenizer,
                             )
                             if not exact_verification.all_green():
                                 rejects.append(
@@ -1633,6 +1807,9 @@ def emit_records(
                                         "contiguous_windows": exact_notes.get(
                                             "contiguous_windows"
                                         ),
+                                        "raw_token_fact_windows": exact_notes.get(
+                                            "raw_token_fact_windows"
+                                        ),
                                     }
                                 )
                                 slot_failed = True
@@ -1644,6 +1821,7 @@ def emit_records(
                                         spec,
                                         cf_classified,
                                         retrieval_top_k=3,
+                                        raw_window_tokenizer=exact_tokenizer,
                                     )
                                 )
                                 if not cf_shortcuts_green:
@@ -1730,7 +1908,7 @@ def emit_records(
                             difficulty={
                                 "context_tokens": metrics.context_tokens,
                                 "max_evidence_distance": metrics.max_evidence_distance,
-                                "proof_depth": spec.proof_depth,
+                                "proof_depth": int(gstat["proof_depth"]),
                                 "state_updates": len(focal_w.state.history),
                                 "query_delay": 1 if timing == "late" else 0,
                                 "distractor_similarity": 1.0 if parallel_arts else 0.0,
@@ -1771,26 +1949,27 @@ def emit_records(
                         dumped["near_dup_sentence_ratio"] = round(near_dup, 4)
                         dumped["natural_tokens"] = metrics.context_tokens
                         dumped["actual_context_tokens"] = metrics.context_tokens
-                        if exact_settings and metrics.length_bucket == "64k":
+                        if (
+                            exact_settings
+                            and metrics.length_bucket in EXACT_TOKEN_BAND_RANGES
+                        ):
                             if exact_tokenizer is None:
                                 exact_tokenizer = _load_exact_tokenizer(
                                     exact_model_id,
                                     exact_revision,
                                     bool(exact_settings.get("local_files_only", True)),
                                 )
-                            context_digest = hashlib.sha256(prompt.encode()).hexdigest()
-                            if context_digest not in exact_token_cache:
-                                exact_token_cache[context_digest] = (
-                                    tokenizer_token_count(prompt, exact_tokenizer)
+                            exact_metadata, exact_length_reason = (
+                                exact_token_metadata_for_band(
+                                    prompt,
+                                    metrics.length_bucket,
+                                    model_id=exact_model_id,
+                                    revision=exact_revision,
+                                    tokenizer=exact_tokenizer,
+                                    cache=exact_token_cache,
                                 )
-                            dumped["tokenizer_context_tokens"] = exact_token_cache[
-                                context_digest
-                            ]
-                            dumped["tokenizer_model_id"] = exact_model_id
-                            dumped["tokenizer_revision"] = exact_revision
-                            exact_length_reason = exact_64k_reject_reason(
-                                int(dumped["tokenizer_context_tokens"])
                             )
+                            dumped.update(exact_metadata)
                             if strict_generation and exact_length_reason:
                                 rejects.append(
                                     {
@@ -1822,7 +2001,14 @@ def emit_records(
                             spec, metrics, view_name
                         )
                         dumped["evidence_distance"] = metrics.max_evidence_distance
+                        raw_fact_windows = exact_notes.get("raw_token_fact_windows")
                         dumped["evidence_span_tokens"] = metrics.evidence_span_tokens
+                        if isinstance(raw_fact_windows, dict) and isinstance(
+                            raw_fact_windows.get("tokenizer_evidence_span_tokens"), int
+                        ):
+                            dumped["tokenizer_evidence_span_tokens"] = int(
+                                raw_fact_windows["tokenizer_evidence_span_tokens"]
+                            )
                         dumped["query_evidence_distance"] = (
                             metrics.query_evidence_distance
                         )
@@ -1831,9 +2017,7 @@ def emit_records(
                             cfg.get("data_product") or "causalcore_v0"
                         )
                         dumped["data_stage"] = data_stage
-                        dumped["hop_count"] = int(
-                            (gstat or {}).get("hop_count") or spec.proof_depth
-                        )
+                        dumped["hop_count"] = int(gstat["hop_count"])
                         dumped["searchart_width"] = len(spec.essential_artifact_ids)
                         dumped["oracle_long_gain"] = int(
                             bool(
@@ -1858,7 +2042,9 @@ def emit_records(
                             workflow_id=focal_w.world_id,
                         )
                         dumped["context_source_relation_count"] = (
-                            context_source_relation_count(focal_w, classified_artifacts)
+                            context_source_relation_count(
+                                focal_w, classified_artifacts, spec=spec
+                            )
                             if has_real_workflows
                             else 0
                         )
@@ -1884,6 +2070,27 @@ def emit_records(
                         )
                         dumped["source_relation_id"] = row_source_relation_id
                         dumped["source_relation_edges"] = row_relation_edges
+                        authentic_relation_edges = [
+                            edge
+                            for edge in row_relation_edges
+                            if edge.get("relation_provenance") == "authentic_source"
+                        ]
+                        dumped["authentic_source_relation_edges"] = (
+                            authentic_relation_edges
+                        )
+                        dumped["authentic_source_relation_id"] = (
+                            stable_digest(
+                                json.dumps(authentic_relation_edges, sort_keys=True),
+                                size=20,
+                            )
+                            if authentic_relation_edges
+                            else ""
+                        )
+                        dumped["hybrid_causal_edges"] = [
+                            edge
+                            for edge in row_relation_edges
+                            if edge.get("relation_provenance") == "synthetic_executable"
+                        ]
                         dumped["strict_support_event_count"] = len(
                             visible_events.intersection(spec.sufficient_event_ids)
                         )

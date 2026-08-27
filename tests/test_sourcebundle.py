@@ -21,6 +21,7 @@ from longworld.core.filingworkflow import (
 from longworld.core.provenance import ProvenanceError
 from longworld.core.sourcebundle import (
     SOURCE_WORKFLOW_ADAPTER_REVISION,
+    SOURCE_WORKFLOW_ADAPTER_REVISION_LATEST,
     SOURCE_WORKFLOW_BUNDLE_PURPOSE,
     SOURCE_WORKFLOW_BUNDLE_SCHEMA,
     load_source_workflow_bundle,
@@ -193,6 +194,32 @@ def test_loads_attested_bundle_and_returns_immutable_effective_binding(
     assert len(loaded.binding_digest) == 64
     with pytest.raises(FrozenInstanceError):
         loaded.binding_digest = "0" * 64  # type: ignore[misc]
+
+
+def test_bundle_revision_controls_relationless_sec_singleton_semantics(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_source_manifest(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest.pop("attestation")
+    manifest["filings"] = manifest["filings"][:1]
+    manifest["filing_relations"] = []
+    manifest["n"] = 1
+    manifest = attach_attestation(manifest, TEST_KEY, purpose="source_manifest")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    entry = _entry(manifest_path.name, manifest_path.read_bytes())
+    v1_path = _write_bundle(tmp_path, [entry], name="v1.json")
+
+    with pytest.raises(ProvenanceError, match="relations.*non-empty"):
+        load_source_workflow_bundle(v1_path, attestation_key=TEST_KEY)
+
+    entry["adapter_revision"] = SOURCE_WORKFLOW_ADAPTER_REVISION_LATEST
+    v2_path = _write_bundle(tmp_path, [entry], name="v2.json")
+    loaded = load_source_workflow_bundle(v2_path, attestation_key=TEST_KEY)
+
+    assert loaded.adapter_revision == SOURCE_WORKFLOW_ADAPTER_REVISION_LATEST
+    assert len(loaded.workflows) == 1
+    assert loaded.workflows[0].relations == ()
 
 
 def test_bundle_and_each_manifest_are_read_exactly_once(

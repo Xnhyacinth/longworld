@@ -28,6 +28,7 @@ from longworld.core.promotion import (
     RELEASE_GATE_PURPOSE,
     RELEASE_GATE_REVISION,
     RELEASE_GATE_SCHEMA,
+    exact_token_band_reject_reason,
     promoted_row_set_sha256,
     promoted_split_row_set_sha256,
 )
@@ -287,7 +288,7 @@ def _tokenizer_context_tokens(context: str, model_id: str, revision: str) -> int
         return len(tokenizer.encode(context, add_special_tokens=False))
 
 
-def _has_exact_64k_metadata(
+def _has_exact_band_metadata(
     row: dict,
     *,
     expected_model_id: str | None = None,
@@ -298,8 +299,10 @@ def _has_exact_64k_metadata(
     except (TypeError, ValueError):
         return False
     revision = str(row.get("tokenizer_revision") or "")
+    length_bucket = str(row.get("length_bucket") or "")
     metadata_valid = (
-        64_000 <= tokens <= 65_536
+        exact_token_band_reject_reason(length_bucket, tokens) is None
+        and length_bucket in {"16k", "32k", "64k"}
         and bool(str(row.get("tokenizer_model_id") or ""))
         and len(revision) == 40
         and all(character in "0123456789abcdef" for character in revision)
@@ -320,21 +323,89 @@ def _has_exact_64k_metadata(
         return False
 
 
+def _has_exact_64k_metadata(
+    row: dict,
+    *,
+    expected_model_id: str | None = None,
+    expected_revision: str | None = None,
+) -> bool:
+    """Compatibility wrapper for existing release reporting."""
+    return row.get("length_bucket") == "64k" and _has_exact_band_metadata(
+        row,
+        expected_model_id=expected_model_id,
+        expected_revision=expected_revision,
+    )
+
+
+def _exact_band_metadata_errors(
+    rows: list[dict],
+    *,
+    expected_model_id: str,
+    expected_revision: str,
+) -> list[str]:
+    errors: list[str] = []
+    for index, row in enumerate(rows):
+        length_bucket = str(row.get("length_bucket") or "")
+        if length_bucket not in {"16k", "32k", "64k"}:
+            continue
+        if not _has_exact_band_metadata(
+            row,
+            expected_model_id=expected_model_id,
+            expected_revision=expected_revision,
+        ):
+            errors.append(
+                f"invalid_exact_{length_bucket}:"
+                f"{row.get('query_id') or row.get('world_id') or index}"
+            )
+    return errors
+
+
+def _proof_metadata_errors(rows: list[dict]) -> list[str]:
+    """Require serialized proof metadata to agree with replayed graph stats."""
+    errors: list[str] = []
+    for index, row in enumerate(rows):
+        label = str(row.get("query_id") or row.get("world_id") or index)
+        graph = row.get("graph")
+        if not isinstance(graph, dict) or any(
+            field not in graph for field in ("proof_depth", "hop_count")
+        ):
+            errors.append(f"missing_graph_metadata:{label}")
+            continue
+        difficulty = row.get("difficulty")
+        if not isinstance(difficulty, dict) or difficulty.get(
+            "proof_depth"
+        ) != graph.get("proof_depth"):
+            errors.append(f"graph_proof_depth_mismatch:{label}")
+        if row.get("hop_count") != graph.get("hop_count"):
+            errors.append(f"graph_hop_count_mismatch:{label}")
+    return errors
+
+
 def _semantic_growth_errors(
     rows: list[dict],
     min_internal_growth: int,
     max_generic_growth_share: float,
+    *,
+    require_substantial_real_proof_growth: bool = False,
 ) -> list[str]:
     def intrinsic_long_source(row: dict, semantic: dict, estimated_total: int) -> bool:
+        exact_tokens = int(row.get("tokenizer_context_tokens") or 0)
+        exact_span = int(row.get("tokenizer_evidence_span_tokens") or 0)
+        span_is_long = (
+            exact_span >= int(exact_tokens * 0.9)
+            if exact_tokens
+            and (exact_span or row.get("query_type") == "sec_financial_reconstruction")
+            else int(row.get("evidence_span_tokens") or 0) >= int(estimated_total * 0.9)
+        )
         return bool(
             row.get("real_source_verified") is True
             and float(row.get("real_source_token_ratio") or 0.0) >= 0.9
             and int(semantic.get("generic_background") or 0) == 0
             and int(semantic.get("event_bearing") or 0) >= int(estimated_total * 0.9)
-            and int(row.get("evidence_span_tokens") or 0) >= int(estimated_total * 0.9)
+            and span_is_long
             and int(row.get("context_source_relation_count") or 0) >= 1
             and int(row.get("strict_support_event_count") or 0) >= 4
-            and int((row.get("difficulty") or {}).get("proof_depth") or 0) >= 4
+            and int((row.get("graph") or {}).get("proof_depth") or 0) >= 4
         )
 
     groups: dict[tuple[str, str, str, str], list[dict]] = defaultdict(list)
@@ -483,12 +554,8 @@ def _semantic_growth_errors(
                         f"->{after.get('length_bucket')}:"
                         f"growth={strict_support_growth}"
                     )
-                before_depth = int(
-                    (before.get("difficulty") or {}).get("proof_depth") or 0
-                )
-                after_depth = int(
-                    (after.get("difficulty") or {}).get("proof_depth") or 0
-                )
+                before_depth = int((before.get("graph") or {}).get("proof_depth") or 0)
+                after_depth = int((after.get("graph") or {}).get("proof_depth") or 0)
                 if after_depth <= before_depth:
                     errors.append(
                         "real_proof_depth_growth:"
@@ -506,7 +573,45 @@ def _semantic_growth_errors(
                         f"{key[0]}:{before.get('length_bucket')}"
                         f"->{after.get('length_bucket')}"
                     )
+                before_proof_tokens = int(before_sem.get("proof_bearing") or 0) + int(
+                    before_sem.get("causal_supporting") or 0
+                )
+                after_proof_tokens = int(after_sem.get("proof_bearing") or 0) + int(
+                    after_sem.get("causal_supporting") or 0
+                )
+                if after_proof_tokens <= before_proof_tokens:
+                    errors.append(
+                        "real_proof_token_growth:"
+                        f"{key[0]}:{before.get('length_bucket')}"
+                        f"->{after.get('length_bucket')}:"
+                        f"growth={after_proof_tokens - before_proof_tokens}"
+                    )
+                elif require_substantial_real_proof_growth:
+                    proof_growth = after_proof_tokens - before_proof_tokens
+                    minimum_proof_growth = max(256, (total_growth + 19) // 20)
+                    if proof_growth < minimum_proof_growth:
+                        errors.append(
+                            "real_proof_growth_share:"
+                            f"{key[0]}:{before.get('length_bucket')}"
+                            f"->{after.get('length_bucket')}:"
+                            f"growth={proof_growth}<minimum={minimum_proof_growth}"
+                        )
     return errors
+
+
+def _real_exact_64k_worlds_by_domain(
+    real_64k_rows: list[dict], domain_order: list[str]
+) -> dict[str, int]:
+    return {
+        domain: len(
+            {
+                str(row["world_id"])
+                for row in real_64k_rows
+                if row.get("domain") == domain and row.get("world_id")
+            }
+        )
+        for domain in domain_order
+    }
 
 
 def _split_leakage_errors(rows: list[dict]) -> list[str]:
@@ -717,6 +822,15 @@ def evaluate_quality(
                     f"release_dense_top_k:{row.get('query_id') or index}:"
                     f"expected={profile.dense_top_k}"
                 )
+        errors.extend(
+            _exact_band_metadata_errors(
+                rows,
+                expected_model_id=profile.tokenizer_model_id,
+                expected_revision=profile.tokenizer_revision,
+            )
+        )
+    if strict_report:
+        errors.extend(_proof_metadata_errors(rows))
     if strict_report and not verify_attestation(
         report,
         attestation_key_from_env("quality_report"),
@@ -807,14 +921,42 @@ def evaluate_quality(
             and row.get("source_relation_edges")
         )
 
-    real_source_relation_ids = {
-        str(row.get("source_relation_id"))
-        for row in rows
-        if row.get("source_relation_id")
-        and isinstance(row.get("source_relation_edges"), list)
-        and bool(row.get("source_relation_edges"))
-        and is_real_row(row)
-    }
+    real_source_relation_ids: set[str] = set()
+    hybrid_causal_relation_ids: set[str] = set()
+    missing_relation_provenance_split = 0
+    require_relation_provenance_split = bool(
+        profile is not None and profile.profile_id.startswith("p7-")
+    )
+    for row in rows:
+        if not is_real_row(row):
+            continue
+        if "authentic_source_relation_edges" in row:
+            authentic_edges = row.get("authentic_source_relation_edges")
+            authentic_relation_id = row.get("authentic_source_relation_id")
+        else:
+            if require_relation_provenance_split:
+                missing_relation_provenance_split += 1
+                continue
+            # Frozen pre-P7 rows predate the explicit relation-provenance split.
+            authentic_edges = row.get("source_relation_edges")
+            authentic_relation_id = row.get("source_relation_id")
+        if (
+            isinstance(authentic_edges, list)
+            and authentic_edges
+            and authentic_relation_id
+        ):
+            real_source_relation_ids.add(str(authentic_relation_id))
+        hybrid_edges = row.get("hybrid_causal_edges")
+        if (
+            isinstance(hybrid_edges, list)
+            and hybrid_edges
+            and row.get("source_relation_id")
+        ):
+            hybrid_causal_relation_ids.add(str(row["source_relation_id"]))
+    if missing_relation_provenance_split:
+        errors.append(
+            f"missing_relation_provenance_split={missing_relation_provenance_split}"
+        )
     real_rows = [row for row in rows if is_real_row(row)]
     real_worlds_by_split = {
         split: {
@@ -829,6 +971,12 @@ def evaluate_quality(
         for row in real_rows
         for source_family_id in row.get("real_source_family_ids") or []
         if source_family_id
+    }
+    real_source_workflow_ids = {
+        str(workflow_id)
+        for row in real_rows
+        for workflow_id in row.get("real_source_workflow_ids") or []
+        if workflow_id
     }
     real_base_task_ids = {
         str(row.get("base_task_id")) for row in real_rows if row.get("base_task_id")
@@ -845,6 +993,13 @@ def evaluate_quality(
     ]
     exact_64k_row_ids = {id(row) for row in exact_64k_rows}
     real_64k_rows = [row for row in real_rows if id(row) in exact_64k_row_ids]
+    real_exact_64k_rows_by_domain = {
+        domain: sum(row.get("domain") == domain for row in real_64k_rows)
+        for domain in domain_order
+    }
+    real_exact_64k_worlds_by_domain = _real_exact_64k_worlds_by_domain(
+        real_64k_rows, domain_order
+    )
     if not rows:
         errors.append("empty_product")
     planned_worlds = int(
@@ -956,6 +1111,25 @@ def evaluate_quality(
                 f"release_real_exact_64k_rows={len(real_64k_rows)}"
                 f"<{profile.min_real_64k_rows}"
             )
+        if len(real_source_workflow_ids) < profile.min_unique_real_source_workflows:
+            errors.append(
+                "release_unique_real_source_workflows="
+                f"{len(real_source_workflow_ids)}"
+                f"<{profile.min_unique_real_source_workflows}"
+            )
+        for domain, minimum in profile.min_real_exact_64k_rows_by_domain:
+            observed = real_exact_64k_rows_by_domain.get(domain, 0)
+            if observed < minimum:
+                errors.append(
+                    f"release_domain_real_exact_64k_rows:{domain}={observed}<{minimum}"
+                )
+        for domain, minimum in profile.min_real_exact_64k_worlds_by_domain:
+            observed = real_exact_64k_worlds_by_domain.get(domain, 0)
+            if observed < minimum:
+                errors.append(
+                    "release_domain_real_exact_64k_worlds:"
+                    f"{domain}={observed}<{minimum}"
+                )
         for domain, minimum in profile.min_exact_64k_rows_by_domain:
             observed = exact_64k_rows_by_domain.get(domain, 0)
             if observed < minimum:
@@ -979,7 +1153,7 @@ def evaluate_quality(
             if len(invalid_long_rows) == len(long_rows):
                 errors.append("need >=64000 exact-token 64k row")
         if not real_source_relation_ids:
-            errors.append("need nonzero real/hybrid source relations")
+            errors.append("need nonzero authentic source relations")
     promotion_rows = (
         rows if strict_report else [row for row in rows if requires_promotion(row)]
     )
@@ -1059,7 +1233,14 @@ def evaluate_quality(
             f"{mean_near_dup:.4f}>{max_near_dup_sentence_ratio:.4f}"
         )
     errors.extend(
-        _semantic_growth_errors(rows, min_internal_growth, max_generic_growth_share)
+        _semantic_growth_errors(
+            rows,
+            min_internal_growth,
+            max_generic_growth_share,
+            require_substantial_real_proof_growth=bool(
+                profile is not None and profile.profile_id.startswith("p7-")
+            ),
+        )
     )
     errors.extend(_row_contract_errors(rows))
     errors.extend(_split_leakage_errors(rows))
@@ -1093,9 +1274,13 @@ def evaluate_quality(
             {row["source_relation_id"] for row in rows if row.get("source_relation_id")}
         ),
         "n_real_source_relations": len(real_source_relation_ids),
+        "n_hybrid_causal_relations": len(hybrid_causal_relation_ids),
         "n_real_source_families": len(real_source_family_ids),
+        "n_unique_real_source_workflows": len(real_source_workflow_ids),
         "n_real_base_tasks": len(real_base_task_ids),
         "n_real_exact_64k_rows": len(real_64k_rows),
+        "real_exact_64k_rows_by_domain": real_exact_64k_rows_by_domain,
+        "real_exact_64k_worlds_by_domain": real_exact_64k_worlds_by_domain,
         "real_worlds_by_split": {
             split: len(worlds) for split, worlds in real_worlds_by_split.items()
         },

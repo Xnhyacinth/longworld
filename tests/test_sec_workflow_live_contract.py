@@ -420,3 +420,68 @@ def test_manifest_audit_recomputes_filing_relations(tmp_path: Path) -> None:
         load_sec_filing_manifest(
             path, attestation_key=b"relation-audit-test-key-32-bytes"
         )
+
+
+def test_explicit_filings_import_local_archives_without_http(tmp_path: Path) -> None:
+    request = _request()
+    request["forms"] = ["10-K"]
+    request["max_filings_per_cik"] = 1
+    request["explicit_filings"] = [
+        {
+            "cik": "0000000001",
+            "accession": "0000000001-26-000001",
+            "form": "10-K",
+            "filing_date": "2026-02-20",
+            "report_date": "2025-12-31",
+            "source_file": "0000000001-26-000001.txt",
+        }
+    ]
+    request_path = tmp_path / "request.json"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    out = tmp_path / "download"
+    out.mkdir()
+    (out / "0000000001-26-000001.txt").write_bytes(
+        _filing("0000000001-26-000001", "10-K", "2026-02-20", "2025-12-31")
+    )
+
+    def forbidden(url: str, headers: dict[str, str], timeout: float):
+        raise AssertionError(f"local archive import must not HTTP {url}")
+
+    input_path = fetch_sec_workflow(
+        request_path,
+        out,
+        http_get=forbidden,
+        sleep=lambda _: None,
+        generated_at="2026-08-26T12:00:00Z",
+    )
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    assert payload["source_status"] == "authorized_download"
+    assert payload["filings"][0]["accession"] == "0000000001-26-000001"
+    assert payload["filings"][0]["cik"] == "0000000001"
+
+
+def test_explicit_filings_fail_closed_when_local_archive_is_missing(
+    tmp_path: Path,
+) -> None:
+    request = _request()
+    request["forms"] = ["10-K"]
+    request["max_filings_per_cik"] = 1
+    request["explicit_filings"] = [
+        {
+            "cik": "0000000001",
+            "accession": "0000000001-26-000001",
+            "form": "10-K",
+            "filing_date": "2026-02-20",
+            "report_date": "2025-12-31",
+            "source_file": "0000000001-26-000001.txt",
+        }
+    ]
+    request_path = tmp_path / "request.json"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    with pytest.raises(ProvenanceError, match="local archive is missing"):
+        fetch_sec_workflow(
+            request_path,
+            tmp_path / "download",
+            http_get=lambda *_: (_ for _ in ()).throw(AssertionError("no HTTP")),
+            sleep=lambda _: None,
+        )

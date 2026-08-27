@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from longworld.core.attestation import attach_attestation, verify_attestation
+from longworld.core.graph import graph_stats
 from longworld.core.pack import (
     SEP,
     compute_view_metrics,
@@ -20,6 +21,9 @@ from longworld.core.promotion import (
     CANDIDATE_ATTESTATION_PURPOSE,
     DENSE_AUDIT_PURPOSE,
     DENSE_RANKING_PURPOSE,
+    QUALITY_REPORT_BINDING_REVISION,
+    RELEASE_GATE_REVISION,
+    STRICT_REPLAY_REVISION,
     PromotionError,
     _candidate_include_program_joins,
     _candidate_n_workstreams,
@@ -622,6 +626,66 @@ def test_two_stage_dense_audit_strictly_replays_and_signs_train_ready_row() -> N
     )
 
 
+def test_dense_audit_rejects_unapproved_exact_tokenizer_pin() -> None:
+    candidate, artifacts = _candidate()
+    candidate.update(
+        {
+            "length_bucket": "16k",
+            "tokenizer_context_tokens": 16_000,
+            "tokenizer_model_id": "/tmp/mutable-tokenizer",
+            "tokenizer_revision": "0" * 40,
+        }
+    )
+    candidate["query_id"] = candidate["query_id"].rsplit(":", 1)[0] + ":16k"
+    candidate = attach_attestation(
+        {key: value for key, value in candidate.items() if key != "attestation"},
+        KEY,
+        purpose=CANDIDATE_ATTESTATION_PURPOSE,
+    )
+
+    with pytest.raises(PromotionError, match="tokenizer pin is not approved"):
+        create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+
+
+def test_dense_audit_recounts_exact_tokens_from_reconstructed_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    revision = "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+
+    class FakeTokenizer:
+        def __init__(self) -> None:
+            self.init_kwargs = {"_commit_hash": revision}
+
+        @staticmethod
+        def encode(text: str, *, add_special_tokens: bool) -> list[int]:
+            assert text
+            assert not add_special_tokens
+            return [0] * 16_001
+
+    monkeypatch.setattr(
+        "longworld.core.promotion._load_replay_tokenizer",
+        lambda _model_id, _revision: FakeTokenizer(),
+    )
+    candidate, artifacts = _candidate()
+    candidate.update(
+        {
+            "length_bucket": "16k",
+            "tokenizer_context_tokens": 16_000,
+            "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+            "tokenizer_revision": revision,
+        }
+    )
+    candidate["query_id"] = candidate["query_id"].rsplit(":", 1)[0] + ":16k"
+    candidate = attach_attestation(
+        {key: value for key, value in candidate.items() if key != "attestation"},
+        KEY,
+        purpose=CANDIDATE_ATTESTATION_PURPOSE,
+    )
+
+    with pytest.raises(PromotionError, match="token count does not replay"):
+        create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+
+
 def test_promotion_recomputes_quality_metrics_from_replayed_serialized_view() -> None:
     candidate, artifacts = _candidate()
     candidate.update(
@@ -673,11 +737,38 @@ def test_promotion_recomputes_quality_metrics_from_replayed_serialized_view() ->
         for key in ("event_bearing", "internal", "generic_background")
     ) == sum(estimate_tokens(artifact.text) for artifact in artifacts)
     assert promoted["semantic_tokens"] != candidate["semantic_tokens"]
-    assert promoted["difficulty"]["proof_depth"] > 0
+    expected_graph = promoted["graph"]
+    assert promoted["difficulty"]["proof_depth"] == expected_graph["proof_depth"]
     assert promoted["difficulty"]["state_updates"] > 0
-    assert promoted["hop_count"] == promoted["difficulty"]["proof_depth"]
+    assert promoted["hop_count"] == expected_graph["hop_count"]
     assert promoted["searchart_width"] == len(promoted["essential_artifact_ids"])
     assert promoted["program_ops"]
+
+
+def test_promotion_uses_replayed_graph_not_the_declared_spec_depth() -> None:
+    candidate, artifacts = _candidate()
+    audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+
+    promoted = promote_candidate(candidate, audit, KEY)
+    materialized = materialize(
+        candidate["seed"],
+        n_parallel=0,
+        n_pulses=0,
+        domain=candidate["domain"],
+        n_workstreams=0,
+    )
+    world = materialized.worlds["focal"]
+    spec = next(
+        query
+        for query in materialized.queries
+        if candidate["query_id"].startswith(f"{query.query_id}:")
+    )
+    replayed = graph_stats(world, spec)
+
+    assert spec.proof_depth != replayed["proof_depth"]
+    assert promoted["graph"] == replayed
+    assert promoted["difficulty"]["proof_depth"] == replayed["proof_depth"]
+    assert promoted["hop_count"] == replayed["hop_count"]
 
 
 def test_promotion_rejects_a_resigned_incorrect_audited_dup_ratio() -> None:
@@ -752,7 +843,7 @@ def test_train_ready_report_binds_the_exact_promoted_row_set() -> None:
     assert verify_attestation(report, KEY, purpose="quality_report")
     assert report["data_stage"] == "train_ready"
     assert report["release_profile_id"] == "p3-probe-12-v1"
-    assert report["report_binding_revision"] == "longworld-quality-binding-v2"
+    assert report["report_binding_revision"] == QUALITY_REPORT_BINDING_REVISION
     assert report["candidate_row_set_sha256"] == promoted_row_set_sha256([candidate])
     assert report["n_rows"] == 1
     assert report["n_worlds"] == 1
@@ -855,7 +946,7 @@ def _selection_audit(
             },
             "k": 3,
             "top_k": [{"rank": rank} for rank in range(1, 4)],
-            "strict_replay_revision": "longworld-strict-replay-v3",
+            "strict_replay_revision": STRICT_REPLAY_REVISION,
             "expected_answer": candidate["answer"],
             "embedding_topk_insufficient": True,
             "verification_replay_sha256": "c" * 64,
@@ -1276,7 +1367,7 @@ def test_production_accepts_only_a_pinned_green_probe_gate_receipt(
     receipt = attach_attestation(
         {
             "schema_version": "longworld-release-gate-pass-v1",
-            "gate_revision": "longworld-quality-gate-v2",
+            "gate_revision": RELEASE_GATE_REVISION,
             "release_profile_id": "p3-probe-12-v1",
             "release_profile_sha256": release_profile_sha256("p3-probe-12-v1"),
             "predecessor_profile_id": None,
@@ -1337,7 +1428,7 @@ def test_production_predecessor_rejects_hmac_signed_fake_kms_metadata(
     receipt = attach_attestation(
         {
             "schema_version": "longworld-release-gate-pass-v1",
-            "gate_revision": "longworld-quality-gate-v2",
+            "gate_revision": RELEASE_GATE_REVISION,
             "release_profile_id": "p3-production-48-v1",
             "release_profile_sha256": release_profile_sha256("p3-production-48-v1"),
             "predecessor_profile_id": "p3-probe-12-v1",
@@ -1831,6 +1922,7 @@ def test_real_candidate_replays_from_exact_hash_bound_episode_sidecar(
     assert promoted["real_source_verified"] is True
     assert promoted["source_family_ids"] == ["github.com/example/parser"]
     assert promoted["real_source_family_ids"] == ["github.com/example/parser"]
+    assert promoted["real_source_workflow_ids"]
     assert promoted["source_relation_edges"]
     assert promoted["context_source_relation_count"] > 0
     assert sft_row_errors(promoted, attestation_key=KEY) == []

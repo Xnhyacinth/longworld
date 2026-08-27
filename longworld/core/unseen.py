@@ -28,7 +28,7 @@ UNSEEN_SPLIT_SCHEMA = "longworld-unseen-splits-v2"
 UNSEEN_SPLIT_ATTESTATION_PURPOSE = "training_export_manifest"
 UNSEEN_TRUST_MODES = ("local_engineering", "production")
 _RELEASE_GATE_SCHEMA = "longworld-release-gate-pass-v1"
-_RELEASE_GATE_REVISION = "longworld-quality-gate-v2"
+_RELEASE_GATE_REVISION = "longworld-quality-gate-v5"
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
 

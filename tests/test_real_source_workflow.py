@@ -9,7 +9,11 @@ from pathlib import Path
 import pytest
 
 import longworld.core.realworkflow as realworkflow_module
-from longworld.core.attestation import ATTESTATION_ENV, attach_attestation
+from longworld.core.attestation import (
+    ATTESTATION_ENV,
+    ATTESTATION_ENVIRONMENT_ENV,
+    attach_attestation,
+)
 from longworld.core.grounded import apply_grounded, grounded_init
 from longworld.core.provenance import (
     ProvenanceError,
@@ -17,6 +21,10 @@ from longworld.core.provenance import (
     load_verified_source_documents,
 )
 from longworld.core.realworkflow import (
+    GH_BINARY_SHA256_ENV,
+    PUBLIC_POLICY_SHA256_ENV,
+    _validate_public_export_governance,
+    approved_public_policy_digests,
     load_episode_replay_bundle,
     load_git_workflow_export,
     parse_rfc_workflow,
@@ -98,6 +106,29 @@ def _release_ancestry(merge_sha: str = "b" * 40) -> dict:
 @pytest.fixture(autouse=True)
 def _attestation_key(monkeypatch) -> None:
     monkeypatch.setenv(ATTESTATION_ENV, TEST_ATTESTATION_KEY.decode())
+
+
+def test_approved_public_policy_digests_accept_historical_and_current_pins() -> None:
+    old = "d" * 64
+    new = "a" * 64
+    assert approved_public_policy_digests(raw=f"{old}, {new}") == {old, new}
+    with pytest.raises(ValueError, match="invalid digest"):
+        approved_public_policy_digests(raw="not-a-hash")
+
+
+def test_probe_export_governance_keeps_historical_allowlist_pin(monkeypatch) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(PUBLIC_POLICY_SHA256_ENV, f"{'d' * 64},{'a' * 64}")
+    monkeypatch.setenv(GH_BINARY_SHA256_ENV, "e" * 64)
+    _validate_public_export_governance(_public_governance())
+
+
+def test_probe_export_governance_rejects_unknown_allowlist_pin(monkeypatch) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(PUBLIC_POLICY_SHA256_ENV, "a" * 64)
+    monkeypatch.setenv(GH_BINARY_SHA256_ENV, "e" * 64)
+    with pytest.raises(ProvenanceError, match="trust pins"):
+        _validate_public_export_governance(_public_governance())
 
 
 def _write_v2_pack(pack_dir: Path, *, text: str = RFC_FIXTURE) -> None:

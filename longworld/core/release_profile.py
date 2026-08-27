@@ -40,6 +40,9 @@ class ReleaseProfile:
     min_real_base_tasks: int
     min_real_source_relations: int
     min_real_64k_rows: int
+    min_unique_real_source_workflows: int
+    min_real_exact_64k_rows_by_domain: tuple[tuple[str, int], ...]
+    min_real_exact_64k_worlds_by_domain: tuple[tuple[str, int], ...]
     tokenizer_model_id: str
     tokenizer_revision: str
     dense_top_k: int
@@ -61,6 +64,10 @@ def _profile(
     min_domains: int,
     promoted_domain_world_quotas: tuple[tuple[str, int], ...] = (),
     min_exact_64k_rows_by_domain: tuple[tuple[str, int], ...] = (),
+    min_unique_real_source_workflows: int = 0,
+    min_real_exact_64k_rows_by_domain: tuple[tuple[str, int], ...] = (),
+    min_real_exact_64k_worlds_by_domain: tuple[tuple[str, int], ...] = (),
+    min_motifs: int = 5,
 ) -> ReleaseProfile:
     return ReleaseProfile(
         profile_id=profile_id,
@@ -89,11 +96,14 @@ def _profile(
         min_domains=min_domains,
         promoted_domain_world_quotas=promoted_domain_world_quotas,
         min_exact_64k_rows_by_domain=min_exact_64k_rows_by_domain,
-        min_motifs=5,
+        min_motifs=min_motifs,
         min_source_families=min_source_families,
         min_real_base_tasks=min_real_base_tasks,
         min_real_source_relations=min_real_source_relations,
         min_real_64k_rows=min_real_64k_rows,
+        min_unique_real_source_workflows=min_unique_real_source_workflows,
+        min_real_exact_64k_rows_by_domain=min_real_exact_64k_rows_by_domain,
+        min_real_exact_64k_worlds_by_domain=min_real_exact_64k_worlds_by_domain,
         tokenizer_model_id="Qwen/Qwen3.5-4B",
         tokenizer_revision="a7b0d22b993d71000cf2eadfb37222a67cee521e",
         dense_top_k=3,
@@ -166,6 +176,105 @@ RELEASE_PROFILES = {
             ("codeforge", 1),
         ),
     ),
+    "p7-source-rich-probe-12-v1": _profile(
+        profile_id="p7-source-rich-probe-12-v1",
+        environment="probe",
+        expected_promoted_worlds=12,
+        min_source_families=4,
+        min_real_base_tasks=12,
+        min_real_source_relations=12,
+        min_real_64k_rows=48,
+        min_train_worlds=10,
+        min_eval_worlds=2,
+        min_real_train_worlds=10,
+        min_real_eval_worlds=2,
+        predecessor_profile_id="p6-source-dependent-probe-12-v1",
+        min_domains=3,
+        promoted_domain_world_quotas=(
+            ("company", 4),
+            ("researchlab", 4),
+            ("codeforge", 4),
+        ),
+        min_exact_64k_rows_by_domain=(
+            ("company", 12),
+            ("researchlab", 12),
+            ("codeforge", 12),
+        ),
+        min_unique_real_source_workflows=12,
+        min_real_exact_64k_rows_by_domain=(
+            ("company", 12),
+            ("researchlab", 12),
+            ("codeforge", 12),
+        ),
+        min_real_exact_64k_worlds_by_domain=(
+            ("company", 4),
+            ("researchlab", 4),
+            ("codeforge", 4),
+        ),
+    ),
+    "p7-sec-source-slice-1-v1": _profile(
+        profile_id="p7-sec-source-slice-1-v1",
+        environment="probe",
+        expected_promoted_worlds=1,
+        min_source_families=1,
+        min_real_base_tasks=1,
+        min_real_source_relations=0,
+        min_real_64k_rows=1,
+        min_train_worlds=1,
+        min_eval_worlds=0,
+        min_real_train_worlds=1,
+        min_real_eval_worlds=0,
+        predecessor_profile_id=None,
+        min_domains=1,
+        promoted_domain_world_quotas=(("company", 1),),
+        min_exact_64k_rows_by_domain=(("company", 1),),
+        min_unique_real_source_workflows=1,
+        min_real_exact_64k_rows_by_domain=(("company", 1),),
+        min_real_exact_64k_worlds_by_domain=(("company", 1),),
+        min_motifs=1,
+    ),
+    "p7-wiki-source-slice-1-v1": _profile(
+        profile_id="p7-wiki-source-slice-1-v1",
+        environment="probe",
+        expected_promoted_worlds=1,
+        min_source_families=1,
+        min_real_base_tasks=1,
+        min_real_source_relations=0,
+        min_real_64k_rows=1,
+        min_train_worlds=1,
+        min_eval_worlds=0,
+        min_real_train_worlds=1,
+        min_real_eval_worlds=0,
+        predecessor_profile_id=None,
+        min_domains=1,
+        promoted_domain_world_quotas=(("researchlab", 1),),
+        min_exact_64k_rows_by_domain=(("researchlab", 1),),
+        min_unique_real_source_workflows=1,
+        min_real_exact_64k_rows_by_domain=(("researchlab", 1),),
+        min_real_exact_64k_worlds_by_domain=(("researchlab", 1),),
+        min_motifs=1,
+    ),
+    "p7-github-source-slice-1-v1": _profile(
+        profile_id="p7-github-source-slice-1-v1",
+        environment="probe",
+        expected_promoted_worlds=1,
+        min_source_families=1,
+        min_real_base_tasks=1,
+        min_real_source_relations=0,
+        min_real_64k_rows=1,
+        min_train_worlds=1,
+        min_eval_worlds=0,
+        min_real_train_worlds=1,
+        min_real_eval_worlds=0,
+        predecessor_profile_id=None,
+        min_domains=1,
+        promoted_domain_world_quotas=(("codeforge", 1),),
+        min_exact_64k_rows_by_domain=(("codeforge", 1),),
+        min_unique_real_source_workflows=1,
+        min_real_exact_64k_rows_by_domain=(("codeforge", 1),),
+        min_real_exact_64k_worlds_by_domain=(("codeforge", 1),),
+        min_motifs=1,
+    ),
     "p4-multidomain-local-48-v1": _profile(
         profile_id="p4-multidomain-local-48-v1",
         environment="probe",
@@ -233,8 +342,15 @@ def release_profile(profile_id: str) -> ReleaseProfile:
 
 def release_profile_sha256(profile_id: str) -> str:
     """Bind an ID to the exact immutable gate values active for a release."""
+    profile = asdict(release_profile(profile_id))
+    if profile["min_unique_real_source_workflows"] == 0:
+        profile.pop("min_unique_real_source_workflows")
+    if not profile["min_real_exact_64k_rows_by_domain"]:
+        profile.pop("min_real_exact_64k_rows_by_domain")
+    if not profile["min_real_exact_64k_worlds_by_domain"]:
+        profile.pop("min_real_exact_64k_worlds_by_domain")
     payload = json.dumps(
-        asdict(release_profile(profile_id)),
+        profile,
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,

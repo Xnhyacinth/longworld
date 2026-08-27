@@ -37,11 +37,12 @@ TEST_KEY = b"paper-export-test-attestation-key-32-bytes"
     "candidate",
     [
         "Funding for this study was provided by the Aurora Research Foundation.",
-        "The project was funded by Aurora and another team by the National Institutes of Health (NIH), grant 12345.",
         "This revision adds a new ablation with stable results across all seeds.",
     ],
 )
-def test_revision_fact_export_skips_unsupported_answer_programs(candidate: str) -> None:
+def test_revision_fact_export_skips_sentences_without_a_cf_digit(
+    candidate: str,
+) -> None:
     assert (
         _revision_added_text_fact(
             {"main.tex": "Earlier manuscript text with no funding statement."},
@@ -50,6 +51,41 @@ def test_revision_fact_export_skips_unsupported_answer_programs(candidate: str) 
         )
         is None
     )
+
+
+def test_revision_fact_export_keeps_unique_semantic_delta_with_a_digit() -> None:
+    added = (
+        "We additionally report a second long-context ablation over 128k tokens "
+        "with unchanged decoder depth."
+    )
+    fact = _revision_added_text_fact(
+        {"main.tex": "Earlier manuscript text with no funding statement."},
+        {"main.tex": added},
+        current_record_text=added,
+    )
+    assert fact is not None
+    assert fact["value"] == added
+    assert fact["evidence_quote"] == added
+
+
+def test_revision_fact_export_prefers_funding_disclosure_over_generic_delta() -> None:
+    funding = (
+        "The authors thank the reviewers for their careful comments. "
+        "Jonathan Crabbé is funded by Aviva and Mihaela van der Schaar by the "
+        "Office of Naval Research (ONR), NSF 172251."
+    )
+    generic = (
+        "We additionally report a second long-context ablation over 128k tokens "
+        "with unchanged decoder depth."
+    )
+    current = generic + "\n" + funding
+    fact = _revision_added_text_fact(
+        {"main.tex": "Earlier manuscript text with no funding statement."},
+        {"main.tex": current},
+        current_record_text=current,
+    )
+    assert fact is not None
+    assert fact["value"] == funding
 
 
 def test_paper_manifest_consumer_rejects_archive_expansion_bomb() -> None:
@@ -159,6 +195,7 @@ def _fetched_inventory(
     tmp_path: Path,
     *,
     include_funding: bool = True,
+    include_semantic_delta: bool = False,
     include_v3: bool = False,
     include_openreview: bool = False,
     unknown_review_role: bool = False,
@@ -171,11 +208,19 @@ def _fetched_inventory(
         if include_funding
         else ""
     )
+    semantic = (
+        "We additionally report a second long-context ablation over 128k tokens "
+        "with unchanged decoder depth.\n"
+        if include_semantic_delta
+        else ""
+    )
     v2 = v1
     if include_funding:
         v2 += (
             "We also report calibration results for every evaluated model.\n" + funding
         )
+    elif include_semantic_delta:
+        v2 += semantic
     v3 = v2 + "% Formatting-only camera-ready update.\n"
 
     def get(url: str, _headers: dict[str, str], _timeout: float) -> HttpResponse:
@@ -319,6 +364,54 @@ def test_fetch_inventory_export_fails_without_new_semantic_latex_body(
             fetch_inventory_path=inventory_path,
             attestation_key=TEST_KEY,
         )
+
+
+def test_fetch_inventory_export_accepts_unique_semantic_delta(
+    tmp_path: Path,
+) -> None:
+    inventory_path = _fetched_inventory(
+        tmp_path, include_funding=False, include_semantic_delta=True
+    )
+    output_path = tmp_path / "manifest.json"
+    export_paper_workflow(
+        None,
+        output_path,
+        fetch_inventory_path=inventory_path,
+        attestation_key=TEST_KEY,
+        generated_at="2026-08-25T02:00:00Z",
+    )
+    loaded = load_paper_workflow_manifest(output_path, attestation_key=TEST_KEY)
+    revision = next(
+        record for record in loaded["records"] if record["revision_id"] == "v2"
+    )
+    fact = next(
+        fact
+        for fact in revision["derived_facts"]
+        if fact["field"] == "revision_added_text"
+    )
+    assert "128k tokens" in fact["value"]
+    assert "NSF" not in fact["value"]
+
+
+def test_attention_inventory_binds_unique_semantic_delta() -> None:
+    root = (
+        Path(__file__).resolve().parents[1]
+        / "data"
+        / "source_inventory"
+        / "arxiv_p7_attention_v1"
+    )
+    previous_path = root / "arxiv-1706.03762v1.record.json"
+    current_path = root / "arxiv-1706.03762v2.record.json"
+    previous = json.loads(previous_path.read_text())
+    current = json.loads(current_path.read_text())
+    fact = _revision_added_text_fact(
+        {item["path"]: item["text"] for item in previous["latex_sources"]},
+        {item["path"]: item["text"] for item in current["latex_sources"]},
+        current_record_text=current_path.read_text(),
+    )
+    assert fact is not None
+    assert "NSF" not in fact["value"]
+    assert any(character.isdigit() for character in fact["value"])
 
 
 def test_fetch_inventory_allows_later_formatting_only_revision(

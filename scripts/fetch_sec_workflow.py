@@ -162,6 +162,12 @@ def _validate_request(payload: dict[str, Any]) -> dict[str, Any]:
         or not 0 <= retries <= 8
     ):
         raise ProvenanceError("SEC fetch max_retries is invalid")
+    explicit = _validate_explicit_filings(
+        payload,
+        ciks=ciks,
+        forms=forms,
+        max_filings=max_filings,
+    )
     return {
         "user_agent": user_agent,
         "authorization": authorization,
@@ -170,6 +176,7 @@ def _validate_request(payload: dict[str, Any]) -> dict[str, Any]:
         "max_filings_per_cik": max_filings,
         "requests_per_second": float(rate),
         "max_retries": retries,
+        "explicit_filings": explicit,
     }
 
 
@@ -279,6 +286,59 @@ def _recent_rows(payload: dict[str, Any], cik: str) -> list[dict[str, str]]:
     return rows
 
 
+def _validate_explicit_filings(
+    payload: dict[str, Any],
+    *,
+    ciks: list[str],
+    forms: list[str],
+    max_filings: int,
+) -> list[dict[str, str]] | None:
+    raw = payload.get("explicit_filings")
+    if raw is None:
+        return None
+    if not isinstance(raw, list) or not raw:
+        raise ProvenanceError("SEC fetch explicit_filings is invalid")
+    required = (
+        "cik",
+        "accession",
+        "form",
+        "filing_date",
+        "report_date",
+        "source_file",
+    )
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            raise ProvenanceError("SEC fetch explicit_filings is invalid")
+        row = {field: str(item.get(field) or "").strip() for field in required}
+        if any(not row[field] for field in required):
+            raise ProvenanceError("SEC fetch explicit_filings is invalid")
+        if row["cik"] not in ciks:
+            raise ProvenanceError("SEC fetch explicit filing CIK is not allowlisted")
+        if row["form"] not in forms:
+            raise ProvenanceError("SEC fetch explicit filing form is not allowlisted")
+        source_name = Path(row["source_file"]).name
+        if source_name != row["source_file"]:
+            raise ProvenanceError("SEC fetch explicit source_file must be a basename")
+        _validate_row(
+            {
+                "accessionNumber": row["accession"],
+                "form": row["form"],
+                "filingDate": row["filing_date"],
+                "reportDate": row["report_date"],
+            },
+            row["cik"],
+        )
+        if row["accession"] in seen:
+            raise ProvenanceError("SEC fetch explicit_filings duplicates an accession")
+        seen.add(row["accession"])
+        rows.append(row)
+    if len(rows) > len(ciks) * max_filings:
+        raise ProvenanceError("SEC fetch request exceeds the filing manifest limit")
+    return rows
+
+
 def _validate_row(row: dict[str, str], cik: str) -> None:
     if _ACCESSION.fullmatch(row["accessionNumber"]) is None:
         raise ProvenanceError("SEC submissions response accession is invalid")
@@ -355,6 +415,91 @@ def _derived_header_facts(text: str, row: dict[str, str]) -> list[dict[str, Any]
     return facts
 
 
+def _filing_export(
+    *,
+    row: dict[str, str],
+    cik: str,
+    source_url: str,
+    source_path: Path,
+    source_raw: bytes,
+    source_text: str,
+    retrieved_at: str,
+) -> dict[str, Any]:
+    header_row = (
+        row
+        if "accessionNumber" in row
+        else {
+            "accessionNumber": row["accession"],
+            "form": row["form"],
+            "filingDate": row["filing_date"],
+            "reportDate": row["report_date"],
+        }
+    )
+    accession = header_row["accessionNumber"]
+    return {
+        "accession": accession,
+        "cik": cik,
+        "form": header_row["form"],
+        "filing_date": header_row["filingDate"],
+        "report_date": header_row["reportDate"],
+        "source_url": source_url,
+        "source_file": source_path.name,
+        "source_sha256": hashlib.sha256(source_raw).hexdigest(),
+        "retrieved_at": retrieved_at,
+        "access_policy": (
+            "SEC public EDGAR fair access; bounded allowlisted fetch; "
+            f"policy {SEC_FAIR_ACCESS_URL}"
+        ),
+        "parser": {
+            "name": "sec_complete_submission_header",
+            "version": "1",
+        },
+        "derived_facts": _derived_header_facts(source_text, header_row),
+    }
+
+
+def _import_local_archives(
+    request: dict[str, Any],
+    output_directory: Path,
+    *,
+    generated_at: str,
+) -> list[dict[str, Any]]:
+    """Bind already-copied Archives .txt files without contacting SEC."""
+    exported: list[dict[str, Any]] = []
+    for row in request["explicit_filings"]:
+        source_path = output_directory / row["source_file"]
+        try:
+            source_raw = _read_regular_file(source_path, MAX_SOURCE_BYTES)
+        except OSError as exc:
+            raise ProvenanceError(
+                f"SEC local archive is missing: {row['source_file']}"
+            ) from exc
+        try:
+            source_text = source_raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ProvenanceError(
+                "SEC complete submission is not UTF-8; preserve it outside this v1 contract"
+            ) from exc
+        accession = row["accession"]
+        cik = row["cik"]
+        source_url = (
+            f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
+            f"{accession.replace('-', '')}/{accession}.txt"
+        )
+        exported.append(
+            _filing_export(
+                row=row,
+                cik=cik,
+                source_url=source_url,
+                source_path=source_path,
+                source_raw=source_raw,
+                source_text=source_text,
+                retrieved_at=generated_at,
+            )
+        )
+    return exported
+
+
 def fetch_sec_workflow(
     request_path: Path,
     output_directory: Path,
@@ -375,86 +520,86 @@ def fetch_sec_workflow(
     timestamp = generated_at or _timestamp()
     _parse_timestamp(timestamp, "generated_at")
     output_directory.mkdir(parents=True, exist_ok=True)
-    downloader = _Downloader(
-        user_agent=request["user_agent"],
-        requests_per_second=request["requests_per_second"],
-        max_retries=request["max_retries"],
-        http_get=http_get,
-        sleep=sleep,
-    )
-
-    exported: list[dict[str, Any]] = []
-    seen_accessions: set[str] = set()
-    for cik in request["allowed_ciks"]:
-        submissions_url = f"https://data.sec.gov/submissions/CIK{cik}.json"
-        submissions_path = output_directory / f"CIK{cik}.submissions.json"
-        submissions_raw, _ = downloader.cached(
-            submissions_url, submissions_path, retrieved_at=timestamp
+    if request["explicit_filings"] is not None:
+        exported = _import_local_archives(
+            request, output_directory, generated_at=timestamp
         )
-        try:
-            submissions = json.loads(submissions_raw.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ProvenanceError("SEC submissions response is invalid JSON") from exc
-        if not isinstance(submissions, dict):
-            raise ProvenanceError("SEC submissions response must be an object")
-        rows = [
-            row
-            for row in _recent_rows(submissions, cik)
-            if row["form"] in request["forms"]
-        ][: request["max_filings_per_cik"]]
-        if not rows:
-            raise ProvenanceError(
-                f"SEC submissions response has no selected filing for {cik}"
-            )
-        for row in rows:
-            _validate_row(row, cik)
-            accession = row["accessionNumber"]
-            if accession in seen_accessions:
-                raise ProvenanceError(
-                    "SEC submissions response duplicates an accession"
-                )
-            seen_accessions.add(accession)
-            accession_directory = accession.replace("-", "")
-            source_url = (
-                f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
-                f"{accession_directory}/{accession}.txt"
-            )
-            source_path = output_directory / f"{accession}.txt"
-            source_raw, retrieved_at = downloader.cached(
-                source_url, source_path, retrieved_at=timestamp
+    else:
+        downloader = _Downloader(
+            user_agent=request["user_agent"],
+            requests_per_second=request["requests_per_second"],
+            max_retries=request["max_retries"],
+            http_get=http_get,
+            sleep=sleep,
+        )
+
+        exported = []
+        seen_accessions: set[str] = set()
+        for cik in request["allowed_ciks"]:
+            submissions_url = f"https://data.sec.gov/submissions/CIK{cik}.json"
+            submissions_path = output_directory / f"CIK{cik}.submissions.json"
+            submissions_raw, _ = downloader.cached(
+                submissions_url, submissions_path, retrieved_at=timestamp
             )
             try:
-                source_text = source_raw.decode("utf-8")
-            except UnicodeDecodeError as exc:
+                submissions = json.loads(submissions_raw.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
                 raise ProvenanceError(
-                    "SEC complete submission is not UTF-8; preserve it outside this v1 contract"
+                    "SEC submissions response is invalid JSON"
                 ) from exc
-            exported.append(
-                {
-                    "accession": accession,
-                    "cik": cik,
-                    "form": row["form"],
-                    "filing_date": row["filingDate"],
-                    "report_date": row["reportDate"],
-                    "source_url": source_url,
-                    "source_file": source_path.name,
-                    "source_sha256": hashlib.sha256(source_raw).hexdigest(),
-                    "retrieved_at": retrieved_at,
-                    "access_policy": (
-                        "SEC public EDGAR fair access; bounded allowlisted fetch; "
-                        f"policy {SEC_FAIR_ACCESS_URL}"
-                    ),
-                    "parser": {
-                        "name": "sec_complete_submission_header",
-                        "version": "1",
-                    },
-                    "derived_facts": _derived_header_facts(source_text, row),
-                }
-            )
+            if not isinstance(submissions, dict):
+                raise ProvenanceError("SEC submissions response must be an object")
+            rows = [
+                row
+                for row in _recent_rows(submissions, cik)
+                if row["form"] in request["forms"]
+            ][: request["max_filings_per_cik"]]
+            if not rows:
+                raise ProvenanceError(
+                    f"SEC submissions response has no selected filing for {cik}"
+                )
+            for row in rows:
+                _validate_row(row, cik)
+                accession = row["accessionNumber"]
+                if accession in seen_accessions:
+                    raise ProvenanceError(
+                        "SEC submissions response duplicates an accession"
+                    )
+                seen_accessions.add(accession)
+                accession_directory = accession.replace("-", "")
+                source_url = (
+                    f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
+                    f"{accession_directory}/{accession}.txt"
+                )
+                source_path = output_directory / f"{accession}.txt"
+                source_raw, retrieved_at = downloader.cached(
+                    source_url, source_path, retrieved_at=timestamp
+                )
+                try:
+                    source_text = source_raw.decode("utf-8")
+                except UnicodeDecodeError as exc:
+                    raise ProvenanceError(
+                        "SEC complete submission is not UTF-8; preserve it outside this v1 contract"
+                    ) from exc
+                exported.append(
+                    _filing_export(
+                        row=row,
+                        cik=cik,
+                        source_url=source_url,
+                        source_path=source_path,
+                        source_raw=source_raw,
+                        source_text=source_text,
+                        retrieved_at=retrieved_at,
+                    )
+                )
 
     payload = {
         "schema_version": SEC_FILING_INPUT_SCHEMA,
-        "source_status": "public_sec_download",
+        "source_status": (
+            "authorized_download"
+            if request["explicit_filings"] is not None
+            else "public_sec_download"
+        ),
         "authorization": request["authorization"],
         "fetch_receipt": {
             "schema_version": "longworld.sec-fetch-receipt.v1",

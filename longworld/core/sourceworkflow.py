@@ -29,6 +29,11 @@ from longworld.core.taxonomy import SourceOrigin
 SEC_SOURCE_KIND = "sec_filing"
 PAPER_SOURCE_KIND = "paper_workflow"
 WIKIMEDIA_SOURCE_KIND = "wikimedia"
+SOURCE_WORKFLOW_ADAPTER_REVISION_V1 = "sourceworkflow@1"
+SOURCE_WORKFLOW_ADAPTER_REVISION_V2 = "sourceworkflow@2"
+SOURCE_WORKFLOW_ADAPTER_REVISIONS = frozenset(
+    {SOURCE_WORKFLOW_ADAPTER_REVISION_V1, SOURCE_WORKFLOW_ADAPTER_REVISION_V2}
+)
 
 _SOURCE_KIND_SCHEMAS = {
     SEC_SOURCE_KIND: frozenset({SEC_FILING_MANIFEST_SCHEMA}),
@@ -40,7 +45,7 @@ _SOURCE_KIND_SCHEMAS = {
 _SOURCE_KIND_DOMAINS = {
     SEC_SOURCE_KIND: "company",
     PAPER_SOURCE_KIND: "researchlab",
-    WIKIMEDIA_SOURCE_KIND: "knowledgebase",
+    WIKIMEDIA_SOURCE_KIND: "researchlab",
 }
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _PUBLIC_STATUS = {
@@ -127,11 +132,13 @@ class SourceWorkflow:
     relations: tuple[SourceRelation, ...]
 
 
-def _objects(value: object, label: str) -> list[Mapping[str, Any]]:
+def _objects(
+    value: object, label: str, *, allow_empty: bool = False
+) -> list[Mapping[str, Any]]:
     if (
         not isinstance(value, Sequence)
         or isinstance(value, (str, bytes))
-        or not value
+        or (not value and not allow_empty)
         or not all(isinstance(item, Mapping) for item in value)
     ):
         raise ProvenanceError(f"source workflow {label} must be a non-empty list")
@@ -527,6 +534,7 @@ def _normalize_components(
     source_origin: SourceOrigin,
     records: list[SourceRecord],
     relations: list[SourceRelation],
+    allow_relationless_singleton: bool = False,
 ) -> tuple[SourceWorkflow, ...]:
     if len({record.record_id for record in records}) != len(records):
         raise ProvenanceError("duplicate source workflow record id")
@@ -547,7 +555,7 @@ def _normalize_components(
     disconnected = sorted(
         record_id for record_id, edges in adjacency.items() if not edges
     )
-    if disconnected:
+    if disconnected and (len(records) > 1 or not allow_relationless_singleton):
         raise ProvenanceError("source inventory contains a disconnected record")
 
     components: list[set[str]] = []
@@ -625,7 +633,10 @@ def _check_schema(
 
 
 def adapt_sec_manifest(
-    manifest: Mapping[str, Any], *, signed_bundle_authorized: bool = False
+    manifest: Mapping[str, Any],
+    *,
+    signed_bundle_authorized: bool = False,
+    adapter_revision: str = SOURCE_WORKFLOW_ADAPTER_REVISION_V1,
 ) -> tuple[SourceWorkflow, ...]:
     """Normalize an already-verified SEC source inventory into graph components."""
     _check_schema(
@@ -661,13 +672,21 @@ def adapt_sec_manifest(
         for raw in raw_filings
     ]
     records_by_id = {record.record_id: record for record in records}
-    raw_relations = _objects(manifest.get("filing_relations"), "SEC relations")
+    if adapter_revision not in SOURCE_WORKFLOW_ADAPTER_REVISIONS:
+        raise ProvenanceError("unsupported source workflow adapter revision")
+    allow_singleton = adapter_revision == SOURCE_WORKFLOW_ADAPTER_REVISION_V2
+    raw_relations = _objects(
+        manifest.get("filing_relations"),
+        "SEC relations",
+        allow_empty=allow_singleton,
+    )
     relations = [_sec_relation(raw, records=records_by_id) for raw in raw_relations]
     return _normalize_components(
         source_kind=SEC_SOURCE_KIND,
         source_origin=origin,
         records=records,
         relations=relations,
+        allow_relationless_singleton=allow_singleton,
     )
 
 
@@ -812,6 +831,7 @@ def adapt_source_manifest(
     *,
     source_kind: str,
     signed_bundle_authorized: bool = False,
+    adapter_revision: str = SOURCE_WORKFLOW_ADAPTER_REVISION_V1,
 ) -> tuple[SourceWorkflow, ...]:
     """Dispatch an already-verified manifest by an explicit source kind."""
     expected_schemas = _SOURCE_KIND_SCHEMAS.get(source_kind)
@@ -820,7 +840,9 @@ def adapt_source_manifest(
     _check_schema(manifest, source_kind=source_kind, expected_schemas=expected_schemas)
     if source_kind == SEC_SOURCE_KIND:
         return adapt_sec_manifest(
-            manifest, signed_bundle_authorized=signed_bundle_authorized
+            manifest,
+            signed_bundle_authorized=signed_bundle_authorized,
+            adapter_revision=adapter_revision,
         )
     if source_kind == PAPER_SOURCE_KIND:
         return adapt_paper_manifest(

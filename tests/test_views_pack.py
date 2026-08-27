@@ -3,6 +3,7 @@ import random
 from longworld.core.causal import build_causal_graph
 from longworld.core.graph import random_walk_event_ids
 from longworld.core.pack import pack_view
+from longworld.core.promotion import STRICT_REPLAY_REVISION
 from longworld.core.sampler import materialize
 from longworld.core.semantic import boilerplate_char_fraction, is_boilerplate
 from longworld.core.topology import canonical_topology
@@ -687,7 +688,7 @@ def test_export_drops_local_or_mixed_on_long_buckets(monkeypatch):
                 "aggregation": "max_similarity",
             },
             "dense_top_k": 3,
-            "strict_replay_revision": "longworld-strict-replay-v3",
+            "strict_replay_revision": STRICT_REPLAY_REVISION,
             "strict_replay_answer": "RV-1",
         },
         "artifact_classification": [

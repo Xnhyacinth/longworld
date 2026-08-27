@@ -19,3 +19,18 @@ def format_revision_funding_delta(value: str) -> str:
         f"{match.group('funder')} | {match.group('agency')} | "
         f"NSF {match.group('grant')}"
     )
+
+
+def format_revision_added_delta(value: str) -> str:
+    """Prefer the funding operator; otherwise keep a unique semantic sentence."""
+    funding = format_revision_funding_delta(value)
+    if funding:
+        return funding
+    stripped = " ".join(value.split())
+    if (
+        len(stripped) < 40
+        or re.search(r"\d", stripped) is None
+        or any(character in stripped for character in "{}\\")
+    ):
+        return ""
+    return stripped
