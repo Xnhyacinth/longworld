@@ -155,6 +155,7 @@ def _load_model(model_id: str, revision: str) -> Encoder:
         model_id,
         revision=revision,
         trust_remote_code=False,
+        device="cpu",
         model_kwargs={"use_safetensors": True},
     )
 

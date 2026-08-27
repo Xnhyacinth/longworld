@@ -313,6 +313,7 @@ def test_default_loader_disables_remote_code_and_requires_safetensors(
             {
                 "revision": REVISION,
                 "trust_remote_code": False,
+                "device": "cpu",
                 "model_kwargs": {"use_safetensors": True},
             },
         )
