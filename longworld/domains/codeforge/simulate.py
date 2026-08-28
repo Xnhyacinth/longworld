@@ -12,6 +12,7 @@ from longworld.domains.codeforge.events import (
     check_preconditions,
     init_values,
 )
+from longworld.domains.codeforge.schema import materialize_grounded_repo_record
 
 
 def _date(start: date, months: int, extra_days: int = 0) -> date:
@@ -178,9 +179,19 @@ def events_for_repo(project: dict[str, Any], prefix: str) -> list[Event]:
                 "single_workflow": len(project.get("real_workflow_ids") or []) == 1,
                 "record_kind": str(record["kind"]),
                 "body_text": str(record["body_text"]),
-                "body_sha256": hashlib.sha256(
-                    str(record["body_text"]).encode()
-                ).hexdigest(),
+                "source_body_text": str(record["source_body_text"]),
+                "source_body_sha256": str(record["source_body_sha256"]),
+                "body_sha256": str(record["source_body_sha256"]),
+                "grounded_source_id": str(record["grounded_source_id"]),
+                "source_grounded_fact_spans": list(
+                    record["source_grounded_fact_spans"]
+                ),
+                "grounded_fact_spans": list(record["source_grounded_fact_spans"]),
+                "grounded_relations": list(record["grounded_relations"]),
+                "source_record_binding": dict(record["source_record_binding"]),
+                "source_record_binding_sha256": str(
+                    record["source_record_binding_sha256"]
+                ),
                 "source_body_facts": facts,
                 "links": links,
                 "source_links": list(record.get("source_links") or []),
@@ -391,10 +402,19 @@ def _link_release_cycles(releases: list[Event]) -> None:
         previous = previous_by_repo.get(source_url)
         if previous is not None:
             previous_version = _release_version(previous)
-            if version and previous_version and version > previous_version:
+            if (
+                version
+                and previous_version
+                and version > previous_version
+                and previous.id not in event.causal_inputs
+                and previous.id not in event.required_inputs
+            ):
                 event.causal_inputs.append(previous.id)
                 event.required_inputs.append(previous.id)
                 event.relation_kinds[previous.id] = "supersedes"
+                event.params.setdefault("synthetic_relation_inputs", []).append(
+                    previous.id
+                )
         if previous is None or version > _release_version(previous):
             previous_by_repo[source_url] = event
 
@@ -422,3 +442,16 @@ def simulate_code(spec: dict[str, Any]) -> dict[str, SimulatedWorld]:
         worlds[prefix].spec["prefix"] = prefix
         worlds[prefix].spec["domain"] = "codeforge"
     return worlds
+
+
+def canonical_repo_record_envelopes(world: SimulatedWorld) -> dict[str, Event]:
+    """Rebuild canonical repo-record events from the verified world spec only."""
+    project = world.spec["project"]
+    prefix = str(world.spec["prefix"])
+    envelopes: dict[str, Event] = {}
+    for event in events_for_repo(project, prefix):
+        if event.type != "repo_record":
+            continue
+        event.params.update(materialize_grounded_repo_record(event.params))
+        envelopes[str(event.params["record_key"])] = event
+    return envelopes

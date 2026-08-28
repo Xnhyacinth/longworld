@@ -12,6 +12,9 @@ from longworld.core.taxonomy import (
     classify_artifact,
 )
 from longworld.core.world import Event, SimulatedWorld
+from longworld.domains.researchlab.simulate import (
+    canonical_researchlab_source_visible_text,
+)
 
 _LAB_EVENT_SLOT = {
     "license_clause": "pi",
@@ -141,21 +144,15 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
     t = ev.type
     date_s = ev.time.isoformat()
     paper, model, bench = project["paper"], project["model"], project["benchmark"]
+    canonical_source_text = canonical_researchlab_source_visible_text(ev)
     if t == "arxiv_revision":
-        return "json", str(ev.params["text"])
+        if canonical_source_text is None:
+            raise ValueError("arXiv revision visible text is invalid")
+        return "json", canonical_source_text
     if t == "arxiv_revision_relation":
-        return "json", json.dumps(
-            {
-                "kind": "arxiv_revision_relation",
-                "relation": ev.params["relation_kind"],
-                "source_revision": ev.params["source_revision_id"],
-                "target_revision": ev.params["target_revision_id"],
-                "evidence": ev.params["evidence_quote"],
-            },
-            ensure_ascii=False,
-            indent=2,
-            sort_keys=True,
-        ) + "\n"
+        if canonical_source_text is None:
+            raise ValueError("arXiv relation visible text is invalid")
+        return "json", canonical_source_text
     if t == "arxiv_revision_decision":
         return "json", json.dumps(
             {
@@ -171,7 +168,13 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
             sort_keys=True,
         ) + "\n"
     if t == "wiki_source_section":
-        return "wiki", str(ev.params["text"])
+        if canonical_source_text is None:
+            raise ValueError("Wikipedia section visible text is invalid")
+        return "wiki", canonical_source_text
+    if t == "wiki_source_relation":
+        if canonical_source_text is None:
+            raise ValueError("Wikipedia relation visible text is invalid")
+        return "json", canonical_source_text
     if t == "wiki_claim_answer":
         return "json", json.dumps(
             {
@@ -540,9 +543,10 @@ def render_lab(sim: SimulatedWorld) -> list[Artifact]:
                 else "derived-sha256:"
                 + hashlib.sha256(artifact.text.encode()).hexdigest()
             )
+            is_real_record = is_record and source_origin is SourceOrigin.REAL_DERIVED
             artifact.slots = {
                 **artifact.slots,
-                "real_workflow_record": is_record,
+                "real_workflow_record": is_real_record,
                 "source_workflow_id": str(ev.params["workflow_id"]),
                 "source_record_id": str(ev.params.get("record_id") or ""),
                 "parent_provenance_id": str(
@@ -550,29 +554,47 @@ def render_lab(sim: SimulatedWorld) -> list[Artifact]:
                 ),
                 "source_url": str(ev.params.get("source_url") or ""),
                 "source_family": str(ev.params.get("source_family") or ""),
+                "source_binding_provenance": str(
+                    ev.params.get("source_binding_provenance") or ""
+                ),
+                "relation_provenance": str(ev.params.get("relation_provenance") or ""),
+                "canonical_source_envelope_sha256": str(
+                    ev.params.get("canonical_source_envelope_sha256") or ""
+                ),
+                "parent_source_envelope_sha256": str(
+                    ev.params.get("parent_source_envelope_sha256") or ""
+                ),
+                "parent_source_origin": str(
+                    ev.params.get("parent_source_origin") or ""
+                ),
             }
             classify_artifact(
                 artifact,
                 source_origin=source_origin,
                 workflow_kind=(
                     WorkflowKind.REAL_SOURCE_DERIVED
-                    if is_record
+                    if is_real_record
                     else WorkflowKind.HYBRID_CAUSAL
                 ),
                 evidence_role=EvidenceRole.CAUSAL_SUPPORTING,
-                workflow_id=str(ev.params["workflow_id"]),
+                workflow_id=sim.spec["world_id"],
                 provenance_id=provenance_id,
             )
-        elif ev.type in {"wiki_source_section", "wiki_claim_answer"}:
+        elif ev.type in {
+            "wiki_source_section",
+            "wiki_source_relation",
+            "wiki_claim_answer",
+        }:
             is_section = ev.type == "wiki_source_section"
+            is_source = ev.type in {"wiki_source_section", "wiki_source_relation"}
             source_origin = (
-                SourceOrigin.REAL_DERIVED
-                if is_section
+                SourceOrigin(str(ev.params.get("source_origin") or "real_derived"))
+                if is_source
                 else SourceOrigin.SYNTHETIC_WORLD
             )
             provenance_id = (
                 str(ev.params["provenance_id"])
-                if is_section
+                if is_source
                 else "derived-sha256:"
                 + hashlib.sha256(artifact.text.encode()).hexdigest()
             )
@@ -586,6 +608,13 @@ def render_lab(sim: SimulatedWorld) -> list[Artifact]:
                 ),
                 "source_url": str(ev.params.get("source_url") or ""),
                 "source_family": str(ev.params.get("source_family") or ""),
+                "source_binding_provenance": str(
+                    ev.params.get("source_binding_provenance") or ""
+                ),
+                "relation_provenance": str(ev.params.get("relation_provenance") or ""),
+                "parent_source_origin": str(
+                    ev.params.get("parent_source_origin") or ""
+                ),
             }
             classify_artifact(
                 artifact,

@@ -8,6 +8,7 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from generate import (
+    _exact_metric_token_counter,
     _strict_workflow_artifacts,
     _trainable,
     _views_for_band,
@@ -21,6 +22,24 @@ from generate import (
 
 from longworld.core.promotion import exact_token_band_reject_reason
 from longworld.core.render import Artifact
+
+
+def test_exact_metric_counter_does_not_depend_on_pack_admission_flag() -> None:
+    counter = len
+
+    assert (
+        _exact_metric_token_counter(
+            {"model_id": "pinned", "revision": "a" * 40}, "64k", counter
+        )
+        is counter
+    )
+    assert _exact_metric_token_counter({}, "64k", counter) is None
+    assert (
+        _exact_metric_token_counter(
+            {"model_id": "pinned", "revision": "a" * 40}, "4k", counter
+        )
+        is None
+    )
 
 
 def test_source_workflow_can_use_a_real_body_specific_bucket_target() -> None:
@@ -253,7 +272,8 @@ def test_exact_token_metadata_is_written_for_each_strict_long_band() -> None:
 def test_emit_records_routes_every_strict_long_band_through_exact_counting() -> None:
     source = inspect.getsource(emit_records)
 
-    assert "metrics.length_bucket in EXACT_TOKEN_BAND_RANGES" in source
+    assert "bname in EXACT_TOKEN_BAND_RANGES" in source
+    assert "length_bucket=bname" in source
 
 
 def test_exact_64k_pack_retune_scales_shared_window_from_observed_wraps() -> None:

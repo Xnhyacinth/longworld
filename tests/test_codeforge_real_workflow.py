@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sys
+from copy import deepcopy
 from pathlib import Path
 
-from longworld.core.engine import answer_from_artifacts
+import pytest
+
+from longworld.core.engine import answer_from_artifacts, semantic_answer_from_artifacts
+from longworld.core.groundedspan import GroundedSpanError, sha256_text
 from longworld.core.pack import estimate_tokens, join_artifacts
+from longworld.core.promotion import _replayed_source_metadata
 from longworld.core.provenance import SourceLineage
 from longworld.core.realworkflow import RealWorkflow, WorkflowRecord
 from longworld.core.taxonomy import (
@@ -17,12 +23,19 @@ from longworld.core.views import render_cf_view
 from longworld.domains.codeforge.queries import build_code_queries
 from longworld.domains.codeforge.render import render_code
 from longworld.domains.codeforge.schema import sample_code_spec
-from longworld.domains.codeforge.simulate import simulate_code
+from longworld.domains.codeforge.simulate import (
+    canonical_repo_record_envelopes,
+    simulate_code,
+)
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from generate import real_workflow_artifacts_for_query
+from generate import (
+    _real_source_tokens,
+    real_source_relation_edges,
+    real_workflow_artifacts_for_query,
+)
 
 
 def _workflow(
@@ -312,6 +325,43 @@ def test_real_repo_episode_binds_body_facts_into_state_answers_and_lineage() -> 
     assert world.state.values["repo:commit:cafe123:version"] == "2.4.1"
     assert world.state.values["real:release:version"] == "2.4.1"
     assert world.state.values["real:release:license"] == "Apache-2.0"
+    recovery = spec["focal"]["repo_episode"][5]
+    version_span = next(
+        span
+        for span in recovery["source_grounded_fact_spans"]
+        if "version" in span["values"]
+    )
+    assert (
+        recovery["source_body_text"][
+            version_span["char_start"] : version_span["char_end"]
+        ]
+        == "2.4.1"
+    )
+    grounded_prefix = f"repo:{recovery['record_key']}:grounded:version"
+    assert world.state.values[f"{grounded_prefix}:fact_id"] == version_span["fact_id"]
+    assert (
+        world.state.values[f"{grounded_prefix}:text_sha256"]
+        == recovery["source_body_sha256"]
+    )
+    assert spec["focal"]["real_grounded_fact_count"] > 0
+    assert spec["focal"]["real_grounded_relation_count"] > 0
+    canonical_events = canonical_repo_record_envelopes(world)
+    observed_events = {
+        str(event.params["record_key"]): event
+        for event in world.events
+        if event.type == "repo_record"
+    }
+    assert canonical_events.keys() == observed_events.keys()
+    for record_key, canonical in canonical_events.items():
+        observed = observed_events[record_key]
+        assert canonical.type == observed.type
+        assert canonical.time == observed.time
+        assert canonical.params == observed.params
+        assert canonical.preconditions == observed.preconditions
+        assert canonical.causal_inputs == observed.causal_inputs
+        assert canonical.required_inputs == observed.required_inputs
+        assert canonical.relation_kinds == observed.relation_kinds
+        assert canonical.skipped == observed.skipped
     assert {query.query_type for query in queries} >= {
         "version_selection",
         "ci_regression_origin",
@@ -413,6 +463,15 @@ def test_release_cycles_create_band_specific_executable_proofs() -> None:
     [supersession_trace] = [
         query for query in queries if query.query_type == "release_supersession_trace"
     ]
+    releases = sorted(
+        (
+            event
+            for event in world.events
+            if event.type == "repo_record"
+            and event.params.get("record_kind") == "release"
+        ),
+        key=lambda event: (event.time, event.id),
+    )
 
     assert len(version_queries) == 2
     short, long = version_queries
@@ -432,6 +491,8 @@ def test_release_cycles_create_band_specific_executable_proofs() -> None:
     assert supersession_trace.motif == "release_supersession_trace"
     assert supersession_trace.preferred_length_buckets == ["64k"]
     assert supersession_trace.program_ops != long.program_ops
+    assert releases[1].params["synthetic_relation_inputs"] == [releases[0].id]
+    assert releases[2].params["synthetic_relation_inputs"] == [releases[1].id]
     trace_essential = [
         artifact
         for artifact in render_code(world)
@@ -444,11 +505,20 @@ def test_release_cycles_create_band_specific_executable_proofs() -> None:
             supersession_trace.sufficient_event_ids
         )
     ]
+    relation_edges = real_source_relation_edges(world, supersession_trace, trace_strict)
     assert (
         answer_from_artifacts(
             world, supersession_trace, trace_strict, enforce_preconditions=True
         )
         == supersession_trace.answer
+    )
+    assert {
+        edge["relation_provenance"]
+        for edge in relation_edges
+        if edge["relation"] == "supersedes"
+    } == {"synthetic_executable"}
+    assert any(
+        edge["relation_provenance"] == "authentic_source" for edge in relation_edges
     )
     assert all(
         answer_from_artifacts(
@@ -481,6 +551,18 @@ def test_release_cycles_create_band_specific_executable_proofs() -> None:
         == supersession_trace.cf_answer
     )
     assert (
+        semantic_answer_from_artifacts(
+            world,
+            supersession_trace,
+            trace_cf_artifacts,
+            extra_overrides={
+                supersession_trace.cf_event_id: supersession_trace.cf_param_updates
+            },
+            enforce_preconditions=True,
+        )
+        == supersession_trace.cf_answer
+    )
+    assert (
         answer_from_artifacts(
             world,
             long,
@@ -495,7 +577,7 @@ def test_release_cycles_create_band_specific_executable_proofs() -> None:
     )
 
 
-def test_repeated_license_snapshots_are_canonicalized_before_strict_replay() -> None:
+def test_repeated_license_snapshots_preserve_identity_and_block_length_gain() -> None:
     def episode(version: str, month: int) -> RealWorkflow:
         return _workflow(
             [
@@ -550,23 +632,16 @@ def test_repeated_license_snapshots_are_canonicalized_before_strict_replay() -> 
         if item.query_type == "version_selection"
     ][-1]
 
-    selected = real_workflow_artifacts_for_query(artifacts, query)
     license_artifacts = [
         artifact
-        for artifact in selected
+        for artifact in artifacts
         if (artifact.slots or {}).get("source_record_id") == "LICENSE"
     ]
-    strict = [
-        artifact
-        for artifact in selected
-        if set(artifact.reveals_events).intersection(query.sufficient_event_ids)
-    ]
 
-    assert len(license_artifacts) == 1
-    assert (
-        answer_from_artifacts(world, query, strict, enforce_preconditions=True)
-        == query.answer
-    )
+    assert len(license_artifacts) == 2
+    assert spec["focal"]["real_record_aliases"] == {}
+    with pytest.raises(ValueError, match="duplicate source bodies"):
+        real_workflow_artifacts_for_query(artifacts, query)
 
 
 def test_duplicate_release_tags_do_not_fake_a_longer_release_cycle() -> None:
@@ -616,6 +691,85 @@ def test_duplicate_release_tags_do_not_fake_a_longer_release_cycle() -> None:
 
     assert len(queries) == 1
     assert queries[0].preferred_length_buckets == ["16k"]
+
+
+def test_release_supersession_does_not_override_explicit_source_link() -> None:
+    workflow = _workflow(
+        [
+            WorkflowRecord(
+                "commit:aaa1111",
+                "commit",
+                "2025-01-01T00:00:00Z",
+                "Commit aaa1111 selects parser-core version 1.0.0.",
+                attributes={
+                    "commit": "aaa1111",
+                    "package": "parser-core",
+                    "version": "1.0.0",
+                },
+            ),
+            WorkflowRecord(
+                "ci:first",
+                "ci_run",
+                "2025-01-02T00:00:00Z",
+                "CI run first for commit aaa1111 passed.",
+                ("commit:aaa1111",),
+                {"run": "first", "result": "passed"},
+            ),
+            WorkflowRecord(
+                "release:v1.0.0",
+                "release",
+                "2025-01-03T00:00:00Z",
+                "Release tag v1.0.0 published.",
+                ("ci:first",),
+                {"tag": "v1.0.0"},
+            ),
+            WorkflowRecord(
+                "commit:bbb2222",
+                "commit",
+                "2025-02-01T00:00:00Z",
+                "Commit bbb2222 selects parser-core version 2.0.0.",
+                attributes={
+                    "commit": "bbb2222",
+                    "package": "parser-core",
+                    "version": "2.0.0",
+                },
+            ),
+            WorkflowRecord(
+                "ci:second",
+                "ci_run",
+                "2025-02-02T00:00:00Z",
+                "CI run second for commit bbb2222 passed.",
+                ("commit:bbb2222",),
+                {"run": "second", "result": "passed"},
+            ),
+            WorkflowRecord(
+                "release:v2.0.0",
+                "release",
+                "2025-02-03T00:00:00Z",
+                "Release tag v2.0.0 published after release tag v1.0.0.",
+                ("ci:second", "release:v1.0.0"),
+                {"tag": "v2.0.0"},
+            ),
+        ]
+    )
+    world = simulate_code(sample_code_spec(73, n_parallel=0, real_workflow=workflow))[
+        "focal"
+    ]
+    releases = sorted(
+        [
+            event
+            for event in world.events
+            if event.type == "repo_record"
+            and event.params.get("record_kind") == "release"
+        ],
+        key=lambda event: event.time,
+    )
+    first, second = releases
+
+    assert second.causal_inputs.count(first.id) == 1
+    assert second.required_inputs.count(first.id) == 1
+    assert second.relation_kinds[first.id] == "derived_from"
+    assert first.id not in second.params.get("synthetic_relation_inputs", [])
 
 
 def test_duplicate_release_tag_uses_the_richest_executable_episode() -> None:
@@ -1038,6 +1192,392 @@ def test_real_workflow_ignores_attribute_values_absent_from_source_body() -> Non
     assert world.state.values["repo:commit:cafe123:version"] == "2.4.1"
     version_query = next(q for q in queries if q.query_type == "version_selection")
     assert "9.9.9" not in version_query.answer
+
+
+def test_real_workflow_rejects_body_corruption_after_grounding() -> None:
+    spec = sample_code_spec(73, n_parallel=0, real_workflow=_repo_episode())
+    recovery = spec["focal"]["repo_episode"][5]
+    recovery["body_text"] = str(recovery["body_text"]).replace("2.4.1", "9.9.9")
+
+    with pytest.raises(GroundedSpanError, match="visible text|sha256|quote"):
+        simulate_code(spec)
+
+
+def test_semantic_replay_rejects_coordinated_artifact_body_replacement() -> None:
+    _, world, artifacts, queries = _materialize_real(_repo_episode())
+    query = next(item for item in queries if item.query_type == "version_selection")
+    selected = [
+        deepcopy(artifact)
+        for artifact in artifacts
+        if artifact.artifact_id in set(query.essential_artifact_ids)
+    ]
+    target = next(
+        artifact
+        for artifact in selected
+        if "2.4.1" in artifact.slots["params"].get("body_text", "")
+    )
+    params = target.slots["params"]
+    replacement = str(params["body_text"]).replace("2.4.1", "9.9.9")
+    target.text = target.text.replace(str(params["body_text"]), replacement)
+    params["body_text"] = replacement
+    params["source_body_text"] = replacement
+    params["body_sha256"] = sha256_text(replacement)
+    params["source_body_sha256"] = sha256_text(replacement)
+
+    assert (
+        semantic_answer_from_artifacts(
+            world, query, selected, enforce_preconditions=False
+        )
+        == "unknown"
+    )
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        lambda record: record.update(links=[]),
+        lambda record: record.update(links=["git:foreign:ci:passed"]),
+        lambda record: record.update(grounded_relations=[]),
+    ],
+    ids=("hidden-link-deletion", "foreign-workflow-link", "relation-mismatch"),
+)
+def test_real_workflow_rejects_link_binding_tamper(tamper) -> None:
+    spec = sample_code_spec(73, n_parallel=0, real_workflow=_repo_episode())
+    release = spec["focal"]["repo_episode"][-1]
+    tamper(release)
+
+    with pytest.raises(GroundedSpanError, match="link|relation|binding"):
+        simulate_code(spec)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "shared canonical-envelope gap: normalized domain records cannot recompute "
+        "the producer-attested workflow digest after coordinated field replacement"
+    ),
+)
+def test_coordinated_source_envelope_replacement_requires_shared_attestation() -> None:
+    spec = sample_code_spec(73, n_parallel=0, real_workflow=_repo_episode())
+    recovery = spec["focal"]["repo_episode"][5]
+    replacement = str(recovery["source_body_text"]).replace("2.4.1", "9.9.9")
+    replacement_hash = sha256_text(replacement)
+    spans = recovery["source_grounded_fact_spans"]
+    for span in spans:
+        quote = str(span["quote"])
+        if "version" in span["values"]:
+            quote = "9.9.9"
+            span["values"]["version"] = "9.9.9"
+        span["quote"] = quote
+        span["normalized_quote"] = quote
+        span["text_sha256"] = replacement_hash
+    recovery["body_text"] = replacement
+    recovery["source_body_text"] = replacement
+    recovery["source_body_sha256"] = replacement_hash
+    recovery["body_facts"]["version"] = "9.9.9"
+    recovery["source_record_binding"]["source_body_sha256"] = replacement_hash
+    recovery["source_record_binding_sha256"] = sha256_text(
+        json.dumps(
+            recovery["source_record_binding"],
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+
+    with pytest.raises(GroundedSpanError, match="attestation|envelope"):
+        simulate_code(spec)
+
+
+def test_review_words_containing_red_do_not_create_a_failure_fact() -> None:
+    workflow = _workflow(
+        [
+            WorkflowRecord(
+                "review:ignored",
+                "review",
+                "2025-01-01T00:00:00Z",
+                "Review confirms gitignored ancestor directories are handled.",
+            )
+        ]
+    )
+    spec = sample_code_spec(73, n_parallel=0, real_workflow=workflow)
+    [record] = spec["focal"]["repo_episode"]
+
+    assert "result" not in record["body_facts"]
+    world = simulate_code(spec)["focal"]
+    event = next(item for item in world.events if item.type == "repo_record")
+    assert "result" not in event.params["replayed_body_facts"]
+
+
+def test_short_package_attribute_does_not_match_inside_unrelated_word() -> None:
+    workflow = _workflow(
+        [
+            WorkflowRecord(
+                "commit:deadbee",
+                "commit",
+                "2025-01-01T00:00:00Z",
+                "Commit deadbee documents Ongoing migration work for 1.2.3.",
+                attributes={
+                    "commit": "deadbee",
+                    "package": "go",
+                    "version": "1.2.3",
+                },
+            )
+        ]
+    )
+    spec = sample_code_spec(73, n_parallel=0, real_workflow=workflow)
+    [record] = spec["focal"]["repo_episode"]
+
+    assert "package" not in record["body_facts"]
+
+
+def test_short_package_span_binds_the_explicit_field_value_not_a_substring() -> None:
+    body = (
+        "Commit deadbee documents Ongoing migration work; "
+        "the go package version 1.2.3 is selected."
+    )
+    workflow = _workflow(
+        [
+            WorkflowRecord(
+                "commit:deadbee",
+                "commit",
+                "2025-01-01T00:00:00Z",
+                body,
+                attributes={
+                    "commit": "deadbee",
+                    "package": "go",
+                    "version": "1.2.3",
+                },
+            )
+        ]
+    )
+    spec = sample_code_spec(73, n_parallel=0, real_workflow=workflow)
+    [record] = spec["focal"]["repo_episode"]
+    package_span = next(
+        span
+        for span in record["source_grounded_fact_spans"]
+        if "package" in span["values"]
+    )
+
+    assert package_span["quote"] == "go"
+    assert package_span["char_start"] == body.index("go package")
+    assert body[package_span["char_start"] : package_span["char_end"]] == "go"
+
+
+@pytest.mark.parametrize("surface", ["file .go extension", "flag -go enabled"])
+def test_short_package_span_rejects_extension_and_flag_tokens(surface: str) -> None:
+    workflow = _workflow(
+        [
+            WorkflowRecord(
+                "commit:deadbee",
+                "commit",
+                "2025-01-01T00:00:00Z",
+                f"Commit deadbee updates {surface}.",
+                attributes={"commit": "deadbee", "package": "go"},
+            )
+        ]
+    )
+    spec = sample_code_spec(73, n_parallel=0, real_workflow=workflow)
+    [record] = spec["focal"]["repo_episode"]
+
+    assert all(
+        "package" not in span["values"] for span in record["source_grounded_fact_spans"]
+    )
+
+
+def test_exact_duplicate_non_license_bodies_preserve_event_identity() -> None:
+    duplicate_body = "Issue reports the same parser regression evidence."
+    distinct_body = "Issue reports a distinct renderer regression."
+    workflow = _workflow(
+        [
+            WorkflowRecord(
+                "issue:one", "issue", "2025-01-01T00:00:00Z", duplicate_body
+            ),
+            WorkflowRecord(
+                "issue:copy", "issue", "2025-01-02T00:00:00Z", duplicate_body
+            ),
+            WorkflowRecord(
+                "issue:distinct", "issue", "2025-01-03T00:00:00Z", distinct_body
+            ),
+            WorkflowRecord(
+                "commit:deadbee",
+                "commit",
+                "2025-01-04T00:00:00Z",
+                "Commit deadbee resolves the copied report.",
+                ("issue:copy",),
+                {"commit": "deadbee"},
+            ),
+        ]
+    )
+    spec = sample_code_spec(73, n_parallel=0, real_workflow=workflow)
+    project = spec["focal"]
+    records = project["repo_episode"]
+    record_ids = [record["record_id"] for record in records]
+
+    assert record_ids.count("issue:one") == 1
+    assert record_ids.count("issue:copy") == 1
+    assert "issue:distinct" in record_ids
+    assert project["real_record_aliases"] == {}
+    assert project["real_event_chars"] == sum(
+        len(record["body_text"]) for record in records
+    )
+    commit = next(
+        record for record in records if record["record_id"] == "commit:deadbee"
+    )
+    assert commit["links"] == [f"{workflow.workflow_id}:issue:copy"]
+
+
+def test_same_workflow_duplicate_fact_bodies_preserve_distinct_source_ids() -> None:
+    workflow = _workflow(
+        [
+            WorkflowRecord(
+                "LICENSE:first",
+                "license",
+                "2025-01-01T00:00:00Z",
+                "License snapshot declares MIT.",
+                attributes={"license": "MIT"},
+            ),
+            WorkflowRecord(
+                "LICENSE:second",
+                "license",
+                "2025-02-01T00:00:00Z",
+                "License snapshot declares MIT.",
+                attributes={"license": "MIT"},
+            ),
+            WorkflowRecord(
+                "release:v1.0.0",
+                "release",
+                "2025-02-02T00:00:00Z",
+                "Release tag v1.0.0 published under MIT.",
+                ("LICENSE:second",),
+                {"tag": "v1.0.0", "license": "MIT"},
+            ),
+        ]
+    )
+
+    records = sample_code_spec(73, n_parallel=0, real_workflow=workflow)["focal"][
+        "repo_episode"
+    ]
+    by_id = {record["record_id"]: record for record in records}
+
+    assert {"LICENSE:first", "LICENSE:second"}.issubset(by_id)
+    assert (
+        by_id["LICENSE:first"]["grounded_source_id"]
+        != by_id["LICENSE:second"]["grounded_source_id"]
+    )
+    assert by_id["release:v1.0.0"]["links"] == [
+        f"{workflow.workflow_id}:LICENSE:second"
+    ]
+
+
+def test_exact_duplicate_bodies_preserve_cross_workflow_event_identity() -> None:
+    duplicate_body = "Issue reports the same parser regression evidence."
+    first = _workflow(
+        [
+            WorkflowRecord(
+                "issue:first", "issue", "2025-01-01T00:00:00Z", duplicate_body
+            ),
+            WorkflowRecord(
+                "commit:aaa1111",
+                "commit",
+                "2025-01-02T00:00:00Z",
+                "Commit aaa1111 resolves the first report.",
+                ("issue:first",),
+                {"commit": "aaa1111"},
+            ),
+        ],
+        source_url="https://github.com/example/first",
+    )
+    second = _workflow(
+        [
+            WorkflowRecord(
+                "issue:second", "issue", "2025-02-01T00:00:00Z", duplicate_body
+            ),
+            WorkflowRecord(
+                "commit:bbb2222",
+                "commit",
+                "2025-02-02T00:00:00Z",
+                "Commit bbb2222 resolves the second report.",
+                ("issue:second",),
+                {"commit": "bbb2222"},
+            ),
+        ],
+        source_url="https://github.com/example/second",
+    )
+
+    project = sample_code_spec(73, n_parallel=0, real_workflows=[first, second])[
+        "focal"
+    ]
+    records = project["repo_episode"]
+    by_key = {record["record_key"]: record for record in records}
+
+    assert f"{first.workflow_id}:issue:first" in by_key
+    assert f"{second.workflow_id}:issue:second" in by_key
+    assert project["real_record_aliases"] == {}
+    assert by_key[f"{first.workflow_id}:commit:aaa1111"]["links"] == [
+        f"{first.workflow_id}:issue:first"
+    ]
+    assert by_key[f"{second.workflow_id}:commit:bbb2222"]["links"] == [
+        f"{second.workflow_id}:issue:second"
+    ]
+
+
+def test_real_ci_counterfactual_synchronizes_visible_body_hash_and_spans() -> None:
+    _, world, _, queries = _materialize_real(_repo_episode())
+    query = next(item for item in queries if item.query_type == "ci_regression_origin")
+    changed_commit = str(query.cf_param_updates["commit"])
+
+    cf_world, cf_artifacts = render_cf_view(world, query)
+    cf_event = next(event for event in cf_world.events if event.id == query.cf_event_id)
+    cf_artifact = next(
+        artifact
+        for artifact in cf_artifacts
+        if query.cf_event_id in artifact.reveals_events
+    )
+    spans = list(cf_event.params["grounded_fact_spans"])
+    commit_span = next(span for span in spans if "commit" in span["values"])
+
+    assert cf_event.params["body_sha256"] == sha256_text(cf_event.params["body_text"])
+    assert (
+        cf_event.params["body_text"][
+            commit_span["char_start"] : commit_span["char_end"]
+        ]
+        == changed_commit
+    )
+    assert commit_span["text_sha256"] == cf_event.params["body_sha256"]
+    assert commit_span["values"]["commit"] == changed_commit
+    visible_span = next(
+        span
+        for span in cf_artifact.slots["visible_grounded_fact_spans"]
+        if "commit" in span["values"]
+    )
+    assert (
+        cf_artifact.text[
+            visible_span["artifact_char_start"] : visible_span["artifact_char_end"]
+        ]
+        == changed_commit
+    )
+    assert visible_span["artifact_text_sha256"] == sha256_text(cf_artifact.text)
+    classification = artifact_classification(cf_artifact)
+    assert classification.source_origin is SourceOrigin.SYNTHETIC_WORLD
+    assert cf_artifact.slots["parent_source_origin"] == "real_private_export"
+    assert cf_artifact.slots["counterfactual_operation"] == "event_param_override"
+    assert _real_source_tokens([cf_artifact]) == 0
+    relation_edges = real_source_relation_edges(world, query, cf_artifacts)
+    replayed_edges = _replayed_source_metadata(world, query, cf_artifacts)[
+        "source_relation_edges"
+    ]
+    for edges in (relation_edges, replayed_edges):
+        changed_record_id = str(cf_event.params["record_id"])
+        changed_edges = [
+            edge
+            for edge in edges
+            if changed_record_id in {edge["parent_record_id"], edge["child_record_id"]}
+        ]
+        assert changed_edges
+        assert all(
+            edge["relation_provenance"] == "synthetic_executable"
+            for edge in changed_edges
+        )
 
 
 def test_real_ci_uses_the_body_visible_check_name_as_regression_origin() -> None:

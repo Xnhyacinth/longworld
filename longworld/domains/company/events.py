@@ -56,6 +56,7 @@ def init_values(project: dict[str, Any]) -> dict[str, Any]:
         "pending_docket": None,
         "controlling_docket": None,
         "sec_filing_facts": {},
+        "sec_filing_relations": {},
         "sec_eligibility_candidates": {},
         "sec_eligibility_approvals": {},
         "sec_xbrl_facts": {},
@@ -91,6 +92,14 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
         candidates = state.values.get("sec_eligibility_candidates") or {}
         if str(ev.params.get("record_id") or "") not in candidates:
             return False, "sec_eligibility_missing"
+        return True, None
+    if ev.type == "sec_amendment_resolution":
+        facts = state.values.get("sec_filing_facts") or {}
+        if any(
+            str(ev.params.get(field) or "") not in facts
+            for field in ("record_id", "target_record_id")
+        ):
+            return False, "sec_amendment_endpoint_missing"
         return True, None
     if ev.type == "sec_filing_publication_ratification":
         approvals = state.values.get("sec_eligibility_approvals") or {}
@@ -284,7 +293,43 @@ def apply_event(state: WorldState, ev: Event) -> None:
         approvals = dict(state.values.get("sec_eligibility_approvals") or {})
         approvals[record_id] = answer
         state.set("sec_eligibility_approvals", approvals, eid, day)
-    elif t == "sec_filing_publication_ratification":
+    elif t in {"sec_amendment_resolution", "sec_filing_publication_ratification"}:
+        if t == "sec_amendment_resolution":
+            amendment_id = str(p.get("record_id") or "")
+            original_id = str(p.get("target_record_id") or "")
+            filing_facts = state.values.get("sec_filing_facts") or {}
+            amendment = filing_facts.get(amendment_id)
+            original = filing_facts.get(original_id)
+            answer_key = str(p.get("answer_key") or "")
+            if (
+                not isinstance(amendment, dict)
+                or not isinstance(original, dict)
+                or not answer_key
+            ):
+                return
+            amendment_form = str(amendment.get("form") or "")
+            try:
+                valid_dates = date.fromisoformat(
+                    str(amendment.get("filing_date") or "")
+                ) >= date.fromisoformat(str(original.get("filing_date") or ""))
+            except ValueError:
+                return
+            is_amendment = (
+                amendment_form.endswith("/A")
+                and amendment_form.removesuffix("/A") == str(original.get("form") or "")
+                and amendment.get("report_date") == original.get("report_date")
+                and valid_dates
+            )
+            status = "AMENDS" if is_amendment else "INVALID_RELATION"
+            answer = (
+                f"{status} | {amendment.get('accession')} | "
+                f"{original.get('accession')} | {amendment.get('report_date')}"
+            )
+            relations = dict(state.values.get("sec_filing_relations") or {})
+            relations[str(p.get("source_relation_id") or "")] = answer
+            state.set("sec_filing_relations", relations, eid, day)
+            state.set(answer_key, answer, eid, day)
+            return
         record_id = str(p.get("record_id") or "")
         prerequisite_answer_key = str(p.get("prerequisite_answer_key") or "")
         ratified_answer: object = (

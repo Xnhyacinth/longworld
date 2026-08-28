@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import re
 
 from longworld.core.grounded import SKIP_RENDER_TYPES
 from longworld.core.render import Artifact
@@ -12,6 +11,7 @@ from longworld.core.taxonomy import (
     classify_artifact,
 )
 from longworld.core.world import Event, SimulatedWorld
+from longworld.domains.codeforge.schema import materialize_grounded_repo_record
 
 
 def _ground(ev: Event) -> list[str]:
@@ -329,44 +329,35 @@ def _text(project: dict, ev: Event) -> tuple[str, str]:
 
 def _repo_record_body(ev: Event) -> str:
     p = ev.params
-    body = str(p["body_text"])
-    source_facts = dict(p.get("source_body_facts") or {})
-    for key, source_value in source_facts.items():
-        if key not in p or p[key] == source_value:
-            continue
-        current = p[key]
-        if key == "result":
-            if source_value == "passed":
-                pattern = r"\b(?:passed|success|green)\b"
-            elif source_value == "failed":
-                pattern = r"\b(?:failed|failure|red)\b"
-            else:
-                pattern = rf"\b{re.escape(str(source_value))}\b"
-            body = re.sub(pattern, str(current), body, count=1, flags=re.IGNORECASE)
-        elif key == "compatible":
-            source_term = "compatible" if source_value else "incompatible"
-            current_term = "compatible" if current else "incompatible"
-            body = re.sub(
-                rf"\b{source_term}\b",
-                current_term,
-                body,
-                count=1,
-                flags=re.IGNORECASE,
-            )
-        else:
-            body = re.sub(
-                re.escape(str(source_value)),
-                str(current),
-                body,
-                count=1,
-                flags=re.IGNORECASE,
-            )
+    materialized = materialize_grounded_repo_record(p)
+    p.update(materialized)
+    body = str(materialized["body_text"])
     return (
         f"Repository workflow record {p['record_id']}\n"
         f"Occurred: {ev.time.isoformat()}\n"
         "Source body (verbatim unless this is a counterfactual view):\n"
         f"{body}"
     )
+
+
+def _visible_grounded_fact_spans(ev: Event, artifact_text: str) -> list[dict]:
+    if ev.type != "repo_record":
+        return []
+    body = str(ev.params["body_text"])
+    body_start = artifact_text.rfind(body)
+    if body_start < 0:
+        return []
+    return [
+        {
+            **dict(span),
+            "source_char_start": int(span["char_start"]),
+            "source_char_end": int(span["char_end"]),
+            "artifact_char_start": body_start + int(span["char_start"]),
+            "artifact_char_end": body_start + int(span["char_end"]),
+            "artifact_text_sha256": hashlib.sha256(artifact_text.encode()).hexdigest(),
+        }
+        for span in ev.params.get("grounded_fact_spans") or []
+    ]
 
 
 def render_code(sim: SimulatedWorld) -> list[Artifact]:
@@ -395,6 +386,9 @@ def render_code(sim: SimulatedWorld) -> list[Artifact]:
                         "event_type": ev.type,
                         "params": dict(ev.params),
                         "ground_values": _ground(ev),
+                        "visible_grounded_fact_spans": (
+                            _visible_grounded_fact_spans(ev, text)
+                        ),
                     },
                     is_focal=is_focal,
                     intentional_stale=ev.type == "changelog_stale",
@@ -425,17 +419,29 @@ def _classify_repo_artifact(
         )
     artifact.slots = {
         **artifact.slots,
-        "real_workflow_record": True,
+        "real_workflow_record": not derived,
         "source_workflow_id": str(ev.params["workflow_id"]),
         "source_record_id": str(ev.params["record_id"]),
         "source_pointer": str(ev.params.get("source_pointer") or ""),
         "source_url": str(ev.params["source_url"]),
         "base_provenance_id": str(ev.params["provenance_id"]),
+        "parent_source_origin": (str(ev.params["source_origin"]) if derived else ""),
+        "counterfactual_operation": "event_param_override" if derived else "",
+        "source_body_sha256": str(ev.params["source_body_sha256"]),
+        "visible_body_sha256": str(ev.params["body_sha256"]),
+        "grounded_source_id": str(ev.params["grounded_source_id"]),
+        "grounded_relations": list(ev.params.get("grounded_relations") or []),
+        "grounded_relation_proof_mode": "structural_closure_only",
+        "grounded_structural_relation_count": len(
+            ev.params.get("grounded_relations") or []
+        ),
+        "grounded_semantic_relation_count": 0,
+        "source_record_binding_sha256": str(ev.params["source_record_binding_sha256"]),
     }
     return classify_artifact(
         artifact,
         source_origin=(
-            SourceOrigin.REAL_DERIVED
+            SourceOrigin.SYNTHETIC_WORLD
             if derived
             else SourceOrigin(str(ev.params["source_origin"]))
         ),

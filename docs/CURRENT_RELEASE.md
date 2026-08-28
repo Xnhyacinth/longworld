@@ -1,6 +1,6 @@
 # Current release status
 
-Last updated: 2026-08-27
+Last updated: 2026-08-28
 
 This file is the canonical publication-status summary. Historical receipts and
 `.hl/` logs remain useful for reproducibility, but they do not override this
@@ -21,7 +21,7 @@ There is currently no missing HF upload.
 
 ## Current stricter-gate result
 
-No P7/P8 row is currently qualified for upload. SEC exact-single v8 and its
+No P7/P8/P9 row is currently qualified for upload. SEC exact-single v8 and its
 derived Apple/Amazon slices were invalidated after exact raw-span replay found
 a 4K shortcut and after readable-text normalization showed that more than 97%
 of the former statement views were HTML/iXBRL markup. Historical green receipts
@@ -48,10 +48,32 @@ stage and fails closed by omitting the unsupported 64K/128K programs. Those
 bands remain disabled until a row/period-aware view supplies genuine new
 evidence.
 
-GitHub, paper/OpenReview/arXiv, and Wikipedia/KB sources remain diagnostic under
-the P8 standard until they use the same visible-text, exact-span, corruption,
-counterfactual, and 4K/8K/16K raw-window replay contract. They must not be
-counted toward P8 real-source retention before that work is complete.
+Wikipedia/KB now uses visible source sections and authentic signed relations in
+state, factual/CF answers, remove-one checks, raw-token windows, dense replay,
+and signed promotion. Fresh Thatcher rows are exact 32K and fresh Newton rows
+are exact 64K, with zero generic background. Both final releases are still
+rejected: Thatcher has no exact 64K stage, while Newton's 64K CF group has no
+valid lower band. These promoted diagnostic rows have no gate receipt and are
+not uploadable training data.
+
+GitHub and paper/OpenReview/arXiv remain diagnostic until their remaining
+producer-envelope and cross-band growth blockers close. Real SEC multi-filing
+retention is also still absent. Current final-qualified P9 rows: **0**.
+
+The P9 implementation now preserves record identity when two workflow events
+carry identical text, while the context selector rejects duplicate protected
+source bodies by global content digest, including across repositories, instead
+of counting them twice. Counterfactual rewrites of SEC or repository text are
+classified as synthetic children with parent lineage and do not contribute
+real-source tokens or authentic endpoint relations. Exact-token bands also use
+the pinned tokenizer and explicit query boundary for every emitted view's
+length, position, evidence distance, local span, and dependency class during
+generation and independent promotion replay.
+
+Exact prefix recounting is currently correctness-first and can become quadratic
+in the number of artifacts. A measured incremental-tokenization implementation
+is required before the 48/210-world scale gates are opened; this performance
+blocker does not relax any current release gate.
 
 ## Scale gates
 

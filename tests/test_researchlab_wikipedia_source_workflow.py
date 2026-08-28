@@ -6,12 +6,21 @@ from pathlib import Path
 
 import pytest
 
-from longworld.core.engine import answer_from_artifacts
+from longworld.core.engine import (
+    answer_from_artifacts,
+    answer_from_events,
+    semantic_answer_from_artifacts,
+)
 from longworld.core.graph import graph_stats
 from longworld.core.pack import estimate_tokens
 from longworld.core.promotion import _replayed_source_metadata
 from longworld.core.sampler import materialize
-from longworld.core.sourceworkflow import SourceRecord, SourceWorkflow
+from longworld.core.sourceworkflow import (
+    SourceEvidence,
+    SourceRecord,
+    SourceRelation,
+    SourceWorkflow,
+)
 from longworld.core.taxonomy import SourceOrigin, artifact_classification
 from longworld.core.verify import verify_question
 from longworld.core.views import render_cf_view
@@ -34,6 +43,10 @@ from longworld.core.wikiparse import (
     WIKI_THATCHER_MID_QUOTE,
     WIKI_TURING_LATE_QUOTE,
     WIKI_TURING_MID_QUOTE,
+)
+from longworld.domains.researchlab.simulate import (
+    canonical_researchlab_source_event_envelope,
+    canonical_researchlab_source_visible_text,
 )
 from scripts.generate import context_source_relation_count, real_source_relation_edges
 
@@ -172,6 +185,62 @@ def _workflow() -> SourceWorkflow:
     )
 
 
+def _workflow_with_relations() -> SourceWorkflow:
+    workflow = _workflow()
+    old, later, entity = workflow.records
+
+    def relation(
+        relation_id: str,
+        kind: str,
+        source: SourceRecord,
+        target: SourceRecord,
+        quote: str,
+    ) -> SourceRelation:
+        start = source.text.index(quote)
+        return SourceRelation(
+            relation_id=relation_id,
+            kind=kind,
+            source_record_id=source.record_id,
+            target_record_id=target.record_id,
+            evidence=(
+                SourceEvidence(
+                    record_id=source.record_id,
+                    evidence_quote=quote,
+                    char_start=start,
+                    char_end=start + len(quote),
+                    source_sha256=source.source_sha256,
+                ),
+            ),
+        )
+
+    return replace(
+        workflow,
+        relations=(
+            relation(
+                "page-r1370153024-r1360639004",
+                "revision_of",
+                later,
+                old,
+                '"parentid":1360639004',
+            ),
+            relation(
+                "page-974-Q7259",
+                "page_describes_entity",
+                later,
+                entity,
+                '"wikibase_item":"Q7259"',
+            ),
+            relation(
+                "Q7259-page-974",
+                "entity_resolves_page",
+                entity,
+                later,
+                '"title":"Ada Lovelace"',
+            ),
+        ),
+    )
+
+
 @pytest.fixture(scope="module")
 def ada_world(monkeypatch_module: pytest.MonkeyPatch):
     monkeypatch_module.setenv(
@@ -184,6 +253,28 @@ def ada_world(monkeypatch_module: pytest.MonkeyPatch):
         domain="researchlab",
         n_workstreams=0,
         source_workflows=[_workflow()],
+        include_program_joins=False,
+    )
+    queries = [
+        query
+        for query in materialized.queries
+        if query.query_type == "wiki_claim_reconstruction"
+    ]
+    return materialized.worlds["focal"], materialized.artifacts["focal"], queries
+
+
+@pytest.fixture(scope="module")
+def ada_related_world(monkeypatch_module: pytest.MonkeyPatch):
+    monkeypatch_module.setenv(
+        "LONGWORLD_ATTESTATION_KEY", "researchlab-wiki-source-test-key-32b"
+    )
+    materialized = materialize(
+        7,
+        n_parallel=0,
+        n_pulses=0,
+        domain="researchlab",
+        n_workstreams=0,
+        source_workflows=[_workflow_with_relations()],
         include_program_joins=False,
     )
     queries = [
@@ -291,6 +382,60 @@ def test_wiki_hybrid_edges_count_compute_and_copy_rungs(ada_world) -> None:
     assert authentic_counts == [0, 0, 0]
 
 
+def test_signed_wiki_relations_enter_state_proof_and_authentic_metadata(
+    ada_related_world,
+) -> None:
+    world, artifacts, queries = ada_related_world
+    relation_events = {
+        event.id for event in world.events if event.type == "wiki_source_relation"
+    }
+
+    assert len(relation_events) == 2
+    for query in queries[1:]:
+        assert relation_events.issubset(query.sufficient_event_ids)
+        answer_event = next(
+            event
+            for event in world.events
+            if event.type == "wiki_claim_answer"
+            and event.params.get("answer_key") == query.answer_key
+        )
+        assert relation_events.issubset(answer_event.causal_inputs)
+        assert graph_stats(world, query)["proof_depth"] == query.proof_depth
+        metadata = _replayed_source_metadata(world, query, artifacts)
+        assert metadata["real_source_verified"] is True
+        assert len(metadata["authentic_source_relation_edges"]) == 2
+        assert {
+            edge["relation"] for edge in metadata["authentic_source_relation_edges"]
+        } == {"page_describes_entity", "entity_resolves_page"}
+        essential = [
+            artifact
+            for artifact in artifacts
+            if artifact.artifact_id in set(query.essential_artifact_ids)
+        ]
+        for relation_event_id in relation_events:
+            relation_artifact = next(
+                artifact
+                for artifact in essential
+                if relation_event_id in artifact.reveals_events
+            )
+            without_relation = [
+                artifact for artifact in essential if artifact is not relation_artifact
+            ]
+            assert answer_from_artifacts(world, query, without_relation) == "unknown"
+            tampered = replace(relation_artifact, text=relation_artifact.text + "x")
+            assert (
+                semantic_answer_from_artifacts(
+                    world,
+                    query,
+                    [
+                        tampered if item is relation_artifact else item
+                        for item in essential
+                    ],
+                )
+                == "unknown"
+            )
+
+
 def test_wiki_cf_remove_one_and_surface_gates(ada_world) -> None:
     world, artifacts, queries = ada_world
     for query in queries:
@@ -346,6 +491,127 @@ def test_wiki_cf_remove_one_and_surface_gates(ada_world) -> None:
         verification_mode="candidate",
     )
     assert verification.essential_text_grounded is False
+
+
+def test_wiki_grounded_binding_rejects_hash_span_and_parent_tampering(
+    ada_world,
+) -> None:
+    world, _artifacts, queries = ada_world
+    query = queries[0]
+    early = next(
+        event
+        for event in world.events
+        if event.type == "wiki_source_section"
+        and event.params.get("section_id") == "early_work"
+    )
+    binding = dict(early.params["grounded_source"])
+    canonical = canonical_researchlab_source_event_envelope(
+        world.spec,
+        event_id=early.id,
+        event_type=early.type,
+        record_id=str(early.params["record_id"]),
+        section_id=str(early.params["section_id"]),
+    )
+    assert canonical == {
+        "id": early.id,
+        "type": early.type,
+        "time": early.time,
+        "params": early.params,
+        "visibility": list(early.visibility),
+        "preconditions": list(early.preconditions),
+        "causal_inputs": list(early.causal_inputs),
+        "required_inputs": list(early.required_inputs),
+        "relation_kinds": dict(early.relation_kinds),
+        "skipped": early.skipped,
+        "skip_reason": early.skip_reason,
+    }
+    artifact = next(item for item in _artifacts if early.id in item.reveals_events)
+    assert canonical_researchlab_source_visible_text(canonical) == artifact.text
+    born_index = next(
+        index
+        for index, fact in enumerate(binding["facts"])
+        if str(fact["fact_id"]).endswith(":born")
+    )
+    corrupt_fact = dict(binding["facts"][born_index])
+    corrupt_fact["char_start"] += 1
+    corrupt_facts = list(binding["facts"])
+    corrupt_facts[born_index] = corrupt_fact
+
+    assert early.params["source_binding_provenance"] == "verified_derived"
+    for updates in (
+        {"grounded_source": {**binding, "text_sha256": "0" * 64}},
+        {"grounded_source": {**binding, "facts": corrupt_facts}},
+        {"parent_source_sha256": "0" * 64},
+    ):
+        assert (
+            answer_from_events(
+                world,
+                query,
+                set(query.sufficient_event_ids),
+                extra_overrides={early.id: updates},
+                enforce_preconditions=True,
+            )
+            == "unknown"
+        )
+
+    assert query.cf_param_updates["source_binding_provenance"] == (
+        "synthetic_executable"
+    )
+    assert (
+        query.cf_param_updates["grounded_source"]["visible_text"]
+        == (query.cf_param_updates["text"])
+    )
+    assert all(
+        event.params["relation_provenance"] == "synthetic_executable"
+        for event in world.events
+        if event.type == "wiki_claim_answer"
+    )
+
+
+def test_wiki_claim_role_and_value_are_reparsed_from_exact_quote(ada_world) -> None:
+    world, _artifacts, queries = ada_world
+    query = queries[0]
+    early = next(
+        event
+        for event in world.events
+        if event.type == "wiki_source_section"
+        and event.params.get("section_id") == "early_work"
+    )
+    [born] = early.params["fact_spans"]
+    compute = next(
+        event
+        for event in world.events
+        if event.type == "wiki_claim_answer"
+        and event.params.get("control_tier") == "16k"
+        and event.params.get("compose") == "compute"
+    )
+    tampered_role = {**born, "role": "entity"}
+    tampered_value = {**born, "value": "1900-01-01"}
+    duplicate_role = [born, dict(born)]
+    coordinated_role = {
+        **born,
+        "role": "commemoration",
+        "value": born["evidence_quote"],
+    }
+    for overrides in (
+        {early.id: {"fact_spans": [tampered_role]}},
+        {early.id: {"fact_spans": [tampered_value]}},
+        {early.id: {"fact_spans": duplicate_role}},
+        {
+            early.id: {"fact_spans": [coordinated_role]},
+            compute.id: {"required_roles": ["commemoration"]},
+        },
+    ):
+        assert (
+            answer_from_events(
+                world,
+                query,
+                set(query.sufficient_event_ids),
+                extra_overrides=overrides,
+                enforce_preconditions=True,
+            )
+            == "unknown"
+        )
 
 
 def _turing_workflow() -> SourceWorkflow:

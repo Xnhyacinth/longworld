@@ -90,6 +90,8 @@ def validate_grounded_source(source: GroundedSource) -> GroundedSource:
 
 def validate_grounded_sources(
     sources: tuple[GroundedSource, ...],
+    *,
+    allow_duplicate_text_hashes: bool = False,
 ) -> tuple[GroundedSource, ...]:
     """Replay fact spans and validate structural relation closure.
 
@@ -109,7 +111,7 @@ def validate_grounded_sources(
         if source.source_id in source_ids:
             raise GroundedSpanError("duplicate source id")
         source_ids.add(source.source_id)
-        if source.text_sha256 in source_hashes:
+        if not allow_duplicate_text_hashes and source.text_sha256 in source_hashes:
             raise GroundedSpanError("duplicate source text hash")
         source_hashes.add(source.text_sha256)
         for fact in source.facts:

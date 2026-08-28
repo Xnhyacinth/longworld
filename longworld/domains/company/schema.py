@@ -47,6 +47,7 @@ EVENT_TYPES = [
     "sec_filing",
     "sec_filing_eligibility_policy",
     "sec_filing_approval",
+    "sec_amendment_resolution",
     "sec_filing_publication_ratification",
     "sec_source_section",
     "sec_financial_answer",

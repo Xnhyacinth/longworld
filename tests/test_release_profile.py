@@ -105,7 +105,7 @@ def test_p7_sec_slice_is_an_explicit_one_world_engineering_gate() -> None:
 
     assert profile.expected_promoted_worlds == 1
     assert profile.promoted_domain_world_quotas == (("company", 1),)
-    assert profile.min_real_source_relations == 0
+    assert profile.min_real_source_relations == 1
     assert profile.min_unique_real_source_workflows == 1
     assert profile.min_real_exact_64k_rows_by_domain == (("company", 1),)
     assert profile.min_real_exact_64k_worlds_by_domain == (("company", 1),)
@@ -116,7 +116,18 @@ def test_p7_wiki_slice_is_an_explicit_one_world_engineering_gate() -> None:
 
     assert profile.expected_promoted_worlds == 1
     assert profile.promoted_domain_world_quotas == (("researchlab", 1),)
-    assert profile.min_real_source_relations == 0
+    assert profile.min_real_source_relations == 1
+    assert profile.min_unique_real_source_workflows == 1
+    assert profile.min_real_exact_64k_rows_by_domain == (("researchlab", 1),)
+    assert profile.min_real_exact_64k_worlds_by_domain == (("researchlab", 1),)
+
+
+def test_p7_paper_slice_is_an_explicit_one_world_engineering_gate() -> None:
+    profile = release_profile("p7-paper-source-slice-1-v1")
+
+    assert profile.expected_promoted_worlds == 1
+    assert profile.promoted_domain_world_quotas == (("researchlab", 1),)
+    assert profile.min_real_source_relations == 1
     assert profile.min_unique_real_source_workflows == 1
     assert profile.min_real_exact_64k_rows_by_domain == (("researchlab", 1),)
     assert profile.min_real_exact_64k_worlds_by_domain == (("researchlab", 1),)
@@ -127,7 +138,7 @@ def test_p7_github_slice_is_an_explicit_one_world_engineering_gate() -> None:
 
     assert profile.expected_promoted_worlds == 1
     assert profile.promoted_domain_world_quotas == (("codeforge", 1),)
-    assert profile.min_real_source_relations == 0
+    assert profile.min_real_source_relations == 1
     assert profile.min_unique_real_source_workflows == 1
     assert profile.min_real_exact_64k_rows_by_domain == (("codeforge", 1),)
     assert profile.min_real_exact_64k_worlds_by_domain == (("codeforge", 1),)

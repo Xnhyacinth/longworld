@@ -292,6 +292,69 @@ def _financial_cf_updates(ops: Event) -> dict[str, Any]:
     }
 
 
+def _sec_form_cf_updates(source: Event, replacement: str) -> dict[str, Any] | None:
+    form_fact = next(
+        (
+            fact
+            for fact in source.params.get("fact_spans") or []
+            if isinstance(fact, dict) and fact.get("field") == "form"
+        ),
+        None,
+    )
+    if not isinstance(form_fact, dict):
+        return None
+    text = str(source.params.get("text") or "")
+    try:
+        quote_start = int(form_fact["char_start"])
+        value_start = quote_start + int(form_fact["value_offset"])
+        value_end = value_start + int(form_fact["value_length"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    original = text[value_start:value_end]
+    if not original or len(original) != len(replacement):
+        return None
+    cf_text = text[:value_start] + replacement + text[value_end:]
+    cf_fact_spans = []
+    for fact in source.params.get("fact_spans") or []:
+        if not isinstance(fact, dict):
+            return None
+        copied = dict(fact)
+        if copied.get("field") == "form":
+            quote = str(copied.get("evidence_quote") or "")
+            offset = int(copied.get("value_offset") or 0)
+            copied["evidence_quote"] = (
+                quote[:offset]
+                + replacement
+                + quote[offset + int(copied["value_length"]) :]
+            )
+        cf_fact_spans.append(copied)
+    cf_text_sha256 = hashlib.sha256(cf_text.encode()).hexdigest()
+    cf_provenance = hashlib.sha256(
+        json.dumps(
+            {
+                "operation": "counterfactual_sec_form",
+                "parent_provenance_id": source.params["provenance_id"],
+                "text_sha256": cf_text_sha256,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+    return {
+        "text": cf_text,
+        "text_sha256": cf_text_sha256,
+        "source_origin": "synthetic_world",
+        "parent_provenance_id": source.params["provenance_id"],
+        "provenance_id": f"synthetic-sha256:{cf_provenance}",
+        "provenance_operation": "counterfactual_sec_form",
+        "fact_spans": cf_fact_spans,
+        "ground_values": [
+            replacement if value == original else value
+            for value in source.params.get("ground_values") or []
+        ],
+    }
+
+
 def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
     """Six programmatic question types. Answers come from replay, never from an LLM."""
     project = world.spec["project"]
@@ -422,9 +485,9 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                 cf_param_updates={
                     "text": cf_text,
                     "text_sha256": cf_text_sha256,
-                    "source_origin": "real_derived",
+                    "source_origin": "synthetic_world",
                     "parent_provenance_id": source.params["provenance_id"],
-                    "provenance_id": f"derived-sha256:{cf_provenance}",
+                    "provenance_id": f"synthetic-sha256:{cf_provenance}",
                     "provenance_operation": "counterfactual_sec_form",
                     "fact_spans": cf_fact_spans,
                     "ground_values": [
@@ -529,6 +592,107 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                     preferred_length_buckets=[control_tier],
                 )
             )
+
+    sources_by_record = {
+        str(event.params.get("record_id") or ""): event
+        for event in world.events
+        if event.type == "sec_filing"
+    }
+    for resolution in (
+        event for event in world.events if event.type == "sec_amendment_resolution"
+    ):
+        amendment = sources_by_record.get(str(resolution.params.get("record_id") or ""))
+        original = sources_by_record.get(
+            str(resolution.params.get("target_record_id") or "")
+        )
+        if amendment is None or original is None:
+            continue
+        form_fact = next(
+            (
+                fact
+                for fact in amendment.params.get("fact_spans") or []
+                if isinstance(fact, dict) and fact.get("field") == "form"
+            ),
+            None,
+        )
+        if not isinstance(form_fact, dict):
+            continue
+        value_start = int(form_fact["char_start"]) + int(form_fact["value_offset"])
+        value_end = value_start + int(form_fact["value_length"])
+        amendment_form = str(amendment.params["text"])[value_start:value_end]
+        replacement = "10-Q/A" if amendment_form == "10-K/A" else "10-K/A"
+        cf_updates = _sec_form_cf_updates(amendment, replacement)
+        if cf_updates is None:
+            continue
+        relation_key = hashlib.sha256(
+            str(resolution.params["source_relation_id"]).encode()
+        ).hexdigest()[:12]
+        essential = [original, amendment, resolution]
+        queries.append(
+            QuerySpec(
+                query_id=f"{qid}:sec_amendment_resolution:{relation_key}:32k",
+                query_type="sec_amendment_resolution",
+                question=(
+                    "Resolve whether the later SEC filing amends the earlier filing "
+                    "by reading both filing bodies. Report the relationship, later "
+                    "accession, earlier accession, and shared reporting period exactly "
+                    "as <AMENDS|INVALID_RELATION> | <later accession> | <earlier "
+                    "accession> | YYYY-MM-DD. Do not infer the relationship from "
+                    "document order or filenames."
+                ),
+                answer="",
+                as_of=resolution.time,
+                answer_key=str(resolution.params["answer_key"]),
+                essential_event_ids=[event.id for event in essential],
+                essential_artifact_ids=[
+                    f"{world.spec['world_id']}.{event.visibility[0]}"
+                    for event in essential
+                ],
+                sufficient_event_ids=[event.id for event in essential],
+                cf_event_id=amendment.id,
+                cf_param_updates=cf_updates,
+                cf_answer="",
+                invariance_event_id=amendment.id,
+                invariance_param_updates={
+                    "retrieval_url": "https://www.sec.gov/Archives/"
+                },
+                gold_expression=(
+                    "READ_SOURCE_SPANS(original accession, form, filing_date, "
+                    "report_date) THEN READ_SOURCE_SPANS(amendment accession, form, "
+                    "filing_date, report_date) THEN VALIDATE_AMENDS_REPORT"
+                ),
+                proof_depth=3,
+                cf_op="filing_body",
+                motif="real_filing_amendment_resolution",
+                topology_id=instance_topology(
+                    "company.real_sec_amendment_resolution", amendment_form
+                ),
+                domain="company",
+                truth_regime="real_source_derived",
+                program_ops=[
+                    {"op": "READ_SOURCE_SPAN", "record": "original", "field": "form"},
+                    {
+                        "op": "READ_SOURCE_SPAN",
+                        "record": "original",
+                        "field": "report_date",
+                    },
+                    {
+                        "op": "READ_SOURCE_SPAN",
+                        "record": "amendment",
+                        "field": "form",
+                    },
+                    {
+                        "op": "READ_SOURCE_SPAN",
+                        "record": "amendment",
+                        "field": "report_date",
+                    },
+                    {"op": "VALIDATE_AMENDS_REPORT"},
+                ],
+                preferred_length_buckets=["32k"],
+                semantic_growth_group="company_real_sec_amendment_resolution",
+                base_task_group=f"sec_amendment_resolution:{relation_key}",
+            )
+        )
 
     computes: dict[str, dict[str, Event]] = {}
     sections: dict[str, dict[str, Event]] = {}

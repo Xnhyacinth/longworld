@@ -340,6 +340,27 @@ def test_short_ordered_view_is_omitted_without_dropping_full_cf_twins() -> None:
     assert str(reason).endswith("<8000")
 
 
+def test_ordered_view_pruning_uses_exact_token_distance_when_available() -> None:
+    a = _artifact("w.a", "semantic evidence a", event="e0")
+    b = _artifact("w.b", "semantic evidence b", event="e1")
+    views = {
+        "full": ("long factual context", [a, b]),
+        "cf": ("long counterfactual context", [a, b]),
+        "ordered_artifact_view": ("semantic evidence a\nsemantic evidence b", [a, b]),
+    }
+
+    kept, reason = prune_short_ordered_view(
+        views,
+        _spec("w.a", "w.b"),
+        query_timing="late",
+        minimum_tokens=8000,
+        token_counter=lambda text: len(text) * 1_000,
+    )
+
+    assert set(kept) == {"full", "cf", "ordered_artifact_view"}
+    assert reason is None
+
+
 def test_real_workflow_bundle_is_explicitly_seed_and_domain_scoped() -> None:
     cfg = {
         "real_workflow_bundle": "configs/public_repo_episodes.json",
@@ -351,6 +372,30 @@ def test_real_workflow_bundle_is_explicitly_seed_and_domain_scoped() -> None:
     )
     assert real_workflow_bundle_for_seed(cfg, seed=5, domain="codeforge") is None
     assert real_workflow_bundle_for_seed(cfg, seed=2, domain="company") is None
+
+
+def test_cross_repository_duplicate_proof_bodies_fail_closed() -> None:
+    first = _artifact("w.a", "identical protected source body", event="e0")
+    second = _artifact("w.b", "identical protected source body", event="e1")
+    body_sha256 = hashlib.sha256(first.text.encode()).hexdigest()
+    for artifact, source_url in (
+        (first, "https://github.com/example/first"),
+        (second, "https://github.com/example/second"),
+    ):
+        artifact.slots.update(
+            {
+                "real_workflow_record": True,
+                "source_url": source_url,
+                "source_workflow_id": artifact.artifact_id,
+                "params": {"body_sha256": body_sha256},
+            }
+        )
+
+    with pytest.raises(ValueError, match="duplicate source bodies"):
+        real_workflow_artifacts_for_query(
+            [first, second],
+            _spec("w.a", "w.b"),
+        )
 
 
 def test_world_budget_override_requires_an_explicit_promotion_target() -> None:
@@ -551,6 +596,58 @@ def test_source_workflow_query_pool_excludes_unbound_source_packs() -> None:
     ]
 
 
+def test_source_workflow_query_pool_excludes_unbound_world_history() -> None:
+    section = _artifact("w.wiki.section", "authentic body", event="section")
+    section.slots.update(
+        event_type="wiki_source_section",
+        source_workflow_id="source:wikimedia:bound",
+    )
+    control = _artifact("w.wiki.control", "claim program", event="control")
+    control.slots.update(
+        event_type="wiki_claim_answer",
+        source_workflow_id="source:wikimedia:bound",
+    )
+    unrelated_source = _artifact("w.wiki.other", "other authentic body", event="other")
+    unrelated_source.slots.update(
+        event_type="wiki_source_section",
+        source_workflow_id="source:wikimedia:other",
+    )
+    unrelated_history = _artifact(
+        "w.lab.release", "unrelated simulated lab release", event="release"
+    )
+    hard_negative = _artifact("w.wiki.hard", "nearby entity decoy")
+    classify_artifact(
+        hard_negative,
+        source_origin=SourceOrigin.REAL_PUBLIC,
+        workflow_kind=WorkflowKind.HYBRID_CAUSAL,
+        evidence_role=EvidenceRole.STRUCTURAL_HARD_NEGATIVE,
+        workflow_id="world",
+        provenance_id="wiki:hard-negative",
+    )
+    spec = _spec(
+        section.artifact_id,
+        control.artifact_id,
+        query_type="wiki_claim_reconstruction",
+    )
+
+    selected = source_workflow_artifacts_for_query(
+        [
+            section,
+            control,
+            unrelated_source,
+            unrelated_history,
+            hard_negative,
+        ],
+        spec,
+    )
+
+    assert {artifact.artifact_id for artifact in selected} == {
+        section.artifact_id,
+        control.artifact_id,
+        hard_negative.artifact_id,
+    }
+
+
 def test_sec_financial_query_pool_excludes_unrelated_company_cycle() -> None:
     def sec_artifact(
         artifact_id: str, event_type: str, workflow_id: str, *, essential: bool = False
@@ -609,7 +706,7 @@ def test_sec_financial_query_pool_excludes_unrelated_company_cycle() -> None:
     }
 
 
-def test_real_query_pool_keeps_same_license_from_two_bound_repositories() -> None:
+def test_real_query_pool_rejects_same_license_body_from_two_repositories() -> None:
     service = _artifact("w.service-license", "Apache License 2.0", event="service")
     service.slots.update(
         real_workflow_record=True,
@@ -628,12 +725,8 @@ def test_real_query_pool_keeps_same_license_from_two_bound_repositories() -> Non
         query_type="cross_repo_release_dependency",
     )
 
-    selected = real_workflow_artifacts_for_query([service, client], spec)
-
-    assert {artifact.artifact_id for artifact in selected} == {
-        service.artifact_id,
-        client.artifact_id,
-    }
+    with pytest.raises(ValueError, match="duplicate source bodies"):
+        real_workflow_artifacts_for_query([service, client], spec)
 
 
 def test_real_repository_url_is_a_source_family_without_filename_heuristics() -> None:

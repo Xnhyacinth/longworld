@@ -63,6 +63,36 @@ def _max_shortest_path_nodes(subgraph: nx.DiGraph, node_ids: list[str]) -> int:
     return longest
 
 
+def _max_dependency_path_nodes(subgraph: nx.DiGraph, node_ids: list[str]) -> int:
+    """Longest directed dependency path whose endpoints are declared nodes."""
+    nodes = [node_id for node_id in node_ids if node_id in subgraph]
+    if len(nodes) <= 1:
+        return 1
+    targets = set(nodes)
+    topological = list(nx.topological_sort(subgraph))
+    longest = 1
+    for source in nodes:
+        distances = {source: 1}
+        for node in topological:
+            distance = distances.get(node)
+            if distance is None:
+                continue
+            for child in subgraph.successors(node):
+                distances[child] = max(distances.get(child, 0), distance + 1)
+        longest = max(
+            longest,
+            max(
+                (
+                    distance
+                    for target, distance in distances.items()
+                    if target != source and target in targets
+                ),
+                default=1,
+            ),
+        )
+    return longest
+
+
 def hop_count(world: SimulatedWorld, spec: QuerySpec) -> int:
     """SearchArt-style depth: longest path on the sufficient/essential subgraph."""
     sub = min_sufficient_subgraph(world, spec)
@@ -76,7 +106,7 @@ def proof_depth(world: SimulatedWorld, spec: QuerySpec) -> int:
     """Longest directed path among essential events (1 if a singleton)."""
     sub = min_sufficient_subgraph(world, spec)
     ess = [e for e in spec.essential_event_ids if e in sub]
-    return _max_shortest_path_nodes(sub, ess)
+    return _max_dependency_path_nodes(sub, ess)
 
 
 def random_walk_event_ids(
@@ -197,7 +227,7 @@ def graph_stats(world: SimulatedWorld, spec: QuerySpec) -> dict[str, Any]:
         ),
         "n_min_subgraph": sub.number_of_nodes(),
         "n_min_edges": sub.number_of_edges(),
-        "proof_depth": _max_shortest_path_nodes(sub, essential),
+        "proof_depth": _max_dependency_path_nodes(sub, essential),
         "hop_count": _max_shortest_path_nodes(sub, sufficient),
         "searchart_width": len(spec.essential_artifact_ids),
         "n_essential_events": len(spec.essential_event_ids),

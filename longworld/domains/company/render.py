@@ -295,6 +295,7 @@ def render_company(sim: SimulatedWorld) -> list[Artifact]:
             "sec_filing",
             "sec_filing_eligibility_policy",
             "sec_filing_approval",
+            "sec_amendment_resolution",
             "sec_filing_publication_ratification",
             "sec_source_section",
             "sec_financial_answer",
@@ -341,6 +342,20 @@ def render_company(sim: SimulatedWorld) -> list[Artifact]:
                     "derived-sha256:" + hashlib.sha256(text.encode()).hexdigest()
                 )
                 evidence_role = EvidenceRole.CAUSAL_SUPPORTING
+                real_record = False
+            elif event.type == "sec_amendment_resolution":
+                text = (
+                    "SEC filing amendment relation control\n"
+                    "Status: relation-evaluated. This control resolves the linked "
+                    "filings only after reading both filing bodies. It does not repeat "
+                    "their forms, accessions, filing dates, or reporting periods."
+                )
+                source_origin = SourceOrigin.SYNTHETIC_WORLD
+                workflow_kind = WorkflowKind.HYBRID_CAUSAL
+                provenance_id = (
+                    "derived-sha256:" + hashlib.sha256(text.encode()).hexdigest()
+                )
+                evidence_role = EvidenceRole.CAUSAL_GOLD
                 real_record = False
             elif event.type == "sec_financial_answer":
                 text = (

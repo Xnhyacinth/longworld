@@ -2,7 +2,13 @@ import random
 
 from longworld.core.causal import build_causal_graph
 from longworld.core.graph import random_walk_event_ids
-from longworld.core.pack import pack_view
+from longworld.core.pack import (
+    compute_view_metrics,
+    pack_view,
+    prompt_document_prefix,
+    prompt_query_boundary,
+    wrap_prompt,
+)
 from longworld.core.promotion import STRICT_REPLAY_REVISION
 from longworld.core.sampler import materialize
 from longworld.core.semantic import boilerplate_char_fraction, is_boilerplate
@@ -97,6 +103,72 @@ def test_pack_keeps_natural_length_instead_of_padding():
         assert packed.tokens < 20000
 
 
+def test_pack_uses_exact_counter_for_optional_artifact_admission() -> None:
+    from datetime import date
+
+    from longworld.core.render import Artifact
+    from longworld.domains.company.queries import QuerySpec
+
+    essential = Artifact(
+        "w.essential",
+        "wiki",
+        date(2026, 1, 1),
+        "wiki",
+        "focal",
+        ["essential"],
+        "x" * 1_000,
+        [],
+        slots={"content_plan": {"new_propositions": ["essential"]}},
+    )
+    optional = Artifact(
+        "w.optional",
+        "wiki",
+        date(2026, 1, 2),
+        "wiki",
+        "focal",
+        ["optional"],
+        "y" * 1_000,
+        [],
+        slots={"content_plan": {"new_propositions": ["optional"]}},
+    )
+    spec = QuerySpec(
+        query_id="w:exact-pack",
+        query_type="source_choice",
+        question="What is selected?",
+        answer="selected",
+        as_of=None,
+        answer_key="selected",
+        essential_event_ids=["essential"],
+        essential_artifact_ids=[essential.artifact_id],
+        sufficient_event_ids=["essential"],
+        cf_event_id="essential",
+        cf_param_updates={"value": "changed"},
+        cf_answer="changed",
+        invariance_event_id=None,
+        proof_depth=1,
+    )
+
+    packed = pack_view(
+        [essential, optional],
+        spec,
+        [],
+        query_timing="late",
+        position_bucket="middle",
+        length_bucket="16k",
+        target_tokens=10,
+        rng=random.Random(0),
+        min_semantic_tokens=1,
+        token_counter=lambda text: len(text.split()),
+    )
+
+    assert packed.ok
+    assert {artifact.artifact_id for artifact in packed.artifacts} == {
+        essential.artifact_id,
+        optional.artifact_id,
+    }
+    assert packed.tokens == len(packed.text.split())
+
+
 def test_pack_preserves_real_source_corridor_without_promoting_intermediate_records():
     from datetime import date
 
@@ -172,6 +244,39 @@ def test_pack_preserves_real_source_corridor_without_promoting_intermediate_reco
         packed.roles[artifact_id] not in {"causal_gold", "causal_supporting"}
         for artifact_id in ("w.history-a", "w.history-b")
     )
+
+
+def test_late_query_distance_excludes_question_and_answer_instruction_tokens() -> None:
+    from datetime import date
+
+    from longworld.core.render import Artifact
+
+    evidence = Artifact(
+        "w.evidence",
+        "record",
+        date(2026, 1, 1),
+        "p",
+        "focal",
+        ["e0"],
+        "grounded evidence",
+        [],
+    )
+
+    distances = []
+    for question in ("Q", "Q" * 1_000):
+        context = evidence.text
+        metrics = compute_view_metrics(
+            [evidence],
+            {evidence.artifact_id},
+            query_timing="late",
+            context=wrap_prompt(question, context, "late"),
+            token_counter=len,
+            token_prefix=prompt_document_prefix(question, "late"),
+            query_boundary_tokens=prompt_query_boundary(question, context, "late", len),
+        )
+        distances.append(metrics.query_evidence_distance)
+
+    assert distances[0] == distances[1]
 
 
 def test_pack_compacts_oversized_real_corridor_in_source_order():

@@ -13,6 +13,7 @@ import math
 import random
 import sys
 from collections import Counter
+from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import replace
 from datetime import date
@@ -34,7 +35,10 @@ from longworld.core.attestation import (
     sanitized_attestation_environment,
 )
 from longworld.core.causal import build_causal_graph
-from longworld.core.filingworkflow import SEC_HYBRID_CHILD_EVENT_TYPES
+from longworld.core.filingworkflow import (
+    SEC_HYBRID_CHILD_EVENT_TYPES,
+    selected_sec_source_relation_edges,
+)
 from longworld.core.graph import (
     graph_stats,
     random_walk_event_ids,
@@ -49,6 +53,8 @@ from longworld.core.pack import (
     join_artifacts,
     local_span_too_short,
     pack_view,
+    prompt_document_prefix,
+    prompt_query_boundary,
     wrap_prompt,
 )
 from longworld.core.promotion import (
@@ -100,6 +106,7 @@ from longworld.core.verify import (
 )
 from longworld.core.views import memory_card, render_cf_view, split_views, view_answer
 from longworld.core.wikiparse import WIKI_HYBRID_CHILD_EVENT_TYPES
+from longworld.domains.researchlab.simulate import selected_wiki_source_relation_edges
 
 HYBRID_CHILD_EVENT_TYPES = SEC_HYBRID_CHILD_EVENT_TYPES | WIKI_HYBRID_CHILD_EVENT_TYPES
 
@@ -445,6 +452,33 @@ def exact_token_metadata_for_band(
     )
 
 
+def _exact_metric_token_counter(
+    exact_settings: dict[str, Any],
+    length_bucket: str,
+    counter: Callable[[str], int],
+) -> Callable[[str], int] | None:
+    if exact_settings and length_bucket in EXACT_TOKEN_BAND_RANGES:
+        return counter
+    return None
+
+
+def exact_context_pack_target(
+    question: str,
+    timing: str,
+    length_bucket: str,
+    tokenizer: object,
+) -> int:
+    """Reserve prompt-wrapper tokens while packing an exact-token document view."""
+    bounds = EXACT_TOKEN_BAND_RANGES.get(length_bucket)
+    if bounds is None:
+        raise ValueError("exact pack admission requires a strict token band")
+    wrapper_tokens = tokenizer_token_count(wrap_prompt(question, "", timing), tokenizer)
+    target = bounds[1] - wrapper_tokens
+    if target < 1:
+        raise ValueError("exact prompt wrapper exhausts the token band")
+    return target
+
+
 def retune_pack_target_for_exact_64k(
     current_target: int,
     observed_wraps: tuple[int, ...],
@@ -584,10 +618,11 @@ def counterfactual_text_reject_reason(
 
 def prune_short_ordered_view(
     view_contexts: dict[str, tuple[str, list[Artifact]]],
-    spec: object,
+    spec: Any,
     *,
     query_timing: str,
     minimum_tokens: int,
+    token_counter: Callable[[str], int] | None = None,
 ) -> tuple[dict[str, tuple[str, list[Artifact]]], str | None]:
     """Keep factual/CF twins while omitting a derived timeline that is local."""
     kept = dict(view_contexts)
@@ -599,7 +634,24 @@ def prune_short_ordered_view(
         artifacts,
         dependency_evidence_ids(artifacts, spec),
         query_timing=query_timing,
-        context=context,
+        context=(
+            wrap_prompt(str(spec.question), context, query_timing)
+            if token_counter is not None
+            else context
+        ),
+        token_counter=token_counter,
+        token_prefix=(
+            prompt_document_prefix(str(spec.question), query_timing)
+            if token_counter is not None
+            else ""
+        ),
+        query_boundary_tokens=(
+            prompt_query_boundary(
+                str(spec.question), context, query_timing, token_counter
+            )
+            if token_counter is not None
+            else None
+        ),
     )
     reason = strict_view_evidence_reject_reason(metrics, minimum_tokens=minimum_tokens)
     if reason:
@@ -776,21 +828,19 @@ def real_workflow_artifacts_for_query(
         for artifact in selected
         if sufficient_event_ids.intersection(artifact.reveals_events)
     }
-    by_body: dict[tuple[str, str], Artifact] = {}
+    by_body: dict[str, Artifact] = {}
     for artifact in selected:
         params = dict((artifact.slots or {}).get("params") or {})
         body_sha256 = str(params.get("body_sha256") or "")
         body_identity = (
             body_sha256 or hashlib.sha256(artifact.text.encode()).hexdigest()
         )
-        source_identity = str((artifact.slots or {}).get("source_url") or "")
-        identity = (source_identity, body_identity)
-        current = by_body.get(identity)
+        current = by_body.get(body_identity)
         if current is None or (
             artifact.artifact_id in protected_ids
             and current.artifact_id not in protected_ids
         ):
-            by_body[identity] = artifact
+            by_body[body_identity] = artifact
         elif (
             current is not None
             and artifact.artifact_id in protected_ids
@@ -824,13 +874,25 @@ def source_workflow_artifacts_for_query(
         and artifact.doc_type != "source_pack"
     ]
     essential_ids = set(getattr(spec, "essential_artifact_ids", []))
-    if getattr(spec, "query_type", "") == "sec_financial_reconstruction":
-        source_workflow_ids = {
-            str((artifact.slots or {}).get("source_workflow_id") or "")
+    source_workflow_ids = {
+        str((artifact.slots or {}).get("source_workflow_id") or "")
+        for artifact in selected
+        if artifact.artifact_id in essential_ids
+    }
+    source_workflow_ids.discard("")
+    if source_workflow_ids:
+        if len(source_workflow_ids) != 1:
+            raise ValueError("source-grounded proof must bind one source workflow")
+        source_workflow_id = next(iter(source_workflow_ids))
+        selected = [
+            artifact
             for artifact in selected
-            if artifact.artifact_id in essential_ids
-        }
-        source_workflow_ids.discard("")
+            if str((artifact.slots or {}).get("source_workflow_id") or "")
+            == source_workflow_id
+            or artifact_classification(artifact).evidence_role
+            == EvidenceRole.STRUCTURAL_HARD_NEGATIVE
+        ]
+    if getattr(spec, "query_type", "") == "sec_financial_reconstruction":
         if len(source_workflow_ids) != 1:
             raise ValueError("SEC financial proof must bind one source workflow")
         source_workflow_id = next(iter(source_workflow_ids))
@@ -922,8 +984,26 @@ def real_source_relation_edges(
         for event_id, event in all_events.items()
         if event.type == "repo_record" and event.params.get("source_url")
     }
+    real_origins = {
+        SourceOrigin.REAL_PUBLIC,
+        SourceOrigin.REAL_PRIVATE_EXPORT,
+        SourceOrigin.REAL_DERIVED,
+    }
+    endpoint_is_real: dict[str, bool] = {}
+    if artifacts is not None:
+        for event_id in events:
+            visible = [
+                artifact
+                for artifact in artifacts
+                if event_id in artifact.reveals_events
+            ]
+            endpoint_is_real[event_id] = bool(visible) and all(
+                artifact_classification(artifact).source_origin in real_origins
+                for artifact in visible
+            )
     edges: list[dict[str, str]] = []
     for child in events.values():
+        synthetic_inputs = set(child.params.get("synthetic_relation_inputs") or [])
         for parent_id in child.causal_inputs:
             parent = events.get(parent_id)
             if parent is None:
@@ -935,13 +1015,35 @@ def real_source_relation_edges(
                     "relation": str(
                         child.relation_kinds.get(parent_id) or "causal_input"
                     ),
-                    "relation_provenance": "authentic_source",
+                    "relation_provenance": (
+                        "synthetic_executable"
+                        if parent_id in synthetic_inputs
+                        or endpoint_is_real.get(parent_id, True) is not True
+                        or endpoint_is_real.get(child.id, True) is not True
+                        else "authentic_source"
+                    ),
                     "parent_source_url": str(parent.params["source_url"]),
                     "child_source_url": str(child.params["source_url"]),
                 }
             )
     for relation in all_events.values():
         if relation.type != "arxiv_revision_relation":
+            continue
+        source_record_id = str(relation.params.get("source_record_id") or "")
+        target_record_id = str(relation.params.get("target_record_id") or "")
+        endpoints = [all_events.get(event_id) for event_id in relation.required_inputs]
+        endpoint_record_ids = {
+            str(endpoint.params.get("record_id") or "")
+            for endpoint in endpoints
+            if endpoint is not None and endpoint.type == "arxiv_revision"
+        }
+        if (
+            not source_record_id
+            or not target_record_id
+            or source_record_id == target_record_id
+            or len(endpoints) != 2
+            or endpoint_record_ids != {source_record_id, target_record_id}
+        ):
             continue
         edges.append(
             {
@@ -955,6 +1057,8 @@ def real_source_relation_edges(
                 "child_source_url": str(relation.params.get("source_url") or ""),
             }
         )
+    edges.extend(selected_sec_source_relation_edges(world, spec, artifacts or []))
+    edges.extend(selected_wiki_source_relation_edges(world, spec, artifacts or []))
     for child in all_events.values():
         if child.type not in HYBRID_CHILD_EVENT_TYPES:
             continue
@@ -1003,13 +1107,25 @@ def context_source_relation_count(
         and all(parent_id in events for parent_id in event.required_inputs)
         for event in events.values()
     )
+    sec_source_relations = len(
+        selected_sec_source_relation_edges(world, spec, artifacts)
+    )
+    wiki_source_relations = len(
+        selected_wiki_source_relation_edges(world, spec, artifacts)
+    )
     sec_edges = sum(
         parent_id in events
         for event in events.values()
         if event.type in HYBRID_CHILD_EVENT_TYPES
         for parent_id in event.causal_inputs
     )
-    return repo_edges + source_relations + sec_edges
+    return (
+        repo_edges
+        + source_relations
+        + sec_source_relations
+        + wiki_source_relations
+        + sec_edges
+    )
 
 
 def emit_records(
@@ -1101,6 +1217,17 @@ def emit_records(
             bool(exact_settings.get("local_files_only", True)),
         )
     exact_token_cache: dict[str, int] = {}
+
+    def count_packed_tokens(text: str) -> int:
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        cached = exact_token_cache.get(digest)
+        if cached is None:
+            if exact_tokenizer is None:
+                raise ValueError("exact pack tokenizer is unavailable")
+            cached = tokenizer_token_count(text, exact_tokenizer)
+            exact_token_cache[digest] = cached
+        return cached
+
     stats: dict[str, Any] = {
         "attempts": 0,
         "kept_slots": 0,
@@ -1351,6 +1478,19 @@ def emit_records(
             for bname, target in sorted(
                 query_buckets.items(), key=lambda kv: int(kv[1])
             ):
+                exact_pack_admission = bool(cfg.get("exact_pack_admission", False))
+                if exact_pack_admission:
+                    if exact_tokenizer is None:
+                        raise ValueError(
+                            "exact_pack_admission requires the pinned exact tokenizer"
+                        )
+                    pack_target = exact_context_pack_target(
+                        spec.question, timing, bname, exact_tokenizer
+                    )
+                    pack_token_counter = count_packed_tokens
+                else:
+                    pack_target = int(target)
+                    pack_token_counter = None
                 min_frac = float(frac_map.get(bname, 0.0))
                 min_dist_tok = int(tok_map.get(bname, 0))
                 candidates: list[tuple[int, PackedContext, Verification]] = []
@@ -1383,7 +1523,7 @@ def emit_records(
                         query_timing=timing,
                         position_bucket=pos,
                         length_bucket=bname,
-                        target_tokens=int(target),
+                        target_tokens=pack_target,
                         rng=rng,
                         min_distance_frac=min_frac,
                         min_distance_tokens=min_dist_tok,
@@ -1391,6 +1531,7 @@ def emit_records(
                         min_semantic_tokens=min_semantic,
                         prefer_ids=prefer,
                         ordered_corridor_ids=corridor_ids,
+                        token_counter=pack_token_counter,
                     )
                     if packed.n_clones:
                         stats["n_clones"] += packed.n_clones
@@ -1411,7 +1552,12 @@ def emit_records(
                         span_why = local_span_too_short(
                             packed.artifacts,
                             dependency_evidence_ids(packed.artifacts, spec),
-                            target_tokens=int(target),
+                            target_tokens=pack_target,
+                            token_counter=(
+                                count_packed_tokens
+                                if exact_settings and bname in EXACT_TOKEN_BAND_RANGES
+                                else None
+                            ),
                         )
                     if span_why:
                         rejects.append(
@@ -1439,7 +1585,7 @@ def emit_records(
                         continue
                     growth_reason = band_growth_reject_reason(
                         prev_tokens,
-                        int(target),
+                        pack_target,
                         packed.tokens,
                         min_internal_growth=int(cfg.get("min_internal_growth", 0)),
                     )
@@ -1568,6 +1714,9 @@ def emit_records(
                             spec,
                             query_timing=timing,
                             minimum_tokens=min_dist_tok,
+                            token_counter=_exact_metric_token_counter(
+                                exact_settings, bname, count_packed_tokens
+                            ),
                         )
                         if ordered_view_reason:
                             rejects.append(
@@ -1681,11 +1830,31 @@ def emit_records(
                     slot_hashes: set[str] = set()
                     slot_failed = False
                     for view_name, (context, view_artifacts) in view_contexts.items():
+                        prompt = wrap_prompt(spec.question, context, timing)
+                        exact_metric_counter = _exact_metric_token_counter(
+                            exact_settings, bname, count_packed_tokens
+                        )
                         metrics = compute_view_metrics(
                             view_artifacts,
                             dependency_evidence_ids(view_artifacts, spec),
                             query_timing=timing,
-                            context=context,
+                            context=prompt if exact_metric_counter else context,
+                            token_counter=exact_metric_counter,
+                            token_prefix=(
+                                prompt_document_prefix(spec.question, timing)
+                                if exact_metric_counter
+                                else ""
+                            ),
+                            query_boundary_tokens=(
+                                prompt_query_boundary(
+                                    spec.question,
+                                    context,
+                                    timing,
+                                    exact_metric_counter,
+                                )
+                                if exact_metric_counter
+                                else None
+                            ),
                         )
                         answer = view_answer(spec, view_name)
                         view_roles = {
@@ -1865,7 +2034,6 @@ def emit_records(
                             )
                             slot_failed = True
                             break
-                        prompt = wrap_prompt(spec.question, context, timing)
                         content_hash = stable_digest(
                             json.dumps(
                                 {
@@ -1886,7 +2054,7 @@ def emit_records(
                         slot_hashes.add(content_hash)
                         slot_qid = (
                             f"{spec.query_id}:{timing}:{metrics.position_bucket}:"
-                            f"{metrics.length_bucket}"
+                            f"{bname}"
                         )
                         rec = SampleRecord(
                             world_id=focal_w.world_id,
@@ -1918,7 +2086,7 @@ def emit_records(
                             essential_artifact_ids=list(spec.essential_artifact_ids),
                             window_artifact_ids=packed.window_ids,
                             position_bucket=metrics.position_bucket,
-                            length_bucket=metrics.length_bucket,
+                            length_bucket=bname,
                             split=record_split,
                             cf_op=spec.cf_op,
                         )
@@ -1949,10 +2117,7 @@ def emit_records(
                         dumped["near_dup_sentence_ratio"] = round(near_dup, 4)
                         dumped["natural_tokens"] = metrics.context_tokens
                         dumped["actual_context_tokens"] = metrics.context_tokens
-                        if (
-                            exact_settings
-                            and metrics.length_bucket in EXACT_TOKEN_BAND_RANGES
-                        ):
+                        if exact_settings and bname in EXACT_TOKEN_BAND_RANGES:
                             if exact_tokenizer is None:
                                 exact_tokenizer = _load_exact_tokenizer(
                                     exact_model_id,
@@ -1962,7 +2127,7 @@ def emit_records(
                             exact_metadata, exact_length_reason = (
                                 exact_token_metadata_for_band(
                                     prompt,
-                                    metrics.length_bucket,
+                                    bname,
                                     model_id=exact_model_id,
                                     revision=exact_revision,
                                     tokenizer=exact_tokenizer,
@@ -2457,7 +2622,9 @@ def main() -> None:
                 for line in handle
                 if line.strip()
             )
-    candidate_row_set_sha256 = row_digest_set_sha256(candidate_row_digests)
+    candidate_row_set_sha256 = (
+        row_digest_set_sha256(candidate_row_digests) if candidate_row_digests else None
+    )
     retention = (n_kept_slots / n_att) if n_att else 0.0
     canonical_neff = round(effective_number(canon_c), 3)
     join_row_share = round((int(type_c.get("program_join") or 0) / max(1, n_kept)), 4)

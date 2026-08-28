@@ -5,8 +5,14 @@ from typing import Any
 
 from longworld.core.domain import eval_answer, handlers
 from longworld.core.world import SimulatedWorld, WorldSimulator
+from longworld.domains.codeforge.schema import materialize_grounded_repo_record
+from longworld.domains.codeforge.simulate import canonical_repo_record_envelopes
 from longworld.domains.company.queries import QuerySpec, _merge_overrides
 from longworld.domains.company.simulate import canonical_sec_source_section_envelope
+from longworld.domains.researchlab.simulate import (
+    canonical_researchlab_source_event_envelope,
+    canonical_researchlab_source_visible_text,
+)
 
 
 def simulator(world: SimulatedWorld) -> WorldSimulator:
@@ -135,12 +141,64 @@ def _sec_raw_lineage_valid(world: SimulatedWorld, event: Any) -> bool:
     }
 
 
+def _event_envelope(event: Any) -> dict[str, Any]:
+    return {
+        "type": event.type,
+        "time": event.time,
+        "params": event.params,
+        "preconditions": list(event.preconditions),
+        "causal_inputs": list(event.causal_inputs),
+        "required_inputs": list(event.required_inputs),
+        "relation_kinds": dict(event.relation_kinds),
+        "skipped": event.skipped,
+        "skip_reason": event.skip_reason,
+    }
+
+
+def _repo_record_lineage_valid(world: SimulatedWorld, event: Any) -> bool:
+    params = getattr(event, "params", None)
+    if not isinstance(params, dict) or getattr(event, "type", "") != "repo_record":
+        return False
+    cached = getattr(world, "_longworld_canonical_repo_records", None)
+    if cached is None:
+        cached = canonical_repo_record_envelopes(world)
+        world._longworld_canonical_repo_records = cached
+    canonical = cached.get(str(params.get("record_key") or ""))
+    return canonical is not None and _event_envelope(canonical) == _event_envelope(
+        event
+    )
+
+
+def _research_source_envelope(
+    world: SimulatedWorld, event: Any
+) -> dict[str, Any] | None:
+    params = getattr(event, "params", None)
+    if not isinstance(params, dict):
+        return None
+    canonical = canonical_researchlab_source_event_envelope(
+        world.spec,
+        event_id=str(getattr(event, "id", "") or ""),
+        event_type=str(getattr(event, "type", "") or ""),
+        record_id=str(params.get("record_id") or ""),
+        relation_id=str(params.get("relation_id") or ""),
+        section_id=str(params.get("section_id") or ""),
+    )
+    if canonical is None:
+        return None
+    observed = {
+        "id": event.id,
+        **_event_envelope(event),
+        "visibility": list(event.visibility),
+    }
+    return canonical if canonical == observed else None
+
+
 def _semantic_artifact_overrides(
     artifacts: list[Any],
     world: SimulatedWorld,
     authorized_overrides: dict[str, dict[str, Any]] | None = None,
-) -> dict[str, dict[str, Any]]:
-    """Bind SEC replay to immutable source params or an explicit CF update."""
+) -> tuple[dict[str, dict[str, Any]], set[str]]:
+    """Bind source replay to immutable params or an explicit CF update."""
     world_id = str(world.spec.get("world_id") or "")
     event_index = {event.id: event for event in world.events}
     overrides: dict[str, dict[str, Any]] = {}
@@ -157,7 +215,16 @@ def _semantic_artifact_overrides(
             event_index[event_id]
             for event_id in event_ids
             if event_id in event_index
-            and event_index[event_id].type in {"sec_filing", "sec_source_section"}
+            and event_index[event_id].type
+            in {
+                "arxiv_revision",
+                "arxiv_revision_relation",
+                "repo_record",
+                "sec_filing",
+                "sec_source_section",
+                "wiki_source_relation",
+                "wiki_source_section",
+            }
         ]
         if not source_events:
             continue
@@ -168,20 +235,44 @@ def _semantic_artifact_overrides(
                 **event.params,
                 **(authorized_overrides or {}).get(event_id, {}),
             }
-            declared_text = (
-                str(params.get("text") or "") if isinstance(params, dict) else ""
+            if event.type == "repo_record" and event_id in (authorized_overrides or {}):
+                expected.update(materialize_grounded_repo_record(expected))
+            research_envelope = (
+                _research_source_envelope(world, event)
+                if event.type
+                in {
+                    "arxiv_revision",
+                    "arxiv_revision_relation",
+                    "wiki_source_relation",
+                    "wiki_source_section",
+                }
+                else None
             )
-            visible_text = (
-                artifact_text[
-                    artifact_text.index(declared_text) : artifact_text.index(
-                        declared_text
-                    )
-                    + len(declared_text)
-                ]
-                if declared_text and artifact_text.count(declared_text) == 1
-                else artifact_text
-            )
-            expected_text = str(expected.get("text") or "")
+            if research_envelope is not None:
+                expected_envelope = {**research_envelope, "params": expected}
+                declared_text = canonical_researchlab_source_visible_text(
+                    expected_envelope
+                )
+                visible_text = artifact_text
+                expected_text = str(declared_text or "")
+            else:
+                text_field = "body_text" if event.type == "repo_record" else "text"
+                declared_text = (
+                    str(params.get(text_field) or "")
+                    if isinstance(params, dict)
+                    else ""
+                )
+                visible_text = (
+                    artifact_text[
+                        artifact_text.index(declared_text) : artifact_text.index(
+                            declared_text
+                        )
+                        + len(declared_text)
+                    ]
+                    if declared_text and artifact_text.count(declared_text) == 1
+                    else artifact_text
+                )
+                expected_text = str(expected.get(text_field) or "")
             lineage_valid = (
                 len(event_ids) == 1
                 and isinstance(params, dict)
@@ -206,6 +297,17 @@ def _semantic_artifact_overrides(
                     == expected.get("section_sha256")
                     and _sec_raw_lineage_valid(world, event)
                 )
+            elif event.type == "repo_record":
+                lineage_valid = lineage_valid and _repo_record_lineage_valid(
+                    world, event
+                )
+            elif event.type in {
+                "arxiv_revision",
+                "arxiv_revision_relation",
+                "wiki_source_relation",
+                "wiki_source_section",
+            }:
+                lineage_valid = lineage_valid and research_envelope is not None
             if lineage_valid and event_id not in invalid_event_ids:
                 overrides[event_id] = dict(params) if isinstance(params, dict) else {}
             elif not lineage_valid:
@@ -216,7 +318,7 @@ def _semantic_artifact_overrides(
                     "text_sha256": hashlib.sha256(visible_text.encode()).hexdigest(),
                     "fact_spans": [],
                 }
-    return overrides
+    return overrides, invalid_event_ids
 
 
 def semantic_answer_from_artifacts(
@@ -231,15 +333,17 @@ def semantic_answer_from_artifacts(
     merged = {
         event_id: dict(values) for event_id, values in (extra_overrides or {}).items()
     }
-    for event_id, values in _semantic_artifact_overrides(
+    semantic_overrides, invalid_event_ids = _semantic_artifact_overrides(
         artifacts, world, extra_overrides
-    ).items():
+    )
+    for event_id, values in semantic_overrides.items():
         merged[event_id] = {**merged.get(event_id, {}), **values}
+    blocked_ids = set(skip_ids or ()) | invalid_event_ids
     return answer_from_events(
         world,
         spec,
         revealed_event_ids(artifacts, world),
         merged,
-        skip_ids,
+        blocked_ids,
         enforce_preconditions,
     )

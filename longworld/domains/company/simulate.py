@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import hashlib
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 from copy import deepcopy
 from datetime import date, timedelta
 from html import unescape
 from typing import Any
 
 from longworld.core.cascade import cascade_events
+from longworld.core.filingworkflow import validated_sec_amendment_endpoints
 from longworld.core.grounded import grounded_events
 from longworld.core.provenance import ProvenanceError
 from longworld.core.secvisible import (
@@ -663,8 +664,14 @@ def canonical_sec_source_section_envelope(
 
 def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]:
     events: list[Event] = []
-    for workflow_index, workflow in enumerate(project.get("source_workflows") or []):
+    source_workflows = project.get("source_workflows") or []
+    record_id_counts = Counter(
+        record.record_id for workflow in source_workflows for record in workflow.records
+    )
+    for workflow_index, workflow in enumerate(source_workflows):
         for record_index, record in enumerate(workflow.records):
+            if record_id_counts[record.record_id] != 1:
+                continue
             required_fields = {"accession", "form", "filing_date", "report_date"}
             facts_by_field = {
                 field: [fact for fact in record.facts if fact.field == field]
@@ -853,6 +860,58 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
                     workflow_index=workflow_index,
                     record_index=record_index,
                     filing_day=filing_day,
+                )
+            )
+        record_indexes = {
+            record.record_id: record_index
+            for record_index, record in enumerate(workflow.records)
+        }
+        for relation_index, relation in enumerate(workflow.relations):
+            endpoints = validated_sec_amendment_endpoints(workflow, relation)
+            if endpoints is None:
+                continue
+            amendment, original = endpoints
+            if any(
+                record_id_counts[record.record_id] != 1
+                for record in (amendment, original)
+            ):
+                continue
+            amendment_source_id = (
+                f"{prefix}.sec_filing_{workflow_index}_"
+                f"{record_indexes[amendment.record_id]}"
+            )
+            original_source_id = (
+                f"{prefix}.sec_filing_{workflow_index}_"
+                f"{record_indexes[original.record_id]}"
+            )
+            resolution_id = (
+                f"{prefix}.sec_amendment_resolution_{workflow_index}_{relation_index}"
+            )
+            relation_day = date.fromisoformat(amendment.occurred_at[:10])
+            events.append(
+                Event(
+                    id=resolution_id,
+                    type="sec_amendment_resolution",
+                    time=relation_day + timedelta(days=3),
+                    params={
+                        "workflow_id": workflow.workflow_id,
+                        "record_id": amendment.record_id,
+                        "target_record_id": original.record_id,
+                        "source_relation_id": relation.relation_id,
+                        "resolution_kind": "amends_report",
+                        "answer_key": (
+                            f"sec_amendment_resolution:{relation.relation_id}"
+                        ),
+                        "control_stage": "amendment graph resolution",
+                        "ground_values": ["relation-evaluated"],
+                    },
+                    visibility=[resolution_id],
+                    causal_inputs=[original_source_id, amendment_source_id],
+                    required_inputs=[original_source_id, amendment_source_id],
+                    relation_kinds={
+                        original_source_id: "amends_target",
+                        amendment_source_id: "amendment_source",
+                    },
                 )
             )
     return events

@@ -33,6 +33,16 @@ def test_shortest_path_span_handles_singleton_and_disconnected_nodes() -> None:
     assert graph_module._max_shortest_path_nodes(graph, ["a", "b"]) == 2
 
 
+def test_proof_depth_keeps_longest_dependency_when_a_shortcut_exists() -> None:
+    graph = nx.DiGraph(
+        [("source", "step-1"), ("step-1", "step-2"), ("step-2", "answer")]
+    )
+    graph.add_edge("source", "answer")
+
+    assert graph_module._max_shortest_path_nodes(graph, ["source", "answer"]) == 2
+    assert graph_module._max_dependency_path_nodes(graph, ["source", "answer"]) == 4
+
+
 @pytest.mark.parametrize("domain", ["company", "researchlab"])
 def test_graph_stats_matches_pairwise_reference(domain: str) -> None:
     materialized = materialize(
@@ -56,5 +66,7 @@ def test_graph_stats_matches_pairwise_reference(domain: str) -> None:
     assert stats["n_event_nodes"] == sum(
         data.get("kind") == "event" for _, data in graph.nodes(data=True)
     )
-    assert stats["proof_depth"] == _pairwise_reference(subgraph, essential)
+    assert stats["proof_depth"] == graph_module._max_dependency_path_nodes(
+        subgraph, essential
+    )
     assert stats["hop_count"] == _pairwise_reference(subgraph, sufficient)

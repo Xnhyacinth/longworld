@@ -72,6 +72,7 @@ SEC_HYBRID_CHILD_EVENT_TYPES = frozenset(
     {
         "sec_filing_eligibility_policy",
         "sec_filing_approval",
+        "sec_amendment_resolution",
         "sec_filing_publication_ratification",
         "sec_financial_answer",
     }
@@ -582,6 +583,334 @@ def _filing_relations(filings: list[dict[str, Any]]) -> list[dict[str, Any]]:
             }
         )
     return sorted(relations, key=lambda relation: relation["relation_id"])
+
+
+def validated_sec_amendment_endpoints(
+    workflow: Any, relation: Any
+) -> tuple[Any, Any] | None:
+    """Return amendment/original records only for an exact grounded SEC relation."""
+    if (
+        getattr(workflow, "source_kind", "") != "sec_filing"
+        or not getattr(relation, "relation_id", "")
+        or getattr(relation, "kind", "") != "amends_report"
+        or getattr(relation, "source_record_id", "")
+        == getattr(relation, "target_record_id", "")
+    ):
+        return None
+    raw_records = tuple(getattr(workflow, "records", ()))
+    records = {record.record_id: record for record in raw_records}
+    if (
+        len(records) != len(raw_records)
+        or len({record.source_sha256 for record in raw_records}) != len(raw_records)
+        or len({record.provenance_id for record in raw_records}) != len(raw_records)
+        or set(getattr(workflow, "provenance_ids", ()))
+        != {record.provenance_id for record in raw_records}
+    ):
+        return None
+    amendment = records.get(relation.source_record_id)
+    original = records.get(relation.target_record_id)
+    if amendment is None or original is None:
+        return None
+    if any(
+        getattr(getattr(record, "source_origin", None), "value", "")
+        not in {"real_public", "real_private_export"}
+        or record.provenance_id != f"sha256:{record.source_sha256}"
+        for record in (amendment, original)
+    ):
+        return None
+    if (
+        amendment.source_sha256 == original.source_sha256
+        or amendment.text_sha256 == original.text_sha256
+        or hashlib.sha256(amendment.text.encode()).hexdigest() != amendment.text_sha256
+        or hashlib.sha256(original.text.encode()).hexdigest() != original.text_sha256
+    ):
+        return None
+
+    amendment_attributes = dict(amendment.attributes)
+    original_attributes = dict(original.attributes)
+    try:
+        amendment_day = date.fromisoformat(amendment.occurred_at[:10])
+        original_day = date.fromisoformat(original.occurred_at[:10])
+    except ValueError:
+        return None
+    for record, attributes in (
+        (amendment, amendment_attributes),
+        (original, original_attributes),
+    ):
+        facts_by_field = {
+            field: [fact for fact in record.facts if fact.field == field]
+            for field in SEC_IDENTITY_FIELDS
+        }
+        if any(len(facts) != 1 for facts in facts_by_field.values()):
+            return None
+        for fact in (facts[0] for facts in facts_by_field.values()):
+            if (
+                fact.record_id != record.record_id
+                or fact.source_sha256 != record.source_sha256
+                or fact.char_start < 0
+                or fact.char_end != fact.char_start + len(fact.evidence_quote)
+                or record.text[fact.char_start : fact.char_end] != fact.evidence_quote
+                or fact.value_offset < 0
+                or fact.evidence_quote[
+                    fact.value_offset : fact.value_offset + len(fact.value)
+                ]
+                != fact.value
+            ):
+                return None
+        if (
+            facts_by_field["accession"][0].value != attributes.get("accession")
+            or facts_by_field["form"][0].value != attributes.get("form")
+            or facts_by_field["filing_date"][0].value
+            != str(attributes.get("filing_date", "")).replace("-", "")
+            or facts_by_field["report_date"][0].value
+            != str(attributes.get("report_date", "")).replace("-", "")
+            or record.record_id != f"sec:{attributes.get('accession', '')}"
+        ):
+            return None
+    amendment_form = amendment_attributes.get("form", "")
+    shared_report_date = amendment_attributes.get("report_date", "")
+    if (
+        not amendment_form.endswith("/A")
+        or amendment_form.removesuffix("/A") != original_attributes.get("form")
+        or not shared_report_date
+        or shared_report_date != original_attributes.get("report_date")
+        or amendment_attributes.get("cik") != original_attributes.get("cik")
+        or amendment_day < original_day
+    ):
+        return None
+
+    facts = {
+        (record.record_id, fact.fact_id): fact
+        for record in (amendment, original)
+        for fact in record.facts
+    }
+    required = {
+        (record.record_id, field)
+        for record in (amendment, original)
+        for field in ("form", "report_date")
+    }
+    if len(relation.evidence) != len(required):
+        return None
+    grounded: set[tuple[str, str]] = set()
+    for evidence in relation.evidence:
+        record = records.get(evidence.record_id)
+        if (
+            evidence.record_id not in {amendment.record_id, original.record_id}
+            or record is None
+            or evidence.source_sha256 != record.source_sha256
+            or evidence.char_start < 0
+            or evidence.char_end <= evidence.char_start
+            or record.text[evidence.char_start : evidence.char_end]
+            != evidence.evidence_quote
+            or len(evidence.fact_ids) != 1
+        ):
+            return None
+        fact = facts.get((evidence.record_id, evidence.fact_ids[0]))
+        if (
+            fact is None
+            or fact.field not in {"form", "report_date"}
+            or fact.evidence_quote != evidence.evidence_quote
+            or fact.char_start != evidence.char_start
+            or fact.char_end != evidence.char_end
+            or fact.source_sha256 != evidence.source_sha256
+        ):
+            return None
+        identity = (record.record_id, fact.field)
+        if identity in grounded:
+            return None
+        grounded.add(identity)
+    if grounded != required:
+        return None
+    return amendment, original
+
+
+def _sec_source_event_matches_record(event: Any, record: Any) -> bool:
+    params = getattr(event, "params", None)
+    if not isinstance(params, Mapping) or getattr(event, "type", "") != "sec_filing":
+        return False
+    text = str(params.get("text") or "")
+    if (
+        not text
+        or hashlib.sha256(text.encode()).hexdigest() != params.get("text_sha256")
+        or params.get("source_sha256") != record.source_sha256
+        or params.get("source_family") != record.source_family
+        or params.get("source_url") != record.source_url
+        or params.get("retrieval_url") != record.retrieval_url
+        or record.text.count(text) != 1
+    ):
+        return False
+    corridor_start = record.text.index(text)
+    fact_spans = params.get("fact_spans")
+    if (
+        not isinstance(fact_spans, Sequence)
+        or isinstance(fact_spans, (str, bytes))
+        or len(fact_spans) != len(SEC_IDENTITY_FIELDS)
+        or not all(isinstance(span, Mapping) for span in fact_spans)
+    ):
+        return False
+    facts_by_field = {
+        field: [fact for fact in record.facts if fact.field == field]
+        for field in SEC_IDENTITY_FIELDS
+    }
+    if any(len(facts) != 1 for facts in facts_by_field.values()):
+        return False
+    seen_fields: set[str] = set()
+    for span in fact_spans:
+        field = str(span.get("field") or "")
+        facts = facts_by_field.get(field)
+        if facts is None or len(facts) != 1 or field in seen_fields:
+            return False
+        fact = facts[0]
+        expected_start = fact.char_start - corridor_start
+        expected_end = fact.char_end - corridor_start
+        if (
+            span.get("fact_id") != fact.fact_id
+            or span.get("evidence_quote") != fact.evidence_quote
+            or span.get("char_start") != expected_start
+            or span.get("char_end") != expected_end
+            or span.get("value_offset") != fact.value_offset
+            or span.get("value_length") != len(fact.value)
+            or expected_start < 0
+            or expected_end > len(text)
+            or text[expected_start:expected_end] != fact.evidence_quote
+        ):
+            return False
+        seen_fields.add(field)
+    if seen_fields != set(SEC_IDENTITY_FIELDS):
+        return False
+
+    if corridor_start == 0 and len(text) == len(record.text):
+        return (
+            params.get("provenance_id") == record.provenance_id
+            and not params.get("parent_provenance_id")
+            and not params.get("provenance_operation")
+            and params.get("source_origin")
+            == getattr(record.source_origin, "value", "")
+        )
+    corridor_end = corridor_start + len(text)
+    excerpt_sha256 = hashlib.sha256(text.encode()).hexdigest()
+    expected_provenance = (
+        "derived-sha256:"
+        + hashlib.sha256(
+            (
+                f"sec_evidence_corridor|{record.provenance_id}|"
+                f"{corridor_start}|{corridor_end}|{excerpt_sha256}"
+            ).encode()
+        ).hexdigest()
+    )
+    return (
+        params.get("provenance_id") == expected_provenance
+        and params.get("parent_provenance_id") == record.provenance_id
+        and params.get("provenance_operation") == "sec_evidence_corridor"
+        and params.get("source_origin") == "real_derived"
+    )
+
+
+def selected_sec_source_relation_edges(
+    world: Any, spec: Any, artifacts: Sequence[Any]
+) -> list[dict[str, str]]:
+    """Derive authentic SEC edges only from selected, exact source artifacts."""
+    visible_event_ids = {
+        event_id
+        for artifact in artifacts
+        for event_id in getattr(artifact, "reveals_events", ())
+    }
+    sufficient_ids = set(getattr(spec, "sufficient_event_ids", ()) or ())
+    if sufficient_ids:
+        visible_event_ids &= sufficient_ids
+    event_index = {
+        event.id: event
+        for event in getattr(world, "events", ())
+        if event.id in visible_event_ids
+    }
+    selected: dict[tuple[str, str], list[Any]] = {}
+    for artifact in artifacts:
+        slots = getattr(artifact, "slots", None) or {}
+        workflow_id = str(slots.get("source_workflow_id") or "")
+        record_id = str(slots.get("source_record_id") or "")
+        revealed = [
+            event_index[event_id]
+            for event_id in getattr(artifact, "reveals_events", ())
+            if event_id in event_index and event_index[event_id].type == "sec_filing"
+        ]
+        if (
+            slots.get("real_workflow_record") is not True
+            or getattr(artifact, "doc_type", "") != "sec_filing"
+            or slots.get("event_type") != "sec_filing"
+            or not workflow_id
+            or not record_id
+            or len(revealed) != 1
+        ):
+            continue
+        event = revealed[0]
+        classification = slots.get("classification")
+        event_text = str(event.params.get("text") or "")
+        if (
+            not isinstance(classification, Mapping)
+            or event.params.get("workflow_id") != workflow_id
+            or event.params.get("record_id") != record_id
+            or slots.get("params") != event.params
+            or not event_text
+            or str(getattr(artifact, "text", "")).count(event_text) != 1
+            or classification.get("source_origin")
+            not in {"real_public", "real_private_export", "real_derived"}
+        ):
+            continue
+        selected.setdefault((workflow_id, record_id), []).append(event)
+
+    project = getattr(world, "spec", {}).get("project")
+    if not isinstance(project, Mapping):
+        return []
+    workflows_by_id: dict[str, list[Any]] = {}
+    for workflow in project.get("source_workflows") or ():
+        workflows_by_id.setdefault(
+            str(getattr(workflow, "workflow_id", "")), []
+        ).append(workflow)
+    edges: list[dict[str, str]] = []
+    for workflow_id in sorted({item[0] for item in selected}):
+        matches = workflows_by_id.get(workflow_id, [])
+        if len(matches) != 1:
+            continue
+        workflow = matches[0]
+        workflow_records = {
+            record.record_id: record for record in getattr(workflow, "records", ())
+        }
+        for relation in getattr(workflow, "relations", ()):
+            endpoints = validated_sec_amendment_endpoints(workflow, relation)
+            if endpoints is None:
+                continue
+            amendment, original = endpoints
+            if {
+                (workflow_id, amendment.record_id),
+                (workflow_id, original.record_id),
+            } - selected.keys():
+                continue
+            if any(
+                not any(
+                    _sec_source_event_matches_record(event, workflow_records[record_id])
+                    for event in selected[(workflow_id, record_id)]
+                )
+                for record_id in (amendment.record_id, original.record_id)
+            ):
+                continue
+            edges.append(
+                {
+                    "parent_record_id": original.record_id,
+                    "child_record_id": amendment.record_id,
+                    "relation": relation.kind,
+                    "relation_provenance": "authentic_source",
+                    "parent_source_url": original.source_url,
+                    "child_source_url": amendment.source_url,
+                }
+            )
+    return sorted(
+        edges,
+        key=lambda edge: (
+            edge["parent_record_id"],
+            edge["child_record_id"],
+            edge["relation"],
+        ),
+    )
 
 
 def build_sec_filing_manifest(

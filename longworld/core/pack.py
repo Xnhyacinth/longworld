@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import random
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from itertools import pairwise
 
@@ -84,10 +85,25 @@ class ViewMetrics:
 
 
 def _artifact_token_bounds(
-    ordered: list[Artifact], essential_ids: set[str]
+    ordered: list[Artifact],
+    essential_ids: set[str],
+    token_counter: Callable[[str], int] | None = None,
+    token_prefix: str = "",
 ) -> tuple[list[tuple[int, int]], int]:
+    if token_counter is not None:
+        exact_bounds: list[tuple[int, int]] = []
+        context = token_prefix
+        for index, artifact in enumerate(ordered):
+            if index:
+                context += SEP
+            start = token_counter(context)
+            context += artifact.text
+            end = token_counter(context)
+            if artifact.artifact_id in essential_ids:
+                exact_bounds.append((start, end))
+        return exact_bounds, token_counter(context) if context else 0
     bounds: list[tuple[int, int]] = []
-    cursor_chars = 0
+    cursor_chars = len(token_prefix)
     for i, artifact in enumerate(ordered):
         if i:
             cursor_chars += len(SEP)
@@ -105,6 +121,9 @@ def compute_view_metrics(
     *,
     query_timing: str,
     context: str | None = None,
+    token_counter: Callable[[str], int] | None = None,
+    token_prefix: str = "",
+    query_boundary_tokens: int | None = None,
 ) -> ViewMetrics:
     """Compute truthful length and distance fields for a rendered view.
 
@@ -114,15 +133,23 @@ def compute_view_metrics(
     regardless of its absolute offset in a 256k context.
     """
 
-    bounds, artifact_tokens = _artifact_token_bounds(ordered, essential_ids)
+    bounds, artifact_tokens = _artifact_token_bounds(
+        ordered, essential_ids, token_counter, token_prefix
+    )
     context_tokens = (
-        estimate_tokens(context) if context is not None else artifact_tokens
+        (token_counter or estimate_tokens)(context)
+        if context is not None
+        else artifact_tokens
     )
     if bounds:
         first_start = min(start for start, _ in bounds)
         last_end = max(end for _, end in bounds)
         evidence_span = max(0, last_end - first_start) if len(bounds) >= 2 else 0
-        if query_timing == "late":
+        if query_boundary_tokens is not None and query_timing == "late":
+            query_distance = max(0, query_boundary_tokens - last_end)
+        elif query_boundary_tokens is not None:
+            query_distance = max(0, last_end - query_boundary_tokens)
+        elif query_timing == "late":
             query_distance = max(0, context_tokens - last_end)
         else:
             query_distance = last_end
@@ -210,6 +237,7 @@ def pack_view(
     skip_boilerplate: bool = True,
     prefer_ids: set[str] | None = None,
     ordered_corridor_ids: set[str] | None = None,
+    token_counter: Callable[[str], int] | None = None,
 ) -> PackedContext:
     """Pack unique, non-boilerplate documents up to a max token cap.
 
@@ -219,6 +247,7 @@ def pack_view(
     """
     del allow_clone
     max_tokens = int(target_tokens)
+    measure_tokens = token_counter or estimate_tokens
     ess_ids = set(spec.essential_artifact_ids)
     corridor_ids = set(ordered_corridor_ids or ())
     essential_world_ids = {
@@ -240,7 +269,7 @@ def pack_view(
         for a in pool
         if a.artifact_id in ess_ids
         or a.artifact_id in corridor_ids
-        or estimate_tokens(a.text) <= max_tokens
+        or measure_tokens(a.text) <= max_tokens
     ]
     pool_index = {artifact.artifact_id: artifact for artifact in pool}
     if corridor_ids and not corridor_ids.issubset(pool_index):
@@ -360,12 +389,12 @@ def pack_view(
         if corridor
         else [*essential, *strict_support]
     )
-    if corridor and estimate_tokens(join_artifacts(core)) > max_tokens:
+    if corridor and measure_tokens(join_artifacts(core)) > max_tokens:
         required_ids = ess_ids | all_support_ids
         selected_core = [
             artifact for artifact in core if artifact.artifact_id in required_ids
         ]
-        if estimate_tokens(join_artifacts(selected_core)) > max_tokens:
+        if measure_tokens(join_artifacts(selected_core)) > max_tokens:
             return PackedContext(
                 artifacts=[],
                 text="",
@@ -380,26 +409,21 @@ def pack_view(
                 requested_max_tokens=max_tokens,
             )
         selected_ids = {artifact.artifact_id for artifact in selected_core}
-        used_chars = sum(len(artifact.text) for artifact in selected_core) + len(
-            SEP
-        ) * max(0, len(selected_core) - 1)
-        max_chars = max_tokens * 4
         for artifact in core:
             if artifact.artifact_id in selected_ids:
                 continue
-            extra_chars = len(artifact.text) + (len(SEP) if selected_core else 0)
-            if used_chars + extra_chars > max_chars:
+            trial_core = [*selected_core, artifact]
+            if measure_tokens(join_artifacts(trial_core)) > max_tokens:
                 continue
             selected_core.append(artifact)
             selected_ids.add(artifact.artifact_id)
-            used_chars += extra_chars
         core = sorted(selected_core, key=source_corridor_key)
     if corridor:
         corridor = core
     mandatory_text = join_artifacts([*core, *buffer_src])
-    if estimate_tokens(mandatory_text) > max_tokens:
+    if measure_tokens(mandatory_text) > max_tokens:
         buffer_src = []
-    if estimate_tokens(join_artifacts(core)) > max_tokens:
+    if measure_tokens(join_artifacts(core)) > max_tokens:
         return PackedContext(
             artifacts=[],
             text="",
@@ -507,7 +531,11 @@ def pack_view(
         ):
             continue
         dist_now = _evidence_distance(
-            ordered, evidence_ids, text, query_timing=query_timing
+            ordered,
+            evidence_ids,
+            text,
+            query_timing=query_timing,
+            token_counter=token_counter,
         )
         trial_gap = pick_gap(dist_now, need)
         if corridor:
@@ -516,7 +544,7 @@ def pack_view(
             gaps[trial_gap].append(nxt)
             trial = layout()
         trial_text = join_artifacts(trial)
-        if estimate_tokens(trial_text) > max_tokens:
+        if measure_tokens(trial_text) > max_tokens:
             if corridor:
                 pop_corridor_side(nxt)
             else:
@@ -529,9 +557,28 @@ def pack_view(
 
     ordered = _dedupe(ordered)
     text = join_artifacts(ordered)
-    tokens = estimate_tokens(text)
+    tokens = measure_tokens(text)
+    metric_context = (
+        wrap_prompt(spec.question, text, query_timing)
+        if token_counter is not None
+        else text
+    )
     metrics = compute_view_metrics(
-        ordered, evidence_ids, query_timing=query_timing, context=text
+        ordered,
+        evidence_ids,
+        query_timing=query_timing,
+        context=metric_context,
+        token_counter=token_counter,
+        token_prefix=(
+            prompt_document_prefix(spec.question, query_timing)
+            if token_counter is not None
+            else ""
+        ),
+        query_boundary_tokens=(
+            prompt_query_boundary(spec.question, text, query_timing, token_counter)
+            if token_counter is not None
+            else None
+        ),
     )
     dist = metrics.max_evidence_distance
     window = [a.artifact_id for a in buffer_src]
@@ -631,13 +678,17 @@ def _semantic_score(artifact: Artifact, prefer: set[str], seen_props: set[str]) 
     return score
 
 
-def covering_span_tokens(ordered: list[Artifact], ess_ids: set[str]) -> int:
+def covering_span_tokens(
+    ordered: list[Artifact],
+    ess_ids: set[str],
+    token_counter: Callable[[str], int] | None = None,
+) -> int:
     """Token length of the contiguous slice that covers every essential doc."""
     idxs = [i for i, a in enumerate(ordered) if a.artifact_id in ess_ids]
     if not idxs:
         return 0
     lo, hi = min(idxs), max(idxs)
-    return estimate_tokens(join_artifacts(ordered[lo : hi + 1]))
+    return (token_counter or estimate_tokens)(join_artifacts(ordered[lo : hi + 1]))
 
 
 def local_span_too_short(
@@ -645,11 +696,12 @@ def local_span_too_short(
     ess_ids: set[str],
     *,
     target_tokens: int,
+    token_counter: Callable[[str], int] | None = None,
 ) -> str | None:
     """Pack-time only. Short unit-test worlds never hit these caps."""
     if len(ess_ids) < 2 or target_tokens < 16000:
         return None
-    span = covering_span_tokens(ordered, ess_ids)
+    span = covering_span_tokens(ordered, ess_ids, token_counter)
     if span <= 8000:
         return f"local_8k_solves:{span}"
     if target_tokens >= 32000 and span <= 16000:
@@ -662,9 +714,14 @@ def _evidence_distance(
     ess_ids: set[str],
     text: str,
     query_timing: str = "first",
+    token_counter: Callable[[str], int] | None = None,
 ) -> int:
     return compute_view_metrics(
-        ordered, ess_ids, query_timing=query_timing, context=text
+        ordered,
+        ess_ids,
+        query_timing=query_timing,
+        context=text,
+        token_counter=token_counter,
     ).max_evidence_distance
 
 
@@ -683,16 +740,34 @@ def _artifact_event_graph(artifacts: list[Artifact]):
     return g
 
 
+def prompt_document_prefix(question: str, timing: str) -> str:
+    """Return the exact prompt bytes that precede the document context."""
+    if timing == "first":
+        return f"Question:\n{question}\n\nContext (internal records):\n"
+    return "Context (internal records):\n"
+
+
+def prompt_query_boundary(
+    question: str,
+    context: str,
+    timing: str,
+    token_counter: Callable[[str], int],
+) -> int:
+    """Return query-end (first) or query-start (late) in prompt token space."""
+    if timing == "first":
+        return token_counter(f"Question:\n{question}")
+    return token_counter(f"{prompt_document_prefix(question, timing)}{context}\n\n")
+
+
 def wrap_prompt(question: str, context: str, timing: str) -> str:
     if timing == "first":
         return (
-            f"Question:\n{question}\n\n"
-            f"Context (internal records):\n{context}\n\n"
+            f"{prompt_document_prefix(question, timing)}{context}\n\n"
             f"Answer using only the documents. If the documents are insufficient, "
             f"reply exactly: unanswerable"
         )
     return (
-        f"Context (internal records):\n{context}\n\n"
+        f"{prompt_document_prefix(question, timing)}{context}\n\n"
         f"Question:\n{question}\n\n"
         f"Answer using only the documents. If the documents are insufficient, "
         f"reply exactly: unanswerable"

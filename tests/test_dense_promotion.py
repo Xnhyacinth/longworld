@@ -15,6 +15,8 @@ from longworld.core.pack import (
     compute_view_metrics,
     estimate_tokens,
     join_artifacts,
+    prompt_document_prefix,
+    prompt_query_boundary,
     wrap_prompt,
 )
 from longworld.core.promotion import (
@@ -29,6 +31,8 @@ from longworld.core.promotion import (
     _candidate_n_workstreams,
     _materialize_synthetic_replay,
     _n_workstreams,
+    _replayed_quality_metrics,
+    _resolved_local_tokenizer_revision,
     _synthetic_replay_materialization,
     candidate_sha256,
     create_dense_audit,
@@ -666,6 +670,10 @@ def test_dense_audit_recounts_exact_tokens_from_reconstructed_prompt(
         "longworld.core.promotion._load_replay_tokenizer",
         lambda _model_id, _revision: FakeTokenizer(),
     )
+    monkeypatch.setattr(
+        "longworld.core.promotion._resolved_local_tokenizer_revision",
+        lambda _model_id, _revision: revision,
+    )
     candidate, artifacts = _candidate()
     candidate.update(
         {
@@ -684,6 +692,22 @@ def test_dense_audit_recounts_exact_tokens_from_reconstructed_prompt(
 
     with pytest.raises(PromotionError, match="token count does not replay"):
         create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+
+
+def test_resolved_local_tokenizer_revision_uses_cache_snapshot_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    revision = "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+
+    monkeypatch.setattr(
+        "transformers.utils.hub.cached_file",
+        lambda *_args, **_kwargs: (
+            f"/cache/models--Qwen--Qwen3.5-4B/snapshots/{revision}/"
+            "tokenizer_config.json"
+        ),
+    )
+
+    assert _resolved_local_tokenizer_revision("Qwen/Qwen3.5-4B", revision) == revision
 
 
 def test_promotion_recomputes_quality_metrics_from_replayed_serialized_view() -> None:
@@ -769,6 +793,110 @@ def test_promotion_uses_replayed_graph_not_the_declared_spec_depth() -> None:
     assert promoted["graph"] == replayed
     assert promoted["difficulty"]["proof_depth"] == replayed["proof_depth"]
     assert promoted["hop_count"] == replayed["hop_count"]
+
+
+def test_replayed_quality_keeps_exact_requested_bucket() -> None:
+    candidate, artifacts = _candidate()
+    candidate["length_bucket"] = "64k"
+    candidate["position_bucket"] = "back"
+    materialized = materialize(
+        candidate["seed"],
+        n_parallel=0,
+        n_pulses=0,
+        domain=candidate["domain"],
+        n_workstreams=0,
+    )
+    world = materialized.worlds["focal"]
+    spec = next(
+        query
+        for query in materialized.queries
+        if candidate["query_id"].startswith(f"{query.query_id}:")
+    )
+
+    replayed = _replayed_quality_metrics(
+        candidate,
+        world,
+        spec,
+        artifacts,
+        {
+            "exact_token_replay": {
+                "tokenizer_context_tokens": 64_100,
+                "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+                "tokenizer_revision": "a" * 40,
+            }
+        },
+        token_counter=lambda text: 64_100 if text else 0,
+    )
+
+    assert replayed["length_bucket"] == "64k"
+    assert replayed["tokenizer_context_tokens"] == 64_100
+
+
+def test_replayed_exact_metrics_use_tokenizer_for_position_and_distance() -> None:
+    candidate, artifacts = _candidate()
+    materialized = materialize(
+        candidate["seed"],
+        n_parallel=0,
+        n_pulses=0,
+        domain=candidate["domain"],
+        n_workstreams=0,
+    )
+    world = materialized.worlds["focal"]
+    spec = next(
+        query
+        for query in materialized.queries
+        if candidate["query_id"].startswith(f"{query.query_id}:")
+    )
+    heavy_suffix = artifacts.pop(0)
+    heavy_suffix.text = "重" * 500
+    artifacts.append(heavy_suffix)
+    document_context = join_artifacts(artifacts)
+    prompt = wrap_prompt(spec.question, document_context, "first")
+    total_weight = sum(40 if char == "重" else 1 for char in prompt)
+
+    def skewed_token_counter(text: str) -> int:
+        weight = sum(40 if char == "重" else 1 for char in text)
+        return (weight * 64_100) // total_weight
+
+    exact_metrics = compute_view_metrics(
+        artifacts,
+        set(spec.essential_artifact_ids),
+        query_timing="first",
+        context=prompt,
+        token_counter=skewed_token_counter,
+        token_prefix=prompt_document_prefix(spec.question, "first"),
+        query_boundary_tokens=prompt_query_boundary(
+            spec.question, document_context, "first", skewed_token_counter
+        ),
+    )
+    approximate_metrics = compute_view_metrics(
+        artifacts,
+        set(spec.essential_artifact_ids),
+        query_timing="first",
+        context=prompt,
+    )
+    assert exact_metrics.position_bucket != approximate_metrics.position_bucket
+
+    candidate["length_bucket"] = "64k"
+    candidate["position_bucket"] = exact_metrics.position_bucket
+    replayed = _replayed_quality_metrics(
+        candidate,
+        world,
+        spec,
+        artifacts,
+        {
+            "exact_token_replay": {
+                "tokenizer_context_tokens": 64_100,
+                "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+                "tokenizer_revision": "a" * 40,
+            }
+        },
+        token_counter=skewed_token_counter,
+    )
+
+    assert replayed["actual_context_tokens"] == 64_100
+    assert replayed["position_bucket"] == exact_metrics.position_bucket
+    assert replayed["evidence_distance"] == exact_metrics.max_evidence_distance
 
 
 def test_promotion_rejects_a_resigned_incorrect_audited_dup_ratio() -> None:
@@ -904,9 +1032,13 @@ def test_train_ready_report_rejects_asymmetric_counterfactual_filtering() -> Non
 
 def _mark_candidate_as_real(candidate: dict) -> None:
     candidate["source_family_ids"] = ["github.com/example/repo"]
-    candidate["source_relation_edges"] = [
-        {"parent_record_id": "issue-1", "child_record_id": "commit-1"}
-    ]
+    source_relation = {
+        "parent_record_id": "issue-1",
+        "child_record_id": "commit-1",
+        "relation_provenance": "authentic_source",
+    }
+    candidate["source_relation_edges"] = [source_relation]
+    candidate["authentic_source_relation_edges"] = [source_relation]
     candidate["episode_replay_bundle"] = {
         "schema_version": "longworld.episode-replay-bundle.v1",
         "sha256": "a" * 64,

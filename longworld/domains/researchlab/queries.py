@@ -6,10 +6,12 @@ import re
 from typing import Any
 
 from longworld.core.asof import find_event, world_as_of
+from longworld.core.groundedspan import normalize_fact_value
 from longworld.core.scholarly import (
     format_revision_added_delta,
     format_revision_funding_delta,
 )
+from longworld.core.wikiparse import WIKI_ENTITY_VIEW_PREFIX, WIKI_SECTION_VIEW_PREFIX
 from longworld.core.world import Event, SimulatedWorld, WorldSimulator
 from longworld.domains.company.queries import (
     QuerySpec,
@@ -155,6 +157,78 @@ def _counterfactual_revision_text(text: str, value: str) -> tuple[str, str]:
     return text.replace(value, changed_value), changed_value
 
 
+def _counterfactual_grounded_source(
+    payload: object, *, original_quote: str, changed_quote: str, changed_text: str
+) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise TypeError("counterfactual source binding is missing")
+    facts = payload.get("facts")
+    if not isinstance(facts, list):
+        raise TypeError("counterfactual source facts are missing")
+    changed = 0
+    original_text = payload.get("visible_text")
+    if not isinstance(original_text, str):
+        raise TypeError("counterfactual visible source is missing")
+    if any(not isinstance(fact, dict) for fact in facts):
+        raise TypeError("counterfactual source fact is invalid")
+    text_sha256 = hashlib.sha256(changed_text.encode()).hexdigest()
+    updated_facts = []
+    matching = [fact for fact in facts if fact.get("quote") == original_quote]
+    if len(matching) != 1:
+        raise ValueError("counterfactual source fact is not unique")
+    target_start = matching[0].get("char_start")
+    target_end = matching[0].get("char_end")
+    if (
+        isinstance(target_start, bool)
+        or isinstance(target_end, bool)
+        or not isinstance(target_start, int)
+        or not isinstance(target_end, int)
+        or original_text[target_start:target_end] != original_quote
+        or changed_text
+        != original_text[:target_start] + changed_quote + original_text[target_end:]
+    ):
+        raise ValueError("counterfactual source replacement is invalid")
+    shift = len(changed_quote) - len(original_quote)
+    for value in facts:
+        if not isinstance(value, dict):
+            raise TypeError("counterfactual source fact is invalid")
+        fact = dict(value)
+        fact["text_sha256"] = text_sha256
+        if fact.get("quote") == original_quote:
+            fact.update(
+                {
+                    "quote": changed_quote,
+                    "char_end": target_start + len(changed_quote),
+                    "normalized_quote": normalize_fact_value(changed_quote),
+                }
+            )
+            changed += 1
+        else:
+            fact_start = fact.get("char_start")
+            fact_end = fact.get("char_end")
+            if (
+                isinstance(fact_start, bool)
+                or isinstance(fact_end, bool)
+                or not isinstance(fact_start, int)
+                or not isinstance(fact_end, int)
+            ):
+                raise ValueError("counterfactual source fact span is invalid")
+            if fact_start >= target_end:
+                fact["char_start"] = fact_start + shift
+                fact["char_end"] = fact_end + shift
+            elif fact_end > target_start:
+                raise ValueError("counterfactual source facts overlap")
+        updated_facts.append(fact)
+    if changed != 1:
+        raise ValueError("counterfactual source fact is not unique")
+    return {
+        **payload,
+        "visible_text": changed_text,
+        "text_sha256": text_sha256,
+        "facts": updated_facts,
+    }
+
+
 def _wiki_program_ops(control_tier: str) -> list[dict[str, Any]]:
     ops: list[dict[str, Any]] = [{"op": "READ_WIKI_FACT", "role": "born"}]
     if control_tier in {"32k", "64k"}:
@@ -211,11 +285,54 @@ def _wiki_cf_updates(section: Event) -> dict[str, Any]:
         ):
             updated["evidence_quote"] = mutated_quote
             updated["value"] = mutated_value
+            updated["char_end"] = start + len(mutated_quote)
+        else:
+            span_start = span.get("char_start")
+            span_end = span.get("char_end")
+            if not isinstance(span_start, int) or not isinstance(span_end, int):
+                raise ValueError("counterfactual wiki fact span is invalid")
+            shift = len(mutated_quote) - len(quote)
+            if span_start >= end:
+                updated["char_start"] = span_start + shift
+                updated["char_end"] = span_end + shift
+            elif span_end > start:
+                raise ValueError("counterfactual wiki fact spans overlap")
         spans.append(updated)
+    grounded_source = _counterfactual_grounded_source(
+        section.params.get("grounded_source"),
+        original_quote=quote,
+        changed_quote=mutated_quote,
+        changed_text=mutated,
+    )
+    prefix = (
+        WIKI_ENTITY_VIEW_PREFIX
+        if section.params.get("section_id") == "wikidata_entity"
+        else WIKI_SECTION_VIEW_PREFIX
+    )
+    section_sha256 = hashlib.sha256(mutated[len(prefix) :].encode()).hexdigest()
+    parent_provenance_id = str(section.params.get("provenance_id") or "")
+    provenance_payload = {
+        "operation": "counterfactual_wiki_section_v1",
+        "parent_provenance_id": parent_provenance_id,
+        "parent_source_sha256": str(section.params.get("parent_source_sha256") or ""),
+        "text_sha256": hashlib.sha256(mutated.encode()).hexdigest(),
+    }
+    provenance = hashlib.sha256(
+        json.dumps(provenance_payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
     return {
         "text": mutated,
         "text_sha256": hashlib.sha256(mutated.encode()).hexdigest(),
+        "section_sha256": section_sha256,
         "fact_spans": spans,
+        "grounded_source": grounded_source,
+        "source_binding_provenance": "synthetic_executable",
+        "provenance_operation": "counterfactual_wiki_section_v1",
+        "parent_provenance_id": parent_provenance_id,
+        "provenance_id": f"derived-sha256:{provenance}",
+        "source_origin": "synthetic_world",
+        "parent_source_origin": "real_derived",
+        "parent_source_text_sha256": str(section.params.get("text_sha256") or ""),
     }
 
 
@@ -279,6 +396,12 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
             str(source.params["text"]), value
         )
         cf_text_sha256 = hashlib.sha256(cf_text.encode()).hexdigest()
+        cf_grounded_source = _counterfactual_grounded_source(
+            source.params.get("grounded_source"),
+            original_quote=value,
+            changed_quote=cf_value,
+            changed_text=cf_text,
+        )
         cf_provenance = hashlib.sha256(
             json.dumps(
                 {
@@ -353,12 +476,19 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                 cf_param_updates={
                     "text": cf_text,
                     "text_sha256": cf_text_sha256,
-                    "source_origin": "real_derived",
                     "parent_provenance_id": source.params["provenance_id"],
                     "provenance_id": f"derived-sha256:{cf_provenance}",
                     "provenance_operation": "counterfactual_revision_text",
+                    "source_binding_provenance": "synthetic_executable",
+                    "source_origin": "synthetic_world",
+                    "parent_source_origin": "real_derived",
+                    "parent_source_envelope_sha256": source.params[
+                        "canonical_source_envelope_sha256"
+                    ],
+                    "parent_source_text_sha256": source.params["text_sha256"],
                     "excluded_paths": [],
                     "ground_values": [cf_value],
+                    "grounded_source": cf_grounded_source,
                 },
                 cf_answer="",
                 invariance_event_id=tok.id,
@@ -390,6 +520,7 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
     computes: dict[str, dict[str, Event]] = {}
     copies_16k: dict[str, list[Event]] = {}
     wiki_sections: dict[str, dict[str, Event]] = {}
+    wiki_relations: dict[str, list[Event]] = {}
     for event in world.events:
         record_id = str(event.params.get("record_id") or "")
         if not record_id:
@@ -405,6 +536,8 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
             section_id = str(event.params.get("section_id") or "")
             if section_id:
                 wiki_sections.setdefault(record_id, {})[section_id] = event
+        elif event.type == "wiki_source_relation":
+            wiki_relations.setdefault(record_id, []).append(event)
     for record_id, by_tier in computes.items():
         if any(tier not in by_tier for tier in ("16k", "32k", "64k")):
             continue
@@ -449,6 +582,13 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                 *needed_answers,
                 *extra_copies,
             ]
+            if control_tier in {"32k", "64k"}:
+                essential_events.extend(
+                    sorted(
+                        wiki_relations.get(record_id) or [],
+                        key=lambda event: (event.time, event.id),
+                    )
+                )
             if control_tier != "16k":
                 essential_events.append(answer_event)
             essential_ids = [event.id for event in essential_events]

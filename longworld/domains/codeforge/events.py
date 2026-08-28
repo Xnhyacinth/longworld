@@ -6,6 +6,7 @@ from longworld.core.cascade import apply_cascade, check_cascade
 from longworld.core.grounded import apply_grounded, check_grounded
 from longworld.core.state import WorldState
 from longworld.core.world import Event
+from longworld.domains.codeforge.schema import materialize_grounded_repo_record
 
 
 def init_values(project: dict[str, Any]) -> dict[str, Any]:
@@ -246,24 +247,46 @@ _REPO_FACT_KEYS = (
 def _apply_repo_record(state: WorldState, ev: Event) -> None:
     """Replay a body-grounded repository record and resolve its explicit links."""
     p = ev.params
+    materialized = materialize_grounded_repo_record(p)
+    p.update(materialized)
+    replayed_facts = dict(materialized["replayed_body_facts"])
     record_id = str(p["record_key"])
     source_record_id = str(p["record_id"])
-    links = [str(link) for link in p.get("links") or []]
+    links = [str(link) for link in materialized["replayed_links"]]
     prefix = f"repo:{record_id}"
     state.set(f"{prefix}:kind", str(p["record_kind"]), ev.id, ev.time)
     state.set(f"{prefix}:body_sha256", str(p["body_sha256"]), ev.id, ev.time)
     state.set(f"{prefix}:links", tuple(links), ev.id, ev.time)
 
     for key in _REPO_FACT_KEYS:
-        if key in p:
-            state.set(f"{prefix}:{key}", p[key], ev.id, ev.time)
-            state.set(f"{prefix}:resolved:{key}", p[key], ev.id, ev.time)
+        if key in replayed_facts:
+            value = replayed_facts[key]
+            state.set(f"{prefix}:{key}", value, ev.id, ev.time)
+            state.set(f"{prefix}:resolved:{key}", value, ev.id, ev.time)
             continue
         for link in links:
             value = state.values.get(f"repo:{link}:resolved:{key}")
             if value is not None:
                 state.set(f"{prefix}:resolved:{key}", value, ev.id, ev.time)
                 break
+
+    for span in materialized["grounded_fact_spans"]:
+        for key in span["values"]:
+            evidence_prefix = f"{prefix}:grounded:{key}"
+            state.set(f"{evidence_prefix}:fact_id", span["fact_id"], ev.id, ev.time)
+            state.set(
+                f"{evidence_prefix}:text_sha256",
+                span["text_sha256"],
+                ev.id,
+                ev.time,
+            )
+            state.set(
+                f"{evidence_prefix}:char_start",
+                span["char_start"],
+                ev.id,
+                ev.time,
+            )
+            state.set(f"{evidence_prefix}:char_end", span["char_end"], ev.id, ev.time)
 
     if p.get("single_workflow"):
         alias_prefix = f"repo:{source_record_id}"

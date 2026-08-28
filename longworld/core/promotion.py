@@ -8,6 +8,7 @@ import json
 import math
 import re
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import replace
 from functools import lru_cache
 from pathlib import Path
@@ -22,7 +23,10 @@ from longworld.core.attestation import (
     verify_attestation_identity,
 )
 from longworld.core.engine import answer_from_artifacts
-from longworld.core.filingworkflow import SEC_HYBRID_CHILD_EVENT_TYPES
+from longworld.core.filingworkflow import (
+    SEC_HYBRID_CHILD_EVENT_TYPES,
+    selected_sec_source_relation_edges,
+)
 from longworld.core.graph import graph_stats
 from longworld.core.pack import (
     SEP,
@@ -31,6 +35,8 @@ from longworld.core.pack import (
     dependency_evidence_ids,
     estimate_tokens,
     join_artifacts,
+    prompt_document_prefix,
+    prompt_query_boundary,
     wrap_prompt,
 )
 from longworld.core.production_trust import (
@@ -68,6 +74,7 @@ from longworld.core.verify import (
 from longworld.core.views import render_cf_view
 from longworld.core.wikiparse import WIKI_HYBRID_CHILD_EVENT_TYPES
 from longworld.domains.company.queries import QuerySpec
+from longworld.domains.researchlab.simulate import selected_wiki_source_relation_edges
 
 DENSE_AUDIT_PURPOSE = "dense_retrieval_audit"
 DENSE_RANKING_PURPOSE = "dense_ranking"
@@ -230,7 +237,7 @@ def _candidate_has_verified_real_source(candidate: dict[str, Any]) -> bool:
     classifications = candidate.get("artifact_classification")
     return bool(
         candidate.get("source_family_ids")
-        and candidate.get("source_relation_edges")
+        and candidate.get("authentic_source_relation_edges")
         and any(
             isinstance(candidate.get(field), dict)
             for field in ("episode_replay_bundle", "source_workflow_bundle")
@@ -1349,13 +1356,51 @@ def _load_replay_tokenizer(model_id: str, revision: str):
         )
 
 
+@lru_cache(maxsize=2)
+def _resolved_local_tokenizer_revision(model_id: str, revision: str) -> str:
+    """Resolve the immutable snapshot backing the locally loaded tokenizer."""
+    with sanitized_attestation_environment():
+        from transformers.utils.hub import cached_file
+
+        resolved = cached_file(
+            model_id,
+            "tokenizer_config.json",
+            revision=revision,
+            local_files_only=True,
+        )
+    if not resolved:
+        raise PromotionError("candidate exact tokenizer cannot be resolved")
+    parts = Path(resolved).parts
+    try:
+        snapshot_index = parts.index("snapshots")
+        resolved_revision = parts[snapshot_index + 1]
+    except (ValueError, IndexError) as error:
+        raise PromotionError(
+            "candidate exact tokenizer is not loaded from a pinned snapshot"
+        ) from error
+    if not _HEX_REVISION.fullmatch(resolved_revision):
+        raise PromotionError("loaded exact tokenizer revision is malformed")
+    return resolved_revision.lower()
+
+
+def _token_counter_for(tokenizer: Any | None) -> Callable[[str], int] | None:
+    if tokenizer is None:
+        return None
+
+    def count(text: str) -> int:
+        with sanitized_attestation_environment():
+            return len(tokenizer.encode(text, add_special_tokens=False))
+
+    return count
+
+
 def _independent_verification_replay(
     candidate: dict[str, Any],
     world: Any,
     spec: QuerySpec,
     artifacts: list[Artifact],
     counterpart: list[Artifact],
-) -> tuple[Verification, dict[str, Any]]:
+) -> tuple[Verification, dict[str, Any], Any | None]:
     factual, counterfactual = _parallel_dossiers(candidate, artifacts, counterpart)
     tokenizer = None
     tokenizer_model_id = str(candidate.get("tokenizer_model_id") or "")
@@ -1365,14 +1410,14 @@ def _independent_verification_replay(
         if (tokenizer_model_id, tokenizer_revision) not in _APPROVED_EXACT_TOKENIZERS:
             raise PromotionError("candidate exact tokenizer pin is not approved")
         try:
+            loaded_revision = _resolved_local_tokenizer_revision(
+                tokenizer_model_id, tokenizer_revision
+            )
             tokenizer = _load_replay_tokenizer(tokenizer_model_id, tokenizer_revision)
         except (ImportError, OSError, RuntimeError, ValueError) as error:
             raise PromotionError(
                 "candidate exact tokenizer cannot be loaded"
             ) from error
-        loaded_revision = str(
-            getattr(tokenizer, "init_kwargs", {}).get("_commit_hash") or ""
-        )
         if loaded_revision != tokenizer_revision:
             raise PromotionError("loaded exact tokenizer revision does not match pin")
         reconstructed_context = wrap_prompt(
@@ -1437,7 +1482,7 @@ def _independent_verification_replay(
     notes["counterfactual_shortcuts"] = cf_shortcut_notes
     if candidate.get("view") == "cf" and not cf_shortcuts_green:
         raise PromotionError("counterfactual dossier has a short-context shortcut")
-    return verification, notes
+    return verification, notes, tokenizer
 
 
 def _source_family_from_url(source_url: str) -> str:
@@ -1631,8 +1676,19 @@ def _replayed_source_metadata(
         for event_id, event in all_events.items()
         if event.type == "repo_record" and event.params.get("source_url")
     }
+    real_origins = {"real_public", "real_private_export", "real_derived"}
+    endpoint_is_real: dict[str, bool] = {}
+    for event_id in events:
+        visible = [
+            artifact for artifact in artifacts if event_id in artifact.reveals_events
+        ]
+        endpoint_is_real[event_id] = bool(visible) and all(
+            artifact_classification(artifact).source_origin.value in real_origins
+            for artifact in visible
+        )
     edges: list[dict[str, str]] = []
     for child in events.values():
+        synthetic_inputs = set(child.params.get("synthetic_relation_inputs") or [])
         for parent_id in child.causal_inputs:
             parent = events.get(parent_id)
             if parent is None:
@@ -1644,13 +1700,51 @@ def _replayed_source_metadata(
                     "relation": str(
                         child.relation_kinds.get(parent_id) or "causal_input"
                     ),
-                    "relation_provenance": "authentic_source",
+                    "relation_provenance": (
+                        "synthetic_executable"
+                        if parent_id in synthetic_inputs
+                        or endpoint_is_real.get(parent_id, True) is not True
+                        or endpoint_is_real.get(child.id, True) is not True
+                        else "authentic_source"
+                    ),
                     "parent_source_url": str(parent.params["source_url"]),
                     "child_source_url": str(child.params["source_url"]),
                 }
             )
     for relation in all_events.values():
         if relation.type != "arxiv_revision_relation":
+            continue
+        source_record_id = str(relation.params.get("source_record_id") or "")
+        target_record_id = str(relation.params.get("target_record_id") or "")
+        endpoints = [all_events.get(event_id) for event_id in relation.required_inputs]
+        endpoint_record_ids = {
+            str(endpoint.params.get("record_id") or "")
+            for endpoint in endpoints
+            if endpoint is not None and endpoint.type == "arxiv_revision"
+        }
+        if (
+            not source_record_id
+            or not target_record_id
+            or source_record_id == target_record_id
+            or len(endpoints) != 2
+            or endpoint_record_ids != {source_record_id, target_record_id}
+        ):
+            continue
+        source = all_events.get(
+            str(relation.params.get("source_record_event_id") or "")
+        )
+        target = all_events.get(
+            str(relation.params.get("target_record_event_id") or "")
+        )
+        if (
+            source is None
+            or target is None
+            or source.type != "arxiv_revision"
+            or target.type != "arxiv_revision"
+            or set(relation.required_inputs) != {source.id, target.id}
+            or relation.params.get("source_record_id") != source.params.get("record_id")
+            or relation.params.get("target_record_id") != target.params.get("record_id")
+        ):
             continue
         edges.append(
             {
@@ -1664,6 +1758,8 @@ def _replayed_source_metadata(
                 "child_source_url": str(relation.params.get("source_url") or ""),
             }
         )
+    edges.extend(selected_sec_source_relation_edges(world, spec, artifacts))
+    edges.extend(selected_wiki_source_relation_edges(world, spec, artifacts))
     for child in all_events.values():
         if (
             child.type
@@ -1731,7 +1827,7 @@ def _replayed_source_metadata(
         else ""
     )
     return {
-        "real_source_verified": bool(edges and real_families),
+        "real_source_verified": bool(authentic_edges and real_families),
         "real_source_family_ids": sorted(real_families),
         "real_source_workflow_ids": sorted(real_workflow_ids),
         "source_relation_edges": edges,
@@ -1752,6 +1848,8 @@ def _replayed_quality_metrics(
     spec: QuerySpec,
     artifacts: list[Artifact],
     verification_notes: dict[str, Any] | None = None,
+    *,
+    token_counter: Callable[[str], int] | None = None,
 ) -> dict[str, Any]:
     """Recompute serialized-view quality fields without trusting candidate values."""
     document_context = join_artifacts(artifacts)
@@ -1759,19 +1857,48 @@ def _replayed_quality_metrics(
         spec.question, document_context, str(candidate["query_timing"])
     )
     essential_ids = set(spec.essential_artifact_ids)
+    requested_bucket = str(candidate.get("length_bucket") or "")
+    exact_token_replay = (verification_notes or {}).get("exact_token_replay")
+    if requested_bucket in EXACT_TOKEN_BAND_RANGES and token_counter is None:
+        raise PromotionError("exact view metrics require the pinned tokenizer")
     metrics = compute_view_metrics(
         artifacts,
         dependency_evidence_ids(artifacts, spec),
         query_timing=str(candidate["query_timing"]),
         context=context,
+        token_counter=token_counter,
+        token_prefix=(
+            prompt_document_prefix(spec.question, str(candidate["query_timing"]))
+            if token_counter is not None
+            else ""
+        ),
+        query_boundary_tokens=(
+            prompt_query_boundary(
+                spec.question,
+                document_context,
+                str(candidate["query_timing"]),
+                token_counter,
+            )
+            if token_counter is not None
+            else None
+        ),
     )
-    if (
-        candidate.get("length_bucket") != metrics.length_bucket
-        or candidate.get("position_bucket") != metrics.position_bucket
-    ):
-        raise PromotionError(
-            "candidate view length or position metadata is not truthful"
+    if requested_bucket in EXACT_TOKEN_BAND_RANGES:
+        exact_tokens = (
+            exact_token_replay.get("tokenizer_context_tokens")
+            if isinstance(exact_token_replay, dict)
+            else None
         )
+        if (
+            not isinstance(exact_tokens, int)
+            or exact_token_band_reject_reason(requested_bucket, exact_tokens)
+            or exact_tokens != metrics.context_tokens
+        ):
+            raise PromotionError("candidate exact length metadata is not truthful")
+    elif requested_bucket != metrics.length_bucket:
+        raise PromotionError("candidate view length metadata is not truthful")
+    if candidate.get("position_bucket") != metrics.position_bucket:
+        raise PromotionError("candidate view position metadata is not truthful")
 
     semantic_tokens = {
         "event_bearing": 0,
@@ -1788,7 +1915,7 @@ def _replayed_quality_metrics(
         if event.params.get("workflow_id")
     }
     for artifact in artifacts:
-        tokens = estimate_tokens(artifact.text)
+        tokens = (token_counter or estimate_tokens)(artifact.text)
         classification = artifact_classification(artifact)
         same_workflow = classification.workflow_id in bound_workflow_ids or (
             classification.workflow_kind.value == "unclassified"
@@ -1854,7 +1981,7 @@ def _replayed_quality_metrics(
         "context": context,
         "document_context": document_context,
         "difficulty": difficulty,
-        "length_bucket": metrics.length_bucket,
+        "length_bucket": requested_bucket,
         "position_bucket": metrics.position_bucket,
         "actual_context_tokens": metrics.context_tokens,
         "natural_tokens": metrics.context_tokens,
@@ -1878,7 +2005,6 @@ def _replayed_quality_metrics(
             real_source_tokens / max(1, metrics.context_tokens), 4
         ),
     }
-    exact_token_replay = (verification_notes or {}).get("exact_token_replay")
     if isinstance(exact_token_replay, dict):
         replayed.update(exact_token_replay)
     if tokenizer_evidence_span_tokens is not None:
@@ -2055,11 +2181,16 @@ def create_dense_audit(
         source_bundle_path,
         source_attestation_key,
     )
-    replayed_verification, replayed_notes = _independent_verification_replay(
-        candidate, world, spec, artifacts, counterpart
+    replayed_verification, replayed_notes, replay_tokenizer = (
+        _independent_verification_replay(candidate, world, spec, artifacts, counterpart)
     )
     replayed_quality = _replayed_quality_metrics(
-        candidate, world, spec, artifacts, replayed_notes
+        candidate,
+        world,
+        spec,
+        artifacts,
+        replayed_notes,
+        token_counter=_token_counter_for(replay_tokenizer),
     )
     verification_replay_sha256 = _canonical_sha256(
         {
@@ -2153,7 +2284,7 @@ def promote_candidate(
         source_bundle_path,
         source_attestation_key,
     )
-    verification, replayed_notes = _independent_verification_replay(
+    verification, replayed_notes, replay_tokenizer = _independent_verification_replay(
         candidate, world, spec, artifacts, counterpart
     )
     verification_replay_sha256 = _canonical_sha256(
@@ -2162,7 +2293,12 @@ def promote_candidate(
     if dense_audit.get("verification_replay_sha256") != verification_replay_sha256:
         raise PromotionError("dense audit verification replay binding mismatch")
     replayed_quality = _replayed_quality_metrics(
-        candidate, world, spec, artifacts, replayed_notes
+        candidate,
+        world,
+        spec,
+        artifacts,
+        replayed_notes,
+        token_counter=_token_counter_for(replay_tokenizer),
     )
     if (
         _audited_near_dup_sentence_ratio(dense_audit)
