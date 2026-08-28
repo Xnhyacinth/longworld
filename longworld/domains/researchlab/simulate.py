@@ -12,6 +12,7 @@ from longworld.core.provenance import ProvenanceError
 from longworld.core.sourceworkflow import PAPER_SOURCE_KIND, WIKIMEDIA_SOURCE_KIND
 from longworld.core.wikiparse import (
     WIKI_ENTITY_VIEW_PREFIX,
+    WIKI_FACT_PARSER_REVISION_V2,
     WIKI_SECTION_REVISION,
     WIKI_SECTION_VIEW_PREFIX,
     parse_wiki_claim_program,
@@ -25,10 +26,6 @@ from longworld.domains.researchlab.events import (
 
 _WIKI_SECTION_OFFSETS = {
     "early_work": 0,
-    "early_birth": 0,
-    "early_career": 1,
-    "early_revolution": 2,
-    "early_diplomacy": 3,
     "commemoration": 8,
     "wikidata_entity": 8,
     "popular_culture": 401,
@@ -51,12 +48,8 @@ _WIKI_CLAIM_TIERS = (
         ("early_work", "commemoration", "popular_culture", "wikidata_entity"),
     ),
 )
-_WIKI_TIER_ROLES = {
-    "16k": ("born",),
-    "32k": ("born", "commemoration", "entity"),
-    "64k": ("born", "commemoration", "entity", "popular_culture"),
-}
-_WIKI_ROLE_TAGS = {
+ARXIV_SOURCE_ENVELOPE_REVISION = "researchlab-arxiv-source-envelope-v1"
+_WIKI_LEGACY_ROLE_TAGS = {
     "born": "BORN",
     "early_career": "CAREER",
     "revolutionary_committee": "COMMITTEE",
@@ -65,8 +58,6 @@ _WIKI_ROLE_TAGS = {
     "entity": "ENTITY",
     "popular_culture": "POP",
 }
-ARXIV_SOURCE_ENVELOPE_REVISION = "researchlab-arxiv-source-envelope-v1"
-WIKI_FACT_PARSER_REVISION = "researchlab-wiki-claim-exact-v1"
 
 
 def _date(start: date, months: int, extra_days: int = 0) -> date:
@@ -74,7 +65,12 @@ def _date(start: date, months: int, extra_days: int = 0) -> date:
     return start + timedelta(days=30 * months + extra_days)
 
 
-def _semantic_arxiv_body(record: Any) -> tuple[str, str, list[str]]:
+def _semantic_arxiv_body(
+    record: Any,
+    *,
+    included_basenames: frozenset[str] | None = None,
+    bind_file_spans: bool = False,
+) -> tuple[str, str, list[str], list[dict[str, Any]]]:
     """Preserve semantic LaTeX while excluding non-body preamble formatting."""
     try:
         payload = json.loads(record.text)
@@ -83,8 +79,9 @@ def _semantic_arxiv_body(record: Any) -> tuple[str, str, list[str]]:
     raw_sources = payload.get("latex_sources") if isinstance(payload, dict) else None
     if not isinstance(raw_sources, list) or not raw_sources:
         raise ValueError("arXiv source record has no LaTeX body")
-    selected: list[str] = []
+    selected: list[tuple[str, str]] = []
     paths: set[str] = set()
+    selected_basenames: set[str] = set()
     for source in raw_sources:
         if not isinstance(source, dict) or set(source) not in (
             {"path", "text"},
@@ -96,35 +93,79 @@ def _semantic_arxiv_body(record: Any) -> tuple[str, str, list[str]]:
         if not path or path in paths or not text:
             raise ValueError("arXiv LaTeX source entry is invalid")
         paths.add(path)
-        if path.rsplit("/", 1)[-1] == "preamble.tex":
+        basename = path.rsplit("/", 1)[-1]
+        if basename == "preamble.tex" or (
+            included_basenames is not None and basename not in included_basenames
+        ):
             continue
-        selected.append(text)
+        if basename in selected_basenames:
+            raise ValueError("arXiv selected source basename is not unique")
+        selected_basenames.add(basename)
+        selected.append((path, text))
     if not selected:
         raise ValueError("arXiv semantic LaTeX body is empty")
     revision_id = record.attribute("revision_id")
     if not revision_id:
         raise ValueError("arXiv source record has no revision identity")
-    body = (
+    header = (
         f"% arXiv manuscript revision {revision_id}\n"
-        f"% arXiv submitted_at {record.occurred_at}\n" + "\n\n".join(selected)
+        f"% arXiv submitted_at {record.occurred_at}\n"
     )
+    body = header + "\n\n".join(text for _path, text in selected)
+    source_file_spans: list[dict[str, Any]] = []
+    cursor = len(header)
+    for index, (path, text) in enumerate(selected):
+        if index:
+            cursor += 2
+        end = cursor + len(text)
+        source_file_spans.append(
+            {
+                "path": path,
+                "basename": path.rsplit("/", 1)[-1],
+                "char_start": cursor,
+                "char_end": end,
+                "text_sha256": hashlib.sha256(text.encode()).hexdigest(),
+            }
+        )
+        cursor = end
+    if cursor != len(body):
+        raise ValueError("arXiv selected source spans do not cover the body")
     text_sha256 = hashlib.sha256(body.encode()).hexdigest()
     excluded_paths = sorted(
-        path for path in paths if path.rsplit("/", 1)[-1] == "preamble.tex"
+        path
+        for path in paths
+        if path.rsplit("/", 1)[-1] == "preamble.tex"
+        or (
+            included_basenames is not None
+            and path.rsplit("/", 1)[-1] not in included_basenames
+        )
     )
+    operation = (
+        "arxiv_semantic_latex_body_v2"
+        if bind_file_spans
+        else "arxiv_semantic_latex_body_v1"
+    )
+    digest_payload = {
+        "operation": operation,
+        "parent_provenance_id": record.provenance_id,
+        "excluded_paths": excluded_paths,
+        "text_sha256": text_sha256,
+    }
+    if bind_file_spans:
+        digest_payload.update(
+            {
+                "source_file_spans": source_file_spans,
+                "source_view_basenames": sorted(selected_basenames),
+            }
+        )
     provenance = hashlib.sha256(
         json.dumps(
-            {
-                "operation": "arxiv_semantic_latex_body_v1",
-                "parent_provenance_id": record.provenance_id,
-                "excluded_paths": excluded_paths,
-                "text_sha256": text_sha256,
-            },
+            digest_payload,
             sort_keys=True,
             separators=(",", ":"),
         ).encode()
     ).hexdigest()
-    return body, f"derived-sha256:{provenance}", excluded_paths
+    return body, f"derived-sha256:{provenance}", excluded_paths, source_file_spans
 
 
 def _canonical_digest(payload: dict[str, Any]) -> str:
@@ -134,9 +175,16 @@ def _canonical_digest(payload: dict[str, Any]) -> str:
 
 
 def _arxiv_source_envelope(
-    *, workflow: Any, record: Any, text_sha256: str, provenance_id: str
+    *,
+    workflow: Any,
+    record: Any,
+    text_sha256: str,
+    provenance_id: str,
+    provenance_operation: str = "arxiv_semantic_latex_body_v1",
+    source_file_spans: list[dict[str, Any]] | None = None,
+    source_view_basenames: list[str] | None = None,
 ) -> dict[str, Any]:
-    return {
+    payload = {
         "revision": ARXIV_SOURCE_ENVELOPE_REVISION,
         "workflow_id": workflow.workflow_id,
         "record_id": record.record_id,
@@ -149,6 +197,10 @@ def _arxiv_source_envelope(
         "text_sha256": text_sha256,
         "provenance_id": provenance_id,
     }
+    if provenance_operation == "arxiv_semantic_latex_body_v2":
+        payload["source_file_spans"] = list(source_file_spans or [])
+        payload["source_view_basenames"] = list(source_view_basenames or [])
+    return payload
 
 
 def _grounded_fact(
@@ -245,9 +297,16 @@ def _wikipedia_source_workflow_events(
         )
     except ProvenanceError:
         return []
+    semantic_tags = program.fact_parser_revision == WIKI_FACT_PARSER_REVISION_V2
     later_day = date.fromisoformat(later.occurred_at[:10])
     events: list[Event] = []
     section_ids: dict[str, str] = {}
+    early_section_names = [
+        section.section_id
+        for section in program.sections
+        if section.section_id.startswith("early_")
+    ]
+    early_offsets = {name: index for index, name in enumerate(early_section_names)}
     for section in program.sections:
         record = entity if section.section_id == "wikidata_entity" else later
         prefix_text = (
@@ -267,12 +326,16 @@ def _wikipedia_source_workflow_events(
             section_text=section_text,
             prefix_text=prefix_text,
         )
+        section_offset = _WIKI_SECTION_OFFSETS.get(
+            section.section_id, early_offsets.get(section.section_id)
+        )
+        if section_offset is None:
+            return []
         events.append(
             Event(
                 id=event_id,
                 type="wiki_source_section",
-                time=later_day
-                + timedelta(days=_WIKI_SECTION_OFFSETS[section.section_id]),
+                time=later_day + timedelta(days=section_offset),
                 params={
                     "workflow_id": workflow.workflow_id,
                     "record_id": later.record_id,
@@ -287,7 +350,7 @@ def _wikipedia_source_workflow_events(
                     "provenance_id": section.provenance_id,
                     "provenance_operation": WIKI_SECTION_REVISION,
                     "source_binding_provenance": "verified_derived",
-                    "fact_parser_revision": WIKI_FACT_PARSER_REVISION,
+                    "fact_parser_revision": program.fact_parser_revision,
                     "source_origin": "real_derived",
                     "source_family": record.source_family,
                     "source_url": record.source_url,
@@ -385,20 +448,37 @@ def _wikipedia_source_workflow_events(
     prior_key = ""
     compute_keys: dict[str, str] = {}
     used_sections: set[str] = set()
-    available_roles = {
-        fact.role for section in program.sections for fact in section.facts
+    early_sections = tuple(early_section_names) or ("early_work",)
+    sections_by_id = {section.section_id: section for section in program.sections}
+    roles_by_section = {
+        section_id: [fact.role for fact in sections_by_id[section_id].facts]
+        for section_id in section_ids
     }
-    segmented_early = (
-        "early_birth",
-        "early_career",
-        "early_revolution",
-        "early_diplomacy",
+    role_tags = (
+        {
+            fact.role: fact.answer_tag
+            for section in program.sections
+            for fact in section.facts
+        }
+        if semantic_tags
+        else _WIKI_LEGACY_ROLE_TAGS
     )
-    early_sections = (
-        segmented_early
-        if set(segmented_early).issubset(section_ids)
-        else ("early_work",)
-    )
+    early_roles = [
+        role for section_id in early_sections for role in roles_by_section[section_id]
+    ]
+    middle_roles = roles_by_section["commemoration"]
+    entity_roles = roles_by_section["wikidata_entity"]
+    late_roles = roles_by_section["popular_culture"]
+    tier_roles = {
+        "16k": early_roles,
+        "32k": [*early_roles, *middle_roles, *entity_roles],
+        "64k": [*early_roles, *middle_roles, *entity_roles, *late_roles],
+    }
+    append_roles = {
+        "16k": early_roles,
+        "32k": [*middle_roles, *entity_roles],
+        "64k": late_roles,
+    }
     for control_tier, rungs, default_sections in _WIKI_CLAIM_TIERS:
         needed_sections = (*early_sections, *default_sections[1:])
         new_sections = [name for name in needed_sections if name not in used_sections]
@@ -424,21 +504,7 @@ def _wikipedia_source_workflow_events(
                 answer_key = (
                     f"wiki_claim_reconstruction:{later.record_id}:{control_tier}"
                 )
-                tier_roles = list(_WIKI_TIER_ROLES[control_tier])
-                early_roles = [
-                    role
-                    for role in (
-                        "early_career",
-                        "revolutionary_committee",
-                        "early_transition",
-                    )
-                    if role in available_roles
-                ]
-                required_roles = [
-                    *(["born"] if "born" in tier_roles else []),
-                    *early_roles,
-                    *(role for role in tier_roles if role != "born"),
-                ]
+                required_roles = list(tier_roles[control_tier])
             relation_kinds = {
                 parent: (
                     "extends"
@@ -453,7 +519,14 @@ def _wikipedia_source_workflow_events(
                 Event(
                     id=event_id,
                     type="wiki_claim_answer",
-                    time=later_day + timedelta(days=offset),
+                    time=later_day
+                    + timedelta(
+                        days=(
+                            max(offset, len(early_sections))
+                            if control_tier == "16k"
+                            else offset
+                        )
+                    ),
                     params={
                         "workflow_id": workflow.workflow_id,
                         "record_id": later.record_id,
@@ -471,9 +544,18 @@ def _wikipedia_source_workflow_events(
                             else ""
                         ),
                         "required_roles": required_roles,
+                        **(
+                            {
+                                "append_roles": list(append_roles[control_tier]),
+                                "role_tags": {
+                                    role: role_tags[role] for role in required_roles
+                                },
+                            }
+                            if semantic_tags
+                            else {}
+                        ),
                         "response_schema": "||".join(
-                            f"{_WIKI_ROLE_TAGS[role]}:<value>"
-                            for role in required_roles
+                            f"{role_tags[role]}:<value>" for role in required_roles
                         ),
                         "required_relation_ids": list(relation_ids)
                         if control_tier in {"32k", "64k"}
@@ -498,6 +580,482 @@ def _wikipedia_source_workflow_events(
     return events
 
 
+_ARXIV_16K_VIEWS: dict[str, frozenset[str] | None] = {
+    "v1": frozenset({"example.tex", "illustrations_sup.tex", "main.tex"}),
+    "v2": frozenset(
+        {
+            "acknowledgements.tex",
+            "discussion.tex",
+            "experiments_details.tex",
+            "main.tex",
+        }
+    ),
+    "v3": frozenset({"abstract.tex"}),
+}
+_ARXIV_32K_FILES = frozenset(
+    {
+        "abstract.tex",
+        "acknowledgements.tex",
+        "example.tex",
+        "experiments_sup.tex",
+        "expressions.tex",
+        "feature.tex",
+        "introduction.tex",
+        "main.tex",
+    }
+)
+_ARXIV_TERMINAL_FILES = frozenset({"abstract.tex", "acknowledgements.tex"})
+_ARXIV_TIER_OFFSETS = {"16k": 0, "32k": 365, "64k": 730}
+
+
+def _paper_multiband_records(workflow: Any) -> dict[str, Any] | None:
+    records = {record.attribute("revision_id"): record for record in workflow.records}
+    if set(records) != {"v1", "v2", "v3"} or len(workflow.relations) != 2:
+        return None
+    relation_pairs = {
+        (
+            records["v2"].record_id,
+            records["v1"].record_id,
+        ),
+        (
+            records["v3"].record_id,
+            records["v2"].record_id,
+        ),
+    }
+    if {
+        (relation.source_record_id, relation.target_record_id)
+        for relation in workflow.relations
+        if relation.kind == "revision_of" and len(relation.evidence) == 1
+    } != relation_pairs:
+        return None
+    delta_facts = [
+        fact for fact in records["v2"].facts if fact.field == "revision_added_text"
+    ]
+    if len(delta_facts) != 1:
+        return None
+    try:
+        v1_16k, _, _, v1_spans = _semantic_arxiv_body(
+            records["v1"],
+            included_basenames=_ARXIV_16K_VIEWS["v1"],
+            bind_file_spans=True,
+        )
+        v2_16k, _, _, v2_spans = _semantic_arxiv_body(
+            records["v2"],
+            included_basenames=_ARXIV_16K_VIEWS["v2"],
+            bind_file_spans=True,
+        )
+        required_new_include = "parts/acknowledgements"
+        v1_files = {
+            span["basename"]: v1_16k[span["char_start"] : span["char_end"]]
+            for span in v1_spans
+        }
+        v2_files = {
+            span["basename"]: v2_16k[span["char_start"] : span["char_end"]]
+            for span in v2_spans
+        }
+        delta_value = delta_facts[0].value
+        if (
+            "main.tex" not in v1_files
+            or "main.tex" not in v2_files
+            or "acknowledgements.tex" not in v2_files
+            or required_new_include in v1_files["main.tex"]
+            or required_new_include not in v2_files["main.tex"]
+            or v2_files["acknowledgements.tex"].count(delta_value) != 1
+        ):
+            return None
+        for revision_id, record in records.items():
+            _semantic_arxiv_body(
+                record,
+                included_basenames=_ARXIV_16K_VIEWS[revision_id],
+                bind_file_spans=True,
+            )
+            _semantic_arxiv_body(
+                record,
+                included_basenames=_ARXIV_32K_FILES,
+                bind_file_spans=True,
+            )
+    except ValueError:
+        return None
+    return records
+
+
+def _multiband_arxiv_revision_event(
+    *,
+    workflow: Any,
+    record: Any,
+    prefix: str,
+    workflow_index: int,
+    record_index: int,
+    tier: str,
+    included_basenames: frozenset[str] | None,
+) -> tuple[Event, str, str, dict[str, str]]:
+    body, provenance_id, excluded_paths, source_file_spans = _semantic_arxiv_body(
+        record,
+        included_basenames=included_basenames,
+        bind_file_spans=True,
+    )
+    event_id = f"{prefix}.arxiv_revision_{tier}_{workflow_index}_{record_index}"
+    revision_id = record.attribute("revision_id")
+    revision_start = body.index(revision_id)
+    revision_fact_id = f"{event_id}:revision_id"
+    submitted_at = record.occurred_at
+    submitted_start = body.index(submitted_at)
+    grounded_facts = [
+        _grounded_fact(
+            source_id=event_id,
+            text=body,
+            fact_id=revision_fact_id,
+            quote=revision_id,
+            char_start=revision_start,
+        ),
+        _grounded_fact(
+            source_id=event_id,
+            text=body,
+            fact_id=f"{event_id}:submitted_at",
+            quote=submitted_at,
+            char_start=submitted_start,
+        ),
+    ]
+    source_fact_ids: dict[str, str] = {}
+    for fact_index, fact in enumerate(record.facts):
+        if body.count(fact.value) != 1:
+            continue
+        fact_id = f"{event_id}:source_fact_{fact_index}"
+        source_fact_ids[fact.fact_id] = fact_id
+        grounded_facts.append(
+            _grounded_fact(
+                source_id=event_id,
+                text=body,
+                fact_id=fact_id,
+                quote=fact.value,
+                char_start=body.index(fact.value),
+            )
+        )
+    text_sha256 = hashlib.sha256(body.encode()).hexdigest()
+    source_envelope = _arxiv_source_envelope(
+        workflow=workflow,
+        record=record,
+        text_sha256=text_sha256,
+        provenance_id=provenance_id,
+        provenance_operation="arxiv_semantic_latex_body_v2",
+        source_file_spans=source_file_spans,
+        source_view_basenames=sorted(
+            str(span["basename"]) for span in source_file_spans
+        ),
+    )
+    event = Event(
+        id=event_id,
+        type="arxiv_revision",
+        time=date.fromisoformat(record.occurred_at[:10])
+        + timedelta(days=_ARXIV_TIER_OFFSETS[tier]),
+        params={
+            "workflow_id": workflow.workflow_id,
+            "record_id": record.record_id,
+            "revision_id": revision_id,
+            "occurred_at": record.occurred_at,
+            "source_view_tier": tier,
+            "text": body,
+            "text_sha256": text_sha256,
+            "source_sha256": record.source_sha256,
+            "parent_provenance_id": record.provenance_id,
+            "provenance_id": provenance_id,
+            "provenance_operation": "arxiv_semantic_latex_body_v2",
+            "source_binding_provenance": "verified_derived",
+            "canonical_source_envelope_sha256": _canonical_digest(source_envelope),
+            "excluded_paths": excluded_paths,
+            "source_file_spans": source_file_spans,
+            "source_view_basenames": sorted(
+                str(span["basename"]) for span in source_file_spans
+            ),
+            "source_origin": "real_derived",
+            "source_family": record.source_family,
+            "source_url": record.source_url,
+            "retrieval_url": record.retrieval_url,
+            "ground_values": [
+                record.occurred_at[:10],
+                *(fact.value for fact in record.facts if fact.value in body),
+            ],
+            "grounded_source": _grounded_source(
+                source_id=event_id, text=body, facts=grounded_facts
+            ),
+        },
+        visibility=[event_id],
+    )
+    return event, body, revision_fact_id, source_fact_ids
+
+
+def _multiband_arxiv_relation_event(
+    *,
+    workflow: Any,
+    records: dict[str, Any],
+    relation: Any,
+    relation_index: int,
+    workflow_index: int,
+    tier: str,
+    source_event: Event,
+    target_event: Event,
+    source_body: str,
+    source_revision_fact_id: str,
+    target_revision_fact_id: str,
+    source_fact_ids: dict[str, str],
+    prior_relation_id: str = "",
+) -> Event:
+    source = records[str(source_event.params["revision_id"])]
+    target = records[str(target_event.params["revision_id"])]
+    selected_facts = [
+        fact for fact in source.facts if fact.field == "revision_added_text"
+    ]
+    delta_fact = selected_facts[0] if len(selected_facts) == 1 else None
+    grounded_fact_id = (
+        source_fact_ids.get(delta_fact.fact_id) if delta_fact is not None else None
+    )
+    relation_mode = "semantic_delta" if grounded_fact_id else "lineage_only"
+    if relation_mode == "semantic_delta":
+        assert delta_fact is not None and grounded_fact_id is not None
+        fact_start = source_body.index(delta_fact.value)
+        evidence_fact_ids = [
+            source_revision_fact_id,
+            target_revision_fact_id,
+            grounded_fact_id,
+        ]
+    else:
+        fact_start = -1
+        evidence_fact_ids = [source_revision_fact_id, target_revision_fact_id]
+    event_id = (
+        f"{source_event.id.rsplit('.arxiv_revision_', 1)[0]}."
+        f"arxiv_revision_relation_{tier}_{workflow_index}_{relation_index}"
+    )
+    workflow_key = hashlib.sha256(workflow.workflow_id.encode()).hexdigest()[:12]
+    grounded_relation = {
+        "relation_id": relation.relation_id,
+        "relation_type": relation.kind,
+        "source_id": source_event.id,
+        "target_id": target_event.id,
+        "claimed_provenance_class": "authentic_source_api",
+        "evidence_fact_ids": evidence_fact_ids,
+        "proof_mode": "structural_closure_only",
+    }
+    evidence = relation.evidence[0]
+    causal_inputs = [target_event.id, source_event.id]
+    relation_kinds = {
+        target_event.id: "revision_of",
+        source_event.id: "derived_from",
+    }
+    if prior_relation_id:
+        causal_inputs.append(prior_relation_id)
+        relation_kinds[prior_relation_id] = "extends"
+    return Event(
+        id=event_id,
+        type="arxiv_revision_relation",
+        time=max(source_event.time, target_event.time),
+        params={
+            "workflow_id": workflow.workflow_id,
+            "work_id": source.attribute("work_id"),
+            "source_view_tier": tier,
+            "relation_mode": relation_mode,
+            "candidate_key": (f"real_revision_delta_candidate:{workflow_key}:{tier}"),
+            "relation_id": relation.relation_id,
+            "relation_kind": relation.kind,
+            "source_record_id": source.record_id,
+            "target_record_id": target.record_id,
+            "source_revision_id": source.attribute("revision_id"),
+            "target_revision_id": target.attribute("revision_id"),
+            "source_record_event_id": source_event.id,
+            "target_record_event_id": target_event.id,
+            "source_url": source.source_url,
+            "target_source_url": target.source_url,
+            "source_family": source.source_family,
+            "evidence_quote": evidence.evidence_quote,
+            "evidence_char_start": evidence.char_start,
+            "fact_id": delta_fact.fact_id if delta_fact is not None else "",
+            "grounded_fact_id": grounded_fact_id or "",
+            "fact_char_start": fact_start,
+            "fact_char_end": (
+                fact_start + len(delta_fact.value) if delta_fact is not None else -1
+            ),
+            "fact_value_offset": 0,
+            "fact_value_length": len(delta_fact.value) if delta_fact is not None else 0,
+            "grounded_relation": grounded_relation,
+            "relation_provenance": "authentic_source_api",
+        },
+        visibility=[event_id],
+        causal_inputs=causal_inputs,
+        required_inputs=[target_event.id, source_event.id],
+        relation_kinds=relation_kinds,
+    )
+
+
+def _paper_multiband_events(
+    workflow: Any, prefix: str, workflow_index: int, records: dict[str, Any]
+) -> list[Event]:
+    record_indices = {
+        record.record_id: index for index, record in enumerate(workflow.records)
+    }
+    views: dict[str, dict[str, frozenset[str] | None]] = {
+        "16k": _ARXIV_16K_VIEWS,
+        "32k": {
+            "v1": _ARXIV_32K_FILES,
+            "v2": _ARXIV_32K_FILES,
+            "v3": _ARXIV_TERMINAL_FILES,
+        },
+        "64k": {"v1": None, "v2": None, "v3": _ARXIV_TERMINAL_FILES},
+    }
+    events: list[Event] = []
+    event_by_tier: dict[str, dict[str, Event]] = {}
+    body_by_tier: dict[str, dict[str, str]] = {}
+    revision_fact_by_tier: dict[str, dict[str, str]] = {}
+    source_facts_by_tier: dict[str, dict[str, dict[str, str]]] = {}
+    for tier, tier_views in views.items():
+        event_by_tier[tier] = {}
+        body_by_tier[tier] = {}
+        revision_fact_by_tier[tier] = {}
+        source_facts_by_tier[tier] = {}
+        for revision_id, included in tier_views.items():
+            record = records[revision_id]
+            event, body, revision_fact, source_facts = _multiband_arxiv_revision_event(
+                workflow=workflow,
+                record=record,
+                prefix=prefix,
+                workflow_index=workflow_index,
+                record_index=record_indices[record.record_id],
+                tier=tier,
+                included_basenames=included,
+            )
+            events.append(event)
+            event_by_tier[tier][revision_id] = event
+            body_by_tier[tier][revision_id] = body
+            revision_fact_by_tier[tier][revision_id] = revision_fact
+            source_facts_by_tier[tier][revision_id] = source_facts
+
+    relations = {
+        (relation.source_record_id, relation.target_record_id): (index, relation)
+        for index, relation in enumerate(workflow.relations)
+    }
+    v2_v1 = relations[(records["v2"].record_id, records["v1"].record_id)]
+    v3_v2 = relations[(records["v3"].record_id, records["v2"].record_id)]
+    relation_events: dict[str, list[Event]] = {"16k": [], "32k": [], "64k": []}
+    for tier in ("32k", "64k"):
+        relation_index, relation = v2_v1
+        delta_relation = _multiband_arxiv_relation_event(
+            workflow=workflow,
+            records=records,
+            relation=relation,
+            relation_index=relation_index,
+            workflow_index=workflow_index,
+            tier=tier,
+            source_event=event_by_tier[tier]["v2"],
+            target_event=event_by_tier[tier]["v1"],
+            source_body=body_by_tier[tier]["v2"],
+            source_revision_fact_id=revision_fact_by_tier[tier]["v2"],
+            target_revision_fact_id=revision_fact_by_tier[tier]["v1"],
+            source_fact_ids=source_facts_by_tier[tier]["v2"],
+        )
+        events.append(delta_relation)
+        relation_events[tier].append(delta_relation)
+        if tier == "64k":
+            relation_index, relation = v3_v2
+            terminal_relation = _multiband_arxiv_relation_event(
+                workflow=workflow,
+                records=records,
+                relation=relation,
+                relation_index=relation_index,
+                workflow_index=workflow_index,
+                tier=tier,
+                source_event=event_by_tier[tier]["v3"],
+                target_event=event_by_tier[tier]["v2"],
+                source_body=body_by_tier[tier]["v3"],
+                source_revision_fact_id=revision_fact_by_tier[tier]["v3"],
+                target_revision_fact_id=revision_fact_by_tier[tier]["v2"],
+                source_fact_ids=source_facts_by_tier[tier]["v3"],
+                prior_relation_id=delta_relation.id,
+            )
+            events.append(terminal_relation)
+            relation_events[tier].append(terminal_relation)
+
+    delta_fact = next(
+        fact for fact in records["v2"].facts if fact.field == "revision_added_text"
+    )
+    for tier in ("16k", "32k", "64k"):
+        source = event_by_tier[tier]["v2"]
+        target = event_by_tier[tier]["v1"]
+        fact_start = body_by_tier[tier]["v2"].index(delta_fact.value)
+        tier_relations = relation_events[tier]
+        decision_id = f"{prefix}.arxiv_revision_decision_{tier}_{workflow_index}"
+        proof_events = [target.id, source.id, event_by_tier[tier]["v3"].id]
+        proof_events.extend(relation.id for relation in tier_relations)
+        proof_events.append(decision_id)
+        workflow_key = hashlib.sha256(workflow.workflow_id.encode()).hexdigest()[:12]
+        causal_inputs = (
+            [target.id, source.id, event_by_tier[tier]["v3"].id]
+            if tier == "16k"
+            else [tier_relations[-1].id]
+        )
+        events.append(
+            Event(
+                id=decision_id,
+                type="arxiv_revision_decision",
+                time=max(
+                    event_by_tier[tier][revision_id].time
+                    for revision_id in event_by_tier[tier]
+                )
+                + timedelta(days=1),
+                params={
+                    "workflow_id": workflow.workflow_id,
+                    "work_id": records["v2"].attribute("work_id"),
+                    "control_tier": tier,
+                    "decision_mode": (
+                        "direct_delta"
+                        if tier == "16k"
+                        else "terminal_chain"
+                        if tier == "64k"
+                        else "relation_delta"
+                    ),
+                    "answer_key": (f"real_revision_added_text:{workflow_key}:{tier}"),
+                    "candidate_key": (
+                        f"real_revision_delta_candidate:{workflow_key}:{tier}"
+                    ),
+                    "source_record_id": records["v2"].record_id,
+                    "target_record_id": records["v1"].record_id,
+                    "terminal_record_id": records["v3"].record_id,
+                    "source_record_event_id": source.id,
+                    "target_record_event_id": target.id,
+                    "terminal_record_event_id": event_by_tier[tier]["v3"].id,
+                    "relation_event_id": tier_relations[0].id if tier_relations else "",
+                    "required_relation_ids": [
+                        str(relation.params["relation_id"])
+                        for relation in tier_relations
+                    ],
+                    "fact_id": delta_fact.fact_id,
+                    "grounded_fact_id": source_facts_by_tier[tier]["v2"].get(
+                        delta_fact.fact_id, ""
+                    ),
+                    "fact_char_start": fact_start,
+                    "fact_char_end": fact_start + len(delta_fact.value),
+                    "fact_value_offset": 0,
+                    "fact_value_length": len(delta_fact.value),
+                    "required_new_include": (
+                        "parts/acknowledgements" if tier == "16k" else ""
+                    ),
+                    "required_new_include_source_basename": (
+                        "main.tex" if tier == "16k" else ""
+                    ),
+                    "fact_source_basename": "acknowledgements.tex",
+                    "proof_event_ids": proof_events,
+                },
+                visibility=[decision_id],
+                causal_inputs=causal_inputs,
+                required_inputs=list(causal_inputs),
+                relation_kinds={
+                    event_id: "reads_source"
+                    if tier == "16k"
+                    else "applies_revision_chain"
+                    for event_id in causal_inputs
+                },
+            )
+        )
+    return events
+
+
 def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]:
     events: list[Event] = []
     for workflow_index, workflow in enumerate(project.get("source_workflows") or []):
@@ -508,13 +1066,23 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
             continue
         if workflow.source_kind != PAPER_SOURCE_KIND:
             continue
+        multiband_records = _paper_multiband_records(workflow)
+        if multiband_records is not None:
+            events.extend(
+                _paper_multiband_events(
+                    workflow, prefix, workflow_index, multiband_records
+                )
+            )
+            continue
         record_event_ids: dict[str, str] = {}
         record_bodies: dict[str, str] = {}
         record_revision_fact_ids: dict[str, str] = {}
         record_source_fact_ids: dict[str, dict[str, str]] = {}
         records = {record.record_id: record for record in workflow.records}
         for record_index, record in enumerate(workflow.records):
-            body, provenance_id, excluded_paths = _semantic_arxiv_body(record)
+            body, provenance_id, excluded_paths, _source_file_spans = (
+                _semantic_arxiv_body(record)
+            )
             event_id = f"{prefix}.arxiv_revision_{workflow_index}_{record_index}"
             record_event_ids[record.record_id] = event_id
             record_bodies[record.record_id] = body
@@ -631,6 +1199,11 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
             )
             source_event_id = record_event_ids[relation.source_record_id]
             target_event_id = record_event_ids[relation.target_record_id]
+            relation_key = hashlib.sha256(
+                f"{workflow.workflow_id}|{relation.relation_id}".encode()
+            ).hexdigest()[:12]
+            candidate_key = f"real_revision_delta_candidate:{relation_key}"
+            answer_key = f"real_revision_added_text:{relation_key}"
             selected_grounded_fact_id = record_source_fact_ids[
                 relation.source_record_id
             ].get(fact.fact_id)
@@ -658,6 +1231,7 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
                         params={
                             "workflow_id": workflow.workflow_id,
                             "work_id": source.attribute("work_id"),
+                            "candidate_key": candidate_key,
                             "relation_id": relation.relation_id,
                             "relation_kind": relation.kind,
                             "source_record_id": relation.source_record_id,
@@ -704,6 +1278,8 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
                         + timedelta(days=1),
                         params={
                             "workflow_id": workflow.workflow_id,
+                            "candidate_key": candidate_key,
+                            "answer_key": answer_key,
                             "relation_id": relation.relation_id,
                             "relation_event_id": relation_event_id,
                             "source_record_event_id": source_event_id,

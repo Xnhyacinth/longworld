@@ -27,7 +27,18 @@ from longworld.core.wikiparse import (
 from longworld.core.world import Event
 
 _ARXIV_SOURCE_ENVELOPE_REVISION = "researchlab-arxiv-source-envelope-v1"
-_WIKI_FACT_PARSER_REVISION = "researchlab-wiki-claim-exact-v1"
+_WIKI_FACT_PARSER_REVISION = "researchlab-wiki-claim-exact-v2"
+_WIKI_LEGACY_FACT_PARSER_REVISION = "researchlab-wiki-claim-exact-v1"
+_WIKI_ANSWER_TAG = re.compile(r"[A-Z][A-Z0-9_]{1,31}")
+_WIKI_LEGACY_ROLE_TAGS = {
+    "born": "BORN",
+    "early_career": "CAREER",
+    "revolutionary_committee": "COMMITTEE",
+    "early_transition": "EARLY",
+    "commemoration": "COMM",
+    "entity": "ENTITY",
+    "popular_culture": "POP",
+}
 _ARXIV_HEADER = re.compile(
     r"\A% arXiv manuscript revision (?P<revision>v[1-9][0-9]*)\n"
     r"% arXiv submitted_at "
@@ -83,8 +94,51 @@ def _arxiv_headers(source: GroundedSource) -> dict[str, str] | None:
     return {role: value[0] for role, value in expected.items()}
 
 
+def _arxiv_source_file_texts(
+    ev: Event, source: GroundedSource
+) -> dict[str, str] | None:
+    spans = ev.params.get("source_file_spans")
+    declared_basenames = ev.params.get("source_view_basenames")
+    if not isinstance(spans, list) or not isinstance(declared_basenames, list):
+        return None
+    texts: dict[str, str] = {}
+    previous_end = 0
+    for span in spans:
+        if not isinstance(span, dict) or set(span) != {
+            "path",
+            "basename",
+            "char_start",
+            "char_end",
+            "text_sha256",
+        }:
+            return None
+        path = str(span["path"])
+        basename = str(span["basename"])
+        start = span["char_start"]
+        end = span["char_end"]
+        if (
+            not path
+            or path.rsplit("/", 1)[-1] != basename
+            or basename in texts
+            or isinstance(start, bool)
+            or isinstance(end, bool)
+            or not isinstance(start, int)
+            or not isinstance(end, int)
+            or not previous_end <= start < end <= len(source.visible_text)
+        ):
+            return None
+        text = source.visible_text[start:end]
+        if hashlib.sha256(text.encode()).hexdigest() != span["text_sha256"]:
+            return None
+        texts[basename] = text
+        previous_end = end
+    if sorted(texts) != declared_basenames:
+        return None
+    return texts
+
+
 def _arxiv_envelope_payload(ev: Event, source: GroundedSource) -> dict[str, Any]:
-    return {
+    payload = {
         "revision": _ARXIV_SOURCE_ENVELOPE_REVISION,
         "workflow_id": str(ev.params.get("workflow_id") or ""),
         "record_id": str(ev.params.get("record_id") or ""),
@@ -97,10 +151,16 @@ def _arxiv_envelope_payload(ev: Event, source: GroundedSource) -> dict[str, Any]
         "text_sha256": source.text_sha256,
         "provenance_id": str(ev.params.get("provenance_id") or ""),
     }
+    if ev.params.get("provenance_operation") == "arxiv_semantic_latex_body_v2":
+        payload["source_file_spans"] = ev.params.get("source_file_spans")
+        payload["source_view_basenames"] = ev.params.get("source_view_basenames")
+    return payload
 
 
-def _wiki_fact_role_value(section_id: str, quote: str) -> tuple[str, str] | None:
-    if section_id in {"early_work", "early_birth"}:
+def _wiki_fact_role_value(
+    section_id: str, declared_role: str, quote: str
+) -> tuple[str, str] | None:
+    if declared_role == "born" and section_id.startswith("early_"):
         matches = list(_WIKI_BIRTH.finditer(quote))
         if len(matches) != 1:
             return None
@@ -113,18 +173,38 @@ def _wiki_fact_role_value(section_id: str, quote: str) -> tuple[str, str] | None
         except ValueError:
             return None
         return "born", f"{year:04d}-{month:02d}-{day:02d}"
-    if section_id == "commemoration":
-        return ("commemoration", quote) if quote else None
-    if section_id == "popular_culture":
-        return ("popular_culture", quote) if quote else None
-    if section_id == "wikidata_entity":
+    if declared_role == "entity" and section_id == "wikidata_entity":
         entity_match = _WIKIDATA_ENTITY.fullmatch(quote)
         return (
             ("entity", entity_match.group("entity"))
             if entity_match is not None
             else None
         )
+    if declared_role and quote and section_id != "wikidata_entity":
+        return declared_role, quote
     return None
+
+
+def _wiki_legacy_fact_role_value(
+    section_id: str, declared_role: str, quote: str
+) -> tuple[str, str] | None:
+    if section_id in {"early_career", "early_revolution", "early_diplomacy"}:
+        expected = {
+            "early_career": "early_career",
+            "early_revolution": "revolutionary_committee",
+            "early_diplomacy": "early_transition",
+        }[section_id]
+        return (expected, quote) if declared_role == expected and quote else None
+    expected_role = {
+        "early_work": "born",
+        "early_birth": "born",
+        "commemoration": "commemoration",
+        "popular_culture": "popular_culture",
+        "wikidata_entity": "entity",
+    }.get(section_id)
+    if declared_role != expected_role:
+        return None
+    return _wiki_fact_role_value(section_id, declared_role, quote)
 
 
 def _grounded_fact(payload: object) -> GroundedFact:
@@ -205,7 +285,10 @@ def _arxiv_source_binding_valid(ev: Event, source: GroundedSource) -> bool:
     provenance_class = params.get("source_binding_provenance")
     operation = str(params.get("provenance_operation") or "")
     parent = str(params.get("parent_provenance_id") or "")
-    if operation == "arxiv_semantic_latex_body_v1":
+    if operation in {
+        "arxiv_semantic_latex_body_v1",
+        "arxiv_semantic_latex_body_v2",
+    }:
         if (
             provenance_class != "verified_derived"
             or params.get("source_origin") != "real_derived"
@@ -217,6 +300,15 @@ def _arxiv_source_binding_valid(ev: Event, source: GroundedSource) -> bool:
             "excluded_paths": params.get("excluded_paths"),
             "text_sha256": source.text_sha256,
         }
+        if operation == "arxiv_semantic_latex_body_v2":
+            if _arxiv_source_file_texts(ev, source) is None:
+                return False
+            digest_payload.update(
+                {
+                    "source_file_spans": params.get("source_file_spans"),
+                    "source_view_basenames": params.get("source_view_basenames"),
+                }
+            )
         expected_envelope = _canonical_digest(_arxiv_envelope_payload(ev, source))
         if params.get("canonical_source_envelope_sha256") != expected_envelope:
             return False
@@ -235,6 +327,15 @@ def _arxiv_source_binding_valid(ev: Event, source: GroundedSource) -> bool:
             "parent_provenance_id": parent,
             "text_sha256": source.text_sha256,
         }
+        if params.get("source_file_spans") is not None:
+            if _arxiv_source_file_texts(ev, source) is None:
+                return False
+            digest_payload.update(
+                {
+                    "source_file_spans": params.get("source_file_spans"),
+                    "source_view_basenames": params.get("source_view_basenames"),
+                }
+            )
     else:
         return False
     return (
@@ -243,7 +344,9 @@ def _arxiv_source_binding_valid(ev: Event, source: GroundedSource) -> bool:
     )
 
 
-def _wiki_source_claims(ev: Event, source: GroundedSource) -> dict[str, str] | None:
+def _wiki_source_claims(
+    ev: Event, source: GroundedSource
+) -> tuple[dict[str, str], dict[str, str]] | None:
     params = ev.params
     section_id = str(params.get("section_id") or "")
     prefix = (
@@ -294,17 +397,22 @@ def _wiki_source_claims(ev: Event, source: GroundedSource) -> dict[str, str] | N
         != f"derived-sha256:{_canonical_digest(digest_payload)}"
     ):
         return None
-    if params.get("fact_parser_revision") != _WIKI_FACT_PARSER_REVISION:
+    parser_revision = params.get("fact_parser_revision")
+    if parser_revision not in {
+        _WIKI_FACT_PARSER_REVISION,
+        _WIKI_LEGACY_FACT_PARSER_REVISION,
+    }:
         return None
     facts_by_id = {fact.fact_id: fact for fact in source.facts}
     spans = params.get("fact_spans")
     if not isinstance(spans, list):
         return None
     if section_id == "appendix_rest":
-        return {} if not spans else None
+        return ({}, {}) if not spans else None
     if not spans:
         return None
     claims: dict[str, str] = {}
+    role_tags: dict[str, str] = {}
     for span in spans:
         if not isinstance(span, dict):
             return None
@@ -324,12 +432,14 @@ def _wiki_source_claims(ev: Event, source: GroundedSource) -> dict[str, str] | N
             return None
         declared_role = str(span.get("role") or "")
         parsed = (
-            (declared_role, fact.quote)
-            if section_id in {"early_career", "early_revolution", "early_diplomacy"}
-            and declared_role
-            in {"early_career", "revolutionary_committee", "early_transition"}
-            and fact.quote
-            else _wiki_fact_role_value(section_id, fact.quote)
+            _wiki_fact_role_value(section_id, declared_role, fact.quote)
+            if parser_revision == _WIKI_FACT_PARSER_REVISION
+            else _wiki_legacy_fact_role_value(section_id, declared_role, fact.quote)
+        )
+        answer_tag = (
+            str(span.get("answer_tag") or "")
+            if parser_revision == _WIKI_FACT_PARSER_REVISION
+            else _WIKI_LEGACY_ROLE_TAGS.get(declared_role, "")
         )
         if (
             parsed is None
@@ -338,10 +448,13 @@ def _wiki_source_claims(ev: Event, source: GroundedSource) -> dict[str, str] | N
             or span.get("value") != parsed[1]
             or source.visible_text.count(fact.quote) != 1
             or parsed[0] in claims
+            or _WIKI_ANSWER_TAG.fullmatch(answer_tag) is None
+            or answer_tag in role_tags.values()
         ):
             return None
         claims[parsed[0]] = parsed[1]
-    return claims
+        role_tags[parsed[0]] = answer_tag
+    return claims, role_tags
 
 
 def _wiki_source_binding_valid(ev: Event, source: GroundedSource) -> bool:
@@ -409,6 +522,16 @@ def _relation_binding_valid(state: WorldState, ev: Event) -> bool:
         return False
     source = _grounded_source(bindings.get(relation.source_id))
     target = _grounded_source(bindings.get(relation.target_id))
+    if ev.params.get("relation_mode") == "lineage_only":
+        source = GroundedSource(
+            source_id=source.source_id,
+            visible_text=source.visible_text,
+            text_sha256=source.text_sha256,
+            facts=source.facts,
+            relations=(relation,),
+        )
+        validate_grounded_sources((source, target))
+        return True
     source_fact = next(
         (
             fact
@@ -489,7 +612,9 @@ def init_values(project: dict[str, Any]) -> dict[str, Any]:
         "source_grounded_bindings": {},
         "real_revision_delta_candidate": None,
         "real_revision_added_text": None,
+        "verified_revision_relations": [],
         "wiki_claims": {},
+        "wiki_claim_tags": {},
         "wiki_source_relations": [],
     }
 
@@ -525,8 +650,24 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
             valid = False
         return (True, None) if valid else (False, "source_relation_binding_invalid")
     if t == "arxiv_revision_decision":
-        if not state.values.get("real_revision_delta_candidate"):
+        mode = str(ev.params.get("decision_mode") or "relation_delta")
+        if mode == "direct_delta":
+            bindings = state.values.get("source_grounded_bindings") or {}
+            if any(
+                str(ev.params.get(field) or "") not in bindings
+                for field in ("source_record_event_id", "target_record_event_id")
+            ):
+                return False, "source_revision_endpoint_missing"
+        elif not state.values.get(
+            str(ev.params.get("candidate_key") or "real_revision_delta_candidate")
+        ):
             return False, "source_revision_relation_missing"
+        paper_required_relations = set(ev.params.get("required_relation_ids") or [])
+        paper_verified_relations = set(
+            state.values.get("verified_revision_relations") or []
+        )
+        if not paper_required_relations.issubset(paper_verified_relations):
+            return False, "source_revision_chain_incomplete"
         return True, None
     if t == "wiki_source_section":
         try:
@@ -551,11 +692,24 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
             return True, None
         record_id = str(ev.params.get("record_id") or "")
         claims = dict((state.values.get("wiki_claims") or {}).get(record_id) or {})
+        claim_tags = dict(
+            (state.values.get("wiki_claim_tags") or {}).get(record_id) or {}
+        )
         required = ev.params.get("required_roles") or []
         if not isinstance(required, list) or any(
             str(role) not in claims for role in required
         ):
             return False, "wiki_claim_roles_missing"
+        role_tags = ev.params.get("role_tags")
+        if role_tags is not None and (
+            not isinstance(role_tags, dict)
+            or set(role_tags) != {str(role) for role in required}
+            or any(
+                claim_tags.get(str(role)) != role_tags.get(str(role))
+                for role in required
+            )
+        ):
+            return False, "wiki_claim_tags_invalid"
         required_relations = ev.params.get("required_relation_ids") or []
         available_relations = set(state.values.get("wiki_source_relations") or [])
         if not isinstance(required_relations, list) or any(
@@ -686,12 +840,16 @@ def apply_event(state: WorldState, ev: Event) -> None:
             return
         texts = dict(state.values.get("source_record_texts") or {})
         texts[str(p["record_id"])] = text
+        texts[eid] = text
         state.set("source_record_texts", texts, eid, day)
         metadata = dict(state.values.get("source_record_metadata") or {})
-        metadata[str(p["record_id"])] = {
+        record_metadata = {
             "occurred_at": headers["submitted_at"],
             "revision_id": headers["revision_id"],
+            "source_files": _arxiv_source_file_texts(ev, source) or {},
         }
+        metadata[str(p["record_id"])] = record_metadata
+        metadata[eid] = record_metadata
         state.set("source_record_metadata", metadata, eid, day)
         bindings = dict(state.values.get("source_grounded_bindings") or {})
         bindings[eid] = p["grounded_source"]
@@ -702,9 +860,24 @@ def apply_event(state: WorldState, ev: Event) -> None:
                 return
         except (GroundedSpanError, TypeError):
             return
+        verified_relations = list(state.values.get("verified_revision_relations") or [])
+        relation_id = str(p.get("relation_id") or "")
+        if relation_id and relation_id not in verified_relations:
+            verified_relations.append(relation_id)
+            state.set("verified_revision_relations", verified_relations, eid, day)
+        if p.get("relation_mode") == "lineage_only":
+            return
         texts = state.values.get("source_record_texts") or {}
-        source_text = str(texts.get(str(p["source_record_id"])) or "")
-        target_text = str(texts.get(str(p["target_record_id"])) or "")
+        source_text = str(
+            texts.get(str(p.get("source_record_event_id") or ""))
+            or texts.get(str(p["source_record_id"]))
+            or ""
+        )
+        target_text = str(
+            texts.get(str(p.get("target_record_event_id") or ""))
+            or texts.get(str(p["target_record_id"]))
+            or ""
+        )
         if not source_text or not target_text:
             return
         evidence_quote = str(p["evidence_quote"])
@@ -719,32 +892,113 @@ def apply_event(state: WorldState, ev: Event) -> None:
         if not value or value in target_text:
             return
         metadata = state.values.get("source_record_metadata") or {}
-        prior = metadata.get(str(p["target_record_id"])) or {}
+        prior = (
+            metadata.get(str(p.get("target_record_event_id") or ""))
+            or metadata.get(str(p["target_record_id"]))
+            or {}
+        )
         prior_date = str(prior.get("occurred_at") or "")[:10]
         if not prior_date:
             return
         state.set(
-            "real_revision_delta_candidate",
+            str(p.get("candidate_key") or "real_revision_delta_candidate"),
             {"prior_date": prior_date, "value": value},
             eid,
             day,
         )
     elif t == "arxiv_revision_decision":
-        candidate = state.values.get("real_revision_delta_candidate")
+        mode = str(p.get("decision_mode") or "relation_delta")
+        paper_required_relations = set(p.get("required_relation_ids") or [])
+        paper_verified_relations = set(
+            state.values.get("verified_revision_relations") or []
+        )
+        if not paper_required_relations.issubset(paper_verified_relations):
+            return
+        candidate = state.values.get(
+            str(p.get("candidate_key") or "real_revision_delta_candidate")
+        )
+        if mode == "direct_delta":
+            texts = state.values.get("source_record_texts") or {}
+            source_event_id = str(p.get("source_record_event_id") or "")
+            target_event_id = str(p.get("target_record_event_id") or "")
+            source_text = str(
+                texts.get(source_event_id)
+                or texts.get(str(p.get("source_record_id") or ""))
+                or ""
+            )
+            target_text = str(
+                texts.get(target_event_id)
+                or texts.get(str(p.get("target_record_id") or ""))
+                or ""
+            )
+            required_new_include = str(p.get("required_new_include") or "")
+            marker_basename = str(p.get("required_new_include_source_basename") or "")
+            fact_basename = str(p.get("fact_source_basename") or "")
+            metadata = state.values.get("source_record_metadata") or {}
+            source_metadata = metadata.get(source_event_id) or {}
+            target_metadata = metadata.get(target_event_id) or {}
+            source_files = source_metadata.get("source_files") or {}
+            target_files = target_metadata.get("source_files") or {}
+            source_marker_text = str(source_files.get(marker_basename) or "")
+            target_marker_text = str(target_files.get(marker_basename) or "")
+            if (
+                not required_new_include
+                or not marker_basename
+                or not fact_basename
+                or required_new_include in target_marker_text
+                or required_new_include not in source_marker_text
+            ):
+                return
+            start = int(p.get("fact_char_start") or 0)
+            end = int(p.get("fact_char_end") or 0)
+            offset = int(p.get("fact_value_offset") or 0)
+            value_length = int(p.get("fact_value_length") or 0)
+            value = source_text[start:end][offset : offset + value_length]
+            if (
+                not value
+                or str(source_files.get(fact_basename) or "").count(value) != 1
+            ):
+                return
+            prior = (
+                target_metadata
+                or metadata.get(str(p.get("target_record_id") or ""))
+                or {}
+            )
+            prior_date = str(prior.get("occurred_at") or "")[:10]
+            candidate = (
+                {"prior_date": prior_date, "value": value}
+                if value and value not in target_text and prior_date
+                else None
+            )
         if not isinstance(candidate, dict):
             return
         answer = _format_revision_delta(str(candidate.get("value") or ""))
         prior_date = str(candidate.get("prior_date") or "")
         if answer and prior_date:
-            state.set("real_revision_added_text", f"{prior_date} | {answer}", eid, day)
+            value = f"{prior_date} | {answer}"
+            if p.get("terminal_record_id"):
+                metadata = state.values.get("source_record_metadata") or {}
+                terminal = (
+                    metadata.get(str(p.get("terminal_record_event_id") or ""))
+                    or metadata.get(str(p.get("terminal_record_id") or ""))
+                    or {}
+                )
+                terminal_date = str(terminal.get("occurred_at") or "")[:10]
+                if not terminal_date:
+                    return
+                value += f" | v3 {terminal_date}"
+            answer_key = str(p.get("answer_key") or "real_revision_added_text")
+            state.set(answer_key, value, eid, day)
+            state.set("real_revision_added_text", value, eid, day)
     elif t == "wiki_source_section":
         try:
             source = _source_binding(ev)
         except (GroundedSpanError, TypeError):
             return
-        parsed_claims = _wiki_source_claims(ev, source)
-        if parsed_claims is None:
+        parsed = _wiki_source_claims(ev, source)
+        if parsed is None:
             return
+        parsed_claims, parsed_tags = parsed
         text = str(p.get("text") or "")
         if hashlib.sha256(text.encode()).hexdigest() != p.get("text_sha256"):
             return
@@ -756,6 +1010,11 @@ def apply_event(state: WorldState, ev: Event) -> None:
         record_claims.update(parsed_claims)
         claims[record_id] = record_claims
         state.set("wiki_claims", claims, eid, day)
+        tags = dict(state.values.get("wiki_claim_tags") or {})
+        record_tags = dict(tags.get(record_id) or {})
+        record_tags.update(parsed_tags)
+        tags[record_id] = record_tags
+        state.set("wiki_claim_tags", tags, eid, day)
         bindings = dict(state.values.get("source_grounded_bindings") or {})
         bindings[eid] = p["grounded_source"]
         state.set("source_grounded_bindings", bindings, eid, day)
@@ -780,6 +1039,9 @@ def apply_event(state: WorldState, ev: Event) -> None:
             return
         tier = str(p.get("control_tier") or "")
         claims = dict((state.values.get("wiki_claims") or {}).get(record_id) or {})
+        claim_tags = dict(
+            (state.values.get("wiki_claim_tags") or {}).get(record_id) or {}
+        )
         required = p.get("required_roles")
         if not isinstance(required, list) or any(
             str(role) not in claims for role in required
@@ -796,28 +1058,39 @@ def apply_event(state: WorldState, ev: Event) -> None:
         prior = state.values.get(prerequisite_key) if prerequisite_key else ""
         if prerequisite_key and not isinstance(prior, str):
             return
-        if tier == "16k":
-            parts = [f"BORN:{claims['born']}"]
-            if "early_career" in required:
-                parts.append(f"CAREER:{claims['early_career']}")
-            if "revolutionary_committee" in required:
-                parts.append(f"COMMITTEE:{claims['revolutionary_committee']}")
-            if "early_transition" in required:
-                parts.append(f"EARLY:{claims['early_transition']}")
-        elif tier == "32k":
-            if not prior:
-                return
-            parts = [
-                str(prior),
-                f"COMM:{claims['commemoration']}",
-                f"ENTITY:{claims['entity']}",
-            ]
-        elif tier == "64k":
-            if not prior:
-                return
-            parts = [str(prior), f"POP:{claims['popular_culture']}"]
-        else:
+        if tier not in {"16k", "32k", "64k"}:
             return
+        role_tags = p.get("role_tags")
+        append_roles = p.get("append_roles")
+        if role_tags is None or append_roles is None:
+            role_tags = {
+                role: _WIKI_LEGACY_ROLE_TAGS[role]
+                for role in required
+                if role in _WIKI_LEGACY_ROLE_TAGS
+            }
+            append_roles = (
+                required
+                if tier == "16k"
+                else ["commemoration", "entity"]
+                if tier == "32k"
+                else ["popular_culture"]
+            )
+        if (
+            not isinstance(role_tags, dict)
+            or not isinstance(append_roles, list)
+            or any(str(role) not in required for role in append_roles)
+            or any(
+                claim_tags.get(str(role)) != role_tags.get(str(role))
+                for role in required
+            )
+        ):
+            return
+        if tier != "16k" and not prior:
+            return
+        parts = [str(prior)] if prior else []
+        parts.extend(
+            f"{role_tags[str(role)]}:{claims[str(role)]}" for role in append_roles
+        )
         state.set(answer_key, "||".join(parts), eid, day)
     elif t == "report_v1":
         state.set("reported_score", p["score"], eid, day)

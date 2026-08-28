@@ -1,0 +1,13 @@
+{
+  "schema_version": "longworld.wikimedia-fetch-request.v1",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P10-WIKIMEDIA-PUBLIC-NEWTON-GROWTH-20260828",
+    "scope": "Isaac Newton English Wikipedia adjacent revision history and Wikidata entity inventory",
+    "basis": "User-authorized public-source LongWorld semantic-growth workflow construction",
+    "reviewed_at": "2026-08-28T12:00:00Z"
+  },
+  "language": "en",
+  "titles": ["Isaac Newton"],
+  "requests_per_second": 5
+}

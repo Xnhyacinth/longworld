@@ -154,13 +154,27 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
             raise ValueError("arXiv relation visible text is invalid")
         return "json", canonical_source_text
     if t == "arxiv_revision_decision":
+        mode = str(ev.params.get("decision_mode") or "relation_delta")
+        if mode == "direct_delta":
+            rule = (
+                "accept the exact semantic delta only after the same main source "
+                "file shows a new acknowledgements include and the later bounded "
+                "view supplies its exact text"
+            )
+        elif mode == "terminal_chain":
+            rule = (
+                "accept the exact semantic delta only after both signed revision_of "
+                "edges and the terminal revision replay"
+            )
+        else:
+            rule = (
+                "accept the exact semantic delta only after both revision bodies "
+                "and their verified revision_of relation replay"
+            )
         return "json", json.dumps(
             {
                 "kind": "arxiv_revision_decision",
-                "rule": (
-                    "accept the exact semantic delta only after both revision bodies "
-                    "and their verified revision_of relation replay"
-                ),
+                "rule": rule,
                 "answer_disclosure": "omitted",
             },
             ensure_ascii=False,

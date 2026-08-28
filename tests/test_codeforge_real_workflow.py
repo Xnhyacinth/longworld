@@ -4,6 +4,7 @@ import hashlib
 import json
 import sys
 from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,7 @@ from longworld.core.taxonomy import (
     WorkflowKind,
     artifact_classification,
 )
+from longworld.core.verify import verify_question
 from longworld.core.views import render_cf_view
 from longworld.domains.codeforge.queries import build_code_queries
 from longworld.domains.codeforge.render import render_code
@@ -577,7 +579,7 @@ def test_release_cycles_create_band_specific_executable_proofs() -> None:
     )
 
 
-def test_repeated_license_snapshots_preserve_identity_and_block_length_gain() -> None:
+def test_repeated_identical_license_snapshots_share_one_source_identity() -> None:
     def episode(version: str, month: int) -> RealWorkflow:
         return _workflow(
             [
@@ -638,10 +640,125 @@ def test_repeated_license_snapshots_preserve_identity_and_block_length_gain() ->
         if (artifact.slots or {}).get("source_record_id") == "LICENSE"
     ]
 
-    assert len(license_artifacts) == 2
+    aliases = spec["focal"]["real_record_aliases"]
+    license_record = next(
+        record
+        for record in spec["focal"]["repo_episode"]
+        if record["record_id"] == "LICENSE"
+    )
+    assert len(license_artifacts) == 1
+    assert len(aliases) == 1
+    assert (
+        next(iter(aliases.values()))
+        == license_artifacts[0].slots["params"]["record_key"]
+    )
+    assert len(license_record["source_observations"]) == 2
+    selected = real_workflow_artifacts_for_query(artifacts, query)
+    assert (
+        sum(
+            (artifact.slots or {}).get("source_record_id") == "LICENSE"
+            for artifact in selected
+        )
+        == 1
+    )
+
+
+def test_changed_source_snapshot_bytes_remain_distinct_observations() -> None:
+    first = _workflow(
+        [
+            WorkflowRecord(
+                "LICENSE",
+                "license",
+                "2025-01-01T00:00:00Z",
+                "Apache License, Version 2.0",
+                attributes={"license": "Apache-2.0", "compatible": True},
+            )
+        ]
+    )
+    conflicting = _workflow(
+        [
+            WorkflowRecord(
+                "LICENSE",
+                "license",
+                "2025-02-01T00:00:00Z",
+                "Apache License, Version 2.0 with conflicting snapshot bytes",
+                attributes={"license": "Apache-2.0", "compatible": True},
+            )
+        ]
+    )
+
+    spec = sample_code_spec(73, n_parallel=0, real_workflows=[first, conflicting])
+
+    assert len(spec["focal"]["repo_episode"]) == 2
     assert spec["focal"]["real_record_aliases"] == {}
-    with pytest.raises(ValueError, match="duplicate source bodies"):
-        real_workflow_artifacts_for_query(artifacts, query)
+
+
+def test_interleaved_identical_snapshots_collapse_to_first_source_identity() -> None:
+    snapshots = []
+    for index, license_id in enumerate(("Apache-2.0", "MIT", "Apache-2.0")):
+        workflow = _workflow(
+            [
+                WorkflowRecord(
+                    "LICENSE",
+                    "license",
+                    f"2025-0{index + 1}-01T00:00:00Z",
+                    "Candidate license identifiers: Apache-2.0 and MIT.",
+                    attributes={"license": license_id},
+                )
+            ],
+        )
+        snapshots.append(
+            replace(
+                workflow,
+                workflow_id=f"{workflow.workflow_id}:{index}",
+            )
+        )
+
+    spec = sample_code_spec(73, n_parallel=0, real_workflows=snapshots)["focal"]
+    records = spec["repo_episode"]
+    aliases = spec["real_record_aliases"]
+
+    assert len(records) == 2
+    assert len(aliases) == 1
+    first = next(
+        record for record in records if record["body_facts"]["license"] == "Apache-2.0"
+    )
+    assert len(first["source_observations"]) == 2
+    assert next(iter(aliases.values())) == first["record_key"]
+
+
+def test_identical_linking_records_remain_distinct_when_targets_change() -> None:
+    def workflow(result: str, month: int) -> RealWorkflow:
+        return _workflow(
+            [
+                WorkflowRecord(
+                    "ci:release",
+                    "ci_run",
+                    f"2025-{month:02d}-01T00:00:00Z",
+                    f"CI run release reports {result}.",
+                    attributes={"run": "release", "result": result},
+                ),
+                WorkflowRecord(
+                    "release:v2.5.0",
+                    "release",
+                    f"2025-{month:02d}-02T00:00:00Z",
+                    "Release tag v2.5.0 references the linked CI observation.",
+                    ("ci:release",),
+                    {"tag": "v2.5.0"},
+                ),
+            ]
+        )
+
+    spec = sample_code_spec(
+        73,
+        n_parallel=0,
+        real_workflows=[workflow("failed", 1), workflow("passed", 2)],
+    )["focal"]
+
+    releases = [
+        record for record in spec["repo_episode"] if record["kind"] == "release"
+    ]
+    assert len(releases) == 2
 
 
 def test_duplicate_release_tags_do_not_fake_a_longer_release_cycle() -> None:
@@ -1006,6 +1123,66 @@ def test_version_selection_ignores_skipped_ci_when_a_gate_passed() -> None:
         ["16k", "32k"],
         ["64k"],
     ]
+
+
+def test_version_selection_cf_replay_keeps_the_selected_gate_in_the_proof() -> None:
+    workflow = _workflow(
+        [
+            WorkflowRecord(
+                "commit:release",
+                "commit",
+                "2025-01-01T00:00:00Z",
+                "Commit cafe123 selects parser-core version 2.5.0.",
+                (),
+                {
+                    "commit": "cafe123",
+                    "package": "parser-core",
+                    "version": "2.5.0",
+                },
+            ),
+            WorkflowRecord(
+                "ci:linux",
+                "ci_run",
+                "2025-01-02T00:00:00Z",
+                "CI run linux for commit cafe123 reports passed.",
+                ("commit:release",),
+                {"run": "linux", "result": "passed"},
+            ),
+            WorkflowRecord(
+                "ci:macos",
+                "ci_run",
+                "2025-01-02T00:01:00Z",
+                "CI run macos for commit cafe123 reports passed.",
+                ("commit:release",),
+                {"run": "macos", "result": "passed"},
+            ),
+            WorkflowRecord(
+                "release:v2.5.0",
+                "release",
+                "2025-01-03T00:00:00Z",
+                "Release tag v2.5.0 published from both linked CI gates.",
+                ("ci:linux", "ci:macos"),
+                {"tag": "v2.5.0"},
+            ),
+        ]
+    )
+    _, world, artifacts, queries = _materialize_real(workflow)
+    query = next(item for item in queries if item.query_type == "version_selection")
+    _, cf_artifacts = render_cf_view(world, query)
+
+    assert query.cf_event_id in query.essential_event_ids
+    verification, notes = verify_question(
+        world,
+        query,
+        real_workflow_artifacts_for_query(artifacts, query),
+        cf_artifacts=real_workflow_artifacts_for_query(cf_artifacts, query),
+        verification_mode="legacy",
+    )
+
+    assert notes["cf_replay_ans"] == query.cf_answer
+    assert verification.counterfactual_replay_sufficient
+    assert verification.counterfactual_changes_answer
+    assert verification.remove_one_fails
 
 
 def test_real_repo_task_families_have_strict_cross_record_proofs_and_cf_twins() -> None:

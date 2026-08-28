@@ -96,7 +96,7 @@ def eval_answer(
             return "unknown"
         return str(matrix)
     if spec.query_type == "real_revision_added_text":
-        value = state_values.get("real_revision_added_text")
+        value = state_values.get(spec.answer_key)
         return str(value) if value else "unknown"
     if spec.query_type == "wiki_claim_reconstruction":
         value = state_values.get(spec.answer_key)
@@ -229,7 +229,37 @@ def _counterfactual_grounded_source(
     }
 
 
-_WIKI_ROLE_TAGS = {
+def _counterfactual_source_file_spans(
+    payload: object, *, changed_text: str
+) -> list[dict[str, Any]]:
+    if not isinstance(payload, list) or not payload:
+        raise TypeError("counterfactual source file spans are missing")
+    updated: list[dict[str, Any]] = []
+    for value in payload:
+        if not isinstance(value, dict):
+            raise TypeError("counterfactual source file span is invalid")
+        start = value.get("char_start")
+        end = value.get("char_end")
+        if (
+            isinstance(start, bool)
+            or isinstance(end, bool)
+            or not isinstance(start, int)
+            or not isinstance(end, int)
+            or not 0 <= start < end <= len(changed_text)
+        ):
+            raise ValueError("counterfactual source file span is invalid")
+        updated.append(
+            {
+                **value,
+                "text_sha256": hashlib.sha256(
+                    changed_text[start:end].encode()
+                ).hexdigest(),
+            }
+        )
+    return updated
+
+
+_WIKI_LEGACY_ROLE_TAGS = {
     "born": "BORN",
     "commemoration": "COMM",
     "entity": "ENTITY",
@@ -241,18 +271,29 @@ _WIKI_ROLE_TAGS = {
 
 
 def _wiki_program_ops(
-    required_roles: list[str], required_relation_ids: list[str]
+    required_roles: list[str],
+    role_tags: dict[str, str],
+    required_relation_ids: list[str],
+    *,
+    include_tags: bool,
 ) -> list[dict[str, Any]]:
-    ops = [{"op": "READ_WIKI_FACT", "role": role} for role in required_roles]
+    ops = []
+    for role in required_roles:
+        op = {"op": "READ_WIKI_FACT", "role": role}
+        if include_tags:
+            op["tag"] = role_tags[role]
+        ops.append(op)
     if required_relation_ids:
         ops.append({"op": "VERIFY_WIKI_SOURCE_RELATIONS"})
     return ops
 
 
 def _wiki_gold_expression(
-    required_roles: list[str], required_relation_ids: list[str]
+    required_roles: list[str],
+    role_tags: dict[str, str],
+    required_relation_ids: list[str],
 ) -> str:
-    tags = "/".join(_WIKI_ROLE_TAGS[role] for role in required_roles)
+    tags = "/".join(role_tags[role] for role in required_roles)
     relation_gate = " with verified source relations" if required_relation_ids else ""
     return f"tagged {tags} reconstruction{relation_gate}"
 
@@ -377,9 +418,207 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
     resolve = _event(world, "resolve_review")
     meta = _event(world, "meta_decision")
     queries: list[QuerySpec] = []
+    events_by_id = {event.id: event for event in world.events}
+
+    multiband_decisions = sorted(
+        (
+            event
+            for event in world.events
+            if event.type == "arxiv_revision_decision"
+            and event.params.get("control_tier") in {"16k", "32k", "64k"}
+        ),
+        key=lambda event: {"16k": 0, "32k": 1, "64k": 2}[
+            str(event.params["control_tier"])
+        ],
+    )
+    for decision in multiband_decisions:
+        tier = str(decision.params["control_tier"])
+        source = next(
+            event
+            for event in world.events
+            if event.id == decision.params["source_record_event_id"]
+        )
+        start = int(decision.params["fact_char_start"])
+        end = int(decision.params["fact_char_end"])
+        offset = int(decision.params["fact_value_offset"])
+        length = int(decision.params["fact_value_length"])
+        quote = str(source.params["text"])[start:end]
+        value = quote[offset : offset + length]
+        if not format_revision_added_delta(value):
+            continue
+        funding = format_revision_funding_delta(value)
+        cf_text, cf_value = _counterfactual_revision_text(
+            str(source.params["text"]), value
+        )
+        cf_text_sha256 = hashlib.sha256(cf_text.encode()).hexdigest()
+        cf_grounded_source = _counterfactual_grounded_source(
+            source.params.get("grounded_source"),
+            original_quote=value,
+            changed_quote=cf_value,
+            changed_text=cf_text,
+        )
+        cf_source_file_spans = _counterfactual_source_file_spans(
+            source.params.get("source_file_spans"), changed_text=cf_text
+        )
+        cf_provenance = hashlib.sha256(
+            json.dumps(
+                {
+                    "operation": "counterfactual_revision_text",
+                    "parent_provenance_id": source.params["provenance_id"],
+                    "source_file_spans": cf_source_file_spans,
+                    "source_view_basenames": source.params["source_view_basenames"],
+                    "text_sha256": cf_text_sha256,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        if funding:
+            answer_schema = (
+                "YYYY-MM-DD | <first_funder> | <agency_acronym> | NSF <grant_id> "
+                "| v3 YYYY-MM-DD"
+            )
+            parse_op = "PARSE_FUNDING_DISCLOSURE"
+        else:
+            answer_schema = "YYYY-MM-DD | <added_sentence> | v3 YYYY-MM-DD"
+            parse_op = "SELECT_UNIQUE_SEMANTIC_DELTA"
+        if tier == "16k":
+            question = (
+                "Compare the bounded, source-attested LaTeX views for the first "
+                f"two public revisions of {decision.params['work_id']}. Verify "
+                "that their shared main source file adds the acknowledgements "
+                "include only in revision two, then read its exact semantic text "
+                "and the bounded third-revision date. Report the original "
+                "submission date and reply exactly as "
+                f"{answer_schema}."
+            )
+            program_ops = [
+                {"op": "READ_SOURCE_SPAN"},
+                {"op": "READ_PRIOR_SUBMISSION_DATE"},
+                {"op": "COMPARE_SHARED_MAIN_SOURCE"},
+                {"op": "VERIFY_NEW_SOURCE_INCLUDE"},
+                {"op": parse_op},
+                {"op": "READ_TERMINAL_REVISION_DATE"},
+                {"op": "APPLY_DIRECT_DELTA_DECISION"},
+            ]
+            gold_expression = (
+                "READ_DATE(v1) AND COMPARE_SHARED_MAIN(v1,v2) AND "
+                "VERIFY_NEW_INCLUDE(acknowledgements) AND "
+                f"READ_SOURCE_SPAN(v2) THEN {parse_op} AND READ_DATE(v3)"
+            )
+            proof_depth = 2
+        elif tier == "32k":
+            question = (
+                "Compare the expanded, source-attested LaTeX file views for the "
+                f"first two public revisions of {decision.params['work_id']} and "
+                "verify their signed revision_of edge. Report the original "
+                "submission date and the newly added semantic sentence selected "
+                "by the resolution, followed by the date stated in the signed "
+                f"v3 view. Reply exactly as {answer_schema}."
+            )
+            program_ops = [
+                {"op": "READ_SOURCE_SPAN"},
+                {"op": "READ_PRIOR_SUBMISSION_DATE"},
+                {"op": "VERIFY_ABSENT_FROM_PRIOR_REVISION"},
+                {"op": "FOLLOW_REVISION_OF"},
+                {"op": parse_op},
+                {"op": "READ_TERMINAL_REVISION_DATE"},
+                {"op": "APPLY_REVISION_RESOLUTION"},
+            ]
+            gold_expression = (
+                "READ_DATE(v1) AND READ_SOURCE_SPAN(v2) AND ABSENT_FROM(v1) "
+                f"THEN {parse_op} AND FOLLOW(v2 revision_of v1) AND READ_DATE(v3)"
+            )
+            proof_depth = 3
+        else:
+            question = (
+                "Trace the complete three-revision arXiv chain for "
+                f"{decision.params['work_id']} across the full first and second "
+                "manuscript bodies and the terminal third-revision view. Report "
+                "the original submission date, the semantic sentence added in "
+                "revision two, and the terminal revision date. Reply exactly as "
+                f"{answer_schema}."
+            )
+            program_ops = [
+                {"op": "READ_SOURCE_SPAN"},
+                {"op": "READ_PRIOR_SUBMISSION_DATE"},
+                {"op": "VERIFY_ABSENT_FROM_PRIOR_REVISION"},
+                {"op": "FOLLOW_REVISION_OF"},
+                {"op": parse_op},
+                {"op": "FOLLOW_TERMINAL_REVISION_OF"},
+                {"op": "READ_TERMINAL_REVISION_DATE"},
+                {"op": "APPLY_REVISION_CHAIN_RESOLUTION"},
+            ]
+            gold_expression = (
+                "READ_DATE(v1) AND READ_SOURCE_SPAN(v2) AND ABSENT_FROM(v1) "
+                f"THEN {parse_op} AND FOLLOW(v2 revision_of v1) AND "
+                "FOLLOW(v3 revision_of v2) AND READ_DATE(v3)"
+            )
+            proof_depth = 4
+        proof_event_ids = list(decision.params["proof_event_ids"])
+        workflow_key = hashlib.sha256(
+            (f"{decision.params['workflow_id']}|{decision.params['work_id']}").encode()
+        ).hexdigest()[:12]
+        base_group = f"real_revision_delta:{decision.params['work_id']}:{workflow_key}"
+        queries.append(
+            QuerySpec(
+                query_id=(f"{qid}:real_revision_added_text:{workflow_key}:{tier}"),
+                query_type="real_revision_added_text",
+                question=question,
+                answer="",
+                as_of=decision.time,
+                answer_key=str(decision.params["answer_key"]),
+                essential_event_ids=proof_event_ids,
+                essential_artifact_ids=[
+                    _event_artifact_id(world, events_by_id[event_id])
+                    for event_id in proof_event_ids
+                ],
+                sufficient_event_ids=proof_event_ids,
+                cf_event_id=source.id,
+                cf_param_updates={
+                    "text": cf_text,
+                    "text_sha256": cf_text_sha256,
+                    "parent_provenance_id": source.params["provenance_id"],
+                    "provenance_id": f"derived-sha256:{cf_provenance}",
+                    "provenance_operation": "counterfactual_revision_text",
+                    "source_binding_provenance": "synthetic_executable",
+                    "source_origin": "synthetic_world",
+                    "parent_source_origin": "real_derived",
+                    "parent_source_envelope_sha256": source.params[
+                        "canonical_source_envelope_sha256"
+                    ],
+                    "parent_source_text_sha256": source.params["text_sha256"],
+                    "excluded_paths": [],
+                    "source_file_spans": cf_source_file_spans,
+                    "ground_values": [cf_value],
+                    "grounded_source": cf_grounded_source,
+                },
+                cf_answer="",
+                invariance_event_id=tok.id,
+                invariance_param_updates={"commit": "ab00ab"},
+                gold_expression=gold_expression,
+                proof_depth=proof_depth,
+                cf_op="revision_text",
+                motif="real_revision_semantic_delta",
+                topology_id=instance_topology(
+                    "lab.real_revision_semantic_delta",
+                    tier,
+                    len(decision.params.get("required_relation_ids") or []),
+                ),
+                domain="researchlab",
+                truth_regime="real_source_derived",
+                program_ops=program_ops,
+                preferred_length_buckets=[tier],
+                semantic_growth_group="researchlab_real_revision_delta",
+                base_task_group=base_group,
+            )
+        )
 
     for relation in [
-        event for event in world.events if event.type == "arxiv_revision_relation"
+        event
+        for event in world.events
+        if event.type == "arxiv_revision_relation"
+        and not event.params.get("source_view_tier")
     ]:
         decision = next(
             event
@@ -428,7 +667,9 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
             ).encode()
         ).hexdigest()
         relation_key = hashlib.sha256(
-            str(relation.params["relation_id"]).encode()
+            (
+                f"{relation.params['workflow_id']}|{relation.params['relation_id']}"
+            ).encode()
         ).hexdigest()[:12]
         if funding:
             question = (
@@ -467,7 +708,7 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                 question=question,
                 answer="",
                 as_of=as_of_now,
-                answer_key="real_revision_added_text",
+                answer_key=str(decision.params["answer_key"]),
                 essential_event_ids=[
                     target.id,
                     source.id,
@@ -528,6 +769,9 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                 ],
                 preferred_length_buckets=["64k"],
                 semantic_growth_group="researchlab_real_revision_delta",
+                base_task_group=(
+                    f"real_revision_delta:{relation.params['work_id']}:{relation_key}"
+                ),
             )
         )
 
@@ -574,6 +818,17 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
         ):
             answer_event = by_tier[control_tier]
             required_roles = list(answer_event.params.get("required_roles") or [])
+            semantic_tags = "role_tags" in answer_event.params
+            role_tags = dict(answer_event.params.get("role_tags") or {})
+            if not semantic_tags:
+                role_tags = {
+                    role: _WIKI_LEGACY_ROLE_TAGS.get(role, "")
+                    for role in required_roles
+                }
+            if set(role_tags) != set(required_roles):
+                continue
+            if any(not tag for tag in role_tags.values()):
+                continue
             required_relation_ids = list(
                 answer_event.params.get("required_relation_ids") or []
             )
@@ -635,7 +890,7 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                         "retrieval_url": "https://en.wikipedia.org/w/index.php?oldid=0"
                     },
                     gold_expression=_wiki_gold_expression(
-                        required_roles, required_relation_ids
+                        required_roles, role_tags, required_relation_ids
                     ),
                     proof_depth=proof_depth,
                     cf_op="numeric",
@@ -648,7 +903,10 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                     domain="researchlab",
                     truth_regime="real_source_derived",
                     program_ops=_wiki_program_ops(
-                        required_roles, required_relation_ids
+                        required_roles,
+                        role_tags,
+                        required_relation_ids,
+                        include_tags=semantic_tags,
                     ),
                     preferred_length_buckets=[control_tier],
                     semantic_growth_group="researchlab_real_wiki_claim_reconstruction",

@@ -33,6 +33,7 @@ from longworld.core.verify import verify_question
 from longworld.core.views import render_cf_view
 from longworld.domains.researchlab.queries import _counterfactual_grounded_source
 from longworld.domains.researchlab.simulate import (
+    _paper_multiband_records,
     canonical_researchlab_source_event_envelope,
     canonical_researchlab_source_visible_text,
 )
@@ -45,15 +46,27 @@ def _record(
     occurred_at: str,
     body: str,
     added_fact: str = "",
+    extra_sources: tuple[tuple[str, str], ...] = (),
+    previous_revision: str = "",
+    work_id: str = "2203.01928",
 ) -> SourceRecord:
     text = (
         json.dumps(
             {
-                "entry_id": f"https://arxiv.org/abs/2203.01928{revision}",
+                "entry_id": f"https://arxiv.org/abs/{work_id}{revision}",
                 "kind": "arxiv_api_entry",
-                "latex_sources": [{"path": "parts/acknowledgements.tex", "text": body}],
+                "latex_sources": [
+                    {"path": "parts/acknowledgements.tex", "text": body},
+                    *({"path": path, "text": text} for path, text in extra_sources),
+                ],
                 "revision": revision,
-                **({"previous_revision_id": "v1"} if revision == "v2" else {}),
+                **(
+                    {"previous_revision_id": previous_revision}
+                    if previous_revision
+                    else {"previous_revision_id": "v1"}
+                    if revision == "v2"
+                    else {}
+                ),
             },
             ensure_ascii=False,
             indent=2,
@@ -83,9 +96,9 @@ def _record(
         kind="manuscript_revision",
         occurred_at=occurred_at,
         text=text,
-        source_url=f"https://arxiv.org/abs/2203.01928{revision}",
+        source_url=f"https://arxiv.org/abs/{work_id}{revision}",
         retrieval_url=(
-            "https://export.arxiv.org/api/query?id_list=2203.01928" + revision
+            f"https://export.arxiv.org/api/query?id_list={work_id}" + revision
         ),
         source_family="arxiv_record",
         source_origin=SourceOrigin.REAL_PUBLIC,
@@ -95,31 +108,35 @@ def _record(
         facts=facts,
         attributes=(
             ("revision_id", revision),
-            ("work_id", "arxiv:2203.01928"),
+            ("work_id", f"arxiv:{work_id}"),
         ),
     )
 
 
-def _workflow() -> tuple[SourceWorkflow, str]:
+def _workflow(
+    *,
+    work_id: str = "2203.01928",
+    disclosure: str = (
+        "Jonathan Crabbé is funded by Aviva and Mihaela van der Schaar by the "
+        "Office of Naval Research (ONR), NSF 172251."
+    ),
+) -> tuple[SourceWorkflow, str]:
     shared_revision_text = (
         "This manuscript reports the same core experimental protocol across "
         "both publicly archived revisions."
     )
-    disclosure = (
-        "Jonathan Crabbé is funded by Aviva and Mihaela van der Schaar by the "
-        "Office of Naval Research (ONR), NSF 172251."
-    )
     v1 = _record(
-        record_id="arxiv:2203.01928v1",
+        record_id=f"arxiv:{work_id}v1",
         revision="v1",
         occurred_at="2022-03-03T18:59:03Z",
         body=(
             f"Revision one introduction is specific to this archive. "
             f"{shared_revision_text} The authors thank the anonymous reviewers."
         ),
+        work_id=work_id,
     )
     v2 = _record(
-        record_id="arxiv:2203.01928v2",
+        record_id=f"arxiv:{work_id}v2",
         revision="v2",
         occurred_at="2022-06-07T11:25:15Z",
         body=(
@@ -127,11 +144,12 @@ def _workflow() -> tuple[SourceWorkflow, str]:
             f"{shared_revision_text} {disclosure}"
         ),
         added_fact=disclosure,
+        work_id=work_id,
     )
     relation_quote = '"previous_revision_id": "v1"'
     relation_start = v2.text.index(relation_quote)
     relation = SourceRelation(
-        relation_id="revision-v2-v1",
+        relation_id=f"revision-{work_id}-v2-v1",
         kind="revision_of",
         source_record_id=v2.record_id,
         target_record_id=v1.record_id,
@@ -146,7 +164,7 @@ def _workflow() -> tuple[SourceWorkflow, str]:
         ),
     )
     workflow = SourceWorkflow(
-        workflow_id="source:paper_workflow:0123456789abcdef01234567",
+        workflow_id=f"source:paper_workflow:legacy:{work_id}",
         component_digest="0" * 64,
         source_kind="paper_workflow",
         target_domain="researchlab",
@@ -157,6 +175,409 @@ def _workflow() -> tuple[SourceWorkflow, str]:
         relations=(relation,),
     )
     return workflow, disclosure
+
+
+def test_two_legacy_paper_workflows_isolate_answers_and_counterfactuals() -> None:
+    first, first_disclosure = _workflow()
+    second, _ = _workflow(
+        work_id="2401.01234",
+        disclosure=first_disclosure.replace("172251", "999999"),
+    )
+    materialized = materialize(
+        7,
+        n_parallel=0,
+        n_pulses=0,
+        domain="researchlab",
+        n_workstreams=0,
+        source_workflows=[first, second],
+        include_program_joins=False,
+    )
+    specs = [
+        query
+        for query in materialized.queries
+        if query.query_type == "real_revision_added_text"
+    ]
+
+    assert len(specs) == 2
+    assert len({spec.query_id for spec in specs}) == 2
+    assert len({spec.answer_key for spec in specs}) == 2
+    assert {spec.answer for spec in specs} == {
+        "2022-03-03 | Aviva | ONR | NSF 172251",
+        "2022-03-03 | Aviva | ONR | NSF 999999",
+    }
+    assert all(spec.cf_answer != spec.answer for spec in specs)
+
+
+def test_one_legacy_paper_workflow_isolates_each_revision_relation() -> None:
+    workflow, _ = _workflow(
+        disclosure=(
+            "Jonathan Crabbé is funded by Aviva and Mihaela van der Schaar by the "
+            "Office of Naval Research (ONR), NSF 111111."
+        )
+    )
+    later_disclosure = (
+        "Jonathan Crabbé is funded by Aviva and Mihaela van der Schaar by the "
+        "Office of Naval Research (ONR), NSF 222222."
+    )
+    v3 = _record(
+        record_id="arxiv:2203.01928v3",
+        revision="v3",
+        occurred_at="2022-06-09T11:32:36Z",
+        body=later_disclosure,
+        added_fact=later_disclosure,
+        previous_revision="v2",
+    )
+    relation_quote = '"previous_revision_id": "v2"'
+    relation_start = v3.text.index(relation_quote)
+    relation = SourceRelation(
+        relation_id="revision-2203.01928-v3-v2",
+        kind="revision_of",
+        source_record_id=v3.record_id,
+        target_record_id="arxiv:2203.01928v2",
+        evidence=(
+            SourceEvidence(
+                record_id=v3.record_id,
+                evidence_quote=relation_quote,
+                char_start=relation_start,
+                char_end=relation_start + len(relation_quote),
+                source_sha256=v3.source_sha256,
+            ),
+        ),
+    )
+    workflow = replace(
+        workflow,
+        provenance_ids=(*workflow.provenance_ids, v3.provenance_id),
+        records=(*workflow.records, v3),
+        relations=(*workflow.relations, relation),
+    )
+
+    materialized = materialize(
+        7,
+        n_parallel=0,
+        n_pulses=0,
+        domain="researchlab",
+        n_workstreams=0,
+        source_workflows=[workflow],
+        include_program_joins=False,
+    )
+    specs = [
+        query
+        for query in materialized.queries
+        if query.query_type == "real_revision_added_text"
+    ]
+
+    assert len(specs) == 2
+    assert len({spec.query_id for spec in specs}) == 2
+    assert len({spec.answer_key for spec in specs}) == 2
+    assert {spec.answer for spec in specs} == {
+        "2022-03-03 | Aviva | ONR | NSF 111111",
+        "2022-06-07 | Aviva | ONR | NSF 222222",
+    }
+    assert all(spec.cf_answer != spec.answer for spec in specs)
+
+
+def _multiband_workflow(
+    *,
+    work_id: str = "2203.01928",
+    disclosure: str = (
+        "Jonathan Crabbé is funded by Aviva and Mihaela van der Schaar by the "
+        "Office of Naval Research (ONR), NSF 172251."
+    ),
+) -> tuple[SourceWorkflow, str]:
+
+    def sections(revision: str) -> tuple[tuple[str, str], ...]:
+        return (
+            ("parts/abstract.tex", f"Abstract evidence unique to {revision}. " * 40),
+            (
+                "main.tex",
+                f"Main routing unique to {revision}. " * 30
+                + (
+                    "\\input{parts/acknowledgements}"
+                    if revision in {"v2", "v3"}
+                    else ""
+                ),
+            ),
+            (
+                "parts/illustrations_sup.tex",
+                f"Illustration note unique to {revision}. " * 20,
+            ),
+            (
+                "parts/introduction.tex",
+                f"Introduction history unique to {revision}. " * 120,
+            ),
+            ("parts/example.tex", f"Worked example unique to {revision}. " * 180),
+            (
+                "parts/expressions.tex",
+                f"Expression analysis unique to {revision}. " * 120,
+            ),
+            ("parts/feature.tex", f"Feature analysis unique to {revision}. " * 100),
+            (
+                "parts/experiments.tex",
+                f"Experiment result unique to {revision}. " * 80,
+            ),
+            (
+                "parts/experiments_sup.tex",
+                f"Supplemental result unique to {revision}. " * 80,
+            ),
+            (
+                "parts/experiments_details.tex",
+                f"Experiment detail unique to {revision}. " * 240,
+            ),
+            ("parts/discussion.tex", f"Discussion unique to {revision}. " * 80),
+        )
+
+    v1 = _record(
+        record_id=f"arxiv:{work_id}v1",
+        revision="v1",
+        occurred_at="2022-03-03T18:59:03Z",
+        body="The first public revision contains no funding disclosure.",
+        extra_sources=sections("v1"),
+        work_id=work_id,
+    )
+    v2 = _record(
+        record_id=f"arxiv:{work_id}v2",
+        revision="v2",
+        occurred_at="2022-06-07T11:25:15Z",
+        body=disclosure,
+        added_fact=disclosure,
+        extra_sources=sections("v2"),
+        work_id=work_id,
+    )
+    v3 = _record(
+        record_id=f"arxiv:{work_id}v3",
+        revision="v3",
+        occurred_at="2022-06-09T11:32:36Z",
+        body="The terminal public revision preserves the accepted disclosure.",
+        extra_sources=sections("v3"),
+        previous_revision="v2",
+        work_id=work_id,
+    )
+
+    def relation(source: SourceRecord, target: SourceRecord) -> SourceRelation:
+        quote = f'"previous_revision_id": "{target.attribute("revision_id")}"'
+        start = source.text.index(quote)
+        return SourceRelation(
+            relation_id=f"{source.record_id}:revision-of",
+            kind="revision_of",
+            source_record_id=source.record_id,
+            target_record_id=target.record_id,
+            evidence=(
+                SourceEvidence(
+                    record_id=source.record_id,
+                    evidence_quote=quote,
+                    char_start=start,
+                    char_end=start + len(quote),
+                    source_sha256=source.source_sha256,
+                ),
+            ),
+        )
+
+    return (
+        SourceWorkflow(
+            workflow_id=f"source:paper_workflow:multiband:{work_id}",
+            component_digest="1" * 64,
+            source_kind="paper_workflow",
+            target_domain="researchlab",
+            source_origin=SourceOrigin.REAL_PUBLIC,
+            source_families=("arxiv_record",),
+            provenance_ids=(v1.provenance_id, v2.provenance_id, v3.provenance_id),
+            records=(v1, v2, v3),
+            relations=(relation(v2, v1), relation(v3, v2)),
+        ),
+        disclosure,
+    )
+
+
+def _replace_record_sources(
+    workflow: SourceWorkflow,
+    revision: str,
+    mutate,
+) -> SourceWorkflow:
+    record = next(
+        item for item in workflow.records if item.attribute("revision_id") == revision
+    )
+    payload = json.loads(record.text)
+    mutate(payload["latex_sources"])
+    text = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    digest = hashlib.sha256(text.encode()).hexdigest()
+    updated = replace(
+        record,
+        text=text,
+        source_sha256=digest,
+        text_sha256=digest,
+        provenance_id=f"sha256:{digest}",
+        facts=tuple(replace(fact, source_sha256=digest) for fact in record.facts),
+    )
+    return replace(
+        workflow,
+        records=tuple(updated if item is record else item for item in workflow.records),
+    )
+
+
+def test_multiband_rejects_include_moved_out_of_shared_main_source() -> None:
+    workflow, _ = _multiband_workflow()
+
+    def move_marker(sources) -> None:
+        by_path = {source["path"]: source for source in sources}
+        marker = "\\input{parts/acknowledgements}"
+        by_path["main.tex"]["text"] = by_path["main.tex"]["text"].replace(marker, "")
+        by_path["parts/discussion.tex"]["text"] += marker
+
+    altered = _replace_record_sources(workflow, "v2", move_marker)
+
+    assert _paper_multiband_records(altered) is None
+
+
+def test_multiband_rejects_missing_shared_main_source() -> None:
+    workflow, _ = _multiband_workflow()
+
+    def remove_main(sources) -> None:
+        sources[:] = [source for source in sources if source["path"] != "main.tex"]
+
+    altered = _replace_record_sources(workflow, "v1", remove_main)
+
+    assert _paper_multiband_records(altered) is None
+
+
+def test_two_multiband_paper_workflows_have_isolated_answers_and_query_ids() -> None:
+    first, first_disclosure = _multiband_workflow()
+    second_disclosure = first_disclosure.replace("172251", "999999")
+    second, _ = _multiband_workflow(work_id="2401.01234", disclosure=second_disclosure)
+
+    materialized = materialize(
+        7,
+        n_parallel=0,
+        n_pulses=0,
+        domain="researchlab",
+        n_workstreams=0,
+        source_workflows=[first, second],
+        include_program_joins=False,
+    )
+    specs = [
+        query
+        for query in materialized.queries
+        if query.query_type == "real_revision_added_text"
+    ]
+
+    assert len(specs) == 6
+    world = materialized.worlds["focal"]
+    assert len({event.id for event in world.events}) == len(world.events)
+    assert len({spec.query_id for spec in specs}) == 6
+    assert len({spec.answer_key for spec in specs}) == 6
+    answers_by_group: dict[str, set[str]] = {}
+    for spec in specs:
+        answers_by_group.setdefault(spec.base_task_group, set()).add(spec.answer)
+    assert len(answers_by_group) == 2
+    assert all(len(answers) == 1 for answers in answers_by_group.values())
+    assert {next(iter(answers)) for answers in answers_by_group.values()} == {
+        "2022-03-03 | Aviva | ONR | NSF 172251 | v3 2022-06-09",
+        "2022-03-03 | Aviva | ONR | NSF 999999 | v3 2022-06-09",
+    }
+
+
+def test_real_arxiv_multiband_queries_grow_source_history_and_proof() -> None:
+    workflow, _ = _multiband_workflow()
+    materialized = materialize(
+        7,
+        n_parallel=0,
+        n_pulses=0,
+        domain="researchlab",
+        n_workstreams=0,
+        source_workflows=[workflow],
+        include_program_joins=False,
+    )
+    world = materialized.worlds["focal"]
+    specs = [
+        query
+        for query in materialized.queries
+        if query.query_type == "real_revision_added_text"
+    ]
+
+    assert [spec.preferred_length_buckets for spec in specs] == [
+        ["16k"],
+        ["32k"],
+        ["64k"],
+    ]
+    assert len({spec.base_task_group for spec in specs}) == 1
+    assert len({spec.semantic_growth_group for spec in specs}) == 1
+    assert [spec.proof_depth for spec in specs] == [2, 3, 4]
+    events_by_id = {event.id: event for event in world.events}
+    revision_events = {
+        (
+            str(event.params.get("source_view_tier")),
+            str(event.params.get("revision_id")),
+        ): event
+        for event in world.events
+        if event.type == "arxiv_revision" and event.params.get("source_view_tier")
+    }
+    v1_16k_files = set(revision_events[("16k", "v1")].params["source_view_basenames"])
+    v2_16k_files = set(revision_events[("16k", "v2")].params["source_view_basenames"])
+    assert "main.tex" in v1_16k_files & v2_16k_files
+    assert "acknowledgements.tex" not in v1_16k_files
+    assert "acknowledgements.tex" in v2_16k_files
+    decision_16k = events_by_id[specs[0].essential_event_ids[-1]]
+    assert decision_16k.params["required_new_include"] == "parts/acknowledgements"
+    assert [
+        sum(
+            events_by_id[event_id].type == "arxiv_revision_relation"
+            for event_id in spec.sufficient_event_ids
+        )
+        for spec in specs
+    ] == [0, 1, 2]
+    assert [len(spec.sufficient_event_ids) for spec in specs] == [4, 5, 6]
+
+    artifacts = materialized.artifacts["focal"]
+    source_chars = []
+    for spec in specs:
+        essential = [
+            artifact
+            for artifact in artifacts
+            if artifact.artifact_id in spec.essential_artifact_ids
+        ]
+        assert sentence_near_dup_ratio(essential) < 0.05
+        source_chars.append(
+            sum(
+                len(artifact.text)
+                for artifact in essential
+                if (artifact.slots or {}).get("event_type") == "arxiv_revision"
+            )
+        )
+        assert (
+            answer_from_artifacts(world, spec, essential, enforce_preconditions=True)
+            == spec.answer
+        )
+        assert all(
+            answer_from_artifacts(
+                world,
+                spec,
+                [artifact for artifact in essential if artifact is not removed],
+                enforce_preconditions=False,
+            )
+            != spec.answer
+            for removed in essential
+        )
+        assert spec.cf_answer != spec.answer
+    assert source_chars[0] < source_chars[1] < source_chars[2]
+    assert {spec.answer for spec in specs} == {
+        "2022-03-03 | Aviva | ONR | NSF 172251 | v3 2022-06-09"
+    }
+    essential_16k = [
+        artifact
+        for artifact in artifacts
+        if artifact.artifact_id in specs[0].essential_artifact_ids
+    ]
+    corrupted_include = [
+        replace(
+            artifact,
+            text=artifact.text.replace(
+                "parts/acknowledgements", "parts/unrelated_appendix"
+            ),
+        )
+        for artifact in essential_16k
+    ]
+    assert (
+        semantic_answer_from_artifacts(world, specs[0], corrupted_include) == "unknown"
+    )
 
 
 def test_real_arxiv_revision_body_drives_state_answer_and_counterfactual() -> None:

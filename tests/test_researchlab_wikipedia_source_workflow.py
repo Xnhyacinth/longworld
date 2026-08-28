@@ -1340,14 +1340,20 @@ def test_thatcher_queries_stage_real_body_programs(thatcher_world) -> None:
         ["64k"],
     ]
     assert [query.proof_depth for query in queries] == [2, 3, 4]
-    assert [len(query.essential_event_ids) for query in queries] == [2, 5, 7]
+    assert [len(query.essential_event_ids) for query in queries] == [6, 9, 11]
     answers = [query.answer for query in queries]
-    assert answers[0] == "BORN:1925-10-13"
+    assert answers[0] == (
+        "BORN:1925-10-13||"
+        "SCHOOL:[[Kesteven and Grantham Girls' School]]||"
+        "OXFORD:[[Somerville College]]||"
+        "POLITICS:[[Dartford (UK Parliament constituency)|Dartford]]||"
+        "LEADERSHIP:[[1975 Conservative Party leadership election|defeated Heath]]"
+    )
     assert answers[1].startswith(answers[0] + "||")
     assert answers[2].startswith(answers[1] + "||")
-    assert f"COMM:{WIKI_THATCHER_MID_QUOTE}" in answers[1]
+    assert f"OPPOSITION:{WIKI_THATCHER_MID_QUOTE}" in answers[1]
     assert "ENTITY:Q7416" in answers[1]
-    assert f"POP:{WIKI_THATCHER_LATE_QUOTE}" in answers[2]
+    assert f"WESTLAND:{WIKI_THATCHER_LATE_QUOTE}" in answers[2]
     rest_ids = [
         artifact.artifact_id
         for artifact in artifacts
@@ -1381,7 +1387,7 @@ def test_thatcher_queries_stage_real_body_programs(thatcher_world) -> None:
             generated_edges
             == _replayed_source_metadata(world, query, artifacts)["hybrid_causal_edges"]
         )
-    assert hybrid_counts == [1, 4, 6]
+    assert hybrid_counts == [5, 8, 10]
 
 
 def test_thatcher_cf_remove_one_and_surface_gates(thatcher_world) -> None:
@@ -1539,14 +1545,21 @@ def test_newton_queries_stage_real_body_programs(newton_world) -> None:
         ["64k"],
     ]
     assert [query.proof_depth for query in queries] == [2, 3, 4]
-    assert [len(query.essential_event_ids) for query in queries] == [2, 5, 7]
+    assert [len(query.essential_event_ids) for query in queries] == [6, 9, 11]
     answers = [query.answer for query in queries]
-    assert answers[0] == "BORN:1643-01-04"
+    assert answers[0] == (
+        "BORN:1643-01-04||"
+        "SCHOOL:[[The King's School, Grantham|The King's School]]||"
+        "CAMBRIDGE:[[Quaestiones quaedam philosophicae|''Quaestiones'']]||"
+        "MATH:[[Binomial theorem#Newton's generalized binomial theorem|generalised "
+        "binomial theorem]]||"
+        "SPECTRUM:prism refracts different colours by different angles"
+    )
     assert answers[1].startswith(answers[0] + "||")
     assert answers[2].startswith(answers[1] + "||")
-    assert f"COMM:{WIKI_NEWTON_MID_QUOTE}" in answers[1]
+    assert f"OPTICS:{WIKI_NEWTON_MID_QUOTE}" in answers[1]
     assert "ENTITY:Q935" in answers[1]
-    assert f"POP:{WIKI_NEWTON_LATE_QUOTE}" in answers[2]
+    assert f"MINT:{WIKI_NEWTON_LATE_QUOTE}" in answers[2]
     rest_ids = [
         artifact.artifact_id
         for artifact in artifacts
@@ -1574,13 +1587,23 @@ def test_newton_queries_stage_real_body_programs(newton_world) -> None:
             == "unknown"
             for removed in essential
         )
+        assert all(
+            semantic_answer_from_artifacts(
+                world,
+                query,
+                [item for item in essential if item.artifact_id != removed.artifact_id],
+                enforce_preconditions=False,
+            )
+            != query.answer
+            for removed in essential
+        )
         generated_edges = real_source_relation_edges(world, query, artifacts)
         hybrid_counts.append(len(generated_edges))
         assert (
             generated_edges
             == _replayed_source_metadata(world, query, artifacts)["hybrid_causal_edges"]
         )
-    assert hybrid_counts == [1, 4, 6]
+    assert hybrid_counts == [5, 8, 10]
 
 
 def test_newton_cf_remove_one_and_surface_gates(newton_world) -> None:
@@ -2138,13 +2161,21 @@ def test_mlk_queries_stage_real_body_programs(mlk_world) -> None:
         ["64k"],
     ]
     assert [query.proof_depth for query in queries] == [2, 3, 4]
+    assert [len(query.essential_event_ids) for query in queries] == [8, 11, 13]
     answers = [query.answer for query in queries]
-    assert answers[0] == "BORN:1929-01-15"
+    assert answers[0] == (
+        "BORN:1929-01-15||"
+        "SCHOOL:[[Gone with the Wind (film)|Gone with the Wind]]||"
+        "SPEECH:[[Original Oratory|oratorical contest]]||"
+        "DEGREE:[[Bachelor of Arts]]||DIVINITY:[[Bachelor of Divinity]]||"
+        "MARRIAGE:King married Scott on June 18, 1953||"
+        'SIT_IN:"a formative step" in his "commitment to a more just society."'
+    )
     assert answers[1].startswith(answers[0] + "||")
     assert answers[2].startswith(answers[1] + "||")
-    assert f"COMM:{WIKI_MLK_MID_QUOTE}" in answers[1]
+    assert f"MONTGOMERY:{WIKI_MLK_MID_QUOTE}" in answers[1]
     assert "ENTITY:Q8027" in answers[1]
-    assert f"POP:{WIKI_MLK_LATE_QUOTE}" in answers[2]
+    assert f"SERMON:{WIKI_MLK_LATE_QUOTE}" in answers[2]
     rest_ids = [
         artifact.artifact_id
         for artifact in artifacts
@@ -2154,7 +2185,7 @@ def test_mlk_queries_stage_real_body_programs(mlk_world) -> None:
     assert rest_ids[0] not in queries[2].essential_artifact_ids
     by_id = {artifact.artifact_id: artifact for artifact in artifacts}
     hybrid_counts = []
-    for query, expected_tokens in zip(queries, (12_000, 20_000, 40_000), strict=True):
+    for query, expected_tokens in zip(queries, (8_000, 20_000, 40_000), strict=True):
         essential = [by_id[item] for item in query.essential_artifact_ids]
         section_tokens = sum(
             estimate_tokens(item.text)
@@ -2178,7 +2209,7 @@ def test_mlk_queries_stage_real_body_programs(mlk_world) -> None:
             generated_edges
             == _replayed_source_metadata(world, query, artifacts)["hybrid_causal_edges"]
         )
-    assert hybrid_counts == [1, 4, 6]
+    assert hybrid_counts == [7, 10, 12]
 
 
 def test_mlk_cf_remove_one_and_surface_gates(mlk_world) -> None:
@@ -2332,6 +2363,27 @@ def jefferson_world(monkeypatch_module: pytest.MonkeyPatch):
 
 def test_jefferson_queries_stage_real_body_programs(jefferson_world) -> None:
     world, artifacts, queries = jefferson_world
+    source_events = [
+        event for event in world.events if event.type == "wiki_source_section"
+    ]
+    answer_events = [
+        event for event in world.events if event.type == "wiki_claim_answer"
+    ]
+    assert source_events
+    assert answer_events
+    assert all(
+        event.params["fact_parser_revision"] == "researchlab-wiki-claim-exact-v1"
+        for event in source_events
+    )
+    assert all(
+        "answer_tag" not in span
+        for event in source_events
+        for span in event.params["fact_spans"]
+    )
+    assert all(
+        "append_roles" not in event.params and "role_tags" not in event.params
+        for event in answer_events
+    )
     assert [query.preferred_length_buckets for query in queries] == [
         ["16k"],
         ["32k"],
@@ -2378,6 +2430,7 @@ def test_jefferson_queries_stage_real_body_programs(jefferson_world) -> None:
         [op["role"] for op in query.program_ops if op["op"] == "READ_WIKI_FACT"]
         for query in queries
     ] == expected_program_roles
+    assert all("tag" not in op for query in queries for op in query.program_ops)
     assert [query.gold_expression for query in queries] == [
         "tagged BORN/CAREER/COMMITTEE/EARLY reconstruction",
         "tagged BORN/CAREER/COMMITTEE/EARLY/COMM/ENTITY reconstruction",

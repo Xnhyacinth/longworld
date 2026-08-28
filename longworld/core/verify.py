@@ -491,7 +491,10 @@ def verify_question(
         else min_arts
     )
     semantic_min_ans = semantic_answer_from_artifacts(
-        world, spec, semantic_min_artifacts
+        world,
+        spec,
+        semantic_min_artifacts,
+        enforce_preconditions=False,
     )
     notes["semantic_min_ans"] = semantic_min_ans
     notes["semantic_proof_scope"] = "attested_artifact_bytes_and_params"
@@ -565,7 +568,12 @@ def verify_question(
         remove_ok = False
     for aid in spec.essential_artifact_ids:
         remaining = [a for a in min_arts if a.artifact_id != aid]
-        semantic_ans = semantic_answer_from_artifacts(world, spec, remaining)
+        semantic_ans = semantic_answer_from_artifacts(
+            world,
+            spec,
+            remaining,
+            enforce_preconditions=False,
+        )
         strict_ans = answer_from_artifacts(
             world, spec, remaining, enforce_preconditions=True
         )

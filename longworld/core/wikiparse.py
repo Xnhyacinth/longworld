@@ -14,6 +14,8 @@ WIKI_SECTION_REVISION = "wiki-heading-section-v1"
 WIKI_SECTION_VIEW_PREFIX = "Wikipedia source section\n"
 WIKI_ENTITY_VIEW_PREFIX = "Wikidata entity section\n"
 WIKI_HYBRID_CHILD_EVENT_TYPES = frozenset({"wiki_claim_answer"})
+WIKI_FACT_PARSER_REVISION_V1 = "researchlab-wiki-claim-exact-v1"
+WIKI_FACT_PARSER_REVISION_V2 = "researchlab-wiki-claim-exact-v2"
 WIKI_COMMEMORATION_QUOTE = "BCSWomen Lovelace Colloquium"
 WIKI_POPULAR_CULTURE_QUOTE = "The Difference Engine"
 WIKI_TURING_MID_QUOTE = "The petition received more than 30,000 signatures"
@@ -55,9 +57,10 @@ class WikiClaimFact:
     char_end: int
     value: str
     parent_sha256: str
+    answer_tag: str = ""
 
     def to_span(self, *, shift: int = 0) -> dict[str, object]:
-        return {
+        span = {
             "kind": "wiki_claim",
             "role": self.role,
             "evidence_quote": self.evidence_quote,
@@ -66,6 +69,9 @@ class WikiClaimFact:
             "value": self.value,
             "parent_sha256": self.parent_sha256,
         }
+        if self.answer_tag:
+            span["answer_tag"] = self.answer_tag
+        return span
 
 
 @dataclass(frozen=True)
@@ -86,6 +92,7 @@ class WikiClaimProgram:
     entity_id: str
     title: str
     sections: tuple[WikiSection, ...]
+    fact_parser_revision: str = WIKI_FACT_PARSER_REVISION_V1
 
 
 def _require_hash(value: str, *, label: str) -> str:
@@ -277,7 +284,13 @@ def _unique_span_containing(
     raise ProvenanceError("Wikipedia birth template is not unique")
 
 
-def _birth_fact(section_text: str, full_text: str, parent_sha256: str) -> WikiClaimFact:
+def _birth_fact(
+    section_text: str,
+    full_text: str,
+    parent_sha256: str,
+    *,
+    answer_tag: str = "",
+) -> WikiClaimFact:
     matches = list(_BIRTH.finditer(section_text))
     if not matches:
         raise ProvenanceError("Wikipedia birth template is not unique")
@@ -305,6 +318,7 @@ def _birth_fact(section_text: str, full_text: str, parent_sha256: str) -> WikiCl
             continue
         return WikiClaimFact(
             role="born",
+            answer_tag=answer_tag,
             evidence_quote=quote,
             char_start=start,
             char_end=end,
@@ -319,6 +333,7 @@ def _literal_fact(
     full_text: str,
     *,
     role: str,
+    answer_tag: str,
     quote: str,
     parent_sha256: str,
 ) -> WikiClaimFact:
@@ -327,6 +342,7 @@ def _literal_fact(
     start, end = _unique_quote(section_text, quote, label=role)
     return WikiClaimFact(
         role=role,
+        answer_tag=answer_tag,
         evidence_quote=quote,
         char_start=start,
         char_end=end,
@@ -335,7 +351,9 @@ def _literal_fact(
     )
 
 
-def _entity_section(entity_text: str, entity_id: str, entity_hash: str) -> WikiSection:
+def _entity_section(
+    entity_text: str, entity_id: str, entity_hash: str, *, answer_tag: str = ""
+) -> WikiSection:
     entity_quote = json.dumps({"id": entity_id}, separators=(",", ":"))[1:-1]
     entity_start, entity_end = _unique_quote(
         entity_text, entity_quote, label="entity_id"
@@ -348,6 +366,7 @@ def _entity_section(entity_text: str, entity_id: str, entity_hash: str) -> WikiS
         facts=(
             WikiClaimFact(
                 role="entity",
+                answer_tag=answer_tag,
                 evidence_quote=entity_quote,
                 char_start=entity_start,
                 char_end=entity_end,
@@ -381,15 +400,21 @@ def _staged_sections(
     middle_heading: str,
     middle_ground: str,
     middle_quote: str,
+    middle_role: str,
+    middle_tag: str,
     late_heading: str,
     late_ground: str,
     late_quote: str,
+    late_role: str,
+    late_tag: str,
     entity_text: str,
     entity_id: str,
     entity_hash: str,
     rest: str = "",
+    rest_ground: str = "",
     early_quote: str = "",
-    early_segments: tuple[tuple[str, str, str, str], ...] = (),
+    early_segments: tuple[tuple[str, ...], ...] = (),
+    semantic_tags: bool = False,
 ) -> tuple[WikiSection, ...]:
     if not (early and middle and late):
         raise ProvenanceError("Wikipedia claim sections overlap or are empty")
@@ -400,20 +425,34 @@ def _staged_sections(
     sections: list[WikiSection] = []
     if early_segments:
         starts = [0]
-        for _section_id, marker, _role, _quote in early_segments[1:]:
+        for segment_spec in early_segments[1:]:
+            marker = segment_spec[1]
             starts.append(_unique_quote(early, marker, label="early segment")[0])
         if starts != sorted(starts) or len(starts) != len(early_segments):
             raise ProvenanceError("Wikipedia early segments are not chronological")
-        for index, (section_id, marker, role, quote) in enumerate(early_segments):
+        for index, segment_spec in enumerate(early_segments):
+            if len(segment_spec) == 4:
+                section_id, marker, role, quote = segment_spec
+                tag = ""
+            elif len(segment_spec) == 5:
+                section_id, marker, role, tag, quote = segment_spec
+            else:
+                raise ProvenanceError("Wikipedia early segment spec is invalid")
             end = starts[index + 1] if index + 1 < len(starts) else None
             segment = early[starts[index] : end]
             fact = (
-                _birth_fact(segment, wikitext, wiki_hash)
+                _birth_fact(
+                    segment,
+                    wikitext,
+                    wiki_hash,
+                    answer_tag=tag if semantic_tags else "",
+                )
                 if role == "born"
                 else _literal_fact(
                     segment,
                     wikitext,
                     role=role,
+                    answer_tag=tag if semantic_tags else "",
                     quote=quote,
                     parent_sha256=wiki_hash,
                 )
@@ -429,13 +468,21 @@ def _staged_sections(
                 )
             )
     else:
-        early_facts = [_birth_fact(early, wikitext, wiki_hash)]
+        early_facts = [
+            _birth_fact(
+                early,
+                wikitext,
+                wiki_hash,
+                answer_tag="BORN" if semantic_tags else "",
+            )
+        ]
         if early_quote:
             early_facts.append(
                 _literal_fact(
                     early,
                     wikitext,
                     role="early_transition",
+                    answer_tag="EARLY" if semantic_tags else "",
                     quote=early_quote,
                     parent_sha256=wiki_hash,
                 )
@@ -461,7 +508,8 @@ def _staged_sections(
                     _literal_fact(
                         middle,
                         wikitext,
-                        role="commemoration",
+                        role=middle_role,
+                        answer_tag=middle_tag if semantic_tags else "",
                         quote=middle_quote,
                         parent_sha256=wiki_hash,
                     ),
@@ -477,7 +525,8 @@ def _staged_sections(
                     _literal_fact(
                         late,
                         wikitext,
-                        role="popular_culture",
+                        role=late_role,
+                        answer_tag=late_tag if semantic_tags else "",
                         quote=late_quote,
                         parent_sha256=wiki_hash,
                     ),
@@ -494,10 +543,17 @@ def _staged_sections(
                 wikitext=rest,
                 parent_sha256=wiki_hash,
                 facts=(),
-                ground_value=_leftover_ground(rest),
+                ground_value=rest_ground or _leftover_ground(rest),
             )
         )
-    sections.append(_entity_section(entity_text, entity_id, entity_hash))
+    sections.append(
+        _entity_section(
+            entity_text,
+            entity_id,
+            entity_hash,
+            answer_tag="ENTITY" if semantic_tags else "",
+        )
+    )
     return tuple(sections)
 
 
@@ -513,10 +569,16 @@ class _WikiTitleCuts:
     late_heading: str
     late_ground: str
     late_quote: str
+    middle_role: str = "commemoration"
+    middle_tag: str = ""
+    late_role: str = "popular_culture"
+    late_tag: str = ""
     tail: str | None = None
     rest_end: str | None = None
+    rest_ground: str = ""
     early_quote: str = ""
-    early_segments: tuple[tuple[str, str, str, str], ...] = ()
+    early_segments: tuple[tuple[str, ...], ...] = ()
+    fact_parser_revision: str = WIKI_FACT_PARSER_REVISION_V1
 
 
 _WIKI_TITLE_PROGRAMS = {
@@ -571,32 +633,105 @@ _WIKI_TITLE_PROGRAMS = {
         rest_end='<ref name="ILjYQ">',
     ),
     "Margaret Thatcher": _WikiTitleCuts(
-        middle="===Leader of the Opposition (1975–1979)===",
+        middle="literal:Thatcher became Conservative Party leader",
         late="===Environment===",
         early_heading="lead through Education Secretary",
-        early_ground="==Early political career==",
+        early_ground="==Early life and education==",
         middle_heading="Opposition through 1979",
-        middle_ground="===Leader of the Opposition (1975–1979)===",
+        middle_ground="Thatcher became Conservative Party leader",
         middle_quote=WIKI_THATCHER_MID_QUOTE,
+        middle_role="opposition_speech",
+        middle_tag="OPPOSITION",
         late_heading="Environment through later life",
         late_ground="===Environment===",
         late_quote=WIKI_THATCHER_LATE_QUOTE,
-        tail="==Legacy==",
+        late_role="westland_affair",
+        late_tag="WESTLAND",
+        tail="literal:Speaking in Scotland in 2009",
         rest_end="[[Scottish independence]]",
+        rest_ground="Speaking in Scotland in 2009",
+        early_segments=(
+            ("early_birth", "", "born", "BORN", ""),
+            (
+                "early_school",
+                "=== Family and childhood (1925–1943) ===",
+                "schooling",
+                "SCHOOL",
+                "[[Kesteven and Grantham Girls' School]]",
+            ),
+            (
+                "early_oxford",
+                "===Oxford (1943–1947)===",
+                "oxford_studies",
+                "OXFORD",
+                "[[Somerville College]]",
+            ),
+            (
+                "early_politics",
+                "==Early political career==",
+                "early_politics",
+                "POLITICS",
+                "[[Dartford (UK Parliament constituency)|Dartford]]",
+            ),
+            (
+                "early_opposition",
+                "===Leader of the Opposition (1975–1979)===",
+                "leadership_election",
+                "LEADERSHIP",
+                "[[1975 Conservative Party leadership election|defeated Heath]]",
+            ),
+        ),
+        fact_parser_revision=WIKI_FACT_PARSER_REVISION_V2,
     ),
     "Isaac Newton": _WikiTitleCuts(
-        middle="=== Optics ===",
-        late="=== Royal Mint ===",
+        middle="literal:From 1670 to 1672, Newton lectured on optics.",
+        late="[[William Chaloner]]",
         early_heading="lead through Mathematics",
-        early_ground="== Scientific studies ==",
+        early_ground="== Early life ==",
         middle_heading="Optics through Principia",
-        middle_ground="=== Optics ===",
+        middle_ground="From 1670 to 1672, Newton lectured on optics.",
         middle_quote=WIKI_NEWTON_MID_QUOTE,
+        middle_role="optics_work",
+        middle_tag="OPTICS",
         late_heading="Royal Mint through See also",
-        late_ground="=== Royal Mint ===",
+        late_ground="[[William Chaloner]]",
         late_quote=WIKI_NEWTON_LATE_QUOTE,
+        late_role="mint_prosecution",
+        late_tag="MINT",
         tail="== References ==",
         rest_end="=== Alchemy further reading ===",
+        early_segments=(
+            ("early_birth", "", "born", "BORN", ""),
+            (
+                "early_school",
+                "=== The King's School ===",
+                "schooling",
+                "SCHOOL",
+                "[[The King's School, Grantham|The King's School]]",
+            ),
+            (
+                "early_cambridge",
+                "=== University of Cambridge ===",
+                "cambridge_studies",
+                "CAMBRIDGE",
+                "[[Quaestiones quaedam philosophicae|''Quaestiones'']]",
+            ),
+            (
+                "early_mathematics",
+                "== Scientific studies ==",
+                "mathematics",
+                "MATH",
+                "[[Binomial theorem#Newton's generalized binomial theorem|generalised binomial theorem]]",
+            ),
+            (
+                "early_optics",
+                "=== Optics ===",
+                "spectrum_observation",
+                "SPECTRUM",
+                "prism refracts different colours by different angles",
+            ),
+        ),
+        fact_parser_revision=WIKI_FACT_PARSER_REVISION_V2,
     ),
     "Barack Obama": _WikiTitleCuts(
         middle="===Family and personal life===",
@@ -627,18 +762,68 @@ _WIKI_TITLE_PROGRAMS = {
         rest_end="==External links==",
     ),
     "Martin Luther King Jr.": _WikiTitleCuts(
-        middle="=== Montgomery bus boycott, 1955 ===",
-        late="=== Opposition to the Vietnam War ===",
-        early_heading="lead through family and early activism",
+        middle="literal:The Mary's Cafe sit-in occurred six months prior",
+        late="=== Biddeford, Maine, 1964 ===",
+        early_heading="lead through Morehouse College",
         early_ground="== Early life and education ==",
-        middle_heading="Montgomery boycott through Chicago",
-        middle_ground="=== Montgomery bus boycott, 1955 ===",
+        middle_heading="Religious education through March on Washington",
+        middle_ground="The Mary's Cafe sit-in occurred six months prior",
         middle_quote=WIKI_MLK_MID_QUOTE,
-        late_heading="Vietnam War through South Africa legacy",
-        late_ground="=== Opposition to the Vietnam War ===",
+        middle_role="montgomery_oratory",
+        middle_tag="MONTGOMERY",
+        late_heading="New York City through assassination aftermath",
+        late_ground="=== Biddeford, Maine, 1964 ===",
         late_quote=WIKI_MLK_LATE_QUOTE,
-        tail="== Legacy ==",
+        late_role="final_sermon",
+        late_tag="SERMON",
+        tail="=== United States ===",
         rest_end="==== ''The Measure of a Man'' ====",
+        early_segments=(
+            ("early_birth", "", "born", "BORN", ""),
+            (
+                "early_school",
+                "=== Early childhood ===",
+                "schooling",
+                "SCHOOL",
+                "[[Gone with the Wind (film)|Gone with the Wind]]",
+            ),
+            (
+                "early_adolescence",
+                "=== Adolescence ===",
+                "adolescence_oratory",
+                "SPEECH",
+                "[[Original Oratory|oratorical contest]]",
+            ),
+            (
+                "early_morehouse",
+                "=== Morehouse College ===",
+                "college_degree",
+                "DEGREE",
+                "[[Bachelor of Arts]]",
+            ),
+            (
+                "early_religious",
+                "== Religious education ==",
+                "divinity_degree",
+                "DIVINITY",
+                "[[Bachelor of Divinity]]",
+            ),
+            (
+                "early_family",
+                "== Marriage and family ==",
+                "marriage_date",
+                "MARRIAGE",
+                "King married Scott on June 18, 1953",
+            ),
+            (
+                "early_sit_in",
+                "=== Mary's Cafe Sit-In, 1950 ===",
+                "sit_in_commitment",
+                "SIT_IN",
+                '"a formative step" in his "commitment to a more just society."',
+            ),
+        ),
+        fact_parser_revision=WIKI_FACT_PARSER_REVISION_V2,
     ),
     "Thomas Jefferson": _WikiTitleCuts(
         middle="==Secretary of State==",
@@ -655,7 +840,12 @@ _WIKI_TITLE_PROGRAMS = {
         rest_end="===Thomas Jefferson Foundation sources===",
         early_segments=(
             ("early_birth", "", "born", ""),
-            ("early_career", "==Career==", "early_career", "[[House of Burgesses]]"),
+            (
+                "early_career",
+                "==Career==",
+                "early_career",
+                "[[House of Burgesses]]",
+            ),
             (
                 "early_revolution",
                 "==Revolutionary War==",
@@ -676,6 +866,9 @@ _WIKI_TITLE_PROGRAMS = {
 def _cut_index(
     wikitext: str, spans: tuple[tuple[str, int, int], ...], spec: str
 ) -> int:
+    if spec.startswith("literal:"):
+        marker = spec.removeprefix("literal:")
+        return _unique_marker_start(wikitext, marker, label=marker)
     if spec.startswith(("=", "[[")):
         return _unique_marker_start(wikitext, spec, label=spec)
     return _heading_start(spans, prefix=spec)
@@ -729,15 +922,21 @@ def parse_wiki_claim_program(
         middle_heading=cuts.middle_heading,
         middle_ground=cuts.middle_ground,
         middle_quote=cuts.middle_quote,
+        middle_role=cuts.middle_role,
+        middle_tag=cuts.middle_tag,
         late_heading=cuts.late_heading,
         late_ground=cuts.late_ground,
         late_quote=cuts.late_quote,
+        late_role=cuts.late_role,
+        late_tag=cuts.late_tag,
         entity_text=entity_text,
         entity_id=entity_id,
         entity_hash=entity_hash,
         rest=rest,
+        rest_ground=cuts.rest_ground,
         early_quote=cuts.early_quote,
         early_segments=cuts.early_segments,
+        semantic_tags=(cuts.fact_parser_revision == WIKI_FACT_PARSER_REVISION_V2),
     )
     payload = json.loads(wikipedia_text)
     revision_id = str(payload["query"]["pages"][0]["revisions"][0]["revid"])
@@ -746,4 +945,5 @@ def parse_wiki_claim_program(
         entity_id=entity_id,
         title=title,
         sections=sections,
+        fact_parser_revision=cuts.fact_parser_revision,
     )

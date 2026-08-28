@@ -511,6 +511,13 @@ def _normalized_workflow_records(
                 "source_links": list(record.links),
                 "body_facts": body_facts,
                 "source_pointer": record.source_pointer,
+                "source_observations": [
+                    {
+                        "source_pointer": record.source_pointer,
+                        "provenance_id": workflow.lineage.provenance_id,
+                        "workflow_id": workflow.workflow_id,
+                    }
+                ],
                 "release_cycle": release_cycle,
                 "source_origin": workflow.source_origin.value,
                 "provenance_id": workflow.lineage.provenance_id,
@@ -519,6 +526,42 @@ def _normalized_workflow_records(
             }
         )
     return records
+
+
+def _collapse_identical_record_snapshots(
+    records: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Share one immutable source node across byte-identical repo snapshots."""
+    canonical_by_identity: dict[tuple[str, ...], dict[str, Any]] = {}
+    aliases: dict[str, str] = {}
+    unique: list[dict[str, Any]] = []
+    for record in records:
+        identity = (
+            str(record["source_url"]),
+            str(record["record_id"]),
+            str(record["kind"]),
+            str(record["source_body_sha256"]),
+            str(record["source_pointer"]).partition("?ref=")[0],
+            json.dumps(record["source_links"], sort_keys=True, separators=(",", ":")),
+            json.dumps(record["body_facts"], sort_keys=True, separators=(",", ":")),
+            str(record["workflow_id"]) if record["source_links"] else "",
+        )
+        canonical = canonical_by_identity.get(identity)
+        if canonical is None:
+            canonical_by_identity[identity] = record
+            unique.append(record)
+            continue
+        aliases[str(record["record_key"])] = str(canonical["record_key"])
+        canonical["source_observations"] = [
+            *canonical["source_observations"],
+            *record["source_observations"],
+        ]
+
+    for record in unique:
+        record["links"] = [
+            aliases.get(str(link), str(link)) for link in record["links"]
+        ]
+    return unique, aliases
 
 
 def bind_real_workflows(project: dict[str, Any], workflows: list[RealWorkflow]) -> None:
@@ -535,7 +578,9 @@ def bind_real_workflows(project: dict[str, Any], workflows: list[RealWorkflow]) 
             int(record["index"]),
         )
     )
-    records = [dict(record) for record in records]
+    records, record_aliases = _collapse_identical_record_snapshots(
+        [dict(record) for record in records]
+    )
     records_by_key = {str(record["record_key"]): record for record in records}
     grounded_records = {
         key: record
@@ -603,26 +648,21 @@ def bind_real_workflows(project: dict[str, Any], workflows: list[RealWorkflow]) 
             "provenance_id": str(record["provenance_id"]),
             "grounded_source_id": str(record["grounded_source_id"]),
             "source_body_sha256": str(record["source_body_sha256"]),
+            "source_observations": list(record["source_observations"]),
             "links": link_bindings,
             "grounded_relations": list(record["grounded_relations"]),
         }
         record["source_record_binding"] = binding
         record["source_record_binding_sha256"] = _canonical_binding_sha256(binding)
     if grounded_records:
-        workflow_grounded_records: dict[str, list[dict[str, Any]]] = {}
-        for record in grounded_records.values():
-            workflow_grounded_records.setdefault(str(record["workflow_id"]), []).append(
-                record
-            )
-        for workflow_records in workflow_grounded_records.values():
-            validate_grounded_sources(
-                tuple(_grounded_source(record) for record in workflow_records),
-                allow_duplicate_text_hashes=True,
-            )
+        validate_grounded_sources(
+            tuple(_grounded_source(record) for record in grounded_records.values()),
+            allow_duplicate_text_hashes=True,
+        )
     workflow_ids = [workflow.workflow_id for workflow in workflows]
     provenance_ids = [workflow.lineage.provenance_id for workflow in workflows]
     project["repo_episode"] = records
-    project["real_record_aliases"] = {}
+    project["real_record_aliases"] = record_aliases
     project["real_workflow_ids"] = workflow_ids
     project["real_provenance_ids"] = provenance_ids
     project["real_workflow_id"] = workflow_ids[0] if len(workflow_ids) == 1 else ""

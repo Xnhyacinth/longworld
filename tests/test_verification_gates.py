@@ -194,6 +194,28 @@ def test_semantic_and_strict_executable_proofs_are_reported_separately():
     assert not verification.all_green()
 
 
+def test_real_hybrid_semantic_proof_does_not_use_strict_preconditions(monkeypatch):
+    world, spec, artifacts = _company_case()
+    hybrid = replace(spec, truth_regime="real_workflow_hybrid_executable")
+    observed: list[bool] = []
+
+    def semantic_replay(_world, _spec, _artifacts, **kwargs):
+        enforce_preconditions = bool(kwargs.get("enforce_preconditions"))
+        observed.append(enforce_preconditions)
+        return hybrid.answer if enforce_preconditions else "unknown"
+
+    monkeypatch.setattr(
+        "longworld.core.verify.semantic_answer_from_artifacts", semantic_replay
+    )
+    verification, _ = verify_question(
+        world, hybrid, artifacts, verification_mode="candidate"
+    )
+
+    assert observed
+    assert not any(observed)
+    assert not verification.semantic_sufficient
+
+
 def test_strict_executable_proof_uses_declared_sufficient_event_closure():
     world, spec, artifacts = _company_case()
     executable = replace(

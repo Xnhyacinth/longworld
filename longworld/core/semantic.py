@@ -102,6 +102,44 @@ def gold_artifact_stem(ess_ids: set[str]) -> str:
     return aid.split(".", 1)[0] if "." in aid else aid
 
 
+def _valid_arxiv_file_spans(
+    text: str, spans: object, declared_basenames: object
+) -> bool:
+    if not isinstance(spans, list) or not isinstance(declared_basenames, list):
+        return False
+    basenames: list[str] = []
+    previous_end = 0
+    for span in spans:
+        if not isinstance(span, dict) or set(span) != {
+            "path",
+            "basename",
+            "char_start",
+            "char_end",
+            "text_sha256",
+        }:
+            return False
+        path = str(span["path"])
+        basename = str(span["basename"])
+        start = span["char_start"]
+        end = span["char_end"]
+        if (
+            not path
+            or path.rsplit("/", 1)[-1] != basename
+            or basename in basenames
+            or isinstance(start, bool)
+            or isinstance(end, bool)
+            or not isinstance(start, int)
+            or not isinstance(end, int)
+            or not previous_end <= start < end <= len(text)
+            or hashlib.sha256(text[start:end].encode()).hexdigest()
+            != span["text_sha256"]
+        ):
+            return False
+        basenames.append(basename)
+        previous_end = end
+    return sorted(basenames) == declared_basenames
+
+
 def _attested_arxiv_revision(artifact: Artifact) -> tuple[str, str] | None:
     slots = artifact.slots or {}
     params = slots.get("params")
@@ -114,7 +152,10 @@ def _attested_arxiv_revision(artifact: Artifact) -> tuple[str, str] | None:
     provenance_id = classification.provenance_id
     text_sha256 = hashlib.sha256(artifact.text.encode()).hexdigest()
     operation = str(params.get("provenance_operation") or "")
-    if operation == "arxiv_semantic_latex_body_v1":
+    if operation in {
+        "arxiv_semantic_latex_body_v1",
+        "arxiv_semantic_latex_body_v2",
+    }:
         excluded_paths = params.get("excluded_paths")
         if (
             not parent_provenance_id.startswith("sha256:")
@@ -129,6 +170,19 @@ def _attested_arxiv_revision(artifact: Artifact) -> tuple[str, str] | None:
             "excluded_paths": excluded_paths,
             "text_sha256": text_sha256,
         }
+        if operation == "arxiv_semantic_latex_body_v2":
+            source_file_spans = params.get("source_file_spans")
+            source_view_basenames = params.get("source_view_basenames")
+            if not _valid_arxiv_file_spans(
+                artifact.text, source_file_spans, source_view_basenames
+            ):
+                return None
+            provenance_payload.update(
+                {
+                    "source_file_spans": source_file_spans,
+                    "source_view_basenames": source_view_basenames,
+                }
+            )
     elif operation == "counterfactual_revision_text":
         if not parent_provenance_id.startswith("derived-sha256:"):
             return None
@@ -137,6 +191,19 @@ def _attested_arxiv_revision(artifact: Artifact) -> tuple[str, str] | None:
             "parent_provenance_id": parent_provenance_id,
             "text_sha256": text_sha256,
         }
+        if params.get("source_file_spans") is not None:
+            source_file_spans = params.get("source_file_spans")
+            source_view_basenames = params.get("source_view_basenames")
+            if not _valid_arxiv_file_spans(
+                artifact.text, source_file_spans, source_view_basenames
+            ):
+                return None
+            provenance_payload.update(
+                {
+                    "source_file_spans": source_file_spans,
+                    "source_view_basenames": source_view_basenames,
+                }
+            )
     else:
         return None
     expected_provenance = (

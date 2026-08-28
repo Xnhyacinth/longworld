@@ -148,6 +148,14 @@ def events_for_repo(project: dict[str, Any], prefix: str) -> list[Event]:
         ).hexdigest()
         for record in repo_records
     }
+    kind_by_record = {
+        str(record["record_key"]): str(record["kind"]) for record in repo_records
+    }
+    result_by_record = {
+        str(record["record_key"]): str((record.get("body_facts") or {}).get("result"))
+        for record in repo_records
+        if (record.get("body_facts") or {}).get("result") is not None
+    }
     real_record_events: list[Event] = []
     real_release_events: list[Event] = []
     for index, record in enumerate(repo_records):
@@ -194,8 +202,19 @@ def events_for_repo(project: dict[str, Any], prefix: str) -> list[Event]:
                 ),
                 "source_body_facts": facts,
                 "links": links,
+                "linked_record_kinds": {
+                    link: kind_by_record[link]
+                    for link in links
+                    if link in kind_by_record
+                },
+                "linked_record_results": {
+                    link: result_by_record[link]
+                    for link in links
+                    if link in result_by_record
+                },
                 "source_links": list(record.get("source_links") or []),
                 "source_pointer": str(record.get("source_pointer") or ""),
+                "source_observations": list(record.get("source_observations") or []),
                 "workflow_id": str(record["workflow_id"]),
                 "source_origin": str(record["source_origin"]),
                 "provenance_id": str(record["provenance_id"]),

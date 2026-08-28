@@ -368,8 +368,13 @@ def _apply_repo_record(state: WorldState, ev: Event) -> None:
             state.set(f"{decision_prefix}:license", selected_license, ev.id, ev.time)
     elif kind == "release":
         release_prefix = f"real:release:{record_id}"
+        linked_record_kinds = dict(p.get("linked_record_kinds") or {})
+        linked_record_results = dict(p.get("linked_record_results") or {})
         ci_links = [
-            link for link in links if state.values.get(f"repo:{link}:kind") == "ci_run"
+            link
+            for link in links
+            if linked_record_kinds.get(link) == "ci_run"
+            and linked_record_results.get(link) in {"failed", "passed"}
         ]
         ci_results = [
             state.values.get(f"repo:{link}:resolved:result") for link in ci_links
@@ -378,7 +383,9 @@ def _apply_repo_record(state: WorldState, ev: Event) -> None:
             "failed"
             if "failed" in ci_results
             else "passed"
-            if any(item == "passed" for item in ci_results)
+            if ci_links and all(item == "passed" for item in ci_results)
+            else None
+            if ci_links
             else state.values.get(f"{prefix}:resolved:result")
         )
         license_results = [

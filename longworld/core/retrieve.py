@@ -19,6 +19,10 @@ from longworld.core.attestation import sanitized_attestation_environment
 from longworld.core.engine import answer_from_artifacts, answer_from_events
 from longworld.core.pack import SEP, estimate_tokens, join_artifacts
 from longworld.core.render import Artifact
+from longworld.core.wikiparse import (
+    WIKI_FACT_PARSER_REVISION_V1,
+    WIKI_FACT_PARSER_REVISION_V2,
+)
 from longworld.core.world import SimulatedWorld
 from longworld.domains.company.queries import QuerySpec
 
@@ -576,6 +580,16 @@ def _wiki_raw_token_fact_windows_insufficient(
             }
         source_params[event_id] = expected
         declared_start = artifact.text.index(declared_text)
+        parser_revision = expected.get("fact_parser_revision")
+        if parser_revision not in {
+            WIKI_FACT_PARSER_REVISION_V1,
+            WIKI_FACT_PARSER_REVISION_V2,
+        }:
+            return False, {
+                "applicable": True,
+                "error": "invalid_source_fact_parser_revision",
+                "artifact_id": artifact.artifact_id,
+            }
         for span_index, span in enumerate(fact_spans):
             if not isinstance(span, dict):
                 return False, {
@@ -587,9 +601,21 @@ def _wiki_raw_token_fact_windows_insufficient(
             end = span.get("char_end")
             quote = str(span.get("evidence_quote") or "")
             role = str(span.get("role") or "")
+            answer_tag = span.get("answer_tag")
             if (
                 span.get("kind") != "wiki_claim"
                 or not role
+                or (
+                    parser_revision == WIKI_FACT_PARSER_REVISION_V1
+                    and answer_tag is not None
+                )
+                or (
+                    parser_revision == WIKI_FACT_PARSER_REVISION_V2
+                    and (
+                        not isinstance(answer_tag, str)
+                        or re.fullmatch(r"[A-Z][A-Z0-9_]{1,31}", answer_tag) is None
+                    )
+                )
                 or isinstance(start, bool)
                 or isinstance(end, bool)
                 or not isinstance(start, int)
