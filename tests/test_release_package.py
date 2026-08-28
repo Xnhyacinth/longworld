@@ -34,7 +34,8 @@ sys.path.insert(0, str(SCRIPTS))
 from build_release_package import build_release_package
 
 PROFILE = "p3-probe-12-v1"
-PRODUCTION_PROFILE = "p3-production-48-v1"
+PRODUCTION_PROFILE = "p10-source-rich-production-48-v1"
+SUPERSEDED_PRODUCTION_PROFILE = "p3-production-48-v1"
 TRANSFORM = "sharegpt-v-test"
 AUDITOR_KEY = b"release-package-auditor-test-key-32b"
 REPORT_KEY = b"release-package-report-test-key-32by"
@@ -619,6 +620,37 @@ def test_probe_profile_cannot_be_committed_as_production(
     assert not destination.exists()
 
 
+def test_superseded_production_profile_cannot_issue_a_new_package(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_root = _prepare_release(
+        tmp_path,
+        monkeypatch,
+        release_profile_id=SUPERSEDED_PRODUCTION_PROFILE,
+        environment="production",
+    )
+    destination = tmp_path / "hf-private-stage"
+
+    with pytest.raises(ValueError, match="superseded production release profile"):
+        build_release_package(
+            source_release_root=source_root,
+            destination=destination,
+            promoted_dir=source_root / "04_promoted",
+            training_manifest_path=(
+                source_root / "05_training" / "training_export_manifest.json"
+            ),
+            data_card_path=source_root / "DATA_CARD.md",
+            release_profile_id=SUPERSEDED_PRODUCTION_PROFILE,
+            transform_revision=TRANSFORM,
+            training_attestation_key=REPORT_KEY,
+            gate_attestation_key=AUDITOR_KEY,
+            inventory_attestation_key=REPORT_KEY,
+            trust_mode="production",
+        )
+
+    assert not destination.exists()
+
+
 def test_production_release_package_rejects_hmac_only_gate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -650,7 +682,7 @@ def test_production_release_package_rejects_hmac_only_gate(
     assert not destination.exists()
 
 
-def test_production_release_package_reverifies_external_approval(
+def test_production_release_package_blocks_until_packaging_contract_is_ready(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source_root = _prepare_release(
@@ -671,20 +703,21 @@ def test_production_release_package_reverifies_external_approval(
     (promoted / "release_gate_pass.json").write_text(json.dumps(receipt) + "\n")
     destination = tmp_path / "hf-private-stage"
 
-    inventory = build_release_package(
-        source_release_root=source_root,
-        destination=destination,
-        promoted_dir=promoted,
-        training_manifest_path=(
-            source_root / "05_training" / "training_export_manifest.json"
-        ),
-        data_card_path=source_root / "DATA_CARD.md",
-        release_profile_id=PRODUCTION_PROFILE,
-        transform_revision=TRANSFORM,
-        training_attestation_key=REPORT_KEY,
-        gate_attestation_key=AUDITOR_KEY,
-        inventory_attestation_key=REPORT_KEY,
-        trust_mode="production",
-    )
+    with pytest.raises(ValueError, match="production packaging contract is not ready"):
+        build_release_package(
+            source_release_root=source_root,
+            destination=destination,
+            promoted_dir=promoted,
+            training_manifest_path=(
+                source_root / "05_training" / "training_export_manifest.json"
+            ),
+            data_card_path=source_root / "DATA_CARD.md",
+            release_profile_id=PRODUCTION_PROFILE,
+            transform_revision=TRANSFORM,
+            training_attestation_key=REPORT_KEY,
+            gate_attestation_key=AUDITOR_KEY,
+            inventory_attestation_key=REPORT_KEY,
+            trust_mode="production",
+        )
 
-    assert inventory["production_eligible"] is True
+    assert not destination.exists()

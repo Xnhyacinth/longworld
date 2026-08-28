@@ -247,6 +247,7 @@ def test_exact_token_metadata_is_written_for_each_strict_long_band() -> None:
             band,
             model_id="pinned/model",
             revision="a" * 40,
+            asset_manifest_sha256="b" * 64,
             tokenizer=FakeTokenizer(),
             cache=cache,
         )
@@ -255,6 +256,7 @@ def test_exact_token_metadata_is_written_for_each_strict_long_band() -> None:
             "tokenizer_context_tokens": tokens,
             "tokenizer_model_id": "pinned/model",
             "tokenizer_revision": "a" * 40,
+            "tokenizer_asset_manifest_sha256": "b" * 64,
         }
 
     metadata, reason = exact_token_metadata_for_band(
@@ -262,6 +264,7 @@ def test_exact_token_metadata_is_written_for_each_strict_long_band() -> None:
         "8k",
         model_id="pinned/model",
         revision="a" * 40,
+        asset_manifest_sha256="b" * 64,
         tokenizer=FakeTokenizer(),
         cache=cache,
     )

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import replace
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -14,6 +16,7 @@ from longworld.core.engine import (
 from longworld.core.graph import graph_stats
 from longworld.core.pack import estimate_tokens
 from longworld.core.promotion import _replayed_source_metadata
+from longworld.core.retrieve import raw_token_fact_windows_insufficient
 from longworld.core.sampler import materialize
 from longworld.core.sourceworkflow import (
     SourceEvidence,
@@ -292,6 +295,41 @@ def monkeypatch_module():
     mp.undo()
 
 
+class _FourCharsPerToken:
+    name_or_path = "test/four-chars"
+    init_kwargs: ClassVar = {"_commit_hash": "0" * 40}
+
+    @staticmethod
+    def __call__(
+        text: str,
+        *,
+        add_special_tokens: bool,
+        return_offsets_mapping: bool,
+    ) -> dict[str, list]:
+        assert not add_special_tokens
+        assert return_offsets_mapping
+        offsets = [
+            (start, min(len(text), start + 4)) for start in range(0, len(text), 4)
+        ]
+        return {"input_ids": list(range(len(offsets))), "offset_mapping": offsets}
+
+
+class _OverlappingOffsetsTokenizer(_FourCharsPerToken):
+    @staticmethod
+    def __call__(
+        text: str,
+        *,
+        add_special_tokens: bool,
+        return_offsets_mapping: bool,
+    ) -> dict[str, list]:
+        assert not add_special_tokens
+        assert return_offsets_mapping
+        offsets = [
+            (start, min(len(text), start + 4)) for start in range(0, len(text), 3)
+        ]
+        return {"input_ids": list(range(len(offsets))), "offset_mapping": offsets}
+
+
 def test_wiki_queries_stage_real_body_programs(ada_world) -> None:
     world, artifacts, queries = ada_world
     assert [query.preferred_length_buckets for query in queries] == [
@@ -299,9 +337,9 @@ def test_wiki_queries_stage_real_body_programs(ada_world) -> None:
         ["32k"],
         ["64k"],
     ]
-    assert [query.proof_depth for query in queries] == [4, 5, 6]
-    assert [graph_stats(world, query)["proof_depth"] for query in queries] == [4, 5, 6]
-    assert [len(query.essential_event_ids) for query in queries] == [4, 5, 7]
+    assert [query.proof_depth for query in queries] == [2, 3, 4]
+    assert [graph_stats(world, query)["proof_depth"] for query in queries] == [2, 3, 4]
+    assert [len(query.essential_event_ids) for query in queries] == [2, 5, 7]
     copy_ids = {
         event.id
         for event in world.events
@@ -314,7 +352,7 @@ def test_wiki_queries_stage_real_body_programs(ada_world) -> None:
         and event.params.get("control_tier") == "16k"
         and event.params.get("compose") != "copy"
     )
-    assert len(copy_ids & set(queries[0].essential_event_ids)) == 2
+    assert copy_ids == set()
     assert compute_16k in queries[0].essential_event_ids
     assert compute_16k in queries[1].essential_event_ids
     assert not (copy_ids & set(queries[1].essential_event_ids))
@@ -354,7 +392,7 @@ def test_wiki_queries_stage_real_body_programs(ada_world) -> None:
         )
 
 
-def test_wiki_hybrid_edges_count_compute_and_copy_rungs(ada_world) -> None:
+def test_wiki_hybrid_edges_count_source_and_compute_rungs(ada_world) -> None:
     world, artifacts, queries = ada_world
     relation_counts = []
     hybrid_counts = []
@@ -377,8 +415,8 @@ def test_wiki_hybrid_edges_count_compute_and_copy_rungs(ada_world) -> None:
             edge["parent_record_id"] != edge["child_record_id"]
             for edge in generated_edges
         )
-    assert relation_counts == [3, 6, 8]
-    assert hybrid_counts == [3, 6, 8]
+    assert relation_counts == [1, 4, 6]
+    assert hybrid_counts == [1, 4, 6]
     assert authentic_counts == [0, 0, 0]
 
 
@@ -386,11 +424,24 @@ def test_signed_wiki_relations_enter_state_proof_and_authentic_metadata(
     ada_related_world,
 ) -> None:
     world, artifacts, queries = ada_related_world
+    expected_endpoints = {
+        str(event.params["relation_kind"]): (
+            str(event.params["source_record_id"]),
+            str(event.params["target_record_id"]),
+        )
+        for event in world.events
+        if event.type == "wiki_source_relation"
+    }
     relation_events = {
         event.id for event in world.events if event.type == "wiki_source_relation"
     }
 
     assert len(relation_events) == 2
+    lower_band = _replayed_source_metadata(world, queries[0], artifacts)
+    assert lower_band["real_source_verified"] is True
+    assert lower_band["real_source_family_ids"]
+    assert lower_band["real_source_workflow_ids"]
+    assert lower_band["authentic_source_relation_edges"] == []
     for query in queries[1:]:
         assert relation_events.issubset(query.sufficient_event_ids)
         answer_event = next(
@@ -407,6 +458,13 @@ def test_signed_wiki_relations_enter_state_proof_and_authentic_metadata(
         assert {
             edge["relation"] for edge in metadata["authentic_source_relation_edges"]
         } == {"page_describes_entity", "entity_resolves_page"}
+        assert {
+            edge["relation"]: (
+                edge["parent_record_id"],
+                edge["child_record_id"],
+            )
+            for edge in metadata["authentic_source_relation_edges"]
+        } == expected_endpoints
         essential = [
             artifact
             for artifact in artifacts
@@ -434,6 +492,188 @@ def test_signed_wiki_relations_enter_state_proof_and_authentic_metadata(
                 )
                 == "unknown"
             )
+
+
+def test_wiki_tasks_do_not_expose_length_controls_or_answer_markers(
+    ada_related_world,
+) -> None:
+    world, artifacts, queries = ada_related_world
+
+    assert all("control stage" not in query.question.lower() for query in queries)
+    assert all("answer_disclosure" not in artifact.text for artifact in artifacts)
+    for query in queries:
+        answer = answer_from_events(world, query, query.sufficient_event_ids)
+        tags = [part.split(":", 1)[0] for part in answer.split("||")]
+        answer_event = next(
+            event
+            for event in world.events
+            if event.type == "wiki_claim_answer"
+            and event.params.get("answer_key") == query.answer_key
+        )
+        review = next(
+            artifact
+            for artifact in artifacts
+            if answer_event.id in artifact.reveals_events
+        )
+        review_payload = json.loads(review.text)
+        program_roles = [
+            operation["role"]
+            for operation in query.program_ops
+            if operation["op"] == "READ_WIKI_FACT"
+        ]
+        schema_offsets = [review.text.index(f"{tag}:<value>") for tag in tags]
+        assert schema_offsets == sorted(schema_offsets)
+        assert review_payload["required_claims"] == program_roles
+        assert review.artifact_id in query.essential_artifact_ids
+
+
+def test_wiki_raw_token_windows_detect_lower_band_body_shortcut(
+    ada_related_world,
+) -> None:
+    world, artifacts, queries = ada_related_world
+    query = queries[0]
+
+    insufficient, notes = raw_token_fact_windows_insufficient(
+        world,
+        query,
+        artifacts,
+        _FourCharsPerToken(),
+        window_sizes=(4000, 8000, 16000),
+    )
+
+    assert not insufficient
+    assert notes["proof_mode"] == "pinned_tokenizer_wiki_fact_replay"
+    assert notes["windows"]["4000"]["answer"] == query.answer
+    assert notes["windows"]["8000"]["answer"] == query.answer
+    assert notes["windows"]["16000"]["applicable"] is True
+    assert notes["windows"]["16000"]["required_insufficient"] is False
+    assert notes["source_event_ids"]
+    assert notes["compute_event_ids"]
+    assert notes["authentic_relation_event_ids"] == []
+
+
+def test_wiki_raw_token_windows_replay_real_sources_compute_and_relations(
+    ada_related_world,
+) -> None:
+    world, artifacts, queries = ada_related_world
+
+    for query in queries[1:]:
+        assert {op["op"] for op in query.program_ops} >= {
+            "READ_WIKI_FACT",
+            "VERIFY_WIKI_SOURCE_RELATIONS",
+        }
+        assert query.gold_expression.endswith("with verified source relations")
+        insufficient, notes = raw_token_fact_windows_insufficient(
+            world,
+            query,
+            artifacts,
+            _FourCharsPerToken(),
+            window_sizes=(4000, 8000, 16000),
+        )
+
+        assert insufficient
+        assert notes["proof_mode"] == "pinned_tokenizer_wiki_fact_replay"
+        assert len(notes["authentic_relation_event_ids"]) == 2
+        assert notes["source_event_ids"]
+        assert notes["compute_event_ids"]
+        assert all(
+            window["applicable"] and window["answer"] is None
+            for window in notes["windows"].values()
+        )
+
+
+def test_wiki_raw_token_windows_fail_closed_without_relation_artifact(
+    ada_related_world,
+) -> None:
+    world, artifacts, queries = ada_related_world
+    query = queries[1]
+    relation_artifact = next(
+        artifact
+        for artifact in artifacts
+        if (artifact.slots or {}).get("event_type") == "wiki_source_relation"
+    )
+
+    insufficient, notes = raw_token_fact_windows_insufficient(
+        world,
+        query,
+        [artifact for artifact in artifacts if artifact is not relation_artifact],
+        _FourCharsPerToken(),
+        window_sizes=(4000, 8000, 16000),
+    )
+
+    assert not insufficient
+    assert notes["error"] == "missing_authentic_relation_events"
+
+
+def test_wiki_raw_token_windows_replay_distant_facts_across_real_sections(
+    jefferson_world,
+) -> None:
+    world, artifacts, queries = jefferson_world
+    query = queries[0]
+    source_events = [
+        event
+        for event in world.events
+        if event.id in query.sufficient_event_ids
+        and event.type == "wiki_source_section"
+    ]
+
+    assert [
+        span["role"] for event in source_events for span in event.params["fact_spans"]
+    ] == [
+        "born",
+        "early_career",
+        "revolutionary_committee",
+        "early_transition",
+    ]
+    insufficient, notes = raw_token_fact_windows_insufficient(
+        world,
+        query,
+        artifacts,
+        _FourCharsPerToken(),
+        window_sizes=(4000, 8000, 16000),
+    )
+
+    assert insufficient, notes
+    assert notes["tokenizer_evidence_span_tokens"] > 8000
+    assert notes["windows"]["4000"]["answer"] is None
+    assert notes["windows"]["8000"]["answer"] is None
+    assert notes["windows"]["16000"]["applicable"] is True
+    assert notes["windows"]["16000"]["required_insufficient"] is False
+
+
+def test_wiki_raw_token_windows_accept_valid_overlapping_fast_offsets(
+    jefferson_world,
+) -> None:
+    world, artifacts, queries = jefferson_world
+
+    insufficient, notes = raw_token_fact_windows_insufficient(
+        world,
+        queries[0],
+        artifacts,
+        _OverlappingOffsetsTokenizer(),
+        window_sizes=(4000, 8000, 16000),
+    )
+
+    assert insufficient, notes
+    assert notes.get("error") != "invalid_token_offsets"
+
+
+def test_wiki_candidate_fails_closed_without_pinned_raw_window_tokenizer(
+    jefferson_world,
+) -> None:
+    world, artifacts, queries = jefferson_world
+    _, cf_artifacts = render_cf_view(world, queries[0])
+
+    verification, notes = verify_question(
+        world,
+        queries[0],
+        artifacts,
+        cf_artifacts=cf_artifacts,
+        verification_mode="candidate",
+    )
+
+    assert verification.contiguous_windows_insufficient is False
+    assert notes["raw_token_fact_windows"]["error"] == "pinned_tokenizer_required"
 
 
 def test_wiki_cf_remove_one_and_surface_gates(ada_world) -> None:
@@ -713,8 +953,8 @@ def test_turing_queries_stage_real_body_programs(turing_world) -> None:
         ["32k"],
         ["64k"],
     ]
-    assert [query.proof_depth for query in queries] == [4, 5, 6]
-    assert [len(query.essential_event_ids) for query in queries] == [4, 5, 7]
+    assert [query.proof_depth for query in queries] == [2, 3, 4]
+    assert [len(query.essential_event_ids) for query in queries] == [2, 5, 7]
     answers = [query.answer for query in queries]
     assert answers[0] == "BORN:1912-06-23"
     assert answers[1].startswith(answers[0] + "||")
@@ -898,8 +1138,8 @@ def test_einstein_queries_stage_real_body_programs(einstein_world) -> None:
         ["32k"],
         ["64k"],
     ]
-    assert [query.proof_depth for query in queries] == [4, 5, 6]
-    assert [len(query.essential_event_ids) for query in queries] == [4, 5, 7]
+    assert [query.proof_depth for query in queries] == [2, 3, 4]
+    assert [len(query.essential_event_ids) for query in queries] == [2, 5, 7]
     answers = [query.answer for query in queries]
     assert answers[0] == "BORN:1879-03-14"
     assert answers[1].startswith(answers[0] + "||")
@@ -940,7 +1180,7 @@ def test_einstein_queries_stage_real_body_programs(einstein_world) -> None:
             generated_edges
             == _replayed_source_metadata(world, query, artifacts)["hybrid_causal_edges"]
         )
-    assert hybrid_counts == [3, 6, 8]
+    assert hybrid_counts == [1, 4, 6]
 
 
 def test_einstein_cf_remove_one_and_surface_gates(einstein_world) -> None:
@@ -1099,8 +1339,8 @@ def test_thatcher_queries_stage_real_body_programs(thatcher_world) -> None:
         ["32k"],
         ["64k"],
     ]
-    assert [query.proof_depth for query in queries] == [4, 5, 6]
-    assert [len(query.essential_event_ids) for query in queries] == [4, 5, 7]
+    assert [query.proof_depth for query in queries] == [2, 3, 4]
+    assert [len(query.essential_event_ids) for query in queries] == [2, 5, 7]
     answers = [query.answer for query in queries]
     assert answers[0] == "BORN:1925-10-13"
     assert answers[1].startswith(answers[0] + "||")
@@ -1141,7 +1381,7 @@ def test_thatcher_queries_stage_real_body_programs(thatcher_world) -> None:
             generated_edges
             == _replayed_source_metadata(world, query, artifacts)["hybrid_causal_edges"]
         )
-    assert hybrid_counts == [3, 6, 8]
+    assert hybrid_counts == [1, 4, 6]
 
 
 def test_thatcher_cf_remove_one_and_surface_gates(thatcher_world) -> None:
@@ -1298,8 +1538,8 @@ def test_newton_queries_stage_real_body_programs(newton_world) -> None:
         ["32k"],
         ["64k"],
     ]
-    assert [query.proof_depth for query in queries] == [4, 5, 6]
-    assert [len(query.essential_event_ids) for query in queries] == [4, 5, 7]
+    assert [query.proof_depth for query in queries] == [2, 3, 4]
+    assert [len(query.essential_event_ids) for query in queries] == [2, 5, 7]
     answers = [query.answer for query in queries]
     assert answers[0] == "BORN:1643-01-04"
     assert answers[1].startswith(answers[0] + "||")
@@ -1340,7 +1580,7 @@ def test_newton_queries_stage_real_body_programs(newton_world) -> None:
             generated_edges
             == _replayed_source_metadata(world, query, artifacts)["hybrid_causal_edges"]
         )
-    assert hybrid_counts == [3, 6, 8]
+    assert hybrid_counts == [1, 4, 6]
 
 
 def test_newton_cf_remove_one_and_surface_gates(newton_world) -> None:
@@ -1497,7 +1737,7 @@ def test_obama_queries_stage_real_body_programs(obama_world) -> None:
         ["32k"],
         ["64k"],
     ]
-    assert [query.proof_depth for query in queries] == [4, 5, 6]
+    assert [query.proof_depth for query in queries] == [2, 3, 4]
     answers = [query.answer for query in queries]
     assert answers[0] == "BORN:1961-08-04"
     assert answers[1].startswith(answers[0] + "||")
@@ -1538,7 +1778,7 @@ def test_obama_queries_stage_real_body_programs(obama_world) -> None:
             generated_edges
             == _replayed_source_metadata(world, query, artifacts)["hybrid_causal_edges"]
         )
-    assert hybrid_counts == [3, 6, 8]
+    assert hybrid_counts == [1, 4, 6]
 
 
 def test_obama_cf_remove_one_and_surface_gates(obama_world) -> None:
@@ -1697,7 +1937,7 @@ def test_elizabeth_queries_stage_real_body_programs(elizabeth_world) -> None:
         ["32k"],
         ["64k"],
     ]
-    assert [query.proof_depth for query in queries] == [4, 5, 6]
+    assert [query.proof_depth for query in queries] == [2, 3, 4]
     answers = [query.answer for query in queries]
     assert answers[0] == "BORN:1926-04-21"
     assert answers[1].startswith(answers[0] + "||")
@@ -1738,7 +1978,7 @@ def test_elizabeth_queries_stage_real_body_programs(elizabeth_world) -> None:
             generated_edges
             == _replayed_source_metadata(world, query, artifacts)["hybrid_causal_edges"]
         )
-    assert hybrid_counts == [3, 6, 8]
+    assert hybrid_counts == [1, 4, 6]
 
 
 def test_elizabeth_cf_remove_one_and_surface_gates(elizabeth_world) -> None:
@@ -1897,7 +2137,7 @@ def test_mlk_queries_stage_real_body_programs(mlk_world) -> None:
         ["32k"],
         ["64k"],
     ]
-    assert [query.proof_depth for query in queries] == [4, 5, 6]
+    assert [query.proof_depth for query in queries] == [2, 3, 4]
     answers = [query.answer for query in queries]
     assert answers[0] == "BORN:1929-01-15"
     assert answers[1].startswith(answers[0] + "||")
@@ -1938,7 +2178,7 @@ def test_mlk_queries_stage_real_body_programs(mlk_world) -> None:
             generated_edges
             == _replayed_source_metadata(world, query, artifacts)["hybrid_causal_edges"]
         )
-    assert hybrid_counts == [3, 6, 8]
+    assert hybrid_counts == [1, 4, 6]
 
 
 def test_mlk_cf_remove_one_and_surface_gates(mlk_world) -> None:
@@ -2097,15 +2337,52 @@ def test_jefferson_queries_stage_real_body_programs(jefferson_world) -> None:
         ["32k"],
         ["64k"],
     ]
-    assert [query.proof_depth for query in queries] == [4, 5, 6]
-    assert [graph_stats(world, query)["proof_depth"] for query in queries] == [4, 5, 6]
+    assert [query.proof_depth for query in queries] == [2, 3, 4]
+    assert [graph_stats(world, query)["proof_depth"] for query in queries] == [2, 3, 4]
     answers = [query.answer for query in queries]
-    assert answers[0] == "BORN:1743-04-13"
+    assert answers[0] == (
+        "BORN:1743-04-13||CAREER:[[House of Burgesses]]||"
+        "COMMITTEE:[[Committee of Five]]||EARLY:[[Mather Brown]]"
+    )
     assert answers[1].startswith(answers[0] + "||")
     assert answers[2].startswith(answers[1] + "||")
     assert f"COMM:{WIKI_JEFFERSON_MID_QUOTE}" in answers[1]
     assert "ENTITY:Q11812" in answers[1]
     assert f"POP:{WIKI_JEFFERSON_LATE_QUOTE}" in answers[2]
+    expected_program_roles = [
+        [
+            "born",
+            "early_career",
+            "revolutionary_committee",
+            "early_transition",
+        ],
+        [
+            "born",
+            "early_career",
+            "revolutionary_committee",
+            "early_transition",
+            "commemoration",
+            "entity",
+        ],
+        [
+            "born",
+            "early_career",
+            "revolutionary_committee",
+            "early_transition",
+            "commemoration",
+            "entity",
+            "popular_culture",
+        ],
+    ]
+    assert [
+        [op["role"] for op in query.program_ops if op["op"] == "READ_WIKI_FACT"]
+        for query in queries
+    ] == expected_program_roles
+    assert [query.gold_expression for query in queries] == [
+        "tagged BORN/CAREER/COMMITTEE/EARLY reconstruction",
+        "tagged BORN/CAREER/COMMITTEE/EARLY/COMM/ENTITY reconstruction",
+        "tagged BORN/CAREER/COMMITTEE/EARLY/COMM/ENTITY/POP reconstruction",
+    ]
     rest_ids = [
         artifact.artifact_id
         for artifact in artifacts
@@ -2139,7 +2416,7 @@ def test_jefferson_queries_stage_real_body_programs(jefferson_world) -> None:
             generated_edges
             == _replayed_source_metadata(world, query, artifacts)["hybrid_causal_edges"]
         )
-    assert hybrid_counts == [3, 6, 8]
+    assert hybrid_counts == [4, 7, 9]
 
 
 def test_jefferson_cf_remove_one_and_surface_gates(jefferson_world) -> None:

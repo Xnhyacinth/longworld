@@ -91,6 +91,9 @@ def test_loaded_release_metrics_feed_the_gate_receipt_world_count(
     assert receipt["ok"] is True
     assert receipt["errors"] == []
     assert receipt["source_file_sha256"] == product.source_file_sha256
+    assert receipt["tokenizer_model_id"] == "Qwen/Qwen3.5-4B"
+    assert len(receipt["tokenizer_revision"]) == 40
+    assert receipt["tokenizer_asset_manifest_sha256"] is None
 
 
 def test_gate_receipt_rejects_non_green_metrics(

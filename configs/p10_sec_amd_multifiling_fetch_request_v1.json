@@ -1,0 +1,15 @@
+{
+  "schema_version": "longworld.sec-fetch-request.v1",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P10-SEC-AMD-MULTIFILING-20260828",
+    "scope": "Bounded public EDGAR import of the AMD 2025 10-K and its 10-K/A amendment",
+    "basis": "User-authorized public-source LongWorld multi-filing workflow construction",
+    "reviewed_at": "2026-08-28T00:00:00Z"
+  },
+  "allowed_ciks": ["0000002488"],
+  "forms": ["10-K", "10-K/A"],
+  "max_filings_per_cik": 2,
+  "requests_per_second": 2,
+  "max_retries": 3
+}

@@ -100,7 +100,7 @@ def _arxiv_envelope_payload(ev: Event, source: GroundedSource) -> dict[str, Any]
 
 
 def _wiki_fact_role_value(section_id: str, quote: str) -> tuple[str, str] | None:
-    if section_id == "early_work":
+    if section_id in {"early_work", "early_birth"}:
         matches = list(_WIKI_BIRTH.finditer(quote))
         if len(matches) != 1:
             return None
@@ -302,7 +302,7 @@ def _wiki_source_claims(ev: Event, source: GroundedSource) -> dict[str, str] | N
         return None
     if section_id == "appendix_rest":
         return {} if not spans else None
-    if len(spans) != 1:
+    if not spans:
         return None
     claims: dict[str, str] = {}
     for span in spans:
@@ -322,7 +322,15 @@ def _wiki_source_claims(ev: Event, source: GroundedSource) -> dict[str, str] | N
             )
         ):
             return None
-        parsed = _wiki_fact_role_value(section_id, fact.quote)
+        declared_role = str(span.get("role") or "")
+        parsed = (
+            (declared_role, fact.quote)
+            if section_id in {"early_career", "early_revolution", "early_diplomacy"}
+            and declared_role
+            in {"early_career", "revolutionary_committee", "early_transition"}
+            and fact.quote
+            else _wiki_fact_role_value(section_id, fact.quote)
+        )
         if (
             parsed is None
             or span.get("kind") != "wiki_claim"
@@ -790,6 +798,12 @@ def apply_event(state: WorldState, ev: Event) -> None:
             return
         if tier == "16k":
             parts = [f"BORN:{claims['born']}"]
+            if "early_career" in required:
+                parts.append(f"CAREER:{claims['early_career']}")
+            if "revolutionary_committee" in required:
+                parts.append(f"COMMITTEE:{claims['revolutionary_committee']}")
+            if "early_transition" in required:
+                parts.append(f"EARLY:{claims['early_transition']}")
         elif tier == "32k":
             if not prior:
                 return

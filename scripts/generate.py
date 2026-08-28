@@ -63,6 +63,7 @@ from longworld.core.promotion import (
     row_digest_set_sha256,
     serialized_row_sha256,
     stable_dossier_id,
+    stable_semantic_base_task_id,
 )
 from longworld.core.realworkflow import (
     EPISODE_REPLAY_BUNDLE_SCHEMA,
@@ -88,6 +89,9 @@ from longworld.core.taxonomy import (
     classify_artifact,
     validate_context_classification,
 )
+from longworld.core.tokenizer_assets import (
+    resolved_tokenizer_asset_manifest_sha256,
+)
 from longworld.core.topology import (
     canonical_topology,
     effective_number,
@@ -106,6 +110,7 @@ from longworld.core.verify import (
 )
 from longworld.core.views import memory_card, render_cf_view, split_views, view_answer
 from longworld.core.wikiparse import WIKI_HYBRID_CHILD_EVENT_TYPES
+from longworld.core.world import SimulatedWorld
 from longworld.domains.researchlab.simulate import selected_wiki_source_relation_edges
 
 HYBRID_CHILD_EVENT_TYPES = SEC_HYBRID_CHILD_EVENT_TYPES | WIKI_HYBRID_CHILD_EVENT_TYPES
@@ -432,6 +437,7 @@ def exact_token_metadata_for_band(
     *,
     model_id: str,
     revision: str,
+    asset_manifest_sha256: str,
     tokenizer: object,
     cache: dict[str, int],
 ) -> tuple[dict[str, object], str | None]:
@@ -447,6 +453,7 @@ def exact_token_metadata_for_band(
             "tokenizer_context_tokens": tokens,
             "tokenizer_model_id": model_id,
             "tokenizer_revision": revision,
+            "tokenizer_asset_manifest_sha256": asset_manifest_sha256,
         },
         exact_token_band_reject_reason(length_bucket, tokens),
     )
@@ -966,7 +973,7 @@ def real_workflow_corridor_ids(artifacts: list[Artifact], spec: object) -> set[s
 
 
 def real_source_relation_edges(
-    world: object, spec: object, artifacts: list[Artifact] | None = None
+    world: SimulatedWorld, spec: object, artifacts: list[Artifact] | None = None
 ) -> list[dict[str, str]]:
     """Return explicit record-to-record edges used by a real answer program."""
     event_ids = set(getattr(spec, "sufficient_event_ids", []))
@@ -1083,7 +1090,7 @@ def real_source_relation_edges(
 
 
 def context_source_relation_count(
-    world: object, artifacts: list[Artifact], *, spec: object | None = None
+    world: SimulatedWorld, artifacts: list[Artifact], *, spec: object | None = None
 ) -> int:
     """Count replayable real-event edges whose endpoints occur in this exact view."""
     visible_event_ids = {
@@ -1210,12 +1217,22 @@ def emit_records(
     ):
         raise ValueError("exact_tokenizer requires a model id and 40-char revision")
     exact_tokenizer = None
+    exact_asset_manifest_sha256 = ""
+    if exact_settings:
+        exact_asset_manifest_sha256 = resolved_tokenizer_asset_manifest_sha256(
+            exact_model_id, exact_revision
+        )
     if strict_generation and exact_settings:
         exact_tokenizer = _load_exact_tokenizer(
             exact_model_id,
             exact_revision,
             bool(exact_settings.get("local_files_only", True)),
         )
+        if (
+            resolved_tokenizer_asset_manifest_sha256(exact_model_id, exact_revision)
+            != exact_asset_manifest_sha256
+        ):
+            raise ValueError("exact tokenizer assets changed while loading")
     exact_token_cache: dict[str, int] = {}
 
     def count_packed_tokens(text: str) -> int:
@@ -1625,6 +1642,11 @@ def emit_records(
                                 "bucket": bname,
                                 "window_ans": notes2.get("window_ans"),
                                 "bm25_top1_id": notes2.get("bm25_top1_id"),
+                                "contiguous_windows": notes2.get("contiguous_windows"),
+                                "raw_token_fact_windows": notes2.get(
+                                    "raw_token_fact_windows"
+                                ),
+                                "embedding_topk": notes2.get("embedding_topk"),
                                 "gates": ver2.model_dump(),
                             }
                         )
@@ -1745,6 +1767,7 @@ def emit_records(
                         f"{focal_w.world_id}|{spec.base_task_group or spec.query_id}",
                         size=20,
                     )
+                    semantic_base_task_id = stable_semantic_base_task_id(spec)
                     dossier = stable_dossier_id(
                         focal_w.world_id,
                         spec.query_id,
@@ -2130,6 +2153,7 @@ def emit_records(
                                     bname,
                                     model_id=exact_model_id,
                                     revision=exact_revision,
+                                    asset_manifest_sha256=(exact_asset_manifest_sha256),
                                     tokenizer=exact_tokenizer,
                                     cache=exact_token_cache,
                                 )
@@ -2192,6 +2216,7 @@ def emit_records(
                         )
                         dumped["program_ops"] = list(spec.program_ops or [])
                         dumped["base_task_id"] = base_task_id
+                        dumped["semantic_base_task_id"] = semantic_base_task_id
                         dumped["dossier_id"] = dossier
                         dumped["semantic_growth_group_id"] = semantic_growth_group_id
                         dumped["executable_proof_id"] = proof_signature

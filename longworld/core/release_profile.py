@@ -43,8 +43,12 @@ class ReleaseProfile:
     min_unique_real_source_workflows: int
     min_real_exact_64k_rows_by_domain: tuple[tuple[str, int], ...]
     min_real_exact_64k_worlds_by_domain: tuple[tuple[str, int], ...]
+    min_unique_executable_proofs: int
+    min_unique_answer_programs: int
+    min_unique_semantic_base_tasks: int
     tokenizer_model_id: str
     tokenizer_revision: str
+    tokenizer_asset_manifest_sha256: str | None
     dense_top_k: int
 
 
@@ -68,6 +72,10 @@ def _profile(
     min_real_exact_64k_rows_by_domain: tuple[tuple[str, int], ...] = (),
     min_real_exact_64k_worlds_by_domain: tuple[tuple[str, int], ...] = (),
     min_motifs: int = 5,
+    min_unique_executable_proofs: int = 0,
+    min_unique_answer_programs: int = 0,
+    min_unique_semantic_base_tasks: int = 0,
+    bind_tokenizer_assets: bool = False,
 ) -> ReleaseProfile:
     return ReleaseProfile(
         profile_id=profile_id,
@@ -104,8 +112,16 @@ def _profile(
         min_unique_real_source_workflows=min_unique_real_source_workflows,
         min_real_exact_64k_rows_by_domain=min_real_exact_64k_rows_by_domain,
         min_real_exact_64k_worlds_by_domain=min_real_exact_64k_worlds_by_domain,
+        min_unique_executable_proofs=min_unique_executable_proofs,
+        min_unique_answer_programs=min_unique_answer_programs,
+        min_unique_semantic_base_tasks=min_unique_semantic_base_tasks,
         tokenizer_model_id="Qwen/Qwen3.5-4B",
         tokenizer_revision="a7b0d22b993d71000cf2eadfb37222a67cee521e",
+        tokenizer_asset_manifest_sha256=(
+            "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb"
+            if bind_tokenizer_assets
+            else None
+        ),
         dense_top_k=3,
     )
 
@@ -211,6 +227,7 @@ RELEASE_PROFILES = {
             ("researchlab", 4),
             ("codeforge", 4),
         ),
+        bind_tokenizer_assets=True,
     ),
     "p7-sec-source-slice-1-v1": _profile(
         profile_id="p7-sec-source-slice-1-v1",
@@ -232,6 +249,7 @@ RELEASE_PROFILES = {
         min_real_exact_64k_rows_by_domain=(("company", 1),),
         min_real_exact_64k_worlds_by_domain=(("company", 1),),
         min_motifs=1,
+        bind_tokenizer_assets=True,
     ),
     "p7-wiki-source-slice-1-v1": _profile(
         profile_id="p7-wiki-source-slice-1-v1",
@@ -253,6 +271,7 @@ RELEASE_PROFILES = {
         min_real_exact_64k_rows_by_domain=(("researchlab", 1),),
         min_real_exact_64k_worlds_by_domain=(("researchlab", 1),),
         min_motifs=1,
+        bind_tokenizer_assets=True,
     ),
     "p7-paper-source-slice-1-v1": _profile(
         profile_id="p7-paper-source-slice-1-v1",
@@ -274,6 +293,7 @@ RELEASE_PROFILES = {
         min_real_exact_64k_rows_by_domain=(("researchlab", 1),),
         min_real_exact_64k_worlds_by_domain=(("researchlab", 1),),
         min_motifs=1,
+        bind_tokenizer_assets=True,
     ),
     "p7-github-source-slice-1-v1": _profile(
         profile_id="p7-github-source-slice-1-v1",
@@ -295,6 +315,7 @@ RELEASE_PROFILES = {
         min_real_exact_64k_rows_by_domain=(("codeforge", 1),),
         min_real_exact_64k_worlds_by_domain=(("codeforge", 1),),
         min_motifs=1,
+        bind_tokenizer_assets=True,
     ),
     "p4-multidomain-local-48-v1": _profile(
         profile_id="p4-multidomain-local-48-v1",
@@ -351,7 +372,96 @@ RELEASE_PROFILES = {
         predecessor_profile_id="p3-production-48-v1",
         min_domains=2,
     ),
+    "p10-source-rich-production-48-v1": _profile(
+        profile_id="p10-source-rich-production-48-v1",
+        environment="production",
+        expected_promoted_worlds=48,
+        min_source_families=6,
+        min_real_base_tasks=48,
+        min_real_source_relations=48,
+        min_real_64k_rows=144,
+        min_train_worlds=40,
+        min_eval_worlds=8,
+        min_real_train_worlds=40,
+        min_real_eval_worlds=8,
+        predecessor_profile_id="p7-source-rich-probe-12-v1",
+        min_domains=3,
+        promoted_domain_world_quotas=(
+            ("company", 16),
+            ("researchlab", 16),
+            ("codeforge", 16),
+        ),
+        min_exact_64k_rows_by_domain=(
+            ("company", 48),
+            ("researchlab", 48),
+            ("codeforge", 48),
+        ),
+        min_unique_real_source_workflows=48,
+        min_real_exact_64k_rows_by_domain=(
+            ("company", 48),
+            ("researchlab", 48),
+            ("codeforge", 48),
+        ),
+        min_real_exact_64k_worlds_by_domain=(
+            ("company", 16),
+            ("researchlab", 16),
+            ("codeforge", 16),
+        ),
+        min_motifs=12,
+        min_unique_executable_proofs=48,
+        min_unique_answer_programs=12,
+        min_unique_semantic_base_tasks=48,
+        bind_tokenizer_assets=True,
+    ),
+    "p10-source-rich-production-210-v1": _profile(
+        profile_id="p10-source-rich-production-210-v1",
+        environment="production",
+        expected_promoted_worlds=210,
+        min_source_families=12,
+        min_real_base_tasks=210,
+        min_real_source_relations=210,
+        min_real_64k_rows=630,
+        min_train_worlds=178,
+        min_eval_worlds=32,
+        min_real_train_worlds=178,
+        min_real_eval_worlds=32,
+        predecessor_profile_id="p10-source-rich-production-48-v1",
+        min_domains=3,
+        promoted_domain_world_quotas=(
+            ("company", 70),
+            ("researchlab", 70),
+            ("codeforge", 70),
+        ),
+        min_exact_64k_rows_by_domain=(
+            ("company", 210),
+            ("researchlab", 210),
+            ("codeforge", 210),
+        ),
+        min_unique_real_source_workflows=210,
+        min_real_exact_64k_rows_by_domain=(
+            ("company", 210),
+            ("researchlab", 210),
+            ("codeforge", 210),
+        ),
+        min_real_exact_64k_worlds_by_domain=(
+            ("company", 70),
+            ("researchlab", 70),
+            ("codeforge", 70),
+        ),
+        min_motifs=18,
+        min_unique_executable_proofs=210,
+        min_unique_answer_programs=24,
+        min_unique_semantic_base_tasks=210,
+        bind_tokenizer_assets=True,
+    ),
 }
+
+ISSUABLE_PRODUCTION_PROFILE_IDS = frozenset(
+    {
+        "p10-source-rich-production-48-v1",
+        "p10-source-rich-production-210-v1",
+    }
+)
 
 
 def release_profile(profile_id: str) -> ReleaseProfile:
@@ -359,6 +469,17 @@ def release_profile(profile_id: str) -> ReleaseProfile:
         return RELEASE_PROFILES[profile_id]
     except KeyError as error:
         raise ValueError(f"unknown release profile: {profile_id}") from error
+
+
+def issuable_release_profile(profile_id: str) -> ReleaseProfile:
+    """Resolve a profile while rejecting superseded production issuance paths."""
+    profile = release_profile(profile_id)
+    if (
+        profile.environment == "production"
+        and profile_id not in ISSUABLE_PRODUCTION_PROFILE_IDS
+    ):
+        raise ValueError(f"superseded production release profile: {profile_id}")
+    return profile
 
 
 def release_profile_sha256(profile_id: str) -> str:
@@ -370,6 +491,14 @@ def release_profile_sha256(profile_id: str) -> str:
         profile.pop("min_real_exact_64k_rows_by_domain")
     if not profile["min_real_exact_64k_worlds_by_domain"]:
         profile.pop("min_real_exact_64k_worlds_by_domain")
+    if not profile["tokenizer_asset_manifest_sha256"]:
+        profile.pop("tokenizer_asset_manifest_sha256")
+    if profile["min_unique_executable_proofs"] == 0:
+        profile.pop("min_unique_executable_proofs")
+    if profile["min_unique_answer_programs"] == 0:
+        profile.pop("min_unique_answer_programs")
+    if profile["min_unique_semantic_base_tasks"] == 0:
+        profile.pop("min_unique_semantic_base_tasks")
     payload = json.dumps(
         profile,
         sort_keys=True,

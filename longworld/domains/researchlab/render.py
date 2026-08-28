@@ -178,14 +178,9 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
     if t == "wiki_claim_answer":
         return "json", json.dumps(
             {
-                "kind": "wiki_claim_answer",
-                "checkpoint": ev.params["control_stage"],
-                "status": "wiki-reconstructed",
-                "rule": (
-                    "reconstruct tagged Wikipedia/Wikidata claims from cited "
-                    "section bodies; this memo does not restate those claims"
-                ),
-                "answer_disclosure": "omitted",
+                "kind": "wiki_evidence_review",
+                "required_claims": ev.params["required_roles"],
+                "response_schema": ev.params["response_schema"],
             },
             ensure_ascii=False,
             indent=2,

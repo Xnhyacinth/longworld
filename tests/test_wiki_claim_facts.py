@@ -499,18 +499,44 @@ def test_jefferson_program_uses_unique_birth_and_non_overlapping_body() -> None:
     by_id = {section.section_id: section for section in program.sections}
     assert program.entity_id == "Q11812"
     assert program.title == "Thomas Jefferson"
-    born = by_id["early_work"].facts[0]
+    born = by_id["early_birth"].facts[0]
     assert born.role == "born"
     assert born.value == "1743-04-13"
     assert born.evidence_quote == "{{birth date|1743|4|13}}"
     assert wikipedia.count(born.evidence_quote) == 1
-    assert WIKI_JEFFERSON_MID_QUOTE not in by_id["early_work"].wikitext
-    assert WIKI_JEFFERSON_LATE_QUOTE not in by_id["early_work"].wikitext
+    early_text = "".join(
+        by_id[section_id].wikitext
+        for section_id in (
+            "early_birth",
+            "early_career",
+            "early_revolution",
+            "early_diplomacy",
+        )
+    )
+    assert WIKI_JEFFERSON_MID_QUOTE not in early_text
+    assert WIKI_JEFFERSON_LATE_QUOTE not in early_text
     assert WIKI_JEFFERSON_LATE_QUOTE not in by_id["commemoration"].wikitext
     assert by_id["commemoration"].facts[0].value == WIKI_JEFFERSON_MID_QUOTE
     assert by_id["popular_culture"].facts[0].value == WIKI_JEFFERSON_LATE_QUOTE
+    assert [(fact.role, fact.value) for fact in by_id["early_birth"].facts] == [
+        ("born", "1743-04-13")
+    ]
+    assert [(fact.role, fact.value) for fact in by_id["early_career"].facts] == [
+        ("early_career", "[[House of Burgesses]]")
+    ]
+    assert [(fact.role, fact.value) for fact in by_id["early_revolution"].facts] == [
+        ("revolutionary_committee", "[[Committee of Five]]")
+    ]
+    assert [(fact.role, fact.value) for fact in by_id["early_diplomacy"].facts] == [
+        ("early_transition", "[[Mather Brown]]")
+    ]
+    assert by_id["commemoration"].wikitext.startswith("==Secretary of State==")
+    assert by_id["popular_culture"].wikitext.startswith("===Autobiography===")
     reconstructed = (
-        by_id["early_work"].wikitext
+        by_id["early_birth"].wikitext
+        + by_id["early_career"].wikitext
+        + by_id["early_revolution"].wikitext
+        + by_id["early_diplomacy"].wikitext
         + by_id["commemoration"].wikitext
         + by_id["popular_culture"].wikitext
     )
@@ -528,7 +554,15 @@ def test_jefferson_program_uses_unique_birth_and_non_overlapping_body() -> None:
     from longworld.core.pack import estimate_tokens
 
     assert 9_500 <= estimate_tokens(rest) <= 10_200
-    assert by_id["early_work"].ground_value in by_id["early_work"].wikitext
+    assert all(
+        by_id[section_id].ground_value in by_id[section_id].wikitext
+        for section_id in (
+            "early_birth",
+            "early_career",
+            "early_revolution",
+            "early_diplomacy",
+        )
+    )
     assert by_id["commemoration"].ground_value in by_id["commemoration"].wikitext
     assert by_id["popular_culture"].ground_value in by_id["popular_culture"].wikitext
     assert by_id["appendix_rest"].ground_value == "==References=="

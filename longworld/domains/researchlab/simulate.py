@@ -25,6 +25,10 @@ from longworld.domains.researchlab.events import (
 
 _WIKI_SECTION_OFFSETS = {
     "early_work": 0,
+    "early_birth": 0,
+    "early_career": 1,
+    "early_revolution": 2,
+    "early_diplomacy": 3,
     "commemoration": 8,
     "wikidata_entity": 8,
     "popular_culture": 401,
@@ -33,11 +37,7 @@ _WIKI_SECTION_OFFSETS = {
 _WIKI_CLAIM_TIERS = (
     (
         "16k",
-        (
-            (5, "compute", "birth-date reconstruction"),
-            (6, "copy", "interim birth confirmation"),
-            (7, "copy", "initial birth publication"),
-        ),
+        ((5, "compute", "birth-date reconstruction"),),
         ("early_work",),
     ),
     (
@@ -55,6 +55,15 @@ _WIKI_TIER_ROLES = {
     "16k": ("born",),
     "32k": ("born", "commemoration", "entity"),
     "64k": ("born", "commemoration", "entity", "popular_culture"),
+}
+_WIKI_ROLE_TAGS = {
+    "born": "BORN",
+    "early_career": "CAREER",
+    "revolutionary_committee": "COMMITTEE",
+    "early_transition": "EARLY",
+    "commemoration": "COMM",
+    "entity": "ENTITY",
+    "popular_culture": "POP",
 }
 ARXIV_SOURCE_ENVELOPE_REVISION = "researchlab-arxiv-source-envelope-v1"
 WIKI_FACT_PARSER_REVISION = "researchlab-wiki-claim-exact-v1"
@@ -291,7 +300,8 @@ def _wikipedia_source_workflow_events(
             )
         )
     record_event_ids = {
-        later.record_id: section_ids.get("early_work", ""),
+        later.record_id: section_ids.get("early_work", "")
+        or section_ids.get("early_birth", ""),
         entity.record_id: section_ids.get("wikidata_entity", ""),
     }
     relation_event_ids: list[str] = []
@@ -375,7 +385,22 @@ def _wikipedia_source_workflow_events(
     prior_key = ""
     compute_keys: dict[str, str] = {}
     used_sections: set[str] = set()
-    for control_tier, rungs, needed_sections in _WIKI_CLAIM_TIERS:
+    available_roles = {
+        fact.role for section in program.sections for fact in section.facts
+    }
+    segmented_early = (
+        "early_birth",
+        "early_career",
+        "early_revolution",
+        "early_diplomacy",
+    )
+    early_sections = (
+        segmented_early
+        if set(segmented_early).issubset(section_ids)
+        else ("early_work",)
+    )
+    for control_tier, rungs, default_sections in _WIKI_CLAIM_TIERS:
+        needed_sections = (*early_sections, *default_sections[1:])
         new_sections = [name for name in needed_sections if name not in used_sections]
         for rung_index, (offset, compose, stage) in enumerate(rungs):
             event_id = (
@@ -399,7 +424,21 @@ def _wikipedia_source_workflow_events(
                 answer_key = (
                     f"wiki_claim_reconstruction:{later.record_id}:{control_tier}"
                 )
-                required_roles = list(_WIKI_TIER_ROLES[control_tier])
+                tier_roles = list(_WIKI_TIER_ROLES[control_tier])
+                early_roles = [
+                    role
+                    for role in (
+                        "early_career",
+                        "revolutionary_committee",
+                        "early_transition",
+                    )
+                    if role in available_roles
+                ]
+                required_roles = [
+                    *(["born"] if "born" in tier_roles else []),
+                    *early_roles,
+                    *(role for role in tier_roles if role != "born"),
+                ]
             relation_kinds = {
                 parent: (
                     "extends"
@@ -432,6 +471,10 @@ def _wikipedia_source_workflow_events(
                             else ""
                         ),
                         "required_roles": required_roles,
+                        "response_schema": "||".join(
+                            f"{_WIKI_ROLE_TAGS[role]}:<value>"
+                            for role in required_roles
+                        ),
                         "required_relation_ids": list(relation_ids)
                         if control_tier in {"32k", "64k"}
                         else [],
@@ -791,12 +834,12 @@ def selected_wiki_source_relation_edges(
             continue
         edges.append(
             {
-                "parent_record_id": str(params["target_record_id"]),
-                "child_record_id": str(params["source_record_id"]),
+                "parent_record_id": str(params["source_record_id"]),
+                "child_record_id": str(params["target_record_id"]),
                 "relation": str(params["relation_kind"]),
                 "relation_provenance": "authentic_source",
-                "parent_source_url": str(params["target_source_url"]),
-                "child_source_url": str(params["source_url"]),
+                "parent_source_url": str(params["source_url"]),
+                "child_source_url": str(params["target_source_url"]),
             }
         )
     return sorted(

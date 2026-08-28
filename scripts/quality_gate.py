@@ -35,8 +35,13 @@ from longworld.core.promotion import (
 from longworld.core.record_contract import replay_bundle_binding_valid, sft_row_errors
 from longworld.core.release_profile import (
     ReleaseProfile,
+    issuable_release_profile,
     release_profile,
     release_profile_sha256,
+)
+from longworld.core.tokenizer_assets import (
+    TokenizerAssetError,
+    resolved_tokenizer_asset_manifest_sha256,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -50,6 +55,10 @@ class ReleaseProduct:
     metrics: dict
     source_file_sha256: dict[str, str]
     production_approval: dict | None = None
+
+
+def _requires_relation_provenance_split(profile: ReleaseProfile | None) -> bool:
+    return bool(profile is not None and profile.profile_id.startswith(("p7-", "p10-")))
 
 
 def _create_release_gate_receipt(
@@ -94,6 +103,11 @@ def _create_release_gate_receipt(
             "gate_revision": RELEASE_GATE_REVISION,
             "release_profile_id": release_profile_id,
             "release_profile_sha256": release_profile_sha256(release_profile_id),
+            "tokenizer_model_id": profile.tokenizer_model_id,
+            "tokenizer_revision": profile.tokenizer_revision,
+            "tokenizer_asset_manifest_sha256": (
+                profile.tokenizer_asset_manifest_sha256
+            ),
             "predecessor_profile_id": profile.predecessor_profile_id,
             "quality_report_sha256": product.source_file_sha256["quality_report.json"],
             "source_file_sha256": dict(sorted(product.source_file_sha256.items())),
@@ -119,6 +133,10 @@ def _create_release_gate_receipt(
     ):
         raise ValueError("release gate receipt requires a complete auditor identity")
     return receipt
+
+
+def _requires_substantial_real_proof_growth(profile: ReleaseProfile | None) -> bool:
+    return bool(profile is not None and profile.profile_id.startswith(("p7-", "p10-")))
 
 
 def _write_json_atomic(path: Path, payload: dict) -> None:
@@ -293,6 +311,7 @@ def _has_exact_band_metadata(
     *,
     expected_model_id: str | None = None,
     expected_revision: str | None = None,
+    expected_asset_manifest_sha256: str | None = None,
 ) -> bool:
     try:
         tokens = int(row.get("tokenizer_context_tokens") or 0)
@@ -312,14 +331,47 @@ def _has_exact_band_metadata(
     model_id = str(row.get("tokenizer_model_id") or "")
     if expected_model_id is None or expected_revision is None:
         return True
-    if model_id != expected_model_id or revision != expected_revision:
+    if expected_asset_manifest_sha256 is None:
+        if model_id != expected_model_id or revision != expected_revision:
+            return False
+        try:
+            return (
+                _tokenizer_context_tokens(
+                    str(row.get("context") or ""), model_id, revision
+                )
+                == tokens
+            )
+        except (ImportError, OSError, RuntimeError, ValueError):
+            return False
+    declared_asset_digest = str(row.get("tokenizer_asset_manifest_sha256") or "")
+    if (
+        len(expected_asset_manifest_sha256) != 64
+        or any(
+            character not in "0123456789abcdef"
+            for character in expected_asset_manifest_sha256
+        )
+        or model_id != expected_model_id
+        or revision != expected_revision
+        or declared_asset_digest != expected_asset_manifest_sha256
+    ):
         return False
     try:
-        return (
-            _tokenizer_context_tokens(str(row.get("context") or ""), model_id, revision)
-            == tokens
+        loaded_asset_digest = resolved_tokenizer_asset_manifest_sha256(
+            model_id, revision
         )
-    except (ImportError, OSError, RuntimeError, ValueError):
+        replayed_tokens = _tokenizer_context_tokens(
+            str(row.get("context") or ""), model_id, revision
+        )
+        replayed_asset_digest = resolved_tokenizer_asset_manifest_sha256(
+            model_id, revision
+        )
+        return (
+            loaded_asset_digest
+            == replayed_asset_digest
+            == expected_asset_manifest_sha256
+            and replayed_tokens == tokens
+        )
+    except (ImportError, OSError, RuntimeError, TokenizerAssetError, ValueError):
         return False
 
 
@@ -328,12 +380,14 @@ def _has_exact_64k_metadata(
     *,
     expected_model_id: str | None = None,
     expected_revision: str | None = None,
+    expected_asset_manifest_sha256: str | None = None,
 ) -> bool:
     """Compatibility wrapper for existing release reporting."""
     return row.get("length_bucket") == "64k" and _has_exact_band_metadata(
         row,
         expected_model_id=expected_model_id,
         expected_revision=expected_revision,
+        expected_asset_manifest_sha256=expected_asset_manifest_sha256,
     )
 
 
@@ -342,6 +396,7 @@ def _exact_band_metadata_errors(
     *,
     expected_model_id: str,
     expected_revision: str,
+    expected_asset_manifest_sha256: str | None = None,
 ) -> list[str]:
     errors: list[str] = []
     for index, row in enumerate(rows):
@@ -352,6 +407,7 @@ def _exact_band_metadata_errors(
             row,
             expected_model_id=expected_model_id,
             expected_revision=expected_revision,
+            expected_asset_manifest_sha256=expected_asset_manifest_sha256,
         ):
             errors.append(
                 f"invalid_exact_{length_bucket}:"
@@ -783,6 +839,13 @@ def evaluate_quality(
             ):
                 errors.append("release_profile_sha256_mismatch")
     if profile is not None:
+        if profile.environment == "production":
+            try:
+                issuable_release_profile(profile.profile_id)
+            except ValueError:
+                errors.append(
+                    f"superseded_production_release_profile:{profile.profile_id}"
+                )
         min_retention = profile.min_retention
         max_retention = profile.max_retention
         max_boilerplate = profile.max_boilerplate
@@ -827,6 +890,9 @@ def evaluate_quality(
                 rows,
                 expected_model_id=profile.tokenizer_model_id,
                 expected_revision=profile.tokenizer_revision,
+                expected_asset_manifest_sha256=(
+                    profile.tokenizer_asset_manifest_sha256
+                ),
             )
         )
     if strict_report:
@@ -918,15 +984,13 @@ def evaluate_quality(
             and promotion.get("real_source_verified") is True
             and replay_bundle_binding_valid(row)
             and row.get("real_source_family_ids")
-            and row.get("source_relation_edges")
+            and row.get("real_source_workflow_ids")
         )
 
     real_source_relation_ids: set[str] = set()
     hybrid_causal_relation_ids: set[str] = set()
     missing_relation_provenance_split = 0
-    require_relation_provenance_split = bool(
-        profile is not None and profile.profile_id.startswith("p7-")
-    )
+    require_relation_provenance_split = _requires_relation_provenance_split(profile)
     for row in rows:
         if not is_real_row(row):
             continue
@@ -981,6 +1045,21 @@ def evaluate_quality(
     real_base_task_ids = {
         str(row.get("base_task_id")) for row in real_rows if row.get("base_task_id")
     }
+    unique_executable_proof_ids = {
+        str(row.get("executable_proof_id"))
+        for row in rows
+        if row.get("executable_proof_id")
+    }
+    unique_answer_program_ids = {
+        str(row.get("answer_program_id"))
+        for row in rows
+        if row.get("answer_program_id")
+    }
+    unique_semantic_base_task_ids = {
+        str(row.get("semantic_base_task_id"))
+        for row in rows
+        if row.get("semantic_base_task_id")
+    }
     exact_64k_rows = [
         row
         for row in rows
@@ -989,6 +1068,9 @@ def evaluate_quality(
             row,
             expected_model_id=(profile.tokenizer_model_id if profile else None),
             expected_revision=(profile.tokenizer_revision if profile else None),
+            expected_asset_manifest_sha256=(
+                profile.tokenizer_asset_manifest_sha256 if profile else None
+            ),
         )
     ]
     exact_64k_row_ids = {id(row) for row in exact_64k_rows}
@@ -1117,6 +1199,24 @@ def evaluate_quality(
                 f"{len(real_source_workflow_ids)}"
                 f"<{profile.min_unique_real_source_workflows}"
             )
+        if len(unique_executable_proof_ids) < profile.min_unique_executable_proofs:
+            errors.append(
+                "release_unique_executable_proofs="
+                f"{len(unique_executable_proof_ids)}"
+                f"<{profile.min_unique_executable_proofs}"
+            )
+        if len(unique_answer_program_ids) < profile.min_unique_answer_programs:
+            errors.append(
+                "release_unique_answer_programs="
+                f"{len(unique_answer_program_ids)}"
+                f"<{profile.min_unique_answer_programs}"
+            )
+        if len(unique_semantic_base_task_ids) < profile.min_unique_semantic_base_tasks:
+            errors.append(
+                "release_unique_semantic_base_tasks="
+                f"{len(unique_semantic_base_task_ids)}"
+                f"<{profile.min_unique_semantic_base_tasks}"
+            )
         for domain, minimum in profile.min_real_exact_64k_rows_by_domain:
             observed = real_exact_64k_rows_by_domain.get(domain, 0)
             if observed < minimum:
@@ -1237,8 +1337,8 @@ def evaluate_quality(
             rows,
             min_internal_growth,
             max_generic_growth_share,
-            require_substantial_real_proof_growth=bool(
-                profile is not None and profile.profile_id.startswith("p7-")
+            require_substantial_real_proof_growth=(
+                _requires_substantial_real_proof_growth(profile)
             ),
         )
     )
@@ -1263,13 +1363,8 @@ def evaluate_quality(
         "n_unique_base_tasks": len(
             {row["base_task_id"] for row in rows if row.get("base_task_id")}
         ),
-        "n_unique_executable_proofs": len(
-            {
-                row["executable_proof_id"]
-                for row in rows
-                if row.get("executable_proof_id")
-            }
-        ),
+        "n_unique_semantic_base_tasks": len(unique_semantic_base_task_ids),
+        "n_unique_executable_proofs": len(unique_executable_proof_ids),
         "n_unique_source_relations": len(
             {row["source_relation_id"] for row in rows if row.get("source_relation_id")}
         ),
@@ -1289,9 +1384,7 @@ def evaluate_quality(
             release_profile_sha256(profile.profile_id) if profile is not None else None
         ),
         "n_promotion_ready": sum(not sft_row_errors(row) for row in rows),
-        "n_unique_answer_programs": len(
-            {row["answer_program_id"] for row in rows if row.get("answer_program_id")}
-        ),
+        "n_unique_answer_programs": len(unique_answer_program_ids),
         "retention": retention,
         "mean_boilerplate": mean_boilerplate,
         "mean_pulse": mean_pulse,

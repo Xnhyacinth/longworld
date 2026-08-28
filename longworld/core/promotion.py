@@ -64,6 +64,10 @@ from longworld.core.sourcebundle import (
 )
 from longworld.core.sourceworkflow import SOURCE_WORKFLOW_ADAPTER_REVISIONS
 from longworld.core.taxonomy import artifact_classification
+from longworld.core.tokenizer_assets import (
+    TokenizerAssetError,
+    resolved_tokenizer_asset_manifest_sha256,
+)
 from longworld.core.topology import canonical_topology, topology_family
 from longworld.core.verify import (
     Verification,
@@ -88,7 +92,8 @@ RELEASE_SELECTION_SCHEMA = "longworld-release-world-selection-v1"
 RELEASE_SELECTION_PURPOSE = "release_world_selection"
 RELEASE_GATE_SCHEMA = "longworld-release-gate-pass-v1"
 RELEASE_GATE_PURPOSE = "release_gate_pass"
-RELEASE_GATE_REVISION = "longworld-quality-gate-v5"
+RELEASE_GATE_REVISION = "longworld-quality-gate-v6"
+LEGACY_RELEASE_GATE_REVISION = "longworld-quality-gate-v5"
 
 EXACT_TOKEN_BAND_RANGES: dict[str, tuple[int, int]] = {
     "16k": (16_000, 16_384),
@@ -107,6 +112,15 @@ _APPROVED_DENSE_MODELS = {
         "dot_product",
     )
 }
+
+
+def release_gate_revision_supported(profile_id: str, revision: object) -> bool:
+    """Accept v5 only for profiles that existed before the p10 gate contract."""
+    return revision == RELEASE_GATE_REVISION or (
+        revision == LEGACY_RELEASE_GATE_REVISION and not profile_id.startswith("p10-")
+    )
+
+
 _APPROVED_EXACT_TOKENIZERS = {
     (
         "Qwen/Qwen3.5-4B",
@@ -199,6 +213,25 @@ def stable_dossier_id(
     )[:20]
 
 
+def stable_semantic_base_task_id(spec: QuerySpec) -> str:
+    """Identify a source-independent task template and operator sequence."""
+    return _sha256_text(
+        json.dumps(
+            {
+                "domain": spec.domain,
+                "query_type": spec.query_type,
+                "motif": spec.motif,
+                "operator_sequence": [
+                    str(operation.get("op") or "")
+                    for operation in (spec.program_ops or [])
+                ],
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )[:20]
+
+
 def serialized_row_sha256(row: dict[str, Any]) -> str:
     """Digest every serialized row field, including its attestation."""
     return _canonical_sha256(row)
@@ -237,7 +270,6 @@ def _candidate_has_verified_real_source(candidate: dict[str, Any]) -> bool:
     classifications = candidate.get("artifact_classification")
     return bool(
         candidate.get("source_family_ids")
-        and candidate.get("authentic_source_relation_edges")
         and any(
             isinstance(candidate.get(field), dict)
             for field in ("episode_replay_bundle", "source_workflow_bundle")
@@ -296,6 +328,17 @@ def _selection_audit_matches_candidate(
         and _SHA256.fullmatch(str(audit.get("ranking_sha256") or "")) is not None
         and _SHA256.fullmatch(str(audit.get("verification_replay_sha256") or ""))
         is not None
+        and (
+            str(candidate.get("length_bucket") or "") not in EXACT_TOKEN_BAND_RANGES
+            or (
+                _SHA256.fullmatch(
+                    str(candidate.get("tokenizer_asset_manifest_sha256") or "")
+                )
+                is not None
+                and audit.get("tokenizer_asset_manifest_sha256")
+                == candidate.get("tokenizer_asset_manifest_sha256")
+            )
+        )
         and isinstance(model, dict)
         and tuple(
             str(model.get(field) or "")
@@ -344,9 +387,16 @@ def validate_predecessor_gate_receipt(
         raise PromotionError("predecessor gate receipt attestation is invalid")
     source_hashes = receipt.get("source_file_sha256")
     report_digest = str(receipt.get("quality_report_sha256") or "")
+    revision_supported = (
+        receipt.get("gate_revision") == RELEASE_GATE_REVISION
+        if release_profile_id.startswith("p10-")
+        else release_gate_revision_supported(
+            predecessor_id, receipt.get("gate_revision")
+        )
+    )
     if (
         receipt.get("schema_version") != RELEASE_GATE_SCHEMA
-        or receipt.get("gate_revision") != RELEASE_GATE_REVISION
+        or not revision_supported
         or receipt.get("release_profile_id") != predecessor_id
         or receipt.get("release_profile_sha256")
         != release_profile_sha256(predecessor_id)
@@ -428,6 +478,17 @@ def select_release_worlds(
         world_id = str(candidate.get("world_id") or "")
         if not world_id:
             raise PromotionError("world selection candidate has no world id")
+        if str(candidate.get("length_bucket") or "") in EXACT_TOKEN_BAND_RANGES:
+            expected_asset_digest = profile.tokenizer_asset_manifest_sha256
+            if expected_asset_digest and (
+                candidate.get("tokenizer_model_id") != profile.tokenizer_model_id
+                or candidate.get("tokenizer_revision") != profile.tokenizer_revision
+                or candidate.get("tokenizer_asset_manifest_sha256")
+                != expected_asset_digest
+            ):
+                raise PromotionError(
+                    "candidate tokenizer assets do not match release profile"
+                )
         digest = candidate_sha256(candidate)
         candidate_digests.append(serialized_row_sha256(candidate))
         by_world.setdefault(world_id, []).append((digest, candidate))
@@ -487,6 +548,23 @@ def select_release_worlds(
             for _digest, candidate in by_world[world_id]
         )
     ]
+    real_exact_64k_eligible_worlds = [
+        world_id
+        for world_id in real_eligible_worlds
+        if any(
+            _candidate_has_verified_real_source(candidate)
+            and candidate.get("length_bucket") == "64k"
+            and isinstance(candidate.get("tokenizer_context_tokens"), int)
+            and not isinstance(candidate.get("tokenizer_context_tokens"), bool)
+            and exact_token_band_reject_reason(
+                "64k", int(candidate["tokenizer_context_tokens"])
+            )
+            is None
+            and candidate.get("tokenizer_model_id") == profile.tokenizer_model_id
+            and candidate.get("tokenizer_revision") == profile.tokenizer_revision
+            for _digest, candidate in by_world[world_id]
+        )
+    ]
     min_real_worlds = profile.min_real_train_worlds + profile.min_real_eval_worlds
     if len(real_eligible_worlds) < min_real_worlds:
         raise PromotionError(
@@ -494,9 +572,7 @@ def select_release_worlds(
             f"{len(real_eligible_worlds)}<{min_real_worlds}"
         )
     select_key = lambda world_id: _sha256_text(f"{profile_digest}|select|{world_id}")
-    required_real_worlds = sorted(real_eligible_worlds, key=select_key)[
-        :min_real_worlds
-    ]
+    required_real_worlds: list[str] = []
     domain_quotas = dict(profile.promoted_domain_world_quotas)
     selected_worlds_by_domain: dict[str, list[str]] = {}
     if domain_quotas:
@@ -514,8 +590,16 @@ def select_release_worlds(
                 for _digest, candidate in world_candidates
             ]
         )
+        required_real_minima = dict(profile.min_real_exact_64k_worlds_by_domain)
+        if len(required_real_minima) != len(
+            profile.min_real_exact_64k_worlds_by_domain
+        ) or any(
+            domain not in domain_quotas or minimum < 0
+            for domain, minimum in required_real_minima.items()
+        ):
+            raise PromotionError("release profile real domain quotas are invalid")
         required_real_set = set(required_real_worlds)
-        for domain in domain_quotas:
+        for domain, domain_quota in domain_quotas.items():
             domain_real_worlds = sorted(
                 (
                     world_id
@@ -524,9 +608,62 @@ def select_release_worlds(
                 ),
                 key=select_key,
             )
-            if domain_real_worlds and required_real_set.isdisjoint(domain_real_worlds):
-                required_real_worlds.append(domain_real_worlds[0])
-                required_real_set.add(domain_real_worlds[0])
+            exact_minimum = required_real_minima.get(domain)
+            minimum = (
+                exact_minimum
+                if exact_minimum is not None
+                else 1
+                if domain_real_worlds
+                else 0
+            )
+            domain_required_real_worlds = (
+                sorted(
+                    (
+                        world_id
+                        for world_id in real_exact_64k_eligible_worlds
+                        if domains_by_world[world_id] == domain
+                    ),
+                    key=select_key,
+                )
+                if exact_minimum is not None and exact_minimum > 0
+                else domain_real_worlds
+            )
+            if minimum > domain_quota:
+                raise PromotionError(
+                    f"real workflow requirement exceeds {domain} world quota"
+                )
+            if len(domain_required_real_worlds) < minimum:
+                raise PromotionError(
+                    "insufficient fully audited real exact-64K domain worlds: "
+                    f"{domain} {len(domain_required_real_worlds)}<{minimum}"
+                )
+            required_real_worlds.extend(domain_required_real_worlds[:minimum])
+            required_real_set.update(domain_required_real_worlds[:minimum])
+        remaining_real = max(0, min_real_worlds - len(required_real_worlds))
+        if remaining_real:
+            required_real_by_domain = Counter(
+                domains_by_world[world_id] for world_id in required_real_worlds
+            )
+            available_real: list[str] = []
+            for world_id in sorted(real_eligible_worlds, key=select_key):
+                domain = domains_by_world[world_id]
+                if (
+                    world_id in required_real_set
+                    or domain not in domain_quotas
+                    or required_real_by_domain[domain] >= domain_quotas[domain]
+                ):
+                    continue
+                available_real.append(world_id)
+                required_real_by_domain[domain] += 1
+                if len(available_real) == remaining_real:
+                    break
+            if len(available_real) < remaining_real:
+                raise PromotionError(
+                    "real workflow requirements cannot fit domain world quotas"
+                )
+            for world_id in available_real:
+                required_real_worlds.append(world_id)
+                required_real_set.add(world_id)
         required_real_by_domain = Counter(
             domains_by_world[world_id] for world_id in required_real_worlds
         )
@@ -570,6 +707,9 @@ def select_release_worlds(
             selected_worlds_by_domain[domain] = sorted(selected_for_domain)
             selected_worlds.extend(selected_for_domain)
     else:
+        required_real_worlds = sorted(real_eligible_worlds, key=select_key)[
+            :min_real_worlds
+        ]
         selected_worlds = (
             required_real_worlds
             + [
@@ -618,6 +758,11 @@ def select_release_worlds(
             "schema_version": RELEASE_SELECTION_SCHEMA,
             "release_profile_id": release_profile_id,
             "release_profile_sha256": profile_digest,
+            "tokenizer_model_id": profile.tokenizer_model_id,
+            "tokenizer_revision": profile.tokenizer_revision,
+            "tokenizer_asset_manifest_sha256": (
+                profile.tokenizer_asset_manifest_sha256
+            ),
             "predecessor_profile_id": profile.predecessor_profile_id,
             "predecessor_report_sha256": predecessor_report_digest or None,
             "predecessor_gate_receipt_sha256": predecessor_gate_digest or None,
@@ -721,6 +866,21 @@ def create_train_ready_report(
     ).issubset(candidate_ids):
         raise PromotionError("promoted rows do not belong to the candidate report")
     profile = release_profile(release_profile_id)
+    for row in rows:
+        if str(row.get("length_bucket") or "") not in EXACT_TOKEN_BAND_RANGES:
+            continue
+        promotion = row.get("promotion") or {}
+        if profile.tokenizer_asset_manifest_sha256 and (
+            row.get("tokenizer_model_id") != profile.tokenizer_model_id
+            or row.get("tokenizer_revision") != profile.tokenizer_revision
+            or row.get("tokenizer_asset_manifest_sha256")
+            != profile.tokenizer_asset_manifest_sha256
+            or promotion.get("tokenizer_asset_manifest_sha256")
+            != profile.tokenizer_asset_manifest_sha256
+        ):
+            raise PromotionError(
+                "train-ready row tokenizer assets do not match release profile"
+            )
     domain_quotas = dict(profile.promoted_domain_world_quotas)
     selection_digest = ""
     selected_worlds_by_domain: dict[str, list[str]] = {}
@@ -766,6 +926,17 @@ def create_train_ready_report(
                 is None
             )
             or release_selection_receipt.get("split_strategy") != profile.split_strategy
+            or (
+                bool(profile.tokenizer_asset_manifest_sha256)
+                and (
+                    release_selection_receipt.get("tokenizer_model_id")
+                    != profile.tokenizer_model_id
+                    or release_selection_receipt.get("tokenizer_revision")
+                    != profile.tokenizer_revision
+                    or release_selection_receipt.get("tokenizer_asset_manifest_sha256")
+                    != profile.tokenizer_asset_manifest_sha256
+                )
+            )
             or release_selection_receipt.get("candidate_row_set_sha256")
             != row_digest_set_sha256(candidate_digests)
             or release_selection_receipt.get("selected_candidate_sha256")
@@ -888,6 +1059,9 @@ def create_train_ready_report(
         "data_stage": "train_ready",
         "release_profile_id": release_profile_id,
         "release_profile_sha256": profile_digest,
+        "tokenizer_model_id": profile.tokenizer_model_id,
+        "tokenizer_revision": profile.tokenizer_revision,
+        "tokenizer_asset_manifest_sha256": (profile.tokenizer_asset_manifest_sha256),
         "report_binding_revision": QUALITY_REPORT_BINDING_REVISION,
         "candidate_quality_report_sha256": _canonical_sha256(candidate_report),
         "release_selection_sha256": selection_digest or None,
@@ -1299,6 +1473,9 @@ def _reconstruct_candidate(
     _validate_replayed_task_metadata(
         candidate, _replayed_task_metadata(candidate, world, spec, reconstructed)
     )
+    _validate_replayed_source_metadata(
+        candidate, _replayed_source_metadata(world, spec, reconstructed)
+    )
     counterpart_index = (
         factual_artifact_index if candidate.get("view") == "cf" else cf_artifact_index
     )
@@ -1409,17 +1586,49 @@ def _independent_verification_replay(
     if str(candidate.get("length_bucket") or "") in EXACT_TOKEN_BAND_RANGES:
         if (tokenizer_model_id, tokenizer_revision) not in _APPROVED_EXACT_TOKENIZERS:
             raise PromotionError("candidate exact tokenizer pin is not approved")
+        declared_asset_digest = str(
+            candidate.get("tokenizer_asset_manifest_sha256") or ""
+        )
+        if _SHA256.fullmatch(declared_asset_digest) is None:
+            raise PromotionError(
+                "candidate exact tokenizer asset manifest digest is missing"
+            )
         try:
             loaded_revision = _resolved_local_tokenizer_revision(
                 tokenizer_model_id, tokenizer_revision
             )
-            tokenizer = _load_replay_tokenizer(tokenizer_model_id, tokenizer_revision)
-        except (ImportError, OSError, RuntimeError, ValueError) as error:
+            loaded_asset_digest = resolved_tokenizer_asset_manifest_sha256(
+                tokenizer_model_id, tokenizer_revision
+            )
+        except (
+            ImportError,
+            OSError,
+            RuntimeError,
+            TokenizerAssetError,
+            ValueError,
+        ) as error:
             raise PromotionError(
                 "candidate exact tokenizer cannot be loaded"
             ) from error
         if loaded_revision != tokenizer_revision:
             raise PromotionError("loaded exact tokenizer revision does not match pin")
+        if loaded_asset_digest != declared_asset_digest:
+            raise PromotionError(
+                "loaded exact tokenizer asset manifest does not match candidate"
+            )
+        try:
+            tokenizer = _load_replay_tokenizer(tokenizer_model_id, tokenizer_revision)
+        except (ImportError, OSError, RuntimeError, ValueError) as error:
+            raise PromotionError(
+                "candidate exact tokenizer cannot be loaded"
+            ) from error
+        if (
+            resolved_tokenizer_asset_manifest_sha256(
+                tokenizer_model_id, tokenizer_revision
+            )
+            != loaded_asset_digest
+        ):
+            raise PromotionError("exact tokenizer assets changed while loading")
         reconstructed_context = wrap_prompt(
             spec.question,
             join_artifacts(artifacts),
@@ -1444,6 +1653,7 @@ def _independent_verification_replay(
             "tokenizer_context_tokens": replayed_tokens,
             "tokenizer_model_id": tokenizer_model_id,
             "tokenizer_revision": tokenizer_revision,
+            "tokenizer_asset_manifest_sha256": loaded_asset_digest,
         }
     verification, notes = verify_question(
         world,
@@ -1557,6 +1767,7 @@ def _replayed_task_metadata(
         "base_task_id": _sha256_text(
             f"{world.world_id}|{spec.base_task_group or spec.query_id}"
         )[:20],
+        "semantic_base_task_id": stable_semantic_base_task_id(spec),
         "dossier_id": dossier,
         "semantic_growth_group_id": semantic_growth_group_id,
         "strict_support_event_count": len(
@@ -1593,6 +1804,7 @@ def _validate_replayed_task_metadata(
         "executable_proof_id": "executable proof",
         "answer_program_id": "answer program",
         "base_task_id": "base task",
+        "semantic_base_task_id": "semantic base task",
         "dossier_id": "dossier identity",
         "semantic_growth_group_id": "semantic growth group",
         "strict_support_event_count": "strict support count",
@@ -1659,6 +1871,27 @@ def _validate_replayed_task_metadata(
     expected_group = _sha256_text(f"{split_strategy}|{group_key}")[:16]
     if holdout.get("group_id") != expected_group:
         raise PromotionError("candidate holdout does not match replay specification")
+
+
+def _validate_replayed_source_metadata(
+    candidate: dict[str, Any], expected: dict[str, Any]
+) -> None:
+    labels = {
+        "real_source_verified": "real source verification",
+        "real_source_family_ids": "real source families",
+        "real_source_workflow_ids": "real source workflows",
+        "source_relation_edges": "source relation edges",
+        "source_relation_id": "source relation identity",
+        "authentic_source_relation_edges": "authentic source relation edges",
+        "authentic_source_relation_id": "authentic source relation identity",
+        "hybrid_causal_edges": "hybrid causal edges",
+        "context_source_relation_count": "source relation count",
+    }
+    for field, label in labels.items():
+        if field in candidate and candidate[field] != expected[field]:
+            raise PromotionError(
+                f"candidate {label} does not match replay specification"
+            )
 
 
 def _replayed_source_metadata(
@@ -1827,7 +2060,7 @@ def _replayed_source_metadata(
         else ""
     )
     return {
-        "real_source_verified": bool(authentic_edges and real_families),
+        "real_source_verified": bool(real_families and real_workflow_ids),
         "real_source_family_ids": sorted(real_families),
         "real_source_workflow_ids": sorted(real_workflow_ids),
         "source_relation_edges": edges,
@@ -1839,6 +2072,7 @@ def _replayed_source_metadata(
         "base_task_id": _sha256_text(
             f"{world.world_id}|{spec.base_task_group or spec.query_id}"
         )[:20],
+        "semantic_base_task_id": stable_semantic_base_task_id(spec),
     }
 
 
@@ -2226,6 +2460,11 @@ def create_dense_audit(
         "verification_replay_sha256": verification_replay_sha256,
         "near_dup_sentence_ratio": replayed_quality["near_dup_sentence_ratio"],
     }
+    exact_replay = replayed_notes.get("exact_token_replay")
+    if isinstance(exact_replay, dict):
+        payload["tokenizer_asset_manifest_sha256"] = exact_replay[
+            "tokenizer_asset_manifest_sha256"
+        ]
     payload.update(bundle_bindings)
     return attach_attestation(payload, audit_key, purpose=DENSE_AUDIT_PURPOSE)
 
@@ -2292,6 +2531,14 @@ def promote_candidate(
     )
     if dense_audit.get("verification_replay_sha256") != verification_replay_sha256:
         raise PromotionError("dense audit verification replay binding mismatch")
+    exact_replay = replayed_notes.get("exact_token_replay")
+    if isinstance(exact_replay, dict) and (
+        dense_audit.get("tokenizer_asset_manifest_sha256")
+        != exact_replay.get("tokenizer_asset_manifest_sha256")
+        or candidate.get("tokenizer_asset_manifest_sha256")
+        != exact_replay.get("tokenizer_asset_manifest_sha256")
+    ):
+        raise PromotionError("dense audit tokenizer asset binding mismatch")
     replayed_quality = _replayed_quality_metrics(
         candidate,
         world,
@@ -2333,6 +2580,11 @@ def promote_candidate(
             != serialized_row_sha256(dense_audit)
             or mapped_split not in {"train", "eval"}
             or (expected_split is not None and expected_split != mapped_split)
+            or (
+                isinstance(exact_replay, dict)
+                and release_selection_receipt.get("tokenizer_asset_manifest_sha256")
+                != exact_replay.get("tokenizer_asset_manifest_sha256")
+            )
         ):
             raise PromotionError("candidate is not bound by release world selection")
         selected_split = str(mapped_split)
@@ -2442,6 +2694,10 @@ def promote_candidate(
         "strict_replay_answer": strict_answer,
         "real_source_verified": replayed_source["real_source_verified"],
     }
+    if isinstance(exact_replay, dict):
+        promoted["promotion"]["tokenizer_asset_manifest_sha256"] = exact_replay[
+            "tokenizer_asset_manifest_sha256"
+        ]
     if selection_digest:
         promoted["promotion"]["release_selection_sha256"] = selection_digest
     promoted["promotion"].update(bundle_bindings)

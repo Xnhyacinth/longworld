@@ -43,6 +43,7 @@ _SOURCE_ORIGINS = {
 }
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _COMMIT_SHA = re.compile(r"[0-9a-f]{40}")
+_STRICT_EXACT_BUCKETS = {"16k", "32k", "64k"}
 STRICT_REPLAY_REVISION = "longworld-strict-replay-v5"
 _DENSE_PROMOTION_CONTRACT = {
     "dense_model_provider": "huggingface",
@@ -134,6 +135,18 @@ def sft_row_errors(
     if verification.get("embedding_topk_insufficient") is not True:
         errors.append("dense_retrieval_gate_failed")
     promotion = _mapping(row.get("promotion"))
+    exact_asset_digest = str(row.get("tokenizer_asset_manifest_sha256") or "")
+    has_exact_asset_binding = (
+        row.get("tokenizer_asset_manifest_sha256") is not None
+        or promotion.get("tokenizer_asset_manifest_sha256") is not None
+    )
+    strict_exact_asset_valid = not (
+        str(row.get("length_bucket") or "") in _STRICT_EXACT_BUCKETS
+        and has_exact_asset_binding
+    ) or (
+        _SHA256.fullmatch(exact_asset_digest) is not None
+        and promotion.get("tokenizer_asset_manifest_sha256") == exact_asset_digest
+    )
     promotion_valid = (
         promotion.get("schema_version") == "train-ready-promotion-v1"
         and all(
@@ -158,6 +171,7 @@ def sft_row_errors(
         and promotion.get("strict_replay_revision") == STRICT_REPLAY_REVISION
         and str(promotion.get("strict_replay_answer") or "")
         == str(row.get("answer") or "")
+        and strict_exact_asset_valid
     )
     if not promotion_valid:
         errors.append("missing_or_invalid_promotion")
@@ -236,11 +250,13 @@ def sft_row_errors(
         errors.append("workflow_kind_summary_mismatch")
     real_source_verified = row.get("real_source_verified") is True
     if real_source_verified:
+        relation_id_present = bool(row.get("source_relation_id"))
+        relation_edges_present = bool(row.get("source_relation_edges"))
         if (
             not real_causal_class
             or not row.get("real_source_family_ids")
-            or not row.get("source_relation_id")
-            or not row.get("source_relation_edges")
+            or not row.get("real_source_workflow_ids")
+            or relation_id_present != relation_edges_present
             or not replay_bundle_binding_valid(row)
             or promotion.get("real_source_verified") is not True
         ):
@@ -248,6 +264,7 @@ def sft_row_errors(
     elif any(
         (
             row.get("real_source_family_ids"),
+            row.get("real_source_workflow_ids"),
             promotion.get("real_source_verified") is True,
         )
     ):

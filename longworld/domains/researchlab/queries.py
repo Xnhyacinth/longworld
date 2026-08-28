@@ -229,18 +229,32 @@ def _counterfactual_grounded_source(
     }
 
 
-def _wiki_program_ops(control_tier: str) -> list[dict[str, Any]]:
-    ops: list[dict[str, Any]] = [{"op": "READ_WIKI_FACT", "role": "born"}]
-    if control_tier in {"32k", "64k"}:
-        ops.extend(
-            [
-                {"op": "READ_WIKI_FACT", "role": "commemoration"},
-                {"op": "READ_WIKI_FACT", "role": "entity"},
-            ]
-        )
-    if control_tier == "64k":
-        ops.append({"op": "READ_WIKI_FACT", "role": "popular_culture"})
+_WIKI_ROLE_TAGS = {
+    "born": "BORN",
+    "commemoration": "COMM",
+    "entity": "ENTITY",
+    "popular_culture": "POP",
+    "early_career": "CAREER",
+    "revolutionary_committee": "COMMITTEE",
+    "early_transition": "EARLY",
+}
+
+
+def _wiki_program_ops(
+    required_roles: list[str], required_relation_ids: list[str]
+) -> list[dict[str, Any]]:
+    ops = [{"op": "READ_WIKI_FACT", "role": role} for role in required_roles]
+    if required_relation_ids:
+        ops.append({"op": "VERIFY_WIKI_SOURCE_RELATIONS"})
     return ops
+
+
+def _wiki_gold_expression(
+    required_roles: list[str], required_relation_ids: list[str]
+) -> str:
+    tags = "/".join(_WIKI_ROLE_TAGS[role] for role in required_roles)
+    relation_gate = " with verified source relations" if required_relation_ids else ""
+    return f"tagged {tags} reconstruction{relation_gate}"
 
 
 def _wiki_cf_updates(section: Event) -> dict[str, Any]:
@@ -518,7 +532,6 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
         )
 
     computes: dict[str, dict[str, Event]] = {}
-    copies_16k: dict[str, list[Event]] = {}
     wiki_sections: dict[str, dict[str, Event]] = {}
     wiki_relations: dict[str, list[Event]] = {}
     for event in world.events:
@@ -527,10 +540,7 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
             continue
         if event.type == "wiki_claim_answer":
             tier = str(event.params.get("control_tier") or "")
-            if str(event.params.get("compose") or "compute") == "copy":
-                if tier == "16k":
-                    copies_16k.setdefault(record_id, []).append(event)
-            elif tier:
+            if str(event.params.get("compose") or "compute") != "copy" and tier:
                 computes.setdefault(record_id, {})[tier] = event
         elif event.type == "wiki_source_section":
             section_id = str(event.params.get("section_id") or "")
@@ -541,46 +551,51 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
     for record_id, by_tier in computes.items():
         if any(tier not in by_tier for tier in ("16k", "32k", "64k")):
             continue
-        copies = sorted(copies_16k.get(record_id) or [], key=lambda event: event.time)
-        if len(copies) < 2:
-            continue
-        publish = copies[-1]
         by_section = wiki_sections.get(record_id) or {}
-        early = by_section.get("early_work")
-        if early is None:
+        birth_source = next(
+            (
+                section
+                for section in by_section.values()
+                if any(
+                    isinstance(span, dict) and span.get("role") == "born"
+                    for span in section.params.get("fact_spans") or []
+                )
+            ),
+            None,
+        )
+        if birth_source is None:
             continue
         source_key = record_id.replace(":", "_")
-        for control_tier, proof_depth, needed_names, extra_answers, extra_copies in (
-            ("16k", 4, ("early_work",), ("16k",), copies),
-            (
-                "32k",
-                5,
-                ("early_work", "commemoration", "wikidata_entity"),
-                ("16k",),
-                (),
-            ),
-            (
-                "64k",
-                6,
-                (
-                    "early_work",
-                    "commemoration",
-                    "popular_culture",
-                    "wikidata_entity",
-                ),
-                ("16k", "32k"),
-                (),
-            ),
+        sections_by_event_id = {section.id: section for section in by_section.values()}
+        for control_tier, proof_depth, extra_answers in (
+            ("16k", 2, ("16k",)),
+            ("32k", 3, ("16k",)),
+            ("64k", 4, ("16k", "32k")),
         ):
-            answer_event = publish if control_tier == "16k" else by_tier[control_tier]
-            needed_sections = [by_section.get(name) for name in needed_names]
-            needed_answers = [by_tier.get(name) for name in extra_answers]
-            if any(item is None for item in (*needed_sections, *needed_answers)):
+            answer_event = by_tier[control_tier]
+            required_roles = list(answer_event.params.get("required_roles") or [])
+            required_relation_ids = list(
+                answer_event.params.get("required_relation_ids") or []
+            )
+            needed_section_ids = list(
+                answer_event.params.get("section_event_ids") or []
+            )
+            if not needed_section_ids or any(
+                section_event_id not in sections_by_event_id
+                for section_event_id in needed_section_ids
+            ):
                 continue
+            needed_sections = [
+                sections_by_event_id[section_event_id]
+                for section_event_id in needed_section_ids
+            ]
+            optional_answers = [by_tier.get(name) for name in extra_answers]
+            if any(item is None for item in optional_answers):
+                continue
+            needed_answers = [item for item in optional_answers if item is not None]
             essential_events = [
                 *needed_sections,
                 *needed_answers,
-                *extra_copies,
             ]
             if control_tier in {"32k", "64k"}:
                 essential_events.extend(
@@ -599,11 +614,9 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                     ),
                     query_type="wiki_claim_reconstruction",
                     question=(
-                        "Reconstruct the tagged Wikipedia/Wikidata claim program "
-                        f"through the {control_tier} control stage using only the "
-                        "cited revision sections and entity record in context. "
-                        "Do not use identity-header fields as substitutes for "
-                        "body claims."
+                        "Use cited body text only. Fill the most inclusive response "
+                        "schema in the evidence reviews. Do not infer values from "
+                        "titles or identity headers."
                     ),
                     answer="",
                     as_of=answer_event.time,
@@ -614,14 +627,16 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                         for event in essential_events
                     ],
                     sufficient_event_ids=essential_ids,
-                    cf_event_id=early.id,
-                    cf_param_updates=_wiki_cf_updates(early),
+                    cf_event_id=birth_source.id,
+                    cf_param_updates=_wiki_cf_updates(birth_source),
                     cf_answer="",
-                    invariance_event_id=early.id,
+                    invariance_event_id=birth_source.id,
                     invariance_param_updates={
                         "retrieval_url": "https://en.wikipedia.org/w/index.php?oldid=0"
                     },
-                    gold_expression="tagged BORN/COMM/ENTITY/POP reconstruction",
+                    gold_expression=_wiki_gold_expression(
+                        required_roles, required_relation_ids
+                    ),
                     proof_depth=proof_depth,
                     cf_op="numeric",
                     motif="source-wiki-claim-program",
@@ -632,7 +647,9 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                     ),
                     domain="researchlab",
                     truth_regime="real_source_derived",
-                    program_ops=_wiki_program_ops(control_tier),
+                    program_ops=_wiki_program_ops(
+                        required_roles, required_relation_ids
+                    ),
                     preferred_length_buckets=[control_tier],
                     semantic_growth_group="researchlab_real_wiki_claim_reconstruction",
                     base_task_group=f"wiki_claim_reconstruction:{source_key}",

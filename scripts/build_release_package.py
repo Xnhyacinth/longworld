@@ -27,6 +27,7 @@ from longworld.core.release_inventory import (
     create_release_inventory,
     validate_release_inventory,
 )
+from longworld.core.release_profile import issuable_release_profile
 from longworld.core.training_manifest import (
     file_sha256,
     resolve_training_manifest_path,
@@ -115,6 +116,8 @@ def build_release_package(
     trust_mode: str = "local_engineering",
 ) -> dict:
     """Copy only signed/allowlisted artifacts, then atomically commit the package."""
+    if trust_mode == "production":
+        issuable_release_profile(release_profile_id)
     source_root = source_release_root.absolute()
     destination = destination.absolute()
     if source_root.is_symlink():

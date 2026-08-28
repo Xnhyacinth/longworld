@@ -4,6 +4,7 @@ import hashlib
 import json
 import sys
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -23,12 +24,16 @@ from longworld.core.promotion import (
     CANDIDATE_ATTESTATION_PURPOSE,
     DENSE_AUDIT_PURPOSE,
     DENSE_RANKING_PURPOSE,
+    LEGACY_RELEASE_GATE_REVISION,
     QUALITY_REPORT_BINDING_REVISION,
+    RELEASE_GATE_PURPOSE,
     RELEASE_GATE_REVISION,
     STRICT_REPLAY_REVISION,
     PromotionError,
+    _candidate_has_verified_real_source,
     _candidate_include_program_joins,
     _candidate_n_workstreams,
+    _independent_verification_replay,
     _materialize_synthetic_replay,
     _n_workstreams,
     _replayed_quality_metrics,
@@ -39,13 +44,19 @@ from longworld.core.promotion import (
     create_train_ready_report,
     promote_candidate,
     promoted_row_set_sha256,
+    release_gate_revision_supported,
     select_release_worlds,
     serialized_row_sha256,
+    stable_semantic_base_task_id,
     validate_predecessor_gate_receipt,
 )
 from longworld.core.realworkflow import load_episode_replay_bundle
 from longworld.core.record_contract import sft_row_errors
-from longworld.core.release_profile import release_profile_sha256
+from longworld.core.release_profile import (
+    RELEASE_PROFILES,
+    release_profile,
+    release_profile_sha256,
+)
 from longworld.core.sampler import materialize
 from longworld.core.semantic import (
     boilerplate_char_fraction,
@@ -630,6 +641,175 @@ def test_two_stage_dense_audit_strictly_replays_and_signs_train_ready_row() -> N
     )
 
 
+def test_strict_exact_sft_contract_requires_matching_tokenizer_asset_digests() -> None:
+    candidate, artifacts = _candidate()
+    audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+    promoted = promote_candidate(candidate, audit, KEY)
+    exact = {
+        **{key: value for key, value in promoted.items() if key != "attestation"},
+        "length_bucket": "16k",
+        "tokenizer_context_tokens": 16_001,
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "a" * 40,
+        "tokenizer_asset_manifest_sha256": "b" * 64,
+        "promotion": {
+            **promoted["promotion"],
+            "tokenizer_asset_manifest_sha256": "b" * 64,
+        },
+    }
+    exact = attach_attestation(exact, KEY, purpose="sft_row")
+
+    assert sft_row_errors(exact, attestation_key=KEY) == []
+    missing = attach_attestation(
+        {
+            **{key: value for key, value in exact.items() if key != "attestation"},
+            "promotion": {
+                key: value
+                for key, value in exact["promotion"].items()
+                if key != "tokenizer_asset_manifest_sha256"
+            },
+        },
+        KEY,
+        purpose="sft_row",
+    )
+    mismatched = attach_attestation(
+        {
+            **{key: value for key, value in exact.items() if key != "attestation"},
+            "promotion": {
+                **exact["promotion"],
+                "tokenizer_asset_manifest_sha256": "c" * 64,
+            },
+        },
+        KEY,
+        purpose="sft_row",
+    )
+
+    assert "missing_or_invalid_promotion" in sft_row_errors(
+        missing, attestation_key=KEY
+    )
+    assert "missing_or_invalid_promotion" in sft_row_errors(
+        mismatched, attestation_key=KEY
+    )
+
+
+def test_legacy_exact_sft_contract_allows_token_metadata_without_asset_binding() -> (
+    None
+):
+    candidate, artifacts = _candidate()
+    audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+    promoted = promote_candidate(candidate, audit, KEY)
+    legacy_exact = {
+        **{key: value for key, value in promoted.items() if key != "attestation"},
+        "length_bucket": "16k",
+        "tokenizer_context_tokens": 16_001,
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "a" * 40,
+    }
+    legacy_exact = attach_attestation(legacy_exact, KEY, purpose="sft_row")
+
+    assert sft_row_errors(legacy_exact, attestation_key=KEY) == []
+
+
+def test_dense_audit_and_promotion_bind_replayed_tokenizer_assets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    asset_digest = "b" * 64
+    candidate, artifacts = _candidate()
+    candidate["tokenizer_asset_manifest_sha256"] = asset_digest
+    candidate = attach_attestation(
+        candidate, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
+    )
+
+    def replay_with_asset(*args, **kwargs):
+        verification, notes, tokenizer = _independent_verification_replay(
+            *args, **kwargs
+        )
+        notes["exact_token_replay"] = {
+            "tokenizer_context_tokens": 16_001,
+            "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+            "tokenizer_revision": ("a7b0d22b993d71000cf2eadfb37222a67cee521e"),
+            "tokenizer_asset_manifest_sha256": asset_digest,
+        }
+        return verification, notes, tokenizer
+
+    monkeypatch.setattr(
+        "longworld.core.promotion._independent_verification_replay",
+        replay_with_asset,
+    )
+    audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+    promoted = promote_candidate(candidate, audit, KEY)
+
+    assert audit["tokenizer_asset_manifest_sha256"] == asset_digest
+    assert promoted["tokenizer_asset_manifest_sha256"] == asset_digest
+    assert promoted["promotion"]["tokenizer_asset_manifest_sha256"] == asset_digest
+
+
+def test_promotion_rejects_resigned_dense_audit_tokenizer_asset_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    asset_digest = "b" * 64
+    candidate, artifacts = _candidate()
+    candidate["tokenizer_asset_manifest_sha256"] = asset_digest
+    candidate = attach_attestation(
+        candidate, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
+    )
+
+    def replay_with_asset(*args, **kwargs):
+        verification, notes, tokenizer = _independent_verification_replay(
+            *args, **kwargs
+        )
+        notes["exact_token_replay"] = {
+            "tokenizer_context_tokens": 16_001,
+            "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+            "tokenizer_revision": ("a7b0d22b993d71000cf2eadfb37222a67cee521e"),
+            "tokenizer_asset_manifest_sha256": asset_digest,
+        }
+        return verification, notes, tokenizer
+
+    monkeypatch.setattr(
+        "longworld.core.promotion._independent_verification_replay",
+        replay_with_asset,
+    )
+    audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+    tampered = attach_attestation(
+        {
+            **{key: value for key, value in audit.items() if key != "attestation"},
+            "tokenizer_asset_manifest_sha256": "c" * 64,
+        },
+        KEY,
+        purpose=DENSE_AUDIT_PURPOSE,
+    )
+
+    with pytest.raises(PromotionError, match="tokenizer asset binding mismatch"):
+        promote_candidate(candidate, tampered, KEY)
+
+
+def test_release_selection_rejects_tokenizer_assets_outside_profile() -> None:
+    revision = "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+    candidate, _artifacts = _candidate()
+    candidate.update(
+        {
+            "length_bucket": "16k",
+            "tokenizer_context_tokens": 16_001,
+            "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+            "tokenizer_revision": revision,
+            "tokenizer_asset_manifest_sha256": "c" * 64,
+        }
+    )
+    candidate = attach_attestation(
+        candidate, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
+    )
+
+    with pytest.raises(PromotionError, match="do not match release profile"):
+        select_release_worlds(
+            [candidate],
+            [],
+            "p7-github-source-slice-1-v1",
+            candidate_attestation_key=KEY,
+            audit_attestation_key=KEY,
+        )
+
+
 def test_dense_audit_rejects_unapproved_exact_tokenizer_pin() -> None:
     candidate, artifacts = _candidate()
     candidate.update(
@@ -674,6 +854,33 @@ def test_dense_audit_recounts_exact_tokens_from_reconstructed_prompt(
         "longworld.core.promotion._resolved_local_tokenizer_revision",
         lambda _model_id, _revision: revision,
     )
+    monkeypatch.setattr(
+        "longworld.core.promotion.resolved_tokenizer_asset_manifest_sha256",
+        lambda _model_id, _revision: "b" * 64,
+    )
+    candidate, artifacts = _candidate()
+    candidate.update(
+        {
+            "length_bucket": "16k",
+            "tokenizer_context_tokens": 16_000,
+            "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+            "tokenizer_revision": revision,
+            "tokenizer_asset_manifest_sha256": "b" * 64,
+        }
+    )
+    candidate["query_id"] = candidate["query_id"].rsplit(":", 1)[0] + ":16k"
+    candidate = attach_attestation(
+        {key: value for key, value in candidate.items() if key != "attestation"},
+        KEY,
+        purpose=CANDIDATE_ATTESTATION_PURPOSE,
+    )
+
+    with pytest.raises(PromotionError, match="token count does not replay"):
+        create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+
+
+def test_dense_audit_rejects_missing_tokenizer_asset_manifest_digest() -> None:
+    revision = "a7b0d22b993d71000cf2eadfb37222a67cee521e"
     candidate, artifacts = _candidate()
     candidate.update(
         {
@@ -690,7 +897,86 @@ def test_dense_audit_recounts_exact_tokens_from_reconstructed_prompt(
         purpose=CANDIDATE_ATTESTATION_PURPOSE,
     )
 
-    with pytest.raises(PromotionError, match="token count does not replay"):
+    with pytest.raises(PromotionError, match="asset manifest digest is missing"):
+        create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+
+
+def test_dense_audit_rejects_changed_local_tokenizer_assets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    revision = "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+    monkeypatch.setattr(
+        "longworld.core.promotion.resolved_tokenizer_asset_manifest_sha256",
+        lambda _model_id, _revision: "c" * 64,
+    )
+    monkeypatch.setattr(
+        "longworld.core.promotion._resolved_local_tokenizer_revision",
+        lambda _model_id, _revision: revision,
+    )
+    candidate, artifacts = _candidate()
+    candidate.update(
+        {
+            "length_bucket": "16k",
+            "tokenizer_context_tokens": 16_000,
+            "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+            "tokenizer_revision": revision,
+            "tokenizer_asset_manifest_sha256": "b" * 64,
+        }
+    )
+    candidate["query_id"] = candidate["query_id"].rsplit(":", 1)[0] + ":16k"
+    candidate = attach_attestation(
+        {key: value for key, value in candidate.items() if key != "attestation"},
+        KEY,
+        purpose=CANDIDATE_ATTESTATION_PURPOSE,
+    )
+
+    with pytest.raises(PromotionError, match="asset manifest does not match"):
+        create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+
+
+def test_dense_audit_rejects_tokenizer_assets_mutated_during_load(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    revision = "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+
+    class FakeTokenizer:
+        @staticmethod
+        def encode(text: str, *, add_special_tokens: bool) -> list[int]:
+            assert text
+            assert not add_special_tokens
+            return [0] * 16_001
+
+    asset_digests = iter(("b" * 64, "c" * 64))
+    monkeypatch.setattr(
+        "longworld.core.promotion.resolved_tokenizer_asset_manifest_sha256",
+        lambda _model_id, _revision: next(asset_digests),
+    )
+    monkeypatch.setattr(
+        "longworld.core.promotion._resolved_local_tokenizer_revision",
+        lambda _model_id, _revision: revision,
+    )
+    monkeypatch.setattr(
+        "longworld.core.promotion._load_replay_tokenizer",
+        lambda _model_id, _revision: FakeTokenizer(),
+    )
+    candidate, artifacts = _candidate()
+    candidate.update(
+        {
+            "length_bucket": "16k",
+            "tokenizer_context_tokens": 16_001,
+            "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+            "tokenizer_revision": revision,
+            "tokenizer_asset_manifest_sha256": "b" * 64,
+        }
+    )
+    candidate["query_id"] = candidate["query_id"].rsplit(":", 1)[0] + ":16k"
+    candidate = attach_attestation(
+        {key: value for key, value in candidate.items() if key != "attestation"},
+        KEY,
+        purpose=CANDIDATE_ATTESTATION_PURPOSE,
+    )
+
+    with pytest.raises(PromotionError, match="assets changed while loading"):
         create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
 
 
@@ -971,6 +1257,9 @@ def test_train_ready_report_binds_the_exact_promoted_row_set() -> None:
     assert verify_attestation(report, KEY, purpose="quality_report")
     assert report["data_stage"] == "train_ready"
     assert report["release_profile_id"] == "p3-probe-12-v1"
+    assert report["tokenizer_model_id"] == "Qwen/Qwen3.5-4B"
+    assert len(report["tokenizer_revision"]) == 40
+    assert report["tokenizer_asset_manifest_sha256"] is None
     assert report["report_binding_revision"] == QUALITY_REPORT_BINDING_REVISION
     assert report["candidate_row_set_sha256"] == promoted_row_set_sha256([candidate])
     assert report["n_rows"] == 1
@@ -1051,42 +1340,51 @@ def _mark_candidate_as_real(candidate: dict) -> None:
     }
 
 
+def test_real_workflow_selection_does_not_require_a_cross_source_relation() -> None:
+    candidate, _ = _candidate()
+    _mark_candidate_as_real(candidate)
+    candidate["source_relation_edges"] = []
+    candidate["authentic_source_relation_edges"] = []
+
+    assert _candidate_has_verified_real_source(candidate)
+
+
 def _selection_audit(
     candidate: dict, *, near_dup_sentence_ratio: float | None = None
 ) -> dict:
     if near_dup_sentence_ratio is None:
         near_dup_sentence_ratio = float(candidate.get("near_dup_sentence_ratio") or 0.0)
-    return attach_attestation(
-        {
-            "schema_version": "train-ready-promotion-v1",
-            "query_id": candidate["query_id"],
-            "candidate_sha256": candidate_sha256(candidate),
-            "ranking_sha256": "b" * 64,
-            "ranker_type": "dense_embedding",
-            "model": {
-                "provider": "huggingface",
-                "model_id": "sentence-transformers/all-MiniLM-L6-v2",
-                "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
-                "backend": "sentence-transformers-6.0.0",
-                "score_metric": "dot_product",
-                "chunking": {
-                    "strategy": "tokenizer_token_windows",
-                    "max_tokens": 192,
-                    "overlap_tokens": 32,
-                    "aggregation": "max_similarity",
-                },
+    payload = {
+        "schema_version": "train-ready-promotion-v1",
+        "query_id": candidate["query_id"],
+        "candidate_sha256": candidate_sha256(candidate),
+        "ranking_sha256": "b" * 64,
+        "ranker_type": "dense_embedding",
+        "model": {
+            "provider": "huggingface",
+            "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+            "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+            "backend": "sentence-transformers-6.0.0",
+            "score_metric": "dot_product",
+            "chunking": {
+                "strategy": "tokenizer_token_windows",
+                "max_tokens": 192,
+                "overlap_tokens": 32,
+                "aggregation": "max_similarity",
             },
-            "k": 3,
-            "top_k": [{"rank": rank} for rank in range(1, 4)],
-            "strict_replay_revision": STRICT_REPLAY_REVISION,
-            "expected_answer": candidate["answer"],
-            "embedding_topk_insufficient": True,
-            "verification_replay_sha256": "c" * 64,
-            "near_dup_sentence_ratio": near_dup_sentence_ratio,
         },
-        KEY,
-        purpose=DENSE_AUDIT_PURPOSE,
-    )
+        "k": 3,
+        "top_k": [{"rank": rank} for rank in range(1, 4)],
+        "strict_replay_revision": STRICT_REPLAY_REVISION,
+        "expected_answer": candidate["answer"],
+        "embedding_topk_insufficient": True,
+        "verification_replay_sha256": "c" * 64,
+        "near_dup_sentence_ratio": near_dup_sentence_ratio,
+    }
+    asset_digest = candidate.get("tokenizer_asset_manifest_sha256")
+    if asset_digest:
+        payload["tokenizer_asset_manifest_sha256"] = asset_digest
+    return attach_attestation(payload, KEY, purpose=DENSE_AUDIT_PURPOSE)
 
 
 def test_release_world_selection_is_deterministic_and_world_atomic() -> None:
@@ -1137,6 +1435,49 @@ def test_release_world_selection_is_deterministic_and_world_atomic() -> None:
     assert len(receipt["split_by_world"]) == 12
     assert list(receipt["split_by_world"].values()).count("train") == 10
     assert list(receipt["split_by_world"].values()).count("eval") == 2
+
+
+def test_legacy_release_profile_does_not_require_a_tokenizer_asset_pin() -> None:
+    template, _ = _candidate()
+    candidates = []
+    audits = []
+    for index in range(14):
+        candidate = {
+            **json.loads(
+                json.dumps(
+                    {
+                        key: value
+                        for key, value in template.items()
+                        if key != "attestation"
+                    }
+                )
+            ),
+            "world_id": f"legacy-exact-world-{index:02d}",
+            "query_id": f"legacy-exact-query-{index:02d}",
+            "length_bucket": "16k",
+            "tokenizer_context_tokens": 16_001,
+            "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+            "tokenizer_revision": ("a7b0d22b993d71000cf2eadfb37222a67cee521e"),
+            "tokenizer_asset_manifest_sha256": "b" * 64,
+        }
+        if index == 0:
+            _mark_candidate_as_real(candidate)
+        candidate = attach_attestation(
+            candidate, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
+        )
+        candidates.append(candidate)
+        audits.append(_selection_audit(candidate))
+
+    selected, receipt = select_release_worlds(
+        candidates,
+        audits,
+        "p3-probe-12-v1",
+        candidate_attestation_key=KEY,
+        audit_attestation_key=KEY,
+    )
+
+    assert len({row["world_id"] for row in selected}) == 12
+    assert receipt["tokenizer_asset_manifest_sha256"] is None
 
 
 def _p4_selection_inputs(
@@ -1202,6 +1543,113 @@ def test_p4_release_world_selection_enforces_exact_domain_quotas() -> None:
     } == receipt["promoted_domain_world_quotas"]
     assert real_world_id in selected_world_domains
     assert receipt["split_by_world"][real_world_id] == "train"
+
+
+def test_domain_selection_balances_an_all_real_surplus_pool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile_id = "p4-multidomain-probe-12-v1"
+    monkeypatch.setitem(
+        RELEASE_PROFILES,
+        profile_id,
+        replace(
+            release_profile(profile_id),
+            min_real_train_worlds=10,
+            min_real_eval_worlds=2,
+            min_real_exact_64k_worlds_by_domain=(
+                ("company", 4),
+                ("researchlab", 4),
+                ("codeforge", 4),
+            ),
+        ),
+    )
+    profile_digest = release_profile_sha256(profile_id)
+    ordered_ids = sorted(
+        (f"surplus-world-{index:02d}" for index in range(18)),
+        key=lambda world_id: hashlib.sha256(
+            f"{profile_digest}|select|{world_id}".encode()
+        ).hexdigest(),
+    )
+    domains = {
+        **{world_id: "company" for world_id in ordered_ids[:5]},
+        **{world_id: "researchlab" for world_id in ordered_ids[5:9]},
+        **{world_id: "codeforge" for world_id in ordered_ids[9:12]},
+        **{world_id: "company" for world_id in ordered_ids[12:13]},
+        **{world_id: "researchlab" for world_id in ordered_ids[13:15]},
+        **{world_id: "codeforge" for world_id in ordered_ids[15:]},
+    }
+    template, _ = _candidate()
+    candidates = []
+    audits = []
+    for index, world_id in enumerate(ordered_ids):
+        candidate = {
+            **json.loads(
+                json.dumps(
+                    {
+                        key: value
+                        for key, value in template.items()
+                        if key != "attestation"
+                    }
+                )
+            ),
+            "world_id": world_id,
+            "query_id": f"surplus-query-{index:02d}",
+            "domain": domains[world_id],
+            "length_bucket": "64k",
+            "tokenizer_context_tokens": 64_000,
+            "tokenizer_model_id": release_profile(profile_id).tokenizer_model_id,
+            "tokenizer_revision": release_profile(profile_id).tokenizer_revision,
+            "tokenizer_asset_manifest_sha256": "d" * 64,
+        }
+        _mark_candidate_as_real(candidate)
+        candidate = attach_attestation(
+            candidate, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
+        )
+        candidates.append(candidate)
+        audits.append(_selection_audit(candidate))
+
+    non_exact_candidates = []
+    non_exact_audits = []
+    for candidate in candidates:
+        non_exact = {
+            key: value
+            for key, value in candidate.items()
+            if key
+            not in {
+                "attestation",
+                "tokenizer_context_tokens",
+                "tokenizer_model_id",
+                "tokenizer_revision",
+            }
+        }
+        non_exact["length_bucket"] = "4k"
+        non_exact = attach_attestation(
+            non_exact, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
+        )
+        non_exact_candidates.append(non_exact)
+        non_exact_audits.append(_selection_audit(non_exact))
+    with pytest.raises(PromotionError, match="real exact-64K domain worlds"):
+        select_release_worlds(
+            non_exact_candidates,
+            non_exact_audits,
+            profile_id,
+            candidate_attestation_key=KEY,
+            audit_attestation_key=KEY,
+        )
+
+    selected, _ = select_release_worlds(
+        candidates,
+        audits,
+        profile_id,
+        candidate_attestation_key=KEY,
+        audit_attestation_key=KEY,
+    )
+
+    assert Counter({row["world_id"]: row["domain"] for row in selected}.values()) == {
+        "company": 4,
+        "researchlab": 4,
+        "codeforge": 4,
+    }
 
 
 def test_p4_release_world_selection_keeps_real_workflows_from_each_domain() -> None:
@@ -1867,6 +2315,68 @@ def test_candidate_motif_must_match_the_replayed_query() -> None:
         create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
 
 
+def test_semantic_base_task_id_ignores_world_and_source_instance_labels() -> None:
+    materialized = materialize(1, n_parallel=0, n_pulses=0, domain="codeforge")
+    spec = materialized.queries[0]
+
+    first = replace(spec, query_id="world-a:query", base_task_group="source:record-a")
+    second = replace(spec, query_id="world-b:query", base_task_group="source:record-b")
+
+    assert stable_semantic_base_task_id(first) == stable_semantic_base_task_id(second)
+
+
+def test_gate_revision_dispatch_is_current_for_p10_and_read_only_for_legacy() -> None:
+    assert release_gate_revision_supported(
+        "p10-source-rich-production-48-v1", RELEASE_GATE_REVISION
+    )
+    assert not release_gate_revision_supported(
+        "p10-source-rich-production-48-v1", LEGACY_RELEASE_GATE_REVISION
+    )
+    assert release_gate_revision_supported(
+        "p3-production-48-v1", LEGACY_RELEASE_GATE_REVISION
+    )
+
+
+def test_p10_selection_rejects_a_legacy_predecessor_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    auditor_key = b"probe-auditor-gate-key-material-at-least-32-bytes"
+    predecessor_id = "p7-source-rich-probe-12-v1"
+    monkeypatch.setenv("LONGWORLD_ATTESTATION_ENVIRONMENT", "probe")
+    monkeypatch.setenv("LONGWORLD_AUDITOR_ATTESTATION_KEY", auditor_key.decode())
+    monkeypatch.setenv("LONGWORLD_AUDITOR_ATTESTATION_KEY_ID", "probe-gate-v1")
+    receipt = attach_attestation(
+        {
+            "schema_version": "longworld-release-gate-pass-v1",
+            "gate_revision": LEGACY_RELEASE_GATE_REVISION,
+            "release_profile_id": predecessor_id,
+            "release_profile_sha256": release_profile_sha256(predecessor_id),
+            "predecessor_profile_id": None,
+            "quality_report_sha256": "a" * 64,
+            "source_file_sha256": {
+                "quality_report.json": "a" * 64,
+                "train.jsonl": "b" * 64,
+                "eval.jsonl": "c" * 64,
+            },
+            "metrics_sha256": "d" * 64,
+            "n_worlds": 12,
+            "n_rows": 12,
+            "ok": True,
+            "errors": [],
+        },
+        auditor_key,
+        purpose=RELEASE_GATE_PURPOSE,
+    )
+
+    with pytest.raises(PromotionError, match="predecessor gate receipt contract"):
+        validate_predecessor_gate_receipt(
+            receipt,
+            "p10-source-rich-production-48-v1",
+            attestation_key=auditor_key,
+            key_id="probe-gate-v1",
+        )
+
+
 @pytest.mark.parametrize(
     ("field", "forged", "message"),
     [
@@ -1876,6 +2386,11 @@ def test_candidate_motif_must_match_the_replayed_query() -> None:
         ("executable_proof_id", "random-proof-id", "executable proof"),
         ("answer_program_id", "random-program-id", "answer program"),
         ("base_task_id", "random-base-task-id", "base task"),
+        (
+            "semantic_base_task_id",
+            "random-semantic-base-task-id",
+            "semantic base task",
+        ),
         ("cf_answer", "forged-counterfactual", "counterfactual answer"),
         ("cf_op", "forged-op", "counterfactual operator"),
         ("proof_graph", {"forged": True}, "proof graph"),
@@ -2009,7 +2524,7 @@ def test_promotion_recomputes_window_artifacts_instead_of_inheriting_subset() ->
     assert promoted["window_artifact_ids"][0] == artifacts[0].artifact_id
 
 
-def test_promotion_recomputes_fake_top_level_real_source_summaries() -> None:
+def test_dense_audit_rejects_fake_top_level_real_source_summaries() -> None:
     candidate, artifacts = _candidate()
     candidate["source_origins"] = ["real_public"]
     candidate["workflow_kinds"] = ["hybrid_causal"]
@@ -2023,15 +2538,8 @@ def test_promotion_recomputes_fake_top_level_real_source_summaries() -> None:
         candidate, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
     )
 
-    audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
-    promoted = promote_candidate(candidate, audit, KEY)
-
-    assert promoted["real_source_verified"] is False
-    assert promoted["real_source_family_ids"] == []
-    assert promoted["source_relation_id"] == ""
-    assert promoted["source_relation_edges"] == []
-    assert promoted["source_origins"] == ["synthetic_world"]
-    assert promoted["workflow_kinds"] == ["synthetic_executable"]
+    with pytest.raises(PromotionError, match="real source verification"):
+        create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
 
 
 def test_real_candidate_replays_from_exact_hash_bound_episode_sidecar(

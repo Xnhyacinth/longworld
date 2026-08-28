@@ -4,6 +4,7 @@ import hashlib
 import json
 import random
 import sys
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
@@ -29,7 +30,11 @@ from longworld.core.pack import (
 from longworld.core.promotion import STRICT_REPLAY_REVISION, promoted_row_set_sha256
 from longworld.core.provenance import ProvenanceError
 from longworld.core.record_contract import replay_bundle_binding_valid, sft_row_errors
-from longworld.core.release_profile import release_profile_sha256
+from longworld.core.release_profile import (
+    RELEASE_PROFILES,
+    release_profile,
+    release_profile_sha256,
+)
 from longworld.core.render import Artifact
 from longworld.core.taxonomy import (
     EvidenceRole,
@@ -102,6 +107,53 @@ def test_replay_bundle_binding_requires_exact_top_level_promotion_match() -> Non
 
     row["promotion"]["source_workflow_bundle"]["binding_digest"] = "c" * 64
     assert not replay_bundle_binding_valid(row)
+
+
+def test_quality_real_source_accounting_is_relation_independent() -> None:
+    row = {
+        "world_id": "wiki-static-world",
+        "domain": "researchlab",
+        "motif": "wiki_claim_reconstruction",
+        "base_task_id": "wiki-static-base",
+        "context": "verified public source body",
+        "question": "q",
+        "answer": "a",
+        "split": "train",
+        "data_stage": "train_ready",
+        "real_source_verified": True,
+        "real_source_family_ids": ["wikipedia.org/wiki/Thomas_Jefferson"],
+        "real_source_workflow_ids": ["wiki-static-workflow"],
+        "source_relation_edges": [],
+        "authentic_source_relation_edges": [],
+        "episode_replay_bundle": {
+            "schema_version": "longworld.episode-replay-bundle.v1",
+            "sha256": "a" * 64,
+            "composition": "chronological_causal_union",
+        },
+        "promotion": {
+            "real_source_verified": True,
+            "episode_replay_bundle": {
+                "schema_version": "longworld.episode-replay-bundle.v1",
+                "sha256": "a" * 64,
+                "composition": "chronological_causal_union",
+            },
+        },
+    }
+
+    result = evaluate_quality(
+        {"retention": 0.5, "n_worlds": 1},
+        [row],
+        min_retention=0.0,
+        max_retention=1.0,
+        max_boilerplate=1.0,
+        max_pulse=1.0,
+        min_internal_growth=0,
+        max_generic_growth_share=1.0,
+    )
+
+    assert result["n_real_source_families"] == 1
+    assert result["n_unique_real_source_workflows"] == 1
+    assert result["n_real_source_relations"] == 0
 
 
 from quality_gate import evaluate_quality
@@ -809,6 +861,7 @@ def test_b5w_uses_weight_without_duplicate_rows(tmp_path: Path) -> None:
         "query_type": "revisitation",
         "query_timing": "late",
         "length_bucket": "32k",
+        "tokenizer_asset_manifest_sha256": "d" * 64,
         "context": "records",
         "answer": "RV-1001",
         "dependency_class": "deep_dependency",
@@ -851,6 +904,7 @@ def test_b5w_uses_weight_without_duplicate_rows(tmp_path: Path) -> None:
             "dense_top_k": 3,
             "strict_replay_revision": STRICT_REPLAY_REVISION,
             "strict_replay_answer": "RV-1001",
+            "tokenizer_asset_manifest_sha256": "d" * 64,
         },
         "artifact_classification": [
             {
@@ -961,6 +1015,7 @@ def test_sharegpt_export_keeps_full_cf_dossier_twins_atomic_under_cap(
         "query_type": "revisitation",
         "query_timing": "first",
         "length_bucket": "64k",
+        "tokenizer_asset_manifest_sha256": "d" * 64,
         "context": "factual records",
         "answer": "RV-1001",
         "dependency_class": "deep_dependency",
@@ -1004,6 +1059,7 @@ def test_sharegpt_export_keeps_full_cf_dossier_twins_atomic_under_cap(
             "dense_top_k": 3,
             "strict_replay_revision": STRICT_REPLAY_REVISION,
             "strict_replay_answer": "RV-1001",
+            "tokenizer_asset_manifest_sha256": "d" * 64,
         },
         "artifact_classification": [
             {
@@ -2302,6 +2358,112 @@ def test_quality_gate_reports_observed_domain_and_motif_distributions() -> None:
     assert result["by_motif"] == {"version_selection": 1, "chain": 1}
 
 
+def test_release_profile_gates_answer_program_and_executable_proof_diversity(
+    monkeypatch,
+) -> None:
+    profile_id = "p7-source-rich-probe-12-v1"
+    monkeypatch.setitem(
+        RELEASE_PROFILES,
+        profile_id,
+        replace(
+            release_profile(profile_id),
+            expected_promoted_worlds=2,
+            min_train_worlds=2,
+            min_eval_worlds=0,
+            min_real_train_worlds=0,
+            min_real_eval_worlds=0,
+            min_domains=1,
+            promoted_domain_world_quotas=(),
+            min_exact_64k_rows_by_domain=(),
+            min_motifs=1,
+            min_source_families=0,
+            min_real_base_tasks=0,
+            min_real_source_relations=0,
+            min_real_64k_rows=0,
+            min_unique_real_source_workflows=0,
+            min_real_exact_64k_rows_by_domain=(),
+            min_real_exact_64k_worlds_by_domain=(),
+            min_unique_executable_proofs=2,
+            min_unique_answer_programs=2,
+            min_unique_semantic_base_tasks=2,
+        ),
+    )
+    rows = [
+        {
+            "world_id": f"world-{index}",
+            "domain": "researchlab",
+            "motif": "same-motif",
+            "context": f"context-{index}",
+            "question": f"question-{index}",
+            "answer": "answer",
+            "split": "train",
+            "executable_proof_id": f"proof-{index}",
+            "answer_program_id": "copied-program",
+            "semantic_base_task_id": "copied-semantic-task",
+        }
+        for index in range(2)
+    ]
+
+    result = evaluate_quality(
+        {
+            "release_profile_id": profile_id,
+            "release_profile_sha256": release_profile_sha256(profile_id),
+            "retention": 1.0,
+            "n_worlds": 2,
+            "target_promoted_worlds": 2,
+        },
+        rows,
+        min_retention=0.0,
+        max_retention=1.0,
+        max_boilerplate=1.0,
+        max_pulse=1.0,
+        min_internal_growth=0,
+        max_generic_growth_share=1.0,
+        release_profile_id=profile_id,
+    )
+
+    assert "release_unique_executable_proofs=2<2" not in result["errors"]
+    assert "release_unique_answer_programs=1<2" in result["errors"]
+    assert "release_unique_semantic_base_tasks=1<2" in result["errors"]
+
+
+def test_quality_gate_rejects_superseded_production_profile_issuance() -> None:
+    profile_id = "p3-production-48-v1"
+
+    result = evaluate_quality(
+        {
+            "release_profile_id": profile_id,
+            "release_profile_sha256": release_profile_sha256(profile_id),
+            "retention": 1.0,
+            "n_worlds": 0,
+            "target_promoted_worlds": 48,
+        },
+        [],
+        min_retention=0.0,
+        max_retention=1.0,
+        max_boilerplate=1.0,
+        max_pulse=1.0,
+        min_internal_growth=0,
+        max_generic_growth_share=1.0,
+        release_profile_id=profile_id,
+    )
+
+    assert f"superseded_production_release_profile:{profile_id}" in result["errors"]
+
+
+def test_current_source_rich_profiles_require_relation_provenance_split() -> None:
+    p7 = release_profile("p7-wiki-source-slice-1-v1")
+    p10 = release_profile("p10-source-rich-production-48-v1")
+    legacy = release_profile("p3-probe-12-v1")
+
+    assert quality_gate._requires_relation_provenance_split(p7)
+    assert quality_gate._requires_relation_provenance_split(p10)
+    assert not quality_gate._requires_relation_provenance_split(legacy)
+    assert quality_gate._requires_substantial_real_proof_growth(p7)
+    assert quality_gate._requires_substantial_real_proof_growth(p10)
+    assert not quality_gate._requires_substantial_real_proof_growth(legacy)
+
+
 def test_quality_gate_rejects_a_tampered_target_report_without_skipping_scale_gates() -> (
     None
 ):
@@ -2574,6 +2736,11 @@ def test_release_metadata_recounts_every_strict_long_band(monkeypatch) -> None:
         "_tokenizer_context_tokens",
         lambda context, _model, _revision: expected[context],
     )
+    monkeypatch.setattr(
+        quality_gate,
+        "resolved_tokenizer_asset_manifest_sha256",
+        lambda _model, _revision: "b" * 64,
+    )
 
     for band, tokens in expected.items():
         row = {
@@ -2582,18 +2749,49 @@ def test_release_metadata_recounts_every_strict_long_band(monkeypatch) -> None:
             "tokenizer_context_tokens": tokens,
             "tokenizer_model_id": "Qwen/Qwen3.5-4B",
             "tokenizer_revision": "a" * 40,
+            "tokenizer_asset_manifest_sha256": "b" * 64,
         }
         assert quality_gate._has_exact_band_metadata(
             row,
             expected_model_id="Qwen/Qwen3.5-4B",
             expected_revision="a" * 40,
+            expected_asset_manifest_sha256="b" * 64,
         )
         row["tokenizer_context_tokens"] += 1
         assert not quality_gate._has_exact_band_metadata(
             row,
             expected_model_id="Qwen/Qwen3.5-4B",
             expected_revision="a" * 40,
+            expected_asset_manifest_sha256="b" * 64,
         )
+
+
+def test_release_metadata_rejects_changed_tokenizer_assets(monkeypatch) -> None:
+    monkeypatch.setattr(
+        quality_gate,
+        "_tokenizer_context_tokens",
+        lambda _context, _model, _revision: 16_100,
+    )
+    monkeypatch.setattr(
+        quality_gate,
+        "resolved_tokenizer_asset_manifest_sha256",
+        lambda _model, _revision: "c" * 64,
+    )
+    row = {
+        "length_bucket": "16k",
+        "context": "16k",
+        "tokenizer_context_tokens": 16_100,
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "a" * 40,
+        "tokenizer_asset_manifest_sha256": "b" * 64,
+    }
+
+    assert not quality_gate._has_exact_band_metadata(
+        row,
+        expected_model_id="Qwen/Qwen3.5-4B",
+        expected_revision="a" * 40,
+        expected_asset_manifest_sha256="b" * 64,
+    )
 
 
 def test_strict_exact_band_gate_rejects_missing_or_mislabeled_metadata(

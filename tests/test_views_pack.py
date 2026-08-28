@@ -279,6 +279,42 @@ def test_late_query_distance_excludes_question_and_answer_instruction_tokens() -
     assert distances[0] == distances[1]
 
 
+def test_exact_bounds_only_recount_essential_artifact_boundaries() -> None:
+    from datetime import date
+
+    from longworld.core.pack import compute_view_metrics, join_artifacts
+    from longworld.core.render import Artifact
+
+    artifacts = [
+        Artifact(
+            f"w.doc-{index}",
+            "record",
+            date(2026, 1, index + 1),
+            "p",
+            "focal",
+            [f"e{index}"],
+            f"document {index} " * 100,
+            [],
+        )
+        for index in range(8)
+    ]
+    calls: list[int] = []
+
+    def token_counter(text: str) -> int:
+        calls.append(len(text))
+        return len(text)
+
+    compute_view_metrics(
+        artifacts,
+        {"w.doc-3"},
+        query_timing="late",
+        context=join_artifacts(artifacts),
+        token_counter=token_counter,
+    )
+
+    assert len(calls) <= 4
+
+
 def test_pack_compacts_oversized_real_corridor_in_source_order():
     from datetime import date
 

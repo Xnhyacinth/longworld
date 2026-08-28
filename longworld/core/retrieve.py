@@ -389,6 +389,360 @@ def contiguous_windows_insufficient(
     return all_insufficient, notes
 
 
+def _wiki_raw_token_fact_windows_insufficient(
+    world: SimulatedWorld,
+    spec: QuerySpec,
+    artifacts: list[Artifact],
+    tokenizer: Any,
+    window_sizes: tuple[int, ...],
+    *,
+    expected_answer: str | None,
+    extra_overrides: dict[str, dict[str, Any]] | None,
+) -> tuple[bool, dict[str, Any]]:
+    event_index = {event.id: event for event in world.events}
+    sufficient_ids = set(spec.sufficient_event_ids)
+    compute_ids = {
+        event_id
+        for event_id in sufficient_ids
+        if event_id in event_index and event_index[event_id].type == "wiki_claim_answer"
+    }
+    target_compute = next(
+        (
+            event_index[event_id]
+            for event_id in compute_ids
+            if event_index[event_id].params.get("answer_key") == spec.answer_key
+        ),
+        None,
+    )
+    if target_compute is None or not any(
+        str(event_index[event_id].params.get("compose") or "compute") != "copy"
+        for event_id in compute_ids
+    ):
+        return False, {"applicable": True, "error": "missing_answer_event"}
+    source_event_ids = {
+        event_id
+        for event_id in sufficient_ids
+        if event_id in event_index
+        and event_index[event_id].type == "wiki_source_section"
+    }
+    if not source_event_ids or any(
+        event_index[event_id].params.get("source_origin") != "real_derived"
+        or event_index[event_id].params.get("source_binding_provenance")
+        != "verified_derived"
+        for event_id in source_event_ids
+    ):
+        return False, {"applicable": True, "error": "missing_real_source_events"}
+
+    required_relation_ids = {
+        str(relation_id)
+        for event_id in compute_ids
+        for relation_id in event_index[event_id].params.get("required_relation_ids")
+        or []
+        if relation_id
+    }
+    relation_event_ids = {
+        event_id
+        for event_id in sufficient_ids
+        if event_id in event_index
+        and event_index[event_id].type == "wiki_source_relation"
+        and str(event_index[event_id].params.get("relation_id") or "")
+        in required_relation_ids
+    }
+    relation_ids_by_event = {
+        str(event_index[event_id].params.get("relation_id") or "")
+        for event_id in relation_event_ids
+    }
+    preferred_bands = list(spec.preferred_length_buckets or [])
+    if len(preferred_bands) != 1 or preferred_bands[0] not in {
+        "16k",
+        "32k",
+        "64k",
+    }:
+        return False, {"applicable": True, "error": "invalid_query_band"}
+    query_band = preferred_bands[0]
+    if (
+        relation_ids_by_event != required_relation_ids
+        or (query_band in {"32k", "64k"} and not relation_event_ids)
+        or any(
+            event_index[event_id].params.get("relation_provenance")
+            != "authentic_source_api"
+            or event_index[event_id].params.get("source_binding_provenance")
+            != "authentic_source_api"
+            or not set(event_index[event_id].required_inputs).issubset(source_event_ids)
+            for event_id in relation_event_ids
+        )
+    ):
+        return False, {
+            "applicable": True,
+            "error": "missing_authentic_relation_events",
+        }
+
+    document_context = join_artifacts(artifacts)
+    try:
+        with sanitized_attestation_environment():
+            encoded = tokenizer(
+                document_context,
+                add_special_tokens=False,
+                return_offsets_mapping=True,
+            )
+        token_ids = list(encoded["input_ids"])
+        offsets = [tuple(item) for item in encoded["offset_mapping"]]
+    except (KeyError, TypeError, ValueError, NotImplementedError) as error:
+        return False, {
+            "applicable": True,
+            "error": "tokenizer_has_no_exact_offset_mapping",
+            "detail": str(error),
+        }
+    if (
+        len(token_ids) != len(offsets)
+        or any(
+            not isinstance(start, int)
+            or not isinstance(end, int)
+            or isinstance(start, bool)
+            or isinstance(end, bool)
+            or start < 0
+            or end <= start
+            or end > len(document_context)
+            for start, end in offsets
+        )
+        or any(
+            left_start > right_start or left_end > right_end
+            for (left_start, left_end), (right_start, right_end) in pairwise(offsets)
+        )
+    ):
+        return False, {"applicable": True, "error": "invalid_token_offsets"}
+    token_starts = [start for start, _end in offsets]
+    token_ends = [end for _start, end in offsets]
+
+    def token_bounds(char_start: int, char_end: int) -> tuple[int, int] | None:
+        start = bisect.bisect_right(token_ends, char_start)
+        end = bisect.bisect_left(token_starts, char_end)
+        return (start, end) if start < end else None
+
+    relevant_ids = source_event_ids | relation_event_ids
+    event_claims: Counter[str] = Counter()
+    source_params: dict[str, dict[str, Any]] = {}
+    span_bounds: dict[tuple[str, int], tuple[int, int]] = {}
+    span_roles: dict[tuple[str, int], str] = {}
+    cursor = 0
+    artifact_prefix = f"{world.spec.get('world_id', '')}."
+    for index, artifact in enumerate(artifacts):
+        if index:
+            cursor += len(SEP)
+        artifact_start = cursor
+        cursor += len(artifact.text)
+        event_ids = list(artifact.reveals_events)
+        relevant = [event_id for event_id in event_ids if event_id in relevant_ids]
+        if not relevant:
+            continue
+        if len(event_ids) != 1 or len(relevant) != 1:
+            return False, {
+                "applicable": True,
+                "error": "ambiguous_source_event_artifact",
+            }
+        event_id = relevant[0]
+        event = event_index[event_id]
+        if not artifact.artifact_id.startswith(artifact_prefix):
+            return False, {
+                "applicable": True,
+                "error": "foreign_source_event_artifact",
+            }
+        slots = artifact.slots or {}
+        params = slots.get("params")
+        expected = {**event.params, **(extra_overrides or {}).get(event_id, {})}
+        if slots.get("event_type") != event.type or params != expected:
+            return False, {
+                "applicable": True,
+                "error": "invalid_source_event_artifact",
+                "artifact_id": artifact.artifact_id,
+            }
+        event_claims[event_id] += 1
+        if event.type == "wiki_source_relation":
+            continue
+        declared_text = str(expected.get("text") or "")
+        fact_spans = expected.get("fact_spans")
+        if (
+            not declared_text
+            or not isinstance(fact_spans, list)
+            or not fact_spans
+            or artifact.text.count(declared_text) != 1
+            or hashlib.sha256(declared_text.encode()).hexdigest()
+            != expected.get("text_sha256")
+        ):
+            return False, {
+                "applicable": True,
+                "error": "invalid_source_event_artifact",
+                "artifact_id": artifact.artifact_id,
+            }
+        source_params[event_id] = expected
+        declared_start = artifact.text.index(declared_text)
+        for span_index, span in enumerate(fact_spans):
+            if not isinstance(span, dict):
+                return False, {
+                    "applicable": True,
+                    "error": "invalid_source_fact_spans",
+                    "artifact_id": artifact.artifact_id,
+                }
+            start = span.get("char_start")
+            end = span.get("char_end")
+            quote = str(span.get("evidence_quote") or "")
+            role = str(span.get("role") or "")
+            if (
+                span.get("kind") != "wiki_claim"
+                or not role
+                or isinstance(start, bool)
+                or isinstance(end, bool)
+                or not isinstance(start, int)
+                or not isinstance(end, int)
+                or start < 0
+                or end <= start
+                or end > len(declared_text)
+                or not quote
+                or declared_text[start:end] != quote
+            ):
+                return False, {
+                    "applicable": True,
+                    "error": "invalid_source_fact_spans",
+                    "artifact_id": artifact.artifact_id,
+                }
+            mapped = token_bounds(
+                artifact_start + declared_start + start,
+                artifact_start + declared_start + end,
+            )
+            if mapped is None:
+                return False, {
+                    "applicable": True,
+                    "error": "unmapped_source_fact_span",
+                    "artifact_id": artifact.artifact_id,
+                }
+            key = (event_id, span_index)
+            span_bounds[key] = mapped
+            span_roles[key] = role
+
+    if any(event_claims[event_id] != 1 for event_id in source_event_ids):
+        return False, {"applicable": True, "error": "missing_real_source_events"}
+    if any(event_claims[event_id] != 1 for event_id in relation_event_ids):
+        return False, {
+            "applicable": True,
+            "error": "missing_authentic_relation_events",
+        }
+    if set(source_params) != source_event_ids or not span_bounds:
+        return False, {"applicable": True, "error": "missing_answer_fact_spans"}
+
+    target = expected_answer if expected_answer is not None else spec.answer
+    structural_ids = compute_ids | relation_event_ids
+    replay_cache: dict[frozenset[tuple[str, int]], str] = {}
+
+    def replay(visible: frozenset[tuple[str, int]]) -> str:
+        cached = replay_cache.get(visible)
+        if cached is not None:
+            return cached
+        overrides = {
+            event_id: dict(values)
+            for event_id, values in (extra_overrides or {}).items()
+        }
+        for event_id, params in source_params.items():
+            overrides[event_id] = {
+                **overrides.get(event_id, {}),
+                **params,
+                "fact_spans": [
+                    span
+                    for span_index, span in enumerate(params["fact_spans"])
+                    if (event_id, span_index) in visible
+                ],
+            }
+        answer = answer_from_events(
+            world,
+            spec,
+            source_event_ids | structural_ids,
+            extra_overrides=overrides,
+            enforce_preconditions=True,
+        )
+        replay_cache[visible] = answer
+        return answer
+
+    full_visible = frozenset(span_bounds)
+    full_answer = replay(full_visible)
+    if full_answer != target:
+        return False, {
+            "applicable": True,
+            "error": "full_source_span_replay_failed",
+            "source_only_replay_answer": full_answer,
+            "expected_answer": target,
+        }
+
+    band_tokens = {"16k": 16_000, "32k": 32_000, "64k": 64_000}[query_band]
+    total_tokens = len(token_ids)
+    windows: dict[str, dict[str, Any]] = {}
+    all_insufficient = True
+    for size in window_sizes:
+        required_insufficient = size < band_tokens
+        applicable = total_tokens > size
+        reason = "context_not_larger_than_window" if not applicable else ""
+        hit_answer: str | None = None
+        hit_start: int | None = None
+        hit_visible: frozenset[tuple[str, int]] = frozenset()
+        max_start = max(0, total_tokens - size)
+        starts = {0, max_start}
+        for start, end in span_bounds.values():
+            starts.add(min(max_start, max(0, end - size)))
+            starts.add(min(max_start, max(0, start + 1)))
+        checked_masks: set[frozenset[tuple[str, int]]] = set()
+        for start in sorted(starts):
+            if not applicable:
+                break
+            end = start + size
+            visible = frozenset(
+                key
+                for key, (fact_start, fact_end) in span_bounds.items()
+                if start <= fact_start and fact_end <= end
+            )
+            if visible in checked_masks:
+                continue
+            checked_masks.add(visible)
+            answer = replay(visible)
+            if answer == target:
+                hit_answer = answer
+                hit_start = start
+                hit_visible = visible
+                break
+        if hit_answer is not None and required_insufficient:
+            all_insufficient = False
+        windows[str(size)] = {
+            "applicable": applicable,
+            "required_insufficient": required_insufficient,
+            "reason": reason or None,
+            "checked_span_masks": len(checked_masks),
+            "answer": hit_answer,
+            "witness_start": hit_start,
+            "witness_end": hit_start + size if hit_start is not None else None,
+            "visible_roles": sorted(
+                span_roles[key] for key in hit_visible if key in span_roles
+            ),
+        }
+    evidence_span = max(end for _start, end in span_bounds.values()) - min(
+        start for start, _end in span_bounds.values()
+    )
+    return all_insufficient, {
+        "applicable": True,
+        "proof_mode": "pinned_tokenizer_wiki_fact_replay",
+        "tokenizer_model_id": str(getattr(tokenizer, "name_or_path", "") or ""),
+        "tokenizer_revision": str(
+            getattr(tokenizer, "init_kwargs", {}).get("_commit_hash") or ""
+        ),
+        "query_band": query_band,
+        "total_tokens": total_tokens,
+        "tokenizer_evidence_span_tokens": evidence_span,
+        "source_only_replay_answer": full_answer,
+        "span_count": len(span_bounds),
+        "source_event_ids": sorted(source_event_ids),
+        "compute_event_ids": sorted(compute_ids),
+        "authentic_relation_event_ids": sorted(relation_event_ids),
+        "replayed_span_masks": len(replay_cache),
+        "windows": windows,
+    }
+
+
 def raw_token_fact_windows_insufficient(
     world: SimulatedWorld,
     spec: QuerySpec,
@@ -399,7 +753,17 @@ def raw_token_fact_windows_insufficient(
     expected_answer: str | None = None,
     extra_overrides: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[bool, dict[str, Any]]:
-    """Replay every distinct exact-token SEC source-span window."""
+    """Replay every distinct exact-token source-fact window."""
+    if spec.query_type == "wiki_claim_reconstruction":
+        return _wiki_raw_token_fact_windows_insufficient(
+            world,
+            spec,
+            artifacts,
+            tokenizer,
+            window_sizes,
+            expected_answer=expected_answer,
+            extra_overrides=extra_overrides,
+        )
     if spec.query_type != "sec_financial_reconstruction":
         return True, {"applicable": False, "proof_mode": "not_sec_financial"}
     event_index = {event.id: event for event in world.events}
@@ -474,8 +838,8 @@ def raw_token_fact_windows_insufficient(
             for start, end in offsets
         )
         or any(
-            left_start > right_start or left_end > right_start
-            for (left_start, left_end), (right_start, _right_end) in pairwise(offsets)
+            left_start > right_start or left_end > right_end
+            for (left_start, left_end), (right_start, right_end) in pairwise(offsets)
         )
     ):
         return False, {"applicable": True, "error": "invalid_token_offsets"}

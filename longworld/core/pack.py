@@ -92,15 +92,18 @@ def _artifact_token_bounds(
 ) -> tuple[list[tuple[int, int]], int]:
     if token_counter is not None:
         exact_bounds: list[tuple[int, int]] = []
-        context = token_prefix
+        context_parts = [token_prefix] if token_prefix else []
         for index, artifact in enumerate(ordered):
             if index:
-                context += SEP
-            start = token_counter(context)
-            context += artifact.text
-            end = token_counter(context)
+                context_parts.append(SEP)
             if artifact.artifact_id in essential_ids:
+                start = token_counter("".join(context_parts))
+                context_parts.append(artifact.text)
+                end = token_counter("".join(context_parts))
                 exact_bounds.append((start, end))
+            else:
+                context_parts.append(artifact.text)
+        context = "".join(context_parts)
         return exact_bounds, token_counter(context) if context else 0
     bounds: list[tuple[int, int]] = []
     cursor_chars = len(token_prefix)

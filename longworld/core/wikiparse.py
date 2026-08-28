@@ -122,7 +122,8 @@ def extract_wikipedia_wikitext(record_text: str) -> tuple[str, str, str]:
     main = slots.get("main") if isinstance(slots, dict) else None
     wikitext = main.get("content") if isinstance(main, dict) else None
     title = str(page.get("title") or "").strip()
-    props = page.get("pageprops") if isinstance(page.get("pageprops"), dict) else {}
+    raw_props = page.get("pageprops")
+    props = raw_props if isinstance(raw_props, dict) else {}
     entity_id = str(props.get("wikibase_item") or "").strip()
     revision_id = str(revision.get("revid") or "").strip()
     if (
@@ -387,6 +388,8 @@ def _staged_sections(
     entity_id: str,
     entity_hash: str,
     rest: str = "",
+    early_quote: str = "",
+    early_segments: tuple[tuple[str, str, str, str], ...] = (),
 ) -> tuple[WikiSection, ...]:
     if not (early and middle and late):
         raise ProvenanceError("Wikipedia claim sections overlap or are empty")
@@ -394,48 +397,95 @@ def _staged_sections(
         raise ProvenanceError("Wikipedia later-tier claims leaked into the 16K section")
     if late_quote in middle:
         raise ProvenanceError("Wikipedia 64K claim leaked into the 32K section")
-    sections = [
-        _section(
-            section_id="early_work",
-            heading=early_heading,
-            wikitext=early,
-            parent_sha256=wiki_hash,
-            facts=(_birth_fact(early, wikitext, wiki_hash),),
-            ground_value=early_ground,
-        ),
-        _section(
-            section_id="commemoration",
-            heading=middle_heading,
-            wikitext=middle,
-            parent_sha256=wiki_hash,
-            facts=(
-                _literal_fact(
-                    middle,
+    sections: list[WikiSection] = []
+    if early_segments:
+        starts = [0]
+        for _section_id, marker, _role, _quote in early_segments[1:]:
+            starts.append(_unique_quote(early, marker, label="early segment")[0])
+        if starts != sorted(starts) or len(starts) != len(early_segments):
+            raise ProvenanceError("Wikipedia early segments are not chronological")
+        for index, (section_id, marker, role, quote) in enumerate(early_segments):
+            end = starts[index + 1] if index + 1 < len(starts) else None
+            segment = early[starts[index] : end]
+            fact = (
+                _birth_fact(segment, wikitext, wiki_hash)
+                if role == "born"
+                else _literal_fact(
+                    segment,
                     wikitext,
-                    role="commemoration",
-                    quote=middle_quote,
+                    role=role,
+                    quote=quote,
                     parent_sha256=wiki_hash,
-                ),
-            ),
-            ground_value=middle_ground,
-        ),
-        _section(
-            section_id="popular_culture",
-            heading=late_heading,
-            wikitext=late,
-            parent_sha256=wiki_hash,
-            facts=(
+                )
+            )
+            sections.append(
+                _section(
+                    section_id=section_id,
+                    heading=section_id.replace("_", " "),
+                    wikitext=segment,
+                    parent_sha256=wiki_hash,
+                    facts=(fact,),
+                    ground_value=early_ground if index == 0 else marker,
+                )
+            )
+    else:
+        early_facts = [_birth_fact(early, wikitext, wiki_hash)]
+        if early_quote:
+            early_facts.append(
                 _literal_fact(
-                    late,
+                    early,
                     wikitext,
-                    role="popular_culture",
-                    quote=late_quote,
+                    role="early_transition",
+                    quote=early_quote,
                     parent_sha256=wiki_hash,
+                )
+            )
+        sections.append(
+            _section(
+                section_id="early_work",
+                heading=early_heading,
+                wikitext=early,
+                parent_sha256=wiki_hash,
+                facts=tuple(early_facts),
+                ground_value=early_ground,
+            )
+        )
+    sections.extend(
+        [
+            _section(
+                section_id="commemoration",
+                heading=middle_heading,
+                wikitext=middle,
+                parent_sha256=wiki_hash,
+                facts=(
+                    _literal_fact(
+                        middle,
+                        wikitext,
+                        role="commemoration",
+                        quote=middle_quote,
+                        parent_sha256=wiki_hash,
+                    ),
                 ),
+                ground_value=middle_ground,
             ),
-            ground_value=late_ground,
-        ),
-    ]
+            _section(
+                section_id="popular_culture",
+                heading=late_heading,
+                wikitext=late,
+                parent_sha256=wiki_hash,
+                facts=(
+                    _literal_fact(
+                        late,
+                        wikitext,
+                        role="popular_culture",
+                        quote=late_quote,
+                        parent_sha256=wiki_hash,
+                    ),
+                ),
+                ground_value=late_ground,
+            ),
+        ]
+    )
     if rest:
         sections.append(
             _section(
@@ -465,6 +515,8 @@ class _WikiTitleCuts:
     late_quote: str
     tail: str | None = None
     rest_end: str | None = None
+    early_quote: str = ""
+    early_segments: tuple[tuple[str, str, str, str], ...] = ()
 
 
 _WIKI_TITLE_PROGRAMS = {
@@ -589,18 +641,34 @@ _WIKI_TITLE_PROGRAMS = {
         rest_end="==== ''The Measure of a Man'' ====",
     ),
     "Thomas Jefferson": _WikiTitleCuts(
-        middle="[[Sublime Porte]]",
-        late="===Cabinet===",
-        early_heading="lead through Minister to France",
+        middle="==Secretary of State==",
+        late="===Autobiography===",
+        early_heading="lead through diplomatic mission in France",
         early_ground="==Early life and education==",
-        middle_heading="France remainder through second term",
+        middle_heading="Secretary of State through reconciliation with Adams",
         middle_ground="==Secretary of State==",
         middle_quote=WIKI_JEFFERSON_MID_QUOTE,
-        late_heading="Cabinet through Legacy",
-        late_ground="===Cabinet===",
+        late_heading="Autobiography through Legacy",
+        late_ground="===Autobiography===",
         late_quote=WIKI_JEFFERSON_LATE_QUOTE,
         tail="==Legacy==",
         rest_end="===Thomas Jefferson Foundation sources===",
+        early_segments=(
+            ("early_birth", "", "born", ""),
+            ("early_career", "==Career==", "early_career", "[[House of Burgesses]]"),
+            (
+                "early_revolution",
+                "==Revolutionary War==",
+                "revolutionary_committee",
+                "[[Committee of Five]]",
+            ),
+            (
+                "early_diplomacy",
+                "==Member of Congress==",
+                "early_transition",
+                "[[Mather Brown]]",
+            ),
+        ),
     ),
 }
 
@@ -668,6 +736,8 @@ def parse_wiki_claim_program(
         entity_id=entity_id,
         entity_hash=entity_hash,
         rest=rest,
+        early_quote=cuts.early_quote,
+        early_segments=cuts.early_segments,
     )
     payload = json.loads(wikipedia_text)
     revision_id = str(payload["query"]["pages"][0]["revisions"][0]["revid"])

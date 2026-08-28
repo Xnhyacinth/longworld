@@ -16,6 +16,7 @@ from longworld.core.attestation import attach_attestation, verify_attestation
 from longworld.core.production_trust import (
     verify_embedded_production_approval_from_env,
 )
+from longworld.core.promotion import RELEASE_GATE_REVISION
 from longworld.core.release_profile import release_profile, release_profile_sha256
 
 UNSEEN_AXES = (
@@ -28,7 +29,6 @@ UNSEEN_SPLIT_SCHEMA = "longworld-unseen-splits-v2"
 UNSEEN_SPLIT_ATTESTATION_PURPOSE = "training_export_manifest"
 UNSEEN_TRUST_MODES = ("local_engineering", "production")
 _RELEASE_GATE_SCHEMA = "longworld-release-gate-pass-v1"
-_RELEASE_GATE_REVISION = "longworld-quality-gate-v5"
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
@@ -146,7 +146,7 @@ def _validated_release_binding(
     release_sources = release_manifest.get("source_file_sha256")
     if (
         release_manifest.get("schema_version") != _RELEASE_GATE_SCHEMA
-        or release_manifest.get("gate_revision") != _RELEASE_GATE_REVISION
+        or release_manifest.get("gate_revision") != RELEASE_GATE_REVISION
         or release_manifest.get("ok") is not True
         or release_manifest.get("errors") != []
         or release_manifest.get("n_rows") != n_rows

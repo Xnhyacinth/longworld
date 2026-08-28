@@ -21,10 +21,14 @@ from longworld.core.production_trust import (
 )
 from longworld.core.promotion import (
     RELEASE_GATE_PURPOSE,
-    RELEASE_GATE_REVISION,
     RELEASE_GATE_SCHEMA,
+    release_gate_revision_supported,
 )
-from longworld.core.release_profile import release_profile, release_profile_sha256
+from longworld.core.release_profile import (
+    issuable_release_profile,
+    release_profile,
+    release_profile_sha256,
+)
 from longworld.core.training_manifest import (
     file_sha256,
     resolve_training_manifest_path,
@@ -34,6 +38,7 @@ from longworld.core.training_manifest import (
 
 RELEASE_INVENTORY_SCHEMA = "longworld-private-dataset-release-v1"
 RELEASE_INVENTORY_NAME = "release_inventory.json"
+PRODUCTION_PACKAGE_READY_PROFILE_IDS: frozenset[str] = frozenset()
 COMMITTED_NAME = "COMMITTED"
 RELEASE_INVENTORY_PURPOSE = "release_inventory"
 RELEASE_TRUST_MODES = ("local_engineering", "production")
@@ -123,7 +128,9 @@ def _load_gate_receipt(
             receipt, attestation_key, purpose=RELEASE_GATE_PURPOSE
         )
         or receipt.get("schema_version") != RELEASE_GATE_SCHEMA
-        or receipt.get("gate_revision") != RELEASE_GATE_REVISION
+        or not release_gate_revision_supported(
+            release_profile_id, receipt.get("gate_revision")
+        )
         or receipt.get("release_profile_id") != release_profile_id
         or receipt.get("release_profile_sha256")
         != release_profile_sha256(release_profile_id)
@@ -365,7 +372,7 @@ def create_release_inventory(
         raise ValueError(f"unsupported release trust mode: {trust_mode}")
     if (
         trust_mode == "production"
-        and release_profile(release_profile_id).environment != "production"
+        and issuable_release_profile(release_profile_id).environment != "production"
     ):
         raise ValueError("production inventory requires a production release profile")
     root = release_root.absolute()
@@ -378,6 +385,14 @@ def create_release_inventory(
         gate_attestation_key=gate_attestation_key,
         trust_mode=trust_mode,
     )
+    if (
+        trust_mode == "production"
+        and release_profile_id not in PRODUCTION_PACKAGE_READY_PROFILE_IDS
+    ):
+        raise ValueError(
+            "production packaging contract is not ready for source sidecars and "
+            "runtime dependency locks"
+        )
     expected_files = {entry["path"] for entry in entries}
     actual_files = {
         path.relative_to(root).as_posix()

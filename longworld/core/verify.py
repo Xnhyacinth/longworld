@@ -665,7 +665,8 @@ def verify_question(
     elif (
         (
             verification_mode in {"candidate", "production"}
-            and spec.query_type == "sec_financial_reconstruction"
+            and spec.query_type
+            in {"sec_financial_reconstruction", "wiki_claim_reconstruction"}
         )
         if require_raw_token_windows is None
         else require_raw_token_windows
