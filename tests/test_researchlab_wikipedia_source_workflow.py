@@ -1139,13 +1139,21 @@ def test_einstein_queries_stage_real_body_programs(einstein_world) -> None:
         ["64k"],
     ]
     assert [query.proof_depth for query in queries] == [2, 3, 4]
-    assert [len(query.essential_event_ids) for query in queries] == [2, 5, 7]
+    assert [len(query.essential_event_ids) for query in queries] == [5, 8, 11]
     answers = [query.answer for query in queries]
-    assert answers[0] == "BORN:1879-03-14"
+    assert (
+        answers[0]
+        == "BORN:1879-03-14||PATENT:assistant examiner – level III||PRAGUE:His time in Prague saw him producing eleven research papers.||REFUGEE:Einstein was now without a permanent home"
+    )
     assert answers[1].startswith(answers[0] + "||")
     assert answers[2].startswith(answers[1] + "||")
     assert f"COMM:{WIKI_EINSTEIN_MID_QUOTE}" in answers[1]
     assert "ENTITY:Q937" in answers[1]
+    assert (
+        "PRAGUE:His time in Prague saw him producing eleven research papers."
+        in answers[1]
+    )
+    assert "FAME:the world's first celebrity scientist" in answers[2]
     assert f"POP:{WIKI_EINSTEIN_LATE_QUOTE}" in answers[2]
     rest_ids = [
         artifact.artifact_id
@@ -1156,7 +1164,7 @@ def test_einstein_queries_stage_real_body_programs(einstein_world) -> None:
     assert rest_ids[0] not in queries[2].essential_artifact_ids
     by_id = {artifact.artifact_id: artifact for artifact in artifacts}
     hybrid_counts = []
-    for query, expected_tokens in zip(queries, (12_000, 20_000, 40_000), strict=True):
+    for query, expected_tokens in zip(queries, (8_000, 20_000, 40_000), strict=True):
         essential = [by_id[item] for item in query.essential_artifact_ids]
         section_tokens = sum(
             estimate_tokens(item.text)
@@ -1180,7 +1188,7 @@ def test_einstein_queries_stage_real_body_programs(einstein_world) -> None:
             generated_edges
             == _replayed_source_metadata(world, query, artifacts)["hybrid_causal_edges"]
         )
-    assert hybrid_counts == [1, 4, 6]
+    assert hybrid_counts == [4, 7, 10]
 
 
 def test_einstein_cf_remove_one_and_surface_gates(einstein_world) -> None:
@@ -1762,11 +1770,21 @@ def test_obama_queries_stage_real_body_programs(obama_world) -> None:
     ]
     assert [query.proof_depth for query in queries] == [2, 3, 4]
     answers = [query.answer for query in queries]
-    assert answers[0] == "BORN:1961-08-04"
+    assert (
+        answers[0]
+        == "BORN:1961-08-04||DEGREE:He graduated with a Bachelor of Arts degree in 1983 and a 3.7||ORGANIZER:hired as director of the [[Developing Communities Project]]||GRANDMOTHER:Madelyn Payne Dunham"
+    )
     assert answers[1].startswith(answers[0] + "||")
     assert answers[2].startswith(answers[1] + "||")
-    assert f"COMM:{WIKI_OBAMA_MID_QUOTE}" in answers[1]
+    assert f"MALIA:{WIKI_OBAMA_MID_QUOTE}" in answers[1]
     assert "ENTITY:Q76" in answers[1]
+    assert (
+        "HARVARD:enrolled at [[Harvard Law School]] in the fall of 1988" in answers[1]
+    )
+    assert (
+        "ORGANIZER:hired as director of the [[Developing Communities Project]]"
+        in answers[2]
+    )
     assert f"POP:{WIKI_OBAMA_LATE_QUOTE}" in answers[2]
     rest_ids = [
         artifact.artifact_id
@@ -1777,7 +1795,7 @@ def test_obama_queries_stage_real_body_programs(obama_world) -> None:
     assert rest_ids[0] not in queries[2].essential_artifact_ids
     by_id = {artifact.artifact_id: artifact for artifact in artifacts}
     hybrid_counts = []
-    for query, expected_tokens in zip(queries, (12_000, 20_000, 40_000), strict=True):
+    for query, expected_tokens in zip(queries, (8_000, 16_000, 40_000), strict=True):
         essential = [by_id[item] for item in query.essential_artifact_ids]
         section_tokens = sum(
             estimate_tokens(item.text)
@@ -1801,7 +1819,7 @@ def test_obama_queries_stage_real_body_programs(obama_world) -> None:
             generated_edges
             == _replayed_source_metadata(world, query, artifacts)["hybrid_causal_edges"]
         )
-    assert hybrid_counts == [1, 4, 6]
+    assert hybrid_counts == [4, 8, 10]
 
 
 def test_obama_cf_remove_one_and_surface_gates(obama_world) -> None:

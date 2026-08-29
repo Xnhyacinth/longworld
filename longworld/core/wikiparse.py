@@ -28,7 +28,7 @@ WIKI_THATCHER_MID_QUOTE = "The lady's not for turning"
 WIKI_THATCHER_LATE_QUOTE = "Westland affair"
 WIKI_NEWTON_MID_QUOTE = "Hypothesis of Light"
 WIKI_NEWTON_LATE_QUOTE = "William Chaloner"
-WIKI_OBAMA_MID_QUOTE = "Madelyn Payne Dunham"
+WIKI_OBAMA_MID_QUOTE = "The couple's first daughter, Malia Ann"
 WIKI_OBAMA_LATE_QUOTE = "Obama Chooses Biden"
 WIKI_ELIZABETH_MID_QUOTE = "Jallianwala Bagh massacre"
 WIKI_ELIZABETH_LATE_QUOTE = "death of Diana"
@@ -84,6 +84,7 @@ class WikiSection:
     provenance_id: str
     facts: tuple[WikiClaimFact, ...]
     ground_value: str
+    minimum_tier: str = "16k"
 
 
 @dataclass(frozen=True)
@@ -206,6 +207,7 @@ def _section(
     parent_sha256: str,
     facts: tuple[WikiClaimFact, ...],
     ground_value: str,
+    minimum_tier: str = "16k",
 ) -> WikiSection:
     if not wikitext:
         raise ProvenanceError(f"Wikipedia section {section_id} is empty")
@@ -215,6 +217,8 @@ def _section(
         raise ProvenanceError(
             f"Wikipedia section {section_id} ground heading is missing"
         )
+    if minimum_tier not in {"16k", "32k", "64k"}:
+        raise ProvenanceError(f"Wikipedia section {section_id} tier is invalid")
     for fact in facts:
         if wikitext[fact.char_start : fact.char_end] != fact.evidence_quote:
             raise ProvenanceError(f"Wikipedia fact {fact.role} is not lossless")
@@ -242,6 +246,7 @@ def _section(
         provenance_id=f"derived-sha256:{provenance}",
         facts=facts,
         ground_value=ground_value,
+        minimum_tier=minimum_tier,
     )
 
 
@@ -436,8 +441,13 @@ def _staged_sections(
                 tag = ""
             elif len(segment_spec) == 5:
                 section_id, marker, role, tag, quote = segment_spec
+                minimum_tier = "16k"
+            elif len(segment_spec) == 6:
+                section_id, marker, role, tag, quote, minimum_tier = segment_spec
             else:
                 raise ProvenanceError("Wikipedia early segment spec is invalid")
+            if len(segment_spec) == 4:
+                minimum_tier = "16k"
             end = starts[index + 1] if index + 1 < len(starts) else None
             segment = early[starts[index] : end]
             fact = (
@@ -465,6 +475,7 @@ def _staged_sections(
                     parent_sha256=wiki_hash,
                     facts=(fact,),
                     ground_value=early_ground if index == 0 else marker,
+                    minimum_tier=minimum_tier,
                 )
             )
     else:
@@ -619,18 +630,56 @@ _WIKI_TITLE_PROGRAMS = {
         late_quote=WIKI_CHURCHILL_LATE_QUOTE,
     ),
     "Albert Einstein": _WikiTitleCuts(
-        middle="=== Immigration to the US (1933) ===",
+        middle="==== Resident scholar at the Institute for Advanced Study ====",
         late="=== Quantum mechanics ===",
         early_heading="lead+Life through 1932",
         early_ground="== Life and career ==",
-        middle_heading="US immigration through old quantum theory",
-        middle_ground="=== Immigration to the US (1933) ===",
+        middle_heading="Resident scholar through old quantum theory",
+        middle_ground="==== Resident scholar at the Institute for Advanced Study ====",
         middle_quote=WIKI_EINSTEIN_MID_QUOTE,
+        middle_tag="COMM",
         late_heading="Quantum mechanics through Notes",
         late_ground="=== Quantum mechanics ===",
         late_quote=WIKI_EINSTEIN_LATE_QUOTE,
+        late_tag="POP",
         tail="== References ==",
         rest_end='<ref name="ILjYQ">',
+        early_segments=(
+            ("early_birth", "", "born", "BORN", "", "16k"),
+            (
+                "early_patent",
+                "=== Assistant at the Swiss Patent Office (1902–1909)===",
+                "patent_examiner",
+                "PATENT",
+                "assistant examiner – level III",
+                "16k",
+            ),
+            (
+                "early_academic",
+                "=== Academic career in Europe (1908–1933)===",
+                "prague_research",
+                "PRAGUE",
+                "His time in Prague saw him producing eleven research papers.",
+                "16k",
+            ),
+            (
+                "early_fame",
+                "=== Coming to terms with fame (1921–1923)===",
+                "scientific_fame",
+                "FAME",
+                "the world's first celebrity scientist",
+                "64k",
+            ),
+            (
+                "early_refugee",
+                "=== Immigration to the US (1933) ===",
+                "refugee_status",
+                "REFUGEE",
+                "Einstein was now without a permanent home",
+                "16k",
+            ),
+        ),
+        fact_parser_revision=WIKI_FACT_PARSER_REVISION_V2,
     ),
     "Margaret Thatcher": _WikiTitleCuts(
         middle="literal:Thatcher became Conservative Party leader",
@@ -734,18 +783,57 @@ _WIKI_TITLE_PROGRAMS = {
         fact_parser_revision=WIKI_FACT_PARSER_REVISION_V2,
     ),
     "Barack Obama": _WikiTitleCuts(
-        middle="===Family and personal life===",
-        late="==Presidential campaigns==",
+        middle="literal:While studying in California",
+        late="===2004 U.S. Senate campaign in Illinois===",
         early_heading="lead through Education",
         early_ground="==Early life and career==",
-        middle_heading="Family through Senate campaigns",
-        middle_ground="===Family and personal life===",
+        middle_heading="Relationships through Illinois Senate",
+        middle_ground="While studying in California",
         middle_quote=WIKI_OBAMA_MID_QUOTE,
-        late_heading="Presidential campaigns through environmental policy",
-        late_ground="==Presidential campaigns==",
+        middle_role="first_daughter",
+        middle_tag="MALIA",
+        late_heading="U.S. Senate campaign through environmental policy",
+        late_ground="===2004 U.S. Senate campaign in Illinois===",
         late_quote=WIKI_OBAMA_LATE_QUOTE,
+        late_tag="POP",
         tail="====Environmental policy====",
         rest_end="[[The Hill (newspaper)|The Hill]]",
+        early_segments=(
+            ("early_birth", "", "born", "BORN", "", "16k"),
+            (
+                "early_degree",
+                "===Education===",
+                "college_degree",
+                "DEGREE",
+                "He graduated with a Bachelor of Arts degree in 1983 and a 3.7",
+                "16k",
+            ),
+            (
+                "early_organizing",
+                "==== Community organizer and Harvard Law School ====",
+                "community_organizer",
+                "ORGANIZER",
+                "hired as director of the [[Developing Communities Project]]",
+                "16k",
+            ),
+            (
+                "early_law",
+                "In mid-1988, he traveled for the first time",
+                "law_school",
+                "HARVARD",
+                "enrolled at [[Harvard Law School]] in the fall of 1988",
+                "32k",
+            ),
+            (
+                "early_family",
+                "===Family and personal life===",
+                "maternal_grandmother",
+                "GRANDMOTHER",
+                "Madelyn Payne Dunham",
+                "16k",
+            ),
+        ),
+        fact_parser_revision=WIKI_FACT_PARSER_REVISION_V2,
     ),
     "Elizabeth II": _WikiTitleCuts(
         middle="=== Perils and dissent ===",

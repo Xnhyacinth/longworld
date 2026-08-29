@@ -22,6 +22,9 @@ from longworld.domains.researchlab.events import (
     apply_event,
     check_preconditions,
     init_values,
+    parse_arxiv_benchmark_detail,
+    parse_arxiv_benchmark_observation,
+    parse_arxiv_training_hardware,
 )
 
 _WIKI_SECTION_OFFSETS = {
@@ -351,6 +354,7 @@ def _wikipedia_source_workflow_events(
                     "provenance_operation": WIKI_SECTION_REVISION,
                     "source_binding_provenance": "verified_derived",
                     "fact_parser_revision": program.fact_parser_revision,
+                    "minimum_tier": section.minimum_tier,
                     "source_origin": "real_derived",
                     "source_family": record.source_family,
                     "source_url": record.source_url,
@@ -463,24 +467,57 @@ def _wikipedia_source_workflow_events(
         if semantic_tags
         else _WIKI_LEGACY_ROLE_TAGS
     )
-    early_roles = [
-        role for section_id in early_sections for role in roles_by_section[section_id]
-    ]
+    tier_rank = {"16k": 0, "32k": 1, "64k": 2}
+    early_sections_by_tier = {
+        tier: tuple(
+            section_id
+            for section_id in early_sections
+            if tier_rank[sections_by_id[section_id].minimum_tier] <= rank
+        )
+        for tier, rank in tier_rank.items()
+    }
+    early_roles_by_minimum_tier = {
+        tier: [
+            role
+            for section_id in early_sections
+            if sections_by_id[section_id].minimum_tier == tier
+            for role in roles_by_section[section_id]
+        ]
+        for tier in tier_rank
+    }
     middle_roles = roles_by_section["commemoration"]
     entity_roles = roles_by_section["wikidata_entity"]
     late_roles = roles_by_section["popular_culture"]
+    roles_16k = list(early_roles_by_minimum_tier["16k"])
+    roles_32k = [
+        *roles_16k,
+        *early_roles_by_minimum_tier["32k"],
+        *middle_roles,
+        *entity_roles,
+    ]
     tier_roles = {
-        "16k": early_roles,
-        "32k": [*early_roles, *middle_roles, *entity_roles],
-        "64k": [*early_roles, *middle_roles, *entity_roles, *late_roles],
+        "16k": roles_16k,
+        "32k": roles_32k,
+        "64k": [
+            *roles_32k,
+            *early_roles_by_minimum_tier["64k"],
+            *late_roles,
+        ],
     }
     append_roles = {
-        "16k": early_roles,
-        "32k": [*middle_roles, *entity_roles],
-        "64k": late_roles,
+        "16k": roles_16k,
+        "32k": [
+            *early_roles_by_minimum_tier["32k"],
+            *middle_roles,
+            *entity_roles,
+        ],
+        "64k": [*early_roles_by_minimum_tier["64k"], *late_roles],
     }
     for control_tier, rungs, default_sections in _WIKI_CLAIM_TIERS:
-        needed_sections = (*early_sections, *default_sections[1:])
+        needed_sections = (
+            *early_sections_by_tier[control_tier],
+            *default_sections[1:],
+        )
         new_sections = [name for name in needed_sections if name not in used_sections]
         for rung_index, (offset, compose, stage) in enumerate(rungs):
             event_id = (
@@ -606,6 +643,197 @@ _ARXIV_32K_FILES = frozenset(
 )
 _ARXIV_TERMINAL_FILES = frozenset({"abstract.tex", "acknowledgements.tex"})
 _ARXIV_TIER_OFFSETS = {"16k": 0, "32k": 365, "64k": 730}
+_ARXIV_BENCHMARK_TRACE_VIEWS: dict[
+    str, tuple[tuple[str, str, frozenset[str], bool, bool, bool], ...]
+] = {
+    "16k": (
+        (
+            "v1",
+            "abstract",
+            frozenset(
+                {
+                    "background.tex",
+                    "introduction.tex",
+                    "ms.tex",
+                    "why_self_attention.tex",
+                }
+            ),
+            True,
+            False,
+            False,
+        ),
+        (
+            "v1",
+            "detail",
+            frozenset({"results.tex", "visualizations.tex"}),
+            False,
+            True,
+            False,
+        ),
+        (
+            "v1",
+            "training",
+            frozenset({"training.tex"}),
+            False,
+            False,
+            True,
+        ),
+    ),
+    "32k": tuple(
+        channel
+        for revision_id in ("v1", "v2")
+        for channel in (
+            (
+                revision_id,
+                "abstract",
+                frozenset(
+                    {
+                        "background.tex",
+                        "introduction.tex",
+                        "ms.tex",
+                        "why_self_attention.tex",
+                    }
+                    | ({"training.tex"} if revision_id != "v1" else set())
+                ),
+                True,
+                False,
+                revision_id != "v1",
+            ),
+            (
+                revision_id,
+                "detail",
+                frozenset(
+                    {
+                        "parameter_attention.tex",
+                        "results.tex",
+                    }
+                    if revision_id == "v2"
+                    else {"results.tex"}
+                ),
+                False,
+                True,
+                False,
+            ),
+        )
+    )
+    + (("v1", "training", frozenset({"training.tex"}), False, False, True),),
+    "64k": tuple(
+        channel
+        for revision_id in ("v1", "v2", "v3")
+        for channel in (
+            (
+                revision_id,
+                "abstract",
+                frozenset(
+                    {
+                        "background.tex",
+                        "introduction.tex",
+                        "model_architecture.tex",
+                        "ms.tex",
+                        "why_self_attention.tex",
+                    }
+                    | ({"training.tex"} if revision_id != "v1" else set())
+                ),
+                True,
+                False,
+                revision_id != "v1",
+            ),
+            (
+                revision_id,
+                "detail",
+                frozenset(
+                    {
+                        "parameter_attention.tex",
+                        "results.tex",
+                        "sqrt_d_trick.tex",
+                        "visualizations.tex",
+                    }
+                    if revision_id != "v1"
+                    else {"results.tex", "visualizations.tex"}
+                ),
+                False,
+                True,
+                False,
+            ),
+        )
+    )
+    + (("v1", "training", frozenset({"training.tex"}), False, False, True),),
+}
+
+
+def _paper_benchmark_trace_records(workflow: Any) -> dict[str, Any] | None:
+    records = {record.attribute("revision_id"): record for record in workflow.records}
+    if set(records) != {"v1", "v2", "v3"} or len(workflow.relations) != 2:
+        return None
+    expected_pairs = {
+        (records["v2"].record_id, records["v1"].record_id),
+        (records["v3"].record_id, records["v2"].record_id),
+    }
+    observed_pairs = {
+        (relation.source_record_id, relation.target_record_id)
+        for relation in workflow.relations
+        if relation.kind == "revision_of" and len(relation.evidence) == 1
+    }
+    if observed_pairs != expected_pairs:
+        return None
+    parsed: dict[str, dict[str, Any]] = {}
+    try:
+        for revision_id, record in records.items():
+            body, _provenance, _excluded, spans = _semantic_arxiv_body(
+                record,
+                included_basenames=frozenset({"ms.tex", "results.tex"}),
+                bind_file_spans=True,
+            )
+            if {str(span["basename"]) for span in spans} != {
+                "ms.tex",
+                "results.tex",
+            }:
+                return None
+            observation = parse_arxiv_benchmark_observation(body, include_detail=True)
+            if observation is None:
+                return None
+            parsed[revision_id] = observation
+        for tier_views in _ARXIV_BENCHMARK_TRACE_VIEWS.values():
+            for (
+                revision_id,
+                _channel,
+                included_basenames,
+                _abstract,
+                _detail,
+                require_training,
+            ) in tier_views:
+                body, _provenance, _excluded, _spans = _semantic_arxiv_body(
+                    records[revision_id],
+                    included_basenames=included_basenames,
+                    bind_file_spans=True,
+                )
+                if require_training and parse_arxiv_training_hardware(body) is None:
+                    return None
+    except ValueError:
+        return None
+
+    def values(revision_id: str) -> tuple[str, str, str]:
+        observation = parsed[revision_id]
+        return (
+            str(observation["benchmark"]["value"]),
+            str(observation["score"]["value"]),
+            str(observation["days"]["value"]),
+        )
+
+    abstracts = {revision_id: values(revision_id) for revision_id in records}
+    detail_scores = {
+        revision_id: str(parsed[revision_id]["detail_score"]["value"])
+        for revision_id in records
+    }
+    if not (
+        len({observation[0] for observation in abstracts.values()}) == 1
+        and abstracts["v1"][1:] != abstracts["v2"][1:]
+        and abstracts["v3"][1:] == abstracts["v1"][1:]
+        and detail_scores["v1"] != detail_scores["v2"]
+        and detail_scores["v3"] == detail_scores["v2"]
+    ):
+        return None
+    return records
 
 
 def _paper_multiband_records(workflow: Any) -> dict[str, Any] | None:
@@ -688,13 +916,18 @@ def _multiband_arxiv_revision_event(
     record_index: int,
     tier: str,
     included_basenames: frozenset[str] | None,
+    view_channel: str = "",
 ) -> tuple[Event, str, str, dict[str, str]]:
     body, provenance_id, excluded_paths, source_file_spans = _semantic_arxiv_body(
         record,
         included_basenames=included_basenames,
         bind_file_spans=True,
     )
-    event_id = f"{prefix}.arxiv_revision_{tier}_{workflow_index}_{record_index}"
+    channel_suffix = f"_{view_channel}" if view_channel else ""
+    event_id = (
+        f"{prefix}.arxiv_revision_{tier}_{workflow_index}_{record_index}"
+        f"{channel_suffix}"
+    )
     revision_id = record.attribute("revision_id")
     revision_start = body.index(revision_id)
     revision_fact_id = f"{event_id}:revision_id"
@@ -754,6 +987,7 @@ def _multiband_arxiv_revision_event(
             "revision_id": revision_id,
             "occurred_at": record.occurred_at,
             "source_view_tier": tier,
+            **({"source_view_channel": view_channel} if view_channel else {}),
             "text": body,
             "text_sha256": text_sha256,
             "source_sha256": record.source_sha256,
@@ -877,10 +1111,15 @@ def _multiband_arxiv_relation_event(
             "fact_value_length": len(delta_fact.value) if delta_fact is not None else 0,
             "grounded_relation": grounded_relation,
             "relation_provenance": "authentic_source_api",
+            "required_prior_relation_event_id": prior_relation_id,
         },
         visibility=[event_id],
         causal_inputs=causal_inputs,
-        required_inputs=[target_event.id, source_event.id],
+        required_inputs=[
+            target_event.id,
+            source_event.id,
+            *([prior_relation_id] if prior_relation_id else []),
+        ],
         relation_kinds=relation_kinds,
     )
 
@@ -1056,6 +1295,218 @@ def _paper_multiband_events(
     return events
 
 
+def _add_benchmark_grounded_facts(
+    event: Event,
+    *,
+    require_abstract: bool,
+    require_detail: bool,
+    require_training: bool,
+) -> None:
+    text = str(event.params["text"])
+    abstract = (
+        parse_arxiv_benchmark_observation(text, include_detail=False)
+        if require_abstract
+        else None
+    )
+    detail = parse_arxiv_benchmark_detail(text) if require_detail else None
+    training = parse_arxiv_training_hardware(text) if require_training else None
+    if (
+        (require_abstract and abstract is None)
+        or (require_detail and detail is None)
+        or (require_training and training is None)
+    ):
+        raise ValueError("arXiv benchmark observation is missing from source view")
+    atoms: dict[str, dict[str, Any]] = {}
+    if abstract is not None:
+        atoms.update(
+            {
+                "benchmark": abstract["benchmark"],
+                "score": abstract["score"],
+                "days": abstract["days"],
+            }
+        )
+    if detail is not None:
+        if (
+            abstract is not None
+            and detail["benchmark"]["value"] != abstract["benchmark"]["value"]
+        ):
+            raise ValueError("arXiv benchmark channels disagree on benchmark")
+        atoms.setdefault("benchmark", detail["benchmark"])
+        atoms["detail_score"] = detail["score"]
+    if training is not None:
+        atoms["training_hardware"] = training
+    grounded_source = dict(event.params["grounded_source"])
+    facts = list(grounded_source["facts"])
+    for role, atom in atoms.items():
+        facts.append(
+            _grounded_fact(
+                source_id=event.id,
+                text=text,
+                fact_id=f"{event.id}:benchmark_{role}",
+                quote=str(atom["value"]),
+                char_start=int(atom["char_start"]),
+            )
+        )
+    grounded_source["facts"] = facts
+    event.params["grounded_source"] = grounded_source
+    event.params["ground_values"] = [
+        *event.params.get("ground_values", []),
+        *(str(atom["value"]) for atom in atoms.values()),
+    ]
+
+
+def _paper_benchmark_trace_events(
+    workflow: Any, prefix: str, workflow_index: int, records: dict[str, Any]
+) -> list[Event]:
+    record_indices = {
+        record.record_id: index for index, record in enumerate(workflow.records)
+    }
+    relations = {
+        (relation.source_record_id, relation.target_record_id): (index, relation)
+        for index, relation in enumerate(workflow.relations)
+    }
+    events: list[Event] = []
+    workflow_key = hashlib.sha256(workflow.workflow_id.encode()).hexdigest()[:12]
+    for tier in ("16k", "32k", "64k"):
+        tier_views = _ARXIV_BENCHMARK_TRACE_VIEWS[tier]
+        view_events: list[tuple[Event, bool, bool, bool]] = []
+        revision_events: dict[str, list[Event]] = {}
+        event_bodies: dict[str, str] = {}
+        revision_fact_ids: dict[str, str] = {}
+        for (
+            revision_id,
+            channel,
+            included_basenames,
+            require_abstract,
+            require_detail,
+            require_training,
+        ) in tier_views:
+            record = records[revision_id]
+            event, body, revision_fact_id, _source_facts = (
+                _multiband_arxiv_revision_event(
+                    workflow=workflow,
+                    record=record,
+                    prefix=prefix,
+                    workflow_index=workflow_index,
+                    record_index=record_indices[record.record_id],
+                    tier=tier,
+                    included_basenames=included_basenames,
+                    view_channel=channel,
+                )
+            )
+            _add_benchmark_grounded_facts(
+                event,
+                require_abstract=require_abstract,
+                require_detail=require_detail,
+                require_training=require_training,
+            )
+            events.append(event)
+            view_events.append(
+                (event, require_abstract, require_detail, require_training)
+            )
+            revision_events.setdefault(revision_id, []).append(event)
+            event_bodies[event.id] = body
+            revision_fact_ids[event.id] = revision_fact_id
+
+        relation_events: list[Event] = []
+        relation_pairs = {
+            "16k": (),
+            "32k": (("v2", "v1"),),
+            "64k": (("v2", "v1"), ("v3", "v2")),
+        }[tier]
+        for source_revision, target_revision in relation_pairs:
+            relation_index, relation = relations[
+                (
+                    records[source_revision].record_id,
+                    records[target_revision].record_id,
+                )
+            ]
+            source_event = revision_events[source_revision][0]
+            target_event = revision_events[target_revision][0]
+            relation_event = _multiband_arxiv_relation_event(
+                workflow=workflow,
+                records=records,
+                relation=relation,
+                relation_index=relation_index,
+                workflow_index=workflow_index,
+                tier=tier,
+                source_event=source_event,
+                target_event=target_event,
+                source_body=event_bodies[source_event.id],
+                source_revision_fact_id=revision_fact_ids[source_event.id],
+                target_revision_fact_id=revision_fact_ids[target_event.id],
+                source_fact_ids={},
+                prior_relation_id=(relation_events[-1].id if relation_events else ""),
+            )
+            events.append(relation_event)
+            relation_events.append(relation_event)
+
+        decision_id = f"{prefix}.arxiv_benchmark_trace_decision_{tier}_{workflow_index}"
+        proof_events = [
+            event.id for event, _abstract, _detail, _training in view_events
+        ]
+        proof_events.extend(event.id for event in relation_events)
+        proof_events.append(decision_id)
+        causal_inputs = (
+            [relation_events[-1].id]
+            if relation_events
+            else [event.id for event, _abstract, _detail, _training in view_events]
+        )
+        if relation_events:
+            causal_inputs = [
+                *(event.id for event, _abstract, _detail, _training in view_events),
+                *causal_inputs,
+            ]
+        events.append(
+            Event(
+                id=decision_id,
+                type="arxiv_benchmark_trace_decision",
+                time=max(
+                    event.time for event, _abstract, _detail, _training in view_events
+                )
+                + timedelta(days=1),
+                params={
+                    "workflow_id": workflow.workflow_id,
+                    "work_id": records["v1"].attribute("work_id"),
+                    "control_tier": tier,
+                    "answer_key": (
+                        f"real_benchmark_revision_trace:{workflow_key}:{tier}"
+                    ),
+                    "record_event_ids": [
+                        event.id for event, _abstract, _detail, _training in view_events
+                    ],
+                    "record_requirements": [
+                        {
+                            "event_id": event.id,
+                            "require_abstract": require_abstract,
+                            "require_detail": require_detail,
+                            "require_training": require_training,
+                        }
+                        for event, require_abstract, require_detail, require_training in view_events
+                    ],
+                    "trace_mode": "full_trace",
+                    "include_detailed_results": True,
+                    "required_relation_ids": [
+                        str(event.params["relation_id"]) for event in relation_events
+                    ],
+                    "proof_event_ids": proof_events,
+                },
+                visibility=[decision_id],
+                causal_inputs=causal_inputs,
+                required_inputs=list(causal_inputs),
+                relation_kinds={
+                    event_id: (
+                        "applies_revision_chain"
+                        if event_id in {event.id for event in relation_events}
+                        else "reads_source"
+                    )
+                    for event_id in causal_inputs
+                },
+            )
+        )
+    return events
+
+
 def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]:
     events: list[Event] = []
     for workflow_index, workflow in enumerate(project.get("source_workflows") or []):
@@ -1065,6 +1516,14 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
             )
             continue
         if workflow.source_kind != PAPER_SOURCE_KIND:
+            continue
+        benchmark_records = _paper_benchmark_trace_records(workflow)
+        if benchmark_records is not None:
+            events.extend(
+                _paper_benchmark_trace_events(
+                    workflow, prefix, workflow_index, benchmark_records
+                )
+            )
             continue
         multiband_records = _paper_multiband_records(workflow)
         if multiband_records is not None:
@@ -1425,6 +1884,52 @@ def selected_wiki_source_relation_edges(
             edge["parent_record_id"],
             edge["child_record_id"],
         ),
+    )
+
+
+def valid_arxiv_revision_relation_event(
+    relation: Event,
+    events: dict[str, Event],
+    *,
+    seen: frozenset[str] = frozenset(),
+) -> bool:
+    """Validate exact endpoints and an optional continuous prior revision edge."""
+    if relation.type != "arxiv_revision_relation" or relation.id in seen:
+        return False
+    source_record_id = str(relation.params.get("source_record_id") or "")
+    target_record_id = str(relation.params.get("target_record_id") or "")
+    source = events.get(str(relation.params.get("source_record_event_id") or ""))
+    target = events.get(str(relation.params.get("target_record_event_id") or ""))
+    if (
+        not source_record_id
+        or not target_record_id
+        or source_record_id == target_record_id
+        or source is None
+        or target is None
+        or source.type != "arxiv_revision"
+        or target.type != "arxiv_revision"
+        or source.params.get("record_id") != source_record_id
+        or target.params.get("record_id") != target_record_id
+    ):
+        return False
+    expected_inputs = {source.id, target.id}
+    prior_id = str(relation.params.get("required_prior_relation_event_id") or "")
+    if prior_id:
+        prior = events.get(prior_id)
+        if (
+            prior is None
+            or not valid_arxiv_revision_relation_event(
+                prior, events, seen=seen | {relation.id}
+            )
+            or prior.params.get("source_record_id") != target_record_id
+            or prior.params.get("workflow_id") != relation.params.get("workflow_id")
+            or prior.params.get("work_id") != relation.params.get("work_id")
+        ):
+            return False
+        expected_inputs.add(prior_id)
+    return (
+        len(relation.required_inputs) == len(expected_inputs)
+        and set(relation.required_inputs) == expected_inputs
     )
 
 

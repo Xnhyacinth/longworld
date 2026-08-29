@@ -133,6 +133,8 @@ def _ground(ev: Event) -> list[str]:
         return [str(p["relation_kind"]), str(p["target_revision_id"])]
     if t == "arxiv_revision_decision":
         return []
+    if t == "arxiv_benchmark_trace_decision":
+        return []
     if t == "wiki_source_section":
         return [str(value) for value in p.get("ground_values") or []]
     if t == "wiki_claim_answer":
@@ -181,6 +183,21 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
             indent=2,
             sort_keys=True,
         ) + "\n"
+    if t == "arxiv_benchmark_trace_decision":
+        return "json", json.dumps(
+            {
+                "kind": "arxiv_benchmark_trace_decision",
+                "rule": (
+                    "report the benchmark observations in verified revision order; "
+                    "include detailed-result spans only when the control tier "
+                    "requires them"
+                ),
+                "answer_disclosure": "omitted",
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        ) + "\n"
     if t == "wiki_source_section":
         if canonical_source_text is None:
             raise ValueError("Wikipedia section visible text is invalid")
@@ -220,8 +237,8 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
         return "code", (
             f"commit {ev.params['commit']}\n"
             f"Author: tokenizer pass for {paper}\n"
-            f"Change: retokenize eval prompts. This commit does not reprint a "
-            f"leaderboard number. Its effect is delayed until a clean rerun."
+            f"Change: retokenize eval prompts. The benchmark report remains the score "
+            f"authority, and this change takes effect only after a clean rerun."
         )
     if t == "log_stale_cache":
         return "log", (
@@ -256,8 +273,7 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
     if t == "release_note":
         return "report", (
             f"# {paper} repository release notes ({date_s})\n"
-            f"This note does not reprint a leaderboard numeral and does not "
-            f"reprint SPDX. If a corrected evaluation JSON exists, that JSON is "
+            f"If a corrected evaluation JSON exists, that JSON is "
             f"adopted as the authoritative score for {model} on {bench}. "
             f"Camera-ready prose is superseded. The LICENSE file remains the "
             f"SPDX source. If no corrected JSON exists, the v1 draft remains "
@@ -268,8 +284,7 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
             f"# {paper} dataset card ({date_s})\n"
             f"Dataset identifier {ev.params['dataset']} replaces the January "
             f"split. Duplicate prompts were found on the old card. Withdraw the "
-            f"January reported {bench} number. This card does not reprint that "
-            f"numeral; reconstruct it from the v1 draft PDF. Later rerun JSON "
+            f"January {bench} result recorded in the v1 draft PDF. Later rerun JSON "
             f"is a different object and is not the withdrawn figure."
         )
     if t == "submit_revision_2":
@@ -346,18 +361,16 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
     if t == "resolve_review":
         return "review", (
             f"# {paper} review resolution ({date_s})\n"
-            f"The review resolution links the second requirement to its later "
-            f"author response and then to the final revision submission. This "
-            f"instrument intentionally does not reprint any of those identifiers; "
-            f"they must be reconstructed from the three earlier records."
+            f"The review resolution links the second requirement to its later author "
+            f"response and then to the final revision submission; those three earlier "
+            f"records remain the identifier-bearing review lineage."
         )
     if t == "meta_decision":
         return "review", (
             f"# {paper} meta decision ({date_s})\n"
             f"Decision: accept the revision named by the resolved review lineage, "
             f"using the benchmark frozen by the corrective patch and the successful "
-            f"independent recovery run. This decision does not reprint the revision, "
-            f"benchmark, run, or response identifiers."
+            f"independent recovery run. The linked lineage remains the identifier record."
         )
     if t == "experiment_revision":
         p = ev.params
@@ -437,17 +450,15 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
             f"than ranking runs by lexical identifier, timestamp ties, or apparent score. "
             f"The matrix decision also verifies that later cycles followed the recovery "
             f"of their upstream lane and that the final join spans all parallel lanes. "
-            f"This decision intentionally does not reprint any recovery run identifier; "
-            f"the complete ordered matrix must be reconstructed from the recovery records."
+            f"The recovery records retain the complete ordered run matrix."
         )
     if t == "adopt_public":
         return "email", (
             f"Subject: public normative file adopted · {paper}\n"
             f"Date: {date_s}\n"
             f"Status: public-norm-adopted. The lab adopted the previously "
-            f"ingested public file as the external normative reference. This "
-            f"memo does not reprint the public-document stem. Reconstruct the "
-            f"stem from the ingested file. Alternate public files are not "
+            f"ingested public file as the external normative reference. The ingested "
+            f"file retains its public source identity. Alternate public files are not "
             f"adopted. Scores and SPDX are not restated here."
         )
     if t == "seed_latent":
@@ -472,25 +483,23 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
     if t == "ack_latent":
         return "email", (
             f"Subject: latent filing acknowledged · {paper}\nDate: {date_s}\n"
-            f"Status: latent-acked. This ack does not reprint the file-code. "
-            f"Reconstruct it from the parked lab note if a later reopen asks. "
+            f"Status: latent-acked. The parked lab note remains the file-code record "
+            f"for any later reopen. "
             f"No scores restated."
         )
     if t == "reopen_latent":
         return "email", (
             f"Subject: case reopened · {paper}\nDate: {date_s}\n"
-            f"Status: case-reopened. The dormant file-code is now active. This "
-            f"memo does not reprint the code. Reconstruct it from the seed note "
-            f"via the ack. Camera-ready prose is not the authority."
+            f"Status: case-reopened. The dormant file-code is now active under the "
+            f"seed note and acknowledgment. Camera-ready prose is not the authority."
         )
     if t == "ratify_latent":
         return "email", (
             f"Subject: case ratified · {paper}\nDate: {date_s}\n"
             f"Status: case-ratified. Reopen made a file-code active; this "
             f"instrument makes it controlling and adopts the early docket as "
-            f"the controlling docket-code. This memo does not reprint the "
-            f"file-code or the docket-code. Reconstruct both from their seed "
-            f"notes via ack and reopen. Camera-ready prose is not the ratify "
+            f"the controlling docket-code. Their seed notes, acknowledgment, and "
+            f"reopen form the controlling audit chain. Camera-ready prose is not the ratify "
             f"authority."
         )
     if t == "status_pulse":
@@ -535,6 +544,7 @@ def render_lab(sim: SimulatedWorld) -> list[Artifact]:
             "arxiv_revision",
             "arxiv_revision_relation",
             "arxiv_revision_decision",
+            "arxiv_benchmark_trace_decision",
         }:
             is_record = ev.type == "arxiv_revision"
             source_origin = (

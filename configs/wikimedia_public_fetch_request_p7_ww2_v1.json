@@ -1,0 +1,13 @@
+{
+  "schema_version": "longworld.wikimedia-fetch-request.v1",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P7-WIKIMEDIA-PUBLIC-WW2-20260826",
+    "scope": "World War II English Wikipedia and Wikidata revision inventory",
+    "basis": "User-authorized public-source LongWorld source-rich workflow construction",
+    "reviewed_at": "2026-08-26T13:30:00Z"
+  },
+  "language": "en",
+  "titles": ["World War II"],
+  "requests_per_second": 5
+}

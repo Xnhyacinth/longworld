@@ -238,8 +238,13 @@ def _attested_arxiv_revision(artifact: Artifact) -> tuple[str, str] | None:
 
 def _attested_revision_relations(
     artifacts: list[Artifact],
-) -> set[tuple[str, frozenset[str]]]:
-    relations: set[tuple[str, frozenset[str]]] = set()
+) -> set[tuple[str, str, str]]:
+    relations: set[tuple[str, str, str]] = set()
+    visible_revisions = {
+        revision
+        for artifact in artifacts
+        if (revision := _attested_arxiv_revision(artifact)) is not None
+    }
     for artifact in artifacts:
         slots = artifact.slots or {}
         params = slots.get("params")
@@ -249,6 +254,27 @@ def _attested_revision_relations(
         workflow_id = str(slots.get("source_workflow_id") or "")
         source_record_id = str(params.get("source_record_id") or "")
         target_record_id = str(params.get("target_record_id") or "")
+        source_revision_id = str(params.get("source_revision_id") or "")
+        target_revision_id = str(params.get("target_revision_id") or "")
+        source_revision = re.fullmatch(r"v([1-9][0-9]*)", source_revision_id)
+        target_revision = re.fullmatch(r"v([1-9][0-9]*)", target_revision_id)
+        source_record_revision = re.search(r"v([1-9][0-9]*)$", source_record_id)
+        target_record_revision = re.search(r"v([1-9][0-9]*)$", target_record_id)
+        canonical_text = (
+            json.dumps(
+                {
+                    "kind": "arxiv_revision_relation",
+                    "relation": params.get("relation_kind"),
+                    "source_revision": source_revision_id,
+                    "target_revision": target_revision_id,
+                    "evidence": params.get("evidence_quote"),
+                },
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
+        )
         expected_provenance = (
             "derived-sha256:" + hashlib.sha256(artifact.text.encode()).hexdigest()
         )
@@ -258,32 +284,53 @@ def _attested_revision_relations(
             and classification.workflow_kind is WorkflowKind.HYBRID_CAUSAL
             and params.get("workflow_id") == workflow_id
             and params.get("relation_kind") == "revision_of"
+            and isinstance(params.get("evidence_quote"), str)
+            and params["evidence_quote"]
+            and artifact.text == canonical_text
             and source_record_id
             and target_record_id
             and source_record_id != target_record_id
+            and source_revision is not None
+            and target_revision is not None
+            and source_record_revision is not None
+            and target_record_revision is not None
+            and source_record_revision.group(1) == source_revision.group(1)
+            and target_record_revision.group(1) == target_revision.group(1)
+            and int(source_revision.group(1)) > int(target_revision.group(1))
+            and (workflow_id, source_record_id) in visible_revisions
+            and (workflow_id, target_record_id) in visible_revisions
             and classification.provenance_id == expected_provenance
         ):
-            relations.add(
-                (workflow_id, frozenset((source_record_id, target_record_id)))
-            )
+            relations.add((workflow_id, source_record_id, target_record_id))
     return relations
 
 
 def _authorized_revision_overlap(
     current: tuple[str, str] | None,
     previous: tuple[str, str] | None,
-    relations: set[tuple[str, frozenset[str]]],
+    relations: set[tuple[str, str, str]],
 ) -> bool:
-    return bool(
-        current
-        and previous
-        and current[0] == previous[0]
-        and (
-            current[0],
-            frozenset((current[1], previous[1])),
-        )
-        in relations
-    )
+    if not current or not previous or current[0] != previous[0]:
+        return False
+    workflow_id = current[0]
+
+    def has_path(source_record_id: str, target_record_id: str) -> bool:
+        frontier = [source_record_id]
+        visited: set[str] = set()
+        while frontier:
+            record_id = frontier.pop()
+            if record_id in visited:
+                continue
+            visited.add(record_id)
+            for relation_workflow, source_id, target_id in relations:
+                if relation_workflow != workflow_id or source_id != record_id:
+                    continue
+                if target_id == target_record_id:
+                    return True
+                frontier.append(target_id)
+        return False
+
+    return has_path(current[1], previous[1]) or has_path(previous[1], current[1])
 
 
 def sentence_near_dup_ratio(artifacts: list[Artifact]) -> float:

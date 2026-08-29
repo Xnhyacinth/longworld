@@ -45,6 +45,20 @@ _ARXIV_HEADER = re.compile(
     r"(?P<submitted>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:"
     r"[0-9]{2}:[0-9]{2}Z)\n"
 )
+_ARXIV_BENCHMARK_ABSTRACT = re.compile(
+    r"On the (?P<benchmark>[^\n]{1,160}? task),\s+our model establishes "
+    r"a new single-model state-of-the-art BLEU score of "
+    r"(?P<score>[0-9]+(?:\.[0-9]+)?) after training for "
+    r"(?P<days>[0-9]+(?:\.[0-9]+)?) days on eight GPUs"
+)
+_ARXIV_BENCHMARK_DETAIL = re.compile(
+    r"On the (?P<benchmark>[^\n]{1,160}? task),\s+our big model achieves "
+    r"a BLEU score of \$?(?P<score>[0-9]+(?:\.[0-9]+)?)\$?"
+)
+_ARXIV_TRAINING_HARDWARE = re.compile(
+    r"We trained our models on one machine with "
+    r"(?P<hardware>[0-9]+ NVIDIA P100 GPUs)\."
+)
 _WIKI_BIRTH = re.compile(
     r"\{\{\s*birth date(?: and age)?\s*\|(?:df=y(?:es)?\|)?"
     r"(?P<year>[0-9]{4})\|(?P<month>[0-9]{1,2})\|"
@@ -54,8 +68,88 @@ _WIKI_BIRTH = re.compile(
 _WIKIDATA_ENTITY = re.compile(r"\"id\":\"(?P<entity>Q[1-9][0-9]{0,11})\"")
 
 
+def parse_arxiv_benchmark_detail(text: str) -> dict[str, Any] | None:
+    """Parse one uniquely grounded detailed benchmark result."""
+    matches = list(_ARXIV_BENCHMARK_DETAIL.finditer(text))
+    if len(matches) != 1:
+        return None
+    match = matches[0]
+    return {
+        role: {
+            "value": match.group(role),
+            "char_start": match.start(role),
+            "char_end": match.end(role),
+        }
+        for role in ("benchmark", "score")
+    }
+
+
+def parse_arxiv_training_hardware(text: str) -> dict[str, Any] | None:
+    """Parse the uniquely grounded training hardware statement."""
+    matches = list(_ARXIV_TRAINING_HARDWARE.finditer(text))
+    if len(matches) != 1:
+        return None
+    match = matches[0]
+    return {
+        "value": match.group("hardware"),
+        "char_start": match.start("hardware"),
+        "char_end": match.end("hardware"),
+    }
+
+
 def _format_revision_delta(value: str) -> str:
     return format_revision_added_delta(value)
+
+
+def parse_arxiv_benchmark_observation(
+    text: str, *, include_detail: bool
+) -> dict[str, Any] | None:
+    """Parse uniquely grounded benchmark values from an arXiv LaTeX view."""
+    abstract_matches = list(_ARXIV_BENCHMARK_ABSTRACT.finditer(text))
+    if len(abstract_matches) != 1:
+        return None
+    abstract = abstract_matches[0]
+    result: dict[str, Any] = {
+        role: {
+            "value": abstract.group(role),
+            "char_start": abstract.start(role),
+            "char_end": abstract.end(role),
+        }
+        for role in ("benchmark", "score", "days")
+    }
+    if not include_detail:
+        return result
+    detail = parse_arxiv_benchmark_detail(text)
+    if detail is None:
+        return None
+    if detail["benchmark"]["value"] != abstract.group("benchmark"):
+        return None
+    result["detail_score"] = {
+        "value": detail["score"]["value"],
+        "char_start": detail["score"]["char_start"],
+        "char_end": detail["score"]["char_end"],
+    }
+    return result
+
+
+def format_arxiv_benchmark_trace(
+    observations: list[dict[str, str]], *, include_detail: bool
+) -> str:
+    if not observations or len({item["benchmark"] for item in observations}) != 1:
+        return ""
+    benchmark = observations[0]["benchmark"]
+    abstract = " -> ".join(
+        f"{item['revision']} {item['score']}@{item['days']}d" for item in observations
+    )
+    answer = f"{benchmark} | {abstract}"
+    if include_detail:
+        if any(not item.get("detail_score") for item in observations):
+            return ""
+        detail = " -> ".join(
+            f"{item['revision']} {item['detail_score']}" for item in observations
+        )
+        answer += f" | detail {detail}"
+    return answer
 
 
 def _canonical_digest(payload: dict[str, Any]) -> str:
@@ -271,6 +365,203 @@ def _source_binding(ev: Event) -> GroundedSource:
     ):
         raise GroundedSpanError("grounded source does not bind its event")
     return source
+
+
+def _benchmark_trace_from_state(
+    state: WorldState, ev: Event
+) -> tuple[list[dict[str, str]], str] | None:
+    record_requirements = ev.params.get("record_requirements")
+    trace_mode = ev.params.get("trace_mode")
+    if (
+        not isinstance(record_requirements, list)
+        or len(record_requirements) not in {3, 5, 7}
+        or trace_mode not in {"cross_channel", "full_trace"}
+    ):
+        return None
+    event_ids: list[str] = []
+    for requirement in record_requirements:
+        if (
+            not isinstance(requirement, dict)
+            or set(requirement)
+            != {
+                "event_id",
+                "require_abstract",
+                "require_detail",
+                "require_training",
+            }
+            or not isinstance(requirement["event_id"], str)
+            or not requirement["event_id"]
+            or not isinstance(requirement["require_abstract"], bool)
+            or not isinstance(requirement["require_detail"], bool)
+            or not isinstance(requirement["require_training"], bool)
+            or not (
+                requirement["require_abstract"]
+                or requirement["require_detail"]
+                or requirement["require_training"]
+            )
+        ):
+            return None
+        event_ids.append(requirement["event_id"])
+    if len(set(event_ids)) != len(event_ids):
+        return None
+    texts = state.values.get("source_record_texts") or {}
+    metadata = state.values.get("source_record_metadata") or {}
+    bindings = state.values.get("source_grounded_bindings") or {}
+    partial_observations: list[dict[str, str]] = []
+    for requirement in record_requirements:
+        event_id = requirement["event_id"]
+        require_abstract = requirement["require_abstract"]
+        require_detail = requirement["require_detail"]
+        require_training = requirement["require_training"]
+        text = str(texts.get(event_id) or "")
+        raw_binding = bindings.get(event_id)
+        if not text or raw_binding is None:
+            return None
+        try:
+            source = validate_grounded_source(_grounded_source(raw_binding))
+        except (GroundedSpanError, TypeError):
+            return None
+        if source.source_id != event_id or source.visible_text != text:
+            return None
+        abstract = (
+            parse_arxiv_benchmark_observation(text, include_detail=False)
+            if require_abstract
+            else None
+        )
+        detail = parse_arxiv_benchmark_detail(text) if require_detail else None
+        training = parse_arxiv_training_hardware(text) if require_training else None
+        if (
+            (require_abstract and abstract is None)
+            or (require_detail and detail is None)
+            or (require_training and training is None)
+        ):
+            return None
+        benchmark = (
+            str(abstract["benchmark"]["value"])
+            if abstract is not None
+            else str(detail["benchmark"]["value"])
+            if detail is not None
+            else ""
+        )
+        if (
+            abstract is not None
+            and detail is not None
+            and abstract["benchmark"]["value"] != detail["benchmark"]["value"]
+        ):
+            return None
+        atoms: dict[str, dict[str, Any]] = {}
+        if abstract is not None:
+            atoms.update(
+                {
+                    "benchmark": abstract["benchmark"],
+                    "score": abstract["score"],
+                    "days": abstract["days"],
+                }
+            )
+        if detail is not None:
+            atoms["detail_score"] = detail["score"]
+            atoms.setdefault("benchmark", detail["benchmark"])
+        if training is not None:
+            atoms["training_hardware"] = training
+        for role, atom in atoms.items():
+            fact_id = f"{event_id}:benchmark_{role}"
+            facts = [fact for fact in source.facts if fact.fact_id == fact_id]
+            if (
+                len(facts) != 1
+                or facts[0].quote != atom["value"]
+                or facts[0].char_start != atom["char_start"]
+                or facts[0].char_end != atom["char_end"]
+            ):
+                return None
+        record_metadata = metadata.get(event_id) or {}
+        revision = str(record_metadata.get("revision_id") or "")
+        if not revision:
+            return None
+        partial_observations.append(
+            {
+                "revision": revision,
+                "benchmark": benchmark,
+                "score": (
+                    str(abstract["score"]["value"]) if abstract is not None else ""
+                ),
+                "days": (
+                    str(abstract["days"]["value"]) if abstract is not None else ""
+                ),
+                "detail_score": (
+                    str(detail["score"]["value"]) if detail is not None else ""
+                ),
+                "training_hardware": (
+                    str(training["value"]) if training is not None else ""
+                ),
+            }
+        )
+    benchmarks = {
+        item["benchmark"] for item in partial_observations if item["benchmark"]
+    }
+    if len(benchmarks) != 1:
+        return None
+    observations_by_revision: dict[str, dict[str, str]] = {}
+    revision_order: list[str] = []
+    for partial in partial_observations:
+        revision = partial["revision"]
+        if revision not in observations_by_revision:
+            if not partial["benchmark"]:
+                return None
+            observations_by_revision[revision] = {
+                "revision": revision,
+                "benchmark": partial["benchmark"],
+                "score": "",
+                "days": "",
+                "detail_score": "",
+                "training_hardware": "",
+            }
+            revision_order.append(revision)
+        merged = observations_by_revision[revision]
+        if partial["benchmark"] and merged["benchmark"] != partial["benchmark"]:
+            return None
+        for field in ("score", "days", "detail_score", "training_hardware"):
+            value = partial[field]
+            if value and merged[field]:
+                return None
+            if value:
+                merged[field] = value
+    observations = [observations_by_revision[revision] for revision in revision_order]
+    training_observations = [item for item in observations if item["training_hardware"]]
+    if len(training_observations) != len(observations):
+        return None
+    if trace_mode == "cross_channel":
+        if (
+            len(observations) != 2
+            or not observations[0]["score"]
+            or not observations[0]["days"]
+            or observations[0]["detail_score"]
+            or observations[1]["score"]
+            or observations[1]["days"]
+            or not observations[1]["detail_score"]
+        ):
+            return None
+        answer = (
+            f"{observations[0]['benchmark']} | abstract "
+            f"{observations[0]['revision']} {observations[0]['score']}@"
+            f"{observations[0]['days']}d -> detail "
+            f"{observations[1]['revision']} {observations[1]['detail_score']}"
+        )
+    else:
+        if any(not item["score"] or not item["detail_score"] for item in observations):
+            return None
+        answer = format_arxiv_benchmark_trace(observations, include_detail=True)
+    training_trace = " -> ".join(
+        f"{item['revision']} {item['training_hardware']}"
+        for item in training_observations
+    )
+    benchmark_prefix = f"{training_observations[0]['benchmark']} |"
+    if not answer.startswith(benchmark_prefix):
+        return None
+    answer = (
+        f"{benchmark_prefix} training {training_trace} "
+        f"|{answer[len(benchmark_prefix) :]}"
+    )
+    return (observations, answer) if answer else None
 
 
 def _arxiv_source_binding_valid(ev: Event, source: GroundedSource) -> bool:
@@ -613,6 +904,7 @@ def init_values(project: dict[str, Any]) -> dict[str, Any]:
         "real_revision_delta_candidate": None,
         "real_revision_added_text": None,
         "verified_revision_relations": [],
+        "verified_revision_relation_events": [],
         "wiki_claims": {},
         "wiki_claim_tags": {},
         "wiki_source_relations": [],
@@ -638,6 +930,17 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
             return False, "source_derived_lineage_invalid"
         return True, None
     if t == "arxiv_revision_relation":
+        required_prior_event = str(
+            ev.params.get("required_prior_relation_event_id") or ""
+        )
+        verified_relation_events = set(
+            state.values.get("verified_revision_relation_events") or []
+        )
+        if (
+            required_prior_event
+            and required_prior_event not in verified_relation_events
+        ):
+            return False, "source_prior_revision_relation_missing"
         texts = state.values.get("source_record_texts") or {}
         if not all(
             texts.get(str(ev.params.get(field) or ""))
@@ -649,6 +952,18 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
         except (GroundedSpanError, TypeError):
             valid = False
         return (True, None) if valid else (False, "source_relation_binding_invalid")
+    if t == "arxiv_benchmark_trace_decision":
+        benchmark_required_relations = set(ev.params.get("required_relation_ids") or [])
+        benchmark_verified_relations = set(
+            state.values.get("verified_revision_relations") or []
+        )
+        if not benchmark_required_relations.issubset(benchmark_verified_relations):
+            return False, "source_revision_chain_incomplete"
+        return (
+            (True, None)
+            if _benchmark_trace_from_state(state, ev) is not None
+            else (False, "source_benchmark_trace_invalid")
+        )
     if t == "arxiv_revision_decision":
         mode = str(ev.params.get("decision_mode") or "relation_delta")
         if mode == "direct_delta":
@@ -855,6 +1170,15 @@ def apply_event(state: WorldState, ev: Event) -> None:
         bindings[eid] = p["grounded_source"]
         state.set("source_grounded_bindings", bindings, eid, day)
     elif t == "arxiv_revision_relation":
+        required_prior_event = str(p.get("required_prior_relation_event_id") or "")
+        verified_relation_events = list(
+            state.values.get("verified_revision_relation_events") or []
+        )
+        if (
+            required_prior_event
+            and required_prior_event not in verified_relation_events
+        ):
+            return
         try:
             if not _relation_binding_valid(state, ev):
                 return
@@ -865,6 +1189,14 @@ def apply_event(state: WorldState, ev: Event) -> None:
         if relation_id and relation_id not in verified_relations:
             verified_relations.append(relation_id)
             state.set("verified_revision_relations", verified_relations, eid, day)
+        if eid not in verified_relation_events:
+            verified_relation_events.append(eid)
+            state.set(
+                "verified_revision_relation_events",
+                verified_relation_events,
+                eid,
+                day,
+            )
         if p.get("relation_mode") == "lineage_only":
             return
         texts = state.values.get("source_record_texts") or {}
@@ -906,6 +1238,22 @@ def apply_event(state: WorldState, ev: Event) -> None:
             eid,
             day,
         )
+    elif t == "arxiv_benchmark_trace_decision":
+        benchmark_required_relations = set(p.get("required_relation_ids") or [])
+        benchmark_verified_relations = set(
+            state.values.get("verified_revision_relations") or []
+        )
+        if not benchmark_required_relations.issubset(benchmark_verified_relations):
+            return
+        resolved = _benchmark_trace_from_state(state, ev)
+        if resolved is None:
+            return
+        _observations, answer = resolved
+        answer_key = str(p.get("answer_key") or "")
+        if not answer_key:
+            return
+        state.set(answer_key, answer, eid, day)
+        state.set("real_benchmark_revision_trace", answer, eid, day)
     elif t == "arxiv_revision_decision":
         mode = str(p.get("decision_mode") or "relation_delta")
         paper_required_relations = set(p.get("required_relation_ids") or [])

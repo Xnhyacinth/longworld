@@ -18,7 +18,11 @@ from longworld.domains.company.queries import (
     _merge_overrides,
     instance_topology,
 )
-from longworld.domains.researchlab.events import apply_event, check_preconditions
+from longworld.domains.researchlab.events import (
+    apply_event,
+    check_preconditions,
+    parse_arxiv_benchmark_observation,
+)
 
 
 def _sim_for(world: SimulatedWorld) -> WorldSimulator:
@@ -419,6 +423,204 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
     meta = _event(world, "meta_decision")
     queries: list[QuerySpec] = []
     events_by_id = {event.id: event for event in world.events}
+
+    benchmark_decisions = sorted(
+        (
+            event
+            for event in world.events
+            if event.type == "arxiv_benchmark_trace_decision"
+            and event.params.get("control_tier") in {"16k", "32k", "64k"}
+        ),
+        key=lambda event: {"16k": 0, "32k": 1, "64k": 2}[
+            str(event.params["control_tier"])
+        ],
+    )
+    for decision in benchmark_decisions:
+        tier = str(decision.params["control_tier"])
+        proof_event_ids = list(decision.params["proof_event_ids"])
+        record_events = [
+            events_by_id[event_id] for event_id in decision.params["record_event_ids"]
+        ]
+        requirements = {
+            requirement["event_id"]: requirement
+            for requirement in decision.params["record_requirements"]
+        }
+        source_revision = "v1" if tier == "16k" else "v2"
+        source = next(
+            event
+            for event in record_events
+            if event.params.get("revision_id") == source_revision
+            and requirements[event.id]["require_abstract"]
+        )
+        observation = parse_arxiv_benchmark_observation(
+            str(source.params["text"]), include_detail=False
+        )
+        score = observation["score"] if observation is not None else None
+        if score is None:
+            continue
+        original_score = str(score["value"])
+        final_digit = "9" if original_score[-1] != "9" else "8"
+        changed_score = original_score[:-1] + final_digit
+        score_start = int(score["char_start"])
+        score_end = int(score["char_end"])
+        source_text = str(source.params["text"])
+        cf_text = source_text[:score_start] + changed_score + source_text[score_end:]
+        cf_text_sha256 = hashlib.sha256(cf_text.encode()).hexdigest()
+        cf_grounded_source = _counterfactual_grounded_source(
+            source.params.get("grounded_source"),
+            original_quote=original_score,
+            changed_quote=changed_score,
+            changed_text=cf_text,
+        )
+        cf_source_file_spans = _counterfactual_source_file_spans(
+            source.params.get("source_file_spans"), changed_text=cf_text
+        )
+        cf_provenance = hashlib.sha256(
+            json.dumps(
+                {
+                    "operation": "counterfactual_revision_text",
+                    "parent_provenance_id": source.params["provenance_id"],
+                    "source_file_spans": cf_source_file_spans,
+                    "source_view_basenames": source.params["source_view_basenames"],
+                    "text_sha256": cf_text_sha256,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        if tier == "16k":
+            question = (
+                f"For {decision.params['work_id']}, join two non-overlapping "
+                "benchmark channels and a third authentic training channel from v1: "
+                "read the abstract BLEU score and training days, the detailed-result "
+                "BLEU score, and the exact training hardware. Reply exactly as "
+                "<benchmark> | training v1 <hardware> | v1 <score>@<days>d | "
+                "detail v1 <score>."
+            )
+            program_ops = [
+                {"op": "READ_REVISION_ABSTRACT_BENCHMARK"},
+                {"op": "READ_DETAILED_BENCHMARK_RESULT"},
+                {"op": "READ_TRAINING_HARDWARE"},
+                {"op": "JOIN_NONOVERLAPPING_SOURCE_CHANNELS"},
+            ]
+            gold_expression = (
+                "READ_ABSTRACT(v1) AND READ_DETAIL(v1) AND READ_TRAINING(v1) "
+                "THEN FORMAT_SINGLE_REVISION_TRACE"
+            )
+            proof_depth = 2
+        elif tier == "32k":
+            question = (
+                "Follow the verified v2 revision_of v1 edge for "
+                f"{decision.params['work_id']}. Report both revisions' abstract "
+                "BLEU score and training days, then their detailed-result BLEU "
+                "scores, and verify the exact training hardware in each revision's "
+                "own source archive. Reply exactly as <benchmark> | training v1 "
+                "<hardware> -> v2 <hardware> | v1 <score>@<days>d -> v2 "
+                "<score>@<days>d | detail v1 <score> -> v2 <score>."
+            )
+            program_ops = [
+                {"op": "READ_REVISION_ABSTRACT_BENCHMARK"},
+                {"op": "FOLLOW_REVISION_OF"},
+                {"op": "READ_DETAILED_BENCHMARK_RESULT"},
+                {"op": "READ_TRAINING_HARDWARE"},
+                {"op": "JOIN_NONOVERLAPPING_SOURCE_CHANNELS"},
+                {"op": "FORMAT_ABSTRACT_DETAIL_CONFLICT"},
+            ]
+            gold_expression = (
+                "READ_ABSTRACT_AND_DETAIL(v1,v2) AND READ_TRAINING(v1,v2) AND "
+                "FOLLOW(v2 revision_of v1) "
+                "THEN FORMAT_REVISION_CONFLICT"
+            )
+            proof_depth = 3
+        else:
+            question = (
+                "Trace the complete authentic v1 -> v2 -> v3 arXiv revision chain "
+                f"for {decision.params['work_id']}. Report every revision's "
+                "abstract BLEU score and training days followed by every detailed "
+                "BLEU result, plus the exact v1 training hardware from its separate "
+                "source channel and the hardware statement in each later revision's "
+                "own source archive, preserving revision order. Reply exactly as "
+                "<benchmark> | training v1 <hardware> -> v2 <hardware> -> v3 "
+                "<hardware> | v1 <score>@<days>d -> v2 <score>@<days>d -> v3 "
+                "<score>@<days>d | detail v1 <score> -> v2 <score> -> v3 <score>."
+            )
+            program_ops = [
+                {"op": "READ_REVISION_ABSTRACT_BENCHMARK"},
+                {"op": "FOLLOW_REVISION_OF"},
+                {"op": "FOLLOW_TERMINAL_REVISION_OF"},
+                {"op": "READ_DETAILED_BENCHMARK_RESULT"},
+                {"op": "READ_TRAINING_HARDWARE"},
+                {"op": "JOIN_NONOVERLAPPING_SOURCE_CHANNELS"},
+                {"op": "FORMAT_COMPLETE_BENCHMARK_REVISION_TRACE"},
+            ]
+            gold_expression = (
+                "READ_ABSTRACT_AND_DETAIL(v1,v2,v3) AND READ_TRAINING(v1,v2,v3) AND "
+                "FOLLOW(v2 revision_of v1, v3 revision_of v2) THEN "
+                "FORMAT_COMPLETE_REVISION_TRACE"
+            )
+            proof_depth = 4
+        workflow_key = hashlib.sha256(
+            str(decision.params["workflow_id"]).encode()
+        ).hexdigest()[:12]
+        queries.append(
+            QuerySpec(
+                query_id=(f"{qid}:real_benchmark_revision_trace:{workflow_key}:{tier}"),
+                query_type="real_benchmark_revision_trace",
+                question=question,
+                answer="",
+                as_of=decision.time,
+                answer_key=str(decision.params["answer_key"]),
+                essential_event_ids=proof_event_ids,
+                essential_artifact_ids=[
+                    _event_artifact_id(world, events_by_id[event_id])
+                    for event_id in proof_event_ids
+                ],
+                sufficient_event_ids=proof_event_ids,
+                cf_event_id=source.id,
+                cf_param_updates={
+                    "text": cf_text,
+                    "text_sha256": cf_text_sha256,
+                    "parent_provenance_id": source.params["provenance_id"],
+                    "provenance_id": f"derived-sha256:{cf_provenance}",
+                    "provenance_operation": "counterfactual_revision_text",
+                    "source_binding_provenance": "synthetic_executable",
+                    "source_origin": "synthetic_world",
+                    "parent_source_origin": "real_derived",
+                    "parent_source_envelope_sha256": source.params[
+                        "canonical_source_envelope_sha256"
+                    ],
+                    "parent_source_text_sha256": source.params["text_sha256"],
+                    "excluded_paths": [],
+                    "source_file_spans": cf_source_file_spans,
+                    "ground_values": [
+                        changed_score if value == original_score else value
+                        for value in source.params.get("ground_values", [])
+                    ],
+                    "grounded_source": cf_grounded_source,
+                },
+                cf_answer="",
+                invariance_event_id=tok.id,
+                invariance_param_updates={"commit": "ab00ab"},
+                gold_expression=gold_expression,
+                proof_depth=proof_depth,
+                cf_op="revision_text",
+                motif="real_benchmark_revision_trace",
+                topology_id=instance_topology(
+                    "lab.real_benchmark_revision_trace",
+                    tier,
+                    len(decision.params.get("required_relation_ids") or []),
+                ),
+                domain="researchlab",
+                truth_regime="real_source_derived",
+                program_ops=program_ops,
+                preferred_length_buckets=[tier],
+                semantic_growth_group="researchlab_real_benchmark_revision_trace",
+                base_task_group=(
+                    f"real_benchmark_revision_trace:{decision.params['work_id']}:"
+                    f"{workflow_key}"
+                ),
+            )
+        )
 
     multiband_decisions = sorted(
         (
@@ -855,7 +1057,12 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
             if control_tier in {"32k", "64k"}:
                 essential_events.extend(
                     sorted(
-                        wiki_relations.get(record_id) or [],
+                        (
+                            relation
+                            for relation in wiki_relations.get(record_id) or []
+                            if relation.params.get("relation_id")
+                            in required_relation_ids
+                        ),
                         key=lambda event: (event.time, event.id),
                     )
                 )

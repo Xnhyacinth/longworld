@@ -217,18 +217,38 @@ def test_einstein_program_uses_non_overlapping_body_facts() -> None:
     by_id = {section.section_id: section for section in program.sections}
     assert program.entity_id == "Q937"
     assert program.title == "Albert Einstein"
-    born = by_id["early_work"].facts[0]
+    early_ids = (
+        "early_birth",
+        "early_patent",
+        "early_academic",
+        "early_fame",
+        "early_refugee",
+    )
+    born = by_id["early_birth"].facts[0]
     assert born.value == "1879-03-14"
     assert born.evidence_quote == "{{Birth date|df=yes|1879|3|14}}"
-    assert WIKI_EINSTEIN_MID_QUOTE not in by_id["early_work"].wikitext
-    assert WIKI_EINSTEIN_LATE_QUOTE not in by_id["early_work"].wikitext
+    assert [
+        (
+            by_id[section_id].facts[0].role,
+            by_id[section_id].facts[0].answer_tag,
+            by_id[section_id].minimum_tier,
+        )
+        for section_id in early_ids
+    ] == [
+        ("born", "BORN", "16k"),
+        ("patent_examiner", "PATENT", "16k"),
+        ("prague_research", "PRAGUE", "16k"),
+        ("scientific_fame", "FAME", "64k"),
+        ("refugee_status", "REFUGEE", "16k"),
+    ]
+    early_text = "".join(by_id[section_id].wikitext for section_id in early_ids)
+    assert WIKI_EINSTEIN_MID_QUOTE not in early_text
+    assert WIKI_EINSTEIN_LATE_QUOTE not in early_text
     assert WIKI_EINSTEIN_LATE_QUOTE not in by_id["commemoration"].wikitext
     assert by_id["commemoration"].facts[0].value == WIKI_EINSTEIN_MID_QUOTE
     assert by_id["popular_culture"].facts[0].value == WIKI_EINSTEIN_LATE_QUOTE
     reconstructed = (
-        by_id["early_work"].wikitext
-        + by_id["commemoration"].wikitext
-        + by_id["popular_culture"].wikitext
+        early_text + by_id["commemoration"].wikitext + by_id["popular_culture"].wikitext
     )
     from longworld.core.wikiparse import extract_wikipedia_wikitext
 
@@ -243,7 +263,10 @@ def test_einstein_program_uses_non_overlapping_body_facts() -> None:
     from longworld.core.pack import estimate_tokens
 
     assert 10_000 <= estimate_tokens(rest) <= 12_000
-    assert by_id["early_work"].ground_value in by_id["early_work"].wikitext
+    assert all(
+        by_id[section_id].ground_value in by_id[section_id].wikitext
+        for section_id in early_ids
+    )
     assert by_id["commemoration"].ground_value in by_id["commemoration"].wikitext
     assert by_id["popular_culture"].ground_value in by_id["popular_culture"].wikitext
 
@@ -401,20 +424,44 @@ def test_obama_program_uses_unique_birth_and_non_overlapping_body() -> None:
     by_id = {section.section_id: section for section in program.sections}
     assert program.entity_id == "Q76"
     assert program.title == "Barack Obama"
-    born = by_id["early_work"].facts[0]
+    early_ids = (
+        "early_birth",
+        "early_degree",
+        "early_organizing",
+        "early_law",
+        "early_family",
+    )
+    born = by_id["early_birth"].facts[0]
     assert born.role == "born"
     assert born.value == "1961-08-04"
     assert born.evidence_quote == "{{birth date and age|1961|8|4}}"
     assert wikipedia.count(born.evidence_quote) == 1
-    assert WIKI_OBAMA_MID_QUOTE not in by_id["early_work"].wikitext
-    assert WIKI_OBAMA_LATE_QUOTE not in by_id["early_work"].wikitext
+    assert [
+        (
+            by_id[section_id].facts[0].role,
+            by_id[section_id].facts[0].answer_tag,
+            by_id[section_id].minimum_tier,
+        )
+        for section_id in early_ids
+    ] == [
+        ("born", "BORN", "16k"),
+        ("college_degree", "DEGREE", "16k"),
+        ("community_organizer", "ORGANIZER", "16k"),
+        ("law_school", "HARVARD", "32k"),
+        ("maternal_grandmother", "GRANDMOTHER", "16k"),
+    ]
+    early_text = "".join(by_id[section_id].wikitext for section_id in early_ids)
+    assert WIKI_OBAMA_MID_QUOTE not in early_text
+    assert WIKI_OBAMA_LATE_QUOTE not in early_text
     assert WIKI_OBAMA_LATE_QUOTE not in by_id["commemoration"].wikitext
     assert by_id["commemoration"].facts[0].value == WIKI_OBAMA_MID_QUOTE
     assert by_id["popular_culture"].facts[0].value == WIKI_OBAMA_LATE_QUOTE
+    assert (
+        by_id["popular_culture"].ground_value
+        == "===2004 U.S. Senate campaign in Illinois==="
+    )
     reconstructed = (
-        by_id["early_work"].wikitext
-        + by_id["commemoration"].wikitext
-        + by_id["popular_culture"].wikitext
+        early_text + by_id["commemoration"].wikitext + by_id["popular_culture"].wikitext
     )
     from longworld.core.wikiparse import extract_wikipedia_wikitext
 
@@ -429,7 +476,10 @@ def test_obama_program_uses_unique_birth_and_non_overlapping_body() -> None:
     from longworld.core.pack import estimate_tokens
 
     assert 1_100 <= estimate_tokens(rest) <= 1_300
-    assert by_id["early_work"].ground_value in by_id["early_work"].wikitext
+    assert all(
+        by_id[section_id].ground_value in by_id[section_id].wikitext
+        for section_id in early_ids
+    )
     assert by_id["commemoration"].ground_value in by_id["commemoration"].wikitext
     assert by_id["popular_culture"].ground_value in by_id["popular_culture"].wikitext
     assert by_id["appendix_rest"].ground_value == "====Environmental policy===="

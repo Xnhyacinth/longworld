@@ -1,0 +1,18 @@
+{
+  "schema_version": "longworld.wikimedia-fetch-request.v1",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P7-WIKIMEDIA-PUBLIC-SOURCE-RICH-20260825",
+    "scope": "Bounded English Wikipedia revision and Wikidata entity workflow export for four exact titles",
+    "basis": "User-authorized public-source LongWorld source-rich workflow construction",
+    "reviewed_at": "2026-08-25T00:00:00Z"
+  },
+  "language": "en",
+  "titles": [
+    "Ada Lovelace",
+    "Grace Hopper",
+    "Alan Turing",
+    "Katherine Johnson"
+  ],
+  "requests_per_second": 5
+}

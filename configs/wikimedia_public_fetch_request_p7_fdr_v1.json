@@ -1,0 +1,13 @@
+{
+  "schema_version": "longworld.wikimedia-fetch-request.v1",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P7-WIKIMEDIA-PUBLIC-FDR-20260826",
+    "scope": "Franklin D. Roosevelt English Wikipedia and Wikidata revision inventory",
+    "basis": "User-authorized public-source LongWorld source-rich workflow construction",
+    "reviewed_at": "2026-08-26T11:30:00Z"
+  },
+  "language": "en",
+  "titles": ["Franklin D. Roosevelt"],
+  "requests_per_second": 5
+}

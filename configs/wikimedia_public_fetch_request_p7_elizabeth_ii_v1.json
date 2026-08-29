@@ -1,0 +1,13 @@
+{
+  "schema_version": "longworld.wikimedia-fetch-request.v1",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P7-WIKIMEDIA-PUBLIC-ELIZABETH-II-20260826",
+    "scope": "Elizabeth II English Wikipedia and Wikidata revision inventory",
+    "basis": "User-authorized public-source LongWorld source-rich workflow construction",
+    "reviewed_at": "2026-08-26T12:10:00Z"
+  },
+  "language": "en",
+  "titles": ["Elizabeth II"],
+  "requests_per_second": 5
+}
