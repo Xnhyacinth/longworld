@@ -1,0 +1,27 @@
+{
+  "schema_version": "longworld.public-github-export-request.v1",
+  "request_id": "p12-wave3-codeforge-deno-three-cycle-v1",
+  "repository": "denoland/deno",
+  "allowlist": "configs/public_repo_allowlist.yaml",
+  "episodes": [
+    {
+      "pull": 34726,
+      "release": "v2.9.0",
+      "role": "release_cycle"
+    },
+    {
+      "pull": 35466,
+      "release": "v2.9.1",
+      "role": "release_cycle"
+    },
+    {
+      "pull": 35786,
+      "release": "v2.9.2",
+      "role": "release_cycle"
+    }
+  ],
+  "composition": "chronological_causal_union",
+  "synthetic_filler_allowed": false,
+  "random_join_allowed": false,
+  "trust_scope": "local_probe"
+}

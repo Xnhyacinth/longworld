@@ -1,0 +1,42 @@
+{
+  "schema_version": "longworld.public-github-export-request.v1",
+  "request_id": "p12-wave3-codeforge-ruff-longhistory-v1",
+  "repository": "astral-sh/ruff",
+  "allowlist": "configs/public_repo_allowlist.yaml",
+  "episodes": [
+    {
+      "pull": 27570,
+      "release": "0.16.3",
+      "role": "release_cycle"
+    },
+    {
+      "pull": 27687,
+      "release": null,
+      "role": "intervening_pr_ci"
+    },
+    {
+      "pull": 17804,
+      "release": "0.16.4",
+      "role": "release_cycle"
+    },
+    {
+      "pull": 27766,
+      "release": null,
+      "role": "intervening_pr_ci"
+    },
+    {
+      "pull": 28024,
+      "release": "0.16.5",
+      "role": "release_cycle"
+    },
+    {
+      "pull": 27924,
+      "release": null,
+      "role": "intervening_pr_ci"
+    }
+  ],
+  "composition": "chronological_causal_union",
+  "synthetic_filler_allowed": false,
+  "random_join_allowed": false,
+  "trust_scope": "local_probe"
+}

@@ -22,6 +22,10 @@ worlds retain zero qualified rows because at least one required exact band is
 missing; the report records why the rows are excluded instead of counting them
 as training data.
 
+See `p12_wave3_source_scaleout_diagnostics_v1.md` for the corresponding Ruff,
+Deno, Megatron-LM, and RFC 9421 scale-out results. Wave 3 adds an audited IETF
+source contract but no new promoted rows.
+
 ## P4 multidomain local probe (2026-08-24)
 
 See `p4_multidomain_local48_v1.md` for the current expanded local release and

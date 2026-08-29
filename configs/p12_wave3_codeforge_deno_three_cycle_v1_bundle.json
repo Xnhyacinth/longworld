@@ -1,0 +1,27 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "data/releases/p12-wave3-codeforge-deno-source-v1/deno_pr34726_v2.9.0.json",
+      "sha256": "1c66e3407723dcb1fcf3e98dffd534f3cc52446c9162cbc631c6919ffc1e12a4"
+    },
+    {
+      "path": "data/releases/p12-wave3-codeforge-deno-source-v1/deno_pr35466_v2.9.1.json",
+      "sha256": "fd809b3e17e71447e407fa9cfc10d0b1042743c6db7ac3d46f17ca35f7f1171c"
+    },
+    {
+      "path": "data/releases/p12-wave3-codeforge-deno-source-v1/deno_pr35786_v2.9.2.json",
+      "sha256": "69b02d63188e2d90beeb8ef3a2853ce4260506eda918ec850ea136a1ccb274bd"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "probe-source-3a689228f9679b0522a18cadd07f1e97",
+    "environment": "probe",
+    "digest": "fe12e84d0e40a532416530952dfbcef30bd18e1798c550f775e5cf497896fe81"
+  }
+}

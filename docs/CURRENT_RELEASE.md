@@ -48,6 +48,16 @@ combined-role artifact is cryptographically labeled
 not independent production trust. Production/KMS-qualified P12 rows therefore
 remain zero, and no raw promoted JSONL is authorized for HF publication.
 
+Wave 3 expanded real-source diagnostics without changing that baseline. Ruff
+produced only a valid 16K group, Deno only a valid 64K group, and the four-revision
+Megatron-LM workflow reached roughly 50K rather than the exact 64K band; all
+failed world-atomic preflight before dense promotion. A new RFC 9421 IETF slice
+now has a source-attested disabled manifest with consecutive draft revisions
+17--19 and a grounded `published_as` relation, but it has not yet been adapted
+into state or an answer program. See
+`reports/p12_wave3_source_scaleout_diagnostics_v1.md`; none of these diagnostics
+is qualified or uploadable training data.
+
 No invalidated P7/P8/P9 row is currently qualified for upload. SEC exact-single v8 and its
 derived Apple/Amazon slices were invalidated after exact raw-span replay found
 a 4K shortcut and after readable-text normalization showed that more than 97%
