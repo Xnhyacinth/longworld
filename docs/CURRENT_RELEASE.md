@@ -51,12 +51,23 @@ remain zero, and no raw promoted JSONL is authorized for HF publication.
 Wave 3 expanded real-source diagnostics without changing that baseline. Ruff
 produced only a valid 16K group, Deno only a valid 64K group, and the four-revision
 Megatron-LM workflow reached roughly 50K rather than the exact 64K band; all
-failed world-atomic preflight before dense promotion. A new RFC 9421 IETF slice
-now has a source-attested disabled manifest with consecutive draft revisions
-17--19 and a grounded `published_as` relation, but it has not yet been adapted
-into state or an answer program. See
+failed world-atomic preflight before dense promotion. RFC 9421 now has 20 draft
+revisions, a signed 22-record/20-relation bundle, and a standalone byte-bound
+state→answer→CF/remove-one replay contract. Its real 18→19 diff does not contain
+a unique single-keyword normative replacement, so actual task retention remains
+zero and it is not a training world. New NVD+CISA, Federal Register+
+Regulations.gov, and ClinicalTrials+openFDA inventories add 9 official records
+and 8 evidence-bound relations, but remain disabled source-only artifacts with
+zero training rows. See
 `reports/p12_wave3_source_scaleout_diagnostics_v1.md`; none of these diagnostics
 is qualified or uploadable training data.
+
+The candidate preflight now enforces cumulative source-bound 16/32/64K history
+before dense ranking. Bands must share one semantic growth identity and grow in
+event-bearing/internal content, strict support, essential events, proof depth,
+and nested authentic relations. Real-source-derived causal evidence counts;
+an unrelated real hard negative does not. This is a structural check over
+signed candidates, not a substitute for independent strict replay.
 
 No invalidated P7/P8/P9 row is currently qualified for upload. SEC exact-single v8 and its
 derived Apple/Amazon slices were invalidated after exact raw-span replay found
