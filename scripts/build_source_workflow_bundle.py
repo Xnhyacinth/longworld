@@ -25,6 +25,11 @@ from longworld.core.filingworkflow import (
     MAX_SEC_MANIFEST_BYTES,
     SEC_FILING_MANIFEST_SCHEMA,
 )
+from longworld.core.issuerfilingworkflow import (
+    ISSUER_IR_FILING_MANIFEST_SCHEMA,
+    ISSUER_IR_SOURCE_KIND,
+    MAX_ISSUER_IR_MANIFEST_BYTES,
+)
 from longworld.core.provenance import ProvenanceError, _read_regular_file
 from longworld.core.sourcebundle import (
     SOURCE_WORKFLOW_ADAPTER_REVISION,
@@ -46,6 +51,11 @@ _CONTRACTS = {
         "researchlab",
         {WIKIPEDIA_WORKFLOW_MANIFEST_SCHEMA},
         MAX_DOCUMENT_MANIFEST_BYTES,
+    ),
+    ISSUER_IR_SOURCE_KIND: (
+        "company",
+        {ISSUER_IR_FILING_MANIFEST_SCHEMA},
+        MAX_ISSUER_IR_MANIFEST_BYTES,
     ),
 }
 
@@ -135,6 +145,7 @@ def main() -> None:
     parser.add_argument("--paper-manifest", action="append", type=Path, default=[])
     parser.add_argument("--sec-manifest", action="append", type=Path, default=[])
     parser.add_argument("--wikimedia-manifest", action="append", type=Path, default=[])
+    parser.add_argument("--issuer-ir-manifest", action="append", type=Path, default=[])
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument(
         "--adapter-revision",
@@ -149,6 +160,7 @@ def main() -> None:
         *(("paper_workflow", path) for path in args.paper_manifest),
         *(("sec_filing", path) for path in args.sec_manifest),
         *(("wikimedia", path) for path in args.wikimedia_manifest),
+        *((ISSUER_IR_SOURCE_KIND, path) for path in args.issuer_ir_manifest),
     ]
     build_source_workflow_bundle(
         manifests, args.out, adapter_revision=args.adapter_revision

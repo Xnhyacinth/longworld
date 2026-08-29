@@ -44,14 +44,22 @@ def _filing(
     form: str,
     filed: str,
     report_date: str,
+    *,
+    cik: str = "0000000001",
+    primary_document: str | None = None,
 ) -> bytes:
+    primary_document = primary_document or (
+        "filing-amendment.htm" if form.endswith("/A") else "filing.htm"
+    )
     return (
         f"<SEC-DOCUMENT>{accession}.txt\n"
         f"ACCESSION NUMBER:\t\t{accession}\n"
         f"CONFORMED SUBMISSION TYPE:\t{form}\n"
         f"CONFORMED PERIOD OF REPORT:\t{report_date.replace('-', '')}\n"
         f"FILED AS OF DATE:\t\t{filed.replace('-', '')}\n"
-        "<DOCUMENT>\n<TYPE>10-K\n"
+        f"CENTRAL INDEX KEY:\t\t\t{cik}\n"
+        f"<DOCUMENT>\n<TYPE>{form}\n<SEQUENCE>1\n"
+        f"<FILENAME>{primary_document}\n"
         "Revenue for the reported period was USD 42 million.\n"
         "</DOCUMENT>\n"
     ).encode()
@@ -76,6 +84,10 @@ def test_fetch_builds_hash_bound_input_and_real_amendment_relation(
                         "filingDate": ["2026-03-01", "2026-02-20"],
                         "reportDate": ["2025-12-31", "2025-12-31"],
                         "form": ["10-K/A", "10-K"],
+                        "primaryDocument": [
+                            "filing-amendment.htm",
+                            "filing.htm",
+                        ],
                     }
                 },
             }
@@ -185,6 +197,7 @@ def test_fetch_retries_transient_http_status(tmp_path: Path) -> None:
                         "filingDate": ["2026-02-20"],
                         "reportDate": ["2025-12-31"],
                         "form": ["10-K"],
+                        "primaryDocument": ["filing.htm"],
                     }
                 },
             }
@@ -239,6 +252,7 @@ def test_fetch_revalidates_online_instead_of_trusting_writable_cache(
                         "filingDate": ["2026-02-20"],
                         "reportDate": ["2025-12-31"],
                         "form": ["10-K"],
+                        "primaryDocument": ["filing.htm"],
                     }
                 },
             }
@@ -283,7 +297,7 @@ def test_fetch_revalidates_online_instead_of_trusting_writable_cache(
     assert calls == 6
 
 
-def test_fetch_rejects_accession_from_a_different_cik(tmp_path: Path) -> None:
+def test_fetch_rejects_complete_submission_cik_mismatch(tmp_path: Path) -> None:
     request = _request()
     request["forms"] = ["10-K"]
     request["max_filings_per_cik"] = 1
@@ -298,16 +312,32 @@ def test_fetch_rejects_accession_from_a_different_cik(tmp_path: Path) -> None:
                     "filingDate": ["2026-02-20"],
                     "reportDate": ["2025-12-31"],
                     "form": ["10-K"],
+                    "primaryDocument": ["filing.htm"],
                 }
             },
         }
     ).encode()
 
-    with pytest.raises(ProvenanceError, match="match CIK"):
+    filing_url = (
+        "https://www.sec.gov/Archives/edgar/data/1/"
+        "000000000226000001/0000000002-26-000001.txt"
+    )
+    responses = {
+        "https://data.sec.gov/submissions/CIK0000000001.json": submissions,
+        filing_url: _filing(
+            "0000000002-26-000001",
+            "10-K",
+            "2026-02-20",
+            "2025-12-31",
+            cik="0000000002",
+        ),
+    }
+
+    with pytest.raises(ProvenanceError, match="bind cik"):
         fetch_sec_workflow(
             request_path,
             tmp_path / "download",
-            http_get=lambda *_: (submissions, {}),
+            http_get=lambda url, *_: (responses[url], {}),
             sleep=lambda _: None,
             generated_at="2026-08-25T10:00:00Z",
         )
@@ -328,6 +358,7 @@ def test_fetch_rejects_unsafe_accession_before_source_download(tmp_path: Path) -
                     "filingDate": ["2026-02-20"],
                     "reportDate": ["2025-12-31"],
                     "form": ["10-K"],
+                    "primaryDocument": ["filing.htm"],
                 }
             },
         }
@@ -381,6 +412,10 @@ def test_manifest_audit_recomputes_filing_relations(tmp_path: Path) -> None:
                         "filingDate": ["2026-03-01", "2026-02-20"],
                         "reportDate": ["2025-12-31", "2025-12-31"],
                         "form": ["10-K/A", "10-K"],
+                        "primaryDocument": [
+                            "filing-amendment.htm",
+                            "filing.htm",
+                        ],
                     }
                 },
             }
@@ -433,6 +468,7 @@ def test_explicit_filings_import_local_archives_without_http(tmp_path: Path) -> 
             "form": "10-K",
             "filing_date": "2026-02-20",
             "report_date": "2025-12-31",
+            "primary_document": "filing.htm",
             "source_file": "0000000001-26-000001.txt",
         }
     ]
@@ -473,6 +509,7 @@ def test_explicit_filings_fail_closed_when_local_archive_is_missing(
             "form": "10-K",
             "filing_date": "2026-02-20",
             "report_date": "2025-12-31",
+            "primary_document": "filing.htm",
             "source_file": "0000000001-26-000001.txt",
         }
     ]

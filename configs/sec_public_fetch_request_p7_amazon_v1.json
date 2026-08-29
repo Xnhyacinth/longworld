@@ -1,0 +1,25 @@
+{
+  "schema_version": "longworld.sec-fetch-request.v1",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P7-SEC-AMAZON-LOCAL-IMPORT-20260826",
+    "scope": "Bounded local Archives import of one allowlisted Amazon 10-K",
+    "basis": "User-authorized public-source LongWorld source-rich workflow construction from an attested local complete submission",
+    "reviewed_at": "2026-08-26T16:00:00Z"
+  },
+  "allowed_ciks": ["0001018724"],
+  "forms": ["10-K"],
+  "max_filings_per_cik": 1,
+  "requests_per_second": 5,
+  "max_retries": 3,
+  "explicit_filings": [
+    {
+      "cik": "0001018724",
+      "accession": "0001018724-25-000004",
+      "form": "10-K",
+      "filing_date": "2025-02-07",
+      "report_date": "2024-12-31",
+      "source_file": "0001018724-25-000004.txt"
+    }
+  ]
+}

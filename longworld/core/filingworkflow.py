@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -35,10 +36,12 @@ SEC_SCANNER_REVISION = "v2"
 MAX_SEC_FILINGS = 512
 MAX_SEC_MANIFEST_BYTES = 32_000_000
 SEC_FILING_COMPONENT_REVISION = "sec-sgml-component-v1"
+ISSUER_GCS_MERGED_COMPONENT_REVISION = "issuer_gcs_merged_html@1"
 
 _ACCESSION = re.compile(r"^\d{10}-\d{2}-\d{6}$")
 _CIK = re.compile(r"^\d{10}$")
 _FORM = re.compile(r"^[A-Z0-9-]+(?:/A)?$")
+_PRIMARY_DOCUMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]+@(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}(?![\w-])")
 _SECRET_PATTERNS = (
@@ -57,6 +60,7 @@ _SOURCE_STATUSES = {
     "test_fixture",
     "public_sec_download",
     "authorized_download",
+    "issuer_owned_public_export",
 }
 _SEC_FAIR_ACCESS_URL = (
     "https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data"
@@ -82,6 +86,24 @@ _SEC_DOCUMENT_BLOCK = re.compile(
     r"^<DOCUMENT>[^\S\n]*\n.*?^</DOCUMENT>[^\S\n]*(?:\n|$)",
     re.MULTILINE | re.DOTALL,
 )
+_GCS_DOCUMENT_TITLE = re.compile(
+    r"(?m)^[ \t]*<title>([^<]+)</title>[ \t]*$",
+)
+_GCS_DOCUMENT_ANCHOR = re.compile(
+    r'<div><a name="([A-Za-z0-9][A-Za-z0-9._-]{0,254})"></a></div>[ \t\r\n]*$'
+)
+_GCS_CIK_FACT = re.compile(
+    r'<ix:nonNumeric\b[^>]*\bname="dei:EntityCentralIndexKey"[^>]*>'
+    r"[ \t\r\n]*(\d{10})[ \t\r\n]*</ix:nonNumeric>",
+    re.IGNORECASE,
+)
+_GCS_FORM_FACT = re.compile(
+    r'<ix:nonNumeric\b[^>]*\bname="dei:DocumentType"[^>]*>'
+    r".*?</ix:nonNumeric>",
+    re.IGNORECASE | re.DOTALL,
+)
+_GCS_SCHEMA_REF = re.compile(r'\bxlink:href="#([A-Za-z0-9][A-Za-z0-9._-]{0,249})\.xsd"')
+_GCS_HTML_BOUNDARY = re.compile(r"<html(?:\s[^>]*)?>|</html\s*>", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -100,6 +122,7 @@ class SecFilingComponent:
     parent_source_sha256: str
     component_sha256: str
     provenance_id: str
+    parser_revision: str = SEC_FILING_COMPONENT_REVISION
 
 
 def _payload_strings(value: Any):
@@ -287,6 +310,226 @@ def parse_sec_filing_components(
     return tuple(components)
 
 
+def _issuer_gcs_component_provenance(
+    *,
+    component_type: str,
+    sequence: int,
+    filename: str,
+    char_start: int,
+    char_end: int,
+    parent_source_sha256: str,
+    component_sha256: str,
+) -> str:
+    payload = {
+        "operation": ISSUER_GCS_MERGED_COMPONENT_REVISION,
+        "component_type": component_type,
+        "sequence": sequence,
+        "filename": filename,
+        "char_start": char_start,
+        "char_end": char_end,
+        "parent_source_sha256": parent_source_sha256,
+        "component_sha256": component_sha256,
+    }
+    return (
+        "derived-sha256:"
+        + hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+    )
+
+
+def _issuer_gcs_outer_html_end(source_text: str) -> int:
+    depth = 0
+    root_start: int | None = None
+    root_end: int | None = None
+    for match in _GCS_HTML_BOUNDARY.finditer(source_text):
+        closing = source_text[match.start() + 1 : match.end()].lstrip().startswith("/")
+        if closing:
+            if depth <= 0:
+                raise ProvenanceError("issuer GCS outer HTML envelope is invalid")
+            depth -= 1
+            if depth == 0:
+                root_end = match.end()
+        else:
+            if root_end is not None:
+                raise ProvenanceError("issuer GCS outer HTML envelope is invalid")
+            if root_start is None:
+                root_start = match.start()
+            depth += 1
+    if (
+        root_start is None
+        or root_end is None
+        or depth != 0
+        or re.fullmatch(
+            r"\s*<!DOCTYPE html>\s*", source_text[:root_start], re.IGNORECASE
+        )
+        is None
+        or source_text[root_end:].strip()
+    ):
+        raise ProvenanceError("issuer GCS outer HTML envelope is invalid")
+    return root_end
+
+
+def validate_issuer_gcs_merged_component(
+    source_text: str, component: SecFilingComponent
+) -> None:
+    """Replay one exact child-document span from an issuer GCS merged page."""
+    parent_sha256 = hashlib.sha256(source_text.encode()).hexdigest()
+    if (
+        component.parser_revision != ISSUER_GCS_MERGED_COMPONENT_REVISION
+        or component.parent_source_sha256 != parent_sha256
+        or component.char_start < 0
+        or component.char_end <= component.char_start
+        or component.char_end > len(source_text)
+    ):
+        raise ProvenanceError("issuer GCS component lineage mismatch")
+    block = source_text[component.char_start : component.char_end]
+    if not block.startswith("<html") or not block.endswith("</html>"):
+        raise ProvenanceError("issuer GCS component boundary mismatch")
+    titles = _GCS_DOCUMENT_TITLE.findall(block)
+    if titles != [component.component_type]:
+        raise ProvenanceError("issuer GCS component title mismatch")
+    component_sha256 = hashlib.sha256(block.encode()).hexdigest()
+    if component.component_sha256 != component_sha256:
+        raise ProvenanceError("issuer GCS component hash mismatch")
+    expected = _issuer_gcs_component_provenance(
+        component_type=component.component_type,
+        sequence=component.sequence,
+        filename=component.filename,
+        char_start=component.char_start,
+        char_end=component.char_end,
+        parent_source_sha256=parent_sha256,
+        component_sha256=component_sha256,
+    )
+    if component.provenance_id != expected:
+        raise ProvenanceError("issuer GCS component provenance mismatch")
+
+
+def parse_issuer_gcs_merged_components(
+    source_text: str,
+    *,
+    expected_accession: str,
+    expected_cik: str,
+    expected_form: str,
+    expected_primary_document: str,
+) -> tuple[SecFilingComponent, ...]:
+    """Parse exact child documents without representing issuer bytes as SEC SGML."""
+    if (
+        _ACCESSION.fullmatch(expected_accession) is None
+        or _CIK.fullmatch(expected_cik) is None
+        or expected_form != "10-K"
+        or _PRIMARY_DOCUMENT.fullmatch(expected_primary_document) is None
+    ):
+        raise ProvenanceError("issuer GCS expected filing identity is invalid")
+    xbrl_starts = [match.start() for match in re.finditer(r"<XBRL>", source_text)]
+    xbrl_ends = [match.start() for match in re.finditer(r"</XBRL>", source_text)]
+    if len(xbrl_starts) != 1 or len(xbrl_ends) != 1 or xbrl_ends[0] <= xbrl_starts[0]:
+        raise ProvenanceError("issuer GCS merged XBRL boundary is invalid")
+    xbrl_start, xbrl_end = xbrl_starts[0], xbrl_ends[0]
+    accession_link = (
+        f"/sec-filings/sec-filing/{expected_form.lower()}/{expected_accession}"
+    )
+    if accession_link not in source_text[:xbrl_start] or (
+        f"{expected_accession}.pdf" not in source_text[:xbrl_start]
+    ):
+        raise ProvenanceError("issuer GCS accession binding is missing")
+    cik_values = set(_GCS_CIK_FACT.findall(source_text[xbrl_start:xbrl_end]))
+    if cik_values != {expected_cik}:
+        raise ProvenanceError("issuer GCS CIK binding is missing or ambiguous")
+
+    outer_html_end = _issuer_gcs_outer_html_end(source_text)
+    title_matches = list(
+        _GCS_DOCUMENT_TITLE.finditer(source_text, xbrl_start, outer_html_end)
+    )
+    recognized = set(SEC_EXTRACTABLE_COMPONENT_TYPES)
+    selected = [match for match in title_matches if match.group(1) in recognized]
+    title_counts = {
+        title: sum(match.group(1) == title for match in selected)
+        for title in recognized
+    }
+    duplicated = sorted(title for title, count in title_counts.items() if count > 1)
+    if duplicated:
+        raise ProvenanceError(
+            f"issuer GCS component identity is duplicated: {duplicated}"
+        )
+    missing = sorted(
+        title for title in SEC_REQUIRED_COMPONENT_TYPES if title_counts[title] != 1
+    )
+    if missing:
+        raise ProvenanceError(
+            f"issuer GCS merged page is missing components: {missing}"
+        )
+
+    if any(
+        (match.group(1) == "10-K") != (match.start() < xbrl_end) for match in selected
+    ):
+        raise ProvenanceError("issuer GCS component placement is invalid")
+
+    main_match = next(match for match in selected if match.group(1) == "10-K")
+    main_start = source_text.rfind("<html", xbrl_start, main_match.start())
+    main_close = source_text.find("</html>", main_match.end(), xbrl_end)
+    main_end = main_close + len("</html>")
+    if main_start < xbrl_start or main_close < 0 or main_end > xbrl_end:
+        raise ProvenanceError("issuer GCS main document boundary is invalid")
+    main_block = source_text[main_start:main_end]
+    form_facts = _GCS_FORM_FACT.findall(main_block)
+    if len(form_facts) != 1 or re.sub(r"<[^>]+>", "", form_facts[0]).strip() != (
+        expected_form
+    ):
+        raise ProvenanceError("issuer GCS form binding is missing or ambiguous")
+    schema_stems = set(_GCS_SCHEMA_REF.findall(main_block))
+    expected_stem = expected_primary_document.removesuffix(".htm")
+    if schema_stems != {expected_stem}:
+        raise ProvenanceError(
+            "issuer GCS primary document binding is missing or ambiguous"
+        )
+
+    parent_sha256 = hashlib.sha256(source_text.encode()).hexdigest()
+    components: list[SecFilingComponent] = []
+    for sequence, match in enumerate(selected, start=1):
+        component_type = match.group(1)
+        lower_bound = xbrl_start if component_type == "10-K" else xbrl_end
+        upper_bound = xbrl_end if component_type == "10-K" else outer_html_end
+        char_start = source_text.rfind("<html", lower_bound, match.start())
+        close = source_text.find("</html>", match.end(), upper_bound)
+        char_end = close + len("</html>")
+        if char_start < lower_bound or close < 0 or char_end > upper_bound:
+            raise ProvenanceError("issuer GCS child document boundary is invalid")
+        if component_type == "10-K":
+            filename = expected_primary_document
+        else:
+            anchor_area = source_text[max(xbrl_start, char_start - 512) : char_start]
+            anchor = _GCS_DOCUMENT_ANCHOR.search(anchor_area)
+            if anchor is None:
+                raise ProvenanceError("issuer GCS child document filename is missing")
+            filename = anchor.group(1)
+        component_sha256 = hashlib.sha256(
+            source_text[char_start:char_end].encode()
+        ).hexdigest()
+        component = SecFilingComponent(
+            component_type=component_type,
+            sequence=sequence,
+            filename=filename,
+            char_start=char_start,
+            char_end=char_end,
+            parent_source_sha256=parent_sha256,
+            component_sha256=component_sha256,
+            provenance_id=_issuer_gcs_component_provenance(
+                component_type=component_type,
+                sequence=sequence,
+                filename=filename,
+                char_start=char_start,
+                char_end=char_end,
+                parent_source_sha256=parent_sha256,
+                component_sha256=component_sha256,
+            ),
+            parser_revision=ISSUER_GCS_MERGED_COMPONENT_REVISION,
+        )
+        validate_issuer_gcs_merged_component(source_text, component)
+        components.append(component)
+    return tuple(components)
+
+
 def _validate_final_payload(payload: dict[str, Any]) -> None:
     for value in _payload_strings(payload):
         _reject_secrets(value)
@@ -336,29 +579,47 @@ def _validate_fetch_receipt(value: object) -> dict[str, Any]:
     }
 
 
-def _validate_sec_identity(filing: dict[str, Any]) -> tuple[str, str, str, str, str]:
+def _validate_sec_identity(
+    filing: dict[str, Any], *, parser: str = ""
+) -> tuple[str, str, str, str, str, str]:
     accession = str(filing.get("accession") or "")
     cik = str(filing.get("cik") or "")
     form = str(filing.get("form") or "")
     filing_date = str(filing.get("filing_date") or "")
+    primary_document = str(filing.get("primary_document") or "")
     source_url = str(filing.get("source_url") or "")
     if _ACCESSION.fullmatch(accession) is None:
         raise ProvenanceError("SEC filing accession is missing or invalid")
     if _CIK.fullmatch(cik) is None:
         raise ProvenanceError("SEC filing CIK must contain ten digits")
-    if accession.split("-", 1)[0] != cik:
-        raise ProvenanceError("SEC filing accession does not match its CIK")
     if _FORM.fullmatch(form) is None:
         raise ProvenanceError("SEC filing form is missing or invalid")
+    if primary_document and (
+        _PRIMARY_DOCUMENT.fullmatch(primary_document) is None
+        or Path(primary_document).name != primary_document
+    ):
+        raise ProvenanceError("SEC filing primary document is invalid")
     try:
         date.fromisoformat(filing_date)
     except ValueError as exc:
         raise ProvenanceError("SEC filing date must be ISO-8601") from exc
     parsed = urlparse(source_url)
     host = (parsed.hostname or "").lower()
-    if parsed.scheme != "https" or not (host == "sec.gov" or host.endswith(".sec.gov")):
+    if parser == ISSUER_GCS_MERGED_COMPONENT_REVISION:
+        if (
+            parsed.scheme != "https"
+            or host != "microsoft.gcs-web.com"
+            or re.fullmatch(r"/node/[1-9]\d{0,19}/html", parsed.path) is None
+            or parsed.params
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ProvenanceError("issuer GCS merged source URL is invalid")
+    elif parsed.scheme != "https" or not (
+        host == "sec.gov" or host.endswith(".sec.gov")
+    ):
         raise ProvenanceError("SEC filing source URL must be an HTTPS sec.gov URL")
-    return accession, cik, form, filing_date, source_url
+    return accession, cik, form, filing_date, primary_document, source_url
 
 
 def _source_path(base_directory: Path, value: object) -> Path:
@@ -367,7 +628,7 @@ def _source_path(base_directory: Path, value: object) -> Path:
     relative = Path(value)
     if (
         relative.name != value
-        or relative.suffix.lower() not in {".json", ".txt"}
+        or relative.suffix.lower() not in {".html", ".json", ".txt"}
         or relative.is_absolute()
     ):
         raise ProvenanceError("SEC filing source file is unsafe or unsupported")
@@ -388,6 +649,13 @@ def _source_lineage(filing: dict[str, Any]) -> tuple[str, str, str]:
     if not parser_name or not parser_version:
         raise ProvenanceError("SEC filing source parser metadata is invalid")
     return retrieved_at, access_policy, f"{parser_name}@{parser_version}"
+
+
+def _validate_source_status_parser(source_status: str, parser: str) -> None:
+    if (parser == ISSUER_GCS_MERGED_COMPONENT_REVISION) != (
+        source_status == "issuer_owned_public_export"
+    ):
+        raise ProvenanceError("SEC source status and parser are inconsistent")
 
 
 def _report_date(filing: dict[str, Any]) -> str:
@@ -456,15 +724,19 @@ def _validate_public_identity_facts(
     facts: list[dict[str, Any]],
     *,
     accession: str,
+    cik: str,
     form: str,
     filing_date: str,
     report_date: str,
+    primary_document: str,
 ) -> None:
     values = {fact["field"]: fact["value"] for fact in facts}
     expected = {
         "accession": accession,
+        "cik": cik,
         "form": form,
         "filing_date": filing_date.replace("-", ""),
+        "primary_document": primary_document,
     }
     if report_date:
         expected["report_date"] = report_date.replace("-", "")
@@ -518,18 +790,18 @@ def parse_sec_identity_spans(text: str, raw_facts: object) -> dict[str, str] | N
     if (
         _ACCESSION.fullmatch(parsed["accession"]) is None
         or _FORM.fullmatch(parsed["form"]) is None
-        or not re.fullmatch(r"\d{8}", parsed["filing_date"])
-        or not re.fullmatch(r"\d{8}", parsed["report_date"])
+        or not re.fullmatch(r"(?:\d{8}|\d{4}-\d{2}-\d{2})", parsed["filing_date"])
+        or not re.fullmatch(r"(?:\d{8}|\d{4}-\d{2}-\d{2})", parsed["report_date"])
     ):
         return None
     try:
+        raw_filing_date = parsed["filing_date"].replace("-", "")
+        raw_report_date = parsed["report_date"].replace("-", "")
         filing_date = date.fromisoformat(
-            f"{parsed['filing_date'][:4]}-{parsed['filing_date'][4:6]}-"
-            f"{parsed['filing_date'][6:]}"
+            f"{raw_filing_date[:4]}-{raw_filing_date[4:6]}-{raw_filing_date[6:]}"
         )
         report_date = date.fromisoformat(
-            f"{parsed['report_date'][:4]}-{parsed['report_date'][4:6]}-"
-            f"{parsed['report_date'][6:]}"
+            f"{raw_report_date[:4]}-{raw_report_date[4:6]}-{raw_report_date[6:]}"
         )
     except ValueError:
         return None
@@ -660,9 +932,9 @@ def validated_sec_amendment_endpoints(
         if (
             facts_by_field["accession"][0].value != attributes.get("accession")
             or facts_by_field["form"][0].value != attributes.get("form")
-            or facts_by_field["filing_date"][0].value
+            or facts_by_field["filing_date"][0].value.replace("-", "")
             != str(attributes.get("filing_date", "")).replace("-", "")
-            or facts_by_field["report_date"][0].value
+            or facts_by_field["report_date"][0].value.replace("-", "")
             != str(attributes.get("report_date", "")).replace("-", "")
             or record.record_id != f"sec:{attributes.get('accession', '')}"
         ):
@@ -913,6 +1185,96 @@ def selected_sec_source_relation_edges(
     )
 
 
+def _issuer_gcs_detail_value(text: str, label: str) -> str:
+    match = re.search(
+        rf'<div class="field__label">{re.escape(label)}</div>\s*'
+        r'<div class="field__item">(.*?)</div>',
+        text,
+        re.DOTALL,
+    )
+    if match is None:
+        raise ProvenanceError(f"issuer GCS detail is missing {label}")
+    return re.sub(r"<[^>]+>", "", match.group(1)).strip()
+
+
+def _validate_issuer_gcs_acquisition(
+    filing: dict[str, Any], *, merged_text: str, detail_text: str
+) -> dict[str, Any]:
+    accession = str(filing.get("accession") or "")
+    cik = str(filing.get("cik") or "")
+    form = str(filing.get("form") or "")
+    filing_date = str(filing.get("filing_date") or "")
+    report_date = str(filing.get("report_date") or "")
+    primary_document = str(filing.get("primary_document") or "")
+    merged_url = str(filing.get("source_url") or "")
+    detail_url = str(filing.get("detail_url") or "")
+    detail_retrieval_url = str(filing.get("detail_retrieval_url") or detail_url)
+    expected_detail_url = (
+        f"https://microsoft.gcs-web.com/sec-filings/sec-filing/"
+        f"{form.lower()}/{accession}"
+    )
+    merged_path = urlparse(merged_url).path
+    if (
+        detail_url != expected_detail_url
+        or detail_retrieval_url not in {detail_url, f"{detail_url}?output=1"}
+        or f'<link rel="canonical" href="{expected_detail_url}"' not in detail_text
+        or f'href="{merged_path}"' not in detail_text
+        or f"<title>{accession} | {form} | Microsoft Corporation</title>"
+        not in detail_text
+    ):
+        raise ProvenanceError("issuer GCS detail identity binding is invalid")
+    if _issuer_gcs_detail_value(detail_text, "Form").strip() != form:
+        raise ProvenanceError("issuer GCS detail form binding is invalid")
+    try:
+        observed_filing = time.strptime(
+            _issuer_gcs_detail_value(detail_text, "Filing Date"), "%b %d, %Y"
+        )
+        observed_report = time.strptime(
+            _issuer_gcs_detail_value(detail_text, "Document Date"), "%b %d, %Y"
+        )
+    except ValueError as exc:
+        raise ProvenanceError("issuer GCS detail date binding is invalid") from exc
+    if date(
+        observed_filing.tm_year, observed_filing.tm_mon, observed_filing.tm_mday
+    ) != date.fromisoformat(filing_date) or date(
+        observed_report.tm_year, observed_report.tm_mon, observed_report.tm_mday
+    ) != date.fromisoformat(report_date):
+        raise ProvenanceError("issuer GCS detail date binding is invalid")
+    parse_issuer_gcs_merged_components(
+        merged_text,
+        expected_accession=accession,
+        expected_cik=cik,
+        expected_form=form,
+        expected_primary_document=primary_document,
+    )
+    facts = filing.get("derived_facts")
+    if not isinstance(facts, list):
+        raise ProvenanceError("issuer GCS identity facts are invalid")
+    values = {
+        str(fact.get("field") or ""): str(fact.get("value") or "") for fact in facts
+    }
+    expected_values = {
+        "accession": accession,
+        "cik": cik,
+        "form": form,
+        "filing_date": filing_date,
+        "report_date": report_date,
+        "primary_document_stem": primary_document.removesuffix(".htm"),
+    }
+    if any(values.get(field) != value for field, value in expected_values.items()):
+        raise ProvenanceError("issuer GCS identity facts do not bind filing")
+    return {
+        "parser_revision": ISSUER_GCS_MERGED_COMPONENT_REVISION,
+        "source_class": "issuer_owned_rendered_filing_not_sec_archives_original",
+        "detail_url": detail_url,
+        "detail_retrieval_url": detail_retrieval_url,
+        "detail_sha256": hashlib.sha256(detail_text.encode()).hexdigest(),
+        "detail_text": detail_text,
+        "merged_url": merged_url,
+        "merged_sha256": hashlib.sha256(merged_text.encode()).hexdigest(),
+    }
+
+
 def build_sec_filing_manifest(
     input_payload: dict[str, Any],
     base_directory: Path,
@@ -944,9 +1306,12 @@ def build_sec_filing_manifest(
     for item in raw_filings:
         if not isinstance(item, dict):
             raise ProvenanceError("SEC filing must be an object")
-        accession, cik, form, filing_date, source_url = _validate_sec_identity(item)
-        report_date = _report_date(item)
         retrieved_at, access_policy, parser = _source_lineage(item)
+        _validate_source_status_parser(source_status, parser)
+        accession, cik, form, filing_date, primary_document, source_url = (
+            _validate_sec_identity(item, parser=parser)
+        )
+        report_date = _report_date(item)
         source_path = _source_path(base_directory, item.get("source_file"))
         try:
             raw = _read_regular_file(source_path, MAX_SOURCE_BYTES)
@@ -975,7 +1340,10 @@ def build_sec_filing_manifest(
             clean_text=clean_text,
             source_sha256=source_sha256,
         )
-        if source_status == "public_sec_download":
+        gcs_acquisition = None
+        if source_status == "public_sec_download" or parser == (
+            "sec_complete_submission_header@1"
+        ):
             canonical_url = (
                 f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
                 f"{accession.replace('-', '')}/{accession}.txt"
@@ -985,37 +1353,67 @@ def build_sec_filing_manifest(
             _validate_public_identity_facts(
                 facts,
                 accession=accession,
+                cik=cik,
                 form=form,
                 filing_date=filing_date,
                 report_date=report_date,
+                primary_document=primary_document,
             )
-        filings.append(
-            {
-                "record_id": f"sec:{accession}",
-                "accession": accession,
-                "cik": cik,
-                "form": form,
-                "filing_date": filing_date,
-                "report_date": report_date,
-                "source_url": source_url,
-                "source_file": source_path.name,
-                "source_sha256": source_sha256,
-                "provenance_id": f"sha256:{source_sha256}",
-                "retrieved_at": retrieved_at,
-                "access_policy": access_policy,
-                "parser": parser,
-                "text_sha256": hashlib.sha256(clean_text.encode()).hexdigest(),
-                "text": clean_text,
-                "derived_facts": facts,
-                "privacy_review": {
-                    "emails": "redacted",
-                    "email_redaction_count": redaction_count,
-                    "secrets": "fail_closed",
-                    "scanner": SEC_SCANNER,
-                    "scanner_revision": SEC_SCANNER_REVISION,
-                },
-            }
-        )
+        elif (
+            source_status == "issuer_owned_public_export"
+            and parser == ISSUER_GCS_MERGED_COMPONENT_REVISION
+        ):
+            detail_path = _source_path(base_directory, item.get("detail_file"))
+            try:
+                detail_raw = _read_regular_file(detail_path, MAX_SOURCE_BYTES)
+                detail_text = detail_raw.decode("utf-8")
+            except (OSError, UnicodeDecodeError) as exc:
+                raise ProvenanceError(
+                    f"cannot read issuer GCS detail source: {exc}"
+                ) from exc
+            detail_sha256 = str(item.get("detail_sha256") or "")
+            if (
+                _SHA256.fullmatch(detail_sha256) is None
+                or hashlib.sha256(detail_raw).hexdigest() != detail_sha256
+            ):
+                raise ProvenanceError("issuer GCS detail source hash mismatch")
+            gcs_item = {**item, "derived_facts": facts}
+            gcs_acquisition = _validate_issuer_gcs_acquisition(
+                gcs_item, merged_text=clean_text, detail_text=detail_text
+            )
+            if gcs_acquisition["detail_sha256"] != detail_sha256:
+                raise ProvenanceError("issuer GCS detail source hash mismatch")
+        elif source_status == "issuer_owned_public_export":
+            raise ProvenanceError("issuer-owned export requires GCS parser revision")
+        filing_payload = {
+            "record_id": f"sec:{accession}",
+            "accession": accession,
+            "cik": cik,
+            "form": form,
+            "filing_date": filing_date,
+            "report_date": report_date,
+            "primary_document": primary_document,
+            "source_url": source_url,
+            "source_file": source_path.name,
+            "source_sha256": source_sha256,
+            "provenance_id": f"sha256:{source_sha256}",
+            "retrieved_at": retrieved_at,
+            "access_policy": access_policy,
+            "parser": parser,
+            "text_sha256": hashlib.sha256(clean_text.encode()).hexdigest(),
+            "text": clean_text,
+            "derived_facts": facts,
+            "privacy_review": {
+                "emails": "redacted",
+                "email_redaction_count": redaction_count,
+                "secrets": "fail_closed",
+                "scanner": SEC_SCANNER,
+                "scanner_revision": SEC_SCANNER_REVISION,
+            },
+        }
+        if gcs_acquisition is not None:
+            filing_payload["acquisition_receipt"] = gcs_acquisition
+        filings.append(filing_payload)
         seen_accessions.add(accession)
         seen_hashes.add(source_sha256)
 
@@ -1040,7 +1438,40 @@ def build_sec_filing_manifest(
     return manifest
 
 
-def _audit_exported_manifest(payload: dict[str, Any]) -> None:
+def _replay_exported_manifest_sources(
+    payload: dict[str, Any], *, base_directory: Path, manifest_name: str = ""
+) -> None:
+    for filing in payload["filings"]:
+        source_path = _source_path(base_directory, filing.get("source_file"))
+        if manifest_name and source_path.name == manifest_name:
+            raise ProvenanceError("SEC filing source file conflicts with manifest")
+        try:
+            source_raw = _read_regular_file(source_path, MAX_SOURCE_BYTES)
+            source_text = source_raw.decode("utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise ProvenanceError(f"cannot replay SEC filing source: {exc}") from exc
+        if hashlib.sha256(source_raw).hexdigest() != filing["source_sha256"]:
+            raise ProvenanceError("SEC filing source hash mismatch")
+        if source_path.suffix.lower() == ".json":
+            try:
+                json.loads(source_text)
+            except json.JSONDecodeError as exc:
+                raise ProvenanceError("SEC JSON source is invalid") from exc
+        clean_text, redaction_count = _sanitize_source_text(source_text)
+        if (
+            clean_text != filing["text"]
+            or hashlib.sha256(clean_text.encode()).hexdigest() != filing["text_sha256"]
+            or redaction_count != filing["privacy_review"]["email_redaction_count"]
+        ):
+            raise ProvenanceError("SEC filing sanitization replay mismatch")
+
+
+def _audit_exported_manifest(
+    payload: dict[str, Any],
+    *,
+    base_directory: Path,
+    manifest_name: str = "",
+) -> None:
     if payload.get("schema_version") != SEC_FILING_MANIFEST_SCHEMA:
         raise ProvenanceError("unsupported SEC filing manifest schema")
     if (
@@ -1071,16 +1502,20 @@ def _audit_exported_manifest(payload: dict[str, Any]) -> None:
     for filing in filings:
         if not isinstance(filing, dict):
             raise ProvenanceError("SEC manifest filing must be an object")
-        accession, cik, form, filing_date, source_url = _validate_sec_identity(filing)
-        report_date = _report_date(filing)
-        _parse_timestamp(str(filing.get("retrieved_at") or ""), "source retrieved_at")
-        if not str(filing.get("access_policy") or "").strip():
-            raise ProvenanceError("SEC manifest source access policy is invalid")
         parser_name, separator, parser_version = str(
             filing.get("parser") or ""
         ).partition("@")
         if not separator or not parser_name or not parser_version:
             raise ProvenanceError("SEC manifest source parser metadata is invalid")
+        parser = f"{parser_name}@{parser_version}"
+        _validate_source_status_parser(str(payload.get("source_status") or ""), parser)
+        accession, cik, form, filing_date, primary_document, source_url = (
+            _validate_sec_identity(filing, parser=parser)
+        )
+        report_date = _report_date(filing)
+        _parse_timestamp(str(filing.get("retrieved_at") or ""), "source retrieved_at")
+        if not str(filing.get("access_policy") or "").strip():
+            raise ProvenanceError("SEC manifest source access policy is invalid")
         source_sha256 = str(filing.get("source_sha256") or "")
         if _SHA256.fullmatch(source_sha256) is None:
             raise ProvenanceError("SEC manifest source sha256 is invalid")
@@ -1138,7 +1573,10 @@ def _audit_exported_manifest(payload: dict[str, Any]) -> None:
                     "SEC manifest derived fact is not source-grounded"
                 )
             fact_ids.add(fact_id)
-        if payload.get("source_status") == "public_sec_download":
+        if (
+            payload.get("source_status") == "public_sec_download"
+            or str(filing.get("parser") or "") == "sec_complete_submission_header@1"
+        ):
             canonical_url = (
                 f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
                 f"{accession.replace('-', '')}/{accession}.txt"
@@ -1148,15 +1586,45 @@ def _audit_exported_manifest(payload: dict[str, Any]) -> None:
             _validate_public_identity_facts(
                 facts,
                 accession=accession,
+                cik=cik,
                 form=form,
                 filing_date=filing_date,
                 report_date=report_date,
+                primary_document=primary_document,
             )
+        elif (
+            payload.get("source_status") == "issuer_owned_public_export"
+            and parser == ISSUER_GCS_MERGED_COMPONENT_REVISION
+        ):
+            receipt = filing.get("acquisition_receipt")
+            if not isinstance(receipt, dict):
+                raise ProvenanceError("issuer GCS acquisition receipt is missing")
+            detail_text = receipt.get("detail_text")
+            if not isinstance(detail_text, str) or not detail_text:
+                raise ProvenanceError("issuer GCS detail text is missing")
+            replayed = _validate_issuer_gcs_acquisition(
+                {
+                    **filing,
+                    "detail_url": receipt.get("detail_url"),
+                    "detail_retrieval_url": receipt.get("detail_retrieval_url"),
+                },
+                merged_text=text,
+                detail_text=detail_text,
+            )
+            if receipt != replayed:
+                raise ProvenanceError("issuer GCS acquisition receipt mismatch")
+        elif payload.get("source_status") == "issuer_owned_public_export":
+            raise ProvenanceError("issuer-owned export requires GCS parser revision")
         seen_accessions.add(accession)
         seen_hashes.add(source_sha256)
     if payload.get("filing_relations") != _filing_relations(filings):
         raise ProvenanceError("SEC manifest filing relations are invalid")
     _validate_final_payload(payload)
+    _replay_exported_manifest_sources(
+        payload,
+        base_directory=base_directory,
+        manifest_name=manifest_name,
+    )
 
 
 def load_sec_filing_manifest(
@@ -1176,5 +1644,9 @@ def load_sec_filing_manifest(
         purpose="source_manifest",
     ):
         raise ProvenanceError("SEC filing manifest has no valid source attestation")
-    _audit_exported_manifest(payload)
+    _audit_exported_manifest(
+        payload,
+        base_directory=path.parent,
+        manifest_name=path.name,
+    )
     return payload

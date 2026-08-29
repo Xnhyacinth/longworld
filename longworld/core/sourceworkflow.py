@@ -23,6 +23,11 @@ from longworld.core.documentworkflow import (
     WIKIPEDIA_WORKFLOW_MANIFEST_SCHEMA,
 )
 from longworld.core.filingworkflow import SEC_FILING_MANIFEST_SCHEMA
+from longworld.core.issuerfilingworkflow import (
+    ISSUER_IR_FILING_MANIFEST_SCHEMA,
+    ISSUER_IR_SOURCE_FAMILY,
+    ISSUER_IR_SOURCE_KIND,
+)
 from longworld.core.provenance import ProvenanceError
 from longworld.core.taxonomy import SourceOrigin
 
@@ -41,17 +46,20 @@ _SOURCE_KIND_SCHEMAS = {
         {PAPER_WORKFLOW_MANIFEST_SCHEMA, PAPER_FETCH_WORKFLOW_MANIFEST_SCHEMA}
     ),
     WIKIMEDIA_SOURCE_KIND: frozenset({WIKIPEDIA_WORKFLOW_MANIFEST_SCHEMA}),
+    ISSUER_IR_SOURCE_KIND: frozenset({ISSUER_IR_FILING_MANIFEST_SCHEMA}),
 }
 _SOURCE_KIND_DOMAINS = {
     SEC_SOURCE_KIND: "company",
     PAPER_SOURCE_KIND: "researchlab",
     WIKIMEDIA_SOURCE_KIND: "researchlab",
+    ISSUER_IR_SOURCE_KIND: "company",
 }
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _PUBLIC_STATUS = {
     SEC_SOURCE_KIND: "public_sec_download",
     PAPER_SOURCE_KIND: "public_api_export",
     WIKIMEDIA_SOURCE_KIND: "public_api_export",
+    ISSUER_IR_SOURCE_KIND: "issuer_owned_ir_download",
 }
 _PAPER_RELATION_ROLES = {
     "revision_of": ("manuscript_revision", "manuscript_revision"),
@@ -165,7 +173,9 @@ def _inventory_origin(
     status = str(manifest.get("source_status") or "")
     if status == "test_fixture":
         raise ProvenanceError("test fixture cannot be adapted as a real workflow")
-    if status == _PUBLIC_STATUS[source_kind]:
+    if status == _PUBLIC_STATUS[source_kind] or (
+        source_kind == SEC_SOURCE_KIND and status == "issuer_owned_public_export"
+    ):
         return SourceOrigin.REAL_PUBLIC
     if status == "authorized_download":
         return SourceOrigin.REAL_PRIVATE_EXPORT
@@ -657,7 +667,11 @@ def adapt_sec_manifest(
             raw,
             kind="sec_filing",
             occurred_at=str(raw.get("filing_date") or ""),
-            source_family="sec_edgar_submission",
+            source_family=(
+                "issuer_gcs_merged_filing"
+                if raw.get("parser") == "issuer_gcs_merged_html@1"
+                else "sec_edgar_submission"
+            ),
             source_origin=origin,
             identity_fields=(
                 "accession",
@@ -687,6 +701,60 @@ def adapt_sec_manifest(
         records=records,
         relations=relations,
         allow_relationless_singleton=allow_singleton,
+    )
+
+
+def adapt_issuer_ir_manifest(
+    manifest: Mapping[str, Any], *, signed_bundle_authorized: bool = False
+) -> tuple[SourceWorkflow, ...]:
+    """Normalize verified issuer-owned annual filing history."""
+    _check_schema(
+        manifest,
+        source_kind=ISSUER_IR_SOURCE_KIND,
+        expected_schemas=_SOURCE_KIND_SCHEMAS[ISSUER_IR_SOURCE_KIND],
+    )
+    origin = _inventory_origin(
+        manifest,
+        source_kind=ISSUER_IR_SOURCE_KIND,
+        signed_bundle_authorized=signed_bundle_authorized,
+    )
+    raw_records = _objects(manifest.get("records"), "issuer IR records")
+    if manifest.get("n") != len(raw_records):
+        raise ProvenanceError("issuer IR source inventory count is invalid")
+    records = [
+        _record(
+            raw,
+            kind="issuer_ir_filing",
+            occurred_at=str(raw.get("filing_date") or ""),
+            source_family=ISSUER_IR_SOURCE_FAMILY,
+            source_origin=origin,
+            identity_fields=(
+                "filing_id",
+                "issuer_name",
+                "cik",
+                "form",
+                "filing_date",
+                "report_date",
+            ),
+            require_facts=True,
+            fact_binding_field="source_sha256",
+        )
+        for raw in raw_records
+    ]
+    records_by_id = {record.record_id: record for record in records}
+    relations = [
+        _document_relation(
+            raw,
+            records=records_by_id,
+            allowed_kinds={"prior_available_annual_filing"},
+        )
+        for raw in _objects(manifest.get("relations"), "issuer IR relations")
+    ]
+    return _normalize_components(
+        source_kind=ISSUER_IR_SOURCE_KIND,
+        source_origin=origin,
+        records=records,
+        relations=relations,
     )
 
 
@@ -846,6 +914,10 @@ def adapt_source_manifest(
         )
     if source_kind == PAPER_SOURCE_KIND:
         return adapt_paper_manifest(
+            manifest, signed_bundle_authorized=signed_bundle_authorized
+        )
+    if source_kind == ISSUER_IR_SOURCE_KIND:
+        return adapt_issuer_ir_manifest(
             manifest, signed_bundle_authorized=signed_bundle_authorized
         )
     return adapt_wikimedia_manifest(

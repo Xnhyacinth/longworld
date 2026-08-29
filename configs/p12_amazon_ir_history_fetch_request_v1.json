@@ -1,0 +1,41 @@
+{
+  "schema_version": "longworld.issuer-ir-fetch-request.v1",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P12-AMAZON-IR-HISTORY-20260828",
+    "scope": "Amazon issuer-owned 2022 through 2024 annual filing artifacts",
+    "basis": "User-authorized public-source LongWorld company workflow acquisition",
+    "reviewed_at": "2026-08-28T09:00:00Z"
+  },
+  "issuer": {
+    "name": "Amazon.com, Inc.",
+    "cik": "0001018724",
+    "detail_host": "ir.aboutamazon.com",
+    "artifact_host": "d18rn0p25nwr6d.cloudfront.net"
+  },
+  "filings": [
+    {
+      "filing_id": "amazon-2024-annual",
+      "detail_url": "https://ir.aboutamazon.com/sec-filings/sec-filings-details/default.aspx?FilingId=18165478",
+      "form": "10-K",
+      "filing_date": "2025-02-07",
+      "report_date": "2024-12-31"
+    },
+    {
+      "filing_id": "amazon-2023-annual",
+      "detail_url": "https://ir.aboutamazon.com/sec-filings/sec-filings-details/default.aspx?FilingId=17229449",
+      "form": "10-K",
+      "filing_date": "2024-02-02",
+      "report_date": "2023-12-31"
+    },
+    {
+      "filing_id": "amazon-2022-annual",
+      "detail_url": "https://ir.aboutamazon.com/sec-filings/sec-filings-details/default.aspx?FilingId=16361618",
+      "form": "10-K",
+      "filing_date": "2023-02-03",
+      "report_date": "2022-12-31"
+    }
+  ],
+  "requests_per_second": 2,
+  "max_retries": 3
+}

@@ -494,7 +494,7 @@ def test_financial_program_fails_closed_for_unprogrammed_issuer(
     source, _parent = local_submission
     mutated = source.replace(
         "CENTRAL INDEX KEY:\t\t\t0000320193",
-        "CENTRAL INDEX KEY:\t\t\t0000789019",
+        "CENTRAL INDEX KEY:\t\t\t0001318605",
         1,
     )
     assert mutated != source

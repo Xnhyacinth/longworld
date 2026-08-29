@@ -1,0 +1,15 @@
+{
+  "schema_version": "longworld.sec-fetch-request.v1",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P12-SEC-NVIDIA-PUBLIC-20260829",
+    "scope": "Bounded public EDGAR 10-K workflow export for NVIDIA CIK 0001045810",
+    "basis": "User-authorized public-source LongWorld source-bound workflow construction",
+    "reviewed_at": "2026-08-29T00:00:00Z"
+  },
+  "allowed_ciks": ["0001045810"],
+  "forms": ["10-K"],
+  "max_filings_per_cik": 1,
+  "requests_per_second": 5,
+  "max_retries": 3
+}

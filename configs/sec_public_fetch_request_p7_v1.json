@@ -1,0 +1,21 @@
+{
+  "schema_version": "longworld.sec-fetch-request.v1",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P7-SEC-PUBLIC-SOURCE-RICH-20260825",
+    "scope": "Bounded public EDGAR 10-K/10-Q workflow export for five allowlisted issuers",
+    "basis": "User-authorized public-source LongWorld source-rich workflow construction",
+    "reviewed_at": "2026-08-25T00:00:00Z"
+  },
+  "allowed_ciks": [
+    "0000320193",
+    "0000789019",
+    "0001018724",
+    "0001045810",
+    "0001652044"
+  ],
+  "forms": ["10-K", "10-K/A", "10-Q", "10-Q/A"],
+  "max_filings_per_cik": 2,
+  "requests_per_second": 5,
+  "max_retries": 3
+}

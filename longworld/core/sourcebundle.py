@@ -45,6 +45,12 @@ from longworld.core.filingworkflow import (
     SEC_FILING_MANIFEST_SCHEMA,
     _audit_exported_manifest,
 )
+from longworld.core.issuerfilingworkflow import (
+    ISSUER_IR_FILING_MANIFEST_SCHEMA,
+    ISSUER_IR_SOURCE_KIND,
+    MAX_ISSUER_IR_MANIFEST_BYTES,
+    _audit_issuer_ir_filing_manifest,
+)
 from longworld.core.provenance import ProvenanceError, _read_regular_file
 from longworld.core.sourceworkflow import (
     PAPER_SOURCE_KIND,
@@ -90,6 +96,11 @@ _KIND_CONTRACTS = {
         "researchlab",
         frozenset({WIKIPEDIA_WORKFLOW_MANIFEST_SCHEMA}),
         MAX_DOCUMENT_MANIFEST_BYTES,
+    ),
+    ISSUER_IR_SOURCE_KIND: (
+        "company",
+        frozenset({ISSUER_IR_FILING_MANIFEST_SCHEMA}),
+        MAX_ISSUER_IR_MANIFEST_BYTES,
     ),
 }
 
@@ -248,6 +259,7 @@ def _verified_manifest_payload(
     raw: bytes,
     *,
     entry: _Entry,
+    base_directory: Path,
     attestation_key: bytes | None,
 ) -> dict[str, Any]:
     if hashlib.sha256(raw).hexdigest() != entry.sha256:
@@ -259,7 +271,13 @@ def _verified_manifest_payload(
     if not verify_attestation(payload, key, purpose="source_manifest"):
         raise ProvenanceError("source manifest has no valid source attestation")
     if entry.kind == SEC_SOURCE_KIND:
-        _audit_exported_manifest(payload)
+        _audit_exported_manifest(
+            payload,
+            base_directory=base_directory,
+            manifest_name=Path(entry.path).name,
+        )
+    elif entry.kind == ISSUER_IR_SOURCE_KIND:
+        _audit_issuer_ir_filing_manifest(payload)
     else:
         _verify_document_manifest(payload, kind=entry.kind)
     return payload
@@ -350,6 +368,7 @@ def load_source_workflow_bundle(
         manifest = _verified_manifest_payload(
             raw_manifest,
             entry=entry,
+            base_directory=entry_path.parent,
             attestation_key=attestation_key,
         )
         entry_workflows = adapt_source_manifest(

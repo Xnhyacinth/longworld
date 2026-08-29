@@ -49,6 +49,11 @@ MAX_FORMS = 32
 _CIK = re.compile(r"^\d{10}$")
 _ACCESSION = re.compile(r"^\d{10}-\d{2}-\d{6}$")
 _FORM = re.compile(r"^[A-Z0-9-]+(?:/A)?$")
+_PRIMARY_DOCUMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$")
+_SEC_DOCUMENT_BLOCK = re.compile(
+    r"^<DOCUMENT>[^\S\n]*\n.*?^</DOCUMENT>[^\S\n]*(?:\n|$)",
+    re.MULTILINE | re.DOTALL,
+)
 _CONTACT_USER_AGENT = re.compile(
     r"^\S(?:.*\S)?\s+[\w.+-]+@(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}$"
 )
@@ -271,7 +276,13 @@ def _recent_rows(payload: dict[str, Any], cik: str) -> list[dict[str, str]]:
     recent = filings.get("recent") if isinstance(filings, dict) else None
     if not isinstance(recent, dict):
         raise ProvenanceError("SEC submissions response has no recent filings")
-    fields = ("accessionNumber", "filingDate", "reportDate", "form")
+    fields = (
+        "accessionNumber",
+        "filingDate",
+        "reportDate",
+        "form",
+        "primaryDocument",
+    )
     columns = [recent.get(field) for field in fields]
     if any(not isinstance(column, list) for column in columns):
         raise ProvenanceError("SEC submissions response columns are invalid")
@@ -304,6 +315,7 @@ def _validate_explicit_filings(
         "form",
         "filing_date",
         "report_date",
+        "primary_document",
         "source_file",
     )
     rows: list[dict[str, str]] = []
@@ -327,6 +339,7 @@ def _validate_explicit_filings(
                 "form": row["form"],
                 "filingDate": row["filing_date"],
                 "reportDate": row["report_date"],
+                "primaryDocument": row["primary_document"],
             },
             row["cik"],
         )
@@ -342,10 +355,16 @@ def _validate_explicit_filings(
 def _validate_row(row: dict[str, str], cik: str) -> None:
     if _ACCESSION.fullmatch(row["accessionNumber"]) is None:
         raise ProvenanceError("SEC submissions response accession is invalid")
-    if row["accessionNumber"].split("-", 1)[0] != cik:
-        raise ProvenanceError("SEC submissions response accession does not match CIK")
+    if _CIK.fullmatch(cik) is None:
+        raise ProvenanceError("SEC submissions response CIK is invalid")
     if _FORM.fullmatch(row["form"]) is None:
         raise ProvenanceError("SEC submissions response form is invalid")
+    primary_document = row.get("primaryDocument", "")
+    if (
+        _PRIMARY_DOCUMENT.fullmatch(primary_document) is None
+        or Path(primary_document).name != primary_document
+    ):
+        raise ProvenanceError("SEC submissions response primaryDocument is invalid")
     try:
         date.fromisoformat(row["filingDate"])
         if row["reportDate"]:
@@ -378,7 +397,39 @@ def _header_fact(
     }
 
 
-def _derived_header_facts(text: str, row: dict[str, str]) -> list[dict[str, Any]]:
+def _primary_document_fact(
+    text: str, *, form: str, primary_document: str
+) -> dict[str, Any]:
+    matches: list[tuple[re.Match[str], re.Match[str]]] = []
+    for block_match in _SEC_DOCUMENT_BLOCK.finditer(text):
+        block = block_match.group()
+        type_match = re.search(r"(?m)^<TYPE>[ \t]*([^\r\n<]+?)[ \t\r]*$", block)
+        filename_match = re.search(r"(?m)^<FILENAME>[ \t]*([^\r\n<]+?)[ \t\r]*$", block)
+        if (
+            type_match is not None
+            and filename_match is not None
+            and type_match.group(1) == form
+            and filename_match.group(1) == primary_document
+        ):
+            matches.append((block_match, filename_match))
+    if len(matches) != 1:
+        raise ProvenanceError(
+            "SEC complete submission does not uniquely bind primary_document"
+        )
+    block_match, filename_match = matches[0]
+    start = block_match.start() + filename_match.start()
+    return {
+        "fact_id": "primary_document",
+        "field": "primary_document",
+        "value": primary_document,
+        "evidence_quote": filename_match.group(0),
+        "evidence_char_start": start,
+    }
+
+
+def _derived_header_facts(
+    text: str, row: dict[str, str], *, cik: str
+) -> list[dict[str, Any]]:
     facts = [
         _header_fact(
             text,
@@ -393,6 +444,13 @@ def _derived_header_facts(text: str, row: dict[str, str]) -> list[dict[str, Any]
             field="form",
             label="CONFORMED SUBMISSION TYPE",
             expected=row["form"],
+        ),
+        _header_fact(
+            text,
+            fact_id="cik",
+            field="cik",
+            label="CENTRAL INDEX KEY",
+            expected=cik,
         ),
         _header_fact(
             text,
@@ -412,6 +470,13 @@ def _derived_header_facts(text: str, row: dict[str, str]) -> list[dict[str, Any]
                 expected=row["reportDate"].replace("-", ""),
             )
         )
+    facts.append(
+        _primary_document_fact(
+            text,
+            form=row["form"],
+            primary_document=row["primaryDocument"],
+        )
+    )
     return facts
 
 
@@ -433,6 +498,7 @@ def _filing_export(
             "form": row["form"],
             "filingDate": row["filing_date"],
             "reportDate": row["report_date"],
+            "primaryDocument": row["primary_document"],
         }
     )
     accession = header_row["accessionNumber"]
@@ -442,6 +508,7 @@ def _filing_export(
         "form": header_row["form"],
         "filing_date": header_row["filingDate"],
         "report_date": header_row["reportDate"],
+        "primary_document": header_row["primaryDocument"],
         "source_url": source_url,
         "source_file": source_path.name,
         "source_sha256": hashlib.sha256(source_raw).hexdigest(),
@@ -454,7 +521,7 @@ def _filing_export(
             "name": "sec_complete_submission_header",
             "version": "1",
         },
-        "derived_facts": _derived_header_facts(source_text, header_row),
+        "derived_facts": _derived_header_facts(source_text, header_row, cik=cik),
     }
 
 
