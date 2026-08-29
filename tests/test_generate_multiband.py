@@ -231,6 +231,14 @@ def test_exact_token_band_ranges_are_closed_and_do_not_relax() -> None:
     assert exact_token_band_reject_reason("32k", 32_768) is None
     assert exact_token_band_reject_reason("64k", 64_000) is None
     assert exact_token_band_reject_reason("64k", 65_536) is None
+    assert exact_token_band_reject_reason("128k", 127_999) == (
+        "exact_128k_out_of_range:127999"
+    )
+    assert exact_token_band_reject_reason("128k", 128_000) is None
+    assert exact_token_band_reject_reason("128k", 131_072) is None
+    assert exact_token_band_reject_reason("128k", 131_073) == (
+        "exact_128k_out_of_range:131073"
+    )
     assert exact_token_band_reject_reason("8k", 8_192) is None
 
 
@@ -241,7 +249,12 @@ def test_exact_token_metadata_is_written_for_each_strict_long_band() -> None:
             return [1] * int(text)
 
     cache: dict[str, int] = {}
-    for band, tokens in (("16k", 16_100), ("32k", 32_200), ("64k", 64_300)):
+    for band, tokens in (
+        ("16k", 16_100),
+        ("32k", 32_200),
+        ("64k", 64_300),
+        ("128k", 128_100),
+    ):
         metadata, reason = exact_token_metadata_for_band(
             str(tokens),
             band,

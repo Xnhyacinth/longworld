@@ -91,20 +91,28 @@ def _artifact_token_bounds(
     token_prefix: str = "",
 ) -> tuple[list[tuple[int, int]], int]:
     if token_counter is not None:
-        exact_bounds: list[tuple[int, int]] = []
-        context_parts = [token_prefix] if token_prefix else []
-        for index, artifact in enumerate(ordered):
-            if index:
-                context_parts.append(SEP)
-            if artifact.artifact_id in essential_ids:
-                start = token_counter("".join(context_parts))
-                context_parts.append(artifact.text)
-                end = token_counter("".join(context_parts))
-                exact_bounds.append((start, end))
-            else:
-                context_parts.append(artifact.text)
-        context = "".join(context_parts)
-        return exact_bounds, token_counter(context) if context else 0
+        essential_indexes = [
+            index
+            for index, artifact in enumerate(ordered)
+            if artifact.artifact_id in essential_ids
+        ]
+        context = f"{token_prefix}{join_artifacts(ordered)}"
+        if not essential_indexes:
+            return [], token_counter(context) if context else 0
+
+        first_index = essential_indexes[0]
+        last_index = essential_indexes[-1]
+        before_first = join_artifacts(ordered[:first_index])
+        if first_index:
+            before_first += SEP
+        start_text = f"{token_prefix}{before_first}"
+        start = token_counter(start_text) if start_text else 0
+        end_text = f"{token_prefix}{join_artifacts(ordered[: last_index + 1])}"
+        end = token_counter(end_text)
+        context_tokens = (
+            end if last_index == len(ordered) - 1 else token_counter(context)
+        )
+        return [(start, end)] * len(essential_indexes), context_tokens
     bounds: list[tuple[int, int]] = []
     cursor_chars = len(token_prefix)
     for i, artifact in enumerate(ordered):
@@ -250,7 +258,6 @@ def pack_view(
     """
     del allow_clone
     max_tokens = int(target_tokens)
-    measure_tokens = token_counter or estimate_tokens
     ess_ids = set(spec.essential_artifact_ids)
     corridor_ids = set(ordered_corridor_ids or ())
     essential_world_ids = {
@@ -267,11 +274,32 @@ def pack_view(
             or sufficient_event_ids.intersection(a.reveals_events)
             or (not is_boilerplate(a))
         ]
+    if token_counter is not None:
+        calibration_text = join_artifacts(pool)
+        estimated_calibration = estimate_tokens(calibration_text)
+        exact_calibration = token_counter(calibration_text)
+        token_scale = exact_calibration / max(1, estimated_calibration)
+
+        def measure_tokens(text: str) -> int:
+            return math.ceil(estimate_tokens(text) * token_scale)
+
+    else:
+        measure_tokens = estimate_tokens
+    required_measure_tokens = token_counter or measure_tokens
+    approx_excluded = [
+        a
+        for a in pool
+        if a.artifact_id not in ess_ids
+        and a.artifact_id not in corridor_ids
+        and not sufficient_event_ids.intersection(a.reveals_events)
+        and measure_tokens(a.text) > max_tokens
+    ]
     pool = [
         a
         for a in pool
         if a.artifact_id in ess_ids
         or a.artifact_id in corridor_ids
+        or sufficient_event_ids.intersection(a.reveals_events)
         or measure_tokens(a.text) <= max_tokens
     ]
     pool_index = {artifact.artifact_id: artifact for artifact in pool}
@@ -392,12 +420,12 @@ def pack_view(
         if corridor
         else [*essential, *strict_support]
     )
-    if corridor and measure_tokens(join_artifacts(core)) > max_tokens:
+    if corridor and required_measure_tokens(join_artifacts(core)) > max_tokens:
         required_ids = ess_ids | all_support_ids
         selected_core = [
             artifact for artifact in core if artifact.artifact_id in required_ids
         ]
-        if measure_tokens(join_artifacts(selected_core)) > max_tokens:
+        if required_measure_tokens(join_artifacts(selected_core)) > max_tokens:
             return PackedContext(
                 artifacts=[],
                 text="",
@@ -416,7 +444,7 @@ def pack_view(
             if artifact.artifact_id in selected_ids:
                 continue
             trial_core = [*selected_core, artifact]
-            if measure_tokens(join_artifacts(trial_core)) > max_tokens:
+            if required_measure_tokens(join_artifacts(trial_core)) > max_tokens:
                 continue
             selected_core.append(artifact)
             selected_ids.add(artifact.artifact_id)
@@ -424,9 +452,9 @@ def pack_view(
     if corridor:
         corridor = core
     mandatory_text = join_artifacts([*core, *buffer_src])
-    if measure_tokens(mandatory_text) > max_tokens:
+    if required_measure_tokens(mandatory_text) > max_tokens:
         buffer_src = []
-    if measure_tokens(join_artifacts(core)) > max_tokens:
+    if required_measure_tokens(join_artifacts(core)) > max_tokens:
         return PackedContext(
             artifacts=[],
             text="",
@@ -510,6 +538,7 @@ def pack_view(
     text = join_artifacts(ordered)
     need = max(min_distance_tokens, int(min_distance_frac * max_tokens))
     seen_text: set[str] = {a.text for a in ordered}
+    capacity_rejected: list[Artifact] = []
     qi = 0
     while qi < len(queue):
         nxt = queue[qi]
@@ -538,7 +567,7 @@ def pack_view(
             evidence_ids,
             text,
             query_timing=query_timing,
-            token_counter=token_counter,
+            token_counter=measure_tokens,
         )
         trial_gap = pick_gap(dist_now, need)
         if corridor:
@@ -548,6 +577,7 @@ def pack_view(
             trial = layout()
         trial_text = join_artifacts(trial)
         if measure_tokens(trial_text) > max_tokens:
+            capacity_rejected.append(nxt)
             if corridor:
                 pop_corridor_side(nxt)
             else:
@@ -560,7 +590,97 @@ def pack_view(
 
     ordered = _dedupe(ordered)
     text = join_artifacts(ordered)
-    tokens = measure_tokens(text)
+    tokens = token_counter(text) if token_counter is not None else measure_tokens(text)
+    if token_counter is not None and tokens < max_tokens and capacity_rejected:
+        refined_scale = tokens / max(1, estimate_tokens(text))
+
+        def refined_measure_tokens(value: str) -> int:
+            return math.ceil(estimate_tokens(value) * refined_scale)
+
+        for nxt in capacity_rejected:
+            if nxt.text in seen_text:
+                continue
+            dist_now = _evidence_distance(
+                ordered,
+                evidence_ids,
+                text,
+                query_timing=query_timing,
+                token_counter=refined_measure_tokens,
+            )
+            trial_gap = pick_gap(dist_now, need)
+            if corridor:
+                trial = add_corridor_side(nxt)
+            else:
+                gaps[trial_gap].append(nxt)
+                trial = layout()
+            trial_text = join_artifacts(trial)
+            if refined_measure_tokens(trial_text) > max_tokens:
+                if corridor:
+                    pop_corridor_side(nxt)
+                else:
+                    gaps[trial_gap].pop()
+                continue
+            ordered = trial
+            text = trial_text
+            seen_text.add(nxt.text)
+            proposition_novelty(nxt, seen_props)
+        ordered = _dedupe(ordered)
+        text = join_artifacts(ordered)
+        tokens = token_counter(text)
+    if token_counter is not None and tokens < int(max_tokens * 0.96):
+        selected_ids = {artifact.artifact_id for artifact in ordered}
+        exact_backfill = _dedupe([*capacity_rejected, *approx_excluded])
+        for nxt in exact_backfill:
+            if nxt.artifact_id in selected_ids or nxt.text in seen_text:
+                continue
+            if skip_boilerplate and is_boilerplate(nxt):
+                continue
+            trial_new = proposition_novelty(nxt, set(seen_props))
+            if (
+                trial_new == 0
+                and nxt.artifact_id not in prefer
+                and nxt.artifact_id not in hard_ids
+                and nxt.doc_type != "source_pack"
+            ):
+                continue
+            if token_counter(nxt.text) > max_tokens - tokens:
+                continue
+            dist_now = _evidence_distance(
+                ordered,
+                evidence_ids,
+                text,
+                query_timing=query_timing,
+                token_counter=measure_tokens,
+            )
+            trial_gap = pick_gap(dist_now, need)
+            if corridor:
+                trial = add_corridor_side(nxt)
+            else:
+                gaps[trial_gap].append(nxt)
+                trial = layout()
+            trial_text = join_artifacts(trial)
+            trial_tokens = token_counter(trial_text)
+            if trial_tokens > max_tokens:
+                if corridor:
+                    pop_corridor_side(nxt)
+                else:
+                    gaps[trial_gap].pop()
+                continue
+            ordered = trial
+            text = trial_text
+            tokens = trial_tokens
+            selected_ids.add(nxt.artifact_id)
+            seen_text.add(nxt.text)
+            proposition_novelty(nxt, seen_props)
+    if token_counter is not None and tokens > max_tokens:
+        for artifact in reversed(ordered):
+            if artifact.artifact_id in evidence_ids:
+                continue
+            ordered.remove(artifact)
+            text = join_artifacts(ordered)
+            tokens = token_counter(text)
+            if tokens <= max_tokens:
+                break
     metric_context = (
         wrap_prompt(spec.question, text, query_timing)
         if token_counter is not None
@@ -584,7 +704,12 @@ def pack_view(
         ),
     )
     dist = metrics.max_evidence_distance
-    window = [a.artifact_id for a in buffer_src]
+    final_artifact_ids = {artifact.artifact_id for artifact in ordered}
+    window = [
+        artifact.artifact_id
+        for artifact in buffer_src
+        if artifact.artifact_id in final_artifact_ids
+    ]
     gold_stem = min(ess_ids).split(".", 1)[0] if ess_ids else ""
     roles = {
         a.artifact_id: artifact_role(
@@ -597,6 +722,7 @@ def pack_view(
     n_bg = sum(1 for r in roles.values() if r == "natural_background")
     bank_frac = boilerplate_char_fraction(text)
     pulses = pulse_doc_ratio(ordered)
+    n_clones = len(ordered) - len({artifact.text for artifact in ordered})
     actual_bucket = length_label(tokens)
     packed = PackedContext(
         artifacts=ordered,
@@ -608,7 +734,7 @@ def pack_view(
         max_evidence_distance=dist,
         query_timing=query_timing,
         n_unique=len(ordered),
-        n_clones=0,
+        n_clones=n_clones,
         roles=roles,
         boilerplate_token_ratio=round(bank_frac, 4),
         pulse_doc_ratio=round(pulses, 4),
@@ -623,6 +749,12 @@ def pack_view(
             packed,
             ok=False,
             reject_reason="strict_support_missing",
+        )
+    if n_clones:
+        return replace(
+            packed,
+            ok=False,
+            reject_reason="duplicate_text_clone",
         )
     if tokens < min_semantic_tokens:
         return replace(

@@ -7,6 +7,8 @@ from datetime import date
 from typing import Any
 
 from longworld.core.attestation import (
+    LOCAL_PROBE_TRUST_ISOLATION_FIELD,
+    LOCAL_PROBE_TRUST_ISOLATION_VALUE,
     attach_attestation,
     attestation_key_from_env,
     verify_attestation,
@@ -185,11 +187,10 @@ def _body_for(kind: str, project: dict[str, Any], ev: Event) -> dict[str, Any]:
         )
         if adopt:
             body += (
-                "This amendment does not reprint a version numeral. It adopts the "
-                "product roadmap target recorded in the Q-cycle notes for this project. "
-                "Anyone reconstructing the legally effective delivery version must read "
-                "that notes file together with this amendment. A customer email citing "
-                "the old packet is not controlling."
+                "This amendment adopts the product roadmap target recorded in the "
+                "Q-cycle notes for this project; those notes and this amendment form "
+                "the controlling version record. A customer email citing the old "
+                "packet is not controlling."
             )
         else:
             body += f"The legally effective delivery version is {ev.params['version']}."
@@ -215,7 +216,7 @@ def _body_for(kind: str, project: dict[str, Any], ev: Event) -> dict[str, Any]:
             "greeting": "Team,",
             "body": (
                 "Staging credentials were issued after the amendment file was present. "
-                "This note does not restate the legally effective version. Access is a "
+                "The executed amendment remains the version authority. Access is a "
                 "separate flag from revenue recognition."
             ),
             "closing": "—",
@@ -327,9 +328,8 @@ def _body_for(kind: str, project: dict[str, Any], ev: Event) -> dict[str, Any]:
             "dest_domain": "internal.example",
             "greeting": f"{people['pm']},",
             "body": (
-                "Reminder to keep the amendment next to the signed packet. This reminder "
-                "does not restate the adopted version numeral. Reconstruct versioning "
-                "from the amendment plus the roadmap notes, not from this ping."
+                "Reminder to keep the amendment next to the signed packet and its "
+                "roadmap notes; together they remain the adopted version record."
             ),
             "closing": "— counsel",
             "department": project["departments"]["legal"],
@@ -347,8 +347,8 @@ def _body_for(kind: str, project: dict[str, Any], ev: Event) -> dict[str, Any]:
             "body": (
                 f"Exception filing for jurisdiction {j}. In that jurisdiction the "
                 f"originally executed packet remains the governing instrument and "
-                f"the later amendment does not control. This memo does not reprint "
-                f"the signed version token; reconstruct it from the executed packet."
+                f"the later amendment does not control. The executed packet remains "
+                f"the signed version authority."
             ),
             "closing": "— counsel",
             "department": project["departments"]["legal"],
@@ -363,10 +363,8 @@ def _body_for(kind: str, project: dict[str, Any], ev: Event) -> dict[str, Any]:
             "dest_domain": "internal.example",
             "greeting": f"{people['pm']},",
             "body": (
-                "Status: amendment-withdrawn. The numbered supplement is pulled. "
-                "Reconstruct the legally effective delivery version from the "
-                "originally executed packet. This withdrawal memo does not reprint "
-                "a version token."
+                "Status: amendment-withdrawn. The numbered supplement is pulled, and "
+                "the originally executed packet again governs delivery versioning."
             ),
             "closing": "— counsel",
             "department": project["departments"]["legal"],
@@ -382,10 +380,9 @@ def _body_for(kind: str, project: dict[str, Any], ev: Event) -> dict[str, Any]:
             "greeting": f"{people['csm']},",
             "body": (
                 "Status: announcement-held. A jurisdictional exception filed "
-                "earlier now blocks the customer-facing announcement. This hold "
-                "notice does not reprint the jurisdiction token. Reconstruct it "
-                "from the carve-out instrument. Do not treat customer belief "
-                "email as the hold authority."
+                "earlier now blocks the customer-facing announcement. The carve-out "
+                "instrument remains the jurisdiction authority; customer belief "
+                "email is not the hold authority."
             ),
             "closing": "— program",
             "department": project["departments"]["product"],
@@ -401,10 +398,9 @@ def _body_for(kind: str, project: dict[str, Any], ev: Event) -> dict[str, Any]:
             "greeting": f"{people['pm']},",
             "body": (
                 "Status: public-norm-adopted. The standards desk adopted the "
-                "previously ingested public file as the external normative "
-                "reference for this workspace. This memo does not reprint the "
-                "public-document stem. Reconstruct the stem from the ingested "
-                "file. Alternate public files on the desk are not adopted."
+                "previously ingested public file as the external normative reference "
+                "for this workspace. The ingested file retains its source identity; "
+                "alternate public files on the desk are not adopted."
             ),
             "closing": "— counsel",
             "department": project["departments"]["legal"],
@@ -471,9 +467,8 @@ def _body_for(kind: str, project: dict[str, Any], ev: Event) -> dict[str, Any]:
             "dest_domain": "internal.example",
             "greeting": f"{people['counsel']},",
             "body": (
-                "Status: latent-acked. Engineering acknowledged the dormant "
-                "filing. This ack does not reprint the file-code. Reconstruct "
-                "it from the earlier dormant filing if a later reopen asks."
+                "Status: latent-acked. Engineering acknowledged the dormant filing; "
+                "the earlier filing remains the file-code record for any later reopen."
             ),
             "closing": "— engineering",
             "department": project["departments"]["product"],
@@ -488,10 +483,9 @@ def _body_for(kind: str, project: dict[str, Any], ev: Event) -> dict[str, Any]:
             "dest_domain": "internal.example",
             "greeting": f"{people['pm']},",
             "body": (
-                "Status: case-reopened. The dormant filing that operations "
-                "acknowledged is now the active file-code. This memo does not "
-                "reprint the code. Reconstruct it from the seed filing via the "
-                "ack. Customer email is not the reopen authority."
+                "Status: case-reopened. The dormant filing acknowledged by operations "
+                "is now the active file-code. The seed filing and acknowledgment form "
+                "the reopen record; customer email is not the authority."
             ),
             "closing": "— audit",
             "department": "Internal Audit",
@@ -508,10 +502,9 @@ def _body_for(kind: str, project: dict[str, Any], ev: Event) -> dict[str, Any]:
             "body": (
                 "Status: case-ratified. Reopen made a file-code active; this "
                 "instrument makes it controlling and adopts the early docket "
-                "as the controlling docket-code. This memo does not reprint "
-                "the file-code or the docket-code. Reconstruct both from their "
-                "seed filings via ack and reopen. Customer email is not the "
-                "ratify authority."
+                "as the controlling docket-code. Their seed filings, acknowledgment, "
+                "and reopen remain the controlling audit chain; customer email is not "
+                "the ratify authority."
             ),
             "closing": "— counsel",
             "department": project["departments"]["legal"],
@@ -594,12 +587,20 @@ def stamp_text_integrity(artifacts: list[Artifact]) -> list[Artifact]:
             "semantic_text_sha256": hashlib.sha256(artifact.text.encode()).hexdigest(),
             "semantic_attestation_revision": ARTIFACT_SEMANTIC_REVISION,
         }
+        artifact.slots.pop(LOCAL_PROBE_TRUST_ISOLATION_FIELD, None)
         if key is not None:
             bound = attach_attestation(
                 artifact_semantic_payload(artifact),
                 key,
                 purpose="artifact_semantics",
             )
+            if (
+                bound.get(LOCAL_PROBE_TRUST_ISOLATION_FIELD)
+                == LOCAL_PROBE_TRUST_ISOLATION_VALUE
+            ):
+                artifact.slots[LOCAL_PROBE_TRUST_ISOLATION_FIELD] = (
+                    LOCAL_PROBE_TRUST_ISOLATION_VALUE
+                )
             artifact.slots["semantic_attestation"] = bound["attestation"]
     return artifacts
 
@@ -617,6 +618,11 @@ def artifact_semantic_payload(artifact: Artifact) -> dict[str, Any]:
     if slots.get("semantic_attestation_revision") == ARTIFACT_SEMANTIC_REVISION:
         payload["semantic_attestation_revision"] = ARTIFACT_SEMANTIC_REVISION
         payload["time"] = artifact.time.isoformat()
+    if (
+        slots.get(LOCAL_PROBE_TRUST_ISOLATION_FIELD)
+        == LOCAL_PROBE_TRUST_ISOLATION_VALUE
+    ):
+        payload[LOCAL_PROBE_TRUST_ISOLATION_FIELD] = LOCAL_PROBE_TRUST_ISOLATION_VALUE
     return payload
 
 
@@ -631,6 +637,9 @@ def semantic_attestation_valid(
         if not allow_legacy:
             return False
     elif revision != ARTIFACT_SEMANTIC_REVISION:
+        return False
+    marker = slots.get(LOCAL_PROBE_TRUST_ISOLATION_FIELD)
+    if marker is not None and marker != LOCAL_PROBE_TRUST_ISOLATION_VALUE:
         return False
     attestation = slots.get("semantic_attestation")
     if not isinstance(attestation, dict):

@@ -17,8 +17,11 @@ from longworld.core.attestation import (
     PREDECESSOR_GATE_KEY_ENV,
     PREDECESSOR_GATE_KEY_ID_ENV,
     attestation_key_from_env,
+    verify_attestation,
 )
 from longworld.core.promotion import (
+    RELEASE_SELECTION_PURPOSE,
+    RELEASE_SELECTION_SCHEMA,
     PromotionError,
     candidate_sha256,
     create_dense_audit,
@@ -26,7 +29,9 @@ from longworld.core.promotion import (
     promote_candidate,
     select_release_worlds,
 )
-from longworld.core.release_profile import release_profile
+from longworld.core.release_profile import release_profile, release_profile_sha256
+
+REPLAY_PATH_REGISTRY_SCHEMA = "longworld.replay-path-registry.v1"
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -105,6 +110,74 @@ def _world_batches(
     ]
 
 
+def _load_replay_registry(path: Path) -> dict[str, dict[str, Path]]:
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("replay registry is missing or not a regular file")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("replay registry is not valid UTF-8 JSON") from error
+    fields = {
+        "schema_version",
+        "episode_replay_bundles",
+        "source_workflow_bundles",
+    }
+    if not isinstance(payload, dict) or set(payload) != fields:
+        raise ValueError("replay registry fields are invalid")
+    if payload.get("schema_version") != REPLAY_PATH_REGISTRY_SCHEMA:
+        raise ValueError("replay registry schema is invalid")
+    registry: dict[str, dict[str, Path]] = {}
+    for field in ("episode_replay_bundles", "source_workflow_bundles"):
+        raw_mapping = payload.get(field)
+        if not isinstance(raw_mapping, dict):
+            raise TypeError(f"replay registry {field} is invalid")
+        resolved: dict[str, Path] = {}
+        for digest, raw_path in raw_mapping.items():
+            if (
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or any(character not in "0123456789abcdef" for character in digest)
+                or not isinstance(raw_path, str)
+                or not raw_path.strip()
+            ):
+                raise ValueError(f"replay registry {field} entry is invalid")
+            candidate = Path(raw_path)
+            if not candidate.is_absolute():
+                candidate = path.parent / candidate
+            if candidate.is_symlink() or not candidate.is_file():
+                raise ValueError(f"replay registry {field} path is invalid")
+            resolved[digest] = candidate.absolute()
+        registry[field] = resolved
+    return registry
+
+
+def _candidate_replay_paths(
+    candidate: dict[str, Any],
+    episode_bundle_path: Path | None,
+    source_bundle_path: Path | None,
+    replay_registry: dict[str, dict[str, Path]] | None,
+) -> tuple[Path | None, Path | None]:
+    if replay_registry is None:
+        return episode_bundle_path, source_bundle_path
+    episode_binding = candidate.get("episode_replay_bundle")
+    source_binding = candidate.get("source_workflow_bundle")
+    if episode_binding is not None and source_binding is not None:
+        raise PromotionError("candidate cannot bind two replay bundle types")
+    if isinstance(episode_binding, dict):
+        digest = str(episode_binding.get("sha256") or "")
+        path = replay_registry["episode_replay_bundles"].get(digest)
+        if path is None:
+            raise PromotionError("episode replay bundle is missing from registry")
+        return path, None
+    if isinstance(source_binding, dict):
+        digest = str(source_binding.get("sha256") or "")
+        path = replay_registry["source_workflow_bundles"].get(digest)
+        if path is None:
+            raise PromotionError("source workflow bundle is missing from registry")
+        return None, path
+    return None, None
+
+
 def _audit_world(
     batch: list[tuple[dict[str, Any], dict[str, Any]]],
     k: int,
@@ -115,19 +188,26 @@ def _audit_world(
     audit_key: bytes,
     source_key: bytes | None,
     filter_mode: bool,
+    replay_registry: dict[str, dict[str, Path]] | None,
 ) -> tuple[list[dict[str, Any]], list[str], list[dict[str, Any]]]:
     audits: list[dict[str, Any]] = []
     errors: dict[str, str] = {}
     for candidate, ranking in batch:
         digest = candidate_sha256(candidate)
         try:
+            candidate_episode_path, candidate_source_path = _candidate_replay_paths(
+                candidate,
+                episode_bundle_path,
+                source_bundle_path,
+                replay_registry,
+            )
             audits.append(
                 create_dense_audit(
                     candidate,
                     ranking,
                     k=k,
-                    episode_bundle_path=episode_bundle_path,
-                    source_bundle_path=source_bundle_path,
+                    episode_bundle_path=candidate_episode_path,
+                    source_bundle_path=candidate_source_path,
                     candidate_attestation_key=candidate_key,
                     ranking_attestation_key=ranking_key,
                     audit_attestation_key=audit_key,
@@ -179,18 +259,25 @@ def _promote_world(
     source_key: bytes | None,
     expected_split: str | None,
     release_selection: dict[str, Any] | None,
+    replay_registry: dict[str, dict[str, Path]] | None,
 ) -> list[dict[str, Any]]:
     promoted: list[dict[str, Any]] = []
     errors: dict[str, str] = {}
     for candidate, audit in batch:
         digest = candidate_sha256(candidate)
         try:
+            candidate_episode_path, candidate_source_path = _candidate_replay_paths(
+                candidate,
+                episode_bundle_path,
+                source_bundle_path,
+                replay_registry,
+            )
             promoted.append(
                 promote_candidate(
                     candidate,
                     audit,
-                    episode_bundle_path=episode_bundle_path,
-                    source_bundle_path=source_bundle_path,
+                    episode_bundle_path=candidate_episode_path,
+                    source_bundle_path=candidate_source_path,
                     candidate_attestation_key=candidate_key,
                     audit_attestation_key=audit_key,
                     promotion_attestation_key=promotion_key,
@@ -249,9 +336,19 @@ def audit_rankings(
     rejects_path: Path | None = None,
     release_profile_id: str | None = None,
     workers: int = 1,
+    replay_registry_path: Path | None = None,
 ) -> int:
     if workers < 1:
         raise ValueError("workers must be at least 1")
+    if replay_registry_path is not None and (
+        episode_bundle_path is not None or source_bundle_path is not None
+    ):
+        raise ValueError("replay registry cannot be combined with a single bundle path")
+    replay_registry = (
+        _load_replay_registry(replay_registry_path)
+        if replay_registry_path is not None
+        else None
+    )
     if release_profile_id is not None:
         required_k = release_profile(release_profile_id).dense_top_k
         if k != required_k:
@@ -285,6 +382,7 @@ def audit_rankings(
                 audit_key,
                 source_key,
                 filter_mode,
+                replay_registry,
             )
             for batch in batches
         ]
@@ -305,6 +403,7 @@ def audit_rankings(
                     audit_key,
                     source_key,
                     filter_mode,
+                    replay_registry,
                 )
                 for batch in batches
             ]
@@ -335,9 +434,19 @@ def promote_rows(
     expected_split: str | None = None,
     release_selection_path: Path | None = None,
     workers: int = 1,
+    replay_registry_path: Path | None = None,
 ) -> int:
     if workers < 1:
         raise ValueError("workers must be at least 1")
+    if replay_registry_path is not None and (
+        episode_bundle_path is not None or source_bundle_path is not None
+    ):
+        raise ValueError("replay registry cannot be combined with a single bundle path")
+    replay_registry = (
+        _load_replay_registry(replay_registry_path)
+        if replay_registry_path is not None
+        else None
+    )
     candidate_key = attestation_key_from_env("candidate_row")
     audit_key = attestation_key_from_env("dense_retrieval_audit")
     promotion_key = attestation_key_from_env("sft_row")
@@ -346,9 +455,6 @@ def promote_rows(
         raise ValueError(
             "candidate, auditor, and promotion attestation keys are required"
         )
-    candidates, audits = _matched_inputs(
-        candidates_path, audits_path, receipt_label="dense audit"
-    )
     release_selection = None
     if release_selection_path is not None:
         release_selection = json.loads(
@@ -356,6 +462,44 @@ def promote_rows(
         )
         if not isinstance(release_selection, dict):
             raise TypeError("release selection receipt must be a JSON object")
+    if not _read_jsonl(candidates_path):
+        if _read_jsonl(audits_path):
+            raise ValueError("empty candidate input has dense audit rows")
+        if expected_split not in {"train", "eval"} or release_selection is None:
+            raise ValueError("empty candidate input requires a selected split")
+        profile_id = str(release_selection.get("release_profile_id") or "")
+        profile = release_profile(profile_id)
+        split_by_world = release_selection.get("split_by_world")
+        expected_worlds = (
+            profile.min_train_worlds
+            if expected_split == "train"
+            else profile.min_eval_worlds
+        )
+        if (
+            not verify_attestation(
+                release_selection,
+                audit_key,
+                purpose=RELEASE_SELECTION_PURPOSE,
+            )
+            or release_selection.get("schema_version") != RELEASE_SELECTION_SCHEMA
+            or release_selection.get("release_profile_sha256")
+            != release_profile_sha256(profile_id)
+            or release_selection.get("split_strategy") != profile.split_strategy
+            or not isinstance(split_by_world, dict)
+            or release_selection.get("n_selected_worlds")
+            != profile.expected_promoted_worlds
+            or len(split_by_world) != profile.expected_promoted_worlds
+            or list(split_by_world.values()).count("train") != profile.min_train_worlds
+            or list(split_by_world.values()).count("eval") != profile.min_eval_worlds
+        ):
+            raise ValueError("empty candidate input has invalid release selection")
+        if expected_worlds != 0:
+            raise ValueError("selected split is not empty")
+        _write_jsonl_atomic(output_path, [])
+        return 0
+    candidates, audits = _matched_inputs(
+        candidates_path, audits_path, receipt_label="dense audit"
+    )
     batches = _world_batches(candidates, audits)
     if workers == 1:
         results = [
@@ -369,6 +513,7 @@ def promote_rows(
                 source_key,
                 expected_split,
                 release_selection,
+                replay_registry,
             )
             for batch in batches
         ]
@@ -389,6 +534,7 @@ def promote_rows(
                     source_key,
                     expected_split,
                     release_selection,
+                    replay_registry,
                 )
                 for batch in batches
             ]
@@ -521,6 +667,7 @@ def main() -> None:
     audit.add_argument("--release-profile", required=True)
     audit.add_argument("--episode-bundle", type=Path)
     audit.add_argument("--source-bundle", type=Path)
+    audit.add_argument("--replay-registry", type=Path)
     audit.add_argument("--accepted-candidates", type=Path)
     audit.add_argument("--rejects", type=Path)
     audit.add_argument("--workers", type=int, default=1)
@@ -533,6 +680,7 @@ def main() -> None:
     promote.add_argument("--output", type=Path, required=True)
     promote.add_argument("--episode-bundle", type=Path)
     promote.add_argument("--source-bundle", type=Path)
+    promote.add_argument("--replay-registry", type=Path)
     promote.add_argument("--expected-split", choices=("train", "eval"), required=True)
     promote.add_argument("--release-selection", type=Path, required=True)
     promote.add_argument("--workers", type=int, default=1)
@@ -572,6 +720,7 @@ def main() -> None:
             rejects_path=args.rejects,
             release_profile_id=args.release_profile,
             workers=args.workers,
+            replay_registry_path=args.replay_registry,
         )
     elif args.command == "promote":
         count = promote_rows(
@@ -583,6 +732,7 @@ def main() -> None:
             expected_split=args.expected_split,
             release_selection_path=args.release_selection,
             workers=args.workers,
+            replay_registry_path=args.replay_registry,
         )
     elif args.command == "select":
         count = select_worlds(

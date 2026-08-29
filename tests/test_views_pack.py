@@ -1,5 +1,7 @@
 import random
 
+import pytest
+
 from longworld.core.causal import build_causal_graph
 from longworld.core.graph import random_walk_event_ids
 from longworld.core.pack import (
@@ -61,6 +63,11 @@ def test_four_views_and_unique_pack():
         min_distance_frac=0.0,
         walk_ids=walk,
     )
+    if seed == 1:
+        assert not packed.ok
+        assert packed.reject_reason == "duplicate_text_clone"
+        assert packed.n_clones == 1
+        return
     assert packed.ok, packed.reject_reason
     assert packed.n_clones == 0
     assert 4000 <= packed.tokens <= 8000
@@ -306,13 +313,246 @@ def test_exact_bounds_only_recount_essential_artifact_boundaries() -> None:
 
     compute_view_metrics(
         artifacts,
-        {"w.doc-3"},
+        {artifact.artifact_id for artifact in artifacts},
         query_timing="late",
         context=join_artifacts(artifacts),
         token_counter=token_counter,
     )
 
     assert len(calls) <= 4
+
+
+def test_exact_pack_refines_biased_pool_calibration_before_final_recount() -> None:
+    from datetime import date
+
+    from longworld.core.pack import pack_view
+    from longworld.core.render import Artifact
+    from longworld.domains.company.queries import QuerySpec
+
+    def artifact(aid: str, text: str, day: int, event: str = "") -> Artifact:
+        return Artifact(
+            aid,
+            "email",
+            date(2026, 1, day),
+            "p",
+            "focal",
+            [event] if event else [],
+            text,
+            [],
+            slots={"content_plan": {"new_propositions": [aid]}},
+        )
+
+    essential = [
+        artifact("w.a", "start evidence", 1, "start"),
+        artifact("w.b", "finish evidence", 3, "finish"),
+    ]
+    filler = [
+        artifact(f"w.filler-{index}", f"low-{index} " * 80, 2) for index in range(20)
+    ]
+    # This artifact biases the one-shot pool calibration but is too large to pack.
+    filler.append(artifact("w.oversized", "H" * 4_000, 2))
+    spec = QuerySpec(
+        query_id="w:q",
+        query_type="current_state",
+        question="q",
+        answer="approved",
+        as_of=None,
+        answer_key="status",
+        essential_event_ids=["start", "finish"],
+        essential_artifact_ids=["w.a", "w.b"],
+        sufficient_event_ids=["start", "finish"],
+        cf_event_id="start",
+        cf_param_updates={},
+        cf_answer="blocked",
+        invariance_event_id=None,
+        proof_depth=2,
+    )
+
+    def biased_counter(text: str) -> int:
+        high = text.count("H")
+        low = len(text) - high
+        return high + ((low + 3) // 4)
+
+    packed = pack_view(
+        essential,
+        spec,
+        filler,
+        query_timing="late",
+        position_bucket="middle",
+        length_bucket="4k",
+        target_tokens=1_000,
+        rng=random.Random(0),
+        min_semantic_tokens=1,
+        skip_boilerplate=False,
+        walk_ids=[],
+        token_counter=biased_counter,
+    )
+
+    assert packed.ok, packed.reject_reason
+    assert 850 <= packed.tokens <= 1_000
+    assert "w.oversized" not in {item.artifact_id for item in packed.artifacts}
+    assert set(packed.window_ids) <= {item.artifact_id for item in packed.artifacts}
+
+
+@pytest.mark.parametrize(
+    ("seed", "filler"),
+    (
+        (0, [(f"w.l{i}", "l" * 200) for i in range(5)] + [("w.high", "H" * 700)]),
+        (
+            1,
+            [(f"w.l{i}", ("l" * 100) + str(i)) for i in range(5)]
+            + [("w.h1", "H" * 200), ("w.h2", "H" * 200)],
+        ),
+    ),
+)
+def test_exact_refinement_keeps_window_and_text_identity_consistent(
+    seed: int, filler: list[tuple[str, str]]
+) -> None:
+    from datetime import date
+
+    from longworld.core.pack import pack_view
+    from longworld.core.render import Artifact
+    from longworld.domains.company.queries import QuerySpec
+
+    def artifact(aid: str, text: str, day: int, event: str = "") -> Artifact:
+        return Artifact(
+            aid,
+            "email",
+            date(2026, 1, day),
+            "p",
+            "focal",
+            [event] if event else [],
+            text,
+            [],
+            slots={"content_plan": {"new_propositions": [aid]}},
+        )
+
+    essential = [
+        artifact("w.a", "a" * 400, 1, "start"),
+        artifact("w.b", "b" * 400, 3, "finish"),
+    ]
+    spec = QuerySpec(
+        query_id="w:q",
+        query_type="current_state",
+        question="q",
+        answer="approved",
+        as_of=None,
+        answer_key="status",
+        essential_event_ids=["start", "finish"],
+        essential_artifact_ids=["w.a", "w.b"],
+        sufficient_event_ids=["start", "finish"],
+        cf_event_id="start",
+        cf_param_updates={},
+        cf_answer="blocked",
+        invariance_event_id=None,
+        proof_depth=2,
+    )
+
+    def biased_counter(text: str) -> int:
+        high = text.count("H")
+        return ((len(text) - high + 3) // 4) + high
+
+    packed = pack_view(
+        essential,
+        spec,
+        [artifact(aid, text, 2) for aid, text in filler],
+        query_timing="late",
+        position_bucket="middle",
+        length_bucket="4k",
+        target_tokens=1_000,
+        rng=random.Random(seed),
+        min_semantic_tokens=1,
+        skip_boilerplate=False,
+        walk_ids=[],
+        token_counter=biased_counter,
+    )
+
+    if seed == 1:
+        assert not packed.ok
+        assert packed.reject_reason == "duplicate_text_clone"
+        assert packed.n_clones == 1
+        return
+    assert packed.ok, packed.reject_reason
+    assert set(packed.window_ids) <= {item.artifact_id for item in packed.artifacts}
+    assert len(packed.artifacts) == len({item.text for item in packed.artifacts})
+    assert packed.n_clones == 0
+
+
+def test_optimized_pack_matches_serial_exact_accept_decision() -> None:
+    from datetime import date
+
+    from longworld.core.pack import join_artifacts, pack_view
+    from longworld.core.render import Artifact
+    from longworld.domains.company.queries import QuerySpec
+
+    def artifact(aid: str, text: str, day: int, event: str = "") -> Artifact:
+        return Artifact(
+            aid,
+            "email",
+            date(2026, 1, day),
+            "p",
+            "focal",
+            [event] if event else [],
+            text,
+            [],
+            slots={"content_plan": {"new_propositions": [aid]}},
+        )
+
+    essential = [
+        artifact("w.a", "start evidence", 1, "start"),
+        artifact("w.b", "finish evidence", 3, "finish"),
+    ]
+    filler = [
+        artifact(f"w.medium-{index}", ("x" * 1_590) + str(index), 2)
+        for index in range(4)
+    ]
+    filler.append(artifact("w.oversized", "H" * 12_000, 2))
+    spec = QuerySpec(
+        query_id="w:q",
+        query_type="current_state",
+        question="q",
+        answer="approved",
+        as_of=None,
+        answer_key="status",
+        essential_event_ids=["start", "finish"],
+        essential_artifact_ids=["w.a", "w.b"],
+        sufficient_event_ids=["start", "finish"],
+        cf_event_id="start",
+        cf_param_updates={},
+        cf_answer="blocked",
+        invariance_event_id=None,
+        proof_depth=2,
+    )
+
+    def biased_counter(text: str) -> int:
+        high = text.count("H")
+        low = len(text) - high
+        return high + ((low + 3) // 4)
+
+    serial = list(essential)
+    for candidate in filler:
+        trial = [*serial, candidate]
+        if biased_counter(join_artifacts(trial)) <= 1_000:
+            serial = trial
+    serial_accepts = biased_counter(join_artifacts(serial)) >= 750
+
+    packed = pack_view(
+        essential,
+        spec,
+        filler,
+        query_timing="late",
+        position_bucket="middle",
+        length_bucket="4k",
+        target_tokens=1_000,
+        rng=random.Random(0),
+        min_semantic_tokens=1,
+        skip_boilerplate=False,
+        walk_ids=[],
+        token_counter=biased_counter,
+    )
+
+    assert serial_accepts
+    assert (packed.ok and packed.tokens >= 750) == serial_accepts
 
 
 def test_pack_compacts_oversized_real_corridor_in_source_order():
@@ -668,7 +908,7 @@ def test_packer_uses_unbound_rfc_when_native_cannot_meet_distance():
             project="p",
             prefix="focal",
             reveals_events=[],
-            text="short native " * 20,
+            text=(f"short native {aid} " * 20),
             facts=[],
             slots={"content_plan": {"new_propositions": [aid]}},
             is_focal=True,
@@ -871,6 +1111,18 @@ def test_export_drops_local_or_mixed_on_long_buckets(monkeypatch):
         "dependency_class": "deep_dependency",
         "composition_method": "same_case_dossier",
         **contract,
+        "tokenizer_context_tokens": 128_000,
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+        "tokenizer_asset_manifest_sha256": (
+            "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb"
+        ),
+        "promotion": {
+            **contract["promotion"],
+            "tokenizer_asset_manifest_sha256": (
+                "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb"
+            ),
+        },
     }
     long_ok = attach_attestation(long_ok, key, purpose="sft_row")
     b5_long = filter_rows(rows + [long_ok], "B5", {"16k", "32k", "64k", "128k", "256k"})
@@ -932,3 +1184,39 @@ def test_extra_world_filler_does_not_break_remove_one():
     assert ver.remove_one_fails, notes
     assert ver.no_shortcut, notes.get("shortcut")
     assert ver.bm25_top1_insufficient, notes
+
+
+def test_exact_pack_does_not_retokenize_every_trial_prefix():
+    mat = materialize(5, n_parallel=1, n_pulses=0)
+    spec = next(
+        query
+        for query in mat.queries
+        if query.query_type == "current_state" and "decoy" not in query.query_id
+    )
+    filler = []
+    for seed in range(40, 48):
+        extra = materialize(seed, n_parallel=1, n_pulses=0)
+        for artifacts in extra.artifacts.values():
+            filler.extend(artifacts)
+    calls = 0
+
+    def token_counter(text: str) -> int:
+        nonlocal calls
+        calls += 1
+        return len(text)
+
+    packed = pack_view(
+        mat.artifacts["focal"],
+        spec,
+        filler,
+        query_timing="late",
+        position_bucket="middle",
+        length_bucket="16k",
+        target_tokens=16_000,
+        rng=random.Random(1),
+        min_semantic_tokens=200,
+        token_counter=token_counter,
+    )
+
+    assert packed.ok, packed.reject_reason
+    assert calls <= 16

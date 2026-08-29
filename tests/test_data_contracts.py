@@ -1605,6 +1605,79 @@ def test_quality_gate_uses_pinned_tokens_for_real_64k_semantic_growth() -> None:
     assert any("real_64k_missing_lower_band" in error for error in result["errors"])
 
 
+def test_128k_semantic_density_uses_exact_not_estimated_total() -> None:
+    row = {
+        "base_task_id": "exact-128-density",
+        "world_id": "w128",
+        "query_timing": "late",
+        "view": "full",
+        "split": "train",
+        "length_bucket": "128k",
+        "actual_context_tokens": 50_000,
+        "tokenizer_context_tokens": 128_100,
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "a" * 40,
+        "tokenizer_asset_manifest_sha256": "b" * 64,
+        "semantic_tokens": {
+            "event_bearing": 0,
+            "internal": 0,
+            "generic_background": 64_000,
+        },
+    }
+
+    errors = quality_gate._semantic_growth_errors(
+        [row], min_internal_growth=4_096, max_generic_growth_share=0.2
+    )
+
+    assert any(
+        error.startswith("semantic_density:exact-128-density:") for error in errors
+    )
+
+
+def test_exact_band_growth_uses_exact_token_delta_denominator() -> None:
+    base = {
+        "base_task_id": "exact-growth-denominator",
+        "world_id": "w-growth",
+        "query_timing": "late",
+        "view": "full",
+        "split": "train",
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "a" * 40,
+    }
+    before = {
+        **base,
+        "length_bucket": "64k",
+        "actual_context_tokens": 50_000,
+        "tokenizer_context_tokens": 64_100,
+        "semantic_tokens": {
+            "event_bearing": 20_000,
+            "internal": 0,
+            "generic_background": 1_000,
+        },
+    }
+    after = {
+        **base,
+        "length_bucket": "128k",
+        "actual_context_tokens": 300_000,
+        "tokenizer_context_tokens": 128_100,
+        "tokenizer_asset_manifest_sha256": "b" * 64,
+        "semantic_tokens": {
+            "event_bearing": 25_000,
+            "internal": 0,
+            "generic_background": 21_000,
+        },
+    }
+
+    errors = quality_gate._semantic_growth_errors(
+        [before, after], min_internal_growth=4_096, max_generic_growth_share=0.2
+    )
+
+    assert any(
+        error.startswith("semantic_growth:exact-growth-denominator:64k->128k:")
+        for error in errors
+    )
+
+
 def test_intrinsic_long_source_does_not_require_artificial_truncation() -> None:
     row = {
         "base_task_id": "intrinsic-paper-base",
@@ -1758,6 +1831,7 @@ def test_real_band_growth_requires_more_replayed_causal_history() -> None:
             "causal_supporting": 3000,
         },
         "context_source_relation_count": 3,
+        "authentic_source_relation_edges": [{"id": index} for index in range(3)],
         "strict_support_event_count": 4,
         "difficulty": {"proof_depth": 3},
         "graph": {"proof_depth": 3, "hop_count": 3},
@@ -1790,6 +1864,19 @@ def test_real_band_growth_requires_more_replayed_causal_history() -> None:
     assert any("real_causal_history_growth" in error for error in result["errors"])
 
     higher["context_source_relation_count"] = 8
+    result = evaluate_quality(
+        {"retention": 0.5, "n_worlds": 1},
+        [lower, higher],
+        min_retention=0.0,
+        max_retention=1.0,
+        max_boilerplate=1.0,
+        max_pulse=1.0,
+        min_internal_growth=1,
+        max_generic_growth_share=0.3,
+    )
+    assert any("real_causal_history_growth" in error for error in result["errors"])
+
+    higher["authentic_source_relation_edges"] = [{"id": index} for index in range(8)]
     higher["strict_support_event_count"] = 9
     higher["difficulty"] = {"proof_depth": 7}
     higher["graph"] = {"proof_depth": 7, "hop_count": 7}
@@ -2454,13 +2541,16 @@ def test_quality_gate_rejects_superseded_production_profile_issuance() -> None:
 def test_current_source_rich_profiles_require_relation_provenance_split() -> None:
     p7 = release_profile("p7-wiki-source-slice-1-v1")
     p10 = release_profile("p10-source-rich-production-48-v1")
+    p12 = release_profile("p12-current-source-probe-12-v1")
     legacy = release_profile("p3-probe-12-v1")
 
     assert quality_gate._requires_relation_provenance_split(p7)
     assert quality_gate._requires_relation_provenance_split(p10)
+    assert quality_gate._requires_relation_provenance_split(p12)
     assert not quality_gate._requires_relation_provenance_split(legacy)
     assert quality_gate._requires_substantial_real_proof_growth(p7)
     assert quality_gate._requires_substantial_real_proof_growth(p10)
+    assert quality_gate._requires_substantial_real_proof_growth(p12)
     assert not quality_gate._requires_substantial_real_proof_growth(legacy)
 
 
@@ -2822,6 +2912,122 @@ def test_strict_exact_band_gate_rejects_missing_or_mislabeled_metadata(
         "invalid_exact_16k:missing",
         "invalid_exact_32k:mislabeled",
     ]
+
+
+def test_128k_quality_gate_requires_complete_exact_tokenizer_binding(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        quality_gate,
+        "_tokenizer_context_tokens",
+        lambda _context, _model, _revision: 128_100,
+    )
+    monkeypatch.setattr(
+        quality_gate,
+        "resolved_tokenizer_asset_manifest_sha256",
+        lambda _model, _revision: "b" * 64,
+    )
+    complete = {
+        "query_id": "complete",
+        "length_bucket": "128k",
+        "context": "bound context",
+        "tokenizer_context_tokens": 128_100,
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "a" * 40,
+        "tokenizer_asset_manifest_sha256": "b" * 64,
+    }
+    rows = []
+    for field in (
+        "tokenizer_context_tokens",
+        "tokenizer_revision",
+        "tokenizer_asset_manifest_sha256",
+    ):
+        rows.append(
+            {
+                key: value
+                for key, value in {**complete, "query_id": f"missing-{field}"}.items()
+                if key != field
+            }
+        )
+
+    errors = quality_gate._exact_band_metadata_errors(
+        rows,
+        expected_model_id="Qwen/Qwen3.5-4B",
+        expected_revision="a" * 40,
+    )
+
+    assert errors == [
+        "invalid_exact_128k:missing-tokenizer_context_tokens",
+        "invalid_exact_128k:missing-tokenizer_revision",
+        "invalid_exact_128k:missing-tokenizer_asset_manifest_sha256",
+    ]
+    assert (
+        quality_gate._exact_band_metadata_errors(
+            [complete],
+            expected_model_id="Qwen/Qwen3.5-4B",
+            expected_revision="a" * 40,
+        )
+        == []
+    )
+    assert quality_gate._exact_band_metadata_errors(
+        [
+            {
+                **complete,
+                "query_id": "mismatched-asset",
+                "tokenizer_asset_manifest_sha256": "c" * 64,
+            }
+        ],
+        expected_model_id="Qwen/Qwen3.5-4B",
+        expected_revision="a" * 40,
+    ) == ["invalid_exact_128k:mismatched-asset"]
+
+
+def test_p12_sec_quality_gate_requires_all_four_exact_length_buckets(
+    monkeypatch,
+) -> None:
+    profile = release_profile("p12-sec-source-slice-1-v1")
+    tokens_by_band = {
+        "16k": 16_000,
+        "32k": 32_000,
+        "64k": 64_000,
+        "128k": 128_000,
+    }
+    monkeypatch.setattr(
+        quality_gate,
+        "_tokenizer_context_tokens",
+        lambda context, _model, _revision: tokens_by_band[context],
+    )
+    monkeypatch.setattr(
+        quality_gate,
+        "resolved_tokenizer_asset_manifest_sha256",
+        lambda _model, _revision: profile.tokenizer_asset_manifest_sha256,
+    )
+
+    def row(band: str) -> dict:
+        return {
+            "world_id": "p12-sec-world",
+            "query_id": f"p12-sec-{band}",
+            "length_bucket": band,
+            "context": band,
+            "tokenizer_context_tokens": tokens_by_band[band],
+            "tokenizer_model_id": profile.tokenizer_model_id,
+            "tokenizer_revision": profile.tokenizer_revision,
+            "tokenizer_asset_manifest_sha256": (
+                profile.tokenizer_asset_manifest_sha256
+            ),
+        }
+
+    assert quality_gate._required_exact_length_bucket_errors(
+        profile,
+        [row("16k"), row("32k"), row("64k")],
+    ) == ["release_required_exact_length_buckets:p12-sec-world:missing=128k"]
+    assert (
+        quality_gate._required_exact_length_bucket_errors(
+            profile,
+            [row("16k"), row("32k"), row("64k"), row("128k")],
+        )
+        == []
+    )
 
 
 def test_proof_metadata_gate_requires_graph_authority() -> None:

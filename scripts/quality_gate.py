@@ -16,8 +16,11 @@ from pathlib import Path
 
 from longworld.core.attestation import (
     ATTESTATION_V2_SCHEME,
+    LOCAL_PROBE_TRUST_ISOLATION_FIELD,
+    LOCAL_PROBE_TRUST_ISOLATION_VALUE,
     attach_attestation,
     attestation_key_from_env,
+    local_probe_diagnostic_metadata,
     production_attestation_errors,
     sanitized_attestation_environment,
     verify_attestation,
@@ -28,12 +31,18 @@ from longworld.core.promotion import (
     RELEASE_GATE_PURPOSE,
     RELEASE_GATE_REVISION,
     RELEASE_GATE_SCHEMA,
-    exact_token_band_reject_reason,
     promoted_row_set_sha256,
     promoted_split_row_set_sha256,
 )
-from longworld.core.record_contract import replay_bundle_binding_valid, sft_row_errors
+from longworld.core.record_contract import (
+    EXACT_TOKEN_BAND_RANGES,
+    exact_token_metadata_valid,
+    replay_bundle_binding_valid,
+    sft_row_errors,
+)
 from longworld.core.release_profile import (
+    RELATION_PROVENANCE_SPLIT_PROFILE_IDS,
+    SUBSTANTIAL_REAL_PROOF_GROWTH_PROFILE_IDS,
     ReleaseProfile,
     issuable_release_profile,
     release_profile,
@@ -58,7 +67,10 @@ class ReleaseProduct:
 
 
 def _requires_relation_provenance_split(profile: ReleaseProfile | None) -> bool:
-    return bool(profile is not None and profile.profile_id.startswith(("p7-", "p10-")))
+    return bool(
+        profile is not None
+        and profile.profile_id in RELATION_PROVENANCE_SPLIT_PROFILE_IDS
+    )
 
 
 def _create_release_gate_receipt(
@@ -97,27 +109,27 @@ def _create_release_gate_receipt(
             ensure_ascii=False,
         ).encode("utf-8")
     ).hexdigest()
+    payload = {
+        "schema_version": RELEASE_GATE_SCHEMA,
+        "gate_revision": RELEASE_GATE_REVISION,
+        "release_profile_id": release_profile_id,
+        "release_profile_sha256": release_profile_sha256(release_profile_id),
+        "tokenizer_model_id": profile.tokenizer_model_id,
+        "tokenizer_revision": profile.tokenizer_revision,
+        "tokenizer_asset_manifest_sha256": (profile.tokenizer_asset_manifest_sha256),
+        "predecessor_profile_id": profile.predecessor_profile_id,
+        "quality_report_sha256": product.source_file_sha256["quality_report.json"],
+        "source_file_sha256": dict(sorted(product.source_file_sha256.items())),
+        "metrics_sha256": metrics_sha256,
+        "n_worlds": product.metrics.get("n_worlds_observed"),
+        "n_rows": product.metrics.get("n_rows"),
+        "production_approval": product.production_approval,
+        "ok": True,
+        "errors": [],
+    }
+    payload.update(local_probe_diagnostic_metadata())
     receipt = attach_attestation(
-        {
-            "schema_version": RELEASE_GATE_SCHEMA,
-            "gate_revision": RELEASE_GATE_REVISION,
-            "release_profile_id": release_profile_id,
-            "release_profile_sha256": release_profile_sha256(release_profile_id),
-            "tokenizer_model_id": profile.tokenizer_model_id,
-            "tokenizer_revision": profile.tokenizer_revision,
-            "tokenizer_asset_manifest_sha256": (
-                profile.tokenizer_asset_manifest_sha256
-            ),
-            "predecessor_profile_id": profile.predecessor_profile_id,
-            "quality_report_sha256": product.source_file_sha256["quality_report.json"],
-            "source_file_sha256": dict(sorted(product.source_file_sha256.items())),
-            "metrics_sha256": metrics_sha256,
-            "n_worlds": product.metrics.get("n_worlds_observed"),
-            "n_rows": product.metrics.get("n_rows"),
-            "production_approval": product.production_approval,
-            "ok": True,
-            "errors": [],
-        },
+        payload,
         attestation_key,
         purpose=RELEASE_GATE_PURPOSE,
     )
@@ -136,7 +148,10 @@ def _create_release_gate_receipt(
 
 
 def _requires_substantial_real_proof_growth(profile: ReleaseProfile | None) -> bool:
-    return bool(profile is not None and profile.profile_id.startswith(("p7-", "p10-")))
+    return bool(
+        profile is not None
+        and profile.profile_id in SUBSTANTIAL_REAL_PROOF_GROWTH_PROFILE_IDS
+    )
 
 
 def _write_json_atomic(path: Path, payload: dict) -> None:
@@ -313,21 +328,15 @@ def _has_exact_band_metadata(
     expected_revision: str | None = None,
     expected_asset_manifest_sha256: str | None = None,
 ) -> bool:
-    try:
-        tokens = int(row.get("tokenizer_context_tokens") or 0)
-    except (TypeError, ValueError):
-        return False
     revision = str(row.get("tokenizer_revision") or "")
     length_bucket = str(row.get("length_bucket") or "")
-    metadata_valid = (
-        exact_token_band_reject_reason(length_bucket, tokens) is None
-        and length_bucket in {"16k", "32k", "64k"}
-        and bool(str(row.get("tokenizer_model_id") or ""))
-        and len(revision) == 40
-        and all(character in "0123456789abcdef" for character in revision)
+    metadata_valid = exact_token_metadata_valid(
+        row,
+        require_asset_manifest=(length_bucket == "128k"),
     )
     if not metadata_valid:
         return False
+    tokens = int(row["tokenizer_context_tokens"])
     model_id = str(row.get("tokenizer_model_id") or "")
     if expected_model_id is None or expected_revision is None:
         return True
@@ -335,13 +344,21 @@ def _has_exact_band_metadata(
         if model_id != expected_model_id or revision != expected_revision:
             return False
         try:
-            return (
-                _tokenizer_context_tokens(
-                    str(row.get("context") or ""), model_id, revision
-                )
-                == tokens
+            loaded_asset_digest = (
+                resolved_tokenizer_asset_manifest_sha256(model_id, revision)
+                if length_bucket == "128k"
+                else ""
             )
-        except (ImportError, OSError, RuntimeError, ValueError):
+            replayed_tokens = _tokenizer_context_tokens(
+                str(row.get("context") or ""), model_id, revision
+            )
+            return replayed_tokens == tokens and (
+                length_bucket != "128k"
+                or loaded_asset_digest
+                == resolved_tokenizer_asset_manifest_sha256(model_id, revision)
+                == str(row.get("tokenizer_asset_manifest_sha256") or "")
+            )
+        except (ImportError, OSError, RuntimeError, TokenizerAssetError, ValueError):
             return False
     declared_asset_digest = str(row.get("tokenizer_asset_manifest_sha256") or "")
     if (
@@ -401,7 +418,7 @@ def _exact_band_metadata_errors(
     errors: list[str] = []
     for index, row in enumerate(rows):
         length_bucket = str(row.get("length_bucket") or "")
-        if length_bucket not in {"16k", "32k", "64k"}:
+        if length_bucket not in EXACT_TOKEN_BAND_RANGES:
             continue
         if not _has_exact_band_metadata(
             row,
@@ -414,6 +431,59 @@ def _exact_band_metadata_errors(
                 f"{row.get('query_id') or row.get('world_id') or index}"
             )
     return errors
+
+
+def _required_exact_length_bucket_errors(
+    profile: ReleaseProfile, rows: list[dict]
+) -> list[str]:
+    required = profile.required_exact_length_buckets
+    if not required:
+        return []
+    if len(set(required)) != len(required) or any(
+        bucket not in EXACT_TOKEN_BAND_RANGES for bucket in required
+    ):
+        return ["release_required_exact_length_buckets:invalid_profile"]
+    observed: dict[str, set[str]] = defaultdict(set)
+    for row in rows:
+        world_id = str(row.get("world_id") or "")
+        bucket = str(row.get("length_bucket") or "")
+        if (
+            world_id
+            and bucket in required
+            and _has_exact_band_metadata(
+                row,
+                expected_model_id=profile.tokenizer_model_id,
+                expected_revision=profile.tokenizer_revision,
+                expected_asset_manifest_sha256=(
+                    profile.tokenizer_asset_manifest_sha256
+                ),
+            )
+        ):
+            observed[world_id].add(bucket)
+    worlds = sorted(
+        {str(row.get("world_id") or "") for row in rows if row.get("world_id")}
+    )
+    return [
+        "release_required_exact_length_buckets:"
+        f"{world_id}:missing="
+        + "+".join(bucket for bucket in required if bucket not in observed[world_id])
+        for world_id in worlds
+        if not set(required).issubset(observed[world_id])
+    ]
+
+
+def _semantic_context_tokens(row: dict) -> int:
+    """Prefer valid exact-band counts over approximate serialized metrics."""
+    estimated = int(
+        row.get("actual_context_tokens")
+        or (row.get("difficulty") or {}).get("context_tokens")
+        or 0
+    )
+    if str(
+        row.get("length_bucket") or ""
+    ) in EXACT_TOKEN_BAND_RANGES and _has_exact_band_metadata(row):
+        return int(row["tokenizer_context_tokens"])
+    return estimated
 
 
 def _proof_metadata_errors(rows: list[dict]) -> list[str]:
@@ -494,11 +564,7 @@ def _semantic_growth_errors(
             or (row.get("difficulty") or {}).get("context_tokens")
             or 0
         )
-        total = (
-            int(row.get("tokenizer_context_tokens") or 0)
-            if _has_exact_64k_metadata(row)
-            else estimated_total
-        )
+        total = _semantic_context_tokens(row)
         if total < 64000:
             continue
         workflow_tokens = int(semantic.get("event_bearing") or 0) + int(
@@ -534,13 +600,7 @@ def _semantic_growth_errors(
                     f"{row.get('view') or '?'}"
                 )
     for key, group in groups.items():
-        group.sort(
-            key=lambda row: int(
-                row.get("actual_context_tokens")
-                or (row.get("difficulty") or {}).get("context_tokens")
-                or 0
-            )
-        )
+        group.sort(key=_semantic_context_tokens)
         bands: list[list[dict]] = []
         for row in group:
             if not bands or bands[-1][0].get("length_bucket") != row.get(
@@ -568,16 +628,8 @@ def _semantic_growth_errors(
                 int(after_sem.get("generic_background") or 0)
                 - int(before_sem.get("generic_background") or 0),
             )
-            before_total = int(
-                before.get("actual_context_tokens")
-                or (before.get("difficulty") or {}).get("context_tokens")
-                or 0
-            )
-            after_total = int(
-                after.get("actual_context_tokens")
-                or (after.get("difficulty") or {}).get("context_tokens")
-                or 0
-            )
+            before_total = _semantic_context_tokens(before)
+            after_total = _semantic_context_tokens(after)
             total_growth = max(1, after_total - before_total)
             generic_share = generic_growth / total_growth
             if (
@@ -591,9 +643,14 @@ def _semantic_growth_errors(
                     f"generic_share={generic_share:.3f}"
                 )
             if after.get("real_source_verified") is True:
-                causal_growth = int(
-                    after.get("context_source_relation_count") or 0
-                ) - int(before.get("context_source_relation_count") or 0)
+                before_authentic = before.get("authentic_source_relation_edges")
+                after_authentic = after.get("authentic_source_relation_edges")
+                causal_growth = (
+                    len(after_authentic) - len(before_authentic)
+                    if isinstance(before_authentic, list)
+                    and isinstance(after_authentic, list)
+                    else 0
+                )
                 if causal_growth <= 0:
                     errors.append(
                         "real_causal_history_growth:"
@@ -745,6 +802,15 @@ def _row_contract_errors(rows: list[dict]) -> list[str]:
         if not isinstance(view, dict):
             errors.append(f"missing_view_verification:{row_id}")
         else:
+            local_probe_diagnostic = (
+                row.get(LOCAL_PROBE_TRUST_ISOLATION_FIELD)
+                == LOCAL_PROBE_TRUST_ISOLATION_VALUE
+                and row.get("trust_scope") == "local_probe"
+                and row.get("diagnostic_only") is True
+                and row.get("content_gate_eligible") is True
+                and row.get("trust_valid_for_production") is False
+                and row.get("production_eligible") is False
+            )
             view_failed = [
                 gate
                 for gate in (
@@ -752,10 +818,16 @@ def _row_contract_errors(rows: list[dict]) -> list[str]:
                     "semantic_text_grounded",
                     "classification_ok",
                     "global_proof_green",
-                    "production_eligible",
+                    (
+                        "content_gate_eligible"
+                        if local_probe_diagnostic
+                        else "production_eligible"
+                    ),
                 )
                 if view.get(gate) is not True
             ]
+            if local_probe_diagnostic and view.get("production_eligible") is not False:
+                view_failed.append("production_eligible")
             if view.get("strict_replay_answer") != view.get("expected_answer"):
                 view_failed.append("strict_replay_answer")
             if view_failed:
@@ -895,6 +967,7 @@ def evaluate_quality(
                 ),
             )
         )
+        errors.extend(_required_exact_length_bucket_errors(profile, rows))
     if strict_report:
         errors.extend(_proof_metadata_errors(rows))
     if strict_report and not verify_attestation(

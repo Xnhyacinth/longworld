@@ -44,6 +44,10 @@ from longworld.core.graph import (
     random_walk_event_ids,
     typed_walk_event_ids,
 )
+from longworld.core.issuerfilingworkflow import (
+    ISSUER_IR_HYBRID_CHILD_EVENT_TYPES,
+    selected_issuer_ir_source_relation_edges,
+)
 from longworld.core.pack import (
     PackedContext,
     compute_view_metrics,
@@ -62,6 +66,7 @@ from longworld.core.promotion import (
     exact_token_band_reject_reason,
     row_digest_set_sha256,
     serialized_row_sha256,
+    stable_answer_program_id,
     stable_dossier_id,
     stable_semantic_base_task_id,
 )
@@ -111,9 +116,16 @@ from longworld.core.verify import (
 from longworld.core.views import memory_card, render_cf_view, split_views, view_answer
 from longworld.core.wikiparse import WIKI_HYBRID_CHILD_EVENT_TYPES
 from longworld.core.world import SimulatedWorld
-from longworld.domains.researchlab.simulate import selected_wiki_source_relation_edges
+from longworld.domains.researchlab.simulate import (
+    selected_wiki_source_relation_edges,
+    valid_arxiv_revision_relation_event,
+)
 
-HYBRID_CHILD_EVENT_TYPES = SEC_HYBRID_CHILD_EVENT_TYPES | WIKI_HYBRID_CHILD_EVENT_TYPES
+HYBRID_CHILD_EVENT_TYPES = (
+    SEC_HYBRID_CHILD_EVENT_TYPES
+    | WIKI_HYBRID_CHILD_EVENT_TYPES
+    | ISSUER_IR_HYBRID_CHILD_EVENT_TYPES
+)
 
 
 def load_cfg(path: Path) -> dict:
@@ -761,6 +773,49 @@ def real_workflow_buckets_for_query(
     return selected
 
 
+def validate_declared_source_workflow_query_buckets(
+    queries: list,
+    *,
+    source_query_types: list[str],
+    routing: dict,
+    active_buckets: list[str] | None = None,
+) -> None:
+    """Fail closed when a declared source-workflow band has no query."""
+
+    if not source_query_types or not routing:
+        return
+    for query_type in source_query_types:
+        declared = routing.get(query_type)
+        if (
+            not isinstance(declared, list)
+            or not declared
+            or not all(isinstance(item, str) for item in declared)
+        ):
+            raise ValueError(
+                f"real workflow length routing is missing for {query_type}"
+            )
+        materialized = {
+            bucket
+            for query in queries
+            if query.query_type == query_type
+            for bucket in query.preferred_length_buckets
+        }
+        missing = [bucket for bucket in declared if bucket not in materialized]
+        if missing:
+            raise ValueError(
+                "declared real workflow query bucket is not materialized for "
+                f"{query_type}: {', '.join(missing)}"
+            )
+        if active_buckets is not None:
+            active = set(active_buckets)
+            inactive = [bucket for bucket in declared if bucket not in active]
+            if inactive:
+                raise ValueError(
+                    "declared real workflow query routing for "
+                    f"{query_type} has inactive buckets: {', '.join(inactive)}"
+                )
+
+
 def apply_source_workflow_bucket_targets(
     buckets: dict[str, int], cfg: dict
 ) -> dict[str, int]:
@@ -1034,23 +1089,7 @@ def real_source_relation_edges(
                 }
             )
     for relation in all_events.values():
-        if relation.type != "arxiv_revision_relation":
-            continue
-        source_record_id = str(relation.params.get("source_record_id") or "")
-        target_record_id = str(relation.params.get("target_record_id") or "")
-        endpoints = [all_events.get(event_id) for event_id in relation.required_inputs]
-        endpoint_record_ids = {
-            str(endpoint.params.get("record_id") or "")
-            for endpoint in endpoints
-            if endpoint is not None and endpoint.type == "arxiv_revision"
-        }
-        if (
-            not source_record_id
-            or not target_record_id
-            or source_record_id == target_record_id
-            or len(endpoints) != 2
-            or endpoint_record_ids != {source_record_id, target_record_id}
-        ):
+        if not valid_arxiv_revision_relation_event(relation, all_events):
             continue
         edges.append(
             {
@@ -1066,6 +1105,7 @@ def real_source_relation_edges(
         )
     edges.extend(selected_sec_source_relation_edges(world, spec, artifacts or []))
     edges.extend(selected_wiki_source_relation_edges(world, spec, artifacts or []))
+    edges.extend(selected_issuer_ir_source_relation_edges(world, spec, artifacts or []))
     for child in all_events.values():
         if child.type not in HYBRID_CHILD_EVENT_TYPES:
             continue
@@ -1120,6 +1160,9 @@ def context_source_relation_count(
     wiki_source_relations = len(
         selected_wiki_source_relation_edges(world, spec, artifacts)
     )
+    issuer_source_relations = len(
+        selected_issuer_ir_source_relation_edges(world, spec, artifacts)
+    )
     sec_edges = sum(
         parent_id in events
         for event in events.values()
@@ -1131,6 +1174,7 @@ def context_source_relation_count(
         + source_relations
         + sec_source_relations
         + wiki_source_relations
+        + issuer_source_relations
         + sec_edges
     )
 
@@ -1204,8 +1248,24 @@ def emit_records(
             mat.queries, list(cfg.get("real_workflow_query_types") or [])
         )
     elif source_workflows is not None:
-        mat.queries = filter_real_workflow_queries(
-            mat.queries, list(cfg.get("source_workflow_query_types") or [])
+        source_query_types = list(cfg.get("source_workflow_query_types") or [])
+        mat.queries = filter_real_workflow_queries(mat.queries, source_query_types)
+        configured_buckets = set(_buckets_for_split(cfg, split, domain))
+        configured_real_buckets = cfg.get("real_workflow_length_buckets")
+        active_buckets = (
+            [
+                bucket
+                for bucket in configured_real_buckets
+                if isinstance(bucket, str) and bucket in configured_buckets
+            ]
+            if isinstance(configured_real_buckets, list)
+            else []
+        )
+        validate_declared_source_workflow_query_buckets(
+            mat.queries,
+            source_query_types=source_query_types,
+            routing=dict(cfg.get("real_workflow_query_length_buckets") or {}),
+            active_buckets=active_buckets,
         )
     exact_settings = dict(cfg.get("exact_tokenizer") or {})
     exact_model_id = str(exact_settings.get("model_id") or "")
@@ -1797,18 +1857,7 @@ def emit_records(
                         ),
                         size=20,
                     )
-                    answer_program_id = stable_digest(
-                        json.dumps(
-                            {
-                                "query_type": spec.query_type,
-                                "program_ops": list(spec.program_ops or []),
-                                "proof_depth": int(gstat["proof_depth"]),
-                                "cf_op": spec.cf_op,
-                            },
-                            sort_keys=True,
-                        ),
-                        size=20,
-                    )
+                    answer_program_id = stable_answer_program_id(spec)
                     source_families = _source_families(views["minimal"])
                     source_provenance_ids = sorted(
                         {

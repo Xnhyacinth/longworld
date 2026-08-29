@@ -7,7 +7,7 @@ import hashlib
 import json
 import math
 import re
-from collections import Counter
+from collections import Counter, OrderedDict
 from collections.abc import Callable
 from dataclasses import replace
 from functools import lru_cache
@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 from longworld.core.attestation import (
     attach_attestation,
     canonical_attested_payload,
+    local_probe_diagnostic_metadata,
     sanitized_attestation_environment,
     verify_attestation,
     verify_attestation_identity,
@@ -28,6 +29,10 @@ from longworld.core.filingworkflow import (
     selected_sec_source_relation_edges,
 )
 from longworld.core.graph import graph_stats
+from longworld.core.issuerfilingworkflow import (
+    ISSUER_IR_HYBRID_CHILD_EVENT_TYPES,
+    selected_issuer_ir_source_relation_edges,
+)
 from longworld.core.pack import (
     SEP,
     compute_view_metrics,
@@ -46,7 +51,12 @@ from longworld.core.realworkflow import (
     EPISODE_REPLAY_BUNDLE_SCHEMA,
     load_episode_replay_bundle,
 )
-from longworld.core.record_contract import STRICT_REPLAY_REVISION, sft_row_errors
+from longworld.core.record_contract import (
+    EXACT_TOKEN_BAND_RANGES,
+    STRICT_REPLAY_REVISION,
+    exact_token_band_reject_reason,
+    sft_row_errors,
+)
 from longworld.core.release_profile import (
     release_profile,
     release_profile_sha256,
@@ -78,7 +88,10 @@ from longworld.core.verify import (
 from longworld.core.views import render_cf_view
 from longworld.core.wikiparse import WIKI_HYBRID_CHILD_EVENT_TYPES
 from longworld.domains.company.queries import QuerySpec
-from longworld.domains.researchlab.simulate import selected_wiki_source_relation_edges
+from longworld.domains.researchlab.simulate import (
+    selected_wiki_source_relation_edges,
+    valid_arxiv_revision_relation_event,
+)
 
 DENSE_AUDIT_PURPOSE = "dense_retrieval_audit"
 DENSE_RANKING_PURPOSE = "dense_ranking"
@@ -94,12 +107,21 @@ RELEASE_GATE_SCHEMA = "longworld-release-gate-pass-v1"
 RELEASE_GATE_PURPOSE = "release_gate_pass"
 RELEASE_GATE_REVISION = "longworld-quality-gate-v6"
 LEGACY_RELEASE_GATE_REVISION = "longworld-quality-gate-v5"
-
-EXACT_TOKEN_BAND_RANGES: dict[str, tuple[int, int]] = {
-    "16k": (16_000, 16_384),
-    "32k": (32_000, 32_768),
-    "64k": (64_000, 65_536),
-}
+_LEGACY_RELEASE_GATE_PROFILE_IDS = frozenset(
+    {
+        "p3-probe-12-v1",
+        "p4-multidomain-probe-12-v1",
+        "p6-source-dependent-probe-12-v1",
+        "p7-source-rich-probe-12-v1",
+        "p7-sec-source-slice-1-v1",
+        "p7-wiki-source-slice-1-v1",
+        "p7-paper-source-slice-1-v1",
+        "p7-github-source-slice-1-v1",
+        "p4-multidomain-local-48-v1",
+        "p3-production-48-v1",
+        "p3-production-210-v1",
+    }
+)
 
 _HEX_REVISION = re.compile(r"[0-9a-f]{40}", re.IGNORECASE)
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -115,9 +137,10 @@ _APPROVED_DENSE_MODELS = {
 
 
 def release_gate_revision_supported(profile_id: str, revision: object) -> bool:
-    """Accept v5 only for profiles that existed before the p10 gate contract."""
+    """Accept v5 only for explicitly registered historical profiles."""
     return revision == RELEASE_GATE_REVISION or (
-        revision == LEGACY_RELEASE_GATE_REVISION and not profile_id.startswith("p10-")
+        revision == LEGACY_RELEASE_GATE_REVISION
+        and profile_id in _LEGACY_RELEASE_GATE_PROFILE_IDS
     )
 
 
@@ -154,6 +177,53 @@ def _synthetic_replay_materialization(
     )
 
 
+_REAL_REPLAY_MATERIALIZATION_CACHE_MAX = 4
+_REAL_REPLAY_MATERIALIZATION_CACHE: OrderedDict[tuple[Any, ...], Any] = OrderedDict()
+
+
+def _real_replay_materialization(
+    cache_identity: tuple[str, ...],
+    *,
+    seed: int,
+    domain: str,
+    n_workstreams: int,
+    include_program_joins: bool,
+    real_workflows: list[Any] | None = None,
+    source_workflows: list[Any] | None = None,
+):
+    """Cache only a verified bundle's immutable materialization baseline."""
+    if (real_workflows is None) == (source_workflows is None):
+        raise PromotionError("real replay requires exactly one workflow source")
+    key = (
+        *cache_identity,
+        seed,
+        domain,
+        n_workstreams,
+        include_program_joins,
+    )
+    materialized = _REAL_REPLAY_MATERIALIZATION_CACHE.get(key)
+    if materialized is None:
+        materialized = materialize(
+            seed,
+            n_parallel=0,
+            n_pulses=0,
+            domain=domain,
+            n_workstreams=n_workstreams,
+            real_workflows=real_workflows,
+            source_workflows=source_workflows,
+            include_program_joins=include_program_joins,
+        )
+        _REAL_REPLAY_MATERIALIZATION_CACHE[key] = materialized
+        while (
+            len(_REAL_REPLAY_MATERIALIZATION_CACHE)
+            > _REAL_REPLAY_MATERIALIZATION_CACHE_MAX
+        ):
+            _REAL_REPLAY_MATERIALIZATION_CACHE.popitem(last=False)
+    else:
+        _REAL_REPLAY_MATERIALIZATION_CACHE.move_to_end(key)
+    return copy.deepcopy(materialized)
+
+
 _WORKSTREAM_ARTIFACT = re.compile(
     r"\.workflow_(\d+)_(?:request|review|ci|license|merge)$"
 )
@@ -167,17 +237,6 @@ _COMPOSITION_BY_VIEW = {
 
 class PromotionError(ValueError):
     """A candidate or audit cannot be promoted without weakening a gate."""
-
-
-def exact_token_band_reject_reason(length_bucket: str, tokens: int) -> str | None:
-    """Return a stable reject reason when an exact-token band is mislabeled."""
-    bounds = EXACT_TOKEN_BAND_RANGES.get(length_bucket)
-    if bounds is None:
-        return None
-    lower, upper = bounds
-    if not lower <= tokens <= upper:
-        return f"exact_{length_bucket}_out_of_range:{tokens}"
-    return None
 
 
 def _sha256_text(value: str) -> str:
@@ -225,6 +284,71 @@ def stable_semantic_base_task_id(spec: QuerySpec) -> str:
                     str(operation.get("op") or "")
                     for operation in (spec.program_ops or [])
                 ],
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )[:20]
+
+
+_ANSWER_PROGRAM_INSTANCE_KEYS = frozenset(
+    {
+        "answer_key",
+        "event_id",
+        "event_ids",
+        "provenance_id",
+        "query_id",
+        "record_id",
+        "record_key",
+        "source_id",
+        "source_key",
+        "topology_id",
+        "workflow_id",
+        "workflow_ids",
+        "world_id",
+    }
+)
+_ANSWER_PROGRAM_SCALE_KEYS = frozenset(
+    {"count", "cycle_count", "lanes", "streams", "tier", "workstreams"}
+)
+
+
+def _stable_answer_program_operand(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _stable_answer_program_operand(value[key])
+            for key in sorted(value)
+            if key not in _ANSWER_PROGRAM_INSTANCE_KEYS
+            and key not in _ANSWER_PROGRAM_SCALE_KEYS
+        }
+    if isinstance(value, (list, tuple)):
+        return [_stable_answer_program_operand(item) for item in value]
+    if isinstance(value, set):
+        return sorted(_stable_answer_program_operand(item) for item in value)
+    return value
+
+
+def stable_answer_program_id(spec: QuerySpec) -> str:
+    """Identify one executable operator program independently of proof length."""
+    program_ops = list(spec.program_ops or [])
+    semantic_program = (
+        _stable_answer_program_operand(program_ops)
+        if program_ops
+        else [
+            {
+                "op": "GOLD_EXPRESSION",
+                "expression": " ".join(spec.gold_expression.split()),
+            }
+        ]
+    )
+    return _sha256_text(
+        json.dumps(
+            {
+                "domain": spec.domain,
+                "query_type": spec.query_type,
+                "motif": spec.motif,
+                "program_ops": semantic_program,
+                "cf_op": spec.cf_op,
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -306,6 +430,50 @@ def _audited_near_dup_sentence_ratio(audit: dict[str, Any]) -> float | None:
     except (TypeError, ValueError):
         return None
     return ratio if math.isfinite(ratio) and 0.0 <= ratio <= 1.0 else None
+
+
+def _missing_required_exact_length_buckets_by_world(
+    rows: list[dict[str, Any]], profile: Any
+) -> dict[str, tuple[str, ...]]:
+    required = profile.required_exact_length_buckets
+    if not required:
+        return {}
+    if len(set(required)) != len(required) or any(
+        bucket not in EXACT_TOKEN_BAND_RANGES for bucket in required
+    ):
+        raise PromotionError(
+            "release profile required exact length buckets are invalid"
+        )
+    observed: dict[str, set[str]] = {}
+    for row in rows:
+        world_id = str(row.get("world_id") or "")
+        bucket = str(row.get("length_bucket") or "")
+        tokens = row.get("tokenizer_context_tokens")
+        if (
+            not world_id
+            or bucket not in required
+            or not isinstance(tokens, int)
+            or isinstance(tokens, bool)
+            or exact_token_band_reject_reason(bucket, tokens) is not None
+            or row.get("tokenizer_model_id") != profile.tokenizer_model_id
+            or row.get("tokenizer_revision") != profile.tokenizer_revision
+            or (
+                profile.tokenizer_asset_manifest_sha256
+                and row.get("tokenizer_asset_manifest_sha256")
+                != profile.tokenizer_asset_manifest_sha256
+            )
+        ):
+            continue
+        observed.setdefault(world_id, set()).add(bucket)
+    worlds = {str(row.get("world_id") or "") for row in rows}
+    worlds.discard("")
+    return {
+        world_id: tuple(
+            bucket for bucket in required if bucket not in observed.get(world_id, set())
+        )
+        for world_id in sorted(worlds)
+        if not set(required).issubset(observed.get(world_id, set()))
+    }
 
 
 def _selection_audit_matches_candidate(
@@ -520,7 +688,7 @@ def select_release_worlds(
     }
     if not set(audits_by_candidate).issubset(all_candidate_ids):
         raise PromotionError("world selection audit does not belong to candidate set")
-    eligible_worlds = [
+    fully_audited_worlds = [
         world_id
         for world_id, world_candidates in by_world.items()
         if all(
@@ -535,8 +703,30 @@ def select_release_worlds(
             for digest, _candidate in world_candidates
         )
     ]
+    missing_required_buckets = _missing_required_exact_length_buckets_by_world(
+        [
+            candidate
+            for world_id in fully_audited_worlds
+            for _digest, candidate in by_world[world_id]
+        ],
+        profile,
+    )
+    eligible_worlds = [
+        world_id
+        for world_id in fully_audited_worlds
+        if world_id not in missing_required_buckets
+    ]
     target = profile.expected_promoted_worlds
     if len(eligible_worlds) < target:
+        if missing_required_buckets:
+            details = ",".join(
+                f"{world_id}={'+'.join(missing)}"
+                for world_id, missing in missing_required_buckets.items()
+            )
+            raise PromotionError(
+                "insufficient fully audited worlds with required exact length buckets: "
+                + details
+            )
         raise PromotionError(
             f"insufficient fully audited worlds: {len(eligible_worlds)}<{target}"
         )
@@ -866,6 +1056,17 @@ def create_train_ready_report(
     ).issubset(candidate_ids):
         raise PromotionError("promoted rows do not belong to the candidate report")
     profile = release_profile(release_profile_id)
+    missing_required_buckets = _missing_required_exact_length_buckets_by_world(
+        rows, profile
+    )
+    if missing_required_buckets:
+        details = ",".join(
+            f"{world_id}={'+'.join(missing)}"
+            for world_id, missing in missing_required_buckets.items()
+        )
+        raise PromotionError(
+            "promoted rows are missing required exact length buckets: " + details
+        )
     for row in rows:
         if str(row.get("length_bucket") or "") not in EXACT_TOKEN_BAND_RANGES:
             continue
@@ -1116,6 +1317,7 @@ def create_train_ready_report(
         "by_domain": dict(Counter(str(row.get("domain") or "?") for row in rows)),
         "by_motif": dict(Counter(str(row.get("motif") or "?") for row in rows)),
     }
+    payload.update(local_probe_diagnostic_metadata())
     return attach_attestation(payload, report_key, purpose=QUALITY_REPORT_PURPOSE)
 
 
@@ -1317,20 +1519,23 @@ def _reconstruct_candidate(
                 raise PromotionError(
                     "source workflow bundle has no workflow for candidate domain"
                 )
-            materialized = materialize(
-                seed,
-                n_parallel=0,
-                n_pulses=0,
+            materialized = _real_replay_materialization(
+                (
+                    "source_workflow_bundle",
+                    loaded.bundle_sha256,
+                    loaded.binding_digest,
+                    loaded.adapter_revision,
+                ),
+                seed=seed,
                 domain=domain,
                 n_workstreams=n_workstreams,
                 source_workflows=domain_workflows,
                 include_program_joins=include_program_joins,
             )
     else:
-        materialized = materialize(
-            seed,
-            n_parallel=0,
-            n_pulses=0,
+        materialized = _real_replay_materialization(
+            ("episode_replay_bundle", bundle_binding["sha256"]),
+            seed=seed,
             domain=domain,
             n_workstreams=n_workstreams,
             real_workflows=real_workflows,
@@ -1735,17 +1940,7 @@ def _replayed_task_metadata(
             sort_keys=True,
         )
     )[:20]
-    program_id = _sha256_text(
-        json.dumps(
-            {
-                "query_type": spec.query_type,
-                "program_ops": list(spec.program_ops or []),
-                "proof_depth": int(replayed_graph["proof_depth"]),
-                "cf_op": spec.cf_op,
-            },
-            sort_keys=True,
-        )
-    )[:20]
+    program_id = stable_answer_program_id(spec)
     dossier = stable_dossier_id(
         world.world_id,
         spec.query_id,
@@ -1944,24 +2139,9 @@ def _replayed_source_metadata(
                     "child_source_url": str(child.params["source_url"]),
                 }
             )
+
     for relation in all_events.values():
-        if relation.type != "arxiv_revision_relation":
-            continue
-        source_record_id = str(relation.params.get("source_record_id") or "")
-        target_record_id = str(relation.params.get("target_record_id") or "")
-        endpoints = [all_events.get(event_id) for event_id in relation.required_inputs]
-        endpoint_record_ids = {
-            str(endpoint.params.get("record_id") or "")
-            for endpoint in endpoints
-            if endpoint is not None and endpoint.type == "arxiv_revision"
-        }
-        if (
-            not source_record_id
-            or not target_record_id
-            or source_record_id == target_record_id
-            or len(endpoints) != 2
-            or endpoint_record_ids != {source_record_id, target_record_id}
-        ):
+        if not valid_arxiv_revision_relation_event(relation, all_events):
             continue
         source = all_events.get(
             str(relation.params.get("source_record_event_id") or "")
@@ -1969,15 +2149,7 @@ def _replayed_source_metadata(
         target = all_events.get(
             str(relation.params.get("target_record_event_id") or "")
         )
-        if (
-            source is None
-            or target is None
-            or source.type != "arxiv_revision"
-            or target.type != "arxiv_revision"
-            or set(relation.required_inputs) != {source.id, target.id}
-            or relation.params.get("source_record_id") != source.params.get("record_id")
-            or relation.params.get("target_record_id") != target.params.get("record_id")
-        ):
+        if source is None or target is None:
             continue
         edges.append(
             {
@@ -1993,10 +2165,12 @@ def _replayed_source_metadata(
         )
     edges.extend(selected_sec_source_relation_edges(world, spec, artifacts))
     edges.extend(selected_wiki_source_relation_edges(world, spec, artifacts))
+    edges.extend(selected_issuer_ir_source_relation_edges(world, spec, artifacts))
     for child in all_events.values():
-        if (
-            child.type
-            not in SEC_HYBRID_CHILD_EVENT_TYPES | WIKI_HYBRID_CHILD_EVENT_TYPES
+        if child.type not in (
+            SEC_HYBRID_CHILD_EVENT_TYPES
+            | WIKI_HYBRID_CHILD_EVENT_TYPES
+            | ISSUER_IR_HYBRID_CHILD_EVENT_TYPES
         ):
             continue
         for parent_id in child.causal_inputs:
@@ -2253,6 +2427,13 @@ def _validate_candidate_gates(
         candidate, attestation_key, purpose=CANDIDATE_ATTESTATION_PURPOSE
     ):
         raise PromotionError("candidate has no valid producer attestation")
+    length_bucket = str(candidate.get("length_bucket") or "")
+    if length_bucket in EXACT_TOKEN_BAND_RANGES:
+        tokens = candidate.get("tokenizer_context_tokens")
+        if isinstance(tokens, int) and not isinstance(tokens, bool):
+            reject_reason = exact_token_band_reject_reason(length_bucket, tokens)
+            if reject_reason:
+                raise PromotionError(reject_reason)
     expected_composition = _COMPOSITION_BY_VIEW.get(str(candidate.get("view") or ""))
     if candidate.get("composition_method") != expected_composition:
         raise PromotionError("candidate view and composition do not match")
@@ -2667,6 +2848,8 @@ def promote_candidate(
         }
     )
     promoted["data_stage"] = "train_ready"
+    diagnostic_metadata = local_probe_diagnostic_metadata()
+    promoted.update(diagnostic_metadata)
     promoted["verification"] = verification.model_dump()
     view = dict(promoted["view_verification"])
     view.update(
@@ -2674,7 +2857,8 @@ def promote_candidate(
             "strict_replay_answer": strict_answer,
             "expected_answer": expected_answer,
             "global_proof_green": True,
-            "production_eligible": True,
+            "content_gate_eligible": True,
+            "production_eligible": not bool(diagnostic_metadata),
         }
     )
     promoted["view_verification"] = view

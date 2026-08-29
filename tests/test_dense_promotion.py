@@ -9,7 +9,16 @@ from pathlib import Path
 
 import pytest
 
-from longworld.core.attestation import attach_attestation, verify_attestation
+from longworld.core.attestation import (
+    ATTESTATION_ENVIRONMENT_ENV,
+    LOCAL_PROBE_COMBINED_ROLES_ENV,
+    LOCAL_PROBE_TRUST_ISOLATION_VALUE,
+    ROLE_KEY_ENVS,
+    ROLE_KEY_ID_ENVS,
+    attach_attestation,
+    verify_attestation,
+)
+from longworld.core.filingworkflow import build_sec_filing_manifest
 from longworld.core.graph import graph_stats
 from longworld.core.pack import (
     SEP,
@@ -28,6 +37,8 @@ from longworld.core.promotion import (
     QUALITY_REPORT_BINDING_REVISION,
     RELEASE_GATE_PURPOSE,
     RELEASE_GATE_REVISION,
+    RELEASE_SELECTION_PURPOSE,
+    RELEASE_SELECTION_SCHEMA,
     STRICT_REPLAY_REVISION,
     PromotionError,
     _candidate_has_verified_real_source,
@@ -63,6 +74,7 @@ from longworld.core.semantic import (
     pulse_doc_ratio,
     sentence_near_dup_ratio,
 )
+from longworld.core.sourcebundle import LoadedSourceWorkflowBundle
 from longworld.core.taxonomy import artifact_classification
 from longworld.core.verify import Verification
 from longworld.core.views import render_cf_view
@@ -143,7 +155,7 @@ def _candidate(
     view: str = "full", query_type: str = "program_join", *, seed: int = 1
 ) -> tuple[dict, list]:
     n_workstreams = (
-        4
+        5
         if query_type
         in {"release_eligibility", "release_ci_matrix", "release_license_matrix"}
         else 0
@@ -393,7 +405,7 @@ def _episode_bundle(tmp_path: Path) -> Path:
             "kind": "release",
             "occurred_at": "2025-01-10T17:00:00Z",
             "text": "Release tag v2.4.1 published after the linked gates.",
-            "links": ["merge:18"],
+            "links": ["merge:18", "ci:passed", "license:18"],
             "attributes": {
                 "tag": "v2.4.1",
                 "tag_commit_sha": "a" * 40,
@@ -602,6 +614,253 @@ def _real_candidate(bundle_path: Path) -> tuple[dict, list]:
     ), artifacts
 
 
+def _configure_probe_role_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    for role, environment_name in ROLE_KEY_ENVS.items():
+        monkeypatch.setenv(environment_name, KEY.decode())
+        monkeypatch.setenv(ROLE_KEY_ID_ENVS[role], f"test-{role}-v1")
+    monkeypatch.setenv("LONGWORLD_PUBLIC_POLICY_SHA256", "d" * 64)
+    monkeypatch.setenv("LONGWORLD_GH_BINARY_SHA256", "e" * 64)
+
+
+def _source_workflow_bundle(
+    tmp_path: Path,
+) -> tuple[Path, LoadedSourceWorkflowBundle]:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from build_source_workflow_bundle import build_source_workflow_bundle
+
+    filings = []
+    for index, form in enumerate(("10-K", "10-K/A"), start=1):
+        accession = f"0000000001-26-{index:06d}"
+        filing_date = f"2026-02-{19 + index:02d}"
+        revenue = f"USD {40 + index * 2} million"
+        text = "\n".join(
+            (
+                f"ACCESSION NUMBER: {accession}",
+                f"CONFORMED SUBMISSION TYPE: {form}",
+                f"FILED AS OF DATE: {filing_date.replace('-', '')}",
+                "CONFORMED PERIOD OF REPORT: 20251231",
+                f"Revenue after audit adjustment: {revenue}",
+            )
+        )
+        source_path = tmp_path / f"filing-{index}.txt"
+        source_path.write_text(text, encoding="utf-8")
+        source_sha256 = hashlib.sha256(text.encode()).hexdigest()
+        facts = []
+        for fact_id, field, value in (
+            ("accession", "accession", accession),
+            ("form", "form", form),
+            ("filing_date", "filing_date", filing_date.replace("-", "")),
+            ("report_date", "report_date", "20251231"),
+            ("revenue", "revenue", revenue),
+        ):
+            quote = next(line for line in text.splitlines() if value in line)
+            facts.append(
+                {
+                    "fact_id": fact_id,
+                    "field": field,
+                    "value": value,
+                    "evidence_quote": quote,
+                    "evidence_char_start": text.index(quote),
+                }
+            )
+        filings.append(
+            {
+                "accession": accession,
+                "cik": "0000000001",
+                "form": form,
+                "filing_date": filing_date,
+                "report_date": "2025-12-31",
+                "source_url": (
+                    "https://www.sec.gov/Archives/edgar/data/1/"
+                    f"{accession.replace('-', '')}/{accession}.txt"
+                ),
+                "source_file": source_path.name,
+                "source_sha256": source_sha256,
+                "retrieved_at": "2026-08-24T09:00:00Z",
+                "access_policy": "authorized read-only SEC filing export",
+                "parser": {"name": "sec_fixture_text", "version": "1"},
+                "derived_facts": facts,
+            }
+        )
+    manifest = build_sec_filing_manifest(
+        {
+            "schema_version": "longworld.sec-filing-input.v1",
+            "source_status": "authorized_download",
+            "authorization": {
+                "record_id": "TEST-SEC-AUTHORIZED-001",
+                "scope": "read-only source replay test",
+                "basis": "unit-test fixture only",
+                "reviewed_at": "2026-08-24T10:00:00Z",
+            },
+            "filings": filings,
+        },
+        tmp_path,
+        generated_at="2026-08-24T11:00:00Z",
+    )
+    manifest_path = tmp_path / "sec-manifest.json"
+    manifest_path.write_text(
+        json.dumps(attach_attestation(manifest, KEY, purpose="source_manifest")),
+        encoding="utf-8",
+    )
+    bundle_path = tmp_path / "source-bundle.json"
+    loaded = build_source_workflow_bundle(
+        [("sec_filing", manifest_path)],
+        bundle_path,
+        attestation_key=KEY,
+    )
+    return bundle_path, loaded
+
+
+def _source_candidate(loaded: LoadedSourceWorkflowBundle) -> tuple[dict, list]:
+    materialized = materialize(
+        91,
+        n_parallel=0,
+        n_pulses=0,
+        domain="company",
+        n_workstreams=0,
+        source_workflows=list(loaded.workflows),
+    )
+    world = materialized.worlds["focal"]
+    spec = next(
+        query
+        for query in materialized.queries
+        if query.query_type == "program_join"
+        and query.query_id.endswith("join:multi_hop+version_diff")
+    )
+    index = {
+        artifact.artifact_id: artifact for artifact in materialized.artifacts["focal"]
+    }
+    essential = [index[artifact_id] for artifact_id in spec.essential_artifact_ids]
+    strict = [
+        artifact
+        for artifact in materialized.artifacts["focal"]
+        if set(artifact.reveals_events).intersection(spec.sufficient_event_ids)
+        and artifact.artifact_id not in spec.essential_artifact_ids
+    ]
+    proof_ids = {artifact.artifact_id for artifact in [*essential, *strict]}
+    distractors = [
+        artifact
+        for artifact in materialized.artifacts["focal"]
+        if artifact.artifact_id not in proof_ids
+        and artifact_classification(artifact).workflow_kind.value != "background_only"
+    ][:3]
+    artifacts = distractors + essential + strict
+    gates = {
+        field: True
+        for field in Verification.model_fields
+        if field not in {"production_mode", "candidate_mode"}
+    }
+    gates["embedding_topk_insufficient"] = False
+    document_context = join_artifacts(artifacts)
+    context = wrap_prompt(spec.question, document_context, "first")
+    metrics = compute_view_metrics(
+        artifacts,
+        set(spec.essential_artifact_ids),
+        query_timing="first",
+        context=context,
+    )
+    row = {
+        "world_id": world.world_id,
+        "seed": world.seed,
+        "schema_version": "p3.0",
+        "data_product": "worldlong_valid_v1",
+        "query_id": (
+            f"{spec.query_id}:first:{metrics.position_bucket}:{metrics.length_bucket}"
+        ),
+        "query_type": spec.query_type,
+        "query_timing": "first",
+        "position_bucket": metrics.position_bucket,
+        "length_bucket": metrics.length_bucket,
+        "question": spec.question,
+        "answer": spec.answer,
+        "cf_answer": spec.cf_answer,
+        "view": "full",
+        "context": context,
+        "document_context": document_context,
+        "essential_artifact_ids": list(spec.essential_artifact_ids),
+        "verification": Verification(
+            production_mode=False, candidate_mode=True, **gates
+        ).model_dump(),
+        "view_verification": {
+            "production_eligible": True,
+            "essential_present": True,
+            "semantic_text_grounded": True,
+            "classification_ok": True,
+            "global_proof_green": True,
+            "expected_answer": spec.answer,
+            "strict_replay_answer": spec.answer,
+        },
+        "artifact_classification": [],
+        "workflow_ids": [world.world_id],
+        "training_objective": "sft",
+        "composition_method": "same_case_dossier",
+        "domain": "company",
+        "motif": spec.motif,
+        "data_stage": "candidate",
+        "n_workstreams": 0,
+        "base_task_id": hashlib.sha256(
+            f"{world.world_id}|{spec.base_task_group or spec.query_id}".encode()
+        ).hexdigest()[:20],
+        "dossier_id": hashlib.sha256(
+            json.dumps(
+                {
+                    "world_id": world.world_id,
+                    "query_id": spec.query_id,
+                    "query_timing": "first",
+                    "artifact_ids": sorted(
+                        artifact.artifact_id for artifact in artifacts
+                    ),
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()[:20],
+        "source_workflow_bundle": {
+            "schema_version": "longworld.source-workflow-bundle.v1",
+            "adapter_revision": loaded.adapter_revision,
+            "sha256": loaded.bundle_sha256,
+            "binding_digest": loaded.binding_digest,
+        },
+    }
+    for artifact in artifacts:
+        classification = artifact_classification(artifact)
+        source_origin = classification.source_origin.value
+        workflow_kind = classification.workflow_kind.value
+        workflow_id = classification.workflow_id
+        provenance_id = classification.provenance_id
+        if not workflow_id or workflow_kind == "unclassified":
+            source_origin = "synthetic_world"
+            workflow_kind = "synthetic_executable"
+            workflow_id = world.world_id
+            provenance_id = (
+                "synthetic-sha256:" + hashlib.sha256(artifact.text.encode()).hexdigest()
+            )
+        row["artifact_classification"].append(
+            {
+                "artifact_id": artifact.artifact_id,
+                "workflow_id": workflow_id,
+                "workflow_kind": workflow_kind,
+                "evidence_role": (
+                    "causal_gold"
+                    if artifact.artifact_id in spec.essential_artifact_ids
+                    else (
+                        "causal_supporting"
+                        if set(spec.sufficient_event_ids).intersection(
+                            artifact.reveals_events
+                        )
+                        else "structural_hard_negative"
+                    )
+                ),
+                "source_origin": source_origin,
+                "provenance_id": provenance_id,
+            }
+        )
+    return attach_attestation(
+        row, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
+    ), artifacts
+
+
 def test_two_stage_dense_audit_strictly_replays_and_signs_train_ready_row() -> None:
     candidate, artifacts = _candidate()
     audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
@@ -639,6 +898,65 @@ def test_two_stage_dense_audit_strictly_replays_and_signs_train_ready_row() -> N
     assert "missing_or_invalid_promotion" in sft_row_errors(
         wrong_backend, attestation_key=KEY
     )
+
+
+def test_combined_probe_promotion_exposes_content_and_trust_eligibility(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure_probe_role_keys(monkeypatch)
+    monkeypatch.setenv(
+        LOCAL_PROBE_COMBINED_ROLES_ENV, LOCAL_PROBE_TRUST_ISOLATION_VALUE
+    )
+    _materialize_synthetic_replay.cache_clear()
+    candidate, artifacts = _candidate()
+    audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+
+    promoted = promote_candidate(candidate, audit, KEY)
+    candidate_report = attach_attestation(
+        {
+            "schema_version": promoted["schema_version"],
+            "data_product": promoted["data_product"],
+            "data_stage": "candidate",
+            "release_profile_id": "p3-probe-12-v1",
+            "release_profile_sha256": release_profile_sha256("p3-probe-12-v1"),
+            "n_worlds": 1,
+            "n_rows": 1,
+            "target_promoted_worlds": 1,
+            "candidate_row_set_sha256": promoted_row_set_sha256([candidate]),
+            "retention": 1.0,
+            "n_clones": 0,
+        },
+        KEY,
+        purpose="quality_report",
+    )
+    report = create_train_ready_report(
+        candidate_report,
+        [candidate],
+        [promoted],
+        KEY,
+    )
+
+    expected = {
+        "trust_scope": "local_probe",
+        "diagnostic_only": True,
+        "trust_valid_for_production": False,
+        "production_eligible": False,
+    }
+    assert {field: promoted.get(field) for field in expected} == expected
+    assert promoted["view_verification"]["content_gate_eligible"] is True
+    assert promoted["view_verification"]["production_eligible"] is False
+    assert {field: report.get(field) for field in expected} == expected
+    assert sft_row_errors(promoted, attestation_key=KEY) == []
+
+    malformed = {
+        **{key: value for key, value in promoted.items() if key != "attestation"},
+        "trust_valid_for_production": True,
+    }
+    malformed = attach_attestation(malformed, KEY, purpose="sft_row")
+    assert "invalid_local_probe_diagnostic_boundary" in sft_row_errors(
+        malformed, attestation_key=KEY
+    )
+    _materialize_synthetic_replay.cache_clear()
 
 
 def test_strict_exact_sft_contract_requires_matching_tokenizer_asset_digests() -> None:
@@ -708,6 +1026,44 @@ def test_legacy_exact_sft_contract_allows_token_metadata_without_asset_binding()
     legacy_exact = attach_attestation(legacy_exact, KEY, purpose="sft_row")
 
     assert sft_row_errors(legacy_exact, attestation_key=KEY) == []
+
+
+def test_128k_sft_contract_requires_complete_exact_tokenizer_binding() -> None:
+    candidate, artifacts = _candidate()
+    audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+    promoted = promote_candidate(candidate, audit, KEY)
+    exact = {
+        **{key: value for key, value in promoted.items() if key != "attestation"},
+        "length_bucket": "128k",
+        "tokenizer_context_tokens": 128_100,
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "a" * 40,
+        "tokenizer_asset_manifest_sha256": "b" * 64,
+        "promotion": {
+            **promoted["promotion"],
+            "tokenizer_asset_manifest_sha256": "b" * 64,
+        },
+    }
+    exact = attach_attestation(exact, KEY, purpose="sft_row")
+    assert sft_row_errors(exact, attestation_key=KEY) == []
+
+    for field in (
+        "tokenizer_context_tokens",
+        "tokenizer_revision",
+        "tokenizer_asset_manifest_sha256",
+    ):
+        missing = attach_attestation(
+            {
+                key: value
+                for key, value in exact.items()
+                if key not in {field, "attestation"}
+            },
+            KEY,
+            purpose="sft_row",
+        )
+        assert "invalid_exact_token_binding" in sft_row_errors(
+            missing, attestation_key=KEY
+        )
 
 
 def test_dense_audit_and_promotion_bind_replayed_tokenizer_assets(
@@ -829,6 +1185,49 @@ def test_dense_audit_rejects_unapproved_exact_tokenizer_pin() -> None:
 
     with pytest.raises(PromotionError, match="tokenizer pin is not approved"):
         create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+
+
+@pytest.mark.parametrize("tokens", [127_999, 131_073])
+def test_candidate_to_promotion_rejects_128k_out_of_exact_band(
+    monkeypatch: pytest.MonkeyPatch, tokens: int
+) -> None:
+    revision = "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+    candidate, artifacts = _candidate()
+    audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+    exact_candidate = attach_attestation(
+        {
+            **{key: value for key, value in candidate.items() if key != "attestation"},
+            "query_id": candidate["query_id"].rsplit(":", 1)[0] + ":128k",
+            "length_bucket": "128k",
+            "tokenizer_context_tokens": tokens,
+            "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+            "tokenizer_revision": revision,
+            "tokenizer_asset_manifest_sha256": "b" * 64,
+        },
+        KEY,
+        purpose=CANDIDATE_ATTESTATION_PURPOSE,
+    )
+    rebound_audit = attach_attestation(
+        {
+            **{key: value for key, value in audit.items() if key != "attestation"},
+            "query_id": exact_candidate["query_id"],
+            "candidate_sha256": candidate_sha256(exact_candidate),
+            "tokenizer_asset_manifest_sha256": "b" * 64,
+        },
+        KEY,
+        purpose=DENSE_AUDIT_PURPOSE,
+    )
+    monkeypatch.setattr(
+        "longworld.core.promotion._resolved_local_tokenizer_revision",
+        lambda _model_id, _revision: revision,
+    )
+    monkeypatch.setattr(
+        "longworld.core.promotion.resolved_tokenizer_asset_manifest_sha256",
+        lambda _model_id, _revision: "b" * 64,
+    )
+
+    with pytest.raises(PromotionError, match=rf"exact_128k_out_of_range:{tokens}"):
+        promote_candidate(exact_candidate, rebound_audit, KEY)
 
 
 def test_dense_audit_recounts_exact_tokens_from_reconstructed_prompt(
@@ -1385,6 +1784,85 @@ def _selection_audit(
     if asset_digest:
         payload["tokenizer_asset_manifest_sha256"] = asset_digest
     return attach_attestation(payload, KEY, purpose=DENSE_AUDIT_PURPOSE)
+
+
+def _p12_sec_exact_bucket_selection_inputs(
+    bands: tuple[str, ...],
+) -> tuple[list[dict], list[dict]]:
+    template, _ = _candidate()
+    profile = release_profile("p12-sec-source-slice-1-v1")
+    tokens_by_band = {
+        "16k": 16_000,
+        "32k": 32_000,
+        "64k": 64_000,
+        "128k": 128_000,
+    }
+    candidates = []
+    audits = []
+    for band in bands:
+        candidate = {
+            **json.loads(
+                json.dumps(
+                    {
+                        key: value
+                        for key, value in template.items()
+                        if key != "attestation"
+                    }
+                )
+            ),
+            "world_id": "p12-sec-exact-world",
+            "query_id": f"p12-sec-{band}",
+            "domain": "company",
+            "length_bucket": band,
+            "tokenizer_context_tokens": tokens_by_band[band],
+            "tokenizer_model_id": profile.tokenizer_model_id,
+            "tokenizer_revision": profile.tokenizer_revision,
+            "tokenizer_asset_manifest_sha256": (
+                profile.tokenizer_asset_manifest_sha256
+            ),
+        }
+        _mark_candidate_as_real(candidate)
+        candidate = attach_attestation(
+            candidate, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
+        )
+        candidates.append(candidate)
+        audits.append(_selection_audit(candidate))
+    return candidates, audits
+
+
+def test_p12_sec_selection_rejects_a_world_missing_required_128k() -> None:
+    candidates, audits = _p12_sec_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+
+    with pytest.raises(PromotionError, match="required exact length buckets"):
+        select_release_worlds(
+            candidates,
+            audits,
+            "p12-sec-source-slice-1-v1",
+            candidate_attestation_key=KEY,
+            audit_attestation_key=KEY,
+        )
+
+
+def test_p12_sec_selection_accepts_all_four_required_exact_buckets() -> None:
+    candidates, audits = _p12_sec_exact_bucket_selection_inputs(
+        ("16k", "32k", "64k", "128k")
+    )
+
+    selected, receipt = select_release_worlds(
+        candidates,
+        audits,
+        "p12-sec-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+        audit_attestation_key=KEY,
+    )
+
+    assert {row["length_bucket"] for row in selected} == {
+        "16k",
+        "32k",
+        "64k",
+        "128k",
+    }
+    assert receipt["n_selected_worlds"] == 1
 
 
 def test_release_world_selection_is_deterministic_and_world_atomic() -> None:
@@ -2325,6 +2803,113 @@ def test_semantic_base_task_id_ignores_world_and_source_instance_labels() -> Non
     assert stable_semantic_base_task_id(first) == stable_semantic_base_task_id(second)
 
 
+def test_answer_program_id_ignores_declared_proof_depth_but_binds_operations() -> None:
+    import longworld.core.promotion as promotion_module
+
+    materialized = materialize(1, n_parallel=0, n_pulses=0, domain="codeforge")
+    spec = materialized.queries[0]
+    shallow = replace(spec, proof_depth=2)
+    deep = replace(spec, proof_depth=9)
+    changed = replace(
+        spec,
+        program_ops=[*(spec.program_ops or []), {"op": "EXTRA_SEMANTIC_JOIN"}],
+    )
+
+    assert promotion_module.stable_answer_program_id(shallow) == (
+        promotion_module.stable_answer_program_id(deep)
+    )
+    assert promotion_module.stable_answer_program_id(shallow) != (
+        promotion_module.stable_answer_program_id(changed)
+    )
+
+
+def test_answer_program_id_ignores_release_cycle_scale() -> None:
+    import longworld.core.promotion as promotion_module
+
+    materialized = materialize(1, n_parallel=0, n_pulses=0, domain="codeforge")
+    spec = materialized.queries[0]
+    two_cycles = replace(
+        spec,
+        query_type="release_supersession_trace",
+        motif="release_supersession_trace",
+        program_ops=[
+            {"op": "FOLLOW_REQUIRED_INPUTS"},
+            {"op": "REQUIRE_EACH_RELEASE_CI", "cycle_count": 2},
+        ],
+    )
+    three_cycles = replace(
+        two_cycles,
+        program_ops=[
+            {"op": "FOLLOW_REQUIRED_INPUTS"},
+            {"op": "REQUIRE_EACH_RELEASE_CI", "cycle_count": 3},
+        ],
+    )
+
+    assert promotion_module.stable_answer_program_id(two_cycles) == (
+        promotion_module.stable_answer_program_id(three_cycles)
+    )
+
+
+def test_answer_program_id_ignores_instance_ids_but_binds_semantic_operands() -> None:
+    import longworld.core.promotion as promotion_module
+
+    materialized = materialize(1, n_parallel=0, n_pulses=0, domain="codeforge")
+    spec = materialized.queries[0]
+    first = replace(
+        spec,
+        program_ops=[
+            {
+                "op": "ADOPT_PRIMARY",
+                "event_id": "world-1.adopt",
+                "answer_key": "world-1.answer",
+                "field": "version",
+            }
+        ],
+    )
+    second = replace(
+        spec,
+        program_ops=[
+            {
+                "op": "ADOPT_PRIMARY",
+                "event_id": "world-2.adopt",
+                "answer_key": "world-2.answer",
+                "field": "version",
+            }
+        ],
+    )
+    changed = replace(
+        second,
+        program_ops=[
+            {
+                "op": "ADOPT_PRIMARY",
+                "event_id": "world-2.adopt",
+                "answer_key": "world-2.answer",
+                "field": "license",
+            }
+        ],
+    )
+
+    assert promotion_module.stable_answer_program_id(first) == (
+        promotion_module.stable_answer_program_id(second)
+    )
+    assert promotion_module.stable_answer_program_id(first) != (
+        promotion_module.stable_answer_program_id(changed)
+    )
+
+
+def test_answer_program_id_falls_back_to_semantic_expression_for_empty_ops() -> None:
+    import longworld.core.promotion as promotion_module
+
+    materialized = materialize(1, n_parallel=0, n_pulses=0, domain="codeforge")
+    spec = materialized.queries[0]
+    first = replace(spec, program_ops=[], gold_expression="read version then select")
+    second = replace(spec, program_ops=[], gold_expression="read license then select")
+
+    assert promotion_module.stable_answer_program_id(first) != (
+        promotion_module.stable_answer_program_id(second)
+    )
+
+
 def test_gate_revision_dispatch_is_current_for_p10_and_read_only_for_legacy() -> None:
     assert release_gate_revision_supported(
         "p10-source-rich-production-48-v1", RELEASE_GATE_REVISION
@@ -2332,16 +2917,23 @@ def test_gate_revision_dispatch_is_current_for_p10_and_read_only_for_legacy() ->
     assert not release_gate_revision_supported(
         "p10-source-rich-production-48-v1", LEGACY_RELEASE_GATE_REVISION
     )
+    assert not release_gate_revision_supported(
+        "p12-current-source-probe-12-v1", LEGACY_RELEASE_GATE_REVISION
+    )
     assert release_gate_revision_supported(
         "p3-production-48-v1", LEGACY_RELEASE_GATE_REVISION
     )
+    assert not release_gate_revision_supported(
+        "p99-future-production-999-v1", LEGACY_RELEASE_GATE_REVISION
+    )
+    assert not release_gate_revision_supported("", LEGACY_RELEASE_GATE_REVISION)
 
 
 def test_p10_selection_rejects_a_legacy_predecessor_gate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     auditor_key = b"probe-auditor-gate-key-material-at-least-32-bytes"
-    predecessor_id = "p7-source-rich-probe-12-v1"
+    predecessor_id = "p12-current-source-probe-12-v1"
     monkeypatch.setenv("LONGWORLD_ATTESTATION_ENVIRONMENT", "probe")
     monkeypatch.setenv("LONGWORLD_AUDITOR_ATTESTATION_KEY", auditor_key.decode())
     monkeypatch.setenv("LONGWORLD_AUDITOR_ATTESTATION_KEY_ID", "probe-gate-v1")
@@ -2568,6 +3160,42 @@ def test_real_candidate_replays_from_exact_hash_bound_episode_sidecar(
     assert sft_row_errors(promoted, attestation_key=KEY) == []
 
 
+def test_real_replay_caches_only_materialization_and_revalidates_source_bundle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import longworld.core.promotion as promotion_module
+
+    bundle_path = _episode_bundle(tmp_path)
+    candidate, artifacts = _real_candidate(bundle_path)
+    ranking = _ranking(candidate, artifacts)
+    materialize_calls = 0
+    load_calls = 0
+    actual_materialize = promotion_module.materialize
+    actual_loader = promotion_module.load_episode_replay_bundle
+    promotion_module._REAL_REPLAY_MATERIALIZATION_CACHE.clear()
+
+    def counting_materialize(*args, **kwargs):
+        nonlocal materialize_calls
+        materialize_calls += 1
+        return actual_materialize(*args, **kwargs)
+
+    def counting_loader(*args, **kwargs):
+        nonlocal load_calls
+        load_calls += 1
+        return actual_loader(*args, **kwargs)
+
+    monkeypatch.setattr(promotion_module, "materialize", counting_materialize)
+    monkeypatch.setattr(promotion_module, "load_episode_replay_bundle", counting_loader)
+
+    audit = create_dense_audit(
+        candidate, ranking, KEY, k=3, episode_bundle_path=bundle_path
+    )
+    promote_candidate(candidate, audit, KEY, episode_bundle_path=bundle_path)
+
+    assert load_calls == 2
+    assert materialize_calls == 1
+
+
 def test_real_candidate_rejects_missing_or_mismatched_episode_sidecar(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -2635,6 +3263,473 @@ def test_real_jsonl_cli_threads_episode_sidecar_through_both_stages(
         promoted["promotion"]["episode_replay_bundle"]
         == candidate["episode_replay_bundle"]
     )
+
+
+def test_real_jsonl_cli_registry_matches_explicit_replay_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from promote_candidates import audit_rankings, promote_rows
+
+    bundle_path = _episode_bundle(tmp_path)
+    candidate, artifacts = _real_candidate(bundle_path)
+    candidates_path = tmp_path / "real-candidates.jsonl"
+    rankings_path = tmp_path / "real-rankings.jsonl"
+    explicit_audits = tmp_path / "explicit-audits.jsonl"
+    registry_audits = tmp_path / "registry-audits.jsonl"
+    explicit_rows = tmp_path / "explicit-rows.jsonl"
+    registry_rows = tmp_path / "registry-rows.jsonl"
+    candidates_path.write_text(json.dumps(candidate) + "\n", encoding="utf-8")
+    rankings_path.write_text(
+        json.dumps(_ranking(candidate, artifacts)) + "\n", encoding="utf-8"
+    )
+    registry_path = tmp_path / "replay-registry.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.replay-path-registry.v1",
+                "episode_replay_bundles": {
+                    candidate["episode_replay_bundle"]["sha256"]: bundle_path.name
+                },
+                "source_workflow_bundles": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        audit_rankings(
+            candidates_path,
+            rankings_path,
+            explicit_audits,
+            k=3,
+            episode_bundle_path=bundle_path,
+        )
+        == 1
+    )
+    assert (
+        audit_rankings(
+            candidates_path,
+            rankings_path,
+            registry_audits,
+            k=3,
+            replay_registry_path=registry_path,
+        )
+        == 1
+    )
+    assert explicit_audits.read_bytes() == registry_audits.read_bytes()
+
+    assert (
+        promote_rows(
+            candidates_path,
+            explicit_audits,
+            explicit_rows,
+            episode_bundle_path=bundle_path,
+        )
+        == 1
+    )
+    assert (
+        promote_rows(
+            candidates_path,
+            registry_audits,
+            registry_rows,
+            replay_registry_path=registry_path,
+        )
+        == 1
+    )
+    assert explicit_rows.read_bytes() == registry_rows.read_bytes()
+
+
+def test_source_jsonl_cli_registry_matches_explicit_replay_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from promote_candidates import audit_rankings, promote_rows
+
+    _configure_probe_role_keys(monkeypatch)
+    bundle_path, loaded = _source_workflow_bundle(tmp_path)
+    candidate, artifacts = _source_candidate(loaded)
+    candidates_path = tmp_path / "source-candidates.jsonl"
+    rankings_path = tmp_path / "source-rankings.jsonl"
+    explicit_audits = tmp_path / "source-explicit-audits.jsonl"
+    registry_audits = tmp_path / "source-registry-audits.jsonl"
+    explicit_rows = tmp_path / "source-explicit-rows.jsonl"
+    registry_rows = tmp_path / "source-registry-rows.jsonl"
+    candidates_path.write_text(json.dumps(candidate) + "\n", encoding="utf-8")
+    rankings_path.write_text(
+        json.dumps(_ranking(candidate, artifacts)) + "\n", encoding="utf-8"
+    )
+    registry_path = tmp_path / "source-replay-registry.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.replay-path-registry.v1",
+                "episode_replay_bundles": {},
+                "source_workflow_bundles": {
+                    candidate["source_workflow_bundle"]["sha256"]: bundle_path.name
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        audit_rankings(
+            candidates_path,
+            rankings_path,
+            explicit_audits,
+            k=3,
+            source_bundle_path=bundle_path,
+        )
+        == 1
+    )
+    assert (
+        audit_rankings(
+            candidates_path,
+            rankings_path,
+            registry_audits,
+            k=3,
+            replay_registry_path=registry_path,
+        )
+        == 1
+    )
+    assert explicit_audits.read_bytes() == registry_audits.read_bytes()
+
+    assert (
+        promote_rows(
+            candidates_path,
+            explicit_audits,
+            explicit_rows,
+            source_bundle_path=bundle_path,
+        )
+        == 1
+    )
+    assert (
+        promote_rows(
+            candidates_path,
+            registry_audits,
+            registry_rows,
+            replay_registry_path=registry_path,
+        )
+        == 1
+    )
+    assert explicit_rows.read_bytes() == registry_rows.read_bytes()
+    promoted = json.loads(registry_rows.read_text(encoding="utf-8"))
+    assert (
+        promoted["promotion"]["source_workflow_bundle"]
+        == candidate["source_workflow_bundle"]
+    )
+
+
+def test_mixed_replay_registry_is_byte_deterministic_across_workers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from promote_candidates import audit_rankings, promote_rows
+
+    _configure_probe_role_keys(monkeypatch)
+    episode_path = _episode_bundle(tmp_path)
+    episode_candidate, episode_artifacts = _real_candidate(episode_path)
+    source_path, loaded = _source_workflow_bundle(tmp_path)
+    source_candidate, source_artifacts = _source_candidate(loaded)
+    candidates = [source_candidate, episode_candidate]
+    rankings = [
+        _ranking(source_candidate, source_artifacts),
+        _ranking(episode_candidate, episode_artifacts),
+    ]
+    candidates_path = tmp_path / "mixed-candidates.jsonl"
+    rankings_path = tmp_path / "mixed-rankings.jsonl"
+    candidates_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in candidates), encoding="utf-8"
+    )
+    rankings_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rankings), encoding="utf-8"
+    )
+    registry_path = tmp_path / "mixed-replay-registry.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.replay-path-registry.v1",
+                "episode_replay_bundles": {
+                    episode_candidate["episode_replay_bundle"]["sha256"]: (
+                        episode_path.name
+                    )
+                },
+                "source_workflow_bundles": {
+                    source_candidate["source_workflow_bundle"]["sha256"]: (
+                        source_path.name
+                    )
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    serial_audits = tmp_path / "mixed-serial-audits.jsonl"
+    parallel_audits = tmp_path / "mixed-parallel-audits.jsonl"
+    assert (
+        audit_rankings(
+            candidates_path,
+            rankings_path,
+            serial_audits,
+            k=3,
+            workers=1,
+            replay_registry_path=registry_path,
+        )
+        == 2
+    )
+    assert (
+        audit_rankings(
+            candidates_path,
+            rankings_path,
+            parallel_audits,
+            k=3,
+            workers=2,
+            replay_registry_path=registry_path,
+        )
+        == 2
+    )
+    assert serial_audits.read_bytes() == parallel_audits.read_bytes()
+
+    serial_rows = tmp_path / "mixed-serial-rows.jsonl"
+    parallel_rows = tmp_path / "mixed-parallel-rows.jsonl"
+    assert (
+        promote_rows(
+            candidates_path,
+            serial_audits,
+            serial_rows,
+            workers=1,
+            replay_registry_path=registry_path,
+        )
+        == 2
+    )
+    assert (
+        promote_rows(
+            candidates_path,
+            parallel_audits,
+            parallel_rows,
+            workers=2,
+            replay_registry_path=registry_path,
+        )
+        == 2
+    )
+    assert serial_rows.read_bytes() == parallel_rows.read_bytes()
+
+
+@pytest.mark.parametrize(
+    ("binding_field", "forged_value"),
+    (("sha256", "0" * 64), ("adapter_revision", "sourceworkflow@2")),
+)
+def test_source_replay_registry_fails_closed_on_binding_rewrite(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    binding_field: str,
+    forged_value: str,
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from promote_candidates import audit_rankings
+
+    _configure_probe_role_keys(monkeypatch)
+    bundle_path, loaded = _source_workflow_bundle(tmp_path)
+    candidate, artifacts = _source_candidate(loaded)
+    candidate["source_workflow_bundle"][binding_field] = forged_value
+    candidate = attach_attestation(
+        candidate, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
+    )
+    candidates_path = tmp_path / f"forged-{binding_field}-candidates.jsonl"
+    rankings_path = tmp_path / f"forged-{binding_field}-rankings.jsonl"
+    output_path = tmp_path / f"forged-{binding_field}-must-not-exist.jsonl"
+    candidates_path.write_text(json.dumps(candidate) + "\n", encoding="utf-8")
+    rankings_path.write_text(
+        json.dumps(_ranking(candidate, artifacts)) + "\n", encoding="utf-8"
+    )
+    registry_path = tmp_path / f"forged-{binding_field}-registry.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.replay-path-registry.v1",
+                "episode_replay_bundles": {},
+                "source_workflow_bundles": {
+                    candidate["source_workflow_bundle"]["sha256"]: bundle_path.name
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PromotionError, match="bundle digest does not match"):
+        audit_rankings(
+            candidates_path,
+            rankings_path,
+            output_path,
+            k=3,
+            replay_registry_path=registry_path,
+        )
+    assert not output_path.exists()
+
+
+def test_real_jsonl_cli_registry_fails_closed_on_missing_bundle_digest(
+    tmp_path: Path,
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from promote_candidates import audit_rankings
+
+    bundle_path = _episode_bundle(tmp_path)
+    candidate, artifacts = _real_candidate(bundle_path)
+    candidates_path = tmp_path / "real-candidates.jsonl"
+    rankings_path = tmp_path / "real-rankings.jsonl"
+    registry_path = tmp_path / "empty-replay-registry.json"
+    candidates_path.write_text(json.dumps(candidate) + "\n", encoding="utf-8")
+    rankings_path.write_text(
+        json.dumps(_ranking(candidate, artifacts)) + "\n", encoding="utf-8"
+    )
+    registry_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.replay-path-registry.v1",
+                "episode_replay_bundles": {},
+                "source_workflow_bundles": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PromotionError, match="missing from registry"):
+        audit_rankings(
+            candidates_path,
+            rankings_path,
+            tmp_path / "must-not-exist.jsonl",
+            k=3,
+            replay_registry_path=registry_path,
+        )
+
+
+def test_replay_registry_routes_source_and_episode_candidates_independently(
+    tmp_path: Path,
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from promote_candidates import _candidate_replay_paths, _load_replay_registry
+
+    episode_digest = "a" * 64
+    source_digest = "b" * 64
+    episode_path = tmp_path / "episode.json"
+    source_path = tmp_path / "source.json"
+    episode_path.write_text("{}", encoding="utf-8")
+    source_path.write_text("{}", encoding="utf-8")
+    registry_path = tmp_path / "registry.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.replay-path-registry.v1",
+                "episode_replay_bundles": {episode_digest: episode_path.name},
+                "source_workflow_bundles": {source_digest: source_path.name},
+            }
+        ),
+        encoding="utf-8",
+    )
+    registry = _load_replay_registry(registry_path)
+
+    assert _candidate_replay_paths(
+        {"episode_replay_bundle": {"sha256": episode_digest}},
+        None,
+        None,
+        registry,
+    ) == (episode_path.absolute(), None)
+    assert _candidate_replay_paths(
+        {"source_workflow_bundle": {"sha256": source_digest}},
+        None,
+        None,
+        registry,
+    ) == (None, source_path.absolute())
+    with pytest.raises(PromotionError, match="cannot bind two"):
+        _candidate_replay_paths(
+            {
+                "episode_replay_bundle": {"sha256": episode_digest},
+                "source_workflow_bundle": {"sha256": source_digest},
+            },
+            None,
+            None,
+            registry,
+        )
+
+
+def test_promote_rows_writes_an_empty_split_only_when_selection_quota_is_zero(
+    tmp_path: Path,
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from promote_candidates import promote_rows
+
+    candidates_path = tmp_path / "eval-candidates.jsonl"
+    audits_path = tmp_path / "eval-audits.jsonl"
+    output_path = tmp_path / "eval.jsonl"
+    candidates_path.write_text("", encoding="utf-8")
+    audits_path.write_text("", encoding="utf-8")
+    profile_id = "p7-github-source-slice-1-v1"
+    profile = release_profile(profile_id)
+    selection = attach_attestation(
+        {
+            "schema_version": RELEASE_SELECTION_SCHEMA,
+            "release_profile_id": profile_id,
+            "release_profile_sha256": release_profile_sha256(profile_id),
+            "split_strategy": profile.split_strategy,
+            "n_selected_worlds": 1,
+            "split_by_world": {"code-world": "train"},
+        },
+        KEY,
+        purpose=RELEASE_SELECTION_PURPOSE,
+    )
+    selection_path = tmp_path / "selection.json"
+    selection_path.write_text(json.dumps(selection), encoding="utf-8")
+
+    assert (
+        promote_rows(
+            candidates_path,
+            audits_path,
+            output_path,
+            expected_split="eval",
+            release_selection_path=selection_path,
+        )
+        == 0
+    )
+    assert output_path.read_bytes() == b""
+
+    with pytest.raises(ValueError, match="selected split is not empty"):
+        promote_rows(
+            candidates_path,
+            audits_path,
+            tmp_path / "train.jsonl",
+            expected_split="train",
+            release_selection_path=selection_path,
+        )
+
+
+def test_real_jsonl_cli_rejects_registry_with_single_bundle_path(
+    tmp_path: Path,
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from promote_candidates import audit_rankings
+
+    registry_path = tmp_path / "replay-registry.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.replay-path-registry.v1",
+                "episode_replay_bundles": {},
+                "source_workflow_bundles": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="cannot be combined"):
+        audit_rankings(
+            tmp_path / "unused-candidates.jsonl",
+            tmp_path / "unused-rankings.jsonl",
+            tmp_path / "must-not-exist.jsonl",
+            k=3,
+            episode_bundle_path=tmp_path / "unused-bundle.json",
+            replay_registry_path=registry_path,
+        )
 
 
 def test_jsonl_two_stage_cli_is_atomic_and_requires_exact_receipt_coverage(
