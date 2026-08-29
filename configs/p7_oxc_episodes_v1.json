@@ -1,0 +1,23 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "data/workflows_p7_oxc/oxc_pr24360_crates_v0.144.0.json",
+      "sha256": "d1a237427c62c87ca2611fc9bf6725d9037255e14d28d6120ec49e6e9a73bc6d"
+    },
+    {
+      "path": "data/workflows_p7_oxc/oxc_pr25585_crates_v0.145.0.json",
+      "sha256": "163f1af547bb8f7cc374e8a58357d99f1f9e33a77e06b02ccae655335b3fae7d"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "probe-source-20260824-01",
+    "environment": "probe",
+    "digest": "7c32ebf6bca120cdfde1bc55c9345b0d66b3b679d62c47de8115121d4ecd0efe"
+  }
+}

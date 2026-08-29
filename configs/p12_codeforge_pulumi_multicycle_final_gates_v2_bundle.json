@@ -1,0 +1,27 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "data/source_inventory/p12_codeforge_pulumi/pulumi_pr24053_v3.256.0_final-gates-v2.json",
+      "sha256": "fbc4f89aa4b51236b7e456dbcf5b5392a515ce4a7cdd86cf7002c898bc414173"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_pulumi/pulumi_pr24184_v3.257.0_final-gates-v2.json",
+      "sha256": "d786bbc3d93c25b31b857037ce68ed095d4158435d373cd73aa72a17743f2a5f"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_pulumi/pulumi_pr24226_v3.258.0_final-gates-v2.json",
+      "sha256": "cc2fc4f2d3445246435da212a1abd0a689ad2961780b755083f20b532ec998d8"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "p9-probe-source-20260827-v1",
+    "environment": "probe",
+    "digest": "f95e6ae9f96116c7027bb8e9ae471e2e2a85c6b854496222f003c70966ae4406"
+  }
+}

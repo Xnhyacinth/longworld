@@ -1,0 +1,23 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "data/workflows_p7_uv/astral_uv_pr17455_0125.json",
+      "sha256": "c3112a7037f3144af3924c9793fee7584199a487fb0588047633254b73ce2ba2"
+    },
+    {
+      "path": "data/workflows_p7_uv/astral_uv_pr21001_0126.json",
+      "sha256": "711d7e3c9e4f668ca680804f3b05c86594df08cc0c4ef761dee5db3ebfe3d99b"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "probe-source-20260824-01",
+    "environment": "probe",
+    "digest": "effd6fadff9998ab3c88d90ab87d3648ba71f40df25b79d44593cbcef00f630c"
+  }
+}

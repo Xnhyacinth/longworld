@@ -1,0 +1,61 @@
+{
+  "schema_version": "longworld.codeforge-discovery-proposal.v1",
+  "status": "proposal_not_runnable",
+  "data_product": "worldlong_p12_codeforge_dprint_five_cycle_v1",
+  "domain": "codeforge",
+  "repository": "dprint/dprint",
+  "evidence": "data/source_inventory/p12_codeforge_expansion_dprint/dprint_multicycle_discovery_v1.json",
+  "future_episode_paths": [
+    "data/source_inventory/p12_codeforge_expansion_dprint/dprint_pr1096_0.52.0.json",
+    "data/source_inventory/p12_codeforge_expansion_dprint/dprint_pr1102_0.53.0.json",
+    "data/source_inventory/p12_codeforge_expansion_dprint/dprint_pr1127_0.54.0.json",
+    "data/source_inventory/p12_codeforge_expansion_dprint/dprint_pr1185_0.55.0.json",
+    "data/source_inventory/p12_codeforge_expansion_dprint/dprint_pr1207_0.56.0.json"
+  ],
+  "future_bundle_path": "configs/p12_codeforge_expansion_dprint_multicycle_bundle_v1.json",
+  "composition": "chronological_causal_union",
+  "release_cycles": ["0.52.0", "0.53.0", "0.54.0", "0.55.0", "0.56.0"],
+  "query_routing": {
+    "version_selection": ["16k"],
+    "ci_regression_origin": ["32k"],
+    "release_supersession_trace": ["32k", "64k"]
+  },
+  "unsupported_query_types": {
+    "license_compatibility": "no real explicit compatibility decision in the selected workflow"
+  },
+  "length_buckets": {
+    "16k": 16000,
+    "32k": 32768,
+    "64k": 65536
+  },
+  "suggested_source_workflow_bucket_targets": {
+    "16k": 13000,
+    "32k": 26000,
+    "64k": 52500
+  },
+  "exact_tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true
+  },
+  "required_gates": [
+    "source_attestation",
+    "episode_bundle_binding",
+    "exact_token_admission",
+    "semantic_growth",
+    "counterfactual_replay",
+    "remove_one",
+    "text_corruption_negative",
+    "window_4k_8k_16k",
+    "bm25_and_embedding_dense_retrieval",
+    "promotion_signature"
+  ],
+  "release_policy": {
+    "local_probe_eligible_now": false,
+    "fresh_export_required": true,
+    "production_eligible": false,
+    "required_check_policy_verified": false,
+    "timestamp_chronology_review_required": true
+  }
+}

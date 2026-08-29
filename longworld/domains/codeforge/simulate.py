@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import date, timedelta
 from typing import Any
 
@@ -13,6 +14,99 @@ from longworld.domains.codeforge.events import (
     init_values,
 )
 from longworld.domains.codeforge.schema import materialize_grounded_repo_record
+
+_REPO_RESOLVED_FACT_KEYS = (
+    "commit",
+    "package",
+    "version",
+    "run",
+    "test",
+    "tag",
+    "license",
+    "compatibility_license",
+    "project",
+    "dependency_project",
+    "result",
+    "compatible",
+)
+_SEMVER_RELEASE_TAG = re.compile(
+    r"(?:(?P<family>[A-Za-z][A-Za-z0-9]*)[_-][vV]|[vV]?)"
+    r"(?P<version>(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))"
+)
+
+
+def _resolved_repo_facts(records: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Resolve body facts through the first explicit link that supplies each key."""
+    by_key = {str(record["record_key"]): record for record in records}
+    memo: dict[str, dict[str, Any]] = {}
+    active: set[str] = set()
+
+    def resolve(record_key: str) -> dict[str, Any]:
+        if record_key in memo:
+            return memo[record_key]
+        record = by_key.get(record_key)
+        if record is None:
+            return {}
+        resolved = dict(record.get("body_facts") or {})
+        if record_key in active:
+            return resolved
+        active.add(record_key)
+        for key in _REPO_RESOLVED_FACT_KEYS:
+            if key in resolved:
+                continue
+            for link in record.get("links") or []:
+                value = resolve(str(link)).get(key)
+                if value is not None:
+                    resolved[key] = value
+                    break
+        active.remove(record_key)
+        memo[record_key] = resolved
+        return resolved
+
+    for key in by_key:
+        resolve(key)
+    return memo
+
+
+def _required_repo_links(
+    record: dict[str, Any],
+    *,
+    kind_by_record: dict[str, str],
+    resolved_facts: dict[str, dict[str, Any]],
+) -> list[str]:
+    """Keep executable fact providers required; retain other links as causal history."""
+    links = [str(link) for link in record.get("links") or []]
+    own_facts = dict(record.get("body_facts") or {})
+    record_kind = str(record.get("kind") or "")
+    required: list[str] = []
+    if record_kind != "release":
+        for key in _REPO_RESOLVED_FACT_KEYS:
+            if record_kind == "commit" and key in {
+                "compatible",
+                "compatibility_license",
+                "license",
+            }:
+                continue
+            if key in own_facts:
+                continue
+            provider = next(
+                (
+                    link
+                    for link in links
+                    if resolved_facts.get(link, {}).get(key) is not None
+                ),
+                None,
+            )
+            if provider is not None and provider not in required:
+                required.append(provider)
+    if record_kind == "release":
+        for link in links:
+            if (
+                kind_by_record.get(link) in {"ci_run", "license", "release"}
+                and link not in required
+            ):
+                required.append(link)
+    return required
 
 
 def _date(start: date, months: int, extra_days: int = 0) -> date:
@@ -142,15 +236,10 @@ def events_for_repo(project: dict[str, Any], prefix: str) -> list[Event]:
         str(record["record_key"]): eid(f"real_{index:05d}")
         for index, record in enumerate(repo_records)
     }
-    body_sha_by_record = {
-        str(record["record_key"]): hashlib.sha256(
-            str(record["body_text"]).encode()
-        ).hexdigest()
-        for record in repo_records
-    }
     kind_by_record = {
         str(record["record_key"]): str(record["kind"]) for record in repo_records
     }
+    resolved_facts = _resolved_repo_facts(repo_records)
     result_by_record = {
         str(record["record_key"]): str((record.get("body_facts") or {}).get("result"))
         for record in repo_records
@@ -164,18 +253,15 @@ def events_for_repo(project: dict[str, Any], prefix: str) -> list[Event]:
         linked_event_ids = [
             event_id_by_record[link] for link in links if link in event_id_by_record
         ]
-        required_event_ids: list[str] = []
-        required_body_hashes: set[str] = set()
-        for link in links:
-            linked_event_id = event_id_by_record.get(link)
-            body_sha256 = body_sha_by_record.get(link)
-            if (
-                linked_event_id is not None
-                and body_sha256 is not None
-                and body_sha256 not in required_body_hashes
-            ):
-                required_event_ids.append(linked_event_id)
-                required_body_hashes.add(body_sha256)
+        required_event_ids = [
+            event_id_by_record[link]
+            for link in _required_repo_links(
+                record,
+                kind_by_record=kind_by_record,
+                resolved_facts=resolved_facts,
+            )
+            if link in event_id_by_record
+        ]
         facts = dict(record.get("body_facts") or {})
         record_event = Event(
             id=event_id_by_record[record_key],
@@ -226,7 +312,15 @@ def events_for_repo(project: dict[str, Any], prefix: str) -> list[Event]:
             visibility=[f"{prefix}.real_record_{index:05d}"],
             causal_inputs=list(linked_event_ids),
             required_inputs=required_event_ids,
-            relation_kinds={item: "derived_from" for item in linked_event_ids},
+            relation_kinds={
+                event_id_by_record[link]: (
+                    "source_context"
+                    if event_id_by_record[link] not in required_event_ids
+                    else "derived_from"
+                )
+                for link in links
+                if link in event_id_by_record
+            },
         )
         evs.append(record_event)
         real_record_events.append(record_event)
@@ -399,26 +493,46 @@ def events_for_repo(project: dict[str, Any], prefix: str) -> list[Event]:
     return evs
 
 
-def _release_version(event: Event) -> tuple[int, ...]:
-    tag = str(event.params.get("tag") or "").lstrip("vV")
+def _release_identity(event: Event) -> tuple[str, tuple[int, int, int]] | None:
+    tag = str(event.params.get("tag") or "")
+    match = _SEMVER_RELEASE_TAG.fullmatch(tag)
+    if match is None:
+        return None
     try:
-        return tuple(int(part) for part in tag.split("."))
+        version = tuple(int(part) for part in match.group("version").split("."))
     except ValueError:
+        return None
+    if len(version) != 3:
+        return None
+    return str(match.group("family") or "").casefold(), version
+
+
+def _release_version(event: Event) -> tuple[int, ...]:
+    identity = _release_identity(event)
+    if identity is None:
         return ()
+    return identity[1]
 
 
 def _link_release_cycles(releases: list[Event]) -> None:
     """Create body-derived supersession edges between distinct release tags."""
-    previous_by_repo: dict[str, Event] = {}
-    cycles_by_repo: dict[str, dict[tuple[int, ...], int]] = {}
+    previous_by_stream: dict[tuple[str, str], Event] = {}
+    cycles_by_stream: dict[tuple[str, str], dict[tuple[int, ...], int]] = {}
     for event in sorted(releases, key=lambda item: (item.time, item.id)):
         source_url = str(event.params.get("source_url") or "")
-        version = _release_version(event)
-        version_cycles = cycles_by_repo.setdefault(source_url, {})
+        identity = _release_identity(event)
+        version = identity[1] if identity is not None else ()
+        family = (
+            identity[0]
+            if identity is not None
+            else f"invalid:{str(event.params.get('tag') or '').casefold()}"
+        )
+        stream = (source_url, family)
+        version_cycles = cycles_by_stream.setdefault(stream, {})
         if version not in version_cycles:
             version_cycles[version] = len(version_cycles) + 1
         event.params["release_cycle"] = version_cycles[version]
-        previous = previous_by_repo.get(source_url)
+        previous = previous_by_stream.get(stream)
         if previous is not None:
             previous_version = _release_version(previous)
             if (
@@ -429,13 +543,12 @@ def _link_release_cycles(releases: list[Event]) -> None:
                 and previous.id not in event.required_inputs
             ):
                 event.causal_inputs.append(previous.id)
-                event.required_inputs.append(previous.id)
                 event.relation_kinds[previous.id] = "supersedes"
                 event.params.setdefault("synthetic_relation_inputs", []).append(
                     previous.id
                 )
         if previous is None or version > _release_version(previous):
-            previous_by_repo[source_url] = event
+            previous_by_stream[stream] = event
 
 
 def simulate_code(spec: dict[str, Any]) -> dict[str, SimulatedWorld]:

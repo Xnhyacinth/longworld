@@ -1,0 +1,63 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "data/source_inventory/p12_codeforge_ruff_signed_v1/ruff_pr27570_0.16.3.json",
+      "sha256": "2ccac56ef7cb0fb4dfe9a0af813c7771b749d47e56f48918ba813bc62fbf3e12"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_ruff_longhistory_v1/ruff_pr27190_support.json",
+      "sha256": "412daedce9a439f9743a41e845f3618e1524dc03f7529406e473542d63a8df2b"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_ruff_longhistory_v1/ruff_pr27687_support.json",
+      "sha256": "553e8aa4bba75decb3b476a9cef98b5a68bcce0b258812c0fb750caac5eaaf67"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_ruff_signed_v1/ruff_pr17804_0.16.4.json",
+      "sha256": "dee0726a5aed808965266a0cf145565ac4dc3495c9390d2a9aaa92264d028166"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_ruff_longhistory_v1/ruff_pr27766_support.json",
+      "sha256": "d4326098c90c1767f9d26f455c94af974381faf072321ef7d954076f261a769d"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_ruff_longhistory_v1/ruff_pr27924_support.json",
+      "sha256": "a3b14aca2909e0905a2288391bf1cd17e703b9cd25a661866483850f0b2068b1"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_ruff_longhistory_v1/ruff_pr28024_0.16.5.json",
+      "sha256": "c2dedff4e1df2fd6236e0e47e6b573009057a0303fd663c287810df2743cbc47"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_ruff_longhistory_v1/ruff_pr27666_support.json",
+      "sha256": "3c5cfca9120ec7dcb499f25fdfff01a50e6b5198731ca1acfe57d24107cb5366"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_ruff_longhistory_v1/ruff_pr28049_support.json",
+      "sha256": "2c1c55900f3f962e73edf8379c3ba523f24fed6f6be56396fd6d7d445e1ef3bb"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_ruff_longhistory_v1/ruff_pr27906_support.json",
+      "sha256": "34169c6a25fb4fec9e7bae7fa9adf4006d5e8c138c29fd9e3d63211390d789f0"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_ruff_longhistory_v1/ruff_pr27910_support.json",
+      "sha256": "07da929b25c64f42e6d4da757bed6e9fa9e5d65dab6847460cc38a225e6475e3"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_ruff_longhistory_v1/ruff_pr27877_support.json",
+      "sha256": "014026a6195fcb75228b7be85b7a2cdda549f3d4cdd854ca72c29fb57c24e5cf"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "probe-source-3a689228f9679b0522a18cadd07f1e97",
+    "environment": "probe",
+    "digest": "66b4999776f115e0ecabf4d61a16680b1c43bbb7a524a8a911bca28c717ed48d"
+  }
+}

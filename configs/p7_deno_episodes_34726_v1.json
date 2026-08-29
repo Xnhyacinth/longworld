@@ -1,0 +1,23 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "data/workflows_p7_deno/deno_pr34726_v2.9.0.json",
+      "sha256": "d0953595c1cb3d7bf3dfd07a40309d74048428b2718c421338edc87fe837b1ed"
+    },
+    {
+      "path": "data/workflows_p7_deno/deno_pr35466_v2.9.1.json",
+      "sha256": "6acd7a4e616fa8a1bae71eab1fdf58eab312d068c6b581cd44385b6ca2c206e4"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "probe-source-20260824-01",
+    "environment": "probe",
+    "digest": "266dbad8362dd797f1b9750e387e4f0832fbe17fe51859565e9c7988bef14f7c"
+  }
+}

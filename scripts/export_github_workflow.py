@@ -22,12 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from longworld.core.attestation import (
-    ATTESTATION_ENV,
     ATTESTATION_ENVIRONMENT_ENV,
-    PREDECESSOR_GATE_KEY_ENV,
-    PREDECESSOR_GATE_KEY_ID_ENV,
-    ROLE_KEY_ENVS,
-    ROLE_KEY_ID_ENVS,
     attach_attestation,
     attestation_key_from_env,
 )
@@ -57,6 +52,7 @@ CANONICAL_ALLOWLIST = ROOT / "configs" / "public_repo_allowlist.yaml"
 PUBLIC_POLICY_SHA256_ENV = "LONGWORLD_PUBLIC_POLICY_SHA256"
 GH_BINARY_ENV = "LONGWORLD_GH_BINARY"
 GH_BINARY_SHA256_ENV = "LONGWORLD_GH_BINARY_SHA256"
+GH_CHILD_ENV_ALLOWLIST = ("GH_TOKEN", "GITHUB_TOKEN", "GH_CONFIG_DIR")
 
 
 def _timestamp(value: str) -> datetime:
@@ -191,17 +187,25 @@ def _github_client_receipt() -> dict[str, str]:
 
 def _gh_fetch(endpoint: str) -> Any:
     client = _github_client_receipt()
-    child_env = dict(os.environ)
-    for name in (
-        ATTESTATION_ENV,
-        ATTESTATION_ENVIRONMENT_ENV,
-        *ROLE_KEY_ENVS.values(),
-        *ROLE_KEY_ID_ENVS.values(),
-        PREDECESSOR_GATE_KEY_ENV,
-        PREDECESSOR_GATE_KEY_ID_ENV,
-    ):
-        child_env.pop(name, None)
-    child_env["PATH"] = "/usr/bin:/bin"
+    child_env = {
+        name: os.environ[name]
+        for name in GH_CHILD_ENV_ALLOWLIST
+        if os.environ.get(name)
+    }
+    if "GH_CONFIG_DIR" not in child_env:
+        config_home = os.environ.get("XDG_CONFIG_HOME")
+        home = os.environ.get("HOME")
+        if config_home:
+            child_env["GH_CONFIG_DIR"] = str(Path(config_home) / "gh")
+        elif home:
+            child_env["GH_CONFIG_DIR"] = str(Path(home) / ".config" / "gh")
+    child_env.update(
+        {
+            "PATH": "/usr/bin:/bin",
+            "GH_PROMPT_DISABLED": "1",
+            "GH_NO_UPDATE_NOTIFIER": "1",
+        }
+    )
     completed = subprocess.run(
         [client["path"], "api", "--hostname", "github.com", endpoint],
         check=True,
@@ -459,48 +463,132 @@ def build_public_release_episode(
         )
 
     head_sha = str(pull["head"]["sha"])
-    head_check_records: list[str] = []
-    head_conclusions: list[str] = []
+    merge_time = _timestamp(str(pull["merged_at"]))
+    head_checks_by_identity: dict[
+        tuple[str, str], tuple[datetime, int, str, str, str, str]
+    ] = {}
     for commit in commits:
         commit_sha = str(commit["sha"])
         checks = _fetch_pages(
             fetch_json,
-            f"repos/{repository}/commits/{commit_sha}/check-runs",
+            f"repos/{repository}/commits/{commit_sha}/check-runs?filter=all",
             field="check_runs",
         )
         for check in checks:
             if str(check.get("head_sha") or "") != commit_sha:
                 continue
+            raw_check_id = check.get("id")
+            if not isinstance(raw_check_id, int) or raw_check_id <= 0:
+                raise ValueError("GitHub check run has no stable numeric identity")
+            check_id = f"ci:{raw_check_id}"
             completed_at = str(check.get("completed_at") or "")
+            status = str(check.get("status") or "")
+            conclusion = str(check.get("conclusion") or "")
+            app = check.get("app")
+            if not isinstance(app, dict):
+                app = {}
+            app_id = app.get("id")
+            app_slug = str(app.get("slug") or "")
+            if commit_sha == head_sha:
+                started_at = str(check.get("started_at") or "")
+                if release_tag is not None and not started_at:
+                    raise ValueError(
+                        "observed selected pre-merge CI checks have no start time"
+                    )
+                attempt_time = _timestamp(started_at) if started_at else None
+                check_name = str(check.get("name") or "")
+                app_identity = (
+                    f"id:{app_id}"
+                    if app_id is not None and str(app_id)
+                    else f"slug:{app_slug}"
+                    if app_slug
+                    else ""
+                )
+                if release_tag is not None and (not check_name or not app_identity):
+                    raise ValueError(
+                        "observed selected pre-merge CI checks have no stable identity"
+                    )
+                if attempt_time is not None and attempt_time <= merge_time:
+                    check_identity = (app_identity, check_name)
+                    check_result = (
+                        attempt_time,
+                        raw_check_id,
+                        check_id,
+                        status,
+                        conclusion,
+                        completed_at,
+                    )
+                    if check_result > head_checks_by_identity.get(
+                        check_identity,
+                        (
+                            datetime.min.replace(tzinfo=timezone.utc),
+                            0,
+                            "",
+                            "",
+                            "",
+                            "",
+                        ),
+                    ):
+                        head_checks_by_identity[check_identity] = check_result
             if not completed_at:
                 continue
-            conclusion = str(check.get("conclusion") or "")
-            check_id = f"ci:{check['id']}"
-            if commit_sha == head_sha:
-                head_check_records.append(check_id)
-                head_conclusions.append(conclusion)
             add(
                 check_id,
                 "ci_run",
                 completed_at,
-                f"CI check {check.get('name') or check['id']} for {commit_sha}\n"
-                f"run_id={check['id']} status={check.get('status')} "
+                f"CI check {check.get('name') or raw_check_id} for {commit_sha}\n"
+                f"run_id={raw_check_id} status={status} "
                 f"conclusion={conclusion}",
                 links=[f"commit:{commit_sha}"],
                 attributes={
                     "head_sha": commit_sha,
                     "name": str(check.get("name") or ""),
+                    "status": status,
                     "conclusion": conclusion,
+                    "started_at": str(check.get("started_at") or ""),
+                    "completed_at": completed_at,
+                    "app_id": app_id,
+                    "app_slug": app_slug,
                 },
                 source_pointer=str(check.get("url") or check.get("details_url") or ""),
             )
-    blocking = {"failure", "cancelled", "timed_out", "action_required"}
+    selected_head_checks = [
+        head_checks_by_identity[identity]
+        for identity in sorted(head_checks_by_identity)
+    ]
+    head_check_records = [check_id for _, _, check_id, _, _, _ in selected_head_checks]
+    head_statuses = [status for _, _, _, status, _, _ in selected_head_checks]
+    head_conclusions = [
+        conclusion for _, _, _, _, conclusion, _ in selected_head_checks
+    ]
+    head_completion_times = [
+        completed_at for _, _, _, _, _, completed_at in selected_head_checks
+    ]
+    blocking = {
+        "failure",
+        "cancelled",
+        "timed_out",
+        "action_required",
+        "stale",
+        "startup_failure",
+    }
+    non_blocking = {"success", "neutral", "skipped"}
     if release_tag is not None and (
         not head_check_records
+        or any(status != "completed" for status in head_statuses)
+        or any(not completed_at for completed_at in head_completion_times)
+        or any(
+            _timestamp(completed_at) > merge_time
+            for completed_at in head_completion_times
+            if completed_at
+        )
         or "success" not in head_conclusions
         or any(conclusion in blocking for conclusion in head_conclusions)
+        or any(conclusion not in non_blocking for conclusion in head_conclusions)
     ):
-        raise ValueError("episode requires successful CI checks for the pull head")
+        raise ValueError(
+            "episode requires non-blocking observed selected pre-merge CI checks"
+        )
 
     merge_id = f"merge:{pull_number}"
     add(
@@ -542,6 +630,11 @@ def build_public_release_episode(
                     f"{pull['merge_commit_sha']}...{tag_commit_sha}"
                 ),
                 "compare_response_sha256": ancestry_response_sha256,
+                "ci_evidence_scope": ("observed_selected_final_pre_merge_check_runs"),
+                "required_check_policy_verified": False,
+                "required_check_policy_requirement": (
+                    "external_signed_policy_required_for_production_eligibility"
+                ),
             },
             source_pointer=str(release.get("url") or release.get("html_url") or ""),
         )

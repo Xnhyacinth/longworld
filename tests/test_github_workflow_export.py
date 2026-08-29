@@ -114,7 +114,7 @@ def _responses() -> dict[str, object]:
             }
         ],
         "repos/acme/tool/pulls/7/comments?per_page=100&page=1": [],
-        "repos/acme/tool/commits/c2/check-runs?per_page=100&page=1": {
+        "repos/acme/tool/commits/c2/check-runs?filter=all&per_page=100&page=1": {
             "total_count": 1,
             "check_runs": [
                 {
@@ -125,11 +125,12 @@ def _responses() -> dict[str, object]:
                     "conclusion": "success",
                     "started_at": "2026-01-01T00:35:00Z",
                     "completed_at": "2026-01-01T00:40:00Z",
+                    "app": {"id": 1, "slug": "github-actions"},
                     "url": "https://api.github.com/repos/acme/tool/check-runs/11",
                 }
             ],
         },
-        "repos/acme/tool/commits/c1/check-runs?per_page=100&page=1": {
+        "repos/acme/tool/commits/c1/check-runs?filter=all&per_page=100&page=1": {
             "total_count": 1,
             "check_runs": [
                 {
@@ -140,6 +141,7 @@ def _responses() -> dict[str, object]:
                     "conclusion": "failure",
                     "started_at": "2026-01-01T00:02:00Z",
                     "completed_at": "2026-01-01T00:05:00Z",
+                    "app": {"id": 1, "slug": "github-actions"},
                     "url": "https://api.github.com/repos/acme/tool/check-runs/10",
                 }
             ],
@@ -347,11 +349,322 @@ def test_release_episode_requires_merge_ancestry() -> None:
 
 def test_check_run_pagination_must_match_total_count() -> None:
     responses = _responses()
-    responses["repos/acme/tool/commits/c2/check-runs?per_page=100&page=1"][
+    responses["repos/acme/tool/commits/c2/check-runs?filter=all&per_page=100&page=1"][
         "total_count"
     ] = 2
 
     with pytest.raises(ValueError, match="pagination coverage"):
+        build_public_release_episode(
+            "acme/tool",
+            7,
+            "v2",
+            {
+                "visibility": "public",
+                "license": "Apache-2.0",
+                "authorization": {
+                    "record_id": "PUBLIC-GITHUB-TERMS",
+                    "scope": "read-only workflow export",
+                    "basis": "public repository",
+                    "reviewed_at": "2026-01-01T00:00:00Z",
+                },
+                "allowed_record_kinds": [
+                    "pull_request",
+                    "review",
+                    "commit",
+                    "ci_run",
+                    "merge",
+                    "release",
+                    "license",
+                ],
+            },
+            responses.__getitem__,
+            exported_at="2026-01-03T00:00:00Z",
+        )
+
+
+def test_release_links_latest_pre_merge_attempt_per_app_and_check_name() -> None:
+    responses = _responses()
+    responses[
+        "repos/acme/tool/commits/c2/check-runs?filter=all&per_page=100&page=1"
+    ] = {
+        "total_count": 4,
+        "check_runs": [
+            {
+                "id": 12,
+                "head_sha": "c2",
+                "name": "parser-tests",
+                "status": "completed",
+                "conclusion": "failure",
+                "started_at": "2026-01-01T00:35:00Z",
+                "completed_at": "2026-01-01T00:50:00Z",
+                "app": {"id": 1},
+                "url": "https://api.github.com/repos/acme/tool/check-runs/12",
+            },
+            {
+                "id": 11,
+                "head_sha": "c2",
+                "name": "parser-tests",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-01-01T00:39:00Z",
+                "completed_at": "2026-01-01T00:40:00Z",
+                "app": {"id": 1},
+                "url": "https://api.github.com/repos/acme/tool/check-runs/11",
+            },
+            {
+                "id": 13,
+                "head_sha": "c2",
+                "name": "parser-tests",
+                "status": "completed",
+                "conclusion": "failure",
+                "started_at": "2026-01-01T01:05:00Z",
+                "completed_at": "2026-01-01T01:10:00Z",
+                "app": {"id": 1},
+                "url": "https://api.github.com/repos/acme/tool/check-runs/13",
+            },
+            {
+                "id": 14,
+                "head_sha": "c2",
+                "name": "parser-tests",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-01-01T00:38:00Z",
+                "completed_at": "2026-01-01T00:42:00Z",
+                "app": {"slug": "other-ci"},
+                "url": "https://api.github.com/repos/acme/tool/check-runs/14",
+            },
+        ],
+    }
+
+    payload = build_public_release_episode(
+        "acme/tool",
+        7,
+        "v2",
+        {
+            "visibility": "public",
+            "license": "Apache-2.0",
+            "authorization": {
+                "record_id": "PUBLIC-GITHUB-TERMS",
+                "scope": "read-only workflow export",
+                "basis": "public repository",
+                "reviewed_at": "2026-01-01T00:00:00Z",
+            },
+            "allowed_record_kinds": [
+                "pull_request",
+                "review",
+                "commit",
+                "ci_run",
+                "merge",
+                "release",
+                "license",
+            ],
+        },
+        responses.__getitem__,
+        exported_at="2026-01-03T00:00:00Z",
+    )
+
+    release = next(
+        record for record in payload["records"] if record["kind"] == "release"
+    )
+    assert "ci:11" in release["links"]
+    assert "ci:14" in release["links"]
+    assert "ci:12" not in release["links"]
+    assert "ci:13" not in release["links"]
+    linked_checks = {
+        record["id"]: record
+        for record in payload["records"]
+        if record["id"] in release["links"] and record["kind"] == "ci_run"
+    }
+    assert linked_checks["ci:11"]["attributes"]["app_id"] == 1
+    assert linked_checks["ci:14"]["attributes"]["app_slug"] == "other-ci"
+    assert (
+        release["attributes"]["ci_evidence_scope"]
+        == "observed_selected_final_pre_merge_check_runs"
+    )
+    assert release["attributes"]["required_check_policy_verified"] is False
+
+
+@pytest.mark.parametrize(
+    "conclusion",
+    (
+        "failure",
+        "cancelled",
+        "timed_out",
+        "action_required",
+        "stale",
+        "startup_failure",
+    ),
+)
+def test_release_rejects_each_blocking_head_check_conclusion(
+    conclusion: str,
+) -> None:
+    responses = _responses()
+    check = responses[
+        "repos/acme/tool/commits/c2/check-runs?filter=all&per_page=100&page=1"
+    ]["check_runs"][0]
+    check["conclusion"] = conclusion
+
+    with pytest.raises(ValueError, match="observed selected pre-merge CI checks"):
+        build_public_release_episode(
+            "acme/tool",
+            7,
+            "v2",
+            {
+                "visibility": "public",
+                "license": "Apache-2.0",
+                "authorization": {
+                    "record_id": "PUBLIC-GITHUB-TERMS",
+                    "scope": "read-only workflow export",
+                    "basis": "public repository",
+                    "reviewed_at": "2026-01-01T00:00:00Z",
+                },
+                "allowed_record_kinds": [
+                    "pull_request",
+                    "review",
+                    "commit",
+                    "ci_run",
+                    "merge",
+                    "release",
+                    "license",
+                ],
+            },
+            responses.__getitem__,
+            exported_at="2026-01-03T00:00:00Z",
+        )
+
+
+def test_release_rejects_missing_selected_head_checks() -> None:
+    responses = _responses()
+    responses[
+        "repos/acme/tool/commits/c2/check-runs?filter=all&per_page=100&page=1"
+    ] = {
+        "total_count": 0,
+        "check_runs": [],
+    }
+
+    with pytest.raises(ValueError, match="observed selected pre-merge CI checks"):
+        build_public_release_episode(
+            "acme/tool",
+            7,
+            "v2",
+            {
+                "visibility": "public",
+                "license": "Apache-2.0",
+                "authorization": {
+                    "record_id": "PUBLIC-GITHUB-TERMS",
+                    "scope": "read-only workflow export",
+                    "basis": "public repository",
+                    "reviewed_at": "2026-01-01T00:00:00Z",
+                },
+                "allowed_record_kinds": [
+                    "pull_request",
+                    "review",
+                    "commit",
+                    "ci_run",
+                    "merge",
+                    "release",
+                    "license",
+                ],
+            },
+            responses.__getitem__,
+            exported_at="2026-01-03T00:00:00Z",
+        )
+
+
+def test_later_pending_pre_merge_attempt_cannot_reuse_older_success() -> None:
+    responses = _responses()
+    responses[
+        "repos/acme/tool/commits/c2/check-runs?filter=all&per_page=100&page=1"
+    ] = {
+        "total_count": 2,
+        "check_runs": [
+            {
+                "id": 11,
+                "head_sha": "c2",
+                "name": "parser-tests",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-01-01T00:35:00Z",
+                "completed_at": "2026-01-01T00:40:00Z",
+                "app": {"id": 1},
+                "url": "https://api.github.com/repos/acme/tool/check-runs/11",
+            },
+            {
+                "id": 12,
+                "head_sha": "c2",
+                "name": "parser-tests",
+                "status": "in_progress",
+                "conclusion": None,
+                "started_at": "2026-01-01T00:45:00Z",
+                "completed_at": None,
+                "app": {"id": 1},
+                "url": "https://api.github.com/repos/acme/tool/check-runs/12",
+            },
+        ],
+    }
+
+    with pytest.raises(ValueError, match="observed selected pre-merge CI checks"):
+        build_public_release_episode(
+            "acme/tool",
+            7,
+            "v2",
+            {
+                "visibility": "public",
+                "license": "Apache-2.0",
+                "authorization": {
+                    "record_id": "PUBLIC-GITHUB-TERMS",
+                    "scope": "read-only workflow export",
+                    "basis": "public repository",
+                    "reviewed_at": "2026-01-01T00:00:00Z",
+                },
+                "allowed_record_kinds": [
+                    "pull_request",
+                    "review",
+                    "commit",
+                    "ci_run",
+                    "merge",
+                    "release",
+                    "license",
+                ],
+            },
+            responses.__getitem__,
+            exported_at="2026-01-03T00:00:00Z",
+        )
+
+
+def test_older_slow_success_cannot_hide_a_newer_failed_head_check() -> None:
+    responses = _responses()
+    responses[
+        "repos/acme/tool/commits/c2/check-runs?filter=all&per_page=100&page=1"
+    ] = {
+        "total_count": 2,
+        "check_runs": [
+            {
+                "id": 11,
+                "head_sha": "c2",
+                "name": "parser-tests",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-01-01T00:35:00Z",
+                "completed_at": "2026-01-01T00:50:00Z",
+                "app": {"id": 1},
+                "url": "https://api.github.com/repos/acme/tool/check-runs/11",
+            },
+            {
+                "id": 12,
+                "head_sha": "c2",
+                "name": "parser-tests",
+                "status": "completed",
+                "conclusion": "failure",
+                "started_at": "2026-01-01T00:39:00Z",
+                "completed_at": "2026-01-01T00:41:00Z",
+                "app": {"id": 1},
+                "url": "https://api.github.com/repos/acme/tool/check-runs/12",
+            },
+        ],
+    }
+
+    with pytest.raises(ValueError, match="observed selected pre-merge CI checks"):
         build_public_release_episode(
             "acme/tool",
             7,
@@ -416,6 +729,13 @@ def test_github_client_child_process_cannot_read_attestation_secrets(
         GH_BINARY_SHA256_ENV,
         hashlib.sha256(Path("/usr/bin/gh").read_bytes()).hexdigest(),
     )
+    monkeypatch.setenv("GH_TOKEN", "github-token-needed-by-client")
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.setenv("GH_CONFIG_DIR", "/tmp/test-gh-config")
+    monkeypatch.setenv("HF_TOKEN", "unrelated-hf-token")
+    monkeypatch.setenv("HUGGING_FACE_HUB_TOKEN", "unrelated-hf-hub-token")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIAIOSFODNN7EXAMPLE")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "unrelated-aws-secret")
     for name in (*ROLE_KEY_ENVS.values(), *ROLE_KEY_ID_ENVS.values()):
         monkeypatch.setenv(name, "secret-value")
     monkeypatch.setattr("export_github_workflow.subprocess.run", fake_run)
@@ -425,3 +745,10 @@ def test_github_client_child_process_cannot_read_attestation_secrets(
     assert ATTESTATION_ENVIRONMENT_ENV not in captured
     assert all(name not in captured for name in ROLE_KEY_ENVS.values())
     assert all(name not in captured for name in ROLE_KEY_ID_ENVS.values())
+    assert captured == {
+        "PATH": "/usr/bin:/bin",
+        "GH_TOKEN": "github-token-needed-by-client",
+        "GH_CONFIG_DIR": "/tmp/test-gh-config",
+        "GH_PROMPT_DISABLED": "1",
+        "GH_NO_UPDATE_NOTIFIER": "1",
+    }

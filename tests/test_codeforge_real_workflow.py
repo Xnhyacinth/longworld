@@ -10,11 +10,13 @@ from pathlib import Path
 import pytest
 
 from longworld.core.engine import answer_from_artifacts, semantic_answer_from_artifacts
+from longworld.core.graph import proof_depth as replayed_proof_depth
 from longworld.core.groundedspan import GroundedSpanError, sha256_text
 from longworld.core.pack import estimate_tokens, join_artifacts
 from longworld.core.promotion import _replayed_source_metadata
 from longworld.core.provenance import SourceLineage
 from longworld.core.realworkflow import RealWorkflow, WorkflowRecord
+from longworld.core.sampler import materialize
 from longworld.core.taxonomy import (
     SourceOrigin,
     WorkflowKind,
@@ -319,6 +321,42 @@ def test_cross_repo_integration_combines_real_release_and_merge_evidence() -> No
     )
 
 
+def test_cross_repo_query_is_not_emitted_for_a_blocked_source_workflow() -> None:
+    dependency = _workflow(
+        [
+            WorkflowRecord(
+                "commit:abc1234",
+                "commit",
+                "2025-01-05T00:00:00Z",
+                "Commit abc1234 implements the client integration.",
+                attributes={"commit": "abc1234"},
+            ),
+            WorkflowRecord(
+                "merge:client",
+                "merge",
+                "2025-01-06T00:00:00Z",
+                "Merged client integration at commit abc1234.",
+                ("commit:abc1234",),
+                {"commit": "abc1234"},
+            ),
+        ],
+        source_url="https://github.com/example/client",
+    )
+    world = simulate_code(
+        sample_code_spec(
+            73,
+            n_parallel=0,
+            real_workflows=[_repo_episode(), dependency],
+        )
+    )["focal"]
+
+    assert world.state.values["cross_repo:status"] == "blocked"
+    assert not any(
+        query.query_type == "cross_repo_release_dependency"
+        for query in build_code_queries(world)
+    )
+
+
 def test_real_repo_episode_binds_body_facts_into_state_answers_and_lineage() -> None:
     workflow = _repo_episode()
     spec, world, artifacts, queries = _materialize_real(workflow)
@@ -462,9 +500,14 @@ def test_release_cycles_create_band_specific_executable_proofs() -> None:
     version_queries = [
         query for query in queries if query.query_type == "version_selection"
     ]
-    [supersession_trace] = [
-        query for query in queries if query.query_type == "release_supersession_trace"
-    ]
+    supersession_traces = sorted(
+        [
+            query
+            for query in queries
+            if query.query_type == "release_supersession_trace"
+        ],
+        key=lambda query: query.preferred_length_buckets,
+    )
     releases = sorted(
         (
             event
@@ -475,44 +518,93 @@ def test_release_cycles_create_band_specific_executable_proofs() -> None:
         key=lambda event: (event.time, event.id),
     )
 
-    assert len(version_queries) == 2
-    short, long = version_queries
-    assert short.preferred_length_buckets == ["16k", "32k"]
+    assert len(version_queries) == 1
+    [short] = version_queries
+    middle, long = supersession_traces
+    assert short.preferred_length_buckets == ["16k"]
+    assert "release-linked selected CI check" in short.question
+    assert "historical branch-protection policy" in short.question
+    assert short.answer == "parser-core@2.4.1 -> v2.4.1"
+    assert middle.preferred_length_buckets == ["32k"]
+    assert "release-linked selected CI check" in middle.question
+    assert "historical branch-protection policy" in middle.question
+    assert middle.query_id.endswith("release_supersession_trace:2_of_3")
+    assert middle.answer == (
+        "parser-core@2.4.1 -> v2.4.1 | parser-core@2.5.0 -> v2.5.0"
+    )
+    assert middle.cf_answer == ("parser-core@2.4.1 -> v2.4.1 | BLOCKED-v2.5.0")
+    assert long.answer == (
+        "parser-core@2.4.1 -> v2.4.1 | parser-core@2.5.0 -> v2.5.0 | "
+        "parser-core@2.6.0 -> v2.6.0"
+    )
+    assert long.cf_answer == (
+        "parser-core@2.4.1 -> v2.4.1 | parser-core@2.5.0 -> v2.5.0 | BLOCKED-v2.6.0"
+    )
+    assert middle.motif == long.motif == "release_supersession_trace"
     assert long.preferred_length_buckets == ["64k"]
-    assert short.answer == "parser-core@2.5.0 -> v2.5.0"
-    assert long.answer == "parser-core@2.6.0 -> v2.6.0"
-    assert short.semantic_growth_group == long.semantic_growth_group
-    assert len(long.sufficient_event_ids) > len(short.sufficient_event_ids)
-    assert long.proof_depth > short.proof_depth
-    assert supersession_trace.answer == (
-        "parser-core@2.5.0 -> v2.5.0 | parser-core@2.6.0 -> v2.6.0"
+    assert short.semantic_growth_group == middle.semantic_growth_group
+    assert middle.semantic_growth_group == long.semantic_growth_group
+    assert len(short.answer) < len(middle.answer) < len(long.answer)
+    assert set(middle.sufficient_event_ids) > set(short.sufficient_event_ids)
+    assert set(long.sufficient_event_ids) > set(middle.sufficient_event_ids)
+    assert short.proof_depth < middle.proof_depth < long.proof_depth
+    assert all(
+        query.proof_depth == replayed_proof_depth(world, query)
+        for query in (short, middle, long)
     )
-    assert supersession_trace.cf_answer == (
-        "parser-core@2.5.0 -> v2.5.0 | BLOCKED-v2.6.0"
-    )
-    assert supersession_trace.motif == "release_supersession_trace"
-    assert supersession_trace.preferred_length_buckets == ["64k"]
-    assert supersession_trace.program_ops != long.program_ops
+    assert short.program_ops != middle.program_ops != long.program_ops
     assert releases[1].params["synthetic_relation_inputs"] == [releases[0].id]
     assert releases[2].params["synthetic_relation_inputs"] == [releases[1].id]
     trace_essential = [
         artifact
         for artifact in render_code(world)
-        if artifact.artifact_id in set(supersession_trace.essential_artifact_ids)
+        if artifact.artifact_id in set(long.essential_artifact_ids)
     ]
     trace_strict = [
         artifact
         for artifact in render_code(world)
-        if set(artifact.reveals_events).intersection(
-            supersession_trace.sufficient_event_ids
-        )
+        if set(artifact.reveals_events).intersection(long.sufficient_event_ids)
     ]
-    relation_edges = real_source_relation_edges(world, supersession_trace, trace_strict)
-    assert (
-        answer_from_artifacts(
-            world, supersession_trace, trace_strict, enforce_preconditions=True
+    relation_edges = real_source_relation_edges(world, long, trace_strict)
+    short_strict = [
+        artifact
+        for artifact in render_code(world)
+        if set(artifact.reveals_events).intersection(short.sufficient_event_ids)
+    ]
+    short_relation_edges = real_source_relation_edges(world, short, short_strict)
+    middle_strict = [
+        artifact
+        for artifact in render_code(world)
+        if set(artifact.reveals_events).intersection(middle.sufficient_event_ids)
+    ]
+    middle_relation_edges = real_source_relation_edges(world, middle, middle_strict)
+    assert all(
+        answer_from_artifacts(world, query, strict, enforce_preconditions=True)
+        == query.answer
+        for query, strict in (
+            (short, short_strict),
+            (middle, middle_strict),
+            (long, trace_strict),
         )
-        == supersession_trace.answer
+    )
+    assert len(relation_edges) > len(short_relation_edges)
+    assert len(short_relation_edges) < len(middle_relation_edges) < len(relation_edges)
+
+    def authentic(edges):
+        return [
+            edge for edge in edges if edge["relation_provenance"] == "authentic_source"
+        ]
+
+    assert (
+        len(authentic(short_relation_edges))
+        < len(authentic(middle_relation_edges))
+        < len(authentic(relation_edges))
+    )
+    assert estimate_tokens(join_artifacts(trace_strict)) > estimate_tokens(
+        join_artifacts(short_strict)
+    )
+    assert estimate_tokens(join_artifacts(trace_strict)) > estimate_tokens(
+        join_artifacts(middle_strict)
     )
     assert {
         edge["relation_provenance"]
@@ -525,58 +617,285 @@ def test_release_cycles_create_band_specific_executable_proofs() -> None:
     assert all(
         answer_from_artifacts(
             world,
-            supersession_trace,
+            long,
             [artifact for artifact in trace_essential if artifact is not dropped],
             enforce_preconditions=False,
         )
-        != supersession_trace.answer
+        != long.answer
         for dropped in trace_essential
     )
-    _, trace_cf_artifacts = render_cf_view(world, supersession_trace)
+    _, trace_cf_artifacts = render_cf_view(world, long)
     trace_cf_strict = [
         artifact
         for artifact in trace_cf_artifacts
-        if set(artifact.reveals_events).intersection(
-            supersession_trace.sufficient_event_ids
-        )
+        if set(artifact.reveals_events).intersection(long.sufficient_event_ids)
     ]
     assert (
         answer_from_artifacts(
             world,
-            supersession_trace,
+            long,
             trace_cf_strict,
-            extra_overrides={
-                supersession_trace.cf_event_id: supersession_trace.cf_param_updates
-            },
+            extra_overrides={long.cf_event_id: long.cf_param_updates},
             enforce_preconditions=True,
         )
-        == supersession_trace.cf_answer
+        == long.cf_answer
     )
     assert (
         semantic_answer_from_artifacts(
             world,
-            supersession_trace,
+            long,
             trace_cf_artifacts,
-            extra_overrides={
-                supersession_trace.cf_event_id: supersession_trace.cf_param_updates
-            },
+            extra_overrides={long.cf_event_id: long.cf_param_updates},
             enforce_preconditions=True,
         )
-        == supersession_trace.cf_answer
+        == long.cf_answer
     )
     assert (
         answer_from_artifacts(
             world,
-            long,
+            middle,
             [
                 artifact
                 for artifact in render_code(world)
-                if set(artifact.reveals_events).intersection(long.sufficient_event_ids)
+                if set(artifact.reveals_events).intersection(
+                    middle.sufficient_event_ids
+                )
             ],
             enforce_preconditions=True,
         )
-        == long.answer
+        == middle.answer
     )
+
+
+def test_exactly_two_release_cycles_create_16k_and_32k_programs() -> None:
+    records = list(_repo_episode().records)
+    records.extend(
+        [
+            WorkflowRecord(
+                "commit:feed456",
+                "commit",
+                "2025-02-01T10:00:00Z",
+                "Commit feed456 selects parser-core version 2.5.0.",
+                ("release:v2.4.1",),
+                {
+                    "commit": "feed456",
+                    "package": "parser-core",
+                    "version": "2.5.0",
+                },
+            ),
+            WorkflowRecord(
+                "ci:2.5.0",
+                "ci_run",
+                "2025-02-02T10:00:00Z",
+                "CI run 250 for commit feed456 passed.",
+                ("commit:feed456",),
+                {"run": "250", "result": "passed"},
+            ),
+            WorkflowRecord(
+                "release:v2.5.0",
+                "release",
+                "2025-02-03T10:00:00Z",
+                "Release tag v2.5.0 published from the linked validation.",
+                ("ci:2.5.0",),
+                {"tag": "v2.5.0"},
+            ),
+        ]
+    )
+    _, world, artifacts, queries = _materialize_real(_workflow(records))
+    version_queries = [
+        query for query in queries if query.query_type == "version_selection"
+    ]
+    trace_queries = [
+        query for query in queries if query.query_type == "release_supersession_trace"
+    ]
+
+    assert len(version_queries) == len(trace_queries) == 1
+    short = version_queries[0]
+    middle = trace_queries[0]
+    assert short.preferred_length_buckets == ["16k"]
+    assert middle.preferred_length_buckets == ["32k"]
+    assert short.answer == "parser-core@2.4.1 -> v2.4.1"
+    assert middle.answer == (
+        "parser-core@2.4.1 -> v2.4.1 | parser-core@2.5.0 -> v2.5.0"
+    )
+    assert middle.cf_answer == ("parser-core@2.4.1 -> v2.4.1 | BLOCKED-v2.5.0")
+    assert middle.query_id.endswith("release_supersession_trace:2_of_2")
+    assert set(middle.sufficient_event_ids) > set(short.sufficient_event_ids)
+    assert middle.proof_depth > short.proof_depth
+
+    strict_by_query = {}
+    for query in (short, middle):
+        strict = [
+            artifact
+            for artifact in artifacts
+            if set(artifact.reveals_events).intersection(query.sufficient_event_ids)
+        ]
+        strict_by_query[query.query_id] = strict
+        assert (
+            answer_from_artifacts(world, query, strict, enforce_preconditions=True)
+            == query.answer
+        )
+        essential = [
+            artifact
+            for artifact in artifacts
+            if artifact.artifact_id in set(query.essential_artifact_ids)
+        ]
+        assert all(
+            query.answer.lower() not in artifact.text.lower() for artifact in essential
+        )
+        assert all(
+            answer_from_artifacts(world, query, [artifact], enforce_preconditions=True)
+            != query.answer
+            for artifact in essential
+        )
+        assert all(
+            semantic_answer_from_artifacts(
+                world,
+                query,
+                [artifact for artifact in essential if artifact is not dropped],
+                enforce_preconditions=False,
+            )
+            != query.answer
+            for dropped in essential
+        )
+
+    short_relations = real_source_relation_edges(
+        world, short, strict_by_query[short.query_id]
+    )
+    middle_relations = real_source_relation_edges(
+        world, middle, strict_by_query[middle.query_id]
+    )
+    assert sum(
+        edge["relation_provenance"] == "authentic_source" for edge in middle_relations
+    ) > sum(
+        edge["relation_provenance"] == "authentic_source" for edge in short_relations
+    )
+
+    _, cf_artifacts = render_cf_view(world, middle)
+    cf_strict = [
+        artifact
+        for artifact in cf_artifacts
+        if set(artifact.reveals_events).intersection(middle.sufficient_event_ids)
+    ]
+    assert (
+        answer_from_artifacts(
+            world,
+            middle,
+            cf_strict,
+            extra_overrides={middle.cf_event_id: middle.cf_param_updates},
+            enforce_preconditions=True,
+        )
+        == middle.cf_answer
+    )
+
+
+def test_materialized_supersession_closure_stops_at_explicit_release_roots() -> None:
+    def release_episode(version: int) -> RealWorkflow:
+        return _workflow(
+            [
+                WorkflowRecord(
+                    f"commit:{version}",
+                    "commit",
+                    f"2025-{version:02d}-01T00:00:00Z",
+                    f"Commit c{version} selects parser-core version {version}.0.0.",
+                    attributes={
+                        "commit": f"c{version}",
+                        "package": "parser-core",
+                        "version": f"{version}.0.0",
+                    },
+                ),
+                WorkflowRecord(
+                    f"ci:{version}",
+                    "ci_run",
+                    f"2025-{version:02d}-02T00:00:00Z",
+                    f"CI run {version} for commit c{version} passed.",
+                    (f"commit:{version}",),
+                    {"run": str(version), "result": "passed"},
+                ),
+                WorkflowRecord(
+                    f"release:{version}",
+                    "release",
+                    f"2025-{version:02d}-03T00:00:00Z",
+                    f"Release tag v{version}.0.0 published from the linked validation.",
+                    (f"ci:{version}",),
+                    {"tag": f"v{version}.0.0"},
+                ),
+            ]
+        )
+
+    materialized = materialize(
+        73,
+        n_parallel=0,
+        n_pulses=0,
+        domain="codeforge",
+        real_workflows=[release_episode(version) for version in range(1, 6)],
+        include_program_joins=False,
+    )
+    world = materialized.worlds["focal"]
+    by_event_id = {event.id: event for event in world.events}
+    releases = sorted(
+        (
+            event
+            for event in world.events
+            if event.type == "repo_record"
+            and event.params.get("record_kind") == "release"
+        ),
+        key=lambda event: (event.time, event.id),
+    )
+
+    assert all(
+        releases[index - 1].id in releases[index].causal_inputs
+        and releases[index].relation_kinds[releases[index - 1].id] == "supersedes"
+        and releases[index - 1].id not in releases[index].required_inputs
+        for index in range(1, len(releases))
+    )
+
+    routed = {
+        tuple(query.preferred_length_buckets): query
+        for query in materialized.queries
+        if query.query_type in {"version_selection", "release_supersession_trace"}
+    }
+    assert set(routed) == {("16k",), ("32k",), ("64k",)}
+    assert all(
+        set(query.essential_event_ids).issubset(query.sufficient_event_ids)
+        for query in routed.values()
+    )
+
+    def source_record_ids(query: object) -> set[str]:
+        return {
+            str(by_event_id[event_id].params["record_id"])
+            for event_id in query.sufficient_event_ids
+            if event_id in by_event_id and by_event_id[event_id].type == "repo_record"
+        }
+
+    assert source_record_ids(routed[("16k",)]) == {
+        "commit:3",
+        "ci:3",
+        "release:3",
+    }
+    assert source_record_ids(routed[("32k",)]) == {
+        "commit:2",
+        "ci:2",
+        "release:2",
+        "commit:3",
+        "ci:3",
+        "release:3",
+    }
+    assert source_record_ids(routed[("64k",)]) == {
+        "commit:1",
+        "ci:1",
+        "release:1",
+        "commit:2",
+        "ci:2",
+        "release:2",
+        "commit:3",
+        "ci:3",
+        "release:3",
+    }
+    rollback = next(
+        query for query in materialized.queries if query.query_type == "rollback_state"
+    )
+    assert "focal.hotfix" in rollback.sufficient_event_ids
 
 
 def test_repeated_identical_license_snapshots_share_one_source_identity() -> None:
@@ -660,6 +979,47 @@ def test_repeated_identical_license_snapshots_share_one_source_identity() -> Non
             for artifact in selected
         )
         == 1
+    )
+
+    license_event = next(
+        event
+        for event in world.events
+        if event.type == "repo_record" and event.params.get("record_kind") == "license"
+    )
+    commit_events = [
+        event
+        for event in world.events
+        if event.type == "repo_record" and event.params.get("record_kind") == "commit"
+    ]
+    assert all(license_event.id in event.causal_inputs for event in commit_events)
+    assert all(license_event.id not in event.required_inputs for event in commit_events)
+    assert all(
+        event.relation_kinds[license_event.id] == "source_context"
+        for event in commit_events
+    )
+
+    materialized = materialize(
+        73,
+        n_parallel=0,
+        n_pulses=0,
+        domain="codeforge",
+        real_workflows=[episode("2.4.1", 1), episode("2.5.0", 2)],
+        include_program_joins=False,
+    )
+    materialized_world = materialized.worlds["focal"]
+    materialized_license = next(
+        event
+        for event in materialized_world.events
+        if event.type == "repo_record" and event.params.get("record_kind") == "license"
+    )
+    materialized_queries = [
+        item
+        for item in materialized.queries
+        if item.query_type in {"version_selection", "release_supersession_trace"}
+    ]
+    assert all(
+        materialized_license.id not in item.sufficient_event_ids
+        for item in materialized_queries
     )
 
 
@@ -889,6 +1249,56 @@ def test_release_supersession_does_not_override_explicit_source_link() -> None:
     assert first.id not in second.params.get("synthetic_relation_inputs", [])
 
 
+def test_unconnected_prerelease_tags_do_not_create_a_supersession_trace() -> None:
+    def release_episode(tag: str, month: int) -> RealWorkflow:
+        commit = tag.replace(".", "-")
+        return _workflow(
+            [
+                WorkflowRecord(
+                    f"commit:{commit}",
+                    "commit",
+                    f"2025-{month:02d}-01T00:00:00Z",
+                    f"Commit {commit} selects parser-core version {tag.lstrip('v')}.",
+                    attributes={
+                        "commit": commit,
+                        "package": "parser-core",
+                        "version": tag.lstrip("v"),
+                    },
+                ),
+                WorkflowRecord(
+                    f"ci:{tag}",
+                    "ci_run",
+                    f"2025-{month:02d}-02T00:00:00Z",
+                    f"CI run {tag} for commit {commit} passed.",
+                    (f"commit:{commit}",),
+                    {"run": tag, "result": "passed"},
+                ),
+                WorkflowRecord(
+                    f"release:{tag}",
+                    "release",
+                    f"2025-{month:02d}-03T00:00:00Z",
+                    f"Release tag {tag} published.",
+                    (f"ci:{tag}",),
+                    {"tag": tag},
+                ),
+            ]
+        )
+
+    spec = sample_code_spec(
+        73,
+        n_parallel=0,
+        real_workflows=[
+            release_episode("v1.0.0-rc1", 1),
+            release_episode("v1.0.0", 2),
+        ],
+    )
+    queries = build_code_queries(simulate_code(spec)["focal"])
+
+    assert not any(
+        query.query_type == "release_supersession_trace" for query in queries
+    )
+
+
 def test_duplicate_release_tag_uses_the_richest_executable_episode() -> None:
     sparse = _workflow(
         [
@@ -976,7 +1386,7 @@ def test_duplicate_release_tag_uses_the_richest_executable_episode() -> None:
     assert "commit:sparse" not in essential_records
 
 
-def test_version_selection_falls_back_from_invalid_richest_prior_release() -> None:
+def test_invalid_release_breaks_the_executable_supersession_history() -> None:
     def release_episode(
         version: str, month: int, *, passed: bool, rich: bool = False
     ) -> RealWorkflow:
@@ -1035,20 +1445,16 @@ def test_version_selection_falls_back_from_invalid_richest_prior_release() -> No
             release_episode("3.0.0", 3, passed=True),
         ],
     )
-    queries = [
-        query
-        for query in build_code_queries(simulate_code(spec)["focal"])
-        if query.query_type == "version_selection"
-    ]
+    queries = build_code_queries(simulate_code(spec)["focal"])
+    version = next(
+        query for query in queries if query.query_type == "version_selection"
+    )
 
-    assert [query.answer for query in queries] == [
-        "parser-core@1.0.0 -> v1.0.0",
-        "parser-core@3.0.0 -> v3.0.0",
-    ]
-    assert [query.cf_answer for query in queries] == [
-        "BLOCKED-v1.0.0",
-        "BLOCKED-v3.0.0",
-    ]
+    assert version.answer == "parser-core@3.0.0 -> v3.0.0"
+    assert version.cf_answer == "BLOCKED-v3.0.0"
+    assert not any(
+        query.query_type == "release_supersession_trace" for query in queries
+    )
 
 
 def test_version_selection_ignores_skipped_ci_when_a_gate_passed() -> None:
@@ -1094,35 +1500,29 @@ def test_version_selection_ignores_skipped_ci_when_a_gate_passed() -> None:
             ]
         )
 
-    queries = [
-        query
-        for query in build_code_queries(
-            simulate_code(
-                sample_code_spec(
-                    73,
-                    n_parallel=0,
-                    real_workflows=[
-                        release_episode("1.0.0", 1),
-                        release_episode("2.0.0", 2),
-                    ],
-                )
-            )["focal"]
-        )
-        if query.query_type == "version_selection"
-    ]
+    queries = build_code_queries(
+        simulate_code(
+            sample_code_spec(
+                73,
+                n_parallel=0,
+                real_workflows=[
+                    release_episode("1.0.0", 1),
+                    release_episode("2.0.0", 2),
+                ],
+            )
+        )["focal"]
+    )
+    version = next(
+        query for query in queries if query.query_type == "version_selection"
+    )
+    trace = next(
+        query for query in queries if query.query_type == "release_supersession_trace"
+    )
 
-    assert [query.preferred_length_buckets for query in queries] == [
-        ["16k", "32k"],
-        ["64k"],
-    ]
-    assert [query.answer for query in queries] == [
-        "parser-core@1.0.0 -> v1.0.0",
-        "parser-core@2.0.0 -> v2.0.0",
-    ]
-    assert [query.preferred_length_buckets for query in queries] == [
-        ["16k", "32k"],
-        ["64k"],
-    ]
+    assert version.preferred_length_buckets == ["16k"]
+    assert version.answer == "parser-core@2.0.0 -> v2.0.0"
+    assert trace.preferred_length_buckets == ["32k"]
+    assert trace.answer == ("parser-core@1.0.0 -> v1.0.0 | parser-core@2.0.0 -> v2.0.0")
 
 
 def test_version_selection_cf_replay_keeps_the_selected_gate_in_the_proof() -> None:
@@ -1185,12 +1585,122 @@ def test_version_selection_cf_replay_keeps_the_selected_gate_in_the_proof() -> N
     assert verification.remove_one_fails
 
 
+def test_release_execution_requires_direct_ci_not_nonexecuted_pr_or_merge_links() -> (
+    None
+):
+    workflow = _workflow(
+        [
+            WorkflowRecord(
+                "commit:release",
+                "commit",
+                "2025-01-01T00:00:00Z",
+                "Commit cafe123 selects parser-core version 2.5.0.",
+                (),
+                {
+                    "commit": "cafe123",
+                    "package": "parser-core",
+                    "version": "2.5.0",
+                },
+            ),
+            WorkflowRecord(
+                "pull_request:7",
+                "pull_request",
+                "2025-01-01T01:00:00Z",
+                "Pull request 7 proposes parser-core version 2.5.0 at commit cafe123.",
+                ("commit:release",),
+                {"commit": "cafe123"},
+            ),
+            WorkflowRecord(
+                "review:7",
+                "review",
+                "2025-01-01T02:00:00Z",
+                "Review state APPROVED for pull request 7.",
+                ("pull_request:7",),
+                {"state": "APPROVED"},
+            ),
+            WorkflowRecord(
+                "merge:7",
+                "merge",
+                "2025-01-01T03:00:00Z",
+                "Merged pull request 7 from validated head commit cafe123.",
+                ("pull_request:7", "review:7"),
+                {"commit": "cafe123"},
+            ),
+            WorkflowRecord(
+                "ci:release",
+                "ci_run",
+                "2025-01-01T04:00:00Z",
+                "CI run release for commit cafe123 reports passed.",
+                ("commit:release",),
+                {"run": "release", "result": "passed"},
+            ),
+            WorkflowRecord(
+                "release:v2.5.0",
+                "release",
+                "2025-01-02T00:00:00Z",
+                "Release tag v2.5.0 published from the linked CI gate.",
+                ("pull_request:7", "merge:7", "ci:release"),
+                {"tag": "v2.5.0"},
+            ),
+        ]
+    )
+    _, world, _, queries = _materialize_real(workflow)
+    release = next(
+        event
+        for event in world.events
+        if event.type == "repo_record"
+        and event.params.get("record_id") == "release:v2.5.0"
+    )
+    event_by_id = {event.id: event for event in world.events}
+
+    assert {
+        event_by_id[event_id].params.get("record_id")
+        for event_id in release.required_inputs
+    } == {"ci:release"}
+    assert {
+        event_by_id[event_id].params.get("record_id")
+        for event_id in release.causal_inputs
+    } == {"pull_request:7", "merge:7", "ci:release"}
+    assert {
+        event_by_id[event_id].params.get("record_id"): release.relation_kinds[event_id]
+        for event_id in release.causal_inputs
+    } == {
+        "pull_request:7": "source_context",
+        "merge:7": "source_context",
+        "ci:release": "derived_from",
+    }
+    version = next(
+        query for query in queries if query.query_type == "version_selection"
+    )
+    assert version.answer == "parser-core@2.5.0 -> v2.5.0"
+    assert version.cf_answer == "BLOCKED-v2.5.0"
+
+    merge_only = _workflow(
+        [
+            replace(record, links=("merge:7",))
+            if record.record_id == "release:v2.5.0"
+            else record
+            for record in workflow.records
+        ]
+    )
+    _, blocked_world, _, blocked_queries = _materialize_real(merge_only)
+    blocked_release = next(
+        event
+        for event in blocked_world.events
+        if event.type == "repo_record"
+        and event.params.get("record_id") == "release:v2.5.0"
+    )
+
+    assert blocked_release.required_inputs == []
+    assert not any(query.query_type == "version_selection" for query in blocked_queries)
+
+
 def test_real_repo_task_families_have_strict_cross_record_proofs_and_cf_twins() -> None:
     _, world, artifacts, queries = _materialize_real(_repo_episode())
     by_type = {query.query_type: query for query in queries}
     expected = {
         "version_selection": "parser-core@2.4.1 -> v2.4.1",
-        "ci_regression_origin": "deadbee :: test_folded_headers",
+        "ci_regression_origin": "deadbee :: test_folded_headers -> v2.4.1",
         "license_compatibility": "parser-core@2.4.1 :: Apache-2.0 :: compatible",
     }
 
@@ -1757,6 +2267,25 @@ def test_real_ci_counterfactual_synchronizes_visible_body_hash_and_spans() -> No
         )
 
 
+def test_real_ci_regression_tracks_the_recovery_through_its_release() -> None:
+    _, world, _, queries = _materialize_real(_repo_episode())
+    query = next(item for item in queries if item.query_type == "ci_regression_origin")
+    by_id = {event.id: event for event in world.events}
+
+    assert query.answer == "deadbee :: test_folded_headers -> v2.4.1"
+    assert query.cf_answer.endswith(" :: test_folded_headers -> v2.4.1")
+    assert query.proof_depth >= 2
+    assert {operation["op"] for operation in query.program_ops} >= {
+        "REQUIRE_SAME_NAME_RECOVERY",
+        "FOLLOW_RECOVERY_RELEASE",
+        "REQUIRE_RELEASE_PUBLISHED",
+    }
+    assert any(
+        by_id[event_id].params.get("record_id") == "release:v2.4.1"
+        for event_id in query.sufficient_event_ids
+    )
+
+
 def test_real_ci_uses_the_body_visible_check_name_as_regression_origin() -> None:
     records = list(_repo_episode().records)
     records[2] = WorkflowRecord(
@@ -1768,6 +2297,7 @@ def test_real_ci_uses_the_body_visible_check_name_as_regression_origin() -> None
         {
             "head_sha": "deadbee",
             "name": "parser-tests",
+            "status": "completed",
             "conclusion": "failure",
         },
     )
@@ -1780,13 +2310,14 @@ def test_real_ci_uses_the_body_visible_check_name_as_regression_origin() -> None
         {
             "head_sha": "cafe123",
             "name": "parser-tests",
+            "status": "completed",
             "conclusion": "success",
         },
     )
     _, _, _, queries = _materialize_real(_workflow(records))
 
     query = next(q for q in queries if q.query_type == "ci_regression_origin")
-    assert query.answer == "deadbee :: parser-tests"
+    assert query.answer == "deadbee :: parser-tests -> v2.4.1"
 
 
 def test_real_ci_counterfactual_commit_preserves_sha_shape() -> None:
@@ -1820,7 +2351,7 @@ def test_real_ci_counterfactual_commit_preserves_sha_shape() -> None:
     assert len(changed) == len(original)
     assert all(character in "0123456789abcdef" for character in changed)
     assert changed != original
-    assert query.cf_answer.endswith(" :: test_folded_headers")
+    assert query.cf_answer.endswith(" :: test_folded_headers -> v2.4.1")
     assert query.cf_answer.startswith(changed)
 
 
@@ -1932,7 +2463,7 @@ def test_real_license_decision_joins_pr_body_commit_and_repo_license() -> None:
     )
 
 
-def test_unique_real_records_create_64k_event_bearing_multi_cycle_history() -> None:
+def test_unique_real_records_provide_64k_background_capacity_only() -> None:
     records: list[WorkflowRecord] = []
     previous = ""
     for index in range(72):
@@ -1991,10 +2522,16 @@ def test_unique_real_records_create_64k_event_bearing_multi_cycle_history() -> N
         artifact for artifact in artifacts if artifact.slots.get("real_workflow_record")
     ]
     assert len(essential) == 3
+    assert len(query.sufficient_event_ids) == 3
     assert len({artifact.text for artifact in real_history}) == len(real_history)
     assert estimate_tokens(join_artifacts(real_history)) >= 64_000
     assert len(world.state.history) >= len(records) * 3
     assert world.state.values["real:release_cycle"] == 1
+    semantic_growth_qualified = (
+        int(world.state.values["real:release_cycle"]) >= 2
+        and len(query.sufficient_event_ids) >= 4
+    )
+    assert semantic_growth_qualified is False
     assert (
         answer_from_artifacts(world, query, essential, enforce_preconditions=False)
         == query.answer

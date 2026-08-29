@@ -93,7 +93,7 @@ def _body_string_fact(
 
 def _body_result(record: WorkflowRecord) -> str:
     value = _body_string_fact(
-        record, "result", "result", "status", "decision", "conclusion", "state"
+        record, "result", "result", "conclusion", "decision", "state", "status"
     )
     if value:
         lowered = value.lower()

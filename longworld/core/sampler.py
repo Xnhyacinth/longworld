@@ -126,14 +126,26 @@ def materialize(
     by_id = {event.id: event for event in worlds["focal"].events}
 
     def causal_closure(event_ids: list[str]) -> list[str]:
+        explicit_roots = set(event_ids)
         selected: set[str] = set()
 
         def visit(event_id: str) -> None:
             if event_id in selected or event_id not in by_id:
                 return
             event = by_id[event_id]
-            for parent_id in (*event.required_inputs, *event.causal_inputs):
+            for parent_id in event.required_inputs:
                 visit(parent_id)
+            for parent_id in event.causal_inputs:
+                relation = event.relation_kinds.get(parent_id)
+                synthetic_relations = event.params.get("synthetic_relation_inputs", [])
+                if (
+                    relation == "supersedes"
+                    and parent_id in synthetic_relations
+                    and parent_id not in explicit_roots
+                ):
+                    continue
+                if relation != "source_context":
+                    visit(parent_id)
             selected.add(event_id)
 
         for event_id in event_ids:

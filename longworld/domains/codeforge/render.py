@@ -121,8 +121,8 @@ def _text(project: dict, ev: Event) -> tuple[str, str]:
             f"=== {project['ci']} pytest · {repo} · {date_s} ===\n"
             f"{test} ... FAILED\n"
             f"internal flake token {ev.params['flake_token']}\n"
-            f"The blamed revision is the latest repository commit object. This "
-            f"log does not reprint that hash. It is also not a GitHub issue."
+            f"The blamed revision is the latest repository commit object recorded "
+            f"before this run. This log is also not a GitHub issue."
         )
     if t == "issue_bug":
         return "issue", (
@@ -137,10 +137,10 @@ def _text(project: dict, ev: Event) -> tuple[str, str]:
             f"commit {ev.params['commit']}\n"
             f"Author: {project['owner']}\n"
             f"Date: {date_s}\n"
-            f"Subject: invalidate eval cache after tokenizer changes\n\n"
+            f"Subject: hotfix invalidates eval cache after tokenizer changes\n\n"
             f"diff --git a/src/{pkg}/eval.py b/src/{pkg}/eval.py\n"
             f"+ key = sha1(prompt + tokenizer_id + schema)\n"
-            f"This hotfix does not reprint SPDX identifiers or changelog quotes."
+            f"License and changelog authority remain in their respective records."
         )
     if t == "changelog_stale":
         return "report", (
@@ -154,7 +154,6 @@ def _text(project: dict, ev: Event) -> tuple[str, str]:
     if t == "tag_release":
         return "report", (
             f"# {repo} git tag notes ({date_s})\n"
-            f"This tag does not reprint a commit hash and does not reprint SPDX. "
             f"If a hotfix object exists on HEAD, that object is adopted as the "
             f"authoritative revision. Changelog prose is superseded. The LICENSE "
             f"file remains the SPDX source. If no hotfix landed, the broken "
@@ -163,9 +162,8 @@ def _text(project: dict, ev: Event) -> tuple[str, str]:
     if t == "rollback_hotfix":
         return "code", (
             f"# {repo} revert note ({date_s})\n"
-            f"Status: revert-hotfix. Emergency rollback restores the pre-hotfix "
-            f"object as HEAD. This note does not reprint a hash. Reconstruct "
-            f"HEAD from the original broken commit object. The git tag remains "
+            f"Status: revert-hotfix. Emergency rollback restores the original broken "
+            f"commit object as HEAD. The git tag remains "
             f"a separate authority and is not updated by this revert."
         )
     if t == "dependency_request":
@@ -236,9 +234,8 @@ def _text(project: dict, ev: Event) -> tuple[str, str]:
             f"Date: {date_s}\nWorkstream {p['stream']} is evaluated for the release "
             f"integration branch. Gate {p['merge_token']} adopts {p['package']} from "
             f"the original request only when {p['stream']} CI is green and its "
-            f"independent license decision is compatible. This {p['stream']} receipt "
-            f"does not restate the requested version or decide any other workstream "
-            f"in the docket."
+            f"independent license decision is compatible. The original request remains "
+            f"the version record; this receipt decides no other workstream in the docket."
         )
     if t == "release_decision":
         p = ev.params
@@ -270,9 +267,8 @@ def _text(project: dict, ev: Event) -> tuple[str, str]:
             f"Subject: public normative file adopted · {repo}\n"
             f"Date: {date_s}\n"
             f"Status: public-norm-adopted. Maintainers adopted the previously "
-            f"ingested public file as the external normative reference. This "
-            f"note does not reprint the public-document stem. Reconstruct the "
-            f"stem from the ingested file. Alternate public files are not "
+            f"ingested public file as the external normative reference. The ingested "
+            f"file retains its public source identity. Alternate public files are not "
             f"adopted. Hashes and SPDX are not restated here."
         )
     if t == "seed_latent":
@@ -297,24 +293,22 @@ def _text(project: dict, ev: Event) -> tuple[str, str]:
     if t == "ack_latent":
         return "email", (
             f"Subject: latent filing acknowledged · {repo}\nDate: {date_s}\n"
-            f"Status: latent-acked. This ack does not reprint the file-code. "
-            f"Reconstruct it from the parked ops note if a later reopen asks."
+            f"Status: latent-acked. The parked ops note remains the file-code record "
+            f"for any later reopen."
         )
     if t == "reopen_latent":
         return "email", (
             f"Subject: case reopened · {repo}\nDate: {date_s}\n"
-            f"Status: case-reopened. The dormant file-code is now active. This "
-            f"memo does not reprint the code. Reconstruct it from the seed note "
-            f"via the ack. Changelog prose is not the authority."
+            f"Status: case-reopened. The dormant file-code is now active under the "
+            f"seed note and acknowledgment. Changelog prose is not the authority."
         )
     if t == "ratify_latent":
         return "email", (
             f"Subject: case ratified · {repo}\nDate: {date_s}\n"
             f"Status: case-ratified. Reopen made a file-code active; this "
             f"instrument makes it controlling and adopts the early docket as "
-            f"the controlling docket-code. This memo does not reprint the "
-            f"file-code or the docket-code. Reconstruct both from their seed "
-            f"notes via ack and reopen. Changelog prose is not the ratify "
+            f"the controlling docket-code. Their seed notes, acknowledgment, and "
+            f"reopen form the controlling audit chain. Changelog prose is not the ratify "
             f"authority."
         )
     if t == "status_pulse":

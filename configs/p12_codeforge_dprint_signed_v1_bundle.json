@@ -1,0 +1,35 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "data/source_inventory/p12_codeforge_dprint_signed_v1/dprint_pr1096_0.52.0.json",
+      "sha256": "cd9f8a3a3ba8662185b4d6dbcae3dbf07b0a3d9406886427007e03debeb5b13a"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_dprint_signed_v1/dprint_pr1102_0.53.0.json",
+      "sha256": "ec87ba502f07a2862cc257454acf2a498ea460b8ea7740653c797ec9a187a32c"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_dprint_signed_v1/dprint_pr1127_0.54.0.json",
+      "sha256": "1c161503b86f2d52f6fb637025fcefdb8d22ea2321f940e10b4263d749a35c50"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_dprint_signed_v1/dprint_pr1185_0.55.0.json",
+      "sha256": "7b899a2c72d7527c611b92dcb448a32af70accc19563ae0dd389f1524ff12a10"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_dprint_signed_v1/dprint_pr1207_0.56.0.json",
+      "sha256": "1276b6d571764fca2350f6b43fa17b9143d3551d99d7212987c40ebc7698b4d7"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "probe-source-26b35259dddf34c9d239aca6478359a9",
+    "environment": "probe",
+    "digest": "c3d74d32506612778202bb115550acab2c7291d152707be195636a18589be3e9"
+  }
+}
