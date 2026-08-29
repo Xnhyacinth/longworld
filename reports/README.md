@@ -2,11 +2,17 @@
 
 ## P6 source-dependent private probe (2026-08-25)
 
-See `p6_source_dependent_probe_v1.md`. The fresh 12-world local-engineering
-release has 542 promoted rows, 16 real-source exact-64K rows, and a green v2
-quality-gate receipt. GitHub/arXiv source-to-answer replay is live; OpenReview,
-production KMS approval, and the private Hugging Face upload remain explicitly
-blocked. This is not a 48/210 or production approval.
+See `p6_source_dependent_probe_v1.md`. The 12-world local-engineering release
+has 542 promoted rows, 16 real-source exact-64K rows, and a green v2
+quality-gate receipt. Its immutable package is present in the private Hugging
+Face dataset, but production KMS approval remains blocked. This is not a
+48/210-world or production approval.
+
+## P12 current source-bound inventory (2026-08-29)
+
+See `p12_current_four_source_bound_inventory_v1.md`. The current stricter
+content gate retains 29 rows from four real source-bound worlds. The 12-world
+target was not evaluated, so this inventory is not an HF release authorization.
 
 ## P4 multidomain local probe (2026-08-24)
 

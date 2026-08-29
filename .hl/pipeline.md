@@ -100,5 +100,5 @@ Train (when GPUs are free; wrap hold):
 ```bash
 bash scripts/setup_swift.sh
 INSTALL_SWIFT=1 bash scripts/setup_swift.sh
-SKIP_HOLD=1 GPUS=6,7 bash scripts/train_baselines_128k.sh
+GPUS=0,1,2,3,4,5,6,7 bash scripts/train_baselines_128k.sh
 ```

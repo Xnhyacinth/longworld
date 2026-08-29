@@ -1,5 +1,252 @@
 # Progress
 
+- 2026-08-29 superseding P12 checkpoint: the strict content-gated baseline is
+  29 rows / 4 source-bound worlds / 1,120,639 receipt-reported exact Qwen
+  context tokens. The 12-world target remains unevaluated and production/KMS
+  P12 rows remain zero. The older P8-zero and provisional 47-row/five-world
+  entries below are historical diagnostics, not current release accounting.
+  Code, tests, configs, and current status are being split into reviewed commits
+  on `feature/p8-readable-source-gates`; P12 HF publication remains blocked.
+- 2026-08-27 final P8 review/publish checkpoint: SEC semantic replay now binds
+  canonical raw source bytes to the complete event envelope (identity, time,
+  params, topology, visibility, and skip state) and to artifact identity/time.
+  Seven coordinated tamper families fail closed. New artifacts use
+  `artifact-semantics-v2`; current candidate/production verification rejects
+  legacy by default, while explicit release-bound legacy audit remains possible.
+  Independent review reports no remaining P0/P1. Final repository regression:
+  755 passed; staged Python Ruff, targeted mypy, compileall, lock, diff, and secret
+  checks pass. Git changes are grouped on `feature/p8-readable-source-gates`;
+  newly qualified P8 rows remain zero, so HF is intentionally unchanged.
+- 2026-08-27 SEC canonical replay hardening: independent review reproduced a
+  synchronized world-event + artifact attack that could retarget a raw span and
+  quote, replace an XBRL fact ID, or self-select a parent provenance while still
+  returning gold. Three fail-first tests captured those bypasses. Semantic replay
+  now regenerates the complete canonical section params from the trusted
+  workflow/record and compares them exactly; its source-hash/metadata cache uses
+  deep copies. The three attacks and the original coordinate attack now fail
+  closed. Final focused grounded/visible/financial suite: 65 passed. Targeted
+  Ruff, mypy, compileall, lock, and diff checks pass.
+- 2026-08-27 P8 readable SEC integration: Company statement artifacts now use
+  normalized visible filing text and retain exact absolute raw-source ranges
+  for every XBRL/certification span. Apple/Amazon source→state→answer and CF
+  tests pass, but readable proof text is naturally below the old 16/32/64/128K
+  targets; the former markup-based length assertions were replaced by explicit
+  insufficiency assertions. Focused SEC/promotion/data-contract regression is
+  238 passed before the final canonical-replay hardening; the final 65-test
+  focused suite covers that hardening.
+- Independent review follow-up closed Amazon's interleaved-year leak: current
+  geography spans exclude every `prior_geo_*` role and the unsupported 64K/
+  128K programs are no longer emitted. Parent-context normalization preserves
+  hidden ancestors, visible provenance binds raw/normalizer/visible hashes, and
+  raw-coordinate tampering fails semantic replay.
+- 2026-08-27 publication audit: Git `main` and `origin/main` are both at
+  `564b826`; the private HF P6 payload is already byte/size synchronized at
+  `32b5dcd`. A canonical `docs/CURRENT_RELEASE.md` and local machine-readable
+  release status now state that newly qualified P8 rows are zero. No P7 row was
+  uploaded. Historical invalid release directories remain audit evidence.
+- 2026-08-27 domain-neutral grounded-span foundation added in isolated new
+  files. It validates visible hashes, exact spans, source/fact/relation closure,
+  typed provenance, and window-contained facts. Engine/retrieval integration
+  across GitHub, paper, and Wikipedia is still required before 12 worlds.
+
+- 2026-08-27 CORRECTION: SEC exact single-world v8 is invalidated and contains
+  zero qualified rows. Raw-token source-span replay proves the nominal 16K MIX
+  task is solvable in a single 4K window. Independent review also found that
+  Amazon's current/prior geography rows are interleaved, leaving a fact-free
+  essential tail, and that about 97.5% of the current statement-view characters
+  are HTML/iXBRL markup rather than readable source text. Historical green
+  receipts are reproducibility records only; 12/48/210 remain blocked.
+- 2026-08-27 SEC exact single-world v8 reran from fresh candidate bytes after
+  closing a semantic-role bypass. Equal-length Products→Services and
+  Americas→Services edits now fail even when `params.text` is changed and the
+  artifact is re-signed: semantic replay accepts only the immutable original
+  event params or the query's explicit CF update, and verifies the raw section
+  hash. The chain retained 12/12 rows (16/32/64K: 4/4/4), dense audit accepted
+  12/12 with zero rejects, and gate v5 is green. Exact Qwen lengths are
+  16,193/32,030/64,255; essentials 4/7/13; proof depth 2/3/4; ops 4/7/12.
+  Promoted SHA `7c9b6e26…`; gate SHA `0b0bfe98…`. This closes the single-world
+  source→state→answer criterion only. One workflow and zero authentic
+  cross-record relations keep P7 12 worlds blocked; 48/210 remain blocked.
+
+- 2026-08-27 P7 Wikipedia Jefferson one-world engineering slice is green.
+  Extra beyond ResearchLab 4/4. Later `page-29922-r1369059101` + Q11812.
+  16K tok 16,183 (middle `[[Sublime Porte]]`); 32K tok 32,592 (late
+  `===Cabinet===`); 64K wrap 64,915 / 64,921 at pack 55,096 (leftover
+  `===Thomas Jefferson Foundation sources===`). Graph proof depth 4/5/6
+  after dropping ancestor-section shortcuts on later computes; hybrid
+  3/6/8. Candidates 18/18; dense audit 18/18; promotion 18/18; gate v5
+  green. Candidate
+  `27fb36a5e9801d98803cb5590f372422696260c6f47e7c3f3c48ac6272dca121`;
+  promoted
+  `2a1a3a2faaa46a4b452e5ad54825bdb1e8d27512df0c92615311e16813e66bbc`.
+  Gold `BORN:1743-04-13` / `COMM:Corps of Discovery` / `ENTITY:Q11812` /
+  `POP:Autobiography of Thomas Jefferson: 1743–1790`. Do not start 12
+  worlds from this title. Next N_task: Amazon eligibility 16K overflowed
+  (tok 23,181); do not overwrite the Amazon 64K/128K slices. uv
+  supersession is still queued.
+- 2026-08-27 pulumi `#24184`→`v3.257.0` + `#24226`→`v3.258.0` did not land
+  exact-64K. Allowlist Apache-2.0 pin `a48982fe…`. 16K emits 6 rows; 64K
+  wrap 58,102 / 58,128 at pack 52,500 and still 58,102 after retune to
+  58,510. Leftover is exhausted below the window. CodeForge stays 2/4.
+- 2026-08-27 Amazon 128k honest extra band is green on the existing Amazon
+  world (new out-dir, not overwriting the 64k slice). Gold grows with
+  CF+FX / TAX / LEASE / OI, not leftover-fill and not Apple Note 7/8/9.
+  Candidates 24/24 (6/6/6/6), zero rejects; dense audit 24/24; promotion
+  24/24; gate v5 green. Packed 14,206 / 28,857 / 49,378 / 123,417; 64K
+  wrap 64,174. Candidate
+  `f63524b4004505ea941d46d0ce1bd0502353b0413405bdb13e618808f15e1c64`;
+  promoted `d663557f959163360e64e8f3bb04a860831ae8fed583e32b09ac1250fe7ae6eb`.
+  Do not merge into P6 v4; do not start 12 worlds from this filing.
+- 2026-08-27 Apple 128k honest extra band is green on the existing v8 world
+  (new out-dir, not overwriting v8). Gold grows with CF/TAX/LEASE/DEBT;
+  pack target 100000 overflowed (gold ~116k). Retuned to 124000. Candidates
+  24/24 (6/6/6/6), zero rejects; dense audit 24/24; promotion 24/24; gate
+  v5 green. Packed 12,790 / 32,860 / 49,648 / 121,113; 64K wrap 64,854.
+  Candidate `03bbd5e32c75efae27e595e0ae23d399edaaf14c70b64d83c4f51a50aaae460b`;
+  promoted `7afaae390dace3986600fa561daf293cd535024782f6f7c93b2cb092a9974896`.
+  Do not merge into P6 v4; do not start 12 worlds from this filing.
+- 2026-08-27 dprint `#1174`→`0.55.0` + `#1207`→`0.56.0` did not land
+  exact-64K. `#1215` secret-blocked. 16K of 0.55.0 emits; 64K wrap 72,244
+  at pack 65,000. `#1210` leftover does not fill. CodeForge stays 2/4.
+  Next leftover-fill scout: pulumi `#24184`/`#24226`, not another cited
+  0.56.0 dprint PR.
+- 2026-08-27 CodeForge ruff `#27170`/`#17804` did not land exact-64K.
+  Allowlist MIT pin `9a51688c…`. 16K `strict_support_overflow`; 32K emits
+  6 rows; 64K wrap 50,144 (first) / 66,128 (late) at pack 52,500 and
+  51,420. Natural lengths, not cap-fill, so first/late straddle the
+  1,536-token window. `#26460` is thinner than `#17804`. `#27766` has
+  `cancelled`. Deno remains inventory (required wrap ~70k). CodeForge
+  unique exact-64K worlds stay 2/4. Do not subset P6; do not pad biome.
+- 2026-08-26 P7 SEC Amazon one-world engineering slice is green. Local
+  `explicit_filings` import of `0001018724-25-000004` plus a CIK-keyed
+  program (7 categories, 5 geos, no tagged Liabilities, EX-32.2, looser
+  cert regex). Wrap 64,174; pack 49,600; 18/18 promoted; gate v5 green.
+  Candidate `a21fcdd13fe38237676e320617a21c71b00cfefbb4531e40e4330b04e47e42fd`;
+  promoted `c2001e06980f3179013eed389f45e49a74531f186d95d7da6842bfca078a22bc`.
+  Company unique exact-64K worlds 2/4. Do not copy Apple headings; do not
+  retry sec.gov; do not start 12 worlds from this filing.
+- 2026-08-26 P7 Wikipedia MLK Jr. one-world engineering slice is green.
+  `appendix_rest` was in the 64K pool; wrap ~59,775 was RFC `source_pack`
+  cap-fill, not leftover skip. Query-pool filter plus leftover
+  `==== ''The Measure of a Man'' ====` lands wrap 64,504 at pack 54,000.
+  Candidates 18/18; dense audit 18/18; promotion 18/18; quality gate v5
+  green. Candidate `5bf3678fd5047a382d67763c45731a9bc40f5f2bc9a14718c65cb3be766820ff`;
+  promoted `e077f35ee6606c8ce74587abfc91ffb5b48d3335aefc2f173f180b47d516d293`.
+  Gold `BORN:1929-01-15` / `COMM:oratorical preaching in Montgomery` /
+  `ENTITY:Q8027` / `POP:I've Been To The Mountaintop`. Extra beyond
+  ResearchLab 4/4. Do not restore Jane Elliott leftover.
+- 2026-08-26 P7 Wikipedia Elizabeth II one-world engineering slice is green.
+  Leftover rest_end retuned from Category to unique `==External links==`
+  (~2,033 est) so pack 50,000 includes it inside exact-64K. Candidates 18/18
+  (6/6/6, zero rejects); dense audit 18/18; promotion 18/18; quality gate v5
+  green. Packed estimated tokens are 14,734 / 32,068 / 49,950; exact 64K wrap
+  is 64,847 (first) and 64,846 (late). Candidate row-set
+  `197fb8c680c2463848624238b08ad19323866dc2063c9ca73e3fe1397b480e78`;
+  promoted row-set
+  `88456e792441ccbddd7fb4bed0ea40d0074f7eda489adfba7d47e2d173550495`.
+  Gold `BORN:1926-04-21` / `COMM:Jallianwala Bagh massacre` / `ENTITY:Q9682` /
+  `POP:death of Diana`. Extra beyond ResearchLab 4/4. Do not start 12 worlds
+  from this title.
+- 2026-08-26 P7 GitHub uv one-world engineering slice is green. `astral-sh/uv`
+  PRs `#17455` (tag 0.12.5) and `#21001` (tag 0.12.6) drive `version_selection`.
+  Skipped CI no longer blocks a passed gate. Candidates 12/12 after dropping
+  the filler-only 32K band (6×16K + 6×64K); dense audit 12/12; promotion
+  12/12; quality gate v5 green. Exact 64K wrap is 64,758 / 64,848; pack
+  52,500. Candidate row-set
+  `28954cf16e878212fa3cc621f2d8e5607c959c7ad947671bfb920e2e835621fa`;
+  promoted row-set
+  `ce3231dce9a4778ba848ee30e922c752977875036f032da39b57c91b3ab88192`.
+  This is CodeForge unique exact-64K world 2/4. Do not start 12 worlds from
+  these two PRs; do not merge into P6 v4.
+- 2026-08-26 P7 Wikipedia Obama one-world engineering slice is green.
+  Barack Obama later revision plus Q76 drive BORN/COMM/ENTITY/POP. Candidates
+  18/18 (6/6/6 at 16K/32K/64K, zero rejects); dense audit 18/18; promotion
+  18/18; quality gate v5 green. Packed estimated tokens are 14,535 / 30,859 /
+  49,284; exact 64K wrap is 64,976 (first) and 64,965 (late); pack 49,300.
+  Candidate row-set
+  `0244e4f9a85ae789c6303655f25d7fb43c0866713b8b10739b7efdf001cb2d30`;
+  promoted row-set
+  `4204bc063dca75f9e416ed2e1cb6fc60991d7c0f6771520dfbaa6deee9a01103`.
+  ResearchLab 4/4 was already filled; this is extra unique-workflow inventory.
+  Dense ranking now loads MiniLM on CPU after a CUDA OOM against GPU hold.
+- 2026-08-26 P7 Wikipedia Newton one-world engineering slice is green.
+  Isaac Newton later revision plus Q935 drive BORN/COMM/ENTITY/POP. The birth
+  template is duplicated in the early body; evidence is a unique infobox
+  wrapper, not the bare template. Candidates 18/18 (6/6/6 at 16K/32K/64K,
+  zero rejects); dense audit 18/18; promotion 18/18; quality gate v5 green.
+  Packed estimated tokens are 14,288 / 28,223 / 54,083; exact 64K wrap is
+  64,959. Proof-bearing growth is 12,680 then 23,985 tokens versus 5% minima
+  696/1,293. Authentic relations remain 0; hybrid signatures 3 (edges 3/5/10).
+  64K proof stops before References; leftover is a References prefix ending
+  at unique `=== Alchemy further reading ===`. Candidate row-set
+  `50202f59fd709feadff42b8a5fc38b5a45094877c5feedd88e561c2f779ca3fe`;
+  promoted row-set
+  `5f24fa4ff10d4efe435f13882b26d1a047143b0396ccb31dad91ce3e852a0451`.
+  Not merged into P6 v4; do not start 12 worlds from this title. Combined with
+  Churchill/Einstein/Thatcher this is four unique ResearchLab exact-64K
+  workflows.
+- 2026-08-26 P7 Wikipedia Thatcher one-world engineering slice is green.
+  Margaret Thatcher later revision plus Q7416 drive BORN/COMM/ENTITY/POP.
+  Candidates 18/18 (6/6/6 at 16K/32K/64K, zero rejects); dense audit 18/18;
+  promotion 18/18; quality gate v5 green. Packed estimated tokens are
+  13,972 / 28,727 / 53,426; exact 64K wrap is 65,417. Proof-bearing growth
+  is 13,500 then 20,146 tokens versus 5% minima 737/1,234. Authentic
+  relations remain 0; hybrid signatures 3 (edges 3/5/10). 64K proof stops
+  before Legacy; leftover is a Legacy prefix ending at unique
+  `[[Scottish independence]]`. Candidate row-set
+  `4bf6b6951d1fe27d92d69361e683f7a99dbabf000f8fea666e837af27704e6d3`;
+  promoted row-set
+  `b3916422ca481f3ec1f3cd1723132f10e38c629ed90a228d96a59e979cc18672`.
+  Not merged into P6 v4; do not start 12 worlds from this title.
+- 2026-08-26 Isaac Newton English Wikipedia/Wikidata inventory fetched
+  (`wikimedia_p7_newton_v1`, Q935, later `14627-r1371274988`, ~56.2k est).
+  Not programmed: the birth template is duplicated in the early body.
+- 2026-08-26 P7 Wikipedia Einstein one-world engineering slice is green.
+  Albert Einstein later revision plus Q937 drive BORN/COMM/ENTITY/POP.
+  Candidates 18/18 (6/6/6 at 16K/32K/64K, zero rejects); dense audit 18/18;
+  promotion 18/18; quality gate v5 green. Packed estimated tokens are
+  15,946 / 32,823 / 54,055; exact 64K wrap is 64,982. Proof-bearing growth
+  is 16,866 then 21,249 tokens versus 5% minima 843/1,061. Authentic
+  relations remain 0; hybrid signatures 3 (edges 3/5/10). Full-page
+  essentials overflowed pack 51,200; 64K proof stops before References
+  and an authentic non-essential References prefix fills wrap. Candidate
+  row-set `eee8896c19915e6628d86d2f2034bdcf08f021ccafced4c7805ca0dc0c08d68a`;
+  promoted row-set
+  `0c04fa828b43c5ee49d7942892385685cb3d9248c6782bb6c8f27ad65896bbe3`.
+  Not merged into P6 v4; do not start 12 worlds from this title.
+- 2026-08-26 Attention `1706.03762` signed as a unique paper workflow after
+  generalizing the revision-added extractor beyond the Aviva/ONR/NSF regex.
+  v1→v2 gold is the authentic 277-char parameter-attention sentence. Body
+  ~21k estimated tokens: source→state, not exact-64K.
+- 2026-08-26 P6's 80 signed GitHub episodes are already one CodeForge world.
+  Leftover unused PRs cannot each fill exact-64K (only v2.34.0/v2.34.1 did).
+- 2026-08-26 P7 Wikipedia Churchill one-world engineering slice is green.
+  Winston Churchill later revision plus Q8016 drive BORN/COMM/ENTITY/POP.
+  Candidates 18/18 (6/6/6 at 16K/32K/64K, zero rejects); dense audit 18/18;
+  promotion 18/18; quality gate v5 green. Packed estimated tokens are
+  14,757 / 28,006 / 51,141; exact 64K wrap is 65,073 (first) and 65,131
+  (late). Proof-bearing growth is 13,182 then 23,187 tokens versus 5%
+  minima 662/1,156. Authentic relations remain 0; hybrid signatures 3
+  (edges 3/5/10). `generate.py` now emits Wikipedia hybrid edges; empty
+  edges had blocked select (`0<1` real worlds). Candidate row-set
+  `a31b7d1a3cd06c4c9e4d6ca4f13015891246231f69ee8b7959db18fed01e99ce`;
+  promoted row-set
+  `577644a028e0bc62d417482cc3c97364feb511b0637bf491a058dd89eb83995e`.
+  Ada/Turing remain unique workflows that cannot fill exact-64K. This is
+  not merged into P6 v4 and does not start 12 worlds.
+- 2026-08-25 P7 SEC v8 one-world engineering slice is green. Exact XBRL facts
+  from the attested Apple 10-K drive MIX/CAT/GEO/BS/CERT answers. Candidates
+  18/18 (6/6/6 at 16K/32K/64K, zero rejects); dense audit 18/18; promotion
+  18/18; quality gate v5 green. First tier is honest 16K (~12.7K estimated);
+  exact 64K wrap is 64,854 Qwen tokens; proof-bearing growth is 16,997 then
+  19,744 tokens versus 5% minima 1,004/840. Authentic relations remain 0;
+  hybrid signatures 3. Candidate row-set
+  `8579b9f83191d55750b416c7c1e438e2ba7c138d26c294e6bf932482d4495131`;
+  promoted row-set
+  `0fb120aeba8074bf218c2dbe25c084aecb4ab1133215e398d99f31a96b47fcfb`.
+  This is not merged into P6 v4 and does not start 12 worlds.
+- 2026-08-25 128k baselines on 8×H200: SP=4 DP=2 micro=1 accum=8 (GBS 16). SP=2 OOM'd 4B on 8-GPU (lm_head logits ~44–56 GiB). wandb group `longworld-128k-sft-8gpu`. ACC → LongTrace → LongMIT.
+
 - 2026-08-25 P6 source-dependent probe v4 is green. Fresh generation produced
   828 candidates from 18 worlds, 92 base tasks, 24 executable proofs, 23 answer
   programs, 7 real relation graphs, zero clones and zero exact duplicates.
@@ -295,3 +542,111 @@ in`; no private-repository or upload claim was made.
   `32b5dcd274c301300826be20f7a698b4d9b09f7d`; unauthenticated API access returns
   HTTP 401. Remote dry-run shows exactly those 19 files plus Hub-generated
   `.gitattributes`, totalling 260.0 MB decimal.
+- 2026-08-25 P7 run 1 started with three disjoint tracks: SEC/Company
+  source→state→answer, Wikimedia RealWorkflow materialization, and read-only
+  replay/filter performance audit. Added an immutable source-rich profile gate
+  requiring all 10 train and 2 eval worlds to contain verified real source;
+  profile tests pass.
+- 2026-08-25 P7 live Wikimedia acquisition completed: four exact titles yielded
+  12 signed records, 12 relations, and four normalized workflows. P7 SEC
+  acquisition attempt 1 returned Akamai HTTP 403 at `data.sec.gov`; a changed
+  compliant User-Agent diagnostic also returned 403, so no identical retry or
+  cache substitution was performed and no partial source file exists.
+- 2026-08-25 P7 strict-replay hotspot repaired with a surgical graph traversal
+  change: one build/subgraph per `graph_stats` call and single-source shortest
+  paths replace all-pairs `has_path` plus shortest-path calls. The required
+  failing call-count test was observed (4 builds), then passed at one build;
+  8 focused tests and targeted Ruff/format checks pass. Targeted MyPy is deferred
+  until the concurrently edited SEC branch settles; its current errors include
+  those in the in-progress filing/company files plus inherited missing NetworkX
+  stubs, not a runtime failure in this optimization.
+- 2026-08-25 P7 SEC source slice v4 completed the full signed local-probe chain.
+  One authentic Apple filing workflow produced three staged executable queries:
+  16K/32K/64K require 4/5/6 support events, proof depth 4/5/6, and 3/4/5
+  replayed hybrid-causal edges. Candidate generation emitted 18 unique rows
+  (six per bucket), dense audit accepted 18/18, world-atomic selection retained
+  all 18, strict promotion replayed all 18, and the quality gate is green. The
+  release has six pinned-token exact-64K rows, zero duplicate/conflicting rows,
+  zero boilerplate/pulse, three base tasks/proofs/programs/relation signatures,
+  and one unique authentic source workflow. Candidate row-set SHA is
+  `5686160f99627e4a9a9a52c6d8c7ade5fd1266a08341b6d105cde03cd19b10f9`;
+  promoted row-set SHA is
+  `ef06b2f7d76e5590fe514a20cdbfec79a57f518805d9f2aa3af0b9e25fdce597`.
+  This is an engineering slice, not the 12-world source-rich release.
+- 2026-08-25 P7 integrated validation after the SEC v4 gate: 596 tests pass;
+  all 27 changed Python files pass Ruff and format; compileall, `uv lock
+--check`, and diff checks pass. Targeted MyPy is clean with missing third-party
+  stubs ignored; the environment lacks NetworkX/PyYAML stubs and Bandit is not
+  installed, so those two tool-level gaps are recorded rather than hidden.
+- 2026-08-25 P7 independent review revoked SEC source slice v4. SourceWorkflow
+  queries had included ratification artifacts after the query `as_of`, synthetic
+  policy edges had been reported as authentic source relations, and proof
+  content grew only 73 tokens per tier while unrelated Company-cycle history
+  supplied most added length. The current v4 gate rejects the retained bytes
+  with revision/binding/provenance errors and `real_proof_growth_share`
+  shortfalls (73 versus minima 837/1053). A local `REVOKED.md` preserves this
+  decision beside the historical signed files; none of those 18 rows count as
+  qualified data.
+- 2026-08-25 Fresh SEC diagnostic v6 verified the future-artifact fix: shorter
+  checkpoints no longer contain later ratifications. It emitted 18 candidate
+  rows with one honest 8K tier (~10.2K estimated tokens), 32K, and six pinned
+  exact-64K rows (~64.1K tokenizer tokens). Ranking/promotion intentionally
+  stopped because the nominal 16K tier underfilled and longer tiers were still
+  dominated by unrelated Company-cycle history. A `NOT_TRAIN_READY.md` records
+  the failure; candidate row-set is
+  `aa20490bc35b27962093907a3f71cd92af969de693c357c415978900aa7444cc`.
+- 2026-08-25 P7 correctness hardening after revocation: strict replay is v5 and
+  release gate v5; P7 requires proof-bearing/supporting content to contribute at
+  least 5% of each length increment (minimum 256 tokens). Hybrid SEC edges now
+  use real event endpoints plus a separate source-record ID instead of accession
+  self-loops. Filing eligibility uses a real body-derived report date and a
+  60-day reporting window rather than a filing-date-derived tautology.
+  Wikimedia replay records now distinguish Wikipedia CC BY-SA 4.0/GFDL from
+  Wikidata CC0-1.0 instead of mislabeling API access policy as content license.
+  Focused validation is 211 tests; the preceding integrated suite was 597.
+- 2026-08-25 SEC component provenance slice completed. The existing attested
+  9.4MB submission now deterministically exposes non-copying coordinates for the
+  main 10-K (sequence 1) and EX-31.1/31.2/32.1 (sequences 5/6/7). Every component
+  binds the parent source hash, original non-overlapping char range, component
+  hash, type, sequence, filename, extractor revision and derived provenance;
+  offset/hash/identity tampering fails closed. Ten new focused tests pass. This
+  is the parser foundation only; XBRL facts, staged state and answers remain the
+  next implementation step.
+- 2026-08-25 P7 source-rich profile now requires at least 12 exact real-64K rows
+  in each of Company, ResearchLab and CodeForge (36 balanced rows total within
+  the existing global minimum of 48). This matches four worlds per domain and
+  three core views, preventing a nominally diverse release whose real long rows
+  are concentrated in one domain.
+- 2026-08-25 Final review closed a remaining scale-accounting loophole: P7 now
+  also requires four distinct worlds with exact real-64K coverage in each
+  domain. Six view/timing rows from one task can no longer satisfy a domain's
+  long-source requirement. Release gate revision advanced to v5.
+- 2026-08-25 Final integrated validation: 610 tests pass; all 30 touched Python
+  files pass Ruff and format checks; targeted MyPy, compileall, `uv lock
+--check`, and `git diff --check` pass. Repository-wide Ruff still reports 26
+  inherited findings in untouched `anchors.py`, `cascade.py`, and
+  `compose_queries.py`; they were not mass-reformatted in this surgical P7 diff.
+  Bandit remains unavailable. Independent review reports no P0. Its two open P1
+  items are intentional next-phase blockers: component/XBRL provenance is not
+  yet connected to SEC state/answers, and the old short ratification chain cannot
+  pass the new material proof-growth gate.
+
+## 2026-08-27 — SEC exact single-world v6 closed
+
+- Parsed exact iXBRL facts, periods, contexts, units/scales, dimensions, and
+  Section 302/906 officer certification fields from signed SEC components.
+- Derived exhaustive non-overlapping fact corridors and bound every view to
+  parent hashes/spans; no copied or randomly concatenated long-text blocks.
+- Added executable sales mix, category/current-geography, prior-geography/YoY,
+  balance identity, and certification-scope answer programs.
+- v1-v5 were retained as explicit `NOT_TRAIN_READY` tuning diagnostics.
+- v6: 16 candidate rows, 0 generation rejects; 16 dense audits accepted, 0
+  rejects; 16 rows promoted; final quality gate `ok=true`.
+- Exact Qwen counts: 16K=16,193, 32K=32,030, 64K=64,255. Essential counts:
+  4→7→13→18; graph depth: 2→3→4→5; program ops: 4→7→12→17.
+- Candidate row-set SHA-256:
+  `9f007ebb7ab40b60f1d7295d2171540d398b6167638f6d1ab52f31184c341cb2`.
+- Gate receipt file SHA-256:
+  `f6a62f51d9a4eee0d0e047edc0877df5022ce495bfa9d1066a7aae84900cd8aa`.
+- Honest boundary: one source workflow, zero authentic cross-record relations;
+  12 worlds stays blocked pending workflow/relation diversity, 48/210 blocked.

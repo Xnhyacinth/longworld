@@ -90,16 +90,16 @@ never credentials, private trust files, rejects, or unapproved candidates.
 Complexity is 10/10 (breadth, depth, dependency, uncertainty, validation all
 2); mixed routing with three disjoint review/implementation tracks.
 
-| Phase | Objective                                                                   | Status      | Validator                                                                  |
-| ----- | --------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------- |
-| P6.0  | Freeze source, trust, release, GitHub, and HF publishing contracts          | complete    | API/account preflight and upload allow/deny list enforced                  |
-| P6.1  | Implement real OpenReview/arXiv fetch and source-attested workflow          | in_progress | arXiv live and signed; OpenReview code green but live endpoint returns 403 |
-| P6.2  | Make SEC/Wikimedia/paper facts enter state, question, answer, and CF replay | in_progress | paper source→state→answer green; SEC/Wikimedia remain inventory-only       |
-| P6.3  | Complete production unseen attestation/release binding                      | blocked     | verifier is fail-closed; external KMS trust root/approval event absent     |
-| P6.4  | Run fresh 12-world candidate→ranking→audit→promotion→quality/unseen release | complete    | 542 rows; 16 real 64K; v2 gate green; partial local unseen readiness       |
-| P6.5  | Record release inventory, lineage, filters, exclusions, and reproducibility | complete    | committed local package; exact hashes/counts and data card recorded        |
-| P6.6  | Independent code/security review and complete validation                    | complete    | no P0; 571 tests and targeted lint/type/package checks pass                |
-| P6.7  | Sync GitHub and create/upload Xnhyacinth private HF dataset                 | complete    | Git main synced; private HF commit 32b5dcd verified                        |
+| Phase | Objective                                                                   | Status      | Validator                                                                                                                                                                                        |
+| ----- | --------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P6.0  | Freeze source, trust, release, GitHub, and HF publishing contracts          | complete    | API/account preflight and upload allow/deny list enforced                                                                                                                                        |
+| P6.1  | Implement real OpenReview/arXiv fetch and source-attested workflow          | in_progress | arXiv live and signed; OpenReview code green but live endpoint returns 403                                                                                                                       |
+| P6.2  | Make SEC/Wikimedia/paper facts enter state, question, answer, and CF replay | superseded  | Historical P6/P7 gates reported SEC v8 and four Wikipedia exact-64K slices green; P8 later invalidated them for current release use pending readable/raw-window and cross-domain grounded replay |
+| P6.3  | Complete production unseen attestation/release binding                      | blocked     | verifier is fail-closed; external KMS trust root/approval event absent                                                                                                                           |
+| P6.4  | Run fresh 12-world candidate→ranking→audit→promotion→quality/unseen release | complete    | 542 rows; 16 real 64K; v2 gate green; partial local unseen readiness                                                                                                                             |
+| P6.5  | Record release inventory, lineage, filters, exclusions, and reproducibility | complete    | committed local package; exact hashes/counts and data card recorded                                                                                                                              |
+| P6.6  | Independent code/security review and complete validation                    | complete    | no P0; 571 tests and targeted lint/type/package checks pass                                                                                                                                      |
+| P6.7  | Sync GitHub and create/upload Xnhyacinth private HF dataset                 | complete    | Git main synced; private HF commit 32b5dcd verified                                                                                                                                              |
 
 P6 success criterion: the promoted 12-world dataset contains authentic
 source-dependent answers from more than GitHub, including live scholarly data;
@@ -116,16 +116,16 @@ authentic body text into state and at least one answer program. Synthetic events
 may add counterfactuals, delayed effects, or workflow closure, but may not
 replace source evidence or provenance.
 
-| Phase | Objective                                                              | Status  | Exit gate                                                                    |
-| ----- | ---------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------- |
-| P7.0  | Freeze source-rich profile and source/task taxonomy                    | planned | 12 real-source worlds; 4 source families; train and eval both contain real   |
-| P7.1  | Complete live scholarly, SEC, Wikipedia/KB, and GitHub episode streams | planned | bounded source manifests; license/retrieval lineage; no surrogate provenance |
-| P7.2  | Add domain-specific state transitions and answer programs              | planned | at least 12 new program/operator signatures; no filename-derived answer      |
-| P7.3  | Grow multi-cycle 64K/128K/256K workflow histories                      | planned | events, evidence, causal edges, proof depth, and source relations co-grow    |
-| P7.4  | Shard and cache ranking/replay/filter by immutable world digest        | planned | deterministic worker counts; bounded memory; identical row-set SHA           |
-| P7.5  | Run source-rich 12 candidate→audit→promotion release                   | planned | at least 200 real-grounded rows and 48 real exact-64K rows; all gates green  |
-| P7.6  | Merge and rerun 48 worlds                                              | blocked | P7.5 receipt plus unseen source/domain coverage                              |
-| P7.7  | Activate production KMS approval and external unseen evaluation        | blocked | independent signer/trust root and benchmark evidence                         |
+| Phase | Objective                                                              | Status      | Exit gate                                                                                                                                                                                     |
+| ----- | ---------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P7.0  | Freeze source-rich profile and source/task taxonomy                    | complete    | 12 real-source worlds; 4 source families; train and eval both contain real                                                                                                                    |
+| P7.1  | Complete live scholarly, SEC, Wikipedia/KB, and GitHub episode streams | in_progress | SEC Apple/Amazon historical slices are invalidated under raw-span/readability review; Wikimedia/GitHub inventories remain diagnostic until the same grounded-span contract is generalized     |
+| P7.2  | Add domain-specific state transitions and answer programs              | in_progress | SEC exact facts enter state, but 16K has a 4K shortcut, Amazon staged geography is invalid, and certification/duplicate/tokenizer gates are being repaired; no SEC row is currently qualified |
+| P7.3  | Grow multi-cycle 64K/128K/256K workflow histories                      | blocked     | Requires readable provenance-mapped source views, genuine multi-record relations, and raw-span replay for every admitted task family; 12/48/210 remain closed                                 |
+| P7.4  | Shard and cache ranking/replay/filter by immutable world digest        | planned     | deterministic worker counts; bounded memory; identical row-set SHA                                                                                                                            |
+| P7.5  | Run source-rich 12 candidate→audit→promotion release                   | planned     | at least 200 real-grounded rows and 48 real exact-64K rows; all gates green                                                                                                                   |
+| P7.6  | Merge and rerun 48 worlds                                              | blocked     | P7.5 receipt plus unseen source/domain coverage                                                                                                                                               |
+| P7.7  | Activate production KMS approval and external unseen evaluation        | blocked     | independent signer/trust root and benchmark evidence                                                                                                                                          |
 
 Priority task families are: release/security/dependency history for CodeForge;
 revision-review-response and benchmark reproduction for ResearchLab; filing
@@ -133,6 +133,25 @@ amendment, restatement, segment reconciliation, and guidance eligibility for
 SEC/company; revision/redirect history, temporal claims, and cross-page entity
 disambiguation for Wikipedia/KB. Cross-domain tasks are admitted only when an
 explicit source relation and executable answer program join the streams.
+
+### P7 execution run 1 — 2026-08-25
+
+Assumptions: `.hl/policy.md` is the control plane; this is pipeline work rather
+than a one-shot generation request; parallel agents are useful only with
+disjoint file ownership. Complexity is 10/10 and routing is mixed.
+
+| Track | Owner               | Files/responsibility                                               | Deliverable and validator                                                   | Status      |
+| ----- | ------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------- | ----------- |
+| A     | SEC worker          | filing workflow + Company integration + focused tests              | real filing body facts enter state/factual/CF answer; corruption/remove-one | complete    |
+| B     | Wikipedia worker    | Wikipedia workflow materializer/export contract + focused tests    | signed revision records become replayable RealWorkflow episodes             | complete    |
+| C     | performance analyst | read-only audit of rank/audit/promotion critical path              | measured minimal optimization with determinism/hash risk assessment         | complete    |
+| D     | root integration    | profile/config/gates, source-rich probe, records, final validation | v8 invalidated; v9 candidate rerun blocked pending source trust restoration | in_progress |
+| E     | independent review  | integrated diff only                                               | raw-span/readability/Amazon review completed with release-blocking findings | complete    |
+
+Run-1 success is an executable source-rich slice, not a 48-world batch: SEC and
+Wikipedia must cross the source→state boundary with real text, new task/program
+identities must be measured rather than relabeled, and the pipeline must retain
+or improve deterministic replay throughput without weakening any filter.
 
 ## Historical P2 record
 

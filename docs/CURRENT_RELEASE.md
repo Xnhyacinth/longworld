@@ -1,10 +1,13 @@
 # Current release status
 
-Last updated: 2026-08-28
+Last updated: 2026-08-29
 
 This file is the canonical publication-status summary. Historical receipts and
 `.hl/` logs remain useful for reproducibility, but they do not override this
-status.
+status. The canonical project root is `/workspace/wynckeliao/longworld`;
+project code, source inventory, generated data, release receipts, reports, and
+durable progress records must live there. Tool caches may be reconstructed
+outside the repository, and credentials must remain outside Git.
 
 ## Published private dataset
 
@@ -21,15 +24,31 @@ There is currently no missing HF upload.
 
 ## Current stricter-gate result
 
-The current strict local union contains **30 qualified rows across 3 unique
-source-bound worlds**, with 10 rows at each 16K/32K/64K band and **1,134,664
-exact Qwen context tokens**. All 30 content hashes are unique. The admitted real
-source families are Wikimedia/Wikidata and arXiv; the implementation domain is
-still only `researchlab`, so this is not the planned 12-world multi-domain
-release. The cross-release audit verifies row identity and receipt-bound bytes;
-it does not replace production KMS attestation or independent approval.
+The current local content-gate corpus covers **29 rows across 4 unique
+source-bound worlds**, with **1,120,639 receipt-reported exact Qwen context
+tokens**. It contains 12 ResearchLab rows, 9 Company rows, and 8 CodeForge rows;
+the exact 16K/32K/64K distribution is 9/10/10. All four source identities and
+release receipts validate under the current protected local-probe root.
 
-No P7/P8/P9 row is currently qualified for upload. SEC exact-single v8 and its
+The schema-v2 neutral inventory is
+`data/releases/p12-current-four-source-bound-union-v1.json`. It verifies four
+distinct world IDs, 29 distinct canonical content hashes, source-workflow
+ownership, tokenizer/bucket metadata, release-file hashes, and the union row-set
+digest `a7492852bf702018bda25a6313aab1e2ce63447229961e32f6f0f00b67434b58`.
+It reports `inventory_integrity_ok=true`, but deliberately reports
+`target_gate_evaluated=false`, `target_gate_passed=false`, and
+`production_eligible=false`: four worlds do not satisfy the 12-world profile.
+The six-world inventory and Jefferson/Newton v5 receipts are retained as
+diagnostic evidence but are excluded from current-state accounting after
+independent semantic review found no value-level dependency on revision deltas.
+
+The local-probe root supports role-separated engineering replay, while every
+combined-role artifact is cryptographically labeled
+`non_independent_local_diagnostic`. The corpus is current-code content evidence,
+not independent production trust. Production/KMS-qualified P12 rows therefore
+remain zero, and no raw promoted JSONL is authorized for HF publication.
+
+No invalidated P7/P8/P9 row is currently qualified for upload. SEC exact-single v8 and its
 derived Apple/Amazon slices were invalidated after exact raw-span replay found
 a 4K shortcut and after readable-text normalization showed that more than 97%
 of the former statement views were HTML/iXBRL markup. Historical green receipts
@@ -63,11 +82,15 @@ rejected because Thatcher had no exact 64K stage and Newton had no valid lower
 band. The replacement Newton multiband workflow described below supersedes that
 diagnostic result; Thatcher remains unqualified.
 
-GitHub and OpenReview remain diagnostic until their producer-envelope and
-cross-band growth blockers close. One arXiv revision-chain world is now
-qualified locally. Real SEC multi-filing retention is still absent.
+The Pulumi GitHub workflow has been regenerated under the current local-probe
+identity and passes the cumulative-answer and cross-band content gates.
+Production required-check policy binding and independent trust remain absent.
+OpenReview remains diagnostic. One arXiv revision-chain
+world passes locally. The issuer-owned Amazon four-filing workflow now supplies
+the first Company content-qualified world; accession-pinned SEC multi-filing
+retention remains absent.
 
-P10 now has one current-gate-qualified Wikimedia world in
+P10 has one content-gate-passed Wikimedia world under retired local-probe trust in
 `p10-wiki-jefferson-semantic-v16-promoted`. The earlier Jefferson v4 receipt and
 the intermediate v6-v15 runs are revoked. Review found a 4K natural-language
 shortcut and two synthetic copy rungs in v4; v6/v7 predated the final window
@@ -87,25 +110,29 @@ committee, and the diplomatic transition. It then adds the commemoration,
 entity relation, and popular-culture evidence at 32K and 64K. No copy event is
 part of the proof, and this is not revision-history gold.
 
-The replacement candidate→dense ranking→strict audit→world
-selection→promotion→quality chain retains 12 rows (4/4/4 by band) with zero
+The current replacement candidate→dense ranking→strict audit→world
+selection→promotion→quality chain retains 16 rows (4/6/6 by band) with zero
 generation rejects, clones, exact duplicates, or prompt conflicts. Proof depth
-grows 2→3→4 and essential events grow 5→10→12. Exact 4K/8K/16K source-span
+grows 2→3→4, essential events grow 5→10→14, and authentic relations grow
+0→2→3. At 64K the third relation is the exact current→prior `revision_of`
+edge; its prior endpoint is an exact API revision-ID span rather than a repeated
+copy of an unchanged article section. Exact 4K/8K/16K source-span
 windows are replayed with the pinned tokenizer: 16K requires 4K/8K
 insufficiency, while 32K/64K require all three windows to be insufficient. The
 serialized answer programs now include all body-fact roles and the 32K/64K
 source-relation verification operation. The signed one-world gate receipt is
-green under gate revision v6. Exact Qwen counts are 16,367, 32,487, and 64,131
-tokens, totaling 451,940 context tokens across the 12 rows. This is a
-qualified local probe slice, not authorization for the 12-world release or an
-HF publication. Current final-qualified P10 rows: **12**.
+green under gate revision v6. Exact Qwen counts are 16,367, 32,644, and 64,232
+tokens per view, totaling 646,724 context tokens across the 16 rows. This is a
+content-gate-passed current local-probe slice, not authorization for the
+12-world release or an HF publication.
 
 P11 adds two independently identified worlds without reusing Jefferson's world
-identity. `p11-wiki-newton-growth-promoted-v6` uses a stable Wikidata-derived
-seed (`14627`) and retains 12 rows (4/4/4 by band), with exact counts 16,096,
-32,654, and 64,728 tokens and 453,912 total context tokens. Its semantic answer
+identity. `p12-wiki-newton-current-probe-v5-promoted` uses a stable
+Wikidata-derived seed (`14627`) and retains 12 rows (4/4/4 by band), with exact
+counts 16,096, 32,680, and 64,885 tokens and 454,644 total context tokens. Its semantic answer
 program grows from five early-life/scientific source spans to the optics,
-Wikidata-entity, and Royal Mint evidence. All dense, CF, remove-one, source
+Wikidata-entity, Royal Mint, and prior-revision lineage evidence. Authentic
+relations grow 0→2→3. All dense, CF, remove-one, source
 relation, raw-window, semantic-growth, and gate-v6 checks pass; generic
 background is zero.
 
@@ -132,14 +159,22 @@ roughly 43K shorter views as 32K or weakening the growth gate is prohibited; the
 next CodeForge run must add a genuinely shorter real release-cycle task at 32K
 and extend it with real CI/history at 64K.
 
+Independent CodeForge review also found and fixed a monorepo release-lineage
+bug: prefixed tags now retain a strict normalized family, so `crates_v*` and
+`napi_v*` cannot be joined as one supersession chain. This correctness fix does
+not promote Deno, Ruff, Oxc, or dprint; their incomplete-band and retrieval
+failures remain unchanged.
+
 Four earlier Wikimedia API probes produced 8 page revisions and 4 Wikidata
 revisions, but only two page revisions were new relative to the existing local
-archive. The current exporter still consumes only latest+parent and does not
-put `revision_of` into the answer proof, so it must not be described as a long
-revision history. Thatcher, MLK, and the pre-retiering Jefferson/Newton runs
-remain diagnostic failures; the qualified Newton v6 result depends on staged
-non-overlapping facts from the authentic latest body, not a revision-history
-claim.
+archive. Jefferson/Newton v5 consumed only a self-contained prior revision ID
+as the `revision_of` endpoint: the old body/delta did not enter state or the
+answer, and coordinated relation-content forgery could preserve the gold answer.
+Those structurally green receipts are therefore revoked and excluded. A future
+revision world must make an independently parsed cross-version fact or delta
+change the answer and must bind both relation endpoints to source bytes.
+Thatcher, MLK, and the
+pre-retiering Jefferson/Newton runs remain diagnostic failures.
 
 The SEC multi-filing probe identified AMD 10-K
 `0000002488-26-000018` and 10-K/A `0000002488-26-000021` for the same report
@@ -182,33 +217,200 @@ implemented, the production-packaging-ready allowlist is empty and package
 creation fails closed even after approval/gate verification. The local v16
 source bundle is replayable, but it is not yet enclosed in a production package.
 
-The v16 replay commands resolve the pinned snapshots from
-`HF_HOME=/root/.cache/huggingface`; that cache location is an execution detail,
-not the trust identity. Reproduction requires a locally resolvable snapshot
-whose freshly computed manifest equals the signed digest. No new HF dataset
-upload is part of this cycle; code and release-status synchronization use
-GitHub after tests and independent review pass.
+## P12 expansion checkpoint
+
+P12 adds deterministic source-materialization caching, digest-addressed mixed
+bundle lookup, and world-parallel strict audit/promotion with deterministic
+output ordering. Tests compare cached/parallel decisions and bytes with the
+uncached/serial path; these optimizations do not skip replay or weaken a gate.
+Production packaging now verifies a separate package approval that binds the
+release inventory, training manifest, and exact `COMMITTED` bytes. Final
+production issuance remains disabled until the two-phase stage, independent KMS
+signature, and finalization flow also admits and re-verifies that sidecar.
+
+The Amazon issuer-IR v4 workflow binds issuer-linked annual-report PDF, XBRL
+ZIP, and rendered-XBRL HTML artifacts for 2021--2024. The exporter verifies
+artifact roles and actual XBRL issuer/CIK/form/report-period identity. Company
+state is reconstructed from 57 exact facts per year across 23 non-overlapping
+rendered-XBRL sections and three authentic adjacent-filing relations.
+
+The v10 candidate→pinned dense ranking→strict audit→world
+selection→promotion→quality chain retains **9 rows** (3/3/3 at 16K/32K/64K)
+with zero generation or audit rejects. Exact Qwen counts are 16,183, 32,658,
+and 64,964 per view, totaling **341,415 context tokens**. Necessary events grow
+23→43→83, proof depth grows 3→4→5, authentic filing relations grow 1→2→3,
+and event-bearing source content grows 9,081→19,229→50,228 tokens with zero
+generic background. The answer-role program is cumulative: a two-year common
+program plus a latest-year revenue extension becomes a three-year program,
+then a four-year program with an earliest-year accounting-policy extension.
+Those extensions are declared in the question schema and bound into the
+executable program identity; CF revenue replay changes every applicable answer.
+The maximum near-duplicate ratio is 0.1803, below the unchanged 0.25 ceiling.
+All 9 external dense receipts report top-k insufficiency, and the signed
+one-world gate-v6 receipt is green. These are **content-gate-passed rows under
+retired local-probe trust**, not
+a production package or HF publication authorization. The local promoted
+`train.jsonl` byte digest is
+`e530737b4b6869488807d025adb52c60dfa97efd8d7f792886f837d924dd08f9`;
+the signed gate-receipt byte digest is
+`34ae90bdbe10516fce772b8bf7790bf7714c652e411b53aeb4a4f7d7611600eb`.
+
+The current P12 inventory therefore does not yet reach 12 qualified worlds.
+ResearchLab has 42 strict-audited candidate rows across four worlds
+(1,589,428 exact Qwen context tokens). The former Pulumi six-row local result is
+superseded because its 32K answer named only one release while carrying the
+prior release closure as hidden evidence. The corrected CodeForge program uses
+a single-cycle 16K answer, a cumulative two-cycle 32K trace, and a cumulative
+three-cycle 64K trace. It preserves every real GitHub workflow record and
+causal link, while executable release closure binds only direct final pre-merge
+CI gates and real release supersession; PR/review/merge history remains source
+context instead of being mislabeled as an answer prerequisite.
+
+The historical v13 candidate retained **8 rows**: full/CF at 16K and
+full/CF/ordered views
+at 32K and 64K. The omitted 16K ordered view truthfully failed the 8K evidence
+distance requirement at 3,964 tokens. Exact Qwen counts are 16,375, 32,665, and
+65,301 per retained view, totaling **326,648 context tokens**. Essential events
+grow 3→128→253. Authentic source relations grow 10→262→514 on the full path
+(8→260→512 on CF); total context relations, including hybrid world relations,
+grow 10→263→516. External dense
+ranking and strict replay accepted 8/8 with embedding top-k insufficiency, and
+the final gate-v6 receipt is green with zero duplicates, prompt conflicts, or
+promotion-contract errors. The promoted `train.jsonl` digest is
+`d5b3bc700d53ee9faaf2bf38032c535f3c9c0e4fa1418fbaf0f5f4de7d026adf`;
+the gate receipt digest is
+`20acd2654698f8fed1f58bed4c120604c842f0f5a6fb3d69044fdd1c6094bf49`.
+
+After the question was corrected to describe observed selected final pre-merge
+checks rather than a verified historical branch-protection policy, fresh
+GitHub exports exposed a real parser bug: `status=completed` shadowed the
+body-visible terminal `conclusion=success`. A fail-first regression now gives
+terminal conclusion precedence. The replacement v17 content-diagnostic chain
+then retained **8 rows** (2/3/3 at 16K/32K/64K), accepted 8/8 pinned dense
+audits, promoted 8/8 strict replays, and passed the unchanged one-world release
+profile. Event-bearing tokens grow 10,344→20,346→43,532, source relations grow
+10→263→516, and generic background remains zero. Its 324,378 exact Qwen
+context tokens restore the CodeForge share of the current per-world
+content-gated baseline. The train-row digest is
+`72ffa2ff0343e2df905394631cfa6e7c0b61b8430a301fb1246f3a7ce97f366b`;
+the gate-receipt digest is
+`3d45285f4b11840766f0053b5f9068706c555423669ea040caa3402bcb916156`.
+Every promoted row, report, and gate explicitly records
+`content_gate_eligible=true`, `trust_valid_for_production=false`, and
+`production_eligible=false`. Combined-role candidate/audit/promotion/report/gate
+artifacts carry the signed isolation marker; role-separated dense rankings carry
+the probe ranker identity without claiming combined-role isolation. The
+superseded v16 release lacks these explicit trust-boundary fields and must not be
+used. The retained `verification.production_mode=true` field names strict replay
+strength only; publication/export code must require
+`trust_valid_for_production is true` and must not infer trust from
+`data_stage=train_ready`, gate `ok`, or replay mode.
+
+The second paper world re-fetches and source-signs the authentic Attention Is
+All You Need arXiv v1/v2/v3 bodies and two revision relations. Its final5 chain
+uses a unique stable world identity and retains six exact rows (two each at
+16K/32K/64K; 226,034 tokens). Authentic revision relations grow 0→1→2,
+graph-replayed proof depth grows 2→3→4, necessary events grow 4→7→10, and
+event-bearing tokens grow 15,944→32,398→64,175. All candidate/dense/audit/
+promotion rows pass; the one-world release gate is green and an independent
+review found no unresolved must-fix. Candidate and strict replay now share one
+fail-closed arXiv chain validator, so a missing prior edge, arbitrary third
+input, wrong relation type, or disconnected chain cannot inflate growth. The
+final train digest is
+`3f445d6cf95e8c7b27e9a321e073eacd587f163ada5d0faef87fb12f68dcee15`;
+the gate-receipt digest is
+`54bb66a05fdfea852d7caeff3ec4dc5c2d1392df8b8825e48e838e62ebddd667`.
+OpenReview API v1/v2 and the forum page returned access challenges, so no review
+record was scraped or simulated as authentic source; the fetch observation is
+an unsigned operator ledger, not source evidence.
+
+Five dprint releases (0.52.0→0.56.0) are now source-signed as a prospective
+CodeForge world: 346 real records, 429 links, 138,857 exact Qwen source-record
+tokens, and one authentic CI failure→origin→same-name recovery→release chain.
+The v12 diagnostic retains five candidate rows without padding or essential
+truncation: full/CF 16K version selection at 16,369 tokens and full/CF/ordered
+64K three-cycle traces at 65,260 tokens. The 32K two-cycle proof remains rejected
+because its dependency distance is 11,806 < 16,000; the CI proof now has depth
+two but its real episode is only 14,073 tokens, below the 16K band. These five
+rows are candidates only and have not entered dense audit or a complete-world
+gate. NVIDIA
+FY2022–FY2025 issuer acquisition likewise remains source discovery only because
+the issuer detail page returned a challenge and the downloader failed closed.
+Microsoft FY2025 now has issuer-owned GCS bytes, a signed source manifest/bundle,
+12 parsed sections, 27 exact XBRL roles, and four certification components. The
+GCS outer-page component envelope, raw/sanitized sidecar replay, parser/status
+trust binding, interleaved current/prior fact projection, real filing timestamps,
+and declared/active bucket fail-closed checks are implemented and independently
+replayed. A fresh three-band candidate run materializes 16/32/64K but retains
+**0/21 attempts**: 16K evidence distance is short, 32K has exact/window/pack
+failures, and 64K contains only 25,233 real tokens with 9,887-token ordered
+distance. Microsoft is therefore validated source capacity and a 0-row
+diagnostic, not training data. The current Amazon rows are unaffected because
+they use four real annual issuer filings rather than the single-filing facet
+timeline.
+Candidate-only ResearchLab and failed/superseded or stale CodeForge rows are not a new
+`COMMITTED` production package and are not eligible for HF upload. The
+current per-world content-gated baseline is **29 rows, 4 unique worlds, and
+1,120,639 exact Qwen context tokens**, but it has not passed the new 12-world
+union profile and its trust receipts are not a production KMS chain. The neutral
+signed inventory at
+`data/releases/p12-current-four-source-bound-union-v1.json` verifies four distinct
+world IDs, 29 distinct content hashes, source identities, and exact release-byte
+bindings; it explicitly records that the 12-world target gate was not evaluated.
+Trust-valid P12 publication therefore remains zero; 48/210 remain blocked.
+
+Replay data, source bytes, releases, and pinned model caches remain under
+`/workspace/wynckeliao`. The workspace permission controller repeatedly restores
+shared ACLs on the top-level credential directory, so runners correctly reject
+that path. A byte-identical active local-probe credential mirror is temporarily
+held under a 0700/0600, ACL-free `/root` path; it is execution authority only,
+not durable data or production trust. Reproduction still requires a locally
+resolvable model snapshot whose fresh manifest equals the signed digest. No new
+HF dataset upload is part of this cycle; code and release-status synchronization
+use GitHub only after final review.
+
+## Current expansion matrix
+
+| Evidence stage              | Worlds | Rows | Exact/context source tokens | Meaning                                                                                                                                |
+| --------------------------- | -----: | ---: | --------------------------: | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Current local-probe union   |      4 |   29 |                   1,120,639 | 16/32/64K rows passed individual strict chains and the neutral union identity/byte audit; the 12-world target gate remains unevaluated |
+| dprint incomplete candidate |      1 |    5 |                     228,518 | 16K/64K rows pass generation, but missing 32K and undersized CI history block dense audit and complete-world promotion                 |
+| P12 production/KMS release  |      0 |    0 |                           0 | independent approval and the 12-world union remain blocked                                                                             |
+
+The implemented query surface currently contains 47 literal task types across
+the CodeForge, Company, and ResearchLab adapters (15/17/15), 48 literal motifs,
+and 81 literal answer-program operators. This is implementation capacity, not
+qualified semantic diversity: the 29 content-gated rows currently exercise only
+seven query types, 11 answer programs, and 12 executable proofs. Wikimedia/KB
+and paper workflows are separate real source families but currently share the
+ResearchLab adapter. Expansion is therefore measured by newly exercised source
+relations/programs/proofs, not by counting unused templates or multiplying
+length by view.
 
 ## Scale gates
 
 1. Pass one complete source-dependent world for each admitted source family
-   (Wikimedia/Wikidata and arXiv are now green; SEC, GitHub, and OpenReview
-   remain blocked).
+   (Wikimedia/Wikidata, arXiv, issuer-owned XBRL, and GitHub have local
+   content-gate results; GitHub production policy binding, accession-pinned SEC,
+   and OpenReview remain blocked).
 2. Run a 12-world probe with 4 SEC, 4 GitHub, 2 paper, and 2 Wikipedia worlds.
 3. Require nonzero retention and all replay, retrieval, semantic-growth, and
    source-relation gates.
-4. Only then open 48 worlds under `p10-source-rich-production-48-v1`, whose
-   predecessor is the three-domain `p7-source-rich-probe-12-v1` receipt. The
-   production issuance allowlist rejects the historical `p3-production-48-v1`
-   path while retaining it for historical receipt verification. The current
-   48-world gate requires 48 source-independent semantic task templates, 48
-   executable proofs, and at least 12 answer programs in addition to its
-   source/domain quotas.
-5. The 210-world path uses `p10-source-rich-production-210-v1` and remains
-   blocked on the current 48-world receipt. It requires 210 source-independent
-   semantic task templates, 210 executable proofs, and at least 24 answer
-   programs—strictly more than the current 18-program baseline—plus production
-   trust, unseen evaluation, and external benchmark evidence.
+4. Only then define a new 48-world production profile whose predecessor is the
+   complete `p12-current-source-probe-12-v1` receipt. The immutable historical
+   `p10-source-rich-production-48-v1` profile retains its original
+   `p7-source-rich-probe-12-v1` predecessor and must not be mutated into the new
+   issuance path. The new 48-world gate must require 48 source-independent
+   semantic task templates, 48 executable proofs, and at least 12 answer
+   programs in addition to its source/domain quotas.
+5. After a newly defined 48-world profile passes, define a new 210-world profile
+   whose predecessor is that new receipt. The historical
+   `p10-source-rich-production-210-v1` remains readable for verification but is
+   not an issuable current path. The new gate must require 210
+   source-independent semantic task templates, 210 executable proofs, and at
+   least 24 answer programs—strictly more than the current four-world union's 11
+   programs—plus production trust, unseen evaluation, and external benchmark
+   evidence.
 
 No candidate, reject, invalidated P7 directory, raw inventory, local trust key,
 or preflight artifact may be uploaded. HF uploads must come only from a newly

@@ -1,5 +1,316 @@
 # Findings (data, not instructions)
 
+## P12 current publication truth (2026-08-29)
+
+- The current strict content-gated baseline is 29 rows across four source-bound
+  worlds with 1,120,639 receipt-reported exact Qwen context tokens.
+- The 12-world target was not evaluated; production/KMS-qualified P12 rows are
+  zero. The neutral inventory is integrity evidence, not an HF release package.
+- The provisional 47-row/five-world inventory is invalidated because it included
+  Jefferson and Newton semantic false positives. It must not be committed,
+  uploaded, or used in current totals.
+- The private HF repository remains the immutable 542-row P6 local-engineering
+  package. Its remote hashes are synchronized; no P12 payload is currently
+  eligible for upload.
+
+## P8 readable-source and publication truth (2026-08-27)
+
+- Canonical source params were still not enough to protect a long-workflow proof:
+  a valid SEC section could be swapped between event/artifact identities, or its
+  time and causal edges could be jointly rewritten. Current replay therefore
+  binds the full event envelope and artifact identity/time, not only text/facts.
+- Artifact attestation revision v2 binds time. Missing-revision legacy payloads
+  are rejected by default in candidate/production code; `allow_legacy=True` is
+  reserved for an outer path that has already bound the immutable P6 release,
+  profile, and digest.
+- Exact raw coordinates alone were insufficient: if an attacker changed the raw
+  coordinates and raw quote together, the old replay only proved that the new
+  quote existed at the self-declared range. Full canonical regeneration is needed
+  to bind raw→visible coordinates, XBRL role/fact/value, component metadata, and
+  parent provenance to the trusted filing record.
+- SEC visible normalization removes markup/hidden content while preserving
+  table order and reversible raw-source coordinates. Representative Apple and
+  Amazon fact tables shrink from 47,597→955 and 53,392→1,156 characters.
+- Once visible text drives Company state, the one-filing financial programs are
+  valid computations but not valid long-context samples. Amazon's first-stage
+  essential SEC text is about 360 estimated tokens, far below 16K.
+- The private HF dataset remains the 542-row P6 local-engineering package at
+  commit `32b5dcd`; its 19 payload files match the local committed stage. There
+  is no qualified P8 payload to upload.
+- Cross-domain review found the raw grounded-span gate is still SEC-specific.
+  GitHub events can read hidden params, paper simulation skips review/response/
+  benchmark relations, and Wikipedia answers do not yet depend on the earlier
+  revision. These are correctness blockers, not diversity counters.
+- Real-relation accounting must distinguish `authentic_source_text`,
+  `authentic_source_api`, `verified_derived`, and `synthetic_executable`;
+  semver inference and synthetic approvals cannot inflate authentic relations.
+
+## P7 GitHub ruff first/late straddle (2026-08-27)
+
+- `astral-sh/ruff` `#27170` → `0.16.1` (62 `ci_run`, 59k commit chars) and
+  `#17804` → `0.16.4` (132 `ci_run`, 116k commit chars). CI is uv-class;
+  patches are close to uv `#17455`/`#21001`.
+- 16K overflows. 32K emits 6 rows (packed to 32,768). 64K wrap is 50,144
+  (first) / 66,128 (late) at pack 52,500 and 51,420. Those wraps do not
+  move with the cap: they are natural lengths. First cannot grow; late
+  cannot shrink; they straddle `[64000, 65536]`.
+- uv lands because leftover fills to the pack cap, so first/late wraps
+  converge (~64,758 / 64,848). ruff's leftover queue is empty relative to
+  the cap, so layout (`buffer` before vs after) dominates.
+- `#26460` (13 commits) is thinner than `#17804` (70k vs 116k commit
+  chars). `#27766` head CI includes `cancelled`.
+
+## P7 GitHub deno CI-matrix wrap (2026-08-26)
+
+- `#33946` has 1,337 `ci_run` records. 16K overflows. 32K of v2.9.0 fits.
+  64K wrap 59,359 at pack 46,648 and 72,894 at pack 50,900: one leftover
+  artifact jumps the window.
+- `#34726` (401 `ci_run`) still overflows 16K. 64K required wrap is 70,395
+  at pack 52,500 and 70,395 at 48,301. The proof itself is over the
+  window. Deno's CI matrix is the wrap, not patch length.
+
+## P7 SEC Amazon one-world proof (2026-08-26)
+
+- Local attested filing `0001018724-25-000004` (AMAZON COM INC, FY2024,
+  filed 2025-02-07). Import is `explicit_filings`; this host cannot reach
+  sec.gov. Issuer spec is keyed on CIK `0001018724`: Note 2 is Financial
+  Instruments, disaggregation/geo is Note 10, Note 13 end is unique iXBRL
+  `id="f-1388"`. Geo axis `srt:StatementGeographicalAxis`. No tagged
+  `us-gaap:Liabilities`; 64K gold uses reconstructed L = A − E.
+- Mix Product 272311 + Service 365648 = 637959; seven category leaves plus
+  five geos. SOX 906 names from EX-32.1 and EX-32.2 (Jassy / Olsavsky).
+  Optional component type `EX-32.2` is extracted if present; Apple has none
+  so still four components. Cert regex allows a title before `certify`.
+- Note 13 `f-1387` wrapped 63,930 (70 short); `f-1388` wrapped 64,174.
+  Packed est 14,298 / 28,950 / 49,471 at pack 49,600. 18/18 promoted; gate
+  v5 green. Candidate `a21fcdd1…`; promoted `c2001e06…`. Company 2/4.
+
+## P7 Wikipedia MLK leftover vs RFC fill (2026-08-26)
+
+- `appendix_rest` was in the 64K pool. Wrap ~59,775 at pack 60,000 was
+  mixed-density cap-fill from unbound RFC `.full` files that
+  `bind_source_packs` injects onto every focal world. Dropping
+  `doc_type == "source_pack"` from `source_workflow_artifacts_for_query`
+  plus leftover rest_end `==== ''The Measure of a Man'' ====` (~6,035 est)
+  at pack 54,000 wraps 64,504. Packed est 14,669 / 32,670 / 53,151.
+- 18/18 promoted; gate v5 green. Extra beyond ResearchLab 4/4. Candidate
+  `5bf3678f…`; promoted `e077f35e…`. Do not restore Jane Elliott leftover.
+
+## P7 Wikipedia Elizabeth leftover retune (2026-08-26)
+
+- Essentials-only wrap was 62,311. Full References leftover (~4,427 est) at
+  pack 51,200 wrapped 66,981: one artifact, all-or-nothing. Cutting leftover
+  at unique `==External links==` (~2,033 est) lets pack 50,000 include it.
+  Wrap 64,847 / 64,846. 18/18 promoted; gate v5 green. Candidate
+  `197fb8c6…`; promoted `88456e79…`. Gold `BORN:1926-04-21` /
+  `COMM:Jallianwala Bagh massacre` / `ENTITY:Q9682` / `POP:death of Diana`.
+- A leftover just under remaining pack budget is the unlock, not padding and
+  not pack retune alone when the next artifact overshoots the 1,536-token
+  exact-64K window.
+
+## P7 GitHub uv one-world proof (2026-08-26)
+
+- Two signed `astral-sh/uv` episodes (`#17455` → `0.12.5`, `#21001` →
+  `0.12.6`) fill exact-64K from inlined commit patches, not changelog length.
+  Skipped CI conclusions no longer force `blocked` / empty version when a
+  gate passed. Gold is `commit -> tag`; CF is `BLOCKED-tag`.
+- 16K (0.12.5) already contains the prior proof (depth 5, support 67). A 32K
+  sibling of that same proof has zero causal/support/depth/proof-token growth
+  and fails the P7 gate. The kept pair is 16K (0.12.5) plus 64K (0.12.6,
+  depth 6, support 149). Wrap 64,758 / 64,848 at pack 52,500.
+- This is CodeForge unique exact-64K world 2/4. Do not subset P6's 80-bundle.
+
+## P7 Wikipedia Obama one-world proof (2026-08-26)
+
+- Later Obama revision `page-534366-r1371416342` plus Wikidata `Q76`. Unique
+  birth `{{birth date and age|1961|8|4}}` → `1961-08-04`; mid quote
+  `Madelyn Payne Dunham`; late quote `Obama Chooses Biden`. Headings have no
+  spaces (`==Early life and career==`). Leftover starts at H4
+  `====Environmental policy====` and ends at `[[The Hill (newspaper)|The Hill]]`.
+- Obama Qwen/est is ~1.31 (denser than Newton ~1.20). Pack 54,000 wrapped
+  69,290; 50,200 wrapped 65,901; 49,300 wrapped 64,976 / 64,965. Leftover
+  shrink does not lower wrap while the packer fills the cap.
+- 18/18 promoted; gate v5 green. Extra beyond ResearchLab 4/4.
+
+## P7 Wikipedia Newton one-world proof (2026-08-26)
+
+- Later Newton revision `page-14627-r1371274988` plus Wikidata `Q935` drive
+  tagged BORN/COMM/ENTITY/POP answers. The birth template
+  `{{Birth date|df=y|1643|01|04}}` occurs twice in the early body (infobox
+  and Old-Style prose). Evidence is the unique infobox wrapper
+  `= {{OldStyleDateNY|{{Birth date|df=y|1643|01|04}}` → `1643-01-04`; mid
+  quote `Hypothesis of Light`; late quote `William Chaloner`; entity Q935.
+  CF birth year +1 → `1644-01-04`.
+- Full later revision is ~56.2k estimated tokens. 64K proof sections stop
+  before unique `== References ==` (~49.3k essentials). An authentic
+  non-essential References prefix ending at
+  `=== Alchemy further reading ===` wraps 64,959.
+- Candidate generation emitted 18 rows (6/6/6 at 16K/32K/64K) with zero
+  rejects. Packed estimated tokens 14,288 / 28,223 / 54,083 (pack target
+  54,000). Exact 64K wrap is 64,959.
+- Promoted proof-bearing growth is 12,680 tokens (16K→32K; minimum 696)
+  and 23,985 tokens (32K→64K; minimum 1,293). Authentic source relations
+  stay 0; hybrid causal signatures are 3 with edge counts 3/5/10.
+- Candidate row-set `50202f59…`; promoted row-set `5f24fa4f…`. This slice
+  is not merged into P6 v4 and is not a 12-world product.
+- Combined with Churchill/Einstein/Thatcher, ResearchLab now has four
+  unique exact-64K source workflows. That would fill the P7.5 researchlab
+  world quota; it does not fill Company or CodeForge.
+
+## P7.5 Company exact-64K blocker (2026-08-26)
+
+- This host cannot reach EDGAR. Both `data.sec.gov` submissions JSON and
+  `www.sec.gov` Archives/browse/company_tickers return HTTP 403 Akamai
+  “undeclared automated tool”. Do not retry from this IP.
+- Copying Apple into 12 worlds is forbidden. A second 10-K needs (1) an
+  attested Archives `.txt` copied from a network that has declared SEC
+  fair-access User-Agent traffic, imported with `explicit_filings` so
+  fetch never HTTP, and (2) a CIK-keyed heading/fact program. Apple
+  `0000320193` remains the only programmed issuer; unknown CIKs fail
+  closed instead of reusing Note 2 / Note 13 / ProductMember cuts.
+- Allowlisted CIKs still waiting on filings: Microsoft `0000789019`,
+  Amazon `0001018724`, NVIDIA `0001045810`, Alphabet `0001652044`.
+
+## P7.5 CodeForge exact-64K blocker (2026-08-26)
+
+- P6 bound all 80 signed GitHub episodes into one world. A v2.34 subset
+  or leftover unused PRs from that bundle is not a new unique workflow.
+- 64K packing is commit-patch text plus CI stubs, not changelog length.
+  urllib3, aiohttp, pytest, and fastapi release-cited PRs scouted here
+  have tens-to-hundreds of added lines — Ada-class, not wrap-64K.
+  `psf_requests_pr7272_v2340` (615 records, ~666KiB) remains the only
+  individually long-enough episode and is already in P6.
+- Unlock: allowlist a new MIT/Apache-2.0 public repo whose two later
+  releases cite merged PRs with large inline patches (or many commits
+  under `MAX_INLINE_PATCH_FILES`), export disjoint episodes, and run a
+  one-world slice. Do not point a P7 slice at the full 80-bundle.
+
+## P7 Wikipedia Thatcher one-world proof (2026-08-26)
+
+- Later Thatcher revision `page-19831-r1370984131` plus Wikidata `Q7416`
+  drive tagged BORN/COMM/ENTITY/POP answers. Birth
+  `{{Birth date|df=y|1925|10|13}}` → `1925-10-13`; mid quote
+  `The lady's not for turning`; late quote `Westland affair`; entity Q7416.
+  CF birth year +1 → `1926-10-13`.
+- Full later revision is ~68.4k estimated tokens. 64K proof sections stop
+  before unique unspaced `==Legacy==` (~46.0k essentials). Qwen/est on this
+  page is ~1.24. A Legacy-through-References leftover (~12k) wraps ~72k and
+  overshoots; `[[Scottish Widows]]` leftover wraps 66,303; `====Reputation====`
+  leftover wraps 65,553 (17 over). Unique `[[Scottish independence]]`
+  leftover (~4,530 est) wraps 65,417.
+- Candidate generation emitted 18 rows (6/6/6 at 16K/32K/64K) with zero
+  rejects. Packed estimated tokens 13,972 / 28,727 / 53,426 (pack target
+  54,000). Exact 64K wrap is 65,417.
+- Promoted proof-bearing growth is 13,500 tokens (16K→32K; minimum 737)
+  and 20,146 tokens (32K→64K; minimum 1,234). Authentic source relations
+  stay 0; hybrid causal signatures are 3 with edge counts 3/5/10.
+- Candidate row-set `4bf6b695…`; promoted row-set `b3916422…`. This slice
+  is not merged into P6 v4 and is not a 12-world product.
+- Leftover ground no longer requires a spaced `== References ==` heading.
+  Unspaced `==References==` or the first leftover H2 (`==Legacy==`) is
+  accepted so bibliography-style leftovers are not the only wrap filler.
+
+## P7 Isaac Newton inventory (2026-08-26)
+
+- Fetched `wikimedia_p7_newton_v1`: later revision `14627-r1371274988`,
+  Q935, ~56.2k estimated, References at ~49.3k. Later programmed: unique
+  infobox wrapper around the duplicated birth template. See the Newton
+  one-world proof above.
+
+## P7 Wikipedia Einstein one-world proof (2026-08-26)
+
+- Later Einstein revision `page-736-r1370002284` plus Wikidata `Q937`
+  drive tagged BORN/COMM/ENTITY/POP answers. Birth
+  `{{Birth date|df=yes|1879|3|14}}` → `1879-03-14`; mid quote
+  `Russell–Einstein Manifesto`; late quote `Einstein–Podolsky–Rosen paradox`;
+  entity Q937. CF birth year +1 → `1880-03-14`.
+- Full later revision is ~59.5k estimated tokens and overflows a 51,200 pack
+  target. 64K proof sections stop before unique `== References ==` (~42.3k
+  essentials). Qwen/est on this page is ~1.14 on body vs Churchill ~1.28, so
+  pack 51,200 wrapped only 51,167. An authentic non-essential References
+  prefix (`appendix_rest`, unique end `<ref name="ILjYQ">`) is preferred in
+  packing so generic source_packs do not consume the leftover budget first.
+- Candidate generation emitted 18 rows (6/6/6 at 16K/32K/64K) with zero
+  rejects. Packed estimated tokens 15,946 / 32,823 / 54,055 (pack target
+  54,000). Exact 64K wrap is 64,982.
+- Promoted proof-bearing growth is 16,866 tokens (16K→32K; minimum 843)
+  and 21,249 tokens (32K→64K; minimum 1,061). Authentic source relations
+  stay 0; hybrid causal signatures are 3 with edge counts 3/5/10.
+- Candidate row-set `eee8896c…`; promoted row-set `0c04fa82…`. This slice
+  is not merged into P6 v4 and is not a 12-world product.
+
+## P7 paper extractor generalization (2026-08-26)
+
+- The funding regex `funded by … (AGENCY), NSF DIGITS.` is too narrow for a
+  second paper. Attention `1706.03762` v1→v2 has unique semantic LaTeX and
+  no funding-regex hit. `format_revision_added_delta` prefers funding when
+  present and otherwise keeps a unique semantic sentence that contains a
+  digit for CF. MLRC Aviva/ONR/NSF 172251 is unchanged.
+- Signed Attention inventory binds
+  `Based on the similarity of these formulae, the two-layer feed-forward
+network can be seen as a kind of attention...`. Body ~21k estimated
+  tokens: not exact-64K. Do not invent funding facts. Do not retry OpenReview 403.
+
+## P7 CodeForge leftover episodes (2026-08-26)
+
+- `public_repo_episodes_v2.json` has 80 attested episodes; P6 v4 seed 3
+  already bound all 80 into one world. Only `psf_requests_pr7272_v2340`
+  is individually long enough for exact-64K and it is already in P6's 64K
+  proof. The only unused two-cycle pair (`v2.33.0`+`v2.33.1`) is ~35k
+  estimated and cannot wrap 64,000. Four leftover exact-64K CodeForge
+  worlds are not available from this bundle.
+
+## P7 Wikipedia Churchill one-world proof (2026-08-26)
+
+- Later Churchill revision `page-33265-r1367982973` plus Wikidata `Q8016`
+  drive tagged BORN/COMM/ENTITY/POP answers. Birth
+  `{{birth date|1874|11|30|df=y}}` → `1874-11-30`; mid quote `We shall
+fight on the beaches`; late quote `On the 8th, Churchill declared war
+on Japan`; entity Q8016. CF birth year +1 → `1875-11-30`.
+- Candidate generation emitted 18 rows (6/6/6 at 16K/32K/64K) with zero
+  rejects. Packed estimated tokens 14,757 / 28,006 / 51,141 (pack target
+  51,200 after 52,200 overshot Qwen wrap to 66,111). Exact 64K wrap is
+  65,073 (first) and 65,131 (late).
+- Promoted proof-bearing growth is 13,182 tokens (16K→32K; minimum 662)
+  and 23,187 tokens (32K→64K; minimum 1,156). Authentic source relations
+  stay 0; hybrid causal signatures are 3 with edge counts 3/5/10.
+  `generate.py` must union `WIKI_HYBRID_CHILD_EVENT_TYPES` when writing
+  `source_relation_edges`; SEC-only counting left Wikipedia candidates
+  with empty edges and select failed (`0<1` real worlds).
+- 16K essentials are early_work + compute + two copy rungs (BM25 top-3
+  cannot cover). 32K/64K parent the prior compute, not the copies.
+  Depth/essentials d4|n4, d5|n5, d6|n7. 64K leftover pack-to-cap is
+  ~2.9% non-real-source tokens; those extras are not the proof.
+- Ada later revision (~24k estimated) yields honest 16K/32K only. Turing
+  later revision (~43k) wraps at 57,125, below 64,000. Do not pad either
+  with pulses, leftover lab docs, or a near-duplicate earlier revision.
+- Candidate row-set `a31b7d1a…`; promoted row-set `577644a0…`. This slice
+  is not merged into P6 v4 and is not a 12-world product.
+
+## P7 SEC v8 one-world proof (2026-08-25)
+
+- iXBRL leaf facts from the Apple FY2025 10-K now enter replayed state and
+  determine staged MIX/CAT/GEO/BS/CERT answers. Product+service = total
+  `416,161,000,000`; category and geographic mixes also sum to that total;
+  L+E=A=LSE on the balance sheet; EX-31.1/31.2/32.1 names are Cook, Parekh,
+  and both.
+- Candidate generation emitted 18 rows (6/6/6 at 16K/32K/64K) with zero
+  rejects. First-tier natural length is 12,698 estimated tokens (honest 16K),
+  not the v6 10.2K/8K underfill. Exact 64K wrap is 64,854 Qwen tokens.
+- Promoted proof-bearing growth is 16,997 tokens (16K→32K; minimum 1,004) and
+  19,744 tokens (32K→64K; minimum 840). Authentic source relations stay 0;
+  hybrid causal signatures are 3. Gate v5 is green.
+- 16K essentials are operations + compute + two copy rungs (BM25 top-3 cannot
+  cover). 32K/64K keep the 16K compute but drop the copies. 32K leftover
+  pack-to-cap still includes Company-cycle documents (~10.7% non-real-source);
+  those extras are not the proof.
+- The pinned Qwen3.5-4B tokenizer snapshot is now available from
+  `HF_HOME=/workspace/wynckeliao/.hf`; its freshly resolved asset manifest
+  matches the release-profile digest. `/root` is no longer required for exact
+  tokenizer replay.
+- Candidate row-set `8579b9f8…`; promoted row-set `0fb120ae…`. This slice is
+  not merged into P6 v4 and is not a 12-world product.
+
 ## P5 implementation and live probes (2026-08-25)
 
 - Live SEC smoke downloaded Apple accession `0000320193-25-000079`: one
@@ -519,3 +830,110 @@ LLaMA-Factory `B1`–`B5`, `B5w`, `ext_acc`, `ext_longtrace`: `cutoff_len: 26214
   remain blocked independently of code correctness: OpenReview live fetch is
   403, production KMS approval is absent, world/entity coverage is world-only,
   domain-composition has fewer than two groups, and HF authentication is absent.
+
+# P7 source-rich run 1 findings — 2026-08-25
+
+- The qualified P6 product has 542 executable rows and about 19.8M estimated
+  context tokens, but only 44 rows in two worlds carry authentic public body
+  text into answer execution; 16 of those are exact-64K. P7 must optimize this
+  source-grounded numerator rather than total row count.
+- Existing live local inventories are sufficient for an executable integration
+  slice but not the 12-real-world exit gate: one Apple SEC 10-K, two Wikipedia
+  revisions plus one Wikidata entity revision, one multi-version arXiv work,
+  and the GitHub episode bundle. Additional authorized live episodes must be
+  fetched after the adapters cross source→state→answer correctly.
+- The immutable profile can already enforce all 12 promoted worlds as real by
+  setting `min_real_train_worlds=10` and `min_real_eval_worlds=2`; no weaker or
+  producer-authored `real_world` count is needed. The planned profile also needs
+  four source families, at least 12 real task/relation identities, and 48 real
+  exact-64K rows.
+- Source loading is seed- and domain-bound in `scripts/generate.py`. ResearchLab
+  currently accepts only `paper_workflow`; Company SEC and Wikipedia need
+  explicit typed adapters rather than relabeling those workflows as papers.
+- The P7 Wikimedia live fetch succeeded for four exact allowlisted titles and
+  produced 12 source records, 12 exact-span relations, and four independently
+  normalized workflows of three records each. The source manifest remains
+  `generation_integration=disabled` until a domain adapter crosses the world
+  boundary.
+- The P7 SEC live fetch failed closed before writing any source file. Both the
+  Python fetcher and a diagnostic request with a different compliant contact
+  User-Agent received Akamai HTTP 403 from `data.sec.gov`, indicating a network
+  access block rather than a parser/cache fallback. The existing signed Apple
+  filing remains the only usable SEC live inventory on this host.
+- Strict replay profiling isolated the primary CPU cost rather than blaming
+  source fetch or dense ranking: one 66-row ResearchLab world spent 140.254 of
+  193.121 seconds in repeated graph statistics. The old implementation issued
+  roughly 1.22M reachability and 1.33M shortest-path calls. Reusing one causal
+  subgraph and one single-source traversal per proof node preserves the current
+  maximum-shortest-path metric while removing repeated graph construction.
+- The graph optimization has no persistent cache and does not weaken replay or
+  filtering. Focused Company/ResearchLab equivalence tests match an independent
+  pairwise reference, and a regression proves `graph_stats` builds the world
+  graph once. Full 1-vs-4-worker row-set/byte-SHA benchmarking is still required
+  before claiming the estimated 3x end-to-end audit improvement.
+- A single SEC query copied across length buckets failed the semantic-growth
+  gate even after exact-64K packing. The correct fix was three chained
+  publication-control stages whose answer keys depend on the preceding stage;
+  `required_inputs` alone was insufficient because the semantic remove-one
+  replay deliberately runs without strict preconditions.
+- Candidate and promotion relation accounting initially diverged. Promotion
+  replay correctly reconstructed 3/4/5 SEC policy/approval/ratification edges,
+  while the view metric counted only GitHub and arXiv and emitted 0/0/0. The
+  repaired metric filters the exact visible graph by the query's declared
+  sufficient event set, preventing later packed events from inflating a shorter
+  query. The final candidate and promotion both report 3/4/5.
+- SEC edges after the authentic filing are simulated executable workflow edges,
+  not independently observed SEC source-to-source relations. The resulting rows
+  are valid hybrid causal training examples, but the source-provenance inventory
+  remains only one authentic Apple filing workflow. P7 scale decisions must use
+  unique authentic workflow/source coverage rather than treating these three
+  programs as three independently acquired filings.
+- The signed v4 SEC slice is not recoverable by relabeling. Once query-time
+  filtering is correct, its first checkpoint contains only about 10.2K natural
+  tokens, while the 32K/64K increments mostly comprise unrelated Company-cycle
+  records. The corrected gate therefore requires a material proof-token share,
+  not merely one additional short ratification memo.
+- A valid offline path exists despite EDGAR HTTP 403: the already attested 9.4MB
+  complete submission contains a main 10-K and EX-31.1/31.2/32.1 components plus
+  exact XBRL facts for sales mix, geographic totals, and the balance-sheet
+  identity. These must be parsed as non-overlapping parent-hash-bound components
+  and sections; only sections whose facts enter the answer may supply 16/32/64K
+  growth. This remains one authentic filing plus a simulated review workflow,
+  not a multi-period real filing history.
+- Wikimedia API access policy and content license are different provenance
+  fields. Wikipedia revision text is represented as CC BY-SA 4.0/GFDL and
+  Wikidata structured entity data as CC0-1.0; the User-Agent policy remains an
+  access receipt and no longer populates `SourceLineage.license`.
+- The local SEC complete submission contains exactly the four required reusable
+  components at verified coordinates: the main 10-K plus EX-31.1, EX-31.2 and
+  EX-32.1. Storing coordinates rather than component text avoids introducing a
+  second body copy while allowing downstream section/fact derivations to bind
+  the same immutable parent bytes.
+
+# 2026-08-27 SEC exact-fact single-world closure (active)
+
+- Existing uncommitted code already contains an exact-fact parser
+  (`longworld/core/secxbrl.py`), non-overlapping SEC components/sections, and a
+  staged `sec_financial_reconstruction` Company program. This is work to audit
+  and validate, not evidence that a release is qualified.
+- The staged code currently exposes 16k/32k/64k/128k variants. This user gate
+  is specifically 16k/32k/64k; 128k must not substitute for a failing 64k
+  closure or inflate the single-world result.
+- The single-world pass is necessary but not sufficient to start the P7
+  12-world run: unique workflow/source-family quotas remain independent hard
+  gates. 48/210 remain blocked.
+
+## 2026-08-27 — SEC source-to-state-to-answer finding
+
+The successful unit is not a whole-filing paste. Exact source facts are parsed
+first, then deterministic non-overlapping source views reveal those facts into
+state, and staged answer events consume the state. This produced exact Qwen
+lengths of 16,193 / 32,030 / 64,255 while evidence count, graph depth, and
+program size all increased. Dense/BM25/TF-IDF/window shortcuts remained
+insufficient and counterfactual text replay produced the declared CF answer.
+
+The remaining limitation is structural rather than a length problem: the v6
+world contains one Apple filing workflow. Hash/span lineage is real provenance,
+but the causal `reads_section`/`extends` edges are simulated executable logic,
+so `n_real_source_relations=0` is correct. Do not use this slice to claim the
+12-world or production diversity gates are met.
