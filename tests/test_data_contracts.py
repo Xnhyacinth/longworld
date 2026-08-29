@@ -2540,17 +2540,23 @@ def test_quality_gate_rejects_superseded_production_profile_issuance() -> None:
 
 def test_current_source_rich_profiles_require_relation_provenance_split() -> None:
     p7 = release_profile("p7-wiki-source-slice-1-v1")
+    p12_wiki = release_profile("p12-wiki-source-slice-1-v1")
     p10 = release_profile("p10-source-rich-production-48-v1")
     p12 = release_profile("p12-current-source-probe-12-v1")
+    p12_v2 = release_profile("p12-current-source-probe-12-v2")
     legacy = release_profile("p3-probe-12-v1")
 
     assert quality_gate._requires_relation_provenance_split(p7)
+    assert quality_gate._requires_relation_provenance_split(p12_wiki)
     assert quality_gate._requires_relation_provenance_split(p10)
     assert quality_gate._requires_relation_provenance_split(p12)
+    assert quality_gate._requires_relation_provenance_split(p12_v2)
     assert not quality_gate._requires_relation_provenance_split(legacy)
     assert quality_gate._requires_substantial_real_proof_growth(p7)
+    assert quality_gate._requires_substantial_real_proof_growth(p12_wiki)
     assert quality_gate._requires_substantial_real_proof_growth(p10)
     assert quality_gate._requires_substantial_real_proof_growth(p12)
+    assert quality_gate._requires_substantial_real_proof_growth(p12_v2)
     assert not quality_gate._requires_substantial_real_proof_growth(legacy)
 
 
@@ -3028,6 +3034,60 @@ def test_p12_sec_quality_gate_requires_all_four_exact_length_buckets(
         )
         == []
     )
+
+
+def test_p12_wiki_quality_gate_requires_all_three_exact_length_buckets(
+    monkeypatch,
+) -> None:
+    profile = release_profile("p12-wiki-source-slice-1-v1")
+    tokens_by_band = {"16k": 16_000, "32k": 32_000, "64k": 64_000}
+    monkeypatch.setattr(
+        quality_gate,
+        "_tokenizer_context_tokens",
+        lambda context, _model, _revision: tokens_by_band[context],
+    )
+    monkeypatch.setattr(
+        quality_gate,
+        "resolved_tokenizer_asset_manifest_sha256",
+        lambda _model, _revision: profile.tokenizer_asset_manifest_sha256,
+    )
+
+    def row(band: str) -> dict:
+        return {
+            "world_id": "p12-wiki-world",
+            "query_id": f"p12-wiki-{band}",
+            "length_bucket": band,
+            "context": band,
+            "tokenizer_context_tokens": tokens_by_band[band],
+            "tokenizer_model_id": profile.tokenizer_model_id,
+            "tokenizer_revision": profile.tokenizer_revision,
+            "tokenizer_asset_manifest_sha256": (
+                profile.tokenizer_asset_manifest_sha256
+            ),
+        }
+
+    assert quality_gate._required_exact_length_bucket_errors(
+        profile,
+        [row("16k"), row("64k")],
+    ) == ["release_required_exact_length_buckets:p12-wiki-world:missing=32k"]
+    assert (
+        quality_gate._required_exact_length_bucket_errors(
+            profile,
+            [row("16k"), row("32k"), row("64k")],
+        )
+        == []
+    )
+
+
+def test_wave2_wikimedia_configs_use_the_exact_multiband_slice_profile() -> None:
+    for entity in ("churchill", "jefferson"):
+        config = yaml.safe_load(
+            (
+                ROOT / "configs" / f"p12_wave2_wikimedia_hunk_{entity}_v1.yaml"
+            ).read_text()
+        )
+
+        assert config["release_profile_id"] == "p12-wiki-source-slice-1-v1"
 
 
 def test_proof_metadata_gate_requires_graph_authority() -> None:

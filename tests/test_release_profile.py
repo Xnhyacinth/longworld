@@ -111,6 +111,22 @@ def test_p12_current_gate_probe_is_a_new_strict_root() -> None:
     }
 
 
+def test_p12_current_v2_adds_per_world_bands_without_rewriting_v1() -> None:
+    historical = release_profile("p12-current-source-probe-12-v1")
+    profile = release_profile("p12-current-source-probe-12-v2")
+
+    assert historical.predecessor_profile_id is None
+    assert profile.predecessor_profile_id is None
+    assert historical.required_exact_length_buckets == ()
+    assert profile.required_exact_length_buckets == ("16k", "32k", "64k")
+    historical_contract = asdict(historical)
+    current_contract = asdict(profile)
+    for field in ("profile_id", "required_exact_length_buckets"):
+        historical_contract.pop(field)
+        current_contract.pop(field)
+    assert current_contract == historical_contract
+
+
 def test_current_production_profiles_require_source_rich_predecessors() -> None:
     production_48 = release_profile("p10-source-rich-production-48-v1")
     production_210 = release_profile("p10-source-rich-production-210-v1")
@@ -253,6 +269,52 @@ def test_p7_wiki_slice_is_an_explicit_one_world_engineering_gate() -> None:
     assert profile.min_unique_real_source_workflows == 1
     assert profile.min_real_exact_64k_rows_by_domain == (("researchlab", 1),)
     assert profile.min_real_exact_64k_worlds_by_domain == (("researchlab", 1),)
+
+
+def test_p12_wiki_slice_adds_per_world_bands_without_rewriting_p7() -> None:
+    historical = release_profile("p7-wiki-source-slice-1-v1")
+    profile = release_profile("p12-wiki-source-slice-1-v1")
+
+    assert historical.required_exact_length_buckets == ()
+    assert profile.required_exact_length_buckets == ("16k", "32k", "64k")
+    historical_contract = asdict(historical)
+    current_contract = asdict(profile)
+    for field in ("profile_id", "required_exact_length_buckets"):
+        historical_contract.pop(field)
+        current_contract.pop(field)
+    assert current_contract == historical_contract
+
+
+def test_historical_p7_and_p12_current_profiles_remain_immutable() -> None:
+    expected_digests = {
+        "p7-source-rich-probe-12-v1": (
+            "846b09bfc977672ef6f5985fd807ea7423ac1a279a24790080d0267c8ffa5a31"
+        ),
+        "p7-sec-source-slice-1-v1": (
+            "a2b08e46b0fe9cfed32ca15c2c01b1074bcac9876432dc42fd803d26d1dbce84"
+        ),
+        "p7-wiki-source-slice-1-v1": (
+            "b67c47e4903d3535e5b556ee7326069ce429d882ffe7e73efac62ba17b7eee1d"
+        ),
+        "p7-paper-source-slice-1-v1": (
+            "0e42fc5c44f85bf537fe45439d06cf7c958ff7d9b39f04e86150ca1d7849c2ab"
+        ),
+        "p7-github-source-slice-1-v1": (
+            "9118b164b7be4fc8a8d4f97ac065df2e7d2170b3a312b59bfae9c9fe0e53719c"
+        ),
+        "p12-current-source-probe-12-v1": (
+            "14a8ee853f6f82078618c101a3277a7304576f23c451f8a646b8ad56757408ed"
+        ),
+    }
+
+    assert {
+        profile_id: release_profile_sha256(profile_id)
+        for profile_id in expected_digests
+    } == expected_digests
+    assert all(
+        release_profile(profile_id).required_exact_length_buckets == ()
+        for profile_id in expected_digests
+    )
 
 
 def test_p7_paper_slice_is_an_explicit_one_world_engineering_gate() -> None:

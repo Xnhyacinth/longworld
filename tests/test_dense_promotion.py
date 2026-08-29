@@ -1865,6 +1865,169 @@ def test_p12_sec_selection_accepts_all_four_required_exact_buckets() -> None:
     assert receipt["n_selected_worlds"] == 1
 
 
+def _p12_wiki_exact_bucket_selection_inputs(
+    bands: tuple[str, ...],
+) -> tuple[list[dict], list[dict]]:
+    template, _ = _candidate()
+    profile = release_profile("p12-wiki-source-slice-1-v1")
+    tokens_by_band = {"16k": 16_000, "32k": 32_000, "64k": 64_000}
+    candidates = []
+    audits = []
+    for band in bands:
+        candidate = {
+            **json.loads(
+                json.dumps(
+                    {
+                        key: value
+                        for key, value in template.items()
+                        if key != "attestation"
+                    }
+                )
+            ),
+            "world_id": "p12-wiki-exact-world",
+            "query_id": f"p12-wiki-{band}",
+            "dossier_id": f"p12-wiki-{band}",
+            "domain": "researchlab",
+            "length_bucket": band,
+            "tokenizer_context_tokens": tokens_by_band[band],
+            "tokenizer_model_id": profile.tokenizer_model_id,
+            "tokenizer_revision": profile.tokenizer_revision,
+            "tokenizer_asset_manifest_sha256": (
+                profile.tokenizer_asset_manifest_sha256
+            ),
+        }
+        _mark_candidate_as_real(candidate)
+        candidate = attach_attestation(
+            candidate, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
+        )
+        candidates.append(candidate)
+        audits.append(_selection_audit(candidate))
+    return candidates, audits
+
+
+def test_p12_wiki_selection_rejects_a_world_missing_required_32k() -> None:
+    candidates, audits = _p12_wiki_exact_bucket_selection_inputs(("16k", "64k"))
+
+    with pytest.raises(PromotionError, match="required exact length buckets"):
+        select_release_worlds(
+            candidates,
+            audits,
+            "p12-wiki-source-slice-1-v1",
+            candidate_attestation_key=KEY,
+            audit_attestation_key=KEY,
+        )
+
+
+def test_p12_wiki_selection_accepts_all_three_required_exact_buckets() -> None:
+    candidates, audits = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+
+    selected, receipt = select_release_worlds(
+        candidates,
+        audits,
+        "p12-wiki-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+        audit_attestation_key=KEY,
+    )
+
+    assert {row["length_bucket"] for row in selected} == {"16k", "32k", "64k"}
+    assert receipt["n_selected_worlds"] == 1
+
+
+def _p12_wiki_promoted_rows(candidates: list[dict], receipt: dict) -> list[dict]:
+    selection_digest = serialized_row_sha256(receipt)
+    return [
+        {
+            **candidate,
+            "data_stage": "train_ready",
+            "split": receipt["split_by_world"][candidate["world_id"]],
+            "promotion": {
+                "candidate_sha256": candidate_sha256(candidate),
+                "dense_audit_sha256": receipt["audit_sha256_by_candidate"][
+                    candidate_sha256(candidate)
+                ],
+                "release_selection_sha256": selection_digest,
+                "tokenizer_asset_manifest_sha256": candidate[
+                    "tokenizer_asset_manifest_sha256"
+                ],
+            },
+        }
+        for candidate in candidates
+    ]
+
+
+def _p12_wiki_candidate_report(candidates: list[dict]) -> dict:
+    return attach_attestation(
+        {
+            "schema_version": candidates[0]["schema_version"],
+            "data_product": candidates[0]["data_product"],
+            "data_stage": "candidate",
+            "release_profile_id": "p12-wiki-source-slice-1-v1",
+            "release_profile_sha256": release_profile_sha256(
+                "p12-wiki-source-slice-1-v1"
+            ),
+            "n_worlds": 1,
+            "n_rows": len(candidates),
+            "target_promoted_worlds": 1,
+            "candidate_row_set_sha256": promoted_row_set_sha256(candidates),
+            "retention": 1.0,
+            "n_clones": 0,
+        },
+        KEY,
+        purpose="quality_report",
+    )
+
+
+def test_p12_wiki_train_ready_report_rejects_missing_required_32k(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidates, audits = _p12_wiki_exact_bucket_selection_inputs(("16k", "64k"))
+    rows = _p12_wiki_promoted_rows(
+        candidates,
+        {
+            "split_by_world": {"p12-wiki-exact-world": "train"},
+            "audit_sha256_by_candidate": {
+                candidate_sha256(candidate): serialized_row_sha256(audit)
+                for candidate, audit in zip(candidates, audits)
+            },
+            "attestation": {},
+        },
+    )
+    monkeypatch.setattr("longworld.core.promotion.sft_row_errors", lambda *_a, **_k: [])
+
+    with pytest.raises(PromotionError, match="missing required exact length buckets"):
+        create_train_ready_report(
+            _p12_wiki_candidate_report(candidates),
+            candidates,
+            rows,
+            KEY,
+        )
+
+
+def test_p12_wiki_train_ready_report_accepts_all_three_required_buckets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidates, audits = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    selected, receipt = select_release_worlds(
+        candidates,
+        audits,
+        "p12-wiki-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+        audit_attestation_key=KEY,
+    )
+    rows = _p12_wiki_promoted_rows(selected, receipt)
+    monkeypatch.setattr("longworld.core.promotion.sft_row_errors", lambda *_a, **_k: [])
+
+    report = create_train_ready_report(
+        _p12_wiki_candidate_report(candidates),
+        candidates,
+        rows,
+        KEY,
+        release_selection_receipt=receipt,
+    )
+
+    assert report["by_length"] == {"16k": 1, "32k": 1, "64k": 1}
+
+
 def test_release_world_selection_is_deterministic_and_world_atomic() -> None:
     template, _ = _candidate()
     candidates = []
@@ -2919,6 +3082,9 @@ def test_gate_revision_dispatch_is_current_for_p10_and_read_only_for_legacy() ->
     )
     assert not release_gate_revision_supported(
         "p12-current-source-probe-12-v1", LEGACY_RELEASE_GATE_REVISION
+    )
+    assert not release_gate_revision_supported(
+        "p12-current-source-probe-12-v2", LEGACY_RELEASE_GATE_REVISION
     )
     assert release_gate_revision_supported(
         "p3-production-48-v1", LEGACY_RELEASE_GATE_REVISION
