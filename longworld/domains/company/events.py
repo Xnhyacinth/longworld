@@ -67,6 +67,68 @@ def init_values(project: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _sec_annual_revenue_answer(
+    state: WorldState,
+    *,
+    record_ids: object,
+    relation_ids: object,
+    role: object,
+) -> str | None:
+    if (
+        not isinstance(record_ids, list)
+        or not 2 <= len(record_ids) <= 5
+        or any(
+            not isinstance(record_id, str) or not record_id for record_id in record_ids
+        )
+        or len(set(record_ids)) != len(record_ids)
+        or not isinstance(relation_ids, list)
+        or len(relation_ids) != len(record_ids) - 1
+        or any(
+            not isinstance(relation_id, str) or not relation_id
+            for relation_id in relation_ids
+        )
+        or not isinstance(role, str)
+        or not role
+    ):
+        return None
+    relations = state.values.get("sec_filing_relations") or {}
+    xbrl = state.values.get("sec_xbrl_facts") or {}
+    facts = state.values.get("sec_filing_facts") or {}
+    values: list[int] = []
+    reports: list[str] = []
+    for record_id in record_ids:
+        try:
+            value = int(xbrl[record_id][role])
+            report = str(facts[record_id]["report_date"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        values.append(value)
+        reports.append(report)
+    for relation_id, (prior_id, current_id) in zip(
+        relation_ids, pairwise(record_ids), strict=True
+    ):
+        try:
+            expected = (
+                f"PRIOR_ANNUAL | {facts[current_id]['accession']} | "
+                f"{facts[prior_id]['accession']} | {facts[current_id]['report_date']} | "
+                f"{facts[prior_id]['report_date']}"
+            )
+        except (KeyError, TypeError):
+            return None
+        if relations.get(relation_id) != expected:
+            return None
+    if len(record_ids) == 2:
+        return (
+            f"ANNUAL_REVENUE_CHANGE | {reports[1]} | {values[1]} | "
+            f"{reports[0]} | {values[0]} | {values[1] - values[0]}"
+        )
+    rows = [f"{report}:{value}" for report, value in zip(reports, values, strict=True)]
+    changes = [str(current - prior) for prior, current in pairwise(values)]
+    return " | ".join(
+        ["ANNUAL_REVENUE_TRAJECTORY", *rows, "CONSECUTIVE_CHANGES", *changes]
+    )
+
+
 def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]:
     grounded = check_grounded(state, ev)
     if grounded is not None:
@@ -113,18 +175,49 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
             return False, "sec_annual_endpoint_missing"
         return True, None
     if ev.type == "sec_annual_revenue_change":
-        current_id = str(ev.params.get("record_id") or "")
-        prior_id = str(ev.params.get("target_record_id") or "")
-        role = str(ev.params.get("required_role") or "")
-        xbrl = state.values.get("sec_xbrl_facts") or {}
-        if not role or any(
-            role not in (xbrl.get(record_id) or {})
-            for record_id in (current_id, prior_id)
+        record_ids = ev.params.get("record_ids")
+        relation_ids = ev.params.get("required_relation_ids")
+        role = ev.params.get("required_role")
+        expected_tier = {2: "16k", 3: "32k", 4: "64k", 5: "128k"}.get(
+            len(record_ids) if isinstance(record_ids, list) else 0
+        )
+        expected_answer_key = (
+            f"sec_annual_revenue_change:"
+            f"{hashlib.sha256(record_ids[-1].encode()).hexdigest()}:{expected_tier}"
+            if expected_tier is not None
+            and isinstance(record_ids, list)
+            and isinstance(record_ids[-1], str)
+            else ""
+        )
+        if (
+            expected_tier is None
+            or ev.params.get("control_tier") != expected_tier
+            or ev.params.get("answer_key") != expected_answer_key
+        ):
+            return False, "sec_annual_tier_invalid"
+        if (
+            _sec_annual_revenue_answer(
+                state,
+                record_ids=record_ids,
+                relation_ids=relation_ids,
+                role=role,
+            )
+            is None
         ):
             return False, "sec_annual_financial_fact_missing"
-        relation_id = str(ev.params.get("required_relation_id") or "")
-        if relation_id not in (state.values.get("sec_filing_relations") or {}):
-            return False, "sec_annual_relation_missing"
+        prerequisite_key = str(ev.params.get("prerequisite_answer_key") or "")
+        if prerequisite_key:
+            prerequisite = _sec_annual_revenue_answer(
+                state,
+                record_ids=ev.params.get("prerequisite_record_ids"),
+                relation_ids=ev.params.get("prerequisite_required_relation_ids"),
+                role=role,
+            )
+            if (
+                prerequisite is None
+                or state.values.get(prerequisite_key) != prerequisite
+            ):
+                return False, "sec_annual_prerequisite_missing"
         return True, None
     if ev.type == "sec_filing_publication_ratification":
         approvals = state.values.get("sec_eligibility_approvals") or {}
@@ -446,33 +539,30 @@ def apply_event(state: WorldState, ev: Event) -> None:
             state.set(answer_key, answer, eid, day)
             return
         if t == "sec_annual_revenue_change":
-            current_id = str(p.get("record_id") or "")
-            prior_id = str(p.get("target_record_id") or "")
-            role = str(p.get("required_role") or "")
-            relation_id = str(p.get("required_relation_id") or "")
-            relations = state.values.get("sec_filing_relations") or {}
-            relation_answer = str(relations.get(relation_id) or "")
-            xbrl = state.values.get("sec_xbrl_facts") or {}
-            facts = state.values.get("sec_filing_facts") or {}
             answer_key = str(p.get("answer_key") or "")
-            if (
-                not relation_answer.startswith("PRIOR_ANNUAL |")
-                or not answer_key
-                or not role
-            ):
-                return
-            try:
-                current_value = int(xbrl[current_id][role])
-                prior_value = int(xbrl[prior_id][role])
-                current_report = str(facts[current_id]["report_date"])
-                prior_report = str(facts[prior_id]["report_date"])
-            except (KeyError, TypeError, ValueError):
-                return
-            answer = (
-                f"ANNUAL_REVENUE_CHANGE | {current_report} | {current_value} | "
-                f"{prior_report} | {prior_value} | {current_value - prior_value}"
+            role = p.get("required_role")
+            annual_answer = _sec_annual_revenue_answer(
+                state,
+                record_ids=p.get("record_ids"),
+                relation_ids=p.get("required_relation_ids"),
+                role=role,
             )
-            state.set(answer_key, answer, eid, day)
+            if not answer_key or annual_answer is None:
+                return
+            prerequisite_key = str(p.get("prerequisite_answer_key") or "")
+            if prerequisite_key:
+                prerequisite = _sec_annual_revenue_answer(
+                    state,
+                    record_ids=p.get("prerequisite_record_ids"),
+                    relation_ids=p.get("prerequisite_required_relation_ids"),
+                    role=role,
+                )
+                if (
+                    prerequisite is None
+                    or state.values.get(prerequisite_key) != prerequisite
+                ):
+                    return
+            state.set(answer_key, annual_answer, eid, day)
             return
         record_id = str(p.get("record_id") or "")
         prerequisite_answer_key = str(p.get("prerequisite_answer_key") or "")

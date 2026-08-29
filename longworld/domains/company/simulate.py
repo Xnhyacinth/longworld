@@ -5,6 +5,7 @@ from collections import Counter, OrderedDict
 from copy import deepcopy
 from datetime import date, timedelta
 from html import unescape
+from itertools import pairwise
 from typing import Any
 
 from longworld.core.cascade import cascade_events
@@ -42,6 +43,7 @@ from longworld.domains.company.events import (
 )
 
 _SEC_REPLAY_MAX_CHARS = 32_000
+_SEC_ANNUAL_IDENTITY_MARGIN = 256
 _SEC_SECTION_VIEW_PREFIX = "SEC source section\n"
 _SEC_FACT_CORRIDOR_MARGIN = 10_600
 _SEC_FACT_PROJECTION_REVISION = "sec-visible-fact-projection-v1"
@@ -1265,6 +1267,280 @@ def _issuer_ir_events(
     return events
 
 
+def _canonical_sec_annual_pairs(workflow) -> set[tuple[str, str]] | None:
+    """Recompute canonical adjacency from every grounded annual record."""
+    groups: dict[tuple[str, str], list[tuple[Any, date, date]]] = {}
+    for record in workflow.records:
+        attributes = dict(record.attributes)
+        if attributes.get("form") != "10-K":
+            continue
+        if (
+            getattr(getattr(record, "source_origin", None), "value", "")
+            not in {"real_public", "real_private_export"}
+            or record.provenance_id != f"sha256:{record.source_sha256}"
+            or hashlib.sha256(record.text.encode()).hexdigest() != record.text_sha256
+        ):
+            continue
+        facts_by_field = {
+            field: [fact for fact in record.facts if fact.field == field]
+            for field in ("cik", "form", "filing_date", "report_date")
+        }
+        if any(len(facts) != 1 for facts in facts_by_field.values()):
+            continue
+        facts = {field: matches[0] for field, matches in facts_by_field.items()}
+        if any(
+            fact.record_id != record.record_id
+            or fact.source_sha256 != record.source_sha256
+            or fact.char_start < 0
+            or fact.char_end != fact.char_start + len(fact.evidence_quote)
+            or record.text[fact.char_start : fact.char_end] != fact.evidence_quote
+            or fact.value_offset < 0
+            or fact.evidence_quote[
+                fact.value_offset : fact.value_offset + len(fact.value)
+            ]
+            != fact.value
+            for fact in facts.values()
+        ):
+            continue
+        if any(
+            str(facts[field].value).replace("-", "")
+            != str(attributes.get(field) or "").replace("-", "")
+            for field in facts
+        ):
+            continue
+        try:
+            filing_day = date.fromisoformat(str(attributes["filing_date"]))
+            report_day = date.fromisoformat(str(attributes["report_date"]))
+        except (KeyError, ValueError):
+            continue
+        group_key = (str(attributes.get("cik") or ""), "10-K")
+        groups.setdefault(group_key, []).append((record, report_day, filing_day))
+
+    pairs: set[tuple[str, str]] = set()
+    for annual_records in groups.values():
+        ordered = sorted(
+            annual_records,
+            key=lambda item: (item[1], item[2], item[0].record_id),
+        )
+        report_days = [report_day for _, report_day, _ in ordered]
+        if len(set(report_days)) != len(report_days):
+            return None
+        for (prior, prior_report, prior_filing), (
+            current,
+            current_report,
+            current_filing,
+        ) in pairwise(ordered):
+            if current_report > prior_report and current_filing > prior_filing:
+                pairs.add((current.record_id, prior.record_id))
+    return pairs
+
+
+def _sec_annual_history_events(
+    *,
+    workflow,
+    prefix: str,
+    workflow_index: int,
+    record_id_counts: Counter[str],
+    record_indexes: dict[str, int],
+    existing_events: list[Event],
+) -> list[Event]:
+    """Build nested answer programs over authentic adjacent annual filings."""
+    validated_by_pair: dict[tuple[str, str], tuple[int, Any, Any, Any]] = {}
+    duplicate_pair = False
+    revenue_sections: dict[str, list[Event]] = {}
+    for event in existing_events:
+        if event.type != "sec_source_section":
+            continue
+        spans = event.params.get("fact_spans") or []
+        if any(
+            isinstance(span, dict)
+            and span.get("kind", "xbrl") == "xbrl"
+            and span.get("role") == "total_revenue"
+            for span in spans
+        ):
+            record_id = str(event.params.get("record_id") or "")
+            revenue_sections.setdefault(record_id, []).append(event)
+
+    revenue_by_record = {
+        record_id: matches[0]
+        for record_id, matches in revenue_sections.items()
+        if len(matches) == 1
+    }
+
+    records_by_id = {record.record_id: record for record in workflow.records}
+    canonical_pairs = _canonical_sec_annual_pairs(workflow)
+    if canonical_pairs is None or not canonical_pairs:
+        return []
+    supplied_annual_relations = sum(
+        relation.kind == "prior_annual_filing" for relation in workflow.relations
+    )
+    validated_annual_relations = 0
+    for relation_index, relation in enumerate(workflow.relations):
+        endpoints = validated_sec_annual_endpoints(workflow, relation)
+        if endpoints is None:
+            continue
+        validated_annual_relations += 1
+        current, prior = endpoints
+        pair = (current.record_id, prior.record_id)
+        if pair in validated_by_pair:
+            duplicate_pair = True
+        else:
+            validated_by_pair[pair] = (relation_index, relation, current, prior)
+
+    if (
+        validated_annual_relations != supplied_annual_relations
+        or set(validated_by_pair) != canonical_pairs
+    ):
+        return []
+    current_counts = Counter(current_id for current_id, _ in validated_by_pair)
+    prior_counts = Counter(prior_id for _, prior_id in validated_by_pair)
+    current_ids = set(current_counts)
+    prior_ids = set(prior_counts)
+    heads = current_ids - prior_ids
+    if (
+        duplicate_pair
+        or any(count != 1 for count in current_counts.values())
+        or any(count != 1 for count in prior_counts.values())
+        or len(heads) != 1
+    ):
+        return []
+    head_id = next(iter(heads))
+    newest_to_oldest = [head_id]
+    traversed_pairs: set[tuple[str, str]] = set()
+    while True:
+        prior_matches = [
+            prior_id
+            for current_id, prior_id in validated_by_pair
+            if current_id == newest_to_oldest[-1]
+        ]
+        if not prior_matches:
+            break
+        if len(prior_matches) != 1 or prior_matches[0] in newest_to_oldest:
+            return []
+        pair = (newest_to_oldest[-1], prior_matches[0])
+        traversed_pairs.add(pair)
+        newest_to_oldest.append(prior_matches[0])
+    if traversed_pairs != set(validated_by_pair):
+        return []
+    if any(
+        record_id_counts[record_id] != 1 or record_id not in revenue_by_record
+        for pair in validated_by_pair
+        for record_id in pair
+    ):
+        return []
+
+    relation_events: list[Event] = []
+    relation_by_pair: dict[tuple[str, str], tuple[Any, Event]] = {}
+    for pair, (
+        relation_index,
+        relation,
+        current,
+        prior,
+    ) in validated_by_pair.items():
+        current_source_id = (
+            f"{prefix}.sec_filing_{workflow_index}_{record_indexes[current.record_id]}"
+        )
+        prior_source_id = (
+            f"{prefix}.sec_filing_{workflow_index}_{record_indexes[prior.record_id]}"
+        )
+        event_id = f"{prefix}.sec_prior_annual_{workflow_index}_{relation_index}"
+        event = Event(
+            id=event_id,
+            type="sec_prior_annual_filing_relation",
+            time=date.fromisoformat(current.occurred_at[:10]) + timedelta(days=3),
+            params={
+                "workflow_id": workflow.workflow_id,
+                "record_id": current.record_id,
+                "target_record_id": prior.record_id,
+                "source_relation_id": relation.relation_id,
+                "resolution_kind": "prior_annual_filing",
+                "relation_provenance": "authentic_source",
+                "adjacency_proof": "manifest_adapter_canonical_recomputation",
+                "answer_key": f"sec_prior_annual:{relation.relation_id}",
+                "ground_values": ["prior annual relation evaluated"],
+            },
+            visibility=[event_id],
+            causal_inputs=[prior_source_id, current_source_id],
+            required_inputs=[prior_source_id, current_source_id],
+            relation_kinds={
+                prior_source_id: "prior_annual_source",
+                current_source_id: "current_annual_source",
+            },
+        )
+        relation_events.append(event)
+        relation_by_pair[pair] = (relation, event)
+
+    history_key = hashlib.sha256(head_id.encode()).hexdigest()
+    tier_by_records = {2: "16k", 3: "32k", 4: "64k", 5: "128k"}
+    answer_events: list[Event] = []
+    prior_answer: Event | None = None
+    prior_parent_ids: set[str] = set()
+    for n_records, tier in tier_by_records.items():
+        if len(newest_to_oldest) < n_records:
+            continue
+        record_ids = list(reversed(newest_to_oldest[:n_records]))
+        relations = [
+            relation_by_pair[(current_id, prior_id)]
+            for prior_id, current_id in pairwise(record_ids)
+        ]
+        all_parent_ids = {
+            *(revenue_by_record[record_id].id for record_id in record_ids),
+            *(event.id for _, event in relations),
+        }
+        parents = [
+            *([prior_answer.id] if prior_answer is not None else []),
+            *(
+                event.id
+                for event in [*existing_events, *relation_events]
+                if event.id in all_parent_ids - prior_parent_ids
+            ),
+        ]
+        answer_id = f"{prefix}.sec_annual_revenue_change_{tier}_{workflow_index}_0"
+        latest = records_by_id[record_ids[-1]]
+        answer_event = Event(
+            id=answer_id,
+            type="sec_annual_revenue_change",
+            time=date.fromisoformat(latest.occurred_at[:10])
+            + timedelta(days=4 + len(answer_events)),
+            params={
+                "workflow_id": workflow.workflow_id,
+                "record_id": record_ids[-1],
+                "target_record_id": record_ids[0],
+                "record_ids": record_ids,
+                "required_relation_ids": [
+                    relation.relation_id for relation, _ in relations
+                ],
+                "required_role": "total_revenue",
+                "control_tier": tier,
+                "prerequisite_answer_key": (
+                    str(prior_answer.params["answer_key"])
+                    if prior_answer is not None
+                    else ""
+                ),
+                "prerequisite_record_ids": (
+                    list(prior_answer.params["record_ids"])
+                    if prior_answer is not None
+                    else []
+                ),
+                "prerequisite_required_relation_ids": (
+                    list(prior_answer.params["required_relation_ids"])
+                    if prior_answer is not None
+                    else []
+                ),
+                "answer_key": (f"sec_annual_revenue_change:{history_key}:{tier}"),
+                "ground_values": ["annual revenue delta computed"],
+            },
+            visibility=[answer_id],
+            causal_inputs=parents,
+            required_inputs=parents,
+            relation_kinds={parent: "computes_from" for parent in parents},
+        )
+        answer_events.append(answer_event)
+        prior_answer = answer_event
+        prior_parent_ids = all_parent_ids
+    return [*relation_events, *answer_events]
+
+
 def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]:
     events: list[Event] = []
     source_workflows = project.get("source_workflows") or []
@@ -1325,37 +1601,45 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
             source_origin = record.source_origin.value
             provenance_id = record.provenance_id
             parent_provenance_id = ""
-            if len(source_text) > _SEC_REPLAY_MAX_CHARS:
+            annual_identity = record.record_id in annual_record_ids
+            if annual_identity or len(source_text) > _SEC_REPLAY_MAX_CHARS:
                 first_fact = min(int(fact["char_start"]) for fact in fact_spans)
                 last_fact = max(int(fact["char_end"]) for fact in fact_spans)
                 if last_fact - first_fact > _SEC_REPLAY_MAX_CHARS:
                     continue
-                corridor_start = max(0, last_fact - _SEC_REPLAY_MAX_CHARS)
-                corridor_start = min(corridor_start, first_fact)
-                corridor_end = min(
-                    len(source_text), corridor_start + _SEC_REPLAY_MAX_CHARS
-                )
-                source_text = source_text[corridor_start:corridor_end]
-                fact_spans = [
-                    {
-                        **fact,
-                        "char_start": int(fact["char_start"]) - corridor_start,
-                        "char_end": int(fact["char_end"]) - corridor_start,
-                    }
-                    for fact in fact_spans
-                ]
-                excerpt_sha256 = hashlib.sha256(source_text.encode()).hexdigest()
-                parent_provenance_id = record.provenance_id
-                provenance_id = (
-                    "derived-sha256:"
-                    + hashlib.sha256(
-                        (
-                            f"sec_evidence_corridor|{record.provenance_id}|"
-                            f"{corridor_start}|{corridor_end}|{excerpt_sha256}"
-                        ).encode()
-                    ).hexdigest()
-                )
-                source_origin = "real_derived"
+                if annual_identity:
+                    corridor_start = max(0, first_fact - _SEC_ANNUAL_IDENTITY_MARGIN)
+                    corridor_end = min(
+                        len(source_text), last_fact + _SEC_ANNUAL_IDENTITY_MARGIN
+                    )
+                else:
+                    corridor_start = max(0, last_fact - _SEC_REPLAY_MAX_CHARS)
+                    corridor_start = min(corridor_start, first_fact)
+                    corridor_end = min(
+                        len(source_text), corridor_start + _SEC_REPLAY_MAX_CHARS
+                    )
+                if corridor_start != 0 or corridor_end != len(source_text):
+                    source_text = source_text[corridor_start:corridor_end]
+                    fact_spans = [
+                        {
+                            **fact,
+                            "char_start": int(fact["char_start"]) - corridor_start,
+                            "char_end": int(fact["char_end"]) - corridor_start,
+                        }
+                        for fact in fact_spans
+                    ]
+                    excerpt_sha256 = hashlib.sha256(source_text.encode()).hexdigest()
+                    parent_provenance_id = record.provenance_id
+                    provenance_id = (
+                        "derived-sha256:"
+                        + hashlib.sha256(
+                            (
+                                f"sec_evidence_corridor|{record.provenance_id}|"
+                                f"{corridor_start}|{corridor_end}|{excerpt_sha256}"
+                            ).encode()
+                        ).hexdigest()
+                    )
+                    source_origin = "real_derived"
             ratification_events: list[Event] = []
             ratification_parent = approval_id
             for control_tier, control_stage, offset in (
@@ -1540,105 +1824,16 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
                 )
                 continue
 
-            annual_endpoints = validated_sec_annual_endpoints(workflow, relation)
-            if annual_endpoints is None:
-                continue
-            current, prior = annual_endpoints
-            if any(
-                record_id_counts[record.record_id] != 1 for record in (current, prior)
-            ):
-                continue
-            revenue_sections = {
-                record.record_id: [
-                    event
-                    for event in events
-                    if event.type == "sec_source_section"
-                    and event.params.get("record_id") == record.record_id
-                    and any(
-                        span.get("kind", "xbrl") == "xbrl"
-                        and span.get("role") == "total_revenue"
-                        for span in event.params.get("fact_spans") or []
-                        if isinstance(span, dict)
-                    )
-                ]
-                for record in (current, prior)
-            }
-            if any(len(matches) != 1 for matches in revenue_sections.values()):
-                continue
-            current_source_id = (
-                f"{prefix}.sec_filing_{workflow_index}_"
-                f"{record_indexes[current.record_id]}"
+        events.extend(
+            _sec_annual_history_events(
+                workflow=workflow,
+                prefix=prefix,
+                workflow_index=workflow_index,
+                record_id_counts=record_id_counts,
+                record_indexes=record_indexes,
+                existing_events=events,
             )
-            prior_source_id = (
-                f"{prefix}.sec_filing_{workflow_index}_"
-                f"{record_indexes[prior.record_id]}"
-            )
-            relation_id = f"{prefix}.sec_prior_annual_{workflow_index}_{relation_index}"
-            answer_id = (
-                f"{prefix}.sec_annual_revenue_change_{workflow_index}_{relation_index}"
-            )
-            relation_day = date.fromisoformat(current.occurred_at[:10])
-            current_revenue = revenue_sections[current.record_id][0]
-            prior_revenue = revenue_sections[prior.record_id][0]
-            events.extend(
-                [
-                    Event(
-                        id=relation_id,
-                        type="sec_prior_annual_filing_relation",
-                        time=relation_day + timedelta(days=3),
-                        params={
-                            "workflow_id": workflow.workflow_id,
-                            "record_id": current.record_id,
-                            "target_record_id": prior.record_id,
-                            "source_relation_id": relation.relation_id,
-                            "resolution_kind": "prior_annual_filing",
-                            "relation_provenance": "authentic_source",
-                            "adjacency_proof": "manifest_adapter_canonical_recomputation",
-                            "answer_key": f"sec_prior_annual:{relation.relation_id}",
-                            "ground_values": ["prior annual relation evaluated"],
-                        },
-                        visibility=[relation_id],
-                        causal_inputs=[prior_source_id, current_source_id],
-                        required_inputs=[prior_source_id, current_source_id],
-                        relation_kinds={
-                            prior_source_id: "prior_annual_source",
-                            current_source_id: "current_annual_source",
-                        },
-                    ),
-                    Event(
-                        id=answer_id,
-                        type="sec_annual_revenue_change",
-                        time=relation_day + timedelta(days=4),
-                        params={
-                            "workflow_id": workflow.workflow_id,
-                            "record_id": current.record_id,
-                            "target_record_id": prior.record_id,
-                            "required_relation_id": relation.relation_id,
-                            "required_role": "total_revenue",
-                            "answer_key": (
-                                f"sec_annual_revenue_change:{relation.relation_id}"
-                            ),
-                            "ground_values": ["annual revenue delta computed"],
-                        },
-                        visibility=[answer_id],
-                        causal_inputs=[
-                            prior_revenue.id,
-                            current_revenue.id,
-                            relation_id,
-                        ],
-                        required_inputs=[
-                            prior_revenue.id,
-                            current_revenue.id,
-                            relation_id,
-                        ],
-                        relation_kinds={
-                            prior_revenue.id: "reads_prior_revenue",
-                            current_revenue.id: "reads_current_revenue",
-                            relation_id: "requires_prior_annual_relation",
-                        },
-                    ),
-                ]
-            )
+        )
     return events
 
 

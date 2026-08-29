@@ -1030,7 +1030,7 @@ def _issuer_ir_question_declares_schema(
     return schema is not None and schema in question
 
 
-def _issuer_ir_required_closure(world: SimulatedWorld, target: Event) -> list[Event]:
+def _required_event_closure(world: SimulatedWorld, target: Event) -> list[Event]:
     by_id = {event.id: event for event in world.events}
     selected: set[str] = set()
 
@@ -1047,7 +1047,7 @@ def _issuer_ir_required_closure(world: SimulatedWorld, target: Event) -> list[Ev
     return [event for event in world.events if event.id in selected]
 
 
-def _issuer_ir_proof_depth(events: list[Event], target: Event) -> int:
+def _required_event_proof_depth(events: list[Event], target: Event) -> int:
     selected = {event.id: event for event in events}
     memo: dict[str, int] = {}
 
@@ -1117,7 +1117,7 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
         cf_updates = _issuer_ir_revenue_cf_updates(cf_source)
         if cf_updates is None:
             continue
-        essential_events = _issuer_ir_required_closure(world, answer_event)
+        essential_events = _required_event_closure(world, answer_event)
         issuer_essential_ids = [event.id for event in essential_events]
         roles = [str(role) for role in answer_event.params["required_roles"]]
         record_ids = [str(item) for item in answer_event.params["record_ids"]]
@@ -1191,7 +1191,7 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                     "relations; format per-record extensions; compute consecutive-"
                     "year common-role deltas"
                 ),
-                proof_depth=_issuer_ir_proof_depth(essential_events, answer_event),
+                proof_depth=_required_event_proof_depth(essential_events, answer_event),
                 cf_op="amount",
                 motif="company.issuer_ir_cross_year_financial_history",
                 truth_regime="real_source_derived",
@@ -1573,46 +1573,72 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
     for answer_event in (
         event for event in world.events if event.type == "sec_annual_revenue_change"
     ):
-        current_id = str(answer_event.params.get("record_id") or "")
-        prior_id = str(answer_event.params.get("target_record_id") or "")
-        relation_id = str(answer_event.params.get("required_relation_id") or "")
-        relation_event = annual_relations.get(relation_id)
-        current_source = sources_by_record.get(current_id)
-        prior_source = sources_by_record.get(prior_id)
-        current_sections = annual_sections.get((current_id, "total_revenue"), [])
-        prior_sections = annual_sections.get((prior_id, "total_revenue"), [])
+        annual_record_ids = answer_event.params.get("record_ids")
+        annual_relation_ids = answer_event.params.get("required_relation_ids")
+        tier = str(answer_event.params.get("control_tier") or "")
+        expected_tier = {2: "16k", 3: "32k", 4: "64k", 5: "128k"}.get(
+            len(annual_record_ids) if isinstance(annual_record_ids, list) else 0
+        )
         if (
-            relation_event is None
-            or current_source is None
-            or prior_source is None
-            or len(current_sections) != 1
-            or len(prior_sections) != 1
+            not isinstance(annual_record_ids, list)
+            or any(not isinstance(record_id, str) for record_id in annual_record_ids)
+            or not isinstance(annual_relation_ids, list)
+            or any(
+                not isinstance(relation_id, str) for relation_id in annual_relation_ids
+            )
+            or tier != expected_tier
         ):
             continue
-        current_section = current_sections[0]
-        prior_section = prior_sections[0]
+        history_key = hashlib.sha256(annual_record_ids[-1].encode()).hexdigest()
+        if answer_event.params.get("answer_key") != (
+            f"sec_annual_revenue_change:{history_key}:{tier}"
+        ):
+            continue
+        annual_sources: list[Event] = []
+        for annual_record_id in annual_record_ids:
+            annual_source_event = sources_by_record.get(annual_record_id)
+            if annual_source_event is not None:
+                annual_sources.append(annual_source_event)
+        annual_section_groups = [
+            annual_sections.get((record_id, "total_revenue"), [])
+            for record_id in annual_record_ids
+        ]
+        annual_relation_events: list[Event] = []
+        for annual_relation_id in annual_relation_ids:
+            annual_relation_event = annual_relations.get(annual_relation_id)
+            if annual_relation_event is not None:
+                annual_relation_events.append(annual_relation_event)
+        if (
+            len(annual_sources) != len(annual_record_ids)
+            or any(len(group) != 1 for group in annual_section_groups)
+            or len(annual_relation_events) != len(annual_relation_ids)
+        ):
+            continue
+        annual_source_sections = [group[0] for group in annual_section_groups]
+        current_section = annual_source_sections[-1]
         cf_updates = _financial_cf_updates(current_section, "total_revenue")
         if cf_updates is None:
             continue
-        relation_key = hashlib.sha256(relation_id.encode()).hexdigest()[:12]
-        essential = [
-            prior_source,
-            current_source,
-            prior_section,
-            current_section,
-            relation_event,
-            answer_event,
-        ]
+        essential = _required_event_closure(world, answer_event)
+        trajectory = len(annual_record_ids) > 2
         queries.append(
             QuerySpec(
-                query_id=f"{qid}:sec_annual_revenue_change:{relation_key}:32k",
+                query_id=(f"{qid}:sec_annual_revenue_change:{history_key}:{tier}"),
                 query_type="sec_annual_revenue_change",
                 question=(
-                    "Read both source-bound annual filings and their authentic "
-                    "prior-annual relation, then compute the change in total revenue. "
-                    "Reply exactly as ANNUAL_REVENUE_CHANGE | <current report date> "
-                    "| <current revenue in base units> | <prior report date> | "
-                    "<prior revenue in base units> | <current minus prior>."
+                    f"Read the exact {len(annual_record_ids)}-filing chain and its "
+                    f"{len(annual_relation_ids)} authentic adjacent prior-annual "
+                    "relations, then reconstruct total revenue in base units. "
+                    + (
+                        "Reply exactly as ANNUAL_REVENUE_TRAJECTORY | "
+                        "<oldest report date>:<revenue> | ... | "
+                        "<newest report date>:<revenue> | CONSECUTIVE_CHANGES | "
+                        "<second minus first> | ... | <newest minus previous>."
+                        if trajectory
+                        else "Reply exactly as ANNUAL_REVENUE_CHANGE | <current "
+                        "report date> | <current revenue> | <prior report date> | "
+                        "<prior revenue> | <current minus prior>."
+                    )
                 ),
                 answer="",
                 as_of=answer_event.time,
@@ -1626,50 +1652,56 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                 cf_event_id=current_section.id,
                 cf_param_updates=cf_updates,
                 cf_answer="",
-                invariance_event_id=current_source.id,
+                invariance_event_id=annual_sources[-1].id,
                 invariance_param_updates={
                     "retrieval_url": "https://www.sec.gov/Archives/"
                 },
                 gold_expression=(
-                    "READ_SOURCE_SPANS(prior/current annual identity) THEN "
-                    "VALIDATE_PRIOR_ANNUAL_FILING THEN "
-                    "READ_XBRL_FACT(prior/current total_revenue) THEN SUBTRACT"
+                    "READ_SOURCE_SPANS(all annual identities) THEN "
+                    "VALIDATE_EACH_PRIOR_ANNUAL_FILING THEN "
+                    "READ_XBRL_FACT(each total_revenue) THEN "
+                    "COMPUTE_CONSECUTIVE_CHANGES"
                 ),
-                proof_depth=4,
+                proof_depth=_required_event_proof_depth(essential, answer_event),
                 cf_op="numeric",
                 motif="real_filing_annual_revenue_change",
                 topology_id=instance_topology(
-                    "company.real_sec_annual_revenue_change", relation_id
+                    "company.real_sec_annual_revenue_change",
+                    tier,
+                    len(annual_record_ids),
+                    len(annual_relation_ids),
                 ),
                 domain="company",
                 truth_regime="real_source_derived",
                 program_ops=[
-                    {
-                        "op": "READ_SOURCE_SPAN",
-                        "record": "prior",
-                        "field": "report_date",
-                    },
-                    {
-                        "op": "READ_SOURCE_SPAN",
-                        "record": "current",
-                        "field": "report_date",
-                    },
-                    {"op": "VALIDATE_PRIOR_ANNUAL_FILING"},
-                    {
-                        "op": "READ_XBRL_FACT",
-                        "record": "prior",
-                        "role": "total_revenue",
-                    },
-                    {
-                        "op": "READ_XBRL_FACT",
-                        "record": "current",
-                        "role": "total_revenue",
-                    },
-                    {"op": "SUBTRACT_CURRENT_MINUS_PRIOR"},
+                    *(
+                        {
+                            "op": "READ_SOURCE_SPAN",
+                            "record_index": index,
+                            "field": "report_date",
+                        }
+                        for index in range(len(annual_record_ids))
+                    ),
+                    *(
+                        {
+                            "op": "VALIDATE_PRIOR_ANNUAL_FILING",
+                            "relation_index": index,
+                        }
+                        for index in range(len(annual_relation_ids))
+                    ),
+                    *(
+                        {
+                            "op": "READ_XBRL_FACT",
+                            "record_index": index,
+                            "role": "total_revenue",
+                        }
+                        for index in range(len(annual_record_ids))
+                    ),
+                    {"op": "COMPUTE_CONSECUTIVE_CHANGES"},
                 ],
-                preferred_length_buckets=["32k"],
+                preferred_length_buckets=[tier],
                 semantic_growth_group="company_real_sec_annual_revenue_change",
-                base_task_group=f"sec_annual_revenue_change:{relation_key}",
+                base_task_group=f"sec_annual_revenue_change:{history_key}",
             )
         )
 
