@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import date
+from itertools import pairwise
 from typing import Any
 
 from longworld.core.cascade import apply_cascade, check_cascade
@@ -61,6 +62,8 @@ def init_values(project: dict[str, Any]) -> dict[str, Any]:
         "sec_eligibility_approvals": {},
         "sec_xbrl_facts": {},
         "sec_certification_facts": {},
+        "issuer_ir_metrics": {},
+        "issuer_ir_relations": {},
     }
 
 
@@ -108,6 +111,39 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
         return True, None
     if ev.type == "sec_source_section":
         return True, None
+    if ev.type == "issuer_ir_source_section":
+        return True, None
+    if ev.type == "issuer_ir_prior_filing_relation":
+        metrics = state.values.get("issuer_ir_metrics") or {}
+        if any(
+            str(ev.params.get(field) or "") not in metrics
+            for field in ("record_id", "target_record_id")
+        ):
+            return False, "issuer_ir_relation_endpoint_missing"
+        return True, None
+    if ev.type == "issuer_ir_cross_year_answer":
+        metrics = state.values.get("issuer_ir_metrics") or {}
+        required_roles = ev.params.get("required_roles")
+        record_ids = ev.params.get("record_ids")
+        if (
+            not isinstance(required_roles, list)
+            or not isinstance(record_ids, list)
+            or any(
+                any(
+                    str(role) not in (metrics.get(str(record_id)) or {})
+                    for role in required_roles
+                )
+                for record_id in record_ids
+            )
+        ):
+            return False, "issuer_ir_metrics_missing"
+        relations = state.values.get("issuer_ir_relations") or {}
+        if any(
+            str(relation_id) not in relations
+            for relation_id in ev.params.get("required_relation_ids") or []
+        ):
+            return False, "issuer_ir_relation_missing"
+        return True, None
     if ev.type == "sec_financial_answer":
         if str(ev.params.get("compose") or "compute") == "copy":
             prerequisite = str(ev.params.get("prerequisite_answer_key") or "")
@@ -124,7 +160,10 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
         prerequisite = str(ev.params.get("prerequisite_answer_key") or "")
         if prerequisite and not isinstance(state.values.get(prerequisite), str):
             return False, "sec_financial_prerequisite_missing"
-        if ev.params.get("control_tier") in {"64k", "128k"}:
+        answer_family = str(ev.params.get("answer_family") or "")
+        if answer_family == "balance_certification" or (
+            not answer_family and ev.params.get("control_tier") in {"64k", "128k"}
+        ):
             certs = (state.values.get("sec_certification_facts") or {}).get(
                 record_id
             ) or {}
@@ -455,6 +494,202 @@ def apply_event(state: WorldState, ev: Event) -> None:
         if record_xbrl != dict(xbrl_facts.get(record_id) or {}):
             xbrl_facts[record_id] = record_xbrl
             state.set("sec_xbrl_facts", xbrl_facts, eid, day)
+    elif t == "issuer_ir_source_section":
+        text = str(p.get("text") or "")
+        prefix = "Issuer IR rendered XBRL statement\n"
+        if (
+            hashlib.sha256(text.encode()).hexdigest() != p.get("text_sha256")
+            or not text.startswith(prefix)
+            or hashlib.sha256(text[len(prefix) :].encode()).hexdigest()
+            != p.get("section_sha256")
+        ):
+            return
+        record_id = str(p.get("record_id") or "")
+        if not record_id:
+            return
+        metrics = dict(state.values.get("issuer_ir_metrics") or {})
+        record_metrics = dict(metrics.get(record_id) or {})
+        for span in p.get("fact_spans") or []:
+            if not isinstance(span, dict):
+                return
+            start = span.get("char_start")
+            end = span.get("char_end")
+            quote = str(span.get("evidence_quote") or "")
+            role = str(span.get("role") or "")
+            numeric_value = span.get("numeric_value")
+            fact_kind = str(span.get("kind") or "numeric")
+            if (
+                isinstance(start, bool)
+                or isinstance(end, bool)
+                or not isinstance(start, int)
+                or not isinstance(end, int)
+                or start < len(prefix)
+                or end <= start
+                or text[start:end] != quote
+                or not role
+                or isinstance(numeric_value, bool)
+                or not isinstance(numeric_value, int)
+            ):
+                return
+            if fact_kind in {"policy_presence", "disclosure_presence"}:
+                if numeric_value != 1 or not quote.strip():
+                    return
+                parsed = 1
+            elif fact_kind == "numeric":
+                display = quote.replace("$", "").strip()
+                negative = display.startswith("(") and display.endswith(")")
+                if negative:
+                    display = display[1:-1]
+                try:
+                    parsed = parse_ixbrl_display_number(
+                        display, scale=0, sign="-" if negative else ""
+                    )
+                except (TypeError, ValueError, ProvenanceError):
+                    return
+            else:
+                return
+            if parsed != numeric_value:
+                return
+            if role in record_metrics and record_metrics[role] != parsed:
+                return
+            record_metrics[role] = parsed
+        if not record_metrics:
+            return
+        metrics[record_id] = record_metrics
+        state.set("issuer_ir_metrics", metrics, eid, day)
+    elif t == "issuer_ir_prior_filing_relation":
+        source_id = str(p.get("record_id") or "")
+        target_id = str(p.get("target_record_id") or "")
+        relation_id = str(p.get("source_relation_id") or "")
+        metrics = state.values.get("issuer_ir_metrics") or {}
+        if (
+            not source_id
+            or not target_id
+            or not relation_id
+            or source_id not in metrics
+            or target_id not in metrics
+        ):
+            return
+        relations = dict(state.values.get("issuer_ir_relations") or {})
+        relations[relation_id] = {
+            "source_record_id": source_id,
+            "target_record_id": target_id,
+            "kind": str(p.get("relation_kind") or ""),
+        }
+        state.set("issuer_ir_relations", relations, eid, day)
+    elif t == "issuer_ir_cross_year_answer":
+        answer_key = str(p.get("answer_key") or "")
+        record_ids = p.get("record_ids")
+        required_roles = p.get("required_roles")
+        record_role_extensions = p.get("record_role_extensions") or {}
+        required_relation_ids = p.get("required_relation_ids")
+        prerequisite_answer_key = str(p.get("prerequisite_answer_key") or "")
+        prerequisite_record_ids = p.get("prerequisite_record_ids")
+        prerequisite_required_roles = p.get("prerequisite_required_roles")
+        prerequisite_record_role_extensions = p.get(
+            "prerequisite_record_role_extensions"
+        )
+        metrics = state.values.get("issuer_ir_metrics") or {}
+        relations = state.values.get("issuer_ir_relations") or {}
+        if (
+            not answer_key
+            or not isinstance(record_ids, list)
+            or not isinstance(required_roles, list)
+            or not isinstance(record_role_extensions, dict)
+            or any(
+                str(record_id) not in {str(item) for item in record_ids}
+                or not isinstance(roles, list)
+                or any(not isinstance(role, str) or not role for role in roles)
+                for record_id, roles in record_role_extensions.items()
+            )
+            or not isinstance(required_relation_ids, list)
+            or any(
+                str(relation_id) not in relations
+                for relation_id in required_relation_ids
+            )
+            or any(
+                any(
+                    str(role) not in (metrics.get(str(record_id)) or {})
+                    for role in required_roles
+                )
+                for record_id in record_ids
+            )
+            or any(
+                any(
+                    str(role) not in (metrics.get(str(record_id)) or {})
+                    for role in record_role_extensions.get(str(record_id), [])
+                )
+                for record_id in record_ids
+            )
+        ):
+            return
+
+        def compose_answer(
+            ids: list[Any],
+            roles: list[Any],
+            extensions: dict[str, list[Any]] | None = None,
+        ) -> str | None:
+            extensions = extensions or {}
+            if any(
+                any(
+                    str(role) not in (metrics.get(str(record_id)) or {})
+                    for role in [*roles, *extensions.get(str(record_id), [])]
+                )
+                for record_id in ids
+            ):
+                return None
+            rows = []
+            for record_id in ids:
+                values = metrics[str(record_id)]
+                record_roles = [*roles, *extensions.get(str(record_id), [])]
+                year = str(record_id).rsplit(":", 1)[-1][:4]
+                rows.append(
+                    year
+                    + ":"
+                    + ",".join(
+                        f"{str(role).upper()}={int(values[str(role)])}"
+                        for role in record_roles
+                    )
+                )
+            deltas = []
+            for prior_id, current_id in pairwise(ids):
+                prior = metrics[str(prior_id)]
+                current = metrics[str(current_id)]
+                years = (
+                    f"{str(prior_id).rsplit(':', 1)[-1][:4]}→"
+                    f"{str(current_id).rsplit(':', 1)[-1][:4]}"
+                )
+                deltas.append(
+                    years
+                    + ":"
+                    + ",".join(
+                        f"Δ{str(role).upper()}="
+                        f"{int(current[str(role)]) - int(prior[str(role)])}"
+                        for role in roles
+                    )
+                )
+            return " | ".join([*rows, *deltas])
+
+        if prerequisite_answer_key:
+            if (
+                not isinstance(prerequisite_record_ids, list)
+                or not isinstance(prerequisite_required_roles, list)
+                or not isinstance(prerequisite_record_role_extensions, dict)
+            ):
+                return
+            prerequisite_answer = compose_answer(
+                prerequisite_record_ids,
+                prerequisite_required_roles,
+                prerequisite_record_role_extensions,
+            )
+            if (
+                prerequisite_answer is None
+                or state.values.get(prerequisite_answer_key) != prerequisite_answer
+            ):
+                return
+        answer = compose_answer(record_ids, required_roles, record_role_extensions)
+        if answer is not None:
+            state.set(answer_key, answer, eid, day)
     elif t == "sec_financial_answer":
         record_id = str(p.get("record_id") or "")
         answer_key = str(p.get("answer_key") or "")
@@ -478,6 +713,18 @@ def apply_event(state: WorldState, ev: Event) -> None:
             or not isinstance(required, list)
             or any(str(role) not in xbrl for role in required)
         ):
+            return
+        answer_family = str(p.get("answer_family") or "")
+        if answer_family:
+            if answer_family == "balance_certification":
+                ceo = certs.get("ex_31_1") or []
+                cfo = certs.get("ex_31_2") or []
+                sox = list(certs.get("ex_32_1") or []) + list(
+                    certs.get("ex_32_2") or []
+                )
+                if len(ceo) != 1 or len(cfo) != 1 or len(sox) != 2:
+                    return
+            state.set(answer_key, "READY", eid, day)
             return
         prerequisite_key = str(p.get("prerequisite_answer_key") or "")
         prior = state.values.get(prerequisite_key) if prerequisite_key else ""

@@ -51,6 +51,9 @@ EVENT_TYPES = [
     "sec_filing_publication_ratification",
     "sec_source_section",
     "sec_financial_answer",
+    "issuer_ir_source_section",
+    "issuer_ir_prior_filing_relation",
+    "issuer_ir_cross_year_answer",
 ]
 
 ARTIFACT_KEYS_CORE = [
@@ -105,10 +108,11 @@ def sample_world_spec(
         raise ValueError("n_workstreams must be between 0 and 64")
     workflows = list(source_workflows or [])
     if any(
-        workflow.target_domain != "company" or workflow.source_kind != "sec_filing"
+        workflow.target_domain != "company"
+        or workflow.source_kind not in {"sec_filing", "issuer_ir_filing"}
         for workflow in workflows
     ):
-        raise ValueError("company requires SEC filing source workflows")
+        raise ValueError("company requires filing source workflows")
     rng = random.Random(seed)
     used_names: set[str] = set()
     used_projects: set[str] = set()

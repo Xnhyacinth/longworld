@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from copy import deepcopy
 from dataclasses import replace
 from datetime import date
@@ -9,6 +10,7 @@ from pathlib import Path
 from typing import ClassVar
 
 import pytest
+import yaml
 
 from longworld.core.attestation import attach_attestation, attestation_key_from_env
 from longworld.core.consist import artifact_text_issues
@@ -26,18 +28,94 @@ from longworld.core.secvisible import (
     SEC_VISIBLE_TEXT_REVISION,
     sec_visible_provenance_id,
 )
-from longworld.core.sourceworkflow import SourceFact, SourceRecord, SourceWorkflow
+from longworld.core.sourceworkflow import (
+    SOURCE_WORKFLOW_ADAPTER_REVISION_V2,
+    SourceFact,
+    SourceRecord,
+    SourceWorkflow,
+    adapt_sec_manifest,
+)
 from longworld.core.taxonomy import SourceOrigin, artifact_classification
 from longworld.core.verify import verify_question
 from longworld.core.views import render_cf_view
-from longworld.domains.company.queries import build_queries
+from longworld.domains.company.queries import (
+    build_queries,
+    sec_financial_answer_conforms,
+)
 from longworld.domains.company.schema import sample_world_spec
-from longworld.domains.company.simulate import simulate_company
+from longworld.domains.company.simulate import (
+    canonical_sec_source_section_envelope,
+    simulate_company,
+)
+from scripts import quality_gate
+from scripts.generate import source_workflow_artifacts_for_query
 
 SOURCE_DIRECTORY = (
     Path(__file__).parents[1] / "data" / "source_inventory" / "sec_p5_apple_smoke"
 )
 RECORD_ID = "sec:0000320193-25-000079"
+
+
+@pytest.mark.parametrize(
+    "config_name",
+    ("p12_sec_amazon_facets_v1.yaml", "p12_sec_apple_facets_v1.yaml"),
+)
+def test_p12_sec_configs_require_exact_pack_admission(config_name: str) -> None:
+    config = yaml.safe_load((Path("configs") / config_name).read_text(encoding="utf-8"))
+
+    assert config["release_profile_id"] == "p12-sec-source-slice-1-v1"
+    assert config["exact_pack_admission"] is True
+    assert config["exact_tokenizer"] == {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+        "local_files_only": True,
+    }
+
+
+@pytest.mark.parametrize(
+    "config_name",
+    ("p12_sec_amazon_facets_v1.yaml", "p12_sec_apple_facets_v1.yaml"),
+)
+def test_p12_sec_strict_configs_stage_one_reconstruction_across_all_bands(
+    config_name: str,
+) -> None:
+    config = yaml.safe_load((Path("configs") / config_name).read_text(encoding="utf-8"))
+    rows = []
+    band_tokens = {"16k": 16_000, "32k": 32_000, "64k": 64_000, "128k": 128_000}
+    for query_type, bands in config["real_workflow_query_length_buckets"].items():
+        for band in bands:
+            total = band_tokens[band]
+            rows.append(
+                {
+                    "base_task_id": f"{query_type}:{band}",
+                    "world_id": "sec-config-probe",
+                    "query_type": query_type,
+                    "query_timing": "late",
+                    "view": "full",
+                    "split": "train",
+                    "length_bucket": band,
+                    "actual_context_tokens": total,
+                    "real_source_verified": True,
+                    "semantic_growth_group_id": query_type,
+                    "semantic_tokens": {
+                        "event_bearing": total - 1_000,
+                        "internal": 1_000,
+                        "generic_background": 0,
+                    },
+                }
+            )
+
+    errors = quality_gate._semantic_growth_errors(
+        rows, min_internal_growth=4_096, max_generic_growth_share=0.2
+    )
+
+    assert not any("real_64k_missing_lower_band" in error for error in errors), errors
+    assert "reconstruction" in config["data_product"]
+    assert "facets" not in config["data_product"]
+    assert config["source_workflow_query_types"] == ["sec_financial_reconstruction"]
+    assert config["real_workflow_query_length_buckets"] == {
+        "sec_financial_reconstruction": ["16k", "32k", "64k", "128k"]
+    }
 
 
 def _identity_facts(text: str, digest: str) -> tuple[SourceFact, ...]:
@@ -247,6 +325,206 @@ def test_financial_programs_replay_but_do_not_meet_long_bands(apple_world) -> No
     assert all(
         sum(display in item.text for display in required_displays) < 3
         for item in first_essential
+    )
+
+
+def test_independent_financial_facet_programs_replay_and_remove_one_fail(
+    apple_world,
+) -> None:
+    world, artifacts, _queries = apple_world
+    facets = {
+        query.query_type: query
+        for query in build_queries(world)
+        if query.query_type.startswith("sec_financial_")
+        and query.query_type != "sec_financial_reconstruction"
+    }
+
+    assert set(facets) == {
+        "sec_financial_sales_mix",
+        "sec_financial_category_geography",
+        "sec_financial_balance_certification",
+        "sec_financial_cashflow_notes",
+    }
+    assert [
+        facets[name].preferred_length_buckets[0]
+        for name in (
+            "sec_financial_sales_mix",
+            "sec_financial_category_geography",
+            "sec_financial_balance_certification",
+            "sec_financial_cashflow_notes",
+        )
+    ] == ["16k", "32k", "64k", "128k"]
+    assert facets["sec_financial_sales_mix"].answer.startswith("MIX:")
+    assert facets["sec_financial_category_geography"].answer.startswith("CAT:")
+    assert facets["sec_financial_balance_certification"].answer.startswith("BS:")
+    assert facets["sec_financial_cashflow_notes"].answer.startswith("CF:")
+    assert len({query.answer for query in facets.values()}) == len(facets)
+    assert len({query.base_task_group for query in facets.values()}) == len(facets)
+    assert all(query.answer != query.cf_answer for query in facets.values())
+
+    by_id = {artifact.artifact_id: artifact for artifact in artifacts}
+    for query in facets.values():
+        essential = [by_id[item] for item in query.essential_artifact_ids]
+        event_types = [
+            (artifact.slots or {}).get("event_type") for artifact in essential
+        ]
+        assert event_types.count("sec_financial_answer") == 1
+        assert event_types.count("sec_source_section") == len(essential) - 1
+        assert answer_from_artifacts(world, query, essential) == query.answer
+        assert all(
+            answer_from_artifacts(
+                world,
+                query,
+                [
+                    artifact
+                    for artifact in essential
+                    if artifact.artifact_id != removed.artifact_id
+                ],
+            )
+            == "unknown"
+            for removed in essential
+        )
+        assert all(query.answer not in artifact.text for artifact in essential)
+        _cf_world, cf_artifacts = render_cf_view(world, query)
+        filtered = source_workflow_artifacts_for_query(artifacts, query)
+        filtered_cf = source_workflow_artifacts_for_query(cf_artifacts, query)
+        verification, notes = verify_question(
+            world,
+            query,
+            filtered,
+            cf_artifacts=filtered_cf,
+            verification_mode="candidate",
+        )
+        assert verification.semantic_sufficient, notes
+        assert verification.counterfactual_replay_sufficient, notes
+        assert verification.counterfactual_changes_answer, notes
+
+
+def test_sec_financial_questions_publish_and_enforce_output_contract(
+    apple_world,
+) -> None:
+    world, _artifacts, reconstructions = apple_world
+    facets = [
+        query
+        for query in build_queries(world)
+        if query.query_type.startswith("sec_financial_")
+        and query.query_type != "sec_financial_reconstruction"
+    ]
+
+    for query in [*reconstructions, *facets]:
+        assert "Metric roles (exact input order):" in query.question
+        assert "All monetary metrics use USD exact integers" in query.question
+        assert "Branch semantics:" in query.question
+        assert "Label order:" in query.question
+        assert "Literal delimiters:" in query.question
+        assert "Exact output grammar: `" in query.question
+        assert sec_financial_answer_conforms(query.question, query.answer)
+        assert sec_financial_answer_conforms(query.question, query.cf_answer)
+        answer_event = next(
+            event
+            for event in world.events
+            if event.type == "sec_financial_answer"
+            and event.params.get("answer_key") == query.answer_key
+        )
+        for role in answer_event.params["required_roles"]:
+            declaration = (
+                rf"[A-Z][^;\[]+ \[input role {re.escape(role)}; output token "
+                rf"{re.escape(role.upper())}; USD exact integer\]"
+            )
+            assert re.search(declaration, query.question)
+
+    reconstruction_64k = next(
+        query for query in reconstructions if query.preferred_length_buckets == ["64k"]
+    )
+    for output_token in (
+        "STATUS",
+        "MAX_INDEX",
+        "CEO_NAME",
+        "CFO_NAME",
+        "COVERED_PERIOD_END",
+        "CERTIFICATION_DATE",
+    ):
+        assert f"{output_token} [" in reconstruction_64k.question
+
+
+def test_sec_financial_answer_contract_rejects_role_and_format_corruption(
+    apple_world,
+) -> None:
+    world, _artifacts, reconstructions = apple_world
+    facets = [
+        query
+        for query in build_queries(world)
+        if query.query_type.startswith("sec_financial_")
+        and query.query_type != "sec_financial_reconstruction"
+    ]
+    for query in [*reconstructions, *facets]:
+        role_omitted = re.sub(r"(?<=:)-?\d+\+", "", query.answer, count=1)
+        assert role_omitted != query.answer
+        assert not sec_financial_answer_conforms(query.question, role_omitted)
+
+        labels_reordered = re.sub(r"^[A-Z_]+:", "BROKEN:", query.answer, count=1)
+        assert labels_reordered != query.answer
+        assert not sec_financial_answer_conforms(query.question, labels_reordered)
+
+        delimiter_corrupted = (
+            query.answer.replace("||", "|", 1)
+            if "||" in query.answer
+            else query.answer.replace("|", "||", 1)
+        )
+        assert delimiter_corrupted != query.answer
+        assert not sec_financial_answer_conforms(query.question, delimiter_corrupted)
+
+
+def test_canonical_replay_accepts_distinct_raw_and_redacted_text_hashes() -> None:
+    manifest = json.loads(
+        (SOURCE_DIRECTORY / "sec_filing_manifest.signed.json").read_text()
+    )
+    workflows = adapt_sec_manifest(
+        manifest,
+        signed_bundle_authorized=True,
+        adapter_revision=SOURCE_WORKFLOW_ADAPTER_REVISION_V2,
+    )
+    workflow = workflows[0]
+    record = workflow.records[0]
+
+    assert record.source_sha256 != record.text_sha256
+    spec = sample_world_spec(
+        1701,
+        n_parallel=0,
+        n_pulses=0,
+        n_workstreams=0,
+        source_workflows=workflows,
+    )
+    world = simulate_company(spec)["focal"]
+    section = next(
+        event for event in world.events if event.type == "sec_source_section"
+    )
+
+    assert (
+        canonical_sec_source_section_envelope(
+            workflow=workflow,
+            record=record,
+            section_id=section.params["section_id"],
+        )
+        is not None
+    )
+    tampered_text_record = replace(record, text_sha256="0" * 64)
+    assert (
+        canonical_sec_source_section_envelope(
+            workflow=replace(workflow, records=(tampered_text_record,)),
+            record=tampered_text_record,
+            section_id=section.params["section_id"],
+        )
+        is None
+    )
+    tampered_source_record = replace(record, source_sha256="f" * 64)
+    assert (
+        canonical_sec_source_section_envelope(
+            workflow=replace(workflow, records=(tampered_source_record,)),
+            record=tampered_source_record,
+            section_id=section.params["section_id"],
+        )
+        is None
     )
 
 
@@ -1209,7 +1487,14 @@ def test_amazon_programs_replay_but_do_not_meet_long_bands(amazon_world) -> None
         event.params.get("control_tier") not in {"64k", "128k"}
         for event in world.events
         if event.type == "sec_financial_answer"
+        and not event.params.get("answer_family")
     )
+
+
+def test_amazon_section_ground_values_are_visible_source_evidence(amazon_world) -> None:
+    world, artifacts, _queries = amazon_world
+
+    assert artifact_text_issues(world, artifacts) == []
 
 
 def test_amazon_financial_cf_mutates_product_display(amazon_world) -> None:

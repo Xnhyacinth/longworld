@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 from typing import Any
 
 from longworld.core.asof import core_as_of, find_event, world_as_of
+from longworld.core.provenance import ProvenanceError
+from longworld.core.secxbrl import parse_ixbrl_display_number
 from longworld.core.world import Event, SimulatedWorld, WorldSimulator
 from longworld.domains.company.events import apply_event, check_preconditions
 
@@ -74,6 +77,21 @@ def eval_answer(
 ) -> str:
     key = spec.answer_key
     val = state_values.get(key)
+    if spec.query_type.startswith("sec_financial_") and spec.query_type != (
+        "sec_financial_reconstruction"
+    ):
+        if val != "READY":
+            return "unknown"
+        record_id = (
+            key.removeprefix("sec_financial_facet_ready:").rsplit(":", 1)[0]
+            if key.startswith("sec_financial_facet_ready:")
+            else ""
+        )
+        xbrl = dict((state_values.get("sec_xbrl_facts") or {}).get(record_id) or {})
+        certs = dict(
+            (state_values.get("sec_certification_facts") or {}).get(record_id) or {}
+        )
+        return _financial_facet_answer(spec.query_type, xbrl, certs)
     if spec.query_type == "version_diff":
         v2 = state_values.get("v2_deliverable")
         v3 = state_values.get("v3_deliverable")
@@ -123,6 +141,510 @@ def eval_answer(
     if val is None or val == 0 or val is False:
         return "unknown"
     return str(val)
+
+
+def _indexed_values(values: dict[str, Any], prefix: str) -> list[int]:
+    keys = sorted(
+        (key for key in values if key.startswith(prefix)),
+        key=lambda key: int(key.rsplit("_", 1)[1]),
+    )
+    return [int(values[key]) for key in keys]
+
+
+def _financial_facet_answer(
+    query_type: str, xbrl: dict[str, Any], certs: dict[str, Any]
+) -> str:
+    if query_type == "sec_financial_sales_mix":
+        required = ("product_revenue", "service_revenue", "total_revenue")
+        if any(role not in xbrl for role in required):
+            return "unknown"
+        gap = (
+            int(xbrl["product_revenue"])
+            + int(xbrl["service_revenue"])
+            - int(xbrl["total_revenue"])
+        )
+        return (
+            f"MIX:{xbrl['product_revenue']}+{xbrl['service_revenue']}="
+            f"{xbrl['total_revenue']}|GAP:{gap}|"
+            f"STATUS:{'PASS' if gap == 0 else 'FAIL'}"
+        )
+    if query_type == "sec_financial_category_geography":
+        categories = _indexed_values(xbrl, "category_")
+        geographies = _indexed_values(xbrl, "geo_")
+        if not categories or not geographies:
+            return "unknown"
+        category_total = sum(categories)
+        geography_total = sum(geographies)
+        return (
+            "CAT:"
+            + "+".join(str(value) for value in categories)
+            + f"={category_total}||GEO:"
+            + "+".join(str(value) for value in geographies)
+            + f"={geography_total}|DELTA:{category_total - geography_total}"
+        )
+    if query_type == "sec_financial_balance_certification":
+        required = ("assets", "equity", "liabilities_and_equity")
+        if any(role not in xbrl for role in required):
+            return "unknown"
+        ceo = certs.get("ex_31_1") or []
+        cfo = certs.get("ex_31_2") or []
+        sox = list(certs.get("ex_32_1") or []) + list(certs.get("ex_32_2") or [])
+        if len(ceo) != 1 or len(cfo) != 1 or len(sox) != 2:
+            return "unknown"
+        rows = [*ceo, *cfo, *sox]
+        if not all(isinstance(row, dict) and row.get("name") for row in rows):
+            return "unknown"
+        if "liabilities" in xbrl:
+            balance = (
+                f"BS:{xbrl['liabilities']}+{xbrl['equity']}={xbrl['assets']}|"
+                f"{xbrl['liabilities_and_equity']}"
+            )
+        else:
+            reconstructed = int(xbrl["assets"]) - int(xbrl["equity"])
+            balance = (
+                f"BS:{xbrl['assets']}-{xbrl['equity']}={reconstructed}|"
+                f"{xbrl['liabilities_and_equity']}"
+            )
+        return (
+            f"{balance}||CERT:CEO:{ceo[0]['name']}||CFO:{cfo[0]['name']}||"
+            f"SOX906:{sox[0]['name']}+{sox[1]['name']}"
+        )
+    if query_type == "sec_financial_cashflow_notes":
+        common = (
+            "cfo",
+            "cfi",
+            "cff",
+            "delta_cash",
+            "federal_tax",
+            "state_tax",
+            "foreign_tax",
+            "income_tax",
+            "lease_current",
+            "lease_noncurrent",
+            "lease_total",
+        )
+        if any(role not in xbrl for role in common):
+            return "unknown"
+        if all(
+            role in xbrl for role in ("debt_current", "debt_noncurrent", "debt_total")
+        ):
+            cash_terms = f"{xbrl['cfo']}+{xbrl['cfi']}+{xbrl['cff']}"
+            extra = (
+                f"DEBT:{xbrl['debt_current']}+{xbrl['debt_noncurrent']}="
+                f"{xbrl['debt_total']}"
+            )
+        elif all(role in xbrl for role in ("fx", "oi_0", "oi_1", "oi_2", "oi_total")):
+            cash_terms = f"{xbrl['cfo']}+{xbrl['cfi']}+{xbrl['cff']}+{xbrl['fx']}"
+            extra = (
+                f"OI:{xbrl['oi_0']}+{xbrl['oi_1']}+{xbrl['oi_2']}={xbrl['oi_total']}"
+            )
+        else:
+            return "unknown"
+        return "||".join(
+            (
+                f"CF:{cash_terms}={xbrl['delta_cash']}",
+                (
+                    f"TAX:{xbrl['federal_tax']}+{xbrl['state_tax']}+"
+                    f"{xbrl['foreign_tax']}={xbrl['income_tax']}"
+                ),
+                (
+                    f"LEASE:{xbrl['lease_current']}+{xbrl['lease_noncurrent']}="
+                    f"{xbrl['lease_total']}"
+                ),
+                extra,
+            )
+        )
+    return "unknown"
+
+
+_SEC_MIX_ROLES = ("product_revenue", "service_revenue", "total_revenue")
+_SEC_APPLE_128K_ROLES = (
+    "cfo",
+    "cfi",
+    "cff",
+    "delta_cash",
+    "federal_tax",
+    "state_tax",
+    "foreign_tax",
+    "income_tax",
+    "lease_current",
+    "lease_noncurrent",
+    "lease_total",
+    "debt_current",
+    "debt_noncurrent",
+    "debt_total",
+)
+_SEC_AMAZON_128K_ROLES = (
+    "cfo",
+    "cfi",
+    "cff",
+    "fx",
+    "delta_cash",
+    "federal_tax",
+    "state_tax",
+    "foreign_tax",
+    "income_tax",
+    "lease_current",
+    "lease_noncurrent",
+    "lease_total",
+    "oi_0",
+    "oi_1",
+    "oi_2",
+    "oi_total",
+)
+_SEC_FINANCIAL_GRAMMAR_PREFIX = "Exact output grammar: `"
+
+
+def _consume_indexed_roles(
+    roles: tuple[str, ...], start: int, prefix: str
+) -> tuple[tuple[str, ...], int]:
+    end = start
+    while end < len(roles) and roles[end].startswith(prefix):
+        end += 1
+    selected = roles[start:end]
+    if not selected or selected != tuple(
+        f"{prefix}{index}" for index in range(len(selected))
+    ):
+        return (), start
+    return selected, end
+
+
+def _sec_financial_output_contract(
+    *, query_type: str, control_tier: str, required_roles: list[str]
+) -> tuple[str, str, str] | None:
+    roles = tuple(str(role) for role in required_roles)
+    mix = (
+        "MIX:<PRODUCT_REVENUE>+<SERVICE_REVENUE>=<TOTAL_REVENUE>"
+        "|GAP:<MIX_GAP>|STATUS:<STATUS>"
+    )
+    labels = ["MIX", "GAP", "STATUS"]
+    branch = "MIX_GAP is PRODUCT_REVENUE + SERVICE_REVENUE - TOTAL_REVENUE; "
+    branch += "STATUS is PASS exactly when MIX_GAP is zero, otherwise FAIL"
+
+    categories: tuple[str, ...] = ()
+    geographies: tuple[str, ...] = ()
+    balance_roles: tuple[str, ...] = ()
+    extras: tuple[str, ...] = ()
+    if query_type == "sec_financial_sales_mix":
+        if roles != _SEC_MIX_ROLES or control_tier != "16k":
+            return None
+        return mix, ", ".join(labels), branch
+    if query_type == "sec_financial_category_geography":
+        categories, position = _consume_indexed_roles(roles, 0, "category_")
+        geographies, position = _consume_indexed_roles(roles, position, "geo_")
+        if position != len(roles) or control_tier != "32k":
+            return None
+        cat_terms = "+".join(f"<{role.upper()}>" for role in categories)
+        geo_terms = "+".join(f"<{role.upper()}>" for role in geographies)
+        grammar = (
+            f"CAT:{cat_terms}=<CATEGORY_TOTAL>||GEO:{geo_terms}="
+            "<GEOGRAPHY_TOTAL>|DELTA:<CATEGORY_MINUS_GEOGRAPHY>"
+        )
+        return (
+            grammar,
+            "CAT, GEO, DELTA",
+            (
+                "CATEGORY_TOTAL and GEOGRAPHY_TOTAL are their displayed operand "
+                "sums; DELTA is CATEGORY_TOTAL - GEOGRAPHY_TOTAL"
+            ),
+        )
+    if query_type == "sec_financial_balance_certification":
+        if control_tier != "64k":
+            return None
+        balance_roles = roles
+    elif query_type == "sec_financial_cashflow_notes":
+        if control_tier != "128k":
+            return None
+        extras = roles
+    elif query_type == "sec_financial_reconstruction":
+        if roles[:3] != _SEC_MIX_ROLES:
+            return None
+        if control_tier == "16k":
+            if roles != _SEC_MIX_ROLES:
+                return None
+            return mix, ", ".join(labels), branch
+        categories, position = _consume_indexed_roles(roles, 3, "category_")
+        geographies, position = _consume_indexed_roles(roles, position, "geo_")
+        if not categories or not geographies:
+            return None
+        cat_terms = "+".join(f"<{role.upper()}>" for role in categories)
+        geo_terms = "+".join(f"<{role.upper()}>" for role in geographies)
+        grammar = (
+            f"{mix}||CAT:{cat_terms}=<TOTAL_REVENUE>||GEO:{geo_terms}=<TOTAL_REVENUE>"
+        )
+        labels.extend(("CAT", "GEO"))
+        branch += "; CAT and GEO operands must each sum to TOTAL_REVENUE"
+        if control_tier == "32k":
+            if position != len(roles):
+                return None
+            return grammar, ", ".join(labels), branch
+        if roles[position : position + 4] == (
+            "assets",
+            "liabilities",
+            "equity",
+            "liabilities_and_equity",
+        ):
+            balance_roles = roles[position : position + 4]
+        elif roles[position : position + 3] == (
+            "assets",
+            "equity",
+            "liabilities_and_equity",
+        ):
+            balance_roles = roles[position : position + 3]
+        else:
+            return None
+        position += len(balance_roles)
+        if position >= len(roles) or roles[position] != "prior_total_revenue":
+            return None
+        prior_geographies, position = _consume_indexed_roles(
+            roles, position + 1, "prior_geo_"
+        )
+        if len(prior_geographies) != len(geographies):
+            return None
+        prior_terms = "+".join(f"<{role.upper()}>" for role in prior_geographies)
+        delta_terms = ",".join(
+            f"<SIGNED_GEO_YOY_{index}>" for index in range(len(geographies))
+        )
+        grammar += (
+            f"||GEO_PRIOR:{prior_terms}=<PRIOR_TOTAL_REVENUE>"
+            f"||GEO_YOY:{delta_terms}|MAX_INDEX:<MAX_INDEX>:<SIGNED_MAX_DELTA>"
+        )
+        labels.extend(("GEO_PRIOR", "GEO_YOY", "MAX_INDEX"))
+        branch += (
+            "; each SIGNED_GEO_YOY_i is GEO_i - PRIOR_GEO_i; MAX_INDEX is the "
+            "zero-based index of the largest absolute delta and SIGNED_MAX_DELTA "
+            "is that delta"
+        )
+        extras = roles[position:]
+        if control_tier == "64k" and extras:
+            return None
+        if control_tier == "128k" and extras not in {
+            _SEC_APPLE_128K_ROLES,
+            _SEC_AMAZON_128K_ROLES,
+        }:
+            return None
+    else:
+        return None
+
+    if balance_roles:
+        if "liabilities" in balance_roles:
+            balance = "BS:<LIABILITIES>+<EQUITY>=<ASSETS>|<LIABILITIES_AND_EQUITY>"
+            balance_branch = (
+                "use the direct-liabilities branch because LIABILITIES is present; "
+                "the first equality is LIABILITIES + EQUITY = ASSETS and the final "
+                "field is LIABILITIES_AND_EQUITY"
+            )
+        else:
+            balance = (
+                "BS:<ASSETS>-<EQUITY>=<ASSETS_MINUS_EQUITY>|<LIABILITIES_AND_EQUITY>"
+            )
+            balance_branch = (
+                "use the reconstructed-liabilities branch because LIABILITIES is "
+                "absent; ASSETS_MINUS_EQUITY is ASSETS - EQUITY and the final field "
+                "is LIABILITIES_AND_EQUITY"
+            )
+        certification = (
+            "CERT:CEO:<CEO_NAME>||CFO:<CFO_NAME>||SOX906:<CEO_NAME>+<CFO_NAME>"
+        )
+        if query_type == "sec_financial_balance_certification":
+            grammar = f"{balance}||{certification}"
+            labels = ["BS", "CERT", "CEO", "CFO", "SOX906"]
+            branch = balance_branch + "; certification order is CEO, CFO, then SOX906"
+            return grammar, ", ".join(labels), branch
+        else:
+            grammar += (
+                f"||{balance}||{certification}||"
+                "CERT_SCOPE:Form 10-K@<COVERED_PERIOD_END>#<CERTIFICATION_DATE>"
+            )
+            labels.extend(("BS", "CERT", "CEO", "CFO", "SOX906", "CERT_SCOPE"))
+            branch += "; " + balance_branch
+            branch += (
+                "; certification order is CEO, CFO, SOX906, then the covered "
+                "Form 10-K period and certification date"
+            )
+            if control_tier == "64k":
+                return grammar, ", ".join(labels), branch
+
+    if extras:
+        cash = "CF:<CFO>+<CFI>+<CFF>"
+        if extras == _SEC_APPLE_128K_ROLES:
+            cash += "=<DELTA_CASH>"
+            final = "DEBT:<DEBT_CURRENT>+<DEBT_NONCURRENT>=<DEBT_TOTAL>"
+            cash_branch = (
+                "use the no-FX cash-flow branch and finish with DEBT because the "
+                "debt roles are present"
+            )
+            final_label = "DEBT"
+        elif extras == _SEC_AMAZON_128K_ROLES:
+            cash += "+<FX>=<DELTA_CASH>"
+            final = "OI:<OI_0>+<OI_1>+<OI_2>=<OI_TOTAL>"
+            cash_branch = (
+                "include FX in the cash-flow identity and finish with OI because "
+                "the operating-income roles are present"
+            )
+            final_label = "OI"
+        else:
+            return None
+        notes = (
+            f"{cash}||TAX:<FEDERAL_TAX>+<STATE_TAX>+<FOREIGN_TAX>="
+            "<INCOME_TAX>||LEASE:<LEASE_CURRENT>+<LEASE_NONCURRENT>="
+            f"<LEASE_TOTAL>||{final}"
+        )
+        if query_type == "sec_financial_cashflow_notes":
+            grammar = notes
+            labels = ["CF", "TAX", "LEASE", final_label]
+            branch = cash_branch
+        else:
+            grammar += "||" + notes
+            labels.extend(("CF", "TAX", "LEASE", final_label))
+            branch += "; " + cash_branch
+        branch += "; every displayed equation must reconcile exactly"
+        return grammar, ", ".join(labels), branch
+    return None
+
+
+def _sec_financial_role_name(role: str) -> str:
+    fixed = {
+        "product_revenue": "Product revenue",
+        "service_revenue": "Service revenue",
+        "total_revenue": "Total revenue",
+        "assets": "Total assets",
+        "liabilities": "Total liabilities",
+        "equity": "Shareholders' equity",
+        "liabilities_and_equity": "Total liabilities and shareholders' equity",
+        "prior_total_revenue": "Prior-year total revenue",
+        "cfo": "Net cash from operating activities",
+        "cfi": "Net cash from investing activities",
+        "cff": "Net cash from financing activities",
+        "fx": "Foreign-exchange effect on cash",
+        "delta_cash": "Net change in cash",
+        "federal_tax": "Federal income tax",
+        "state_tax": "State income tax",
+        "foreign_tax": "Foreign income tax",
+        "income_tax": "Total income tax",
+        "lease_current": "Current lease liabilities",
+        "lease_noncurrent": "Noncurrent lease liabilities",
+        "lease_total": "Total lease liabilities",
+        "debt_current": "Current debt",
+        "debt_noncurrent": "Noncurrent debt",
+        "debt_total": "Total debt",
+        "oi_total": "Total operating income",
+    }
+    if role in fixed:
+        return fixed[role]
+    for prefix, label in (
+        ("category_", "Revenue category"),
+        ("prior_geo_", "Prior-year geography"),
+        ("geo_", "Current geography"),
+        ("oi_", "Operating-income segment"),
+    ):
+        if role.startswith(prefix) and role[len(prefix) :].isdigit():
+            return f"{label} {role[len(prefix) :]}"
+    return role.replace("_", " ").capitalize()
+
+
+def _sec_financial_output_field(token: str) -> str:
+    fixed = {
+        "MIX_GAP": "Sales-mix reconciliation gap; USD exact integer",
+        "STATUS": "Sales-mix status; PASS if MIX_GAP is zero, otherwise FAIL",
+        "CATEGORY_TOTAL": "Sum of category operands; USD exact integer",
+        "GEOGRAPHY_TOTAL": "Sum of geography operands; USD exact integer",
+        "CATEGORY_MINUS_GEOGRAPHY": (
+            "CATEGORY_TOTAL minus GEOGRAPHY_TOTAL; USD exact integer"
+        ),
+        "ASSETS_MINUS_EQUITY": "ASSETS minus EQUITY; USD exact integer",
+        "MAX_INDEX": "Zero-based index of the largest absolute geography delta",
+        "SIGNED_MAX_DELTA": "Delta selected by MAX_INDEX; signed USD exact integer",
+        "CEO_NAME": "Chief executive officer name; source text",
+        "CFO_NAME": "Chief financial officer name; source text",
+        "COVERED_PERIOD_END": "Certified Form 10-K period end; YYYY-MM-DD",
+        "CERTIFICATION_DATE": "Officer certification date; YYYY-MM-DD",
+    }
+    if token in fixed:
+        return fixed[token]
+    if token.startswith("SIGNED_GEO_YOY_"):
+        return (
+            "Current geography minus matching prior geography; signed USD exact integer"
+        )
+    return "Derived USD exact integer"
+
+
+def _sec_financial_question_schema(
+    *, query_type: str, control_tier: str, required_roles: list[str]
+) -> str | None:
+    contract = _sec_financial_output_contract(
+        query_type=query_type,
+        control_tier=control_tier,
+        required_roles=required_roles,
+    )
+    if contract is None:
+        return None
+    grammar, labels, branch = contract
+    role_declarations = "; ".join(
+        f"{_sec_financial_role_name(role)} [input role {role}; output token "
+        f"{role.upper()}; USD exact integer]"
+        for role in required_roles
+    )
+    input_tokens = {role.upper() for role in required_roles}
+    derived_tokens = dict.fromkeys(re.findall(r"<([A-Z0-9_]+)>", grammar))
+    output_fields = "; ".join(
+        f"{token} [{_sec_financial_output_field(token)}]"
+        for token in derived_tokens
+        if token not in input_tokens
+    )
+    return (
+        f"Metric roles (exact input order): {role_declarations}. "
+        f"Derived/output fields: {output_fields}. "
+        "All monetary metrics use USD exact integers after applying the filing's "
+        "XBRL scale and sign; officer names are source text, MAX_INDEX is a "
+        "zero-based integer, STATUS is PASS or FAIL, and dates are YYYY-MM-DD. "
+        f"Branch semantics: {branch}. Label order: {labels}. "
+        "Literal delimiters: labels use `:`, arithmetic operands use `+` or the "
+        "branch's literal `-`, equations use `=`, fields inside a block use `|`, "
+        "top-level blocks use `||`, and GEO_YOY deltas use `,`; emit no extra "
+        "delimiters or whitespace except source officer-name spaces and literal "
+        f"`Form 10-K`. Exact output grammar: `{grammar}`."
+    )
+
+
+def sec_financial_answer_conforms(question: str, answer: str) -> bool:
+    """Return whether an answer matches the exact grammar published in its prompt."""
+    if question.count(_SEC_FINANCIAL_GRAMMAR_PREFIX) != 1:
+        return False
+    grammar_start = question.index(_SEC_FINANCIAL_GRAMMAR_PREFIX) + len(
+        _SEC_FINANCIAL_GRAMMAR_PREFIX
+    )
+    grammar_end = question.find("`.", grammar_start)
+    if grammar_end < 0:
+        return False
+    grammar = question[grammar_start:grammar_end]
+    pieces = re.split(r"(<[A-Z0-9_]+>)", grammar)
+    patterns: list[str] = []
+    captures: dict[str, str] = {}
+    for piece in pieces:
+        if not piece.startswith("<"):
+            patterns.append(re.escape(piece))
+            continue
+        token = piece[1:-1]
+        if token in captures:
+            patterns.append(f"(?P={captures[token]})")
+            continue
+        group = f"value_{len(captures)}"
+        captures[token] = group
+        if token == "STATUS":
+            value_pattern = "(?:PASS|FAIL)"
+        elif token in {"COVERED_PERIOD_END", "CERTIFICATION_DATE"}:
+            value_pattern = r"\d{4}-\d{2}-\d{2}"
+        elif token in {"CEO_NAME", "CFO_NAME"}:
+            value_pattern = r"[^|+=:\r\n]+"
+        elif token == "MAX_INDEX":
+            value_pattern = r"\d+"
+        elif token.startswith("SIGNED_"):
+            value_pattern = r"[+-]\d+"
+        else:
+            value_pattern = r"-?\d+"
+        patterns.append(f"(?P<{group}>{value_pattern})")
+    return re.fullmatch("".join(patterns), answer) is not None
 
 
 def _merge_overrides(
@@ -216,13 +738,15 @@ def _financial_program_ops(
     return ops
 
 
-def _financial_cf_updates(ops: Event) -> dict[str, Any]:
+def _financial_cf_updates(
+    ops: Event, target_role: str = "product_revenue"
+) -> dict[str, Any]:
     original = str(ops.params.get("text") or "")
     product = next(
         (
             span
             for span in ops.params.get("fact_spans") or []
-            if isinstance(span, dict) and span.get("role") == "product_revenue"
+            if isinstance(span, dict) and span.get("role") == target_role
         ),
         None,
     )
@@ -237,12 +761,21 @@ def _financial_cf_updates(ops: Event) -> dict[str, Any]:
         or not isinstance(start, int)
         or not isinstance(end, int)
         or original[start:end] != quote
-        or len(quote) != 7
     ):
         return {"text": original}
+    digit_index = next(
+        (
+            index
+            for index, value in enumerate(quote)
+            if value.isdigit() and value != "0"
+        ),
+        -1,
+    )
     mutated_quote = (
-        str(int(quote[0]) - 1) + quote[1:]
-        if quote[0].isdigit() and quote[0] != "0"
+        quote[:digit_index]
+        + str(int(quote[digit_index]) - 1)
+        + quote[digit_index + 1 :]
+        if digit_index >= 0
         else quote
     )
     if mutated_quote == quote:
@@ -254,8 +787,7 @@ def _financial_cf_updates(ops: Event) -> dict[str, Any]:
             continue
         updated = dict(span)
         if span is product or (
-            span.get("role") == "product_revenue"
-            and span.get("evidence_quote") == quote
+            span.get("role") == target_role and span.get("evidence_quote") == quote
         ):
             updated["evidence_quote"] = mutated_quote
             raw_scale = span.get("scale")
@@ -263,7 +795,14 @@ def _financial_cf_updates(ops: Event) -> dict[str, Any]:
                 scale = int(raw_scale) if isinstance(raw_scale, (int, str)) else 6
             except (TypeError, ValueError):
                 scale = 6
-            updated["numeric_value"] = int(mutated_quote.replace(",", "")) * (10**scale)
+            try:
+                updated["numeric_value"] = parse_ixbrl_display_number(
+                    mutated_quote,
+                    scale=scale,
+                    sign=str(span.get("sign") or ""),
+                )
+            except ProvenanceError:
+                return {"text": original}
         spans.append(updated)
     parent_provenance_id = str(ops.params.get("provenance_id") or "")
     provenance_payload = {
@@ -355,6 +894,174 @@ def _sec_form_cf_updates(source: Event, replacement: str) -> dict[str, Any] | No
     }
 
 
+def _issuer_ir_revenue_cf_updates(source: Event) -> dict[str, Any] | None:
+    text = str(source.params.get("text") or "")
+    prefix = "Issuer IR rendered XBRL statement\n"
+    spans = source.params.get("fact_spans")
+    if not text.startswith(prefix) or not isinstance(spans, list):
+        return None
+    revenue = next(
+        (
+            span
+            for span in spans
+            if isinstance(span, dict) and span.get("role") == "revenue"
+        ),
+        None,
+    )
+    if not isinstance(revenue, dict):
+        return None
+    start = revenue.get("char_start")
+    end = revenue.get("char_end")
+    numeric_value = revenue.get("numeric_value")
+    if (
+        not isinstance(start, int)
+        or not isinstance(end, int)
+        or isinstance(numeric_value, bool)
+        or not isinstance(numeric_value, int)
+    ):
+        return None
+    quote = text[start:end]
+    replacement = quote.replace(f"{numeric_value:,}", f"{numeric_value + 1_000:,}")
+    if replacement == quote or len(replacement) != len(quote):
+        return None
+    cf_text = text[:start] + replacement + text[end:]
+    cf_spans = [dict(span) for span in spans]
+    cf_revenue = next(span for span in cf_spans if span.get("role") == "revenue")
+    cf_revenue.update(
+        evidence_quote=replacement,
+        numeric_value=numeric_value + 1_000,
+        source_evidence_quote=replacement,
+    )
+    return {
+        "text": cf_text,
+        "text_sha256": hashlib.sha256(cf_text.encode()).hexdigest(),
+        "section_sha256": hashlib.sha256(cf_text[len(prefix) :].encode()).hexdigest(),
+        "fact_spans": cf_spans,
+        "ground_values": [
+            replacement if value == quote else value
+            for value in source.params.get("ground_values") or []
+        ],
+        "source_origin": "synthetic_world",
+        "provenance_id": "derived-sha256:"
+        + hashlib.sha256(
+            f"issuer_ir_cf_revenue|{source.params.get('provenance_id')}|{cf_text}".encode()
+        ).hexdigest(),
+        "parent_provenance_id": str(source.params.get("provenance_id") or ""),
+        "provenance_operation": "counterfactual_issuer_ir_revenue",
+    }
+
+
+def _issuer_ir_question_schema(
+    *,
+    years: list[int],
+    roles: list[str],
+    role_kinds: dict[str, str],
+    record_role_extensions: dict[int, list[str]] | None = None,
+) -> str | None:
+    extensions = record_role_extensions or {}
+    all_roles = [*roles, *(role for values in extensions.values() for role in values)]
+    if (
+        not years
+        or not roles
+        or any(year not in years for year in extensions)
+        or any(role not in role_kinds for role in all_roles)
+    ):
+        return None
+
+    def declarations_for(selected_roles: list[str]) -> str:
+        declarations = []
+        for role in selected_roles:
+            kind = role_kinds[role]
+            if kind == "numeric":
+                unit = "USD millions"
+            elif kind in {"policy_presence", "disclosure_presence"}:
+                unit = "presence flag, 1=phrase present, 0=absent"
+            else:
+                return ""
+            declarations.append(
+                f"{role.replace('_', ' ').capitalize()} [label {role.upper()}; {unit}]"
+            )
+        return "; ".join(declarations)
+
+    declarations = declarations_for(roles)
+    if not declarations:
+        return None
+    extension_declarations = []
+    for year in years:
+        extension_roles = extensions.get(year, [])
+        if not extension_roles:
+            continue
+        rendered = declarations_for(extension_roles)
+        if not rendered:
+            return None
+        extension_declarations.append(f"{year}: {rendered}")
+    extension_clause = ""
+    if extension_declarations:
+        extension_clause = (
+            " Per-year extensions appended to that year's YEAR block: "
+            + "; ".join(extension_declarations)
+            + ". Consecutive-pair deltas use the common roles only."
+        )
+    return (
+        f"{years[0]}–{years[-1]}. Required roles in exact order: "
+        + declarations
+        + extension_clause
+        + ". Exact output format: for each year in ascending order, "
+        "YEAR:ROLE=integer,ROLE=integer; then for each consecutive pair, "
+        "PRIOR_YEAR→CURRENT_YEAR:ΔROLE=integer,ΔROLE=integer. "
+        "Separate blocks with ` | ` and do not reorder labels."
+    )
+
+
+def _issuer_ir_question_declares_schema(
+    question: str,
+    *,
+    years: list[int],
+    roles: list[str],
+    role_kinds: dict[str, str],
+    record_role_extensions: dict[int, list[str]] | None = None,
+) -> bool:
+    schema = _issuer_ir_question_schema(
+        years=years,
+        roles=roles,
+        role_kinds=role_kinds,
+        record_role_extensions=record_role_extensions,
+    )
+    return schema is not None and schema in question
+
+
+def _issuer_ir_required_closure(world: SimulatedWorld, target: Event) -> list[Event]:
+    by_id = {event.id: event for event in world.events}
+    selected: set[str] = set()
+
+    def visit(event: Event) -> None:
+        if event.id in selected:
+            return
+        for parent_id in event.required_inputs:
+            parent = by_id.get(parent_id)
+            if parent is not None:
+                visit(parent)
+        selected.add(event.id)
+
+    visit(target)
+    return [event for event in world.events if event.id in selected]
+
+
+def _issuer_ir_proof_depth(events: list[Event], target: Event) -> int:
+    selected = {event.id: event for event in events}
+    memo: dict[str, int] = {}
+
+    def depth(event_id: str) -> int:
+        if event_id in memo:
+            return memo[event_id]
+        event = selected[event_id]
+        parents = [parent for parent in event.required_inputs if parent in selected]
+        memo[event_id] = 1 + max((depth(parent) for parent in parents), default=0)
+        return memo[event_id]
+
+    return depth(target.id)
+
+
 def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
     """Six programmatic question types. Answers come from replay, never from an LLM."""
     project = world.spec["project"]
@@ -370,6 +1077,155 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
 
     qid = world.spec["world_id"].split(":")[0]
     queries: list[QuerySpec] = []
+
+    issuer_answers = sorted(
+        (
+            event
+            for event in world.events
+            if event.type == "issuer_ir_cross_year_answer"
+        ),
+        key=lambda event: event.time,
+    )
+    issuer_type = {
+        "16k": "issuer_ir_two_year_growth",
+        "32k": "issuer_ir_three_year_growth",
+        "64k": "issuer_ir_four_year_consistency",
+    }
+    for answer_event in issuer_answers:
+        tier = str(answer_event.params.get("control_tier") or "")
+        query_type = issuer_type.get(tier)
+        years = answer_event.params.get("report_years")
+        if query_type is None or not isinstance(years, list) or not years:
+            continue
+        latest_record_id = str(answer_event.params["record_ids"][-1])
+        cf_source = next(
+            (
+                event
+                for event in world.events
+                if event.type == "issuer_ir_source_section"
+                and event.params.get("record_id") == latest_record_id
+                and any(
+                    span.get("role") == "revenue"
+                    for span in event.params.get("fact_spans") or []
+                    if isinstance(span, dict)
+                )
+            ),
+            None,
+        )
+        if cf_source is None:
+            continue
+        cf_updates = _issuer_ir_revenue_cf_updates(cf_source)
+        if cf_updates is None:
+            continue
+        essential_events = _issuer_ir_required_closure(world, answer_event)
+        essential = [event.id for event in essential_events]
+        roles = [str(role) for role in answer_event.params["required_roles"]]
+        record_ids = [str(item) for item in answer_event.params["record_ids"]]
+        extensions_by_record = {
+            str(record_id): [str(role) for role in extension_roles]
+            for record_id, extension_roles in dict(
+                answer_event.params.get("record_role_extensions") or {}
+            ).items()
+        }
+        extensions_by_year = {
+            int(record_id.rsplit(":", 1)[-1][:4]): extension_roles
+            for record_id, extension_roles in extensions_by_record.items()
+        }
+        all_roles = {
+            *roles,
+            *(role for values in extensions_by_record.values() for role in values),
+        }
+        role_kinds: dict[str, str] = {}
+        role_kind_conflict = False
+        for event_id in essential:
+            source_event = next(
+                (event for event in world.events if event.id == event_id), None
+            )
+            if source_event is None:
+                continue
+            for span in source_event.params.get("fact_spans") or []:
+                if not isinstance(span, dict) or str(span.get("role")) not in all_roles:
+                    continue
+                role = str(span["role"])
+                kind = str(span.get("kind") or "")
+                if role in role_kinds and role_kinds[role] != kind:
+                    role_kinds = {}
+                    role_kind_conflict = True
+                    break
+                role_kinds[role] = kind
+            if role_kind_conflict:
+                break
+        schema = _issuer_ir_question_schema(
+            years=[int(year) for year in years],
+            roles=roles,
+            role_kinds=role_kinds,
+            record_role_extensions=extensions_by_year,
+        )
+        if schema is None:
+            continue
+        question = (
+            "Using the issuer-owned rendered XBRL statements and the validated "
+            "annual-filing chain, reconstruct the cross-year financial comparison. "
+            + schema
+        )
+        queries.append(
+            QuerySpec(
+                query_id=f"{qid}:{query_type}:{answer_event.params['workflow_id']}",
+                query_type=query_type,
+                question=question,
+                answer="",
+                as_of=answer_event.time,
+                answer_key=str(answer_event.params["answer_key"]),
+                essential_event_ids=essential,
+                essential_artifact_ids=[
+                    f"{world.spec['world_id']}.{event_id}" for event_id in essential
+                ],
+                sufficient_event_ids=essential,
+                cf_event_id=cf_source.id,
+                cf_param_updates=cf_updates,
+                cf_answer="",
+                invariance_event_id=None,
+                gold_expression=(
+                    "read issuer XBRL metrics; validate same-issuer prior-annual "
+                    "relations; format per-record extensions; compute consecutive-"
+                    "year common-role deltas"
+                ),
+                proof_depth=_issuer_ir_proof_depth(essential_events, answer_event),
+                cf_op="amount",
+                motif="company.issuer_ir_cross_year_financial_history",
+                truth_regime="real_source_derived",
+                topology_id=instance_topology(
+                    "company.issuer_ir_cross_year", tier, len(years), len(all_roles)
+                ),
+                program_ops=[
+                    *(
+                        {"op": "READ_ISSUER_XBRL_METRIC", "role": role}
+                        for role in roles
+                    ),
+                    *(
+                        {
+                            "op": "READ_ISSUER_XBRL_RECORD_EXTENSION",
+                            "record_index": record_ids.index(record_id),
+                            "roles": extension_roles,
+                        }
+                        for record_id, extension_roles in sorted(
+                            extensions_by_record.items(),
+                            key=lambda item: record_ids.index(item[0]),
+                        )
+                    ),
+                    {"op": "VALIDATE_PRIOR_ANNUAL_RELATION"},
+                    *(
+                        [{"op": "FORMAT_PER_RECORD_EXTENSION"}]
+                        if extensions_by_record
+                        else []
+                    ),
+                    {"op": "COMPUTE_CONSECUTIVE_YEAR_DELTAS"},
+                ],
+                preferred_length_buckets=[tier],
+                semantic_growth_group="company_real_issuer_ir_cross_year",
+                base_task_group=f"issuer_ir_cross_year:{answer_event.params['workflow_id']}",
+            )
+        )
 
     for source in [event for event in world.events if event.type == "sec_filing"]:
         policy = next(
@@ -695,6 +1551,7 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
         )
 
     computes: dict[str, dict[str, Event]] = {}
+    facet_answers: dict[str, dict[str, Event]] = {}
     sections: dict[str, dict[str, Event]] = {}
     for event in world.events:
         record_id = str(event.params.get("record_id") or "")
@@ -702,7 +1559,10 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
             continue
         if event.type == "sec_financial_answer":
             tier = str(event.params.get("control_tier") or "")
-            if str(event.params.get("compose") or "compute") != "copy" and tier:
+            answer_family = str(event.params.get("answer_family") or "")
+            if answer_family:
+                facet_answers.setdefault(record_id, {})[answer_family] = event
+            elif str(event.params.get("compose") or "compute") != "copy" and tier:
                 computes.setdefault(record_id, {})[tier] = event
         elif event.type == "sec_source_section":
             section_id = str(event.params.get("section_id") or "")
@@ -746,6 +1606,165 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
             extra_128k = apple_128k
         elif all(name in by_section for name in amazon_128k):
             extra_128k = amazon_128k
+        facet_specs = (
+            (
+                "sales_mix",
+                "16k",
+                operation_sections,
+                operation_sections[0],
+                "product_revenue",
+                (
+                    {"op": "READ_XBRL_FACT", "role": "product_revenue"},
+                    {"op": "READ_XBRL_FACT", "role": "service_revenue"},
+                    {"op": "READ_XBRL_FACT", "role": "total_revenue"},
+                    {"op": "COMPUTE_SALES_MIX_IDENTITY"},
+                ),
+            ),
+            (
+                "category_geography",
+                "32k",
+                ("note2_revenue", "note13_segments"),
+                "note2_revenue",
+                "category_0",
+                (
+                    {"op": "READ_XBRL_FACT", "role": "category_mix"},
+                    {"op": "READ_XBRL_FACT", "role": "geographic_mix"},
+                    {"op": "RECONCILE_CATEGORY_GEOGRAPHY"},
+                ),
+            ),
+            (
+                "balance_certification",
+                "64k",
+                (
+                    "item8_balance_sheet",
+                    "ex_31_1",
+                    "ex_31_2",
+                    "ex_32_1",
+                    *(("ex_32_2",) if "ex_32_2" in by_section else ()),
+                ),
+                "item8_balance_sheet",
+                "assets",
+                (
+                    {"op": "READ_XBRL_FACT", "role": "balance_sheet"},
+                    {"op": "READ_CERTIFICATION", "role": "ceo_section_302"},
+                    {"op": "READ_CERTIFICATION", "role": "cfo_section_302"},
+                    {"op": "READ_CERTIFICATION", "role": "section_906"},
+                    {"op": "RECONCILE_BALANCE_AND_CERTIFICATIONS"},
+                ),
+            ),
+            *(
+                (
+                    (
+                        "cashflow_notes",
+                        "128k",
+                        extra_128k,
+                        "item8_cash_flow",
+                        "cfo",
+                        (
+                            {"op": "READ_XBRL_FACT", "role": "cash_flow"},
+                            {"op": "READ_XBRL_FACT", "role": "income_tax"},
+                            {"op": "READ_XBRL_FACT", "role": "leases"},
+                            {
+                                "op": "READ_XBRL_FACT",
+                                "role": (
+                                    "operating_income"
+                                    if "note10_segment_oi" in extra_128k
+                                    else "debt"
+                                ),
+                            },
+                            {"op": "RECONCILE_CASHFLOW_NOTES"},
+                        ),
+                    ),
+                )
+                if extra_128k
+                else ()
+            ),
+        )
+        by_facet = facet_answers.get(record_id) or {}
+        for (
+            answer_family,
+            control_tier,
+            needed_names,
+            cf_section_name,
+            cf_role,
+            program_ops,
+        ) in facet_specs:
+            answer_event = by_facet.get(answer_family)
+            needed_sections = [by_section.get(name) for name in needed_names]
+            cf_section = by_section.get(cf_section_name)
+            if (
+                answer_event is None
+                or cf_section is None
+                or any(event is None for event in needed_sections)
+            ):
+                continue
+            essential_events = [
+                *(event for event in needed_sections if event is not None),
+                answer_event,
+            ]
+            query_type = f"sec_financial_{answer_family}"
+            required_roles = [
+                str(role) for role in answer_event.params.get("required_roles") or []
+            ]
+            question_schema = _sec_financial_question_schema(
+                query_type=query_type,
+                control_tier=control_tier,
+                required_roles=required_roles,
+            )
+            if question_schema is None:
+                continue
+            queries.append(
+                QuerySpec(
+                    query_id=(
+                        f"{qid}:sec_financial_{answer_family}:{source_key}:"
+                        f"{control_tier}"
+                    ),
+                    query_type=query_type,
+                    question=(
+                        "Execute the independent SEC XBRL "
+                        f"{answer_family.replace('_', ' ')} program using only the "
+                        "statement, note, and certification evidence in context. "
+                        "Return the tagged reconciliation exactly; do not substitute "
+                        "filing identity metadata for financial facts. "
+                        + question_schema
+                    ),
+                    answer="",
+                    as_of=answer_event.time,
+                    answer_key=str(answer_event.params["answer_key"]),
+                    essential_event_ids=[event.id for event in essential_events],
+                    essential_artifact_ids=[
+                        f"{world.spec['world_id']}.{event.visibility[0]}"
+                        for event in essential_events
+                    ],
+                    sufficient_event_ids=[event.id for event in essential_events],
+                    cf_event_id=cf_section.id,
+                    cf_param_updates=_financial_cf_updates(cf_section, cf_role),
+                    cf_answer="",
+                    invariance_event_id=cf_section.id,
+                    invariance_param_updates={
+                        "retrieval_url": (
+                            "https://www.sec.gov/Archives/edgar/data/0/noise.htm"
+                        )
+                    },
+                    gold_expression=" THEN ".join(
+                        str(operation["op"]) for operation in program_ops
+                    ),
+                    proof_depth=2,
+                    cf_op="numeric",
+                    motif=f"source-financial-{answer_family}",
+                    topology_id=instance_topology(
+                        f"company.sec_financial_{answer_family}", record_id
+                    ),
+                    domain="company",
+                    truth_regime="real_source_derived",
+                    program_ops=list(program_ops),
+                    preferred_length_buckets=[control_tier],
+                    semantic_growth_group=(
+                        f"company_real_sec_financial_{answer_family}"
+                    ),
+                    base_task_group=f"sec_financial_{answer_family}:{source_key}",
+                )
+            )
         staged = [
             ("16k", 2, operation_sections, ("16k",)),
             (
@@ -811,6 +1830,16 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                 item for item in (*needed_sections, *needed_answers) if item is not None
             ]
             essential_ids = [event.id for event in essential_events]
+            required_roles = [
+                str(role) for role in answer_event.params.get("required_roles") or []
+            ]
+            question_schema = _sec_financial_question_schema(
+                query_type="sec_financial_reconstruction",
+                control_tier=control_tier,
+                required_roles=required_roles,
+            )
+            if question_schema is None:
+                continue
             queries.append(
                 QuerySpec(
                     query_id=(
@@ -823,7 +1852,7 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                         f"through the {control_tier} control stage using only the "
                         "itemized statements, notes, and certifications in context. "
                         "Do not use identity-header fields as substitutes for "
-                        "statement amounts."
+                        "statement amounts. " + question_schema
                     ),
                     answer="",
                     as_of=answer_event.time,
@@ -1620,5 +2649,10 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
     for q in queries:
         q.answer = gold_from_full(world, q)
         q.cf_answer = cf_from_full(world, q)
+        if q.query_type.startswith("sec_financial_") and (
+            not sec_financial_answer_conforms(q.question, q.answer)
+            or not sec_financial_answer_conforms(q.question, q.cf_answer)
+        ):
+            continue
         out.append(q)
     return out

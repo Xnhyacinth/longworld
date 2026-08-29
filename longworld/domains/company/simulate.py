@@ -10,6 +10,16 @@ from typing import Any
 from longworld.core.cascade import cascade_events
 from longworld.core.filingworkflow import validated_sec_amendment_endpoints
 from longworld.core.grounded import grounded_events
+from longworld.core.issuerfilingworkflow import (
+    ISSUER_IR_OPERATIONS_SECTION,
+    ISSUER_IR_POLICY_SECTION,
+    ISSUER_IR_REVENUE_SECTION,
+    ISSUER_IR_SECTIONS_16K,
+    ISSUER_IR_SECTIONS_32K,
+    ISSUER_IR_SECTIONS_64K,
+    ISSUER_IR_SECTIONS_64K_REQUIRED,
+    parse_issuer_ir_rendered_metrics,
+)
 from longworld.core.provenance import ProvenanceError
 from longworld.core.secvisible import (
     normalize_sec_visible_text,
@@ -30,27 +40,11 @@ from longworld.domains.company.events import (
 _SEC_REPLAY_MAX_CHARS = 32_000
 _SEC_SECTION_VIEW_PREFIX = "SEC source section\n"
 _SEC_FACT_CORRIDOR_MARGIN = 10_600
+_SEC_FACT_PROJECTION_REVISION = "sec-visible-fact-projection-v1"
 _SEC_CANONICAL_SECTION_CACHE_MAX = 512
 _SEC_CANONICAL_SECTION_CACHE: OrderedDict[
     tuple[Any, ...], dict[str, dict[str, Any]]
 ] = OrderedDict()
-_SEC_SECTION_OFFSETS = {
-    "item8_operations": 0,
-    "note2_revenue": 8,
-    "note13_segments": 8,
-    "item8_balance_sheet": 401,
-    "item8_cash_flow": 801,
-    "note7_income_taxes": 801,
-    "note8_leases": 801,
-    "note9_debt": 801,
-    "note4_leases": 801,
-    "note9_income_taxes": 801,
-    "note10_segment_oi": 801,
-    "ex_31_1": 401,
-    "ex_31_2": 401,
-    "ex_32_1": 401,
-    "ex_32_2": 401,
-}
 _SEC_64K_SECTIONS = (
     "note13_prior_segments",
     "item8_balance_sheet",
@@ -112,6 +106,28 @@ _SEC_FINANCIAL_TIERS = (
     ),
 )
 
+_SEC_FINANCIAL_FACETS = (
+    (
+        "sales_mix",
+        "16k",
+        (
+            "item8_operations_product_revenue",
+            "item8_operations_service_revenue",
+            "item8_operations_total_revenue",
+        ),
+    ),
+    (
+        "category_geography",
+        "32k",
+        ("note2_revenue", "note13_segments"),
+    ),
+    (
+        "balance_certification",
+        "64k",
+        ("item8_balance_sheet", "ex_31_1", "ex_31_2", "ex_32_1"),
+    ),
+)
+
 
 def _sec_tier_roles(program, control_tier: str) -> tuple[str, ...]:
     mix = ("product_revenue", "service_revenue", "total_revenue")
@@ -136,19 +152,41 @@ def _sec_tier_roles(program, control_tier: str) -> tuple[str, ...]:
     return core + tuple(role for role in _SEC_128K_EXTRA_ROLES if role in program.roles)
 
 
+def _sec_facet_roles(program, answer_family: str) -> tuple[str, ...]:
+    if answer_family == "sales_mix":
+        return ("product_revenue", "service_revenue", "total_revenue")
+    if answer_family == "category_geography":
+        return tuple(
+            f"category_{index}" for index in range(program.n_category)
+        ) + tuple(f"geo_{index}" for index in range(program.n_geo))
+    if answer_family == "balance_certification":
+        return (
+            ("assets", "liabilities", "equity", "liabilities_and_equity")
+            if program.require_liabilities
+            else ("assets", "equity", "liabilities_and_equity")
+        )
+    if answer_family == "cashflow_notes":
+        return tuple(role for role in _SEC_128K_EXTRA_ROLES if role in program.roles)
+    return ()
+
+
 def _date(start: date, offset: int) -> date:
     return start + timedelta(days=offset)
 
 
 def _sec_section_cache_key(workflow, record) -> tuple[Any, ...] | None:
-    source_sha256 = hashlib.sha256(record.text.encode()).hexdigest()
-    if source_sha256 != record.source_sha256 or source_sha256 != record.text_sha256:
+    text_sha256 = hashlib.sha256(record.text.encode()).hexdigest()
+    if (
+        text_sha256 != record.text_sha256
+        or record.provenance_id != f"sha256:{record.source_sha256}"
+    ):
         return None
     return (
         workflow.workflow_id,
         workflow.component_digest,
         record.record_id,
-        source_sha256,
+        record.source_sha256,
+        text_sha256,
         record.provenance_id,
         str(record.source_origin),
         record.source_family,
@@ -282,6 +320,122 @@ def _section_fact_spans(
     return spans
 
 
+def _interleaved_note13_views(
+    source_text: str, section, program
+) -> list[dict[str, Any]]:
+    grouped_roles = {
+        "note13_segments": tuple(f"geo_{index}" for index in range(program.n_geo)),
+        "note13_prior_segments": tuple(
+            f"prior_geo_{index}" for index in range(program.n_geo)
+        ),
+    }
+    ordered = sorted(
+        (
+            (role, program.roles[role])
+            for roles in grouped_roles.values()
+            for role in roles
+        ),
+        key=lambda item: item[1].char_start,
+    )
+    grouping = [
+        "prior" if role.startswith("prior_geo_") else "current"
+        for role, _fact in ordered
+    ]
+    if grouping == sorted(grouping, key=lambda item: item == "prior"):
+        return []
+    slices = split_sec_filing_section_by_facts(
+        source_text,
+        section,
+        tuple(fact for _role, fact in ordered),
+    )
+    slices_by_role = {
+        role: view for (role, _fact), view in zip(ordered, slices, strict=True)
+    }
+    projections: list[dict[str, Any]] = []
+    for alias, roles in grouped_roles.items():
+        visible_parts = []
+        fact_spans: list[dict[str, Any]] = []
+        source_ranges: list[dict[str, int | str]] = []
+        visible_offset = len(_SEC_SECTION_VIEW_PREFIX)
+        for role in roles:
+            view = slices_by_role[role]
+            visible = normalize_sec_visible_text(
+                source_text,
+                char_start=view.char_start,
+                char_end=view.char_end,
+                context_char_start=section.char_start,
+                context_char_end=section.char_end,
+            )
+            if not visible.text:
+                raise ProvenanceError("SEC fact-centered projection is empty")
+            spans = [
+                span
+                for span in _section_fact_spans(
+                    source_text,
+                    program,
+                    visible=visible,
+                    char_start=view.char_start,
+                    char_end=view.char_end,
+                    shift=visible_offset,
+                )
+                if span.get("role") == role
+            ]
+            if len(spans) != 1:
+                raise ProvenanceError(
+                    "SEC fact-centered projection does not bind one target role"
+                )
+            visible_parts.append(visible.text)
+            fact_spans.extend(spans)
+            raw_text = source_text[view.char_start : view.char_end]
+            source_ranges.append(
+                {
+                    "char_start": view.char_start,
+                    "char_end": view.char_end,
+                    "sha256": hashlib.sha256(raw_text.encode()).hexdigest(),
+                }
+            )
+            visible_offset += len(visible.text) + 1
+        projected_text = "\n".join(visible_parts)
+        raw_projection_sha256 = hashlib.sha256(
+            "|".join(
+                f"{item['char_start']}:{item['char_end']}:{item['sha256']}"
+                for item in source_ranges
+            ).encode()
+        ).hexdigest()
+        visible_sha256 = hashlib.sha256(projected_text.encode()).hexdigest()
+        projections.append(
+            {
+                "section_id": (
+                    "note13_current_geography"
+                    if alias == "note13_segments"
+                    else "note13_prior_geography"
+                ),
+                "section_alias": alias,
+                "text": projected_text,
+                "section_sha256": visible_sha256,
+                "raw_section_sha256": raw_projection_sha256,
+                "provenance_id": sec_visible_provenance_id(
+                    parent_provenance_id=section.provenance_id,
+                    raw_section_sha256=raw_projection_sha256,
+                    visible_text_sha256=visible_sha256,
+                    revision=_SEC_FACT_PROJECTION_REVISION,
+                ),
+                "parent_provenance_id": section.provenance_id,
+                "provenance_operation": _SEC_FACT_PROJECTION_REVISION,
+                "visible_text_revision": _SEC_FACT_PROJECTION_REVISION,
+                "parent_char_start": min(
+                    int(item["char_start"]) for item in source_ranges
+                ),
+                "parent_char_end": max(int(item["char_end"]) for item in source_ranges),
+                "context_char_start": section.char_start,
+                "context_char_end": section.char_end,
+                "source_ranges": source_ranges,
+                "fact_spans": fact_spans,
+            }
+        )
+    return projections
+
+
 def _sec_financial_events(
     *,
     workflow,
@@ -306,7 +460,7 @@ def _sec_financial_events(
     events: list[Event] = []
     section_ids: dict[str, str] = {}
     for section in program.sections:
-        views = [(section, "", "")]
+        views: list[tuple[Any, str, str]] = [(section, "", "")]
         if section.section_id == "item8_operations":
             roles = (
                 "product_revenue",
@@ -374,46 +528,59 @@ def _sec_financial_events(
                 )
                 views.append((tail, "", ""))
         elif section.section_id == "note13_segments":
-            first_current = program.roles["geo_0"]
-            current = program.roles[f"geo_{program.n_geo - 1}"]
-            current_start = max(
-                section.char_start,
-                first_current.char_start - _SEC_FACT_CORRIDOR_MARGIN,
-            )
-            current_end = min(
-                section.char_end,
-                current.char_end + _SEC_FACT_CORRIDOR_MARGIN,
-            )
-            current_view = derive_sec_filing_subsection(
-                full_text,
-                section,
-                section_id="note13_current_geography",
-                char_start=current_start,
-                char_end=current_end,
-            )
-            prior_view = derive_sec_filing_subsection(
-                full_text,
-                section,
-                section_id="note13_prior_geography",
-                char_start=current_end,
-                char_end=section.char_end,
-            )
-            views = []
-            if current_start > section.char_start:
-                preamble = derive_sec_filing_subsection(
+            projected_views = []
+            if record.attribute("cik") == "0000789019":
+                try:
+                    projected_views = _interleaved_note13_views(
+                        full_text, section, program
+                    )
+                except ProvenanceError:
+                    return []
+            if projected_views:
+                views = [
+                    (view, "", str(view["section_alias"])) for view in projected_views
+                ]
+            else:
+                first_current = program.roles["geo_0"]
+                current = program.roles[f"geo_{program.n_geo - 1}"]
+                current_start = max(
+                    section.char_start,
+                    first_current.char_start - _SEC_FACT_CORRIDOR_MARGIN,
+                )
+                current_end = min(
+                    section.char_end,
+                    current.char_end + _SEC_FACT_CORRIDOR_MARGIN,
+                )
+                current_view = derive_sec_filing_subsection(
                     full_text,
                     section,
-                    section_id="note13_geography_preamble",
-                    char_start=section.char_start,
-                    char_end=current_start,
+                    section_id="note13_current_geography",
+                    char_start=current_start,
+                    char_end=current_end,
                 )
-                views.append((preamble, "", ""))
-            views.extend(
-                [
-                    (current_view, "", "note13_segments"),
-                    (prior_view, "", "note13_prior_segments"),
-                ]
-            )
+                prior_view = derive_sec_filing_subsection(
+                    full_text,
+                    section,
+                    section_id="note13_prior_geography",
+                    char_start=current_end,
+                    char_end=section.char_end,
+                )
+                views = []
+                if current_start > section.char_start:
+                    preamble = derive_sec_filing_subsection(
+                        full_text,
+                        section,
+                        section_id="note13_geography_preamble",
+                        char_start=section.char_start,
+                        char_end=current_start,
+                    )
+                    views.append((preamble, "", ""))
+                views.extend(
+                    [
+                        (current_view, "", "note13_segments"),
+                        (prior_view, "", "note13_prior_segments"),
+                    ]
+                )
         elif section.section_id == "item8_balance_sheet":
             core_start = max(
                 section.char_start,
@@ -438,29 +605,54 @@ def _sec_financial_events(
                 (core, "", "item8_balance_sheet"),
             ]
         for view, financial_role, section_alias in views:
-            view_id = view.section_id
-            char_start = view.char_start
-            char_end = view.char_end
-            try:
-                visible = normalize_sec_visible_text(
-                    full_text,
-                    char_start=char_start,
-                    char_end=char_end,
-                    context_char_start=section.char_start,
-                    context_char_end=section.char_end,
+            if isinstance(view, dict):
+                view_id = str(view["section_id"])
+                char_start = int(view["parent_char_start"])
+                char_end = int(view["parent_char_end"])
+                visible_text = str(view["text"])
+                fact_spans = list(view["fact_spans"])
+                visible_text_sha256 = str(view["section_sha256"])
+                raw_section_sha256 = str(view["raw_section_sha256"])
+                visible_revision = str(view["visible_text_revision"])
+                visible_provenance_id = str(view["provenance_id"])
+                parent_provenance_id = str(view["parent_provenance_id"])
+                source_ranges = list(view["source_ranges"])
+            else:
+                view_id = view.section_id
+                char_start = view.char_start
+                char_end = view.char_end
+                try:
+                    visible = normalize_sec_visible_text(
+                        full_text,
+                        char_start=char_start,
+                        char_end=char_end,
+                        context_char_start=section.char_start,
+                        context_char_end=section.char_end,
+                    )
+                    fact_spans = _section_fact_spans(
+                        full_text,
+                        program,
+                        visible=visible,
+                        char_start=char_start,
+                        char_end=char_end,
+                        shift=len(_SEC_SECTION_VIEW_PREFIX),
+                    )
+                except (ProvenanceError, ValueError):
+                    continue
+                if not visible.text:
+                    continue
+                visible_text = visible.text
+                visible_text_sha256 = visible.text_sha256
+                raw_section_sha256 = view.section_sha256
+                visible_revision = visible.revision
+                visible_provenance_id = sec_visible_provenance_id(
+                    parent_provenance_id=view.provenance_id,
+                    raw_section_sha256=view.section_sha256,
+                    visible_text_sha256=visible.text_sha256,
+                    revision=visible.revision,
                 )
-                fact_spans = _section_fact_spans(
-                    full_text,
-                    program,
-                    visible=visible,
-                    char_start=char_start,
-                    char_end=char_end,
-                    shift=len(_SEC_SECTION_VIEW_PREFIX),
-                )
-            except (ProvenanceError, ValueError):
-                continue
-            if not visible.text:
-                continue
+                parent_provenance_id = view.provenance_id
+                source_ranges = []
             if section_alias == "note13_segments":
                 fact_spans = [
                     span
@@ -473,32 +665,21 @@ def _sec_financial_events(
                     for span in fact_spans
                     if str(span.get("role") or "").startswith("prior_geo_")
                 ]
-            section_text = _SEC_SECTION_VIEW_PREFIX + visible.text
+            section_text = _SEC_SECTION_VIEW_PREFIX + visible_text
             event_id = f"{prefix}.sec_section_{view_id}_{workflow_index}_{record_index}"
             section_ids[view_id] = event_id
             if section_alias and fact_spans:
                 section_ids[section_alias] = event_id
-            ground_values = (
-                [
-                    str(span["evidence_quote"])
-                    for span in fact_spans
-                    if span.get("kind") == "xbrl"
-                ]
-                if view.section_id != section.section_id
-                else [dict(program.section_ground)[section.section_id]]
-            )
-            visible_provenance_id = sec_visible_provenance_id(
-                parent_provenance_id=view.provenance_id,
-                raw_section_sha256=view.section_sha256,
-                visible_text_sha256=visible.text_sha256,
-                revision=visible.revision,
-            )
+            ground_values = [
+                str(span["evidence_quote"])
+                for span in fact_spans
+                if span.get("evidence_quote")
+            ]
             events.append(
                 Event(
                     id=event_id,
                     type="sec_source_section",
-                    time=filing_day
-                    + timedelta(days=_SEC_SECTION_OFFSETS[section.section_id]),
+                    time=filing_day,
                     params={
                         "workflow_id": workflow.workflow_id,
                         "record_id": record.record_id,
@@ -513,17 +694,18 @@ def _sec_financial_events(
                         ).hexdigest(),
                         "source_sha256": record.source_sha256,
                         "parent_source_sha256": parent_hash,
-                        "section_sha256": visible.text_sha256,
-                        "raw_section_sha256": view.section_sha256,
-                        "visible_text_revision": visible.revision,
+                        "section_sha256": visible_text_sha256,
+                        "raw_section_sha256": raw_section_sha256,
+                        "visible_text_revision": visible_revision,
                         "component_sha256": section.component_sha256,
                         "parent_char_start": char_start,
                         "parent_char_end": char_end,
-                        "context_char_start": visible.context_char_start,
-                        "context_char_end": visible.context_char_end,
+                        "context_char_start": section.char_start,
+                        "context_char_end": section.char_end,
                         "provenance_id": visible_provenance_id,
-                        "parent_provenance_id": view.provenance_id,
-                        "provenance_operation": visible.revision,
+                        "parent_provenance_id": parent_provenance_id,
+                        "provenance_operation": visible_revision,
+                        "source_ranges": source_ranges,
                         "source_origin": "real_derived",
                         "source_family": record.source_family,
                         "source_url": record.source_url,
@@ -590,7 +772,8 @@ def _sec_financial_events(
                         "section_event_ids": [
                             section_ids[name] for name in selected_sections
                         ],
-                        "ground_values": ["financial-reconstructed", stage],
+                        "ground_values": ["reconciliation-scope-approved", stage],
+                        "relation_provenance": "synthetic_executable",
                     },
                     visibility=[event_id],
                     causal_inputs=parents,
@@ -602,6 +785,60 @@ def _sec_financial_events(
             prior_key = answer_key
             compute_ids[control_tier] = event_id
             compute_keys[control_tier] = answer_key
+    facet_specs = list(_SEC_FINANCIAL_FACETS)
+    if program.extra_128k_sections:
+        facet_specs.append(
+            ("cashflow_notes", "128k", tuple(program.extra_128k_sections))
+        )
+    for facet_index, (answer_family, control_tier, needed_sections) in enumerate(
+        facet_specs
+    ):
+        if any(name not in section_ids for name in needed_sections):
+            continue
+        selected_sections = list(needed_sections)
+        if answer_family == "balance_certification" and "ex_32_2" in section_ids:
+            selected_sections.append("ex_32_2")
+        required_roles = list(_sec_facet_roles(program, answer_family))
+        if not required_roles:
+            continue
+        event_id = (
+            f"{prefix}.sec_financial_facet_{answer_family}_{facet_index}_"
+            f"{workflow_index}_{record_index}"
+        )
+        parents = [section_ids[name] for name in selected_sections]
+        events.append(
+            Event(
+                id=event_id,
+                type="sec_financial_answer",
+                time=filing_day
+                + timedelta(
+                    days={"16k": 5, "32k": 400, "64k": 800, "128k": 1_600}[control_tier]
+                ),
+                params={
+                    "workflow_id": workflow.workflow_id,
+                    "record_id": record.record_id,
+                    "control_tier": control_tier,
+                    "control_stage": f"independent {answer_family} reconstruction",
+                    "compose": "facet",
+                    "answer_family": answer_family,
+                    "answer_key": (
+                        f"sec_financial_facet_ready:{record.record_id}:{answer_family}"
+                    ),
+                    "prerequisite_answer_key": "",
+                    "required_roles": required_roles,
+                    "section_event_ids": parents,
+                    "ground_values": [
+                        "reconciliation-scope-approved",
+                        f"independent {answer_family} reconstruction",
+                    ],
+                    "relation_provenance": "synthetic_executable",
+                },
+                visibility=[event_id],
+                causal_inputs=parents,
+                required_inputs=parents,
+                relation_kinds={parent: "reads_section" for parent in parents},
+            )
+        )
     cache_key = _sec_section_cache_key(workflow, record)
     if cache_key is not None:
         section_events = [
@@ -662,6 +899,368 @@ def canonical_sec_source_section_envelope(
     return deepcopy(sections[section_id])
 
 
+def _issuer_ir_section_event(
+    *,
+    workflow,
+    record,
+    prefix: str,
+    workflow_index: int,
+    record_index: int,
+    section_name: str,
+    section_index: int,
+    program,
+) -> Event:
+    section_ranges = {
+        name: (char_start, char_end)
+        for name, char_start, char_end in program.section_ranges
+    }
+    char_start, char_end = section_ranges[section_name]
+    visible = normalize_sec_visible_text(
+        record.text, char_start=char_start, char_end=char_end
+    )
+    text_prefix = "Issuer IR rendered XBRL statement\n"
+    text = text_prefix + visible.text
+    fact_spans: list[dict[str, Any]] = []
+    for fact in program.facts:
+        if fact.section != section_name:
+            continue
+        ranges = visible.visible_ranges(fact.char_start, fact.char_end)
+        if len(ranges) != 1:
+            raise ProvenanceError("issuer IR metric does not map to one visible span")
+        visible_start, visible_end = ranges[0]
+        shifted_start = len(text_prefix) + visible_start
+        shifted_end = len(text_prefix) + visible_end
+        fact_spans.append(
+            {
+                "role": fact.role,
+                "numeric_value": fact.numeric_value,
+                "evidence_quote": text[shifted_start:shifted_end],
+                "char_start": shifted_start,
+                "char_end": shifted_end,
+                "source_evidence_quote": fact.evidence_quote,
+                "source_char_start": fact.char_start,
+                "source_char_end": fact.char_end,
+                "source_sha256": record.source_sha256,
+                "kind": fact.kind,
+            }
+        )
+    if not fact_spans:
+        raise ProvenanceError("issuer IR statement has no required metrics")
+    event_id = (
+        f"{prefix}.issuer_ir_section_{section_index}_{workflow_index}_{record_index}"
+    )
+    return Event(
+        id=event_id,
+        type="issuer_ir_source_section",
+        time=date.fromisoformat(record.occurred_at[:10]),
+        params={
+            "workflow_id": workflow.workflow_id,
+            "record_id": record.record_id,
+            "report_date": record.attribute("report_date"),
+            "section_name": section_name,
+            "text": text,
+            "text_sha256": hashlib.sha256(text.encode()).hexdigest(),
+            "section_sha256": visible.text_sha256,
+            "source_sha256": record.source_sha256,
+            "source_origin": "real_derived",
+            "source_family": record.source_family,
+            "source_url": record.source_url,
+            "retrieval_url": record.retrieval_url,
+            "provenance_id": (
+                "derived-sha256:"
+                + hashlib.sha256(
+                    (
+                        f"issuer_ir_visible_statement|{record.provenance_id}|"
+                        f"{char_start}|{char_end}|{visible.text_sha256}"
+                    ).encode()
+                ).hexdigest()
+            ),
+            "parent_provenance_id": record.provenance_id,
+            "provenance_operation": "issuer_ir_visible_statement",
+            "source_char_start": char_start,
+            "source_char_end": char_end,
+            "fact_spans": fact_spans,
+            "ground_values": [str(fact["evidence_quote"]) for fact in fact_spans],
+        },
+        visibility=[event_id],
+    )
+
+
+def canonical_issuer_ir_source_section_envelopes(
+    *, workflow, record
+) -> dict[str, dict[str, Any]]:
+    """Rebuild issuer section envelopes from the immutable rendered-XBRL record."""
+
+    text_sha256 = hashlib.sha256(record.text.encode()).hexdigest()
+    if (
+        text_sha256 != record.text_sha256
+        or text_sha256 != record.source_sha256
+        or record.provenance_id != f"sha256:{record.source_sha256}"
+    ):
+        return {}
+    try:
+        program = parse_issuer_ir_rendered_metrics(
+            record.text, report_date=record.attribute("report_date")
+        )
+        section_events = {
+            section_name: _issuer_ir_section_event(
+                workflow=workflow,
+                record=record,
+                prefix="canonical",
+                workflow_index=0,
+                record_index=0,
+                section_name=section_name,
+                section_index=section_index,
+                program=program,
+            )
+            for section_index, section_name in enumerate(ISSUER_IR_SECTIONS_64K)
+        }
+    except (AttributeError, KeyError, TypeError, ValueError, ProvenanceError):
+        return {}
+    return {
+        section_name: {
+            "type": event.type,
+            "time": event.time,
+            "params": deepcopy(event.params),
+            "preconditions": list(event.preconditions),
+            "causal_inputs": list(event.causal_inputs),
+            "required_inputs": list(event.required_inputs),
+            "relation_kinds": dict(event.relation_kinds),
+            "skipped": event.skipped,
+            "skip_reason": event.skip_reason,
+        }
+        for section_name, event in section_events.items()
+    }
+
+
+def _issuer_ir_events(
+    *,
+    workflow,
+    prefix: str,
+    workflow_index: int,
+    record_id_counts: Counter[str],
+) -> list[Event]:
+    records = sorted(workflow.records, key=lambda item: item.attribute("report_date"))
+    if len(records) < 3 or any(
+        record_id_counts[record.record_id] != 1 for record in records
+    ):
+        return []
+    events: list[Event] = []
+    sections_by_record: dict[str, dict[str, str]] = {}
+    programs_by_record = {
+        record.record_id: parse_issuer_ir_rendered_metrics(
+            record.text, report_date=record.attribute("report_date")
+        )
+        for record in records
+    }
+    for record_index, record in enumerate(records):
+        sections: dict[str, str] = {}
+        for section_index, section_name in enumerate(ISSUER_IR_SECTIONS_64K):
+            event = _issuer_ir_section_event(
+                workflow=workflow,
+                record=record,
+                prefix=prefix,
+                workflow_index=workflow_index,
+                record_index=record_index,
+                section_name=section_name,
+                section_index=section_index,
+                program=programs_by_record[record.record_id],
+            )
+            events.append(event)
+            sections[section_name] = event.id
+        sections_by_record[record.record_id] = sections
+
+    relation_events: dict[tuple[str, str], str] = {}
+    records_by_id = {record.record_id: record for record in records}
+    for relation_index, relation in enumerate(workflow.relations):
+        if relation.kind != "prior_available_annual_filing":
+            continue
+        source = records_by_id.get(relation.source_record_id)
+        target = records_by_id.get(relation.target_record_id)
+        if source is None or target is None:
+            continue
+        relation_id = f"{prefix}.issuer_ir_relation_{workflow_index}_{relation_index}"
+        parents = [
+            sections_by_record[target.record_id][ISSUER_IR_OPERATIONS_SECTION],
+            sections_by_record[source.record_id][ISSUER_IR_OPERATIONS_SECTION],
+        ]
+        events.append(
+            Event(
+                id=relation_id,
+                type="issuer_ir_prior_filing_relation",
+                time=date.fromisoformat(source.occurred_at[:10]) + timedelta(days=12),
+                params={
+                    "workflow_id": workflow.workflow_id,
+                    "source_relation_id": relation.relation_id,
+                    "record_id": source.record_id,
+                    "target_record_id": target.record_id,
+                    "relation_kind": relation.kind,
+                    "source_url": source.source_url,
+                    "target_source_url": target.source_url,
+                    "ground_values": ["prior-annual-filing-validated"],
+                },
+                visibility=[relation_id],
+                causal_inputs=parents,
+                required_inputs=parents,
+                relation_kinds={
+                    parent: "validates_temporal_endpoint" for parent in parents
+                },
+            )
+        )
+        relation_events[(source.record_id, target.record_id)] = relation_id
+
+    year_records = {
+        int(record.attribute("report_date")[:4]): record for record in records
+    }
+    years = sorted(year_records)
+    if len(years) < 3:
+        return events
+    tier_specs: tuple[
+        tuple[str, list[int], tuple[str, ...], tuple[tuple[int, str], ...]], ...
+    ] = (
+        (
+            "16k",
+            years[-2:],
+            ISSUER_IR_SECTIONS_16K,
+            ((years[-1], ISSUER_IR_REVENUE_SECTION),),
+        ),
+        ("32k", years[-3:], ISSUER_IR_SECTIONS_32K, ()),
+    )
+    if len(years) >= 4:
+        tier_specs += (
+            (
+                "64k",
+                years[-4:],
+                ISSUER_IR_SECTIONS_64K_REQUIRED,
+                ((years[-4], ISSUER_IR_POLICY_SECTION),),
+            ),
+        )
+    prior_answer_id: str | None = None
+    prior_answer_params: dict[str, Any] | None = None
+    prior_answer_time: date | None = None
+    prior_parent_ids: set[str] = set()
+    for tier_index, (
+        tier,
+        selected_years,
+        required_sections,
+        record_section_extensions,
+    ) in enumerate(tier_specs):
+        selected = [year_records[year] for year in selected_years]
+        source_parents = [
+            sections_by_record[record.record_id][section_name]
+            for record in selected
+            for section_name in required_sections
+        ]
+        source_parents.extend(
+            sections_by_record[year_records[year].record_id][section_name]
+            for year, section_name in record_section_extensions
+        )
+        required_roles = tuple(
+            fact.role
+            for fact in programs_by_record[selected[-1].record_id].facts
+            if fact.section in required_sections
+        )
+        record_role_extensions = {
+            year_records[year].record_id: [
+                fact.role
+                for fact in programs_by_record[year_records[year].record_id].facts
+                if fact.section == section_name
+            ]
+            for year, section_name in record_section_extensions
+        }
+        relation_ids = []
+        for newer, older in zip(selected[1:], selected[:-1], strict=True):
+            relation_event_id = relation_events.get((newer.record_id, older.record_id))
+            if relation_event_id is None:
+                source_parents = []
+                break
+            relation_ids.append(relation_event_id)
+        if not source_parents:
+            continue
+        all_parent_ids = {*source_parents, *relation_ids}
+        parents = [
+            *([prior_answer_id] if prior_answer_id is not None else []),
+            *(
+                event.id
+                for event in events
+                if event.id in all_parent_ids - prior_parent_ids
+            ),
+        ]
+        answer_id = f"{prefix}.issuer_ir_answer_{tier}_{workflow_index}"
+        answer_params = {
+            "workflow_id": workflow.workflow_id,
+            "answer_key": f"issuer_ir_cross_year:{tier}:{workflow.component_digest}",
+            "control_tier": tier,
+            "record_ids": [record.record_id for record in selected],
+            "report_years": selected_years,
+            "required_roles": list(required_roles),
+            "record_role_extensions": record_role_extensions,
+            "required_relation_ids": [
+                relation.relation_id
+                for relation in workflow.relations
+                if relation.source_record_id
+                in {record.record_id for record in selected}
+                and relation.target_record_id
+                in {record.record_id for record in selected}
+            ],
+            "prerequisite_answer_key": (
+                str(prior_answer_params["answer_key"])
+                if prior_answer_params is not None
+                else ""
+            ),
+            "prerequisite_record_ids": (
+                list(prior_answer_params["record_ids"])
+                if prior_answer_params is not None
+                else []
+            ),
+            "prerequisite_required_roles": (
+                list(prior_answer_params["required_roles"])
+                if prior_answer_params is not None
+                else []
+            ),
+            "prerequisite_record_role_extensions": (
+                dict(prior_answer_params["record_role_extensions"])
+                if prior_answer_params is not None
+                else {}
+            ),
+            "ground_values": ["comparison-scope-approved", tier],
+        }
+        answer_time = max(
+            date.fromisoformat(record.occurred_at[:10]) for record in selected
+        ) + timedelta(
+            days=max(
+                14 + tier_index,
+                max(
+                    ISSUER_IR_SECTIONS_64K.index(section_name)
+                    for section_name in (
+                        *required_sections,
+                        *(section for _, section in record_section_extensions),
+                    )
+                )
+                + 2,
+            )
+        )
+        if prior_answer_time is not None:
+            answer_time = max(answer_time, prior_answer_time + timedelta(days=1))
+        events.append(
+            Event(
+                id=answer_id,
+                type="issuer_ir_cross_year_answer",
+                time=answer_time,
+                params=answer_params,
+                visibility=[answer_id],
+                causal_inputs=parents,
+                required_inputs=parents,
+                relation_kinds={parent: "computes_from" for parent in parents},
+            )
+        )
+        prior_answer_id = answer_id
+        prior_answer_params = answer_params
+        prior_answer_time = answer_time
+        prior_parent_ids = all_parent_ids
+    return events
+
+
 def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]:
     events: list[Event] = []
     source_workflows = project.get("source_workflows") or []
@@ -669,6 +1268,16 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
         record.record_id for workflow in source_workflows for record in workflow.records
     )
     for workflow_index, workflow in enumerate(source_workflows):
+        if workflow.source_kind == "issuer_ir_filing":
+            events.extend(
+                _issuer_ir_events(
+                    workflow=workflow,
+                    prefix=prefix,
+                    workflow_index=workflow_index,
+                    record_id_counts=record_id_counts,
+                )
+            )
+            continue
         for record_index, record in enumerate(workflow.records):
             if record_id_counts[record.record_id] != 1:
                 continue
@@ -903,7 +1512,7 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
                             f"sec_amendment_resolution:{relation.relation_id}"
                         ),
                         "control_stage": "amendment graph resolution",
-                        "ground_values": ["relation-evaluated"],
+                        "ground_values": ["amendment relation evaluated"],
                     },
                     visibility=[resolution_id],
                     causal_inputs=[original_source_id, amendment_source_id],

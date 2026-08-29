@@ -4,11 +4,15 @@ import hashlib
 from typing import Any
 
 from longworld.core.domain import eval_answer, handlers
+from longworld.core.issuerfilingworkflow import ISSUER_IR_SECTIONS_64K
 from longworld.core.world import SimulatedWorld, WorldSimulator
 from longworld.domains.codeforge.schema import materialize_grounded_repo_record
 from longworld.domains.codeforge.simulate import canonical_repo_record_envelopes
 from longworld.domains.company.queries import QuerySpec, _merge_overrides
-from longworld.domains.company.simulate import canonical_sec_source_section_envelope
+from longworld.domains.company.simulate import (
+    canonical_issuer_ir_source_section_envelopes,
+    canonical_sec_source_section_envelope,
+)
 from longworld.domains.researchlab.simulate import (
     canonical_researchlab_source_event_envelope,
     canonical_researchlab_source_visible_text,
@@ -169,6 +173,57 @@ def _repo_record_lineage_valid(world: SimulatedWorld, event: Any) -> bool:
     )
 
 
+def _issuer_ir_raw_lineage_valid(world: SimulatedWorld, event: Any) -> bool:
+    params = getattr(event, "params", None)
+    if (
+        not isinstance(params, dict)
+        or getattr(event, "type", "") != "issuer_ir_source_section"
+    ):
+        return False
+    workflow_id = str(params.get("workflow_id") or "")
+    record_id = str(params.get("record_id") or "")
+    project = world.spec.get("project")
+    if not isinstance(project, dict):
+        return False
+    matches = [
+        (workflow_index, record_index, workflow, record)
+        for workflow_index, workflow in enumerate(project.get("source_workflows", ()))
+        if getattr(workflow, "workflow_id", "") == workflow_id
+        for record_index, record in enumerate(getattr(workflow, "records", ()))
+        if getattr(record, "record_id", "") == record_id
+    ]
+    if len(matches) != 1:
+        return False
+    workflow_index, record_index, workflow, record = matches[0]
+    section_name = str(params.get("section_name") or "")
+    try:
+        section_index = ISSUER_IR_SECTIONS_64K.index(section_name)
+    except ValueError:
+        return False
+    prefix = str(world.spec.get("prefix") or "")
+    expected_event_id = (
+        f"{prefix}.issuer_ir_section_{section_index}_{workflow_index}_{record_index}"
+    )
+    if event.id != expected_event_id or list(event.visibility) != [expected_event_id]:
+        return False
+    cache_key = (
+        str(getattr(workflow, "component_digest", "")),
+        record_id,
+        str(getattr(record, "source_sha256", "")),
+        str(getattr(record, "text_sha256", "")),
+    )
+    cache = getattr(world, "_longworld_canonical_issuer_sections", None)
+    if cache is None:
+        cache = {}
+        world._longworld_canonical_issuer_sections = cache
+    if cache_key not in cache:
+        cache[cache_key] = canonical_issuer_ir_source_section_envelopes(
+            workflow=workflow, record=record
+        )
+    canonical = cache[cache_key].get(section_name)
+    return canonical is not None and canonical == _event_envelope(event)
+
+
 def _research_source_envelope(
     world: SimulatedWorld, event: Any
 ) -> dict[str, Any] | None:
@@ -222,6 +277,7 @@ def _semantic_artifact_overrides(
                 "repo_record",
                 "sec_filing",
                 "sec_source_section",
+                "issuer_ir_source_section",
                 "wiki_source_relation",
                 "wiki_source_section",
             }
@@ -296,6 +352,19 @@ def _semantic_artifact_overrides(
                     and hashlib.sha256(raw_section.encode()).hexdigest()
                     == expected.get("section_sha256")
                     and _sec_raw_lineage_valid(world, event)
+                )
+            elif event.type == "issuer_ir_source_section":
+                prefix = "Issuer IR rendered XBRL statement\n"
+                raw_section = (
+                    visible_text[len(prefix) :]
+                    if visible_text.startswith(prefix)
+                    else ""
+                )
+                lineage_valid = (
+                    lineage_valid
+                    and hashlib.sha256(raw_section.encode()).hexdigest()
+                    == expected.get("section_sha256")
+                    and _issuer_ir_raw_lineage_valid(world, event)
                 )
             elif event.type == "repo_record":
                 lineage_valid = lineage_valid and _repo_record_lineage_valid(

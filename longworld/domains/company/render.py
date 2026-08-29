@@ -216,8 +216,8 @@ def _cycle_meta(project: dict[str, Any], event: Event) -> dict[str, Any]:
             "discussion": (
                 f"After the recorded recovery, Engineering registered release "
                 f"{params['release_token']} for the {kind} cycle. The release inherits "
-                f"agreement {agreement_id} but does not restate the incident or resolution "
-                "tokens. Finance may now prepare the cycle close; Internal Audit must still "
+                f"agreement {agreement_id}; the incident and resolution records retain "
+                "their own identifiers. Finance may now prepare the cycle close; Internal Audit must still "
                 f"publish the controlling {cycle_id} amount before the next contract "
                 "cycle opens."
             ),
@@ -299,16 +299,56 @@ def render_company(sim: SimulatedWorld) -> list[Artifact]:
             "sec_filing_publication_ratification",
             "sec_source_section",
             "sec_financial_answer",
+            "issuer_ir_source_section",
+            "issuer_ir_prior_filing_relation",
+            "issuer_ir_cross_year_answer",
         }:
             params = event.params
             artifact_id = f"{sim.spec['world_id']}.{event.visibility[0]}"
-            if event.type == "sec_filing" or event.type == "sec_source_section":
+            if event.type in {
+                "sec_filing",
+                "sec_source_section",
+                "issuer_ir_source_section",
+            }:
                 text = str(params["text"])
                 source_origin = SourceOrigin(str(params["source_origin"]))
                 workflow_kind = WorkflowKind.HYBRID_CAUSAL
                 provenance_id = str(params["provenance_id"])
                 evidence_role = EvidenceRole.CAUSAL_SUPPORTING
                 real_record = True
+            elif event.type == "issuer_ir_prior_filing_relation":
+                text = (
+                    "Issuer annual-filing temporal relation control\n"
+                    f"Current filing record: {params['record_id']}.\n"
+                    f"Prior filing record: {params['target_record_id']}.\n"
+                    "Status: prior-annual-filing-validated. This control binds "
+                    "these issuer-owned rendered statements in chronological order."
+                )
+                source_origin = SourceOrigin.SYNTHETIC_WORLD
+                workflow_kind = WorkflowKind.HYBRID_CAUSAL
+                provenance_id = (
+                    "derived-sha256:" + hashlib.sha256(text.encode()).hexdigest()
+                )
+                evidence_role = EvidenceRole.CAUSAL_SUPPORTING
+                real_record = False
+            elif event.type == "issuer_ir_cross_year_answer":
+                text = (
+                    "Issuer financial history control decision\n"
+                    f"Control tier: {params['control_tier']}.\n"
+                    "Annual periods: "
+                    + ", ".join(str(year) for year in params["report_years"])
+                    + ".\n"
+                    f"Metric register size: {len(params['required_roles'])}.\n"
+                    "Status: comparison-scope-approved under the validated "
+                    "prior-annual-filing controls."
+                )
+                source_origin = SourceOrigin.SYNTHETIC_WORLD
+                workflow_kind = WorkflowKind.HYBRID_CAUSAL
+                provenance_id = (
+                    "derived-sha256:" + hashlib.sha256(text.encode()).hexdigest()
+                )
+                evidence_role = EvidenceRole.CAUSAL_GOLD
+                real_record = False
             elif event.type == "sec_filing_eligibility_policy":
                 accepted = ", ".join(str(item) for item in params["accepted_forms"])
                 text = (
@@ -317,9 +357,8 @@ def render_company(sim: SimulatedWorld) -> list[Artifact]:
                     "Filing window: no later than "
                     f"{params['max_days_after_report']} days after the reported "
                     "period end.\n"
-                    "The policy engine must read the selected filing body to determine "
-                    "its actual form, filing date, reporting period, and accession. This "
-                    "memo does not restate those filing-specific facts."
+                    "Controlled inputs: filing form, filing date, reporting period, "
+                    "accession, and issuer identity."
                 )
                 source_origin = SourceOrigin.SYNTHETIC_WORLD
                 workflow_kind = WorkflowKind.HYBRID_CAUSAL
@@ -331,10 +370,8 @@ def render_company(sim: SimulatedWorld) -> list[Artifact]:
             elif event.type == "sec_filing_approval":
                 text = (
                     "SEC filing release committee decision\n"
-                    "Status: committee-approved. The committee authorizes publication "
-                    "of the result produced by the eligibility policy. This decision "
-                    "does not repeat the filing form, dates, accession, or computed "
-                    "eligibility status."
+                    "Status: committee-approved. The committee authorizes the "
+                    "eligibility result for the publication control register."
                 )
                 source_origin = SourceOrigin.SYNTHETIC_WORLD
                 workflow_kind = WorkflowKind.HYBRID_CAUSAL
@@ -346,9 +383,9 @@ def render_company(sim: SimulatedWorld) -> list[Artifact]:
             elif event.type == "sec_amendment_resolution":
                 text = (
                     "SEC filing amendment relation control\n"
-                    "Status: relation-evaluated. This control resolves the linked "
-                    "filings only after reading both filing bodies. It does not repeat "
-                    "their forms, accessions, filing dates, or reporting periods."
+                    f"Current filing record: {params['record_id']}.\n"
+                    f"Target filing record: {params['target_record_id']}.\n"
+                    "Status: amendment relation evaluated."
                 )
                 source_origin = SourceOrigin.SYNTHETIC_WORLD
                 workflow_kind = WorkflowKind.HYBRID_CAUSAL
@@ -359,11 +396,11 @@ def render_company(sim: SimulatedWorld) -> list[Artifact]:
                 real_record = False
             elif event.type == "sec_financial_answer":
                 text = (
-                    "SEC financial answer. "
-                    f"Checkpoint: {params['control_stage']}. "
-                    "Status: financial-reconstructed. Reconstruct the tagged program "
-                    "from cited statements, notes, and certifications. This memo does "
-                    "not restate amounts."
+                    "SEC financial reconciliation control\n"
+                    f"Checkpoint: {params['control_stage']}.\n"
+                    f"Control tier: {params['control_tier']}.\n"
+                    "Source classes: statements, notes, and certifications.\n"
+                    "Status: reconciliation-scope-approved."
                 )
                 source_origin = SourceOrigin.SYNTHETIC_WORLD
                 workflow_kind = WorkflowKind.HYBRID_CAUSAL
