@@ -24,6 +24,7 @@ from longworld.core.taxonomy import (
 )
 from longworld.core.verify import verify_question
 from longworld.core.views import render_cf_view
+from longworld.domains.codeforge.multiband import bind_cumulative_release_history
 from longworld.domains.codeforge.queries import build_code_queries
 from longworld.domains.codeforge.render import render_code
 from longworld.domains.codeforge.schema import sample_code_spec
@@ -542,6 +543,36 @@ def test_release_cycles_create_band_specific_executable_proofs() -> None:
     )
     assert middle.motif == long.motif == "release_supersession_trace"
     assert long.preferred_length_buckets == ["64k"]
+    assert short.base_task_group
+    assert len({query.base_task_group for query in (short, middle, long)}) == 1
+    malformed_middle = replace(
+        middle,
+        essential_event_ids=list(short.essential_event_ids),
+    )
+    with pytest.raises(
+        ValueError, match="release-history necessary evidence does not grow"
+    ):
+        bind_cumulative_release_history(world, [short, malformed_middle, long])
+    malformed_middle = replace(
+        middle,
+        sufficient_event_ids=list(short.sufficient_event_ids),
+    )
+    with pytest.raises(
+        ValueError, match="release-history strict support does not grow"
+    ):
+        bind_cumulative_release_history(world, [short, malformed_middle, long])
+    malformed_middle = replace(middle, proof_depth=short.proof_depth)
+    with pytest.raises(ValueError, match="release-history proof depth does not grow"):
+        bind_cumulative_release_history(world, [short, malformed_middle, long])
+    relation_flat_world = deepcopy(world)
+    middle_only = set(middle.sufficient_event_ids) - set(short.sufficient_event_ids)
+    for event in relation_flat_world.events:
+        if event.id in middle_only:
+            event.params["synthetic_relation_inputs"] = list(event.causal_inputs)
+    with pytest.raises(
+        ValueError, match="release-history authentic source relations do not grow"
+    ):
+        bind_cumulative_release_history(relation_flat_world, [short, middle, long])
     assert short.semantic_growth_group == middle.semantic_growth_group
     assert middle.semantic_growth_group == long.semantic_growth_group
     assert len(short.answer) < len(middle.answer) < len(long.answer)

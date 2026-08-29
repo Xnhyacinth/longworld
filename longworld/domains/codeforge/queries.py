@@ -6,6 +6,7 @@ from typing import Any
 from longworld.core.asof import find_event, world_as_of
 from longworld.core.world import Event, SimulatedWorld, WorldSimulator
 from longworld.domains.codeforge.events import apply_event, check_preconditions
+from longworld.domains.codeforge.multiband import bind_cumulative_release_history
 from longworld.domains.company.queries import (
     QuerySpec,
     _merge_overrides,
@@ -801,6 +802,7 @@ def build_code_queries(world: SimulatedWorld) -> list[QuerySpec]:
 
             q.proof_depth = replayed_proof_depth(world, q)
         out.append(q)
+    bind_cumulative_release_history(world, out)
     return out
 
 
