@@ -1,0 +1,14 @@
+{
+  "schema_version": "longworld.cyber-fetch-request.v1",
+  "user_agent": "LongWorld/0.2 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "p12-wave3-public-cyber-log4shell-v1",
+    "scope": "bounded read-only export of public NVD CVE and CISA KEV records",
+    "basis": "project-owner authorization for public-source research diagnostics",
+    "reviewed_at": "2026-08-29T00:00:00Z",
+    "allowed_actions": ["fetch_cisa_kev", "fetch_nvd_cve"]
+  },
+  "cve_ids": ["CVE-2021-44228"],
+  "requests_per_second": 0.1,
+  "max_retries": 2
+}
