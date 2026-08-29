@@ -304,7 +304,7 @@ def fetch_wikipedia_workflow(
                 "prop": "revisions|pageprops",
                 "titles": requested_title,
                 "rvprop": "ids|timestamp",
-                "rvlimit": 2,
+                "rvlimit": 3,
                 "format": "json",
                 "formatversion": 2,
                 "redirects": 1,
@@ -332,25 +332,24 @@ def fetch_wikipedia_workflow(
             or not title
             or not re.fullmatch(r"Q[1-9]\d*", entity_id)
             or not isinstance(revisions, list)
-            or len(revisions) != 2
+            or len(revisions) != 3
             or not all(isinstance(item, dict) for item in revisions)
         ):
             raise ProvenanceError("Wikimedia page metadata is incomplete")
-        current, parent = revisions
-        current_id = current.get("revid")
-        parent_id = parent.get("revid")
-        if (
-            not isinstance(current_id, int)
-            or not isinstance(parent_id, int)
-            or current_id <= 0
-            or parent_id <= 0
-            or current.get("parentid") != parent_id
+        revision_ids = [item.get("revid") for item in revisions]
+        if any(
+            not isinstance(revision_id, int) or revision_id <= 0
+            for revision_id in revision_ids
+        ) or any(
+            revisions[index].get("parentid") != revision_ids[index + 1]
+            for index in range(len(revisions) - 1)
         ):
             raise ProvenanceError("Wikimedia revision ancestry is invalid")
+        current_id, middle_id, prior_id = revision_ids
         seen_pages.add(page_id)
 
         by_revision: dict[int, tuple[dict[str, Any], bytes]] = {}
-        for revision_id in (parent_id, current_id):
+        for revision_id in (prior_id, middle_id, current_id):
             revision_url = _api_url(
                 wiki_host,
                 {
@@ -441,12 +440,6 @@ def fetch_wikipedia_workflow(
         records.append(entity_record)
 
         current_record, current_raw = by_revision[current_id]
-        parent_record, _parent_raw = by_revision[parent_id]
-        parent_quote, parent_start = _evidence(
-            current_raw,
-            re.compile(rf'"parentid"\s*:\s*{parent_id}(?!\d)'),
-            "parent revision",
-        )
         entity_quote, entity_start = _evidence(
             current_raw,
             re.compile(rf'"wikibase_item"\s*:\s*"{re.escape(entity_id)}"'),
@@ -457,17 +450,30 @@ def fetch_wikipedia_workflow(
             re.compile(rf'"title"\s*:\s*{re.escape(json.dumps(title))}'),
             "Wikipedia title",
         )
-        relations.extend(
-            [
+        for child_id, parent_id in (
+            (middle_id, prior_id),
+            (current_id, middle_id),
+        ):
+            child_record, child_raw = by_revision[child_id]
+            parent_record, _parent_raw = by_revision[parent_id]
+            parent_quote, parent_start = _evidence(
+                child_raw,
+                re.compile(rf'"parentid"\s*:\s*{parent_id}(?!\d)'),
+                "parent revision",
+            )
+            relations.append(
                 {
-                    "relation_id": f"page-r{current_id}-r{parent_id}",
+                    "relation_id": f"page-r{child_id}-r{parent_id}",
                     "kind": "revision_of",
-                    "source_record_id": current_record["record_id"],
+                    "source_record_id": child_record["record_id"],
                     "target_record_id": parent_record["record_id"],
-                    "evidence_record_id": current_record["record_id"],
+                    "evidence_record_id": child_record["record_id"],
                     "evidence_quote": parent_quote,
                     "evidence_char_start": parent_start,
-                },
+                }
+            )
+        relations.extend(
+            [
                 {
                     "relation_id": f"page-{page_id}-{entity_id}",
                     "kind": "page_describes_entity",

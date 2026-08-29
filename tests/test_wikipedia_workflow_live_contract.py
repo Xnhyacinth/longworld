@@ -53,6 +53,12 @@ def _page(revid: int) -> dict:
             "timestamp": "2025-02-01T00:00:00Z",
             "slots": {"main": {"content": "Ada was a mathematician."}},
         },
+        99: {
+            "revid": 99,
+            "parentid": 98,
+            "timestamp": "2025-01-01T00:00:00Z",
+            "slots": {"main": {"content": "Ada studied mathematics."}},
+        },
     }
     return {
         "batchcomplete": True,
@@ -93,6 +99,11 @@ def test_fetch_wikipedia_builds_real_revision_entity_exact_spans(
                             "parentid": 99,
                             "timestamp": "2025-02-01T00:00:00Z",
                         },
+                        {
+                            "revid": 99,
+                            "parentid": 98,
+                            "timestamp": "2025-01-01T00:00:00Z",
+                        },
                     ],
                 }
             ]
@@ -131,17 +142,28 @@ def test_fetch_wikipedia_builds_real_revision_entity_exact_spans(
     )
     payload = json.loads(input_path.read_text(encoding="utf-8"))
 
-    assert len(calls) == 4
+    assert len(calls) == 5
     assert set(calls) == {_request()["user_agent"]}
     assert payload["source_status"] == "public_api_export"
     assert payload["fetch_receipt"]["title_resolutions"] == [
         {"requested_title": "Ada Lovelace", "resolved_title": "Ada Lovelace"}
     ]
-    assert len(payload["records"]) == 3
-    assert {relation["kind"] for relation in payload["relations"]} == {
+    assert len(payload["records"]) == 4
+    relation_kinds = [relation["kind"] for relation in payload["relations"]]
+    assert relation_kinds.count("revision_of") == 2
+    assert set(relation_kinds) == {
         "revision_of",
         "page_describes_entity",
         "entity_resolves_page",
+    }
+    revision_edges = {
+        (relation["source_record_id"], relation["target_record_id"])
+        for relation in payload["relations"]
+        if relation["kind"] == "revision_of"
+    }
+    assert revision_edges == {
+        ("page-200-r100", "page-200-r99"),
+        ("page-200-r101", "page-200-r100"),
     }
     for record in payload["records"]:
         retrieval = urlparse(record["retrieval_url"])
@@ -180,6 +202,16 @@ def test_fetch_wikipedia_builds_real_revision_entity_exact_spans(
     with pytest.raises(ProvenanceError, match="retrieval URL"):
         build_wikipedia_workflow_manifest(
             payload, input_path.parent, generated_at="2026-08-25T10:01:00Z"
+        )
+
+    metadata["query"]["pages"][0]["revisions"][1]["parentid"] = 98
+    with pytest.raises(ProvenanceError, match="revision ancestry"):
+        fetch_wikipedia_workflow(
+            request_path,
+            tmp_path / "invalid-ancestry",
+            http_get=get,
+            sleep=lambda _: None,
+            generated_at="2026-08-25T10:00:00Z",
         )
 
     first_record["retrieval_url"] = original_retrieval_url

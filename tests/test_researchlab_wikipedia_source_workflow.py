@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import random
 from dataclasses import replace
 from pathlib import Path
 from typing import ClassVar
@@ -14,7 +15,7 @@ from longworld.core.engine import (
     semantic_answer_from_artifacts,
 )
 from longworld.core.graph import graph_stats
-from longworld.core.pack import estimate_tokens
+from longworld.core.pack import estimate_tokens, pack_view
 from longworld.core.promotion import _replayed_source_metadata
 from longworld.core.retrieve import raw_token_fact_windows_insufficient
 from longworld.core.sampler import materialize
@@ -46,8 +47,15 @@ from longworld.core.wikiparse import (
     WIKI_THATCHER_MID_QUOTE,
     WIKI_TURING_LATE_QUOTE,
     WIKI_TURING_MID_QUOTE,
+    extract_wikipedia_wikitext,
+)
+from longworld.core.world import WorldSimulator
+from longworld.domains.researchlab.events import (
+    apply_event,
+    check_preconditions,
 )
 from longworld.domains.researchlab.simulate import (
+    _wiki_revision_hunk,
     canonical_researchlab_source_event_envelope,
     canonical_researchlab_source_visible_text,
 )
@@ -244,6 +252,144 @@ def _workflow_with_relations() -> SourceWorkflow:
     )
 
 
+def _three_revision_workflow() -> SourceWorkflow:
+    base = _workflow()
+    _old, current, entity = base.records
+    template = json.loads(current.text)
+    revision = template["query"]["pages"][0]["revisions"][0]
+    base_body = revision["slots"]["main"]["content"]
+
+    def revision_record(
+        revision_id: int,
+        parent_revision_id: int,
+        occurred_at: str,
+        body: str,
+    ) -> SourceRecord:
+        payload = json.loads(current.text)
+        item = payload["query"]["pages"][0]["revisions"][0]
+        item.update(
+            {
+                "revid": revision_id,
+                "parentid": parent_revision_id,
+                "timestamp": occurred_at,
+            }
+        )
+        item["slots"]["main"]["content"] = body
+        text = json.dumps(payload, separators=(",", ":"))
+        digest = hashlib.sha256(text.encode()).hexdigest()
+        return SourceRecord(
+            record_id=f"page-974-r{revision_id}",
+            kind="wikipedia_revision",
+            occurred_at=occurred_at,
+            text=text,
+            source_url=f"https://en.wikipedia.org/w/index.php?oldid={revision_id}",
+            retrieval_url=(
+                "https://en.wikipedia.org/w/api.php?action=query&prop=revisions"
+                f"%7Cpageprops&revids={revision_id}"
+            ),
+            source_family="wikipedia_revision",
+            source_origin=SourceOrigin.REAL_PUBLIC,
+            provenance_id=f"sha256:{digest}",
+            source_sha256=digest,
+            text_sha256=digest,
+            facts=(),
+            attributes=(
+                ("kind", "wikipedia_revision"),
+                ("revision_id", str(revision_id)),
+                ("page_id", "974"),
+                ("title", "Ada Lovelace"),
+                ("parent_revision_id", str(parent_revision_id)),
+            ),
+        )
+
+    stable_context = (
+        "The archival catalogue retained the verified source boundary. "
+        "Its unchanged description separates the two independently recorded edits."
+    )
+    prior = revision_record(
+        1370153022,
+        1370153021,
+        "2026-08-17T11:48:44Z",
+        f"{base_body}\n{stable_context}",
+    )
+    middle_claim = "The analytical engine correction was documented in 2026."
+    middle = revision_record(
+        1370153023,
+        1370153022,
+        "2026-08-18T11:48:44Z",
+        f"{base_body}\n{middle_claim}\n{stable_context}",
+    )
+    latest_claim = "The cross-source archival relation was verified in 2027."
+    latest = revision_record(
+        1370153024,
+        1370153023,
+        "2026-08-19T11:48:44Z",
+        f"{base_body}\n{middle_claim}\n{stable_context}\n{latest_claim}",
+    )
+
+    def relation(
+        relation_id: str,
+        kind: str,
+        source: SourceRecord,
+        target: SourceRecord,
+        quote: str,
+    ) -> SourceRelation:
+        start = source.text.index(quote)
+        return SourceRelation(
+            relation_id=relation_id,
+            kind=kind,
+            source_record_id=source.record_id,
+            target_record_id=target.record_id,
+            evidence=(
+                SourceEvidence(
+                    record_id=source.record_id,
+                    evidence_quote=quote,
+                    char_start=start,
+                    char_end=start + len(quote),
+                    source_sha256=source.source_sha256,
+                ),
+            ),
+        )
+
+    return replace(
+        base,
+        provenance_ids=tuple(
+            record.provenance_id for record in (prior, middle, latest, entity)
+        ),
+        records=(prior, middle, latest, entity),
+        relations=(
+            relation(
+                "page-r1370153023-r1370153022",
+                "revision_of",
+                middle,
+                prior,
+                '"parentid":1370153022',
+            ),
+            relation(
+                "page-r1370153024-r1370153023",
+                "revision_of",
+                latest,
+                middle,
+                '"parentid":1370153023',
+            ),
+            relation(
+                "page-974-Q7259",
+                "page_describes_entity",
+                latest,
+                entity,
+                '"wikibase_item":"Q7259"',
+            ),
+            relation(
+                "Q7259-page-974",
+                "entity_resolves_page",
+                entity,
+                latest,
+                '"title":"Ada Lovelace"',
+            ),
+        ),
+    )
+
+
 @pytest.fixture(scope="module")
 def ada_world(monkeypatch_module: pytest.MonkeyPatch):
     monkeypatch_module.setenv(
@@ -278,6 +424,28 @@ def ada_related_world(monkeypatch_module: pytest.MonkeyPatch):
         domain="researchlab",
         n_workstreams=0,
         source_workflows=[_workflow_with_relations()],
+        include_program_joins=False,
+    )
+    queries = [
+        query
+        for query in materialized.queries
+        if query.query_type == "wiki_claim_reconstruction"
+    ]
+    return materialized.worlds["focal"], materialized.artifacts["focal"], queries
+
+
+@pytest.fixture(scope="module")
+def ada_revision_chain_world(monkeypatch_module: pytest.MonkeyPatch):
+    monkeypatch_module.setenv(
+        "LONGWORLD_ATTESTATION_KEY", "researchlab-wiki-source-test-key-32b"
+    )
+    materialized = materialize(
+        7,
+        n_parallel=0,
+        n_pulses=0,
+        domain="researchlab",
+        n_workstreams=0,
+        source_workflows=[_three_revision_workflow()],
         include_program_joins=False,
     )
     queries = [
@@ -328,6 +496,287 @@ class _OverlappingOffsetsTokenizer(_FourCharsPerToken):
             (start, min(len(text), start + 4)) for start in range(0, len(text), 3)
         ]
         return {"input_ids": list(range(len(offsets))), "offset_mapping": offsets}
+
+
+def test_large_body_bounded_estimated_pack_contract(
+    ada_revision_chain_world,
+) -> None:
+    # This locally constructed REAL_PUBLIC object exercises only the source-path
+    # contract. It is not provenance evidence or an exporter/signature E2E test.
+    world, artifacts, queries = ada_revision_chain_world
+    assert [query.preferred_length_buckets for query in queries] == [
+        ["16k"],
+        ["32k"],
+        ["64k"],
+    ]
+    hunk_events = {
+        (
+            str(event.params.get("transition_tier")),
+            str(event.params.get("hunk_side")),
+        ): event
+        for event in world.events
+        if event.type == "wiki_source_section"
+        and str(event.params.get("section_id") or "").startswith("revision_")
+    }
+    assert set(hunk_events) == {
+        ("32k", "before"),
+        ("32k", "after"),
+        ("64k", "before"),
+        ("64k", "after"),
+    }
+    records = {
+        record.record_id: record for record in _three_revision_workflow().records
+    }
+    hunk_texts = []
+    source_ranges: dict[str, list[tuple[int, int]]] = {}
+    for event in hunk_events.values():
+        section_record_id = str(event.params["section_record_id"])
+        record = records[section_record_id]
+        _title, _entity_id, body = extract_wikipedia_wikitext(record.text)
+        start = int(event.params["source_char_start"])
+        end = int(event.params["source_char_end"])
+        span = body[start:end]
+        assert 0 <= start < end <= len(body)
+        assert (
+            event.params["source_body_sha256"]
+            == hashlib.sha256(body.encode()).hexdigest()
+        )
+        assert (
+            event.params["source_span_sha256"]
+            == hashlib.sha256(span.encode()).hexdigest()
+        )
+        assert span in str(event.params["text"])
+        assert len(span) <= 512
+        assert len(str(event.params["text"])) <= 1024
+        assert str(event.params["text"]) != body
+        hunk_texts.append(str(event.params["text"]))
+        source_ranges.setdefault(section_record_id, []).append((start, end))
+    assert len(hunk_texts) == len(set(hunk_texts))
+    assert all(
+        first_end <= second_start or second_end <= first_start
+        for ranges in source_ranges.values()
+        for index, (first_start, first_end) in enumerate(ranges)
+        for second_start, second_end in ranges[index + 1 :]
+    )
+    for tier in ("32k", "64k"):
+        before = hunk_events[(tier, "before")]
+        after = hunk_events[(tier, "after")]
+        assert before.params["change_kind"] == after.params["change_kind"] == "insert"
+        assert (
+            abs(
+                int(before.params["source_char_end"])
+                - int(after.params["source_char_start"])
+            )
+            <= 1
+        )
+
+    relation_events = {
+        str(event.params["relation_id"]): event
+        for event in world.events
+        if event.type == "wiki_source_relation"
+        and event.params.get("relation_kind") == "revision_of"
+    }
+    assert set(relation_events) == {
+        "page-r1370153023-r1370153022",
+        "page-r1370153024-r1370153023",
+    }
+    assert (
+        relation_events["page-r1370153023-r1370153022"].params["source_record_event_id"]
+        == hunk_events[("32k", "after")].id
+    )
+    assert (
+        relation_events["page-r1370153024-r1370153023"].params["target_record_event_id"]
+        == hunk_events[("64k", "before")].id
+    )
+
+    by_tier = {query.preferred_length_buckets[0]: query for query in queries}
+    assert "REVISION_INSERT_32K:" not in by_tier["16k"].answer
+    assert "REVISION_BEFORE_32K:" in by_tier["32k"].answer
+    assert (
+        "REVISION_INSERT_32K:The analytical engine correction was documented in 2026."
+        in by_tier["32k"].answer
+    )
+    assert "REVISION_INSERT_64K:" not in by_tier["32k"].answer
+    assert "REVISION_BEFORE_64K:" in by_tier["64k"].answer
+    assert (
+        "REVISION_INSERT_64K:The cross-source archival relation was verified in 2027."
+        in by_tier["64k"].answer
+    )
+    assert len(by_tier["32k"].essential_event_ids) < len(
+        by_tier["64k"].essential_event_ids
+    )
+    assert len(by_tier["16k"].essential_event_ids) < len(
+        by_tier["32k"].essential_event_ids
+    )
+    assert [
+        sum(
+            event_id in query.essential_event_ids
+            for event_id in (event.id for event in relation_events.values())
+        )
+        for query in (by_tier["16k"], by_tier["32k"], by_tier["64k"])
+    ] == [0, 1, 2]
+
+    simulator = WorldSimulator(
+        spec=world.spec,
+        init_values=world.init_values,
+        check_preconditions=check_preconditions,
+        apply_event=apply_event,
+    )
+    state = simulator.replay_events(world.events, up_to=by_tier["64k"].as_of)
+    bindings = state.values["source_grounded_bindings"]
+    assert all(event.id in bindings for event in hunk_events.values())
+    assert set(state.values["wiki_source_relations"]) >= set(relation_events)
+
+    for tier, estimated_upper_bound in (
+        ("16k", 24_000),
+        ("32k", 40_000),
+        ("64k", 80_000),
+    ):
+        query = by_tier[tier]
+        packed = pack_view(
+            artifacts,
+            query,
+            artifacts,
+            query_timing="late",
+            position_bucket="middle",
+            length_bucket=tier,
+            target_tokens=estimated_upper_bound,
+            rng=random.Random(7),
+        )
+        assert packed.ok, packed.reject_reason
+        lower_bound = {"16k": 12_000, "32k": 24_000, "64k": 40_000}[tier]
+        assert lower_bound <= packed.tokens < estimated_upper_bound
+        assert packed.length_bucket == tier
+        assert set(query.essential_artifact_ids).issubset(
+            {artifact.artifact_id for artifact in packed.artifacts}
+        )
+
+    for query in (by_tier["16k"], by_tier["32k"], by_tier["64k"]):
+        assert (
+            answer_from_events(world, query, query.essential_event_ids) == query.answer
+        )
+        assert all(
+            answer_from_events(
+                world,
+                query,
+                [
+                    event_id
+                    for event_id in query.essential_event_ids
+                    if event_id != drop
+                ],
+            )
+            == "unknown"
+            for drop in query.essential_event_ids
+        )
+        _, cf_artifacts = render_cf_view(world, query)
+        verification, _ = verify_question(
+            world,
+            query,
+            artifacts,
+            cf_artifacts=cf_artifacts,
+            verification_mode="candidate",
+        )
+        assert query.cf_answer != query.answer
+        assert verification.minimal_sufficient
+        assert verification.semantic_sufficient
+        assert verification.strict_executable_sufficient
+        assert verification.counterfactual_replay_sufficient
+        assert verification.remove_one_fails
+
+    middle_artifact = next(
+        artifact
+        for artifact in artifacts
+        if hunk_events[("32k", "after")].id in artifact.reveals_events
+    )
+    corrupted = replace(
+        middle_artifact,
+        text=middle_artifact.text.replace(
+            "The analytical engine correction was documented in 2026.",
+            "The analytical engine correction was undocumented in 2026.",
+            1,
+        ),
+    )
+    assert corrupted.text != middle_artifact.text
+    corrupted_artifacts = [
+        corrupted if item.artifact_id == corrupted.artifact_id else item
+        for item in artifacts
+    ]
+    # Strict replay proves the event program, while semantic replay separately
+    # binds the supplied source bytes to the canonical event envelope.
+    assert (
+        answer_from_events(world, by_tier["32k"], by_tier["32k"].essential_event_ids)
+        == by_tier["32k"].answer
+    )
+    corrupted_essential = [
+        artifact
+        for artifact in corrupted_artifacts
+        if artifact.artifact_id in by_tier["32k"].essential_artifact_ids
+    ]
+    assert (
+        semantic_answer_from_artifacts(world, by_tier["32k"], corrupted_essential)
+        == "unknown"
+    )
+    verification, _ = verify_question(
+        world,
+        by_tier["32k"],
+        corrupted_artifacts,
+        cf_artifacts=render_cf_view(world, by_tier["32k"])[1],
+        verification_mode="candidate",
+    )
+    assert verification.strict_executable_sufficient
+    assert verification.semantic_sufficient is False
+    assert verification.essential_text_grounded is False
+    assert verification.all_green() is False
+
+
+def test_revision_hunks_reject_nonsemantic_changes_and_preserve_exact_replacement() -> (
+    None
+):
+    template = json.loads(_workflow().records[1].text)
+
+    def revision_text(body: str) -> str:
+        payload = json.loads(json.dumps(template))
+        payload["query"]["pages"][0]["revisions"][0]["slots"]["main"]["content"] = body
+        return json.dumps(payload, separators=(",", ":"))
+
+    baseline = "The archive described the analytical engine in 2025."
+    numeric = _wiki_revision_hunk(
+        revision_text(baseline),
+        revision_text("The archive described the analytical engine in 2026."),
+    )
+    assert numeric is not None
+    assert numeric.change_kind == "replace"
+    assert numeric.before_span == baseline
+    assert numeric.after_span == "The archive described the analytical engine in 2026."
+
+    long_before = ("The archive retained a substantive historical record. " * 60)[:2639]
+    short_after = "The archive records one verified analytical engine fact."
+    assert len(long_before) == 2639
+    assert len(short_after) == 56
+    assert (
+        _wiki_revision_hunk(revision_text(long_before), revision_text(short_after))
+        is None
+    )
+    for added in (
+        "[[Category:English analytical engine historical archive records]]",
+        "Bot maintenance copyedit formatting for the archive citation.",
+        "Reverted the archive entry after a routine maintenance edit.",
+        "{{Citation needed|date=August 2026}}",
+    ):
+        assert (
+            _wiki_revision_hunk(
+                revision_text(baseline), revision_text(f"{baseline}\n{added}")
+            )
+            is None
+        )
+
+    before = "The archive described the analytical engine design in detail."
+    after = "The archive documented the analytical engine correction in detail."
+    hunk = _wiki_revision_hunk(revision_text(before), revision_text(after))
+    assert hunk is not None
+    assert hunk.change_kind == "replace"
+    assert hunk.before_span == before
+    assert hunk.after_span == after
 
 
 def test_wiki_queries_stage_real_body_programs(ada_world) -> None:

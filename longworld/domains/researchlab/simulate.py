@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+from dataclasses import dataclass
 from datetime import date, timedelta
+from difflib import SequenceMatcher
 from typing import Any
 
 from longworld.core.cascade import cascade_events
@@ -15,6 +18,7 @@ from longworld.core.wikiparse import (
     WIKI_FACT_PARSER_REVISION_V2,
     WIKI_SECTION_REVISION,
     WIKI_SECTION_VIEW_PREFIX,
+    extract_wikipedia_wikitext,
     parse_wiki_claim_program,
 )
 from longworld.core.world import Event, SimulatedWorld, WorldSimulator
@@ -61,6 +65,23 @@ _WIKI_LEGACY_ROLE_TAGS = {
     "entity": "ENTITY",
     "popular_culture": "POP",
 }
+_WIKI_REVISION_HUNK = "wiki_revision_hunk_v1"
+_WIKI_MAINTENANCE_CHANGE = re.compile(
+    r"\b(?:bot|citation|copyedit|formatting|maintenance|revert|rvv|template|typo)\b",
+    re.IGNORECASE,
+)
+_WIKI_WORD = re.compile(r"[A-Za-z][A-Za-z'-]{2,}")
+
+
+@dataclass(frozen=True)
+class _WikiRevisionHunk:
+    change_kind: str
+    before_start: int
+    before_end: int
+    before_span: str
+    after_start: int
+    after_end: int
+    after_span: str
 
 
 def _date(start: date, months: int, extra_days: int = 0) -> date:
@@ -272,6 +293,281 @@ def _wiki_grounded_source(
     return _grounded_source(source_id=event_id, text=section_text, facts=facts), spans
 
 
+def _trimmed_span(text: str, start: int, end: int) -> tuple[int, int, str]:
+    while start < end and text[start].isspace():
+        start += 1
+    while end > start and text[end - 1].isspace():
+        end -= 1
+    return start, end, text[start:end]
+
+
+def _semantic_wiki_text(text: str) -> str:
+    without_tags = re.sub(r"<[^>]+>|\{\{[^{}]*\}\}", " ", text)
+    return " ".join(re.sub(r"[\[\]{}|=*#]", " ", without_tags).split())
+
+
+def _substantive_revision_change(
+    *, change_kind: str, before_span: str, after_span: str
+) -> bool:
+    stripped_after = after_span.lstrip()
+    before_semantic = _semantic_wiki_text(before_span)
+    after_semantic = _semantic_wiki_text(after_span)
+    combined = f"{before_semantic} {after_semantic}".strip()
+    if (
+        not after_semantic
+        or stripped_after.startswith(("[[Category:", "{{", "<ref"))
+        or len(before_span) > 512
+        or len(after_span) > 512
+        or len(_WIKI_WORD.findall(after_semantic)) < 5
+        or _WIKI_MAINTENANCE_CHANGE.search(combined) is not None
+    ):
+        return False
+    if change_kind == "insert":
+        return True
+    prefix = 0
+    while (
+        prefix < len(before_semantic)
+        and prefix < len(after_semantic)
+        and before_semantic[prefix] == after_semantic[prefix]
+    ):
+        prefix += 1
+    old_end = len(before_semantic)
+    new_end = len(after_semantic)
+    while (
+        old_end > prefix
+        and new_end > prefix
+        and before_semantic[old_end - 1] == after_semantic[new_end - 1]
+    ):
+        old_end -= 1
+        new_end -= 1
+    changed_core = before_semantic[prefix:old_end] + after_semantic[prefix:new_end]
+    return any(character.isalnum() for character in changed_core)
+
+
+def _wiki_revision_hunk(prior_text: str, later_text: str) -> _WikiRevisionHunk | None:
+    """Select one bounded exact insert/replace hunk from adjacent source bodies."""
+    _prior_title, _prior_entity, prior_body = extract_wikipedia_wikitext(prior_text)
+    _later_title, _later_entity, later_body = extract_wikipedia_wikitext(later_text)
+    prior_lines = prior_body.splitlines(keepends=True)
+    later_lines = later_body.splitlines(keepends=True)
+    prior_offsets = [0]
+    later_offsets = [0]
+    for line in prior_lines:
+        prior_offsets.append(prior_offsets[-1] + len(line))
+    for line in later_lines:
+        later_offsets.append(later_offsets[-1] + len(line))
+    matcher = SequenceMatcher(
+        None,
+        prior_lines,
+        later_lines,
+        autojunk=False,
+    )
+    candidates: list[_WikiRevisionHunk] = []
+    for tag, old_start, old_end, new_start, new_end in matcher.get_opcodes():
+        if tag not in {"insert", "replace"}:
+            continue
+        before_start, before_end, before_span = _trimmed_span(
+            prior_body, prior_offsets[old_start], prior_offsets[old_end]
+        )
+        after_start, after_end, after_span = _trimmed_span(
+            later_body, later_offsets[new_start], later_offsets[new_end]
+        )
+        change_kind = "insert" if tag == "insert" else "replace"
+        insertion_offset = prior_offsets[old_start]
+        if tag == "replace":
+            shared_prefix = 0
+            while (
+                shared_prefix < len(before_span)
+                and shared_prefix < len(after_span)
+                and before_span[shared_prefix] == after_span[shared_prefix]
+            ):
+                shared_prefix += 1
+            old_tail = len(before_span)
+            new_tail = len(after_span)
+            while (
+                old_tail > shared_prefix
+                and new_tail > shared_prefix
+                and before_span[old_tail - 1] == after_span[new_tail - 1]
+            ):
+                old_tail -= 1
+                new_tail -= 1
+            if not before_span[shared_prefix:old_tail]:
+                change_kind = "insert"
+                insertion_offset = before_start + shared_prefix
+                after_start, after_end, after_span = _trimmed_span(
+                    later_body,
+                    after_start + shared_prefix,
+                    after_start + new_tail,
+                )
+        if not _substantive_revision_change(
+            change_kind=change_kind,
+            before_span=before_span,
+            after_span=after_span,
+        ):
+            continue
+        if change_kind == "insert":
+            anchor_end = min(len(prior_body), insertion_offset)
+            anchor_start = max(0, anchor_end - 96)
+            if anchor_start == anchor_end:
+                anchor_end = min(len(prior_body), 96)
+            before_start, before_end, before_span = _trimmed_span(
+                prior_body, anchor_start, anchor_end
+            )
+        if (
+            not before_span
+            or not after_span
+            or prior_body.count(before_span) != 1
+            or later_body.count(after_span) != 1
+        ):
+            continue
+        candidates.append(
+            _WikiRevisionHunk(
+                change_kind=change_kind,
+                before_start=before_start,
+                before_end=before_end,
+                before_span=before_span,
+                after_start=after_start,
+                after_end=after_end,
+                after_span=after_span,
+            )
+        )
+    if not candidates:
+        return None
+    return max(
+        candidates,
+        key=lambda value: (
+            len(_WIKI_WORD.findall(_semantic_wiki_text(value.after_span))),
+            value.after_span,
+        ),
+    )
+
+
+def _wiki_revision_hunk_event(
+    *,
+    workflow: Any,
+    record: Any,
+    prefix: str,
+    workflow_index: int,
+    transition_tier: str,
+    hunk_side: str,
+    hunk: _WikiRevisionHunk,
+    counterpart: Any,
+    relation_id: str,
+    answer_record_id: str,
+) -> Event:
+    _title, _entity_id, body = extract_wikipedia_wikitext(record.text)
+    section_id = f"revision_{transition_tier}_{hunk_side}"
+    event_id = f"{prefix}.wiki_section_{section_id}_{workflow_index}_{record.record_id}"
+    start = hunk.before_start if hunk_side == "before" else hunk.after_start
+    end = hunk.before_end if hunk_side == "before" else hunk.after_end
+    source_span = hunk.before_span if hunk_side == "before" else hunk.after_span
+    section_body = (
+        f"transition {relation_id}\nside {hunk_side}\n"
+        f"change {hunk.change_kind}\nsource span\n{source_span}"
+    )
+    section_text = WIKI_SECTION_VIEW_PREFIX + section_body
+    section_sha256 = hashlib.sha256(section_body.encode()).hexdigest()
+    source_body_sha256 = hashlib.sha256(body.encode()).hexdigest()
+    source_span_sha256 = hashlib.sha256(source_span.encode()).hexdigest()
+    provenance_id = "derived-sha256:" + _canonical_digest(
+        {
+            "operation": _WIKI_REVISION_HUNK,
+            "section_id": section_id,
+            "relation_id": relation_id,
+            "change_kind": hunk.change_kind,
+            "hunk_side": hunk_side,
+            "source_record_id": record.record_id,
+            "counterpart_record_id": counterpart.record_id,
+            "source_sha256": record.source_sha256,
+            "counterpart_source_sha256": counterpart.source_sha256,
+            "source_body_sha256": source_body_sha256,
+            "source_char_start": start,
+            "source_char_end": end,
+            "source_span_sha256": source_span_sha256,
+            "section_sha256": section_sha256,
+        }
+    )
+    facts: list[dict[str, Any]] = [
+        _grounded_fact(
+            source_id=event_id,
+            text=section_text,
+            fact_id=f"{event_id}:source_span",
+            quote=source_span,
+            char_start=section_text.index(source_span),
+        )
+    ]
+    spans: list[dict[str, Any]] = []
+    if hunk_side in {"before", "after"}:
+        role = f"revision_{'new' if hunk_side == 'after' else 'old'}_{transition_tier}"
+        answer_tag = (
+            f"REVISION_BEFORE_{transition_tier.upper()}"
+            if hunk.change_kind == "insert" and hunk_side == "before"
+            else f"REVISION_INSERT_{transition_tier.upper()}"
+            if hunk.change_kind == "insert"
+            else f"REVISION_{hunk_side.upper()}_{transition_tier.upper()}"
+        )
+        fact_id = f"{event_id}:{role}"
+        facts[0]["fact_id"] = fact_id
+        spans.append(
+            {
+                "kind": "wiki_claim",
+                "role": role,
+                "evidence_quote": source_span,
+                "char_start": section_text.index(source_span),
+                "char_end": section_text.index(source_span) + len(source_span),
+                "value": source_span,
+                "parent_sha256": record.text_sha256,
+                "answer_tag": answer_tag,
+                "fact_id": fact_id,
+            }
+        )
+    grounded_source = _grounded_source(
+        source_id=event_id,
+        text=section_text,
+        facts=facts,
+    )
+    return Event(
+        id=event_id,
+        type="wiki_source_section",
+        time=date.fromisoformat(record.occurred_at[:10]),
+        params={
+            "workflow_id": workflow.workflow_id,
+            "record_id": answer_record_id,
+            "section_record_id": record.record_id,
+            "section_id": section_id,
+            "transition_tier": transition_tier,
+            "hunk_side": hunk_side,
+            "relation_id": relation_id,
+            "change_kind": hunk.change_kind,
+            "counterpart_record_id": counterpart.record_id,
+            "counterpart_source_sha256": counterpart.source_sha256,
+            "source_body_sha256": source_body_sha256,
+            "source_char_start": start,
+            "source_char_end": end,
+            "source_span_sha256": source_span_sha256,
+            "text": section_text,
+            "text_sha256": hashlib.sha256(section_text.encode()).hexdigest(),
+            "source_sha256": record.source_sha256,
+            "parent_source_sha256": record.text_sha256,
+            "section_sha256": section_sha256,
+            "parent_provenance_id": record.provenance_id,
+            "provenance_id": provenance_id,
+            "provenance_operation": _WIKI_REVISION_HUNK,
+            "source_binding_provenance": "verified_derived",
+            "fact_parser_revision": WIKI_FACT_PARSER_REVISION_V2,
+            "minimum_tier": transition_tier,
+            "source_origin": "real_derived",
+            "source_family": record.source_family,
+            "source_url": record.source_url,
+            "retrieval_url": record.retrieval_url,
+            "fact_spans": spans,
+            "grounded_source": grounded_source,
+            "ground_values": [source_span],
+        },
+        visibility=[event_id],
+    )
+
+
 def _wikipedia_source_workflow_events(
     workflow: Any, prefix: str, workflow_index: int
 ) -> list[Event]:
@@ -283,9 +579,12 @@ def _wikipedia_source_workflow_events(
         for record in workflow.records
         if record.kind == "wikidata_entity_revision"
     ]
-    if len(wiki_records) != 2 or len(entity_records) != 1:
+    if len(wiki_records) not in {2, 3} or len(entity_records) != 1:
         return []
-    later = max(wiki_records, key=lambda record: (record.occurred_at, record.record_id))
+    ordered_wiki_records = sorted(
+        wiki_records, key=lambda record: (record.occurred_at, record.record_id)
+    )
+    later = ordered_wiki_records[-1]
     entity = entity_records[0]
     wiki_hash = hashlib.sha256(later.text.encode()).hexdigest()
     entity_hash = hashlib.sha256(entity.text.encode()).hexdigest()
@@ -304,6 +603,90 @@ def _wikipedia_source_workflow_events(
     later_day = date.fromisoformat(later.occurred_at[:10])
     events: list[Event] = []
     section_ids: dict[str, str] = {}
+    revision_roles: dict[str, list[str]] = {}
+    revision_role_tags: dict[str, str] = {}
+    revision_relation_ids_by_tier: dict[str, list[str]] = {"32k": [], "64k": []}
+    revision_section_names_by_tier: dict[str, tuple[str, ...]] = {
+        "16k": (),
+        "32k": (),
+        "64k": (),
+    }
+    revision_relation_endpoint_ids: dict[str, dict[str, str]] = {}
+    if len(ordered_wiki_records) == 3:
+        prior, middle, latest = ordered_wiki_records
+        expected_revision_edges = {
+            (middle.record_id, prior.record_id),
+            (latest.record_id, middle.record_id),
+        }
+        actual_revision_edges = {
+            (relation.source_record_id, relation.target_record_id)
+            for relation in workflow.relations
+            if relation.kind == "revision_of" and len(relation.evidence) == 1
+        }
+        if actual_revision_edges != expected_revision_edges:
+            return []
+        try:
+            transition_hunks = {
+                "32k": _wiki_revision_hunk(prior.text, middle.text),
+                "64k": _wiki_revision_hunk(middle.text, latest.text),
+            }
+        except ProvenanceError:
+            return []
+        if any(hunk is None for hunk in transition_hunks.values()):
+            return []
+        revision_relations_by_edge = {
+            (relation.source_record_id, relation.target_record_id): relation
+            for relation in workflow.relations
+            if relation.kind == "revision_of"
+        }
+        for tier, before, after in (
+            ("32k", prior, middle),
+            ("64k", middle, latest),
+        ):
+            relation = revision_relations_by_edge[(after.record_id, before.record_id)]
+            hunk = transition_hunks[tier]
+            assert hunk is not None
+            endpoints: dict[str, str] = {}
+            for side, record, counterpart in (
+                ("before", before, after),
+                ("after", after, before),
+            ):
+                hunk_event = _wiki_revision_hunk_event(
+                    workflow=workflow,
+                    record=record,
+                    prefix=prefix,
+                    workflow_index=workflow_index,
+                    transition_tier=tier,
+                    hunk_side=side,
+                    hunk=hunk,
+                    counterpart=counterpart,
+                    relation_id=relation.relation_id,
+                    answer_record_id=later.record_id,
+                )
+                events.append(hunk_event)
+                section_name = str(hunk_event.params["section_id"])
+                section_ids[section_name] = hunk_event.id
+                endpoints[record.record_id] = hunk_event.id
+                revision_roles[section_name] = [
+                    str(span["role"]) for span in hunk_event.params["fact_spans"]
+                ]
+                revision_role_tags.update(
+                    {
+                        str(span["role"]): str(span["answer_tag"])
+                        for span in hunk_event.params["fact_spans"]
+                    }
+                )
+            revision_relation_endpoint_ids[relation.relation_id] = endpoints
+        revision_section_names_by_tier = {
+            "16k": (),
+            "32k": ("revision_32k_before", "revision_32k_after"),
+            "64k": (
+                "revision_32k_before",
+                "revision_32k_after",
+                "revision_64k_before",
+                "revision_64k_after",
+            ),
+        }
     early_section_names = [
         section.section_id
         for section in program.sections
@@ -372,13 +755,24 @@ def _wikipedia_source_workflow_events(
         entity.record_id: section_ids.get("wikidata_entity", ""),
     }
     relation_event_ids: list[str] = []
+    relation_event_ids_by_relation_id: dict[str, str] = {}
     relation_ids: list[str] = []
     records_by_id = {record.record_id: record for record in workflow.records}
     for relation_index, relation in enumerate(workflow.relations):
-        source_event_id = record_event_ids.get(relation.source_record_id, "")
-        target_event_id = record_event_ids.get(relation.target_record_id, "")
+        relation_endpoints = revision_relation_endpoint_ids.get(
+            relation.relation_id, {}
+        )
+        source_event_id = relation_endpoints.get(
+            relation.source_record_id,
+            record_event_ids.get(relation.source_record_id, ""),
+        )
+        target_event_id = relation_endpoints.get(
+            relation.target_record_id,
+            record_event_ids.get(relation.target_record_id, ""),
+        )
         if (
-            relation.kind not in {"page_describes_entity", "entity_resolves_page"}
+            relation.kind
+            not in {"revision_of", "page_describes_entity", "entity_resolves_page"}
             or not source_event_id
             or not target_event_id
             or source_event_id == target_event_id
@@ -447,7 +841,12 @@ def _wikipedia_source_workflow_events(
             )
         )
         relation_event_ids.append(relation_event_id)
+        relation_event_ids_by_relation_id[relation.relation_id] = relation_event_id
         relation_ids.append(relation.relation_id)
+        if relation.kind == "revision_of":
+            if relation.source_record_id == ordered_wiki_records[1].record_id:
+                revision_relation_ids_by_tier["32k"].append(relation.relation_id)
+            revision_relation_ids_by_tier["64k"].append(relation.relation_id)
     prior_id = ""
     prior_key = ""
     compute_keys: dict[str, str] = {}
@@ -456,8 +855,9 @@ def _wikipedia_source_workflow_events(
     sections_by_id = {section.section_id: section for section in program.sections}
     roles_by_section = {
         section_id: [fact.role for fact in sections_by_id[section_id].facts]
-        for section_id in section_ids
+        for section_id in sections_by_id
     }
+    roles_by_section.update(revision_roles)
     role_tags = (
         {
             fact.role: fact.answer_tag
@@ -465,8 +865,10 @@ def _wikipedia_source_workflow_events(
             for fact in section.facts
         }
         if semantic_tags
-        else _WIKI_LEGACY_ROLE_TAGS
+        else dict(_WIKI_LEGACY_ROLE_TAGS)
     )
+    tagged_answers = semantic_tags or bool(revision_roles)
+    role_tags.update(revision_role_tags)
     tier_rank = {"16k": 0, "32k": 1, "64k": 2}
     early_sections_by_tier = {
         tier: tuple(
@@ -494,6 +896,8 @@ def _wikipedia_source_workflow_events(
         *early_roles_by_minimum_tier["32k"],
         *middle_roles,
         *entity_roles,
+        *revision_roles.get("revision_32k_before", []),
+        *revision_roles.get("revision_32k_after", []),
     ]
     tier_roles = {
         "16k": roles_16k,
@@ -502,6 +906,8 @@ def _wikipedia_source_workflow_events(
             *roles_32k,
             *early_roles_by_minimum_tier["64k"],
             *late_roles,
+            *revision_roles.get("revision_64k_before", []),
+            *revision_roles.get("revision_64k_after", []),
         ],
     }
     append_roles = {
@@ -510,13 +916,21 @@ def _wikipedia_source_workflow_events(
             *early_roles_by_minimum_tier["32k"],
             *middle_roles,
             *entity_roles,
+            *revision_roles.get("revision_32k_before", []),
+            *revision_roles.get("revision_32k_after", []),
         ],
-        "64k": [*early_roles_by_minimum_tier["64k"], *late_roles],
+        "64k": [
+            *early_roles_by_minimum_tier["64k"],
+            *late_roles,
+            *revision_roles.get("revision_64k_before", []),
+            *revision_roles.get("revision_64k_after", []),
+        ],
     }
     for control_tier, rungs, default_sections in _WIKI_CLAIM_TIERS:
         needed_sections = (
             *early_sections_by_tier[control_tier],
             *default_sections[1:],
+            *revision_section_names_by_tier[control_tier],
         )
         new_sections = [name for name in needed_sections if name not in used_sections]
         for rung_index, (offset, compose, stage) in enumerate(rungs):
@@ -536,8 +950,21 @@ def _wikipedia_source_workflow_events(
                 # as parallel parents shortens shortest-path proof depth.
                 parents = [prior_id] if prior_id else []
                 parents.extend(section_ids[name] for name in new_sections)
-                if control_tier in {"32k", "64k"}:
-                    parents.extend(relation_event_ids)
+                required_relation_ids = (
+                    [
+                        relation_id
+                        for relation_id in relation_ids
+                        if relation_id not in revision_relation_ids_by_tier["64k"]
+                    ]
+                    + revision_relation_ids_by_tier[control_tier]
+                    if control_tier in {"32k", "64k"}
+                    else []
+                )
+                if required_relation_ids:
+                    parents.extend(
+                        relation_event_ids_by_relation_id[relation_id]
+                        for relation_id in required_relation_ids
+                    )
                 answer_key = (
                     f"wiki_claim_reconstruction:{later.record_id}:{control_tier}"
                 )
@@ -588,15 +1015,13 @@ def _wikipedia_source_workflow_events(
                                     role: role_tags[role] for role in required_roles
                                 },
                             }
-                            if semantic_tags
+                            if tagged_answers
                             else {}
                         ),
                         "response_schema": "||".join(
                             f"{role_tags[role]}:<value>" for role in required_roles
                         ),
-                        "required_relation_ids": list(relation_ids)
-                        if control_tier in {"32k", "64k"}
-                        else [],
+                        "required_relation_ids": required_relation_ids,
                         "section_event_ids": [
                             section_ids[name] for name in needed_sections
                         ],

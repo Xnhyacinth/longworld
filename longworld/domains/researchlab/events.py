@@ -29,6 +29,7 @@ from longworld.core.world import Event
 _ARXIV_SOURCE_ENVELOPE_REVISION = "researchlab-arxiv-source-envelope-v1"
 _WIKI_FACT_PARSER_REVISION = "researchlab-wiki-claim-exact-v2"
 _WIKI_LEGACY_FACT_PARSER_REVISION = "researchlab-wiki-claim-exact-v1"
+_WIKI_REVISION_HUNK = "wiki_revision_hunk_v1"
 _WIKI_ANSWER_TAG = re.compile(r"[A-Z][A-Z0-9_]{1,31}")
 _WIKI_LEGACY_ROLE_TAGS = {
     "born": "BORN",
@@ -655,6 +656,7 @@ def _wiki_source_claims(
     provenance_class = params.get("source_binding_provenance")
     operation = str(params.get("provenance_operation") or "")
     parent_sha256 = str(params.get("parent_source_sha256") or "")
+    digest_payload: dict[str, Any]
     if operation == WIKI_SECTION_REVISION:
         if (
             provenance_class != "verified_derived"
@@ -665,6 +667,55 @@ def _wiki_source_claims(
             "operation": operation,
             "section_id": section_id,
             "parent_sha256": parent_sha256,
+            "section_sha256": section_sha256,
+        }
+    elif operation == _WIKI_REVISION_HUNK:
+        start = params.get("source_char_start")
+        end = params.get("source_char_end")
+        relation_id = str(params.get("relation_id") or "")
+        change_kind = str(params.get("change_kind") or "")
+        hunk_side = str(params.get("hunk_side") or "")
+        transition_tier = str(params.get("transition_tier") or "")
+        if (
+            provenance_class != "verified_derived"
+            or params.get("source_origin") != "real_derived"
+            or len(source.facts) != 1
+            or change_kind not in {"insert", "replace"}
+            or hunk_side not in {"before", "after"}
+            or transition_tier not in {"32k", "64k"}
+            or section_id != f"revision_{transition_tier}_{hunk_side}"
+            or not relation_id
+            or isinstance(start, bool)
+            or isinstance(end, bool)
+            or not isinstance(start, int)
+            or not isinstance(end, int)
+            or start < 0
+            or start >= end
+            or end - start != len(source.facts[0].quote)
+            or hashlib.sha256(source.facts[0].quote.encode()).hexdigest()
+            != params.get("source_span_sha256")
+            or source.visible_text.count(source.facts[0].quote) != 1
+            or source.visible_text
+            != (
+                f"{prefix}transition {relation_id}\nside {hunk_side}\n"
+                f"change {change_kind}\nsource span\n{source.facts[0].quote}"
+            )
+        ):
+            return None
+        digest_payload = {
+            "operation": operation,
+            "section_id": section_id,
+            "relation_id": relation_id,
+            "change_kind": change_kind,
+            "hunk_side": hunk_side,
+            "source_record_id": params.get("section_record_id"),
+            "counterpart_record_id": params.get("counterpart_record_id"),
+            "source_sha256": params.get("source_sha256"),
+            "counterpart_source_sha256": params.get("counterpart_source_sha256"),
+            "source_body_sha256": params.get("source_body_sha256"),
+            "source_char_start": start,
+            "source_char_end": end,
+            "source_span_sha256": params.get("source_span_sha256"),
             "section_sha256": section_sha256,
         }
     elif operation == "counterfactual_wiki_section_v1":
@@ -700,6 +751,8 @@ def _wiki_source_claims(
         return None
     if section_id == "appendix_rest":
         return ({}, {}) if not spans else None
+    if section_id.startswith("revision_") and not spans:
+        return {}, {}
     if not spans:
         return None
     claims: dict[str, str] = {}
@@ -716,7 +769,7 @@ def _wiki_source_claims(
             or fact.normalized_quote
             != normalize_fact_value(str(span.get("evidence_quote") or ""))
             or (
-                operation == WIKI_SECTION_REVISION
+                operation in {WIKI_SECTION_REVISION, _WIKI_REVISION_HUNK}
                 and span.get("parent_sha256") != parent_sha256
             )
         ):
@@ -763,7 +816,8 @@ def _wiki_relation_binding_valid(state: WorldState, ev: Event) -> bool:
     evidence_quote = str(params.get("evidence_quote") or "")
     bindings = state.values.get("source_grounded_bindings") or {}
     if (
-        relation_kind not in {"page_describes_entity", "entity_resolves_page"}
+        relation_kind
+        not in {"revision_of", "page_describes_entity", "entity_resolves_page"}
         or not relation_id
         or not evidence_quote
         or not source_event_id
