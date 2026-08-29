@@ -16,6 +16,44 @@ authorization.
 | CodeForge / Company / ResearchLab rows     |  14 / 9 / 12 |
 | CodeForge / Company / ResearchLab worlds   |    2 / 1 / 2 |
 
+Exact-byte semantic coverage, recomputed from the five bound promoted JSONL
+files rather than from implementation templates, is:
+
+| Exercised semantic field            | Value |
+| ----------------------------------- | ----: |
+| Query types                         |     7 |
+| Motifs                              |     5 |
+| Answer programs                     |    11 |
+| Executable proofs                   |    15 |
+| Program operators                   |    30 |
+| Real source family IDs              |     4 |
+| Authentic source relation kinds     |     3 |
+| Synthetic executable relation kinds |     4 |
+
+The authentic source relations are `derived_from`, `revision_of`, and
+`prior_available_annual_filing`. The separate synthetic executable set is
+`computes_from`, `derived_from`, `supersedes`, and
+`validates_temporal_endpoint`. A relation name may occur in both sets with a
+different provenance; synthetic execution edges are not counted as authentic
+source diversity. The four real source-family IDs are one arXiv family, two
+repository-specific GitHub families, and one issuer XBRL family; conceptually
+they represent three source families.
+
+Recompute this table with:
+
+```bash
+./scripts/run_with_local_probe_trust.py \
+  --trust-file /root/.longworld-p12-active/p12-probe-12-20260829-v1/local_probe_trust.json \
+  --role report --role auditor --allow-combined-roles -- \
+  .venv/bin/python scripts/audit_semantic_coverage.py \
+  data/releases/p12-current-five-source-bound-union-v1.json \
+  --workspace-root .
+```
+
+The audit replays the signed local release union and each release-gate receipt,
+then validates promoted-file roles, exact tokenizer bindings, and canonical
+relation provenance before counting semantic coverage.
+
 The canonical machine-readable inventory is ignored generated data at
 `data/releases/p12-current-five-source-bound-union-v1.json`. Its file SHA-256
 is `18acbdf746e6b79737a295c081b7d7455512ceab8527056239d9a956ad426531`;

@@ -25,6 +25,7 @@ from scripts.audit_release_union import (
     main,
     verify_local_release_inventory_attestation,
 )
+from scripts.audit_semantic_coverage import audit_semantic_coverage
 
 AUDITOR_KEY = b"release-union-auditor-test-key-32-bytes"
 REPORT_KEY = b"release-union-report-test-key-32-bytesx"
@@ -82,6 +83,14 @@ def _row(
         "tokenizer_asset_manifest_sha256": (profile.tokenizer_asset_manifest_sha256),
         "difficulty": {"context_tokens": tokens},
         "domain": domain,
+        "query_type": "real_revision_added_text",
+        "motif": "real_revision_semantic_delta",
+        "answer_program_id": "program-real-revision",
+        "executable_proof_id": f"proof:{world_id}:{bucket}",
+        "program_ops": [{"op": "READ_SOURCE_SPAN"}],
+        "real_source_family_ids": ["test_public_source"],
+        "source_relation_edges": [],
+        "authentic_source_relation_edges": [],
         "split": "train",
         "workflow_ids": [f"workflow:{world_id}"],
         "real_source_workflow_ids": [f"real:{world_id}"],
@@ -636,6 +645,23 @@ def test_union_inventory_is_deterministic_relative_signed_and_summarized(
     assert not verify_local_release_inventory_attestation(
         production_relabel, REPORT_KEY
     )
+
+
+def test_semantic_coverage_replays_key_backed_release_union(tmp_path: Path) -> None:
+    release = _write_release(
+        tmp_path,
+        "release",
+        [_row("world-a", "content-a", bucket="16k", tokens=16_001)],
+    )
+    inventory = _audit([release], tmp_path)
+    inventory_path = tmp_path / "inventory.json"
+    inventory_path.write_text(json.dumps(inventory))
+
+    report = audit_semantic_coverage(inventory_path, workspace_root=tmp_path)
+
+    assert report["n_rows"] == 1
+    assert report["n_worlds"] == 1
+    assert report["n_exact_context_tokens"] == 16_001
 
 
 def test_cli_emits_signed_relative_inventory(
