@@ -22,6 +22,18 @@ top-k, strict executable proof, and semantic proof checks all passed for the
 32K rows. The immutable `p12-sec-source-slice-1-v1` profile still rejected the
 world because a single 32K program is not a long-history curriculum.
 
+After the canonical multi-filing correction, a v2 rerun maps two filings to the
+honest 16K tier rather than preserving the old 32K label. It emitted six unique
+16K candidates at 16,339 or 16,344 exact Qwen tokens across full, CF, and
+ordered-artifact views. Every row has six essential artifacts, six strict
+support events, and one authentic annual relation; exact duplicate count is
+zero. The new structural preflight rejected all six before dense ranking because
+the real inventory still lacks 32K, 64K, and 128K. Its accepted output is empty;
+the candidate row-set and preflight-reject file SHA-256 digests are
+`ff048f798fa0b73616585d36e9a6a8a2bedceda75f5764eaf24927c68223dc75`
+and `f4a48130a13b7548a64114ab33525722ed69dfa784506c7f409f1f82a82b0f63`.
+The earlier 32K run remains a historical diagnostic, not current-code data.
+
 The two Wikimedia runs use three consecutive public revisions and two adjacent
 `revision_of` relations. Their answers consume bounded before/after revision
 hunks rather than repeated full article bodies. Churchill's real hunk support
@@ -48,6 +60,8 @@ Tracked replay-request/configuration records and their SHA-256 digests are:
 | ------------------------------------------------------------ | ------------------------------------------------------------------ |
 | `configs/p12_wave2_company_microsoft_annual_run_v1.json`     | `2e9ce0dea87d93a5110cc290644b96a8ae9be3d217c248dee591b1862d4172e4` |
 | `configs/p12_wave2_company_microsoft_annual_v1.yaml`         | `3c897b10d0ecff2f1b45455ad6957afc63c09f5038e79eed15b3a86fe8ae8740` |
+| `configs/p12_wave2_company_microsoft_annual_run_v2.json`     | `72f168998dd1b58e9633292d3f20bda33cc7543c5a9d75476b39e40d86e3ee59` |
+| `configs/p12_wave2_company_microsoft_annual_v2.yaml`         | `1d9784b3bf62851e6928a6a34223d3d0ae4b051147d105fb666baeba32a913a0` |
 | `configs/p12_wave2_wikimedia_hunk_churchill_request_v1.json` | `2f1f23e30b300755eb12ee2e8bd17e3cf64c0ad8871f3ac2fb55b4550c9d874e` |
 | `configs/p12_wave2_wikimedia_hunk_churchill_v1.yaml`         | `c66ed9db8fe0d796adf29910a9b31f0d44e7d05eafa46409a73fce1976f4d79b` |
 | `configs/p12_wave2_wikimedia_hunk_jefferson_request_v1.json` | `f1be025103013e1d2093c166222fb6b0db16c487496785e342171ea4f1f2c77f` |

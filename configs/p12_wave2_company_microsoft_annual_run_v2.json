@@ -1,0 +1,48 @@
+{
+  "schema_version": "longworld-local-probe-run-request-v1",
+  "probe_id": "p12-wave2-company-microsoft-annual-v2",
+  "data_product": "worldlong_p12_wave2_company_microsoft_annual_v2",
+  "release_profile_id": "p12-sec-source-slice-1-v1",
+  "config": "configs/p12_wave2_company_microsoft_annual_v2.yaml",
+  "source_bundle": {
+    "path": "data/source_inventory/p12_wave1_company_microsoft_gcs_history_v1/source_workflow_bundle.p12.wave2.annual.signed.json",
+    "adapter_revision": "sourceworkflow@2",
+    "sha256": "3f14283fc27f4c7e67109110ef4aa750bca294499a2233e343ed9e463a45e7e7",
+    "binding_digest": "7aba666cbdaf885cf210ff94b4bf4bb89c65bfc9dd105826b3f4516440608fb5"
+  },
+  "source_relation": {
+    "id": "sec:0000950170-24-087843:prior_annual:sec:0000950170-23-035122",
+    "kind": "prior_annual_filing",
+    "cik": "0000789019",
+    "form": "10-K",
+    "prior_report_date": "2023-06-30",
+    "current_report_date": "2024-06-30"
+  },
+  "expected_answer_facts": {
+    "prior_total_revenue": 211915000000,
+    "current_total_revenue": 245122000000,
+    "current_minus_prior": 33207000000
+  },
+  "exact_tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb"
+  },
+  "dense_ranker": {
+    "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "implementation": "sentence-transformers-6.0.0",
+    "similarity": "dot_product",
+    "top_k": 3
+  },
+  "execution_pins": {
+    "public_policy_sha256": "a48982fe9dfedb6737943ca16d7f7296a82e7d135ab77d220a690f0760cbab7b",
+    "gh_binary_sha256": "2fd925d68889746976958342fb749bf102bc7dc8bcba3abfa533a80ad7791673"
+  },
+  "declared_exact_buckets": ["16k"],
+  "required_profile_buckets": ["16k", "32k", "64k", "128k"],
+  "qualification_policy": "zero qualified unless the immutable P12 profile passes without lowering any gate",
+  "trust_scope": "local_probe",
+  "production_eligible": false,
+  "fixture_counted_as_source": false
+}

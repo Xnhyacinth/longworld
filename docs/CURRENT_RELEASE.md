@@ -366,6 +366,16 @@ require exact 16K/32K/64K coverage for every world at selection, train-ready
 reporting, and final quality-gate layers. The source-free diagnostic record is
 `reports/p12_wave2_rejected_source_scaleout_v1.md`.
 
+Current code supersedes that 32K diagnostic with a canonical nested annual
+program: two, three, four, and five filings map to 16K, 32K, 64K, and 128K,
+respectively, and each higher tier consumes one additional exact XBRL revenue,
+one grounded adjacent-filing relation, and the preceding answer. The available
+two-filing Microsoft inventory now emits six unique 16K candidates at 16,339 or
+16,344 exact Qwen tokens. Structural preflight rejects them before dense ranking
+because 32K/64K/128K are absent. Thus the rerun saves replay work but still adds
+zero qualified rows; three, four, and five real annual filings are required for
+the higher tiers.
+
 Candidate-only ResearchLab and failed/superseded or stale CodeForge rows are not a new
 `COMMITTED` production package and are not eligible for HF upload. The
 current per-world content-gated baseline is **35 rows, 5 unique worlds, and
