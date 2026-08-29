@@ -1,0 +1,31 @@
+{
+  "schema_version": "longworld.ietf-fetch-request.v1",
+  "user_agent": "LongWorld/0.2 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "p12-wave3-ietf-rfc9421-v1",
+    "scope": "public IETF Datatracker, Internet-Draft archive, and RFC Editor records for RFC 9421",
+    "basis": "IETF open-records research export for source-bound long-context workflow development",
+    "reviewed_at": "2026-08-29T00:00:00Z",
+    "allowed_actions": [
+      "fetch_datatracker_document",
+      "fetch_datatracker_relation",
+      "fetch_draft_revision",
+      "fetch_rfc"
+    ]
+  },
+  "drafts": [
+    {
+      "name": "draft-ietf-httpbis-message-signatures",
+      "revisions": ["17", "18", "19"]
+    }
+  ],
+  "rfc_numbers": [9421],
+  "approved_public_test_vector_sha256": [
+    "3180837c4b9ed08b8aed33d355084dc06ecf22824794b80ed960bc7928fb42c8",
+    "59ed770b277c7fa5d279c810e6e291624bab2a02ae2971cfd891910e6073e5a7",
+    "b9dc1ca2914a28d0091739e6e0d2c68edc1f6d177381ff6fd81a00de2ec093b8",
+    "e1ef2c538192db34cc2d40546f555c8510bc4e808d9c0fccaf14a5089edee5cc"
+  ],
+  "requests_per_second": 1.0,
+  "max_retries": 2
+}
