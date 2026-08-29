@@ -33,11 +33,13 @@ from longworld.core.issuerfilingworkflow import (
     ISSUER_IR_SOURCE_KIND,
 )
 from longworld.core.provenance import ProvenanceError
+from longworld.core.standardsworkflow import IETF_WORKFLOW_MANIFEST_SCHEMA
 from longworld.core.taxonomy import SourceOrigin
 
 SEC_SOURCE_KIND = "sec_filing"
 PAPER_SOURCE_KIND = "paper_workflow"
 WIKIMEDIA_SOURCE_KIND = "wikimedia"
+STANDARDS_SOURCE_KIND = "ietf_standards"
 SOURCE_WORKFLOW_ADAPTER_REVISION_V1 = "sourceworkflow@1"
 SOURCE_WORKFLOW_ADAPTER_REVISION_V2 = "sourceworkflow@2"
 SOURCE_WORKFLOW_ADAPTER_REVISIONS = frozenset(
@@ -51,12 +53,14 @@ _SOURCE_KIND_SCHEMAS = {
     ),
     WIKIMEDIA_SOURCE_KIND: frozenset({WIKIPEDIA_WORKFLOW_MANIFEST_SCHEMA}),
     ISSUER_IR_SOURCE_KIND: frozenset({ISSUER_IR_FILING_MANIFEST_SCHEMA}),
+    STANDARDS_SOURCE_KIND: frozenset({IETF_WORKFLOW_MANIFEST_SCHEMA}),
 }
 _SOURCE_KIND_DOMAINS = {
     SEC_SOURCE_KIND: "company",
     PAPER_SOURCE_KIND: "researchlab",
     WIKIMEDIA_SOURCE_KIND: "researchlab",
     ISSUER_IR_SOURCE_KIND: "company",
+    STANDARDS_SOURCE_KIND: "standards",
 }
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _PUBLIC_STATUS = {
@@ -64,6 +68,7 @@ _PUBLIC_STATUS = {
     PAPER_SOURCE_KIND: "public_api_export",
     WIKIMEDIA_SOURCE_KIND: "public_api_export",
     ISSUER_IR_SOURCE_KIND: "issuer_owned_ir_download",
+    STANDARDS_SOURCE_KIND: "public_api_export",
 }
 _PAPER_RELATION_ROLES = {
     "revision_of": ("manuscript_revision", "manuscript_revision"),
@@ -612,6 +617,10 @@ def _normalize_components(
             raise ProvenanceError("source relation references an unknown record")
         adjacency[relation.source_record_id].add(relation.target_record_id)
         adjacency[relation.target_record_id].add(relation.source_record_id)
+        for evidence in relation.evidence:
+            if evidence.record_id in records_by_id:
+                adjacency[relation.source_record_id].add(evidence.record_id)
+                adjacency[evidence.record_id].add(relation.source_record_id)
     disconnected = sorted(
         record_id for record_id, edges in adjacency.items() if not edges
     )
@@ -944,6 +953,151 @@ def adapt_wikimedia_manifest(
     )
 
 
+def adapt_standards_manifest(
+    manifest: Mapping[str, Any], *, signed_bundle_authorized: bool = False
+) -> tuple[SourceWorkflow, ...]:
+    """Normalize a verified IETF revision/publication graph for standalone replay."""
+    _check_schema(
+        manifest,
+        source_kind=STANDARDS_SOURCE_KIND,
+        expected_schemas=_SOURCE_KIND_SCHEMAS[STANDARDS_SOURCE_KIND],
+    )
+    origin = _inventory_origin(
+        manifest,
+        source_kind=STANDARDS_SOURCE_KIND,
+        signed_bundle_authorized=signed_bundle_authorized,
+    )
+    raw_primary = _objects(manifest.get("records"), "IETF records")
+    raw_supporting = _objects(
+        manifest.get("supporting_records"), "IETF supporting records"
+    )
+    raw_relations = _objects(manifest.get("relations"), "IETF relations")
+    if (
+        manifest.get("n") != len(raw_primary)
+        or manifest.get("n_supporting_records") != len(raw_supporting)
+        or manifest.get("n_relations") != len(raw_relations)
+    ):
+        raise ProvenanceError("IETF source inventory count is invalid")
+    referenced_evidence_ids = {
+        str(item.get("record_id") or "")
+        for relation in raw_relations
+        for item in _objects(relation.get("evidence"), "IETF relation evidence")
+    }
+    selected_raw_records = [
+        *raw_primary,
+        *(
+            record
+            for record in raw_supporting
+            if str(record.get("record_id") or "") in referenced_evidence_ids
+        ),
+    ]
+    records: list[SourceRecord] = []
+    for raw in selected_raw_records:
+        transformed = dict(raw)
+        grounded_facts = [
+            {
+                **dict(fact),
+                "evidence_char_start": fact.get("char_start"),
+                "text_sha256": raw.get("text_sha256"),
+            }
+            for fact in _objects(raw.get("facts"), "IETF facts")
+            if str(fact.get("value") or "") in str(fact.get("evidence_quote") or "")
+        ]
+        if grounded_facts:
+            transformed["derived_facts"] = grounded_facts
+        else:
+            transformed.pop("derived_facts", None)
+        records.append(
+            _record(
+                transformed,
+                kind=str(raw.get("kind") or ""),
+                occurred_at=str(raw.get("occurred_at") or ""),
+                source_family="ietf_standards",
+                source_origin=origin,
+                identity_fields=(
+                    "draft_name",
+                    "revision",
+                    "rfc_number",
+                    "draft_references",
+                ),
+                require_facts=str(raw.get("kind") or "") in {"draft_revision", "rfc"},
+            )
+        )
+    records_by_id = {record.record_id: record for record in records}
+    relations: list[SourceRelation] = []
+    allowed_kinds = {"revision_of", "published_as", "updates", "obsoletes"}
+    for raw in raw_relations:
+        relation_id = str(raw.get("relation_id") or "")
+        kind = str(raw.get("kind") or "")
+        source_id = str(raw.get("source_record_id") or "")
+        target_id = str(raw.get("target_record_id") or "")
+        if (
+            not relation_id
+            or kind not in allowed_kinds
+            or source_id == target_id
+            or source_id not in records_by_id
+            or target_id not in records_by_id
+        ):
+            raise ProvenanceError("IETF source relation identity is invalid")
+        evidence: list[SourceEvidence] = []
+        for item in _objects(raw.get("evidence"), "IETF relation evidence"):
+            record_id = str(item.get("record_id") or "")
+            record = records_by_id.get(record_id)
+            quote = str(item.get("evidence_quote") or "")
+            start, end = item.get("char_start"), item.get("char_end")
+            fact_ids = item.get("fact_ids")
+            if (
+                record is None
+                or not quote
+                or not isinstance(start, int)
+                or not isinstance(end, int)
+                or end != start + len(quote)
+                or record.text[start:end] != quote
+                or item.get("source_sha256") != record.source_sha256
+                or not isinstance(fact_ids, list)
+                or not fact_ids
+                or any(not isinstance(fact_id, str) for fact_id in fact_ids)
+            ):
+                raise ProvenanceError("IETF source relation evidence is invalid")
+            evidence.append(
+                SourceEvidence(
+                    record_id=record_id,
+                    evidence_quote=quote,
+                    char_start=start,
+                    char_end=end,
+                    source_sha256=record.source_sha256,
+                    fact_ids=tuple(fact_ids),
+                )
+            )
+        if not {source_id, target_id}.issubset({item.record_id for item in evidence}):
+            raise ProvenanceError("IETF source relation lacks endpoint evidence")
+        source_kind = records_by_id[source_id].kind
+        target_kind = records_by_id[target_id].kind
+        expected_kinds = {
+            "revision_of": ("draft_revision", "draft_revision"),
+            "published_as": ("draft_revision", "rfc"),
+            "updates": ("rfc", "rfc"),
+            "obsoletes": ("rfc", "rfc"),
+        }[kind]
+        if (source_kind, target_kind) != expected_kinds:
+            raise ProvenanceError("IETF source relation endpoint roles are invalid")
+        relations.append(
+            SourceRelation(
+                relation_id=relation_id,
+                kind=kind,
+                source_record_id=source_id,
+                target_record_id=target_id,
+                evidence=tuple(evidence),
+            )
+        )
+    return _normalize_components(
+        source_kind=STANDARDS_SOURCE_KIND,
+        source_origin=origin,
+        records=records,
+        relations=relations,
+    )
+
+
 def adapt_source_manifest(
     manifest: Mapping[str, Any],
     *,
@@ -968,6 +1122,10 @@ def adapt_source_manifest(
         )
     if source_kind == ISSUER_IR_SOURCE_KIND:
         return adapt_issuer_ir_manifest(
+            manifest, signed_bundle_authorized=signed_bundle_authorized
+        )
+    if source_kind == STANDARDS_SOURCE_KIND:
+        return adapt_standards_manifest(
             manifest, signed_bundle_authorized=signed_bundle_authorized
         )
     return adapt_wikimedia_manifest(

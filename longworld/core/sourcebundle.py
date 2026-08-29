@@ -58,9 +58,15 @@ from longworld.core.sourceworkflow import (
     SOURCE_WORKFLOW_ADAPTER_REVISION_V1,
     SOURCE_WORKFLOW_ADAPTER_REVISION_V2,
     SOURCE_WORKFLOW_ADAPTER_REVISIONS,
+    STANDARDS_SOURCE_KIND,
     WIKIMEDIA_SOURCE_KIND,
     SourceWorkflow,
     adapt_source_manifest,
+)
+from longworld.core.standardsworkflow import (
+    IETF_WORKFLOW_MANIFEST_SCHEMA,
+    MAX_IETF_MANIFEST_BYTES,
+    audit_ietf_workflow_manifest,
 )
 
 SOURCE_WORKFLOW_BUNDLE_SCHEMA = "longworld.source-workflow-bundle.v1"
@@ -101,6 +107,11 @@ _KIND_CONTRACTS = {
         "company",
         frozenset({ISSUER_IR_FILING_MANIFEST_SCHEMA}),
         MAX_ISSUER_IR_MANIFEST_BYTES,
+    ),
+    STANDARDS_SOURCE_KIND: (
+        "standards",
+        frozenset({IETF_WORKFLOW_MANIFEST_SCHEMA}),
+        MAX_IETF_MANIFEST_BYTES,
     ),
 }
 
@@ -278,6 +289,8 @@ def _verified_manifest_payload(
         )
     elif entry.kind == ISSUER_IR_SOURCE_KIND:
         _audit_issuer_ir_filing_manifest(payload)
+    elif entry.kind == STANDARDS_SOURCE_KIND:
+        audit_ietf_workflow_manifest(payload)
     else:
         _verify_document_manifest(payload, kind=entry.kind)
     return payload

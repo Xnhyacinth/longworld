@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import subprocess
+import sys
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -13,7 +17,10 @@ from longworld.core.standardsworkflow import (
     IETF_WORKFLOW_MANIFEST_SCHEMA,
     _clean,
     _validate_rfc_target_closure,
+    audit_ietf_normative_change_task,
+    build_ietf_normative_change_task,
     build_ietf_workflow_from_fetch_inventory,
+    replay_ietf_normative_change_task,
 )
 from scripts.export_ietf_workflow import export_ietf_workflow
 
@@ -85,11 +92,13 @@ def _inventory(tmp_path: Path) -> tuple[dict[str, object], Path]:
             },
             sort_keys=True,
         ).encode(),
-        "draft00": b"Internet-Draft draft-ietf-demo-00\n1 January 2024\nContact: editor@example.org\n",
+        "draft00": (
+            b"Internet-Draft draft-ietf-demo-00\n1 January 2024\n"
+            b"Endpoints SHOULD reject stale tokens.\nContact: editor@example.org\n"
+        ),
         "draft01": (
             b"Internet-Draft draft-ietf-demo-01\n2 February 2024\n"
-            + private_key_block
-            + b"\n"
+            b"Endpoints MUST reject stale tokens.\n" + private_key_block + b"\n"
         ),
         "rfc7777": b"RFC 7777\nHistoric baseline.\nJanuary 2020\n",
         "rfc8888": b"RFC 8888\nEarlier standard.\nJanuary 2021\n",
@@ -391,6 +400,204 @@ def test_rejects_relation_without_both_endpoint_evidence(tmp_path: Path) -> None
             generated_at="2026-08-29T02:00:00Z",
             fetch_inventory_sha256="c" * 64,
         )
+
+
+def test_normative_change_task_replays_source_relations_cf_and_negative_gates(
+    tmp_path: Path,
+) -> None:
+    inventory, _path = _inventory(tmp_path)
+    manifest = build_ietf_workflow_from_fetch_inventory(
+        inventory,
+        tmp_path,
+        generated_at="2026-08-29T02:00:00Z",
+        fetch_inventory_sha256="a" * 64,
+    )
+    task = build_ietf_normative_change_task(manifest)
+
+    assert task["query_type"] == "normative_change_introducer"
+    assert task["answer_program_id"] == "ietf.normative_change_introducer.v1"
+    assert replay_ietf_normative_change_task(task) == task["answer"]
+    assert task["answer"] == (
+        "draft-ietf-demo-01 | RFC 9999 | SHOULD -> MUST | "
+        "Endpoints MUST reject stale tokens."
+    )
+    essentials = task["essential_evidence_ids"]
+    assert len(essentials) == 4
+    assert all(
+        replay_ietf_normative_change_task(task, evidence_ids=[evidence_id]) == "unknown"
+        for evidence_id in essentials
+    )
+    assert all(
+        replay_ietf_normative_change_task(
+            task,
+            evidence_ids=[item for item in essentials if item != removed],
+        )
+        == "unknown"
+        for removed in essentials
+    )
+    assert all(
+        task["answer"] not in item["surface_text"]
+        for item in task["evidence_items"]
+        if item["evidence_id"] in essentials
+    )
+
+    assert (
+        replay_ietf_normative_change_task(task, counterfactual=True)
+        == task["cf_answer"]
+    )
+    assert task["cf_answer"] != task["answer"]
+    assert audit_ietf_normative_change_task(task) == {
+        "strict_replay_sufficient": True,
+        "counterfactual_replay_sufficient": True,
+        "counterfactual_changes_answer": True,
+        "remove_one_fails": True,
+        "essential_single_doc_insufficient": True,
+        "essential_surface_gold_free": True,
+        "essential_text_grounded": True,
+    }
+
+    corrupted = deepcopy(task)
+    latest = next(
+        item
+        for item in corrupted["source_records"]
+        if item["record_id"] == "ietf:draft:draft-ietf-demo-01"
+    )
+    latest["text"] = latest["text"].replace("MUST", "MAY", 1)
+    latest["text_sha256"] = hashlib.sha256(latest["text"].encode()).hexdigest()
+    corrupted["source_bindings"][latest["record_id"]] = latest["text_sha256"]
+    with pytest.raises(ProvenanceError, match="byte binding"):
+        replay_ietf_normative_change_task(corrupted)
+
+    keyword_tamper = deepcopy(task)
+    normative_after = next(
+        item
+        for item in keyword_tamper["evidence_items"]
+        if item["kind"] == "normative_after"
+    )
+    normative_after["keyword"] = "MAY"
+    with pytest.raises(ProvenanceError, match="normative keyword"):
+        replay_ietf_normative_change_task(keyword_tamper)
+
+    prefixed_cf = deepcopy(task)
+    twin = prefixed_cf["counterfactual_twin"]
+    twin["text"] = "X" + twin["text"]
+    twin["text_sha256"] = hashlib.sha256(twin["text"].encode()).hexdigest()
+    twin["char_start"] += 1
+    twin["char_end"] += 1
+    twin["keyword_char_start"] += 1
+    twin["keyword_char_end"] += 1
+    with pytest.raises(ProvenanceError, match="counterfactual replacement"):
+        replay_ietf_normative_change_task(prefixed_cf, counterfactual=True)
+
+
+def test_direct_task_builder_audits_receipt_lineage(tmp_path: Path) -> None:
+    inventory, _path = _inventory(tmp_path)
+    manifest = build_ietf_workflow_from_fetch_inventory(
+        inventory,
+        tmp_path,
+        generated_at="2026-08-29T02:00:00Z",
+        fetch_inventory_sha256="a" * 64,
+    )
+
+    wrong_url = deepcopy(manifest)
+    draft = next(
+        item for item in wrong_url["records"] if item["kind"] == "draft_revision"
+    )
+    draft["retrieval_url"] = f"{draft['retrieval_url']}?unbound=1"
+    with pytest.raises(ProvenanceError, match="receipt lineage"):
+        build_ietf_normative_change_task(wrong_url)
+
+    wrong_observation = deepcopy(manifest)
+    relation_record = next(
+        item
+        for item in wrong_observation["supporting_records"]
+        if item["kind"] == "datatracker_relation"
+    )
+    relation_record["occurred_at"] = "2026-08-29T00:30:00Z"
+    with pytest.raises(ProvenanceError, match="receipt lineage"):
+        build_ietf_normative_change_task(wrong_observation)
+
+    coordinated_url_tamper = deepcopy(manifest)
+    rfc = next(
+        item for item in coordinated_url_tamper["records"] if item["kind"] == "rfc"
+    )
+    prior_url = rfc["source_url"]
+    forged_url = "https://evil.example/fabricated.txt"
+    rfc["source_url"] = forged_url
+    rfc["retrieval_url"] = forged_url
+    retrieval = next(
+        item
+        for item in coordinated_url_tamper["fetch_receipt"]["retrievals"]
+        if item["kind"] == "rfc" and item["requested_url"] == prior_url
+    )
+    retrieval["requested_url"] = forged_url
+    retrieval["final_url"] = forged_url
+    with pytest.raises(ProvenanceError, match="retrieval URL or transport"):
+        build_ietf_normative_change_task(coordinated_url_tamper)
+
+
+def test_attested_standards_manifest_bundle_materializes_executable_task(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from longworld.core.attestation import (
+        ATTESTATION_ENVIRONMENT_ENV,
+        ROLE_KEY_ENVS,
+        ROLE_KEY_ID_ENVS,
+        attach_attestation,
+    )
+    from longworld.core.sourceworkflow import STANDARDS_SOURCE_KIND
+    from longworld.core.standardsworkflow import materialize_ietf_normative_change_task
+    from scripts.build_source_workflow_bundle import build_source_workflow_bundle
+
+    key = b"standards-source-bundle-test-key-material"
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(ROLE_KEY_ENVS["source"], key.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["source"], "probe-standards-source-v1")
+    inventory, _path = _inventory(tmp_path)
+    manifest = build_ietf_workflow_from_fetch_inventory(
+        inventory,
+        tmp_path,
+        generated_at="2026-08-29T02:00:00Z",
+        fetch_inventory_sha256="a" * 64,
+    )
+    manifest_path = tmp_path / "ietf-source-manifest.json"
+    manifest_path.write_text(
+        json.dumps(attach_attestation(manifest, key, purpose="source_manifest")),
+        encoding="utf-8",
+    )
+
+    loaded = build_source_workflow_bundle(
+        [(STANDARDS_SOURCE_KIND, manifest_path)],
+        tmp_path / "source-workflow-bundle.json",
+        attestation_key=key,
+    )
+    assert len(loaded.workflows) == 1
+    workflow = loaded.workflows[0]
+    assert workflow.source_kind == STANDARDS_SOURCE_KIND
+    assert workflow.target_domain == "standards"
+    task = materialize_ietf_normative_change_task(workflow)
+    assert replay_ietf_normative_change_task(task) == task["answer"]
+    assert audit_ietf_normative_change_task(task)["counterfactual_replay_sufficient"]
+
+
+def test_core_sourceworkflow_import_does_not_require_repo_scripts_package(
+    tmp_path: Path,
+) -> None:
+    environment = dict(os.environ)
+    environment.pop("PYTHONPATH", None)
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import longworld.core.sourceworkflow; import longworld.core.promotion",
+        ],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_export_signs_only_valid_disabled_manifest(tmp_path: Path) -> None:

@@ -39,6 +39,11 @@ from longworld.core.sourcebundle import (
     LoadedSourceWorkflowBundle,
     load_source_workflow_bundle,
 )
+from longworld.core.sourceworkflow import STANDARDS_SOURCE_KIND
+from longworld.core.standardsworkflow import (
+    IETF_WORKFLOW_MANIFEST_SCHEMA,
+    MAX_IETF_MANIFEST_BYTES,
+)
 
 _CONTRACTS = {
     "paper_workflow": (
@@ -56,6 +61,11 @@ _CONTRACTS = {
         "company",
         {ISSUER_IR_FILING_MANIFEST_SCHEMA},
         MAX_ISSUER_IR_MANIFEST_BYTES,
+    ),
+    STANDARDS_SOURCE_KIND: (
+        "standards",
+        {IETF_WORKFLOW_MANIFEST_SCHEMA},
+        MAX_IETF_MANIFEST_BYTES,
     ),
 }
 
@@ -146,6 +156,7 @@ def main() -> None:
     parser.add_argument("--sec-manifest", action="append", type=Path, default=[])
     parser.add_argument("--wikimedia-manifest", action="append", type=Path, default=[])
     parser.add_argument("--issuer-ir-manifest", action="append", type=Path, default=[])
+    parser.add_argument("--standards-manifest", action="append", type=Path, default=[])
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument(
         "--adapter-revision",
@@ -161,6 +172,7 @@ def main() -> None:
         *(("sec_filing", path) for path in args.sec_manifest),
         *(("wikimedia", path) for path in args.wikimedia_manifest),
         *((ISSUER_IR_SOURCE_KIND, path) for path in args.issuer_ir_manifest),
+        *((STANDARDS_SOURCE_KIND, path) for path in args.standards_manifest),
     ]
     build_source_workflow_bundle(
         manifests, args.out, adapter_revision=args.adapter_revision

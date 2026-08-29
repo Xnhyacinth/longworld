@@ -9,12 +9,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Callable
 from datetime import datetime, timezone
-from importlib import import_module
 from itertools import pairwise
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from longworld.core.provenance import (
@@ -23,16 +21,11 @@ from longworld.core.provenance import (
     _parse_timestamp,
     _read_regular_file,
 )
-
-_public_scanner = import_module("scripts.export_github_workflow")
-PUBLIC_SCANNER = cast(str, _public_scanner.PUBLIC_SCANNER)
-PUBLIC_SCANNER_REVISION = cast(str, _public_scanner.PUBLIC_SCANNER_REVISION)
-sanitize_public_text = cast(
-    Callable[[str], tuple[str, list[str]]], _public_scanner.sanitize_public_text
-)
-validate_sanitized_public_payload = cast(
-    Callable[[dict[str, Any]], None],
-    _public_scanner.validate_sanitized_public_payload,
+from longworld.core.publicscan import (
+    PUBLIC_SCANNER,
+    PUBLIC_SCANNER_REVISION,
+    sanitize_public_text,
+    validate_sanitized_public_payload,
 )
 
 IETF_FETCH_INVENTORY_SCHEMA = "longworld.ietf-fetch-inventory.v1"
@@ -384,7 +377,7 @@ def _validate_bound_request(value: object) -> dict[str, Any]:
     return value
 
 
-def _validate_retrieval(item: object, base: Path) -> tuple[dict[str, Any], bytes]:
+def _validate_retrieval_metadata(item: object) -> dict[str, Any]:
     fields = {
         "kind",
         "requested_url",
@@ -450,8 +443,13 @@ def _validate_retrieval(item: object, base: Path) -> tuple[dict[str, Any], bytes
     ):
         raise ProvenanceError("IETF retrieval URL or transport metadata is invalid")
     _parse_timestamp(str(item.get("observed_at") or ""), "IETF retrieval observed_at")
-    return dict(item), _regular_bytes(
-        base, item.get("retrieval_file"), item.get("sha256")
+    return dict(item)
+
+
+def _validate_retrieval(item: object, base: Path) -> tuple[dict[str, Any], bytes]:
+    validated = _validate_retrieval_metadata(item)
+    return validated, _regular_bytes(
+        base, validated.get("retrieval_file"), validated.get("sha256")
     )
 
 
@@ -910,3 +908,808 @@ def build_ietf_workflow_from_fetch_inventory(
     if len(json.dumps(manifest, ensure_ascii=False).encode()) > MAX_IETF_MANIFEST_BYTES:
         raise ProvenanceError("IETF workflow manifest exceeds size limit")
     return manifest
+
+
+IETF_NORMATIVE_TASK_SCHEMA = "longworld.ietf-normative-change-task.v1"
+_NORMATIVE_LINE = re.compile(
+    r"(?m)^(?P<prefix>[^\r\n]{1,240}?)(?P<keyword>MUST NOT|SHOULD NOT|MUST|SHOULD|MAY)"
+    r"(?P<suffix>[^\r\n]{1,400})$"
+)
+_NORMATIVE_KEYWORD = re.compile(
+    r"(?<![A-Z])(?:MUST NOT|SHOULD NOT|MUST|SHOULD|MAY)(?![A-Z])"
+)
+
+
+def audit_ietf_workflow_manifest(manifest: dict[str, Any]) -> None:
+    """Fail closed on a signed-manifest payload before bundle adaptation."""
+    records = manifest.get("records")
+    supporting = manifest.get("supporting_records")
+    relations = manifest.get("relations")
+    if (
+        manifest.get("schema_version") != IETF_WORKFLOW_MANIFEST_SCHEMA
+        or manifest.get("source_status") != "public_api_export"
+        or manifest.get("data_stage") != "source_inventory"
+        or manifest.get("hybrid_train_ready") is not False
+        or manifest.get("production_eligible") is not False
+        or manifest.get("generation_integration") != "disabled"
+        or manifest.get("semantic_facts_train_ready") is not False
+        or not isinstance(records, list)
+        or not isinstance(supporting, list)
+        or not isinstance(relations, list)
+        or manifest.get("n") != len(records)
+        or manifest.get("n_supporting_records") != len(supporting)
+        or manifest.get("n_relations") != len(relations)
+    ):
+        raise ProvenanceError("IETF signed workflow manifest contract is invalid")
+    all_records = [*records, *supporting]
+    receipt = manifest.get("fetch_receipt")
+    retrievals = receipt.get("retrievals") if isinstance(receipt, dict) else None
+    if not isinstance(retrievals, list) or not retrievals:
+        raise ProvenanceError("IETF signed manifest receipt lineage is missing")
+    lineage: dict[tuple[str, str], dict[str, Any]] = {}
+    for retrieval in retrievals:
+        retrieval = _validate_retrieval_metadata(retrieval)
+        key = (
+            str(retrieval.get("kind") or ""),
+            str(retrieval.get("requested_url") or ""),
+        )
+        if (
+            not all(key)
+            or key in lineage
+            or retrieval.get("final_url") != key[1]
+            or _SHA256.fullmatch(str(retrieval.get("sha256") or "")) is None
+        ):
+            raise ProvenanceError("IETF signed manifest receipt lineage is invalid")
+        _parse_timestamp(
+            str(retrieval.get("observed_at") or ""),
+            "IETF signed receipt observed_at",
+        )
+        lineage[key] = retrieval
+    by_id: dict[str, dict[str, Any]] = {}
+    used_lineage: set[tuple[str, str]] = set()
+    for record in all_records:
+        if not isinstance(record, dict):
+            raise ProvenanceError("IETF signed workflow record is invalid")
+        record_id = str(record.get("record_id") or "")
+        text = record.get("text")
+        source_sha256 = str(record.get("source_sha256") or "")
+        text_sha256 = str(record.get("text_sha256") or "")
+        facts = record.get("facts")
+        lineage_key = (
+            str(record.get("kind") or ""),
+            str(record.get("source_url") or ""),
+        )
+        retrieval = lineage.get(lineage_key)
+        if (
+            not record_id
+            or record_id in by_id
+            or not isinstance(text, str)
+            or not text
+            or _SHA256.fullmatch(source_sha256) is None
+            or hashlib.sha256(text.encode()).hexdigest() != text_sha256
+            or record.get("provenance_id") != f"sha256:{source_sha256}"
+            or record.get("source_family") != "ietf_standards"
+            or record.get("source_origin") != "real_public"
+            or not isinstance(facts, list)
+            or not facts
+            or retrieval is None
+            or record.get("retrieval_url") != retrieval.get("final_url")
+            or source_sha256 != retrieval.get("sha256")
+        ):
+            raise ProvenanceError(
+                "IETF signed workflow record or receipt lineage binding is invalid"
+            )
+        occurred_at = _parse_timestamp(
+            str(record.get("occurred_at") or ""), "IETF signed record occurred_at"
+        )
+        observed_at = _parse_timestamp(
+            str(retrieval.get("observed_at") or ""),
+            "IETF signed receipt observed_at",
+        )
+        semantics = str(record.get("temporal_semantics") or "")
+        if (
+            semantics == "retrieval_observation_only" and occurred_at != observed_at
+        ) or (semantics == "source_event_time" and occurred_at > observed_at):
+            raise ProvenanceError(
+                "IETF signed manifest receipt lineage time is invalid"
+            )
+        if semantics not in {"retrieval_observation_only", "source_event_time"}:
+            raise ProvenanceError(
+                "IETF signed manifest receipt lineage time is invalid"
+            )
+        used_lineage.add(lineage_key)
+        fact_ids: set[str] = set()
+        for fact in facts:
+            if not isinstance(fact, dict):
+                raise ProvenanceError("IETF signed workflow fact is invalid")
+            fact_id = str(fact.get("fact_id") or "")
+            start, end = fact.get("char_start"), fact.get("char_end")
+            quote = fact.get("evidence_quote")
+            if (
+                not fact_id
+                or fact_id in fact_ids
+                or not isinstance(start, int)
+                or not isinstance(end, int)
+                or not isinstance(quote, str)
+                or start < 0
+                or end != start + len(quote)
+                or text[start:end] != quote
+                or not str(fact.get("value") or "")
+            ):
+                raise ProvenanceError("IETF signed workflow fact binding is invalid")
+            fact_ids.add(fact_id)
+        by_id[record_id] = record
+    if used_lineage != set(lineage):
+        raise ProvenanceError("IETF signed manifest receipt lineage is incomplete")
+    primary_ids = {str(record["record_id"]) for record in records}
+    adjacency: dict[str, set[str]] = {record_id: set() for record_id in primary_ids}
+    relation_ids: set[str] = set()
+    for relation in relations:
+        if not isinstance(relation, dict):
+            raise ProvenanceError("IETF signed workflow relation is invalid")
+        relation_id = str(relation.get("relation_id") or "")
+        kind = str(relation.get("kind") or "")
+        source_id = str(relation.get("source_record_id") or "")
+        target_id = str(relation.get("target_record_id") or "")
+        evidence = relation.get("evidence")
+        if (
+            not relation_id
+            or relation_id in relation_ids
+            or kind not in {"revision_of", "published_as", "updates", "obsoletes"}
+            or source_id == target_id
+            or source_id not in primary_ids
+            or target_id not in primary_ids
+            or not isinstance(evidence, list)
+            or not evidence
+        ):
+            raise ProvenanceError("IETF signed workflow relation contract is invalid")
+        evidence_ids: set[str] = set()
+        for item in evidence:
+            if not isinstance(item, dict):
+                raise ProvenanceError("IETF signed relation evidence is invalid")
+            record_id = str(item.get("record_id") or "")
+            record = by_id.get(record_id)
+            start, end = item.get("char_start"), item.get("char_end")
+            quote = item.get("evidence_quote")
+            if (
+                record is None
+                or item.get("source_sha256") != record.get("source_sha256")
+                or not isinstance(start, int)
+                or not isinstance(end, int)
+                or not isinstance(quote, str)
+                or start < 0
+                or end != start + len(quote)
+                or record["text"][start:end] != quote
+            ):
+                raise ProvenanceError(
+                    "IETF signed relation evidence binding is invalid"
+                )
+            evidence_ids.add(record_id)
+        if not {source_id, target_id}.issubset(evidence_ids):
+            raise ProvenanceError("IETF signed relation lacks endpoint evidence")
+        adjacency[source_id].add(target_id)
+        adjacency[target_id].add(source_id)
+        relation_ids.add(relation_id)
+    if len(primary_ids) > 1 and any(not edges for edges in adjacency.values()):
+        raise ProvenanceError("IETF signed workflow has a disconnected primary record")
+    try:
+        validate_sanitized_public_payload(manifest)
+    except ValueError as error:
+        raise ProvenanceError(
+            "IETF signed manifest failed the public scanner"
+        ) from error
+
+
+def _normative_lines(record: dict[str, Any]) -> list[dict[str, Any]]:
+    text = str(record.get("text") or "")
+    matches: list[dict[str, Any]] = []
+    for match in _NORMATIVE_LINE.finditer(text):
+        quote = match.group(0).strip()
+        start = text.index(quote, match.start(), match.end())
+        matches.append(
+            {
+                "quote": quote,
+                "keyword": match.group("keyword"),
+                "anchor": (
+                    " ".join(match.group("prefix").split()),
+                    " ".join(match.group("suffix").split()),
+                ),
+                "char_start": start,
+                "char_end": start + len(quote),
+            }
+        )
+    return matches
+
+
+def _normative_hunk(
+    prior: dict[str, Any], latest: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    changed = [
+        (before, after)
+        for before in _normative_lines(prior)
+        for after in _normative_lines(latest)
+        if before["anchor"] == after["anchor"] and before["keyword"] != after["keyword"]
+    ]
+    if len(changed) != 1:
+        raise ProvenanceError(
+            "IETF task requires one uniquely byte-bound normative revision hunk"
+        )
+    return changed[0]
+
+
+def _task_record_map(task: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    raw_records = task.get("source_records")
+    if not isinstance(raw_records, list) or not raw_records:
+        raise ProvenanceError("IETF task source records are missing")
+    records = {
+        str(record.get("record_id") or ""): record
+        for record in raw_records
+        if isinstance(record, dict)
+    }
+    bindings = task.get("source_bindings")
+    if (
+        len(records) != len(raw_records)
+        or not isinstance(bindings, dict)
+        or set(bindings) != set(records)
+    ):
+        raise ProvenanceError("IETF task source bindings are invalid")
+    for record_id, record in records.items():
+        text = record.get("text")
+        digest = hashlib.sha256(str(text).encode()).hexdigest()
+        if (
+            not isinstance(text, str)
+            or not text
+            or record.get("text_sha256") != digest
+            or bindings.get(record_id) != digest
+        ):
+            raise ProvenanceError("IETF task source byte binding is invalid")
+    return records
+
+
+def _task_span(
+    item: dict[str, Any], records: dict[str, dict[str, Any]]
+) -> tuple[str, str]:
+    record_id = str(item.get("record_id") or "")
+    record = records.get(record_id)
+    start, end = item.get("char_start"), item.get("char_end")
+    quote = item.get("evidence_quote")
+    if (
+        record is None
+        or not isinstance(start, int)
+        or not isinstance(end, int)
+        or not isinstance(quote, str)
+        or start < 0
+        or end != start + len(quote)
+        or record["text"][start:end] != quote
+    ):
+        raise ProvenanceError("IETF task evidence byte binding is invalid")
+    keyword_matches = list(_NORMATIVE_KEYWORD.finditer(quote))
+    declared_keyword = str(item.get("keyword") or "")
+    if len(keyword_matches) != 1 or declared_keyword != keyword_matches[0].group(0):
+        raise ProvenanceError("IETF task normative keyword binding is invalid")
+    return quote, declared_keyword
+
+
+def _task_relation_valid(
+    relation: dict[str, Any], records: dict[str, dict[str, Any]]
+) -> bool:
+    source_id = str(relation.get("source_record_id") or "")
+    target_id = str(relation.get("target_record_id") or "")
+    evidence = relation.get("evidence")
+    if (
+        source_id not in records
+        or target_id not in records
+        or not isinstance(evidence, list)
+        or not evidence
+    ):
+        return False
+    evidence_record_ids: set[str] = set()
+    for item in evidence:
+        if not isinstance(item, dict):
+            return False
+        record_id = str(item.get("record_id") or "")
+        record = records.get(record_id)
+        start, end = item.get("char_start"), item.get("char_end")
+        quote = item.get("evidence_quote")
+        if (
+            record is None
+            or item.get("source_sha256") != record.get("source_sha256")
+            or not isinstance(start, int)
+            or not isinstance(end, int)
+            or not isinstance(quote, str)
+            or start < 0
+            or end != start + len(quote)
+            or record["text"][start:end] != quote
+        ):
+            return False
+        evidence_record_ids.add(record_id)
+    return {source_id, target_id}.issubset(evidence_record_ids)
+
+
+def _task_fact_value(record: dict[str, Any], fact_id: str) -> str:
+    facts = record.get("facts")
+    if not isinstance(facts, list):
+        raise ProvenanceError("IETF task endpoint facts are missing")
+    matches = [
+        fact
+        for fact in facts
+        if isinstance(fact, dict) and fact.get("fact_id") == fact_id
+    ]
+    if len(matches) != 1:
+        raise ProvenanceError("IETF task endpoint fact is not unique")
+    fact = matches[0]
+    start, end = fact.get("char_start"), fact.get("char_end")
+    quote = fact.get("evidence_quote")
+    value = str(fact.get("value") or "")
+    if (
+        not value
+        or not isinstance(start, int)
+        or not isinstance(end, int)
+        or not isinstance(quote, str)
+        or record["text"][start:end] != quote
+        or value not in quote
+    ):
+        raise ProvenanceError("IETF task endpoint fact byte binding is invalid")
+    return value
+
+
+def _normative_answer(
+    *,
+    prior_record_id: str,
+    latest_record_id: str,
+    revision_source_id: str,
+    revision_target_id: str,
+    publication_source_id: str,
+    draft_identity: str,
+    rfc_number: str,
+    before_keyword: str,
+    after_keyword: str,
+    after_quote: str,
+) -> str:
+    if (
+        not draft_identity
+        or not rfc_number
+        or revision_source_id != latest_record_id
+        or revision_target_id != prior_record_id
+        or publication_source_id != latest_record_id
+        or not all((before_keyword, after_keyword, after_quote))
+    ):
+        return "unknown"
+    return (
+        f"{draft_identity} | RFC {rfc_number} | "
+        f"{before_keyword} -> {after_keyword} | {after_quote}"
+    )
+
+
+def replay_ietf_normative_change_task(
+    task: dict[str, Any],
+    *,
+    evidence_ids: list[str] | None = None,
+    counterfactual: bool = False,
+) -> str:
+    """Strictly replay one task from byte-bound spans and two source relations."""
+    if (
+        task.get("schema_version") != IETF_NORMATIVE_TASK_SCHEMA
+        or task.get("data_stage") != "candidate_task"
+        or task.get("train_ready") is not False
+    ):
+        raise ProvenanceError("IETF normative task contract is invalid")
+    records = _task_record_map(task)
+    raw_items = task.get("evidence_items")
+    if not isinstance(raw_items, list):
+        raise ProvenanceError("IETF task evidence items are invalid")
+    items = {
+        str(item.get("evidence_id") or ""): item
+        for item in raw_items
+        if isinstance(item, dict)
+    }
+    essentials = task.get("essential_evidence_ids")
+    if (
+        not isinstance(essentials, list)
+        or any(not isinstance(item, str) for item in essentials)
+        or len(items) != len(raw_items)
+        or set(essentials) != set(items)
+    ):
+        raise ProvenanceError("IETF task essential evidence contract is invalid")
+    selected = set(essentials if evidence_ids is None else evidence_ids)
+    if not selected.issubset(items):
+        raise ProvenanceError("IETF task evidence selection is invalid")
+
+    before_keyword = ""
+    after_keyword = ""
+    after_quote = ""
+    prior_record_id = ""
+    latest_record_id = ""
+    revision_source_id = ""
+    revision_target_id = ""
+    publication_source_id = ""
+    draft_identity = ""
+    rfc_number = ""
+    for evidence_id in selected:
+        item = items[evidence_id]
+        kind = item.get("kind")
+        if kind == "normative_before":
+            _quote, before_keyword = _task_span(item, records)
+            prior_record_id = str(item["record_id"])
+        elif kind == "normative_after":
+            after_quote, after_keyword = _task_span(item, records)
+            latest_record_id = str(item["record_id"])
+        elif kind in {"revision_of", "published_as"}:
+            relation = item.get("relation")
+            if (
+                not isinstance(relation, dict)
+                or relation.get("kind") != kind
+                or not _task_relation_valid(relation, records)
+            ):
+                raise ProvenanceError("IETF task relation byte binding is invalid")
+            if kind == "revision_of":
+                revision_source_id = str(relation["source_record_id"])
+                revision_target_id = str(relation["target_record_id"])
+            else:
+                publication_source_id = str(relation["source_record_id"])
+                latest_record_id = str(relation["source_record_id"])
+                rfc_record_id = str(relation["target_record_id"])
+                draft_identity = _task_fact_value(
+                    records[latest_record_id], "draft_revision"
+                )
+                rfc_number = _task_fact_value(records[rfc_record_id], "rfc_number")
+        else:
+            raise ProvenanceError("IETF task evidence kind is invalid")
+
+    if counterfactual and items:
+        twin = task.get("counterfactual_twin")
+        if not isinstance(twin, dict):
+            raise ProvenanceError("IETF counterfactual twin is missing")
+        after_items = [
+            item for item in items.values() if item.get("kind") == "normative_after"
+        ]
+        if len(after_items) != 1:
+            raise ProvenanceError("IETF counterfactual normative parent is invalid")
+        after_item = after_items[0]
+        parent_quote, parent_keyword = _task_span(after_item, records)
+        parent_record_id = str(after_item.get("record_id") or "")
+        latest = records.get(parent_record_id)
+        text = twin.get("text")
+        digest = hashlib.sha256(str(text).encode()).hexdigest()
+        parent_start = int(after_item["char_start"])
+        parent_end = int(after_item["char_end"])
+        keyword_match = _NORMATIVE_KEYWORD.search(parent_quote)
+        if keyword_match is None:
+            raise ProvenanceError("IETF counterfactual normative parent is invalid")
+        keyword_start = parent_start + keyword_match.start()
+        keyword_end = parent_start + keyword_match.end()
+        replacement = str(twin.get("keyword") or "")
+        expected_text = ""
+        expected_quote = ""
+        if latest is not None and _NORMATIVE_KEYWORD.fullmatch(replacement):
+            expected_text = (
+                latest["text"][:keyword_start]
+                + replacement
+                + latest["text"][keyword_end:]
+            )
+            expected_quote = (
+                parent_quote[: keyword_match.start()]
+                + replacement
+                + parent_quote[keyword_match.end() :]
+            )
+        if (
+            latest is None
+            or twin.get("record_id") != parent_record_id
+            or twin.get("source_origin") != "synthetic_counterfactual"
+            or twin.get("provenance_operation") != "replace_normative_keyword"
+            or twin.get("parent_text_sha256") != latest.get("text_sha256")
+            or twin.get("parent_evidence_quote") != parent_quote
+            or twin.get("parent_char_start") != parent_start
+            or twin.get("parent_char_end") != parent_end
+            or twin.get("parent_keyword") != parent_keyword
+            or twin.get("keyword_char_start") != keyword_start
+            or twin.get("keyword_char_end") != keyword_start + len(replacement)
+            or replacement == parent_keyword
+            or not isinstance(text, str)
+            or twin.get("text_sha256") != digest
+            or text != expected_text
+            or twin.get("evidence_quote") != expected_quote
+            or twin.get("char_start") != parent_start
+            or twin.get("char_end") != parent_start + len(expected_quote)
+        ):
+            raise ProvenanceError("IETF counterfactual replacement is invalid")
+        if after_item["evidence_id"] in selected:
+            after_quote = expected_quote
+            after_keyword = replacement
+
+    return _normative_answer(
+        prior_record_id=prior_record_id,
+        latest_record_id=latest_record_id,
+        revision_source_id=revision_source_id,
+        revision_target_id=revision_target_id,
+        publication_source_id=publication_source_id,
+        draft_identity=draft_identity,
+        rfc_number=rfc_number,
+        before_keyword=before_keyword,
+        after_keyword=after_keyword,
+        after_quote=after_quote,
+    )
+
+
+def _compile_ietf_normative_change_task(manifest: dict[str, Any]) -> dict[str, Any]:
+    if (
+        manifest.get("schema_version") != IETF_WORKFLOW_MANIFEST_SCHEMA
+        or manifest.get("generation_integration") != "disabled"
+        or manifest.get("production_eligible") is not False
+    ):
+        raise ProvenanceError("IETF task requires a disabled source manifest")
+    raw_records = [
+        *manifest.get("records", []),
+        *manifest.get("supporting_records", []),
+    ]
+    records = {
+        str(record.get("record_id") or ""): record
+        for record in raw_records
+        if isinstance(record, dict)
+    }
+    candidates: list[
+        tuple[
+            dict[str, Any],
+            dict[str, Any],
+            dict[str, Any],
+            dict[str, Any],
+            dict[str, Any],
+            dict[str, Any],
+        ]
+    ] = []
+    relations = manifest.get("relations")
+    if not isinstance(relations, list):
+        raise ProvenanceError("IETF source relations are missing")
+    for revision in relations:
+        if not isinstance(revision, dict) or revision.get("kind") != "revision_of":
+            continue
+        latest = records.get(str(revision.get("source_record_id") or ""))
+        prior = records.get(str(revision.get("target_record_id") or ""))
+        publications = [
+            relation
+            for relation in relations
+            if isinstance(relation, dict)
+            and relation.get("kind") == "published_as"
+            and relation.get("source_record_id") == revision.get("source_record_id")
+        ]
+        if latest is None or prior is None or len(publications) != 1:
+            continue
+        published = publications[0]
+        rfc = records.get(str(published.get("target_record_id") or ""))
+        if rfc is None:
+            continue
+        try:
+            before, after = _normative_hunk(prior, latest)
+        except ProvenanceError:
+            continue
+        candidates.append(
+            (
+                prior,
+                latest,
+                rfc,
+                revision,
+                published,
+                {"before": before, "after": after},
+            )
+        )
+    if len(candidates) != 1:
+        raise ProvenanceError("IETF manifest does not uniquely select a normative task")
+    prior, latest, rfc, revision, published, hunk = candidates[0]
+    before, after = hunk["before"], hunk["after"]
+    evidence_items = [
+        {
+            "evidence_id": "normative_before",
+            "kind": "normative_before",
+            "record_id": prior["record_id"],
+            "evidence_quote": before["quote"],
+            "surface_text": before["quote"],
+            "keyword": before["keyword"],
+            "char_start": before["char_start"],
+            "char_end": before["char_end"],
+        },
+        {
+            "evidence_id": "normative_after",
+            "kind": "normative_after",
+            "record_id": latest["record_id"],
+            "evidence_quote": after["quote"],
+            "surface_text": after["quote"],
+            "keyword": after["keyword"],
+            "char_start": after["char_start"],
+            "char_end": after["char_end"],
+        },
+        {
+            "evidence_id": "revision_relation",
+            "kind": "revision_of",
+            "surface_text": "\n".join(
+                str(item["evidence_quote"]) for item in revision["evidence"]
+            ),
+            "relation": revision,
+        },
+        {
+            "evidence_id": "publication_relation",
+            "kind": "published_as",
+            "surface_text": "\n".join(
+                str(item["evidence_quote"]) for item in published["evidence"]
+            ),
+            "relation": published,
+        },
+    ]
+    replacement = next(
+        keyword
+        for keyword in ("MAY", "SHOULD", "MUST")
+        if keyword not in {before["keyword"], after["keyword"]}
+    )
+    cf_quote = str(after["quote"]).replace(str(after["keyword"]), replacement, 1)
+    keyword_offset = str(after["quote"]).index(str(after["keyword"]))
+    keyword_start = int(after["char_start"]) + keyword_offset
+    cf_text = (
+        str(latest["text"])[: after["char_start"]]
+        + cf_quote
+        + str(latest["text"])[after["char_end"] :]
+    )
+    task: dict[str, Any] = {
+        "schema_version": IETF_NORMATIVE_TASK_SCHEMA,
+        "data_stage": "candidate_task",
+        "train_ready": False,
+        "query_type": "normative_change_introducer",
+        "answer_program_id": "ietf.normative_change_introducer.v1",
+        "question": (
+            "Which draft revision introduced the normative keyword change, and "
+            "which RFC was that revision published as? Return the prior and current "
+            "keywords plus the exact current normative statement."
+        ),
+        "answer": "",
+        "cf_answer": "",
+        "essential_evidence_ids": [item["evidence_id"] for item in evidence_items],
+        "evidence_items": evidence_items,
+        "source_bindings": {
+            record_id: record["text_sha256"] for record_id, record in records.items()
+        },
+        "source_records": list(records.values()),
+        "counterfactual_twin": {
+            "record_id": latest["record_id"],
+            "source_origin": "synthetic_counterfactual",
+            "provenance_operation": "replace_normative_keyword",
+            "parent_text_sha256": latest["text_sha256"],
+            "parent_evidence_quote": after["quote"],
+            "parent_char_start": after["char_start"],
+            "parent_char_end": after["char_end"],
+            "parent_keyword": after["keyword"],
+            "text": cf_text,
+            "text_sha256": hashlib.sha256(cf_text.encode()).hexdigest(),
+            "evidence_quote": cf_quote,
+            "keyword": replacement,
+            "char_start": after["char_start"],
+            "char_end": after["char_start"] + len(cf_quote),
+            "keyword_char_start": keyword_start,
+            "keyword_char_end": keyword_start + len(replacement),
+        },
+    }
+    task["answer"] = replay_ietf_normative_change_task(task)
+    task["cf_answer"] = replay_ietf_normative_change_task(task, counterfactual=True)
+    return task
+
+
+def build_ietf_normative_change_task(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Audit a source manifest, then compile one executable task candidate."""
+    audit_ietf_workflow_manifest(manifest)
+    return _compile_ietf_normative_change_task(manifest)
+
+
+def materialize_ietf_normative_change_task(workflow: Any) -> dict[str, Any]:
+    """Materialize a standalone task from one bundle-authorized workflow."""
+    if (
+        getattr(workflow, "source_kind", "") != "ietf_standards"
+        or getattr(workflow, "target_domain", "") != "standards"
+        or not str(getattr(workflow, "component_digest", ""))
+    ):
+        raise ProvenanceError("IETF task materialization requires a standards workflow")
+
+    def record_payload(record: Any) -> dict[str, Any]:
+        attributes = dict(getattr(record, "attributes", ()))
+        return {
+            "record_id": record.record_id,
+            "kind": record.kind,
+            "occurred_at": record.occurred_at,
+            "source_url": record.source_url,
+            "retrieval_url": record.retrieval_url,
+            "source_family": record.source_family,
+            "source_origin": record.source_origin.value,
+            "source_sha256": record.source_sha256,
+            "text_sha256": record.text_sha256,
+            "provenance_id": record.provenance_id,
+            "text": record.text,
+            "facts": [
+                {
+                    "fact_id": fact.fact_id,
+                    "field": fact.field,
+                    "value": fact.value,
+                    "evidence_quote": fact.evidence_quote,
+                    "char_start": fact.char_start,
+                    "char_end": fact.char_end,
+                }
+                for fact in record.facts
+            ],
+            **attributes,
+        }
+
+    converted_records = [record_payload(record) for record in workflow.records]
+    primary = [
+        record
+        for record in converted_records
+        if record["kind"] in {"draft_revision", "rfc"}
+    ]
+    supporting = [
+        record
+        for record in converted_records
+        if record["kind"] not in {"draft_revision", "rfc"}
+    ]
+    relations = [
+        {
+            "relation_id": relation.relation_id,
+            "kind": relation.kind,
+            "source_record_id": relation.source_record_id,
+            "target_record_id": relation.target_record_id,
+            "evidence": [
+                {
+                    "record_id": item.record_id,
+                    "fact_ids": list(item.fact_ids),
+                    "evidence_quote": item.evidence_quote,
+                    "char_start": item.char_start,
+                    "char_end": item.char_end,
+                    "source_sha256": item.source_sha256,
+                }
+                for item in relation.evidence
+            ],
+        }
+        for relation in workflow.relations
+    ]
+    manifest = {
+        "schema_version": IETF_WORKFLOW_MANIFEST_SCHEMA,
+        "generation_integration": "disabled",
+        "production_eligible": False,
+        "records": primary,
+        "supporting_records": supporting,
+        "relations": relations,
+    }
+    task = _compile_ietf_normative_change_task(manifest)
+    task["source_workflow_binding"] = {
+        "workflow_id": workflow.workflow_id,
+        "component_digest": workflow.component_digest,
+    }
+    return task
+
+
+def audit_ietf_normative_change_task(task: dict[str, Any]) -> dict[str, bool]:
+    """Replay strict, CF, remove-one, surface, and byte-grounding gates."""
+    essentials = list(task.get("essential_evidence_ids") or [])
+    answer = str(task.get("answer") or "")
+    cf_answer = str(task.get("cf_answer") or "")
+    strict = replay_ietf_normative_change_task(task) == answer
+    cf_replay = replay_ietf_normative_change_task(task, counterfactual=True)
+    singles = [
+        replay_ietf_normative_change_task(task, evidence_ids=[evidence_id])
+        for evidence_id in essentials
+    ]
+    removals = [
+        replay_ietf_normative_change_task(
+            task,
+            evidence_ids=[item for item in essentials if item != removed],
+        )
+        for removed in essentials
+    ]
+    items = task.get("evidence_items") or []
+    surface_free = bool(items) and all(
+        answer not in str(item.get("surface_text") or "") for item in items
+    )
+    return {
+        "strict_replay_sufficient": strict,
+        "counterfactual_replay_sufficient": cf_replay == cf_answer,
+        "counterfactual_changes_answer": cf_answer != answer,
+        "remove_one_fails": bool(removals)
+        and all(value != answer for value in removals),
+        "essential_single_doc_insufficient": bool(singles)
+        and all(value != answer for value in singles),
+        "essential_surface_gold_free": surface_free,
+        "essential_text_grounded": strict,
+    }
