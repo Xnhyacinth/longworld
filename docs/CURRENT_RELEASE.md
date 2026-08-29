@@ -351,6 +351,21 @@ distance. Microsoft is therefore validated source capacity and a 0-row
 diagnostic, not training data. The current Amazon rows are unaffected because
 they use four real annual issuer filings rather than the single-filing facet
 timeline.
+
+A follow-up Microsoft adjacent-annual probe binds the FY2023 and FY2024 issuer
+filings, their exact revenue facts, and one grounded `prior_annual_filing`
+relation into the answer. Six distinct 32K rows passed dense and strict semantic
+audit, CF, remove-one, corruption, window, BM25, and embedding checks. The world
+still has **zero qualified rows** because exact 16K, 64K, and 128K are absent.
+Two three-revision Wikimedia probes likewise remain excluded: Churchill emitted
+only four 64K rows, while Jefferson emitted four 16K and four 64K rows but no
+32K. Jefferson's historical one-world profile receipt is invalid for Wave 2
+because that profile did not require all bands. The new immutable
+`p12-wiki-source-slice-1-v1` and `p12-current-source-probe-12-v2` profiles
+require exact 16K/32K/64K coverage for every world at selection, train-ready
+reporting, and final quality-gate layers. The source-free diagnostic record is
+`reports/p12_wave2_rejected_source_scaleout_v1.md`.
+
 Candidate-only ResearchLab and failed/superseded or stale CodeForge rows are not a new
 `COMMITTED` production package and are not eligible for HF upload. The
 current per-world content-gated baseline is **35 rows, 5 unique worlds, and
@@ -399,7 +414,7 @@ length by view.
 3. Require nonzero retention and all replay, retrieval, semantic-growth, and
    source-relation gates.
 4. Only then define a new 48-world production profile whose predecessor is the
-   complete `p12-current-source-probe-12-v1` receipt. The immutable historical
+   complete `p12-current-source-probe-12-v2` receipt. The immutable historical
    `p10-source-rich-production-48-v1` profile retains its original
    `p7-source-rich-probe-12-v1` predecessor and must not be mutated into the new
    issuance path. The new 48-world gate must require 48 source-independent

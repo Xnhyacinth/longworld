@@ -1,0 +1,13 @@
+{
+  "schema_version": "longworld.wikimedia-fetch-request.v1",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P12-WAVE2-WIKIMEDIA-HUNK-JEFFERSON-20260829",
+    "scope": "Thomas Jefferson English Wikipedia and linked Wikidata consecutive revision hunk workflow",
+    "basis": "User-authorized public-source LongWorld workflow construction from the most recent manually reviewed qualifying consecutive three-revision window",
+    "reviewed_at": "2026-08-29T00:00:00Z"
+  },
+  "language": "en",
+  "titles": ["Thomas Jefferson"],
+  "requests_per_second": 5
+}
