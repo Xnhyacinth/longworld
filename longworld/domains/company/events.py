@@ -534,25 +534,25 @@ def apply_event(state: WorldState, ev: Event) -> None:
             if fact_kind in {"policy_presence", "disclosure_presence"}:
                 if numeric_value != 1 or not quote.strip():
                     return
-                parsed = 1
+                parsed_value = 1
             elif fact_kind == "numeric":
                 display = quote.replace("$", "").strip()
                 negative = display.startswith("(") and display.endswith(")")
                 if negative:
                     display = display[1:-1]
                 try:
-                    parsed = parse_ixbrl_display_number(
+                    parsed_value = parse_ixbrl_display_number(
                         display, scale=0, sign="-" if negative else ""
                     )
                 except (TypeError, ValueError, ProvenanceError):
                     return
             else:
                 return
-            if parsed != numeric_value:
+            if parsed_value != numeric_value:
                 return
-            if role in record_metrics and record_metrics[role] != parsed:
+            if role in record_metrics and record_metrics[role] != parsed_value:
                 return
-            record_metrics[role] = parsed
+            record_metrics[role] = parsed_value
         if not record_metrics:
             return
         metrics[record_id] = record_metrics
@@ -687,9 +687,11 @@ def apply_event(state: WorldState, ev: Event) -> None:
                 or state.values.get(prerequisite_answer_key) != prerequisite_answer
             ):
                 return
-        answer = compose_answer(record_ids, required_roles, record_role_extensions)
-        if answer is not None:
-            state.set(answer_key, answer, eid, day)
+        composed_answer = compose_answer(
+            record_ids, required_roles, record_role_extensions
+        )
+        if composed_answer is not None:
+            state.set(answer_key, composed_answer, eid, day)
     elif t == "sec_financial_answer":
         record_id = str(p.get("record_id") or "")
         answer_key = str(p.get("answer_key") or "")

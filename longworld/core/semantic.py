@@ -164,7 +164,7 @@ def _attested_arxiv_revision(artifact: Artifact) -> tuple[str, str] | None:
             or excluded_paths != sorted(set(excluded_paths))
         ):
             return None
-        provenance_payload = {
+        provenance_payload: dict[str, object] = {
             "operation": operation,
             "parent_provenance_id": parent_provenance_id,
             "excluded_paths": excluded_paths,

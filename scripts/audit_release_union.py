@@ -643,8 +643,8 @@ def audit_release_union(
         for path in release_dirs
     )
     releases: list[dict[str, Any]] = []
-    world_owners: dict[str, str] = {}
-    content_owners: dict[str, str] = {}
+    world_owners: dict[str, Path] = {}
+    content_owners: dict[str, Path] = {}
     source_identity_owners: dict[tuple[str, str], str] = {}
     world_domains: dict[str, str] = {}
     domain_worlds: defaultdict[str, set[str]] = defaultdict(set)
@@ -746,12 +746,12 @@ def audit_release_union(
     inventory = _attach_local_release_inventory_attestation(
         payload, inventory_attestation_key
     )
-    identity = inventory.get("attestation")
+    inventory_attestation = inventory.get("attestation")
     if (
-        not isinstance(identity, dict)
-        or identity.get("scheme") != ATTESTATION_V2_SCHEME
-        or identity.get("role") != "report"
-        or identity.get("environment") != "probe"
+        not isinstance(inventory_attestation, dict)
+        or inventory_attestation.get("scheme") != ATTESTATION_V2_SCHEME
+        or inventory_attestation.get("role") != "report"
+        or inventory_attestation.get("environment") != "probe"
         or not verify_local_release_inventory_attestation(
             inventory, inventory_attestation_key
         )

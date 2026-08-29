@@ -1118,7 +1118,7 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
         if cf_updates is None:
             continue
         essential_events = _issuer_ir_required_closure(world, answer_event)
-        essential = [event.id for event in essential_events]
+        issuer_essential_ids = [event.id for event in essential_events]
         roles = [str(role) for role in answer_event.params["required_roles"]]
         record_ids = [str(item) for item in answer_event.params["record_ids"]]
         extensions_by_record = {
@@ -1137,7 +1137,7 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
         }
         role_kinds: dict[str, str] = {}
         role_kind_conflict = False
-        for event_id in essential:
+        for event_id in issuer_essential_ids:
             source_event = next(
                 (event for event in world.events if event.id == event_id), None
             )
@@ -1176,11 +1176,12 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                 answer="",
                 as_of=answer_event.time,
                 answer_key=str(answer_event.params["answer_key"]),
-                essential_event_ids=essential,
+                essential_event_ids=issuer_essential_ids,
                 essential_artifact_ids=[
-                    f"{world.spec['world_id']}.{event_id}" for event_id in essential
+                    f"{world.spec['world_id']}.{event_id}"
+                    for event_id in issuer_essential_ids
                 ],
-                sufficient_event_ids=essential,
+                sufficient_event_ids=issuer_essential_ids,
                 cf_event_id=cf_source.id,
                 cf_param_updates=cf_updates,
                 cf_answer="",
@@ -1689,22 +1690,23 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
             cf_role,
             program_ops,
         ) in facet_specs:
-            answer_event = by_facet.get(answer_family)
+            facet_answer_event = by_facet.get(answer_family)
             needed_sections = [by_section.get(name) for name in needed_names]
             cf_section = by_section.get(cf_section_name)
             if (
-                answer_event is None
+                facet_answer_event is None
                 or cf_section is None
                 or any(event is None for event in needed_sections)
             ):
                 continue
             essential_events = [
                 *(event for event in needed_sections if event is not None),
-                answer_event,
+                facet_answer_event,
             ]
             query_type = f"sec_financial_{answer_family}"
             required_roles = [
-                str(role) for role in answer_event.params.get("required_roles") or []
+                str(role)
+                for role in facet_answer_event.params.get("required_roles") or []
             ]
             question_schema = _sec_financial_question_schema(
                 query_type=query_type,
@@ -1729,8 +1731,8 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                         + question_schema
                     ),
                     answer="",
-                    as_of=answer_event.time,
-                    answer_key=str(answer_event.params["answer_key"]),
+                    as_of=facet_answer_event.time,
+                    answer_key=str(facet_answer_event.params["answer_key"]),
                     essential_event_ids=[event.id for event in essential_events],
                     essential_artifact_ids=[
                         f"{world.spec['world_id']}.{event.visibility[0]}"

@@ -232,7 +232,7 @@ def _arxiv_source_file_texts(
 
 
 def _arxiv_envelope_payload(ev: Event, source: GroundedSource) -> dict[str, Any]:
-    payload = {
+    payload: dict[str, Any] = {
         "revision": _ARXIV_SOURCE_ENVELOPE_REVISION,
         "workflow_id": str(ev.params.get("workflow_id") or ""),
         "record_id": str(ev.params.get("record_id") or ""),

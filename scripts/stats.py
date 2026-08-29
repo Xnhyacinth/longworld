@@ -34,7 +34,7 @@ def main() -> None:
     def count(key):
         return Counter(r[key] for r in rows)
 
-    dist_tokens = Counter()
+    dist_tokens: Counter[str] = Counter()
     for r in rows:
         t = r["difficulty"]["context_tokens"]
         if t < 4000:

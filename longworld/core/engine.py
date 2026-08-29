@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Any
+from typing import Any, cast
 
 from longworld.core.domain import eval_answer, handlers
 from longworld.core.issuerfilingworkflow import ISSUER_IR_SECTIONS_64K
@@ -64,7 +64,7 @@ def answer_from_events(
     cached = getattr(world, "_longworld_event_index", None)
     if cached is None or cached[0] is not world.events:
         cached = (world.events, {event.id: event for event in world.events})
-        world._longworld_event_index = cached
+        cast(Any, world)._longworld_event_index = cached
     event_index = cached[1]
     events = [event_index[event_id] for event_id in allowed if event_id in event_index]
     st = simulator(world).replay_events(
@@ -166,7 +166,7 @@ def _repo_record_lineage_valid(world: SimulatedWorld, event: Any) -> bool:
     cached = getattr(world, "_longworld_canonical_repo_records", None)
     if cached is None:
         cached = canonical_repo_record_envelopes(world)
-        world._longworld_canonical_repo_records = cached
+        cast(Any, world)._longworld_canonical_repo_records = cached
     canonical = cached.get(str(params.get("record_key") or ""))
     return canonical is not None and _event_envelope(canonical) == _event_envelope(
         event
@@ -215,7 +215,7 @@ def _issuer_ir_raw_lineage_valid(world: SimulatedWorld, event: Any) -> bool:
     cache = getattr(world, "_longworld_canonical_issuer_sections", None)
     if cache is None:
         cache = {}
-        world._longworld_canonical_issuer_sections = cache
+        cast(Any, world)._longworld_canonical_issuer_sections = cache
     if cache_key not in cache:
         cache[cache_key] = canonical_issuer_ir_source_section_envelopes(
             workflow=workflow, record=record

@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from itertools import pairwise
 from pathlib import Path
+from typing import Any
 
 from longworld.core.attestation import (
     ATTESTATION_V2_SCHEME,
@@ -109,7 +110,7 @@ def _create_release_gate_receipt(
             ensure_ascii=False,
         ).encode("utf-8")
     ).hexdigest()
-    payload = {
+    payload: dict[str, Any] = {
         "schema_version": RELEASE_GATE_SCHEMA,
         "gate_revision": RELEASE_GATE_REVISION,
         "release_profile_id": release_profile_id,

@@ -65,24 +65,22 @@ def _ok_child(q: QuerySpec) -> bool:
         return False
     if q.query_type in _SKIP_JOIN_TYPES:
         return False
-    if not q.answer or q.answer == "unknown":
-        return False
-    return True
+    return not (not q.answer or q.answer == "unknown")
 
 
 def _disjoint(parts: list[QuerySpec]) -> bool:
     sets = [set(q.essential_artifact_ids) for q in parts]
-    for i, a in enumerate(sets):
-        for b in sets[i + 1 :]:
+    for left_index, a in enumerate(sets):
+        for b in sets[left_index + 1 :]:
             if a <= b or b <= a:
                 return False
     union: list[str] = []
     seen: set[str] = set()
     for q in parts:
-        for i in q.essential_artifact_ids:
-            if i not in seen:
-                seen.add(i)
-                union.append(i)
+        for artifact_id in q.essential_artifact_ids:
+            if artifact_id not in seen:
+                seen.add(artifact_id)
+                union.append(artifact_id)
     return len(union) >= 2 + len(parts)
 
 

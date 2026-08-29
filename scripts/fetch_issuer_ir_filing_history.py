@@ -398,8 +398,10 @@ def _parse_detail(
     observed_form = " ".join(parser.form_parts).strip()
     observed_date = " ".join(parser.date_parts).strip()
     try:
-        parsed = time.strptime(observed_date, "%b %d, %Y")
-        parsed_date = date(parsed.tm_year, parsed.tm_mon, parsed.tm_mday).isoformat()
+        parsed_time = time.strptime(observed_date, "%b %d, %Y")
+        parsed_date = date(
+            parsed_time.tm_year, parsed_time.tm_mon, parsed_time.tm_mday
+        ).isoformat()
     except ValueError as exc:
         raise ProvenanceError("issuer IR detail page has invalid filing date") from exc
     if observed_form != expected_form or parsed_date != expected_filing_date:

@@ -613,7 +613,7 @@ def _visible_cell_text(cell_html: str) -> str:
 
 
 def _report_value_cell_index(table: str, display_date: str) -> int:
-    matches = []
+    matches: list[int] = []
     for row in _ROW.finditer(table):
         headers = list(_HEADER_CELL.finditer(row.group()))
         has_row_label = bool(headers and 'class="tl"' in headers[0].group())

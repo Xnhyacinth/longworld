@@ -216,9 +216,7 @@ def _world_label(world: SimulatedWorld) -> tuple[str, str]:
 def _token_in_question(spec, token: str, decoy: str) -> bool:
     if token and token in spec.question:
         return True
-    if decoy and decoy in spec.question:
-        return True
-    return False
+    return bool(decoy and decoy in spec.question)
 
 
 def build_revisitation_query(
@@ -356,7 +354,13 @@ def build_docket_control_query(
     ack = find_event(world, ACK_TYPE)
     reopen = find_event(world, REOPEN_TYPE)
     ratify = find_event(world, RATIFY_TYPE)
-    if None in (seed, docket, ack, reopen, ratify):
+    if (
+        seed is None
+        or docket is None
+        or ack is None
+        or reopen is None
+        or ratify is None
+    ):
         return None
     project = world.spec["project"]
     dock = str(project.get("docket_token") or docket.params.get("token") or "")

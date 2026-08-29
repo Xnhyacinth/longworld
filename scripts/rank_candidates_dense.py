@@ -13,7 +13,7 @@ import struct
 import tempfile
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from longworld.core.attestation import (
     attach_attestation,
@@ -151,12 +151,15 @@ def _load_model(model_id: str, revision: str) -> Encoder:
         raise RuntimeError(
             "sentence-transformers==6.0.0 is required for reproducible dense ranking"
         )
-    return sentence_transformers.SentenceTransformer(
-        model_id,
-        revision=revision,
-        trust_remote_code=False,
-        device="cpu",
-        model_kwargs={"use_safetensors": True},
+    return cast(
+        Encoder,
+        sentence_transformers.SentenceTransformer(
+            model_id,
+            revision=revision,
+            trust_remote_code=False,
+            device="cpu",
+            model_kwargs={"use_safetensors": True},
+        ),
     )
 
 

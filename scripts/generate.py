@@ -104,6 +104,7 @@ from longworld.core.topology import (
     topology_family,
 )
 from longworld.core.verify import (
+    Difficulty,
     ProofGraph,
     SampleRecord,
     Verification,
@@ -2145,15 +2146,15 @@ def emit_records(
                             view=view_name,
                             context=prompt,
                             proof_graph=proof,
-                            difficulty={
-                                "context_tokens": metrics.context_tokens,
-                                "max_evidence_distance": metrics.max_evidence_distance,
-                                "proof_depth": int(gstat["proof_depth"]),
-                                "state_updates": len(focal_w.state.history),
-                                "query_delay": 1 if timing == "late" else 0,
-                                "distractor_similarity": 1.0 if parallel_arts else 0.0,
-                                "visibility_gap": vis_gap,
-                            },
+                            difficulty=Difficulty(
+                                context_tokens=metrics.context_tokens,
+                                max_evidence_distance=metrics.max_evidence_distance,
+                                proof_depth=int(gstat["proof_depth"]),
+                                state_updates=len(focal_w.state.history),
+                                query_delay=1 if timing == "late" else 0,
+                                distractor_similarity=(1.0 if parallel_arts else 0.0),
+                                visibility_gap=vis_gap,
+                            ),
                             verification=exact_verification,
                             essential_artifact_ids=list(spec.essential_artifact_ids),
                             window_artifact_ids=packed.window_ids,
