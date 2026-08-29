@@ -485,13 +485,14 @@ def audit_rankings(
             candidate_attestation_key=candidate_key,
         )
     if structural_rejects and not filter_mode:
-        missing_by_world = {
-            str(reject["world_id"]): tuple(reject["missing_exact_length_buckets"])
-            for reject in structural_rejects
-        }
+        reasons_by_world: dict[str, set[str]] = {}
+        for reject in structural_rejects:
+            reasons_by_world.setdefault(str(reject["world_id"]), set()).add(
+                str(reject["reason"])
+            )
         details = ",".join(
-            f"{world_id}={'+'.join(missing_by_world[world_id])}"
-            for world_id in sorted(missing_by_world)
+            f"{world_id}={'|'.join(sorted(reasons_by_world[world_id]))}"
+            for world_id in sorted(reasons_by_world)
         )
         raise PromotionError("candidate structural preflight failed: " + details)
     candidates_by_digest: dict[str, dict[str, Any]] = {}

@@ -6,6 +6,7 @@ import sys
 from collections import Counter
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -275,7 +276,7 @@ def _candidate(
         "motif": spec.motif,
         "data_stage": "candidate",
         "base_task_id": hashlib.sha256(
-            f"{world.world_id}|{spec.query_id}".encode()
+            f"{world.world_id}|{spec.base_task_group or spec.query_id}".encode()
         ).hexdigest()[:20],
         "dossier_id": hashlib.sha256(
             json.dumps(
@@ -555,7 +556,7 @@ def _real_candidate(bundle_path: Path) -> tuple[dict, list]:
         "motif": spec.motif,
         "data_stage": "candidate",
         "base_task_id": hashlib.sha256(
-            f"{world.world_id}|{spec.query_id}".encode()
+            f"{world.world_id}|{spec.base_task_group or spec.query_id}".encode()
         ).hexdigest()[:20],
         "dossier_id": hashlib.sha256(
             json.dumps(
@@ -1875,6 +1876,7 @@ def _p12_wiki_exact_bucket_selection_inputs(
     candidates = []
     audits = []
     for band in bands:
+        level = {"16k": 1, "32k": 2, "64k": 3}[band]
         candidate = {
             **json.loads(
                 json.dumps(
@@ -1898,6 +1900,32 @@ def _p12_wiki_exact_bucket_selection_inputs(
             ),
         }
         _mark_candidate_as_real(candidate)
+        relations = [
+            {
+                "parent_record_id": f"revision-{index}",
+                "child_record_id": f"revision-{index + 1}",
+                "relation_provenance": "authentic_source",
+            }
+            for index in range(level)
+        ]
+        candidate.update(
+            {
+                "semantic_growth_group_id": "p12-wiki-real-history",
+                "semantic_tokens": {
+                    "event_bearing": 10_000 * level,
+                    "internal": 0,
+                    "generic_background": 0,
+                },
+                "strict_support_event_count": 4 * level,
+                "source_relation_edges": relations,
+                "authentic_source_relation_edges": relations,
+                "graph": {
+                    **dict(candidate.get("graph") or {}),
+                    "n_essential_events": 2 * level,
+                    "proof_depth": level + 1,
+                },
+            }
+        )
         candidate = attach_attestation(
             candidate, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
         )
@@ -4234,6 +4262,274 @@ def test_candidate_structural_preflight_does_not_replace_authoritative_selection
         )
 
 
+def _source_bound_classifications(candidate: dict[str, Any]) -> list[dict[str, Any]]:
+    classifications = [dict(item) for item in candidate["artifact_classification"]]
+    classifications[0]["evidence_role"] = "causal_supporting"
+    return classifications
+
+
+def test_candidate_structural_preflight_rejects_non_growing_real_history() -> None:
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    resigned = []
+    for candidate in candidates:
+        payload = {
+            **{key: value for key, value in candidate.items() if key != "attestation"},
+            "semantic_growth_group_id": "one-real-history",
+            "artifact_classification": _source_bound_classifications(candidate),
+            "semantic_tokens": {
+                "event_bearing": 12_000,
+                "internal": 0,
+                "generic_background": 0,
+            },
+            "strict_support_event_count": 8,
+            "source_relation_edges": [
+                {
+                    "parent_record_id": "revision-0",
+                    "child_record_id": "revision-1",
+                    "relation_provenance": "authentic_source",
+                }
+            ],
+            "authentic_source_relation_edges": [
+                {
+                    "parent_record_id": "revision-0",
+                    "child_record_id": "revision-1",
+                    "relation_provenance": "authentic_source",
+                }
+            ],
+            "graph": {
+                **dict(candidate.get("graph") or {}),
+                "n_essential_events": 4,
+                "proof_depth": 3,
+            },
+        }
+        resigned.append(
+            attach_attestation(payload, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+        )
+
+    accepted, rejects = candidate_structural_preflight(
+        resigned,
+        "p12-wiki-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+    )
+
+    assert accepted == []
+    assert len(rejects) == 3
+    assert all(
+        row["reason"].startswith("invalid cumulative source history:")
+        for row in rejects
+    )
+    violations = set(rejects[0]["cumulative_history_violations"])
+    assert any("event_bearing_not_growing" in item for item in violations)
+    assert any("strict_support_not_growing" in item for item in violations)
+    assert any("essential_events_not_growing" in item for item in violations)
+    assert any("authentic_relations_not_growing" in item for item in violations)
+    assert any("proof_depth_not_growing" in item for item in violations)
+
+
+def test_candidate_structural_preflight_does_not_treat_real_hard_negative_as_proof() -> (
+    None
+):
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    resigned = []
+    for candidate in candidates:
+        payload = {
+            **{key: value for key, value in candidate.items() if key != "attestation"},
+            "semantic_tokens": {
+                "event_bearing": 12_000,
+                "internal": 0,
+                "generic_background": 0,
+            },
+        }
+        resigned.append(
+            attach_attestation(payload, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+        )
+
+    accepted, rejects = candidate_structural_preflight(
+        resigned,
+        "p12-wiki-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+    )
+
+    assert accepted == resigned
+    assert rejects == []
+
+
+def test_candidate_structural_preflight_accepts_growing_real_history() -> None:
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    scale = {"16k": 1, "32k": 2, "64k": 3}
+    resigned = []
+    for candidate in candidates:
+        level = scale[str(candidate["length_bucket"])]
+        relations = [
+            {
+                "parent_record_id": f"revision-{index}",
+                "child_record_id": f"revision-{index + 1}",
+                "relation_provenance": "authentic_source",
+            }
+            for index in range(level)
+        ]
+        payload = {
+            **{key: value for key, value in candidate.items() if key != "attestation"},
+            "semantic_growth_group_id": "one-real-history",
+            "artifact_classification": _source_bound_classifications(candidate),
+            "semantic_tokens": {
+                "event_bearing": 10_000 * level,
+                "internal": 0,
+                "generic_background": 0,
+            },
+            "strict_support_event_count": 4 * level,
+            "source_relation_edges": relations,
+            "authentic_source_relation_edges": relations,
+            "graph": {
+                **dict(candidate.get("graph") or {}),
+                "n_essential_events": 2 * level,
+                "proof_depth": level + 1,
+            },
+        }
+        resigned.append(
+            attach_attestation(payload, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+        )
+
+    accepted, rejects = candidate_structural_preflight(
+        resigned,
+        "p12-wiki-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+    )
+
+    assert accepted == resigned
+    assert rejects == []
+
+
+def test_candidate_structural_preflight_includes_real_source_derived_lower_band() -> (
+    None
+):
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    resigned = []
+    for candidate in candidates:
+        payload = {
+            key: value for key, value in candidate.items() if key != "attestation"
+        }
+        payload["artifact_classification"] = _source_bound_classifications(candidate)
+        if candidate["length_bucket"] == "16k":
+            payload["artifact_classification"][0].update(
+                source_origin="real_derived", workflow_kind="real_source_derived"
+            )
+        resigned.append(
+            attach_attestation(payload, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+        )
+
+    accepted, rejects = candidate_structural_preflight(
+        resigned,
+        "p12-wiki-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+    )
+
+    assert accepted == resigned
+    assert rejects == []
+
+
+def test_candidate_structural_preflight_rejects_cross_group_band_stitching() -> None:
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    resigned = []
+    for candidate in candidates:
+        payload = {
+            **{key: value for key, value in candidate.items() if key != "attestation"},
+            "semantic_growth_group_id": (
+                "history-b" if candidate["length_bucket"] == "32k" else "history-a"
+            ),
+            "artifact_classification": _source_bound_classifications(candidate),
+        }
+        resigned.append(
+            attach_attestation(payload, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+        )
+
+    accepted, rejects = candidate_structural_preflight(
+        resigned,
+        "p12-wiki-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+    )
+
+    assert accepted == []
+    assert len(rejects) == 3
+    assert any(
+        "missing_buckets=32k" in violation
+        for violation in rejects[0]["cumulative_history_violations"]
+    )
+
+
+def test_candidate_structural_preflight_requires_real_growth_identity() -> None:
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    resigned = [
+        attach_attestation(
+            {
+                key: value
+                for key, value in candidate.items()
+                if key not in {"attestation", "semantic_growth_group_id"}
+            }
+            | {"artifact_classification": _source_bound_classifications(candidate)},
+            KEY,
+            purpose=CANDIDATE_ATTESTATION_PURPOSE,
+        )
+        for candidate in candidates
+    ]
+
+    accepted, rejects = candidate_structural_preflight(
+        resigned,
+        "p12-wiki-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+    )
+
+    assert accepted == []
+    assert len(rejects) == 3
+    assert rejects[0]["cumulative_history_violations"] == (
+        "missing_semantic_growth_group",
+    )
+
+
+def test_candidate_structural_preflight_requires_nested_real_relations() -> None:
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    scale = {"16k": 1, "32k": 2, "64k": 3}
+    resigned = []
+    for candidate in candidates:
+        level = scale[str(candidate["length_bucket"])]
+        relations = [
+            {
+                "parent_record_id": f"band-{level}-revision-{index}",
+                "child_record_id": f"band-{level}-revision-{index + 1}",
+                "relation_provenance": "authentic_source",
+            }
+            for index in range(level)
+        ]
+        resigned.append(
+            attach_attestation(
+                {
+                    **{
+                        key: value
+                        for key, value in candidate.items()
+                        if key != "attestation"
+                    },
+                    "source_relation_edges": relations,
+                    "authentic_source_relation_edges": relations,
+                    "artifact_classification": _source_bound_classifications(candidate),
+                },
+                KEY,
+                purpose=CANDIDATE_ATTESTATION_PURPOSE,
+            )
+        )
+
+    accepted, rejects = candidate_structural_preflight(
+        resigned,
+        "p12-wiki-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+    )
+
+    assert accepted == []
+    assert any(
+        "authentic_relation_history_not_nested" in violation
+        for violation in rejects[0]["cumulative_history_violations"]
+    )
+
+
 def test_candidate_preflight_cli_is_byte_deterministic_and_world_atomic(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -4493,6 +4789,51 @@ def test_audit_preflight_without_filter_outputs_fails_before_strict_replay(
     monkeypatch.setattr(promote_script, "create_dense_audit", unexpected_replay)
 
     with pytest.raises(PromotionError, match="structural preflight.*32k"):
+        promote_script.audit_rankings(
+            candidates_path,
+            rankings_path,
+            output_path,
+            k=3,
+            release_profile_id="p12-wiki-source-slice-1-v1",
+        )
+    assert not output_path.exists()
+
+
+def test_audit_preflight_reports_cumulative_reject_before_strict_replay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import promote_candidates as promote_script
+
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    resigned = []
+    for candidate in candidates:
+        payload = {
+            **{key: value for key, value in candidate.items() if key != "attestation"},
+            "artifact_classification": _source_bound_classifications(candidate),
+            "semantic_tokens": {
+                "event_bearing": 12_000,
+                "internal": 0,
+                "generic_background": 0,
+            },
+        }
+        resigned.append(
+            attach_attestation(payload, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+        )
+    candidates_path = tmp_path / "candidates.jsonl"
+    rankings_path = tmp_path / "rankings.jsonl"
+    output_path = tmp_path / "must-not-exist.jsonl"
+    candidates_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in resigned), encoding="utf-8"
+    )
+    rankings_path.write_text("", encoding="utf-8")
+
+    def unexpected_replay(*_args, **_kwargs):
+        raise AssertionError("strict replay must not run")
+
+    monkeypatch.setattr(promote_script, "create_dense_audit", unexpected_replay)
+
+    with pytest.raises(PromotionError, match="invalid cumulative source history"):
         promote_script.audit_rankings(
             candidates_path,
             rankings_path,

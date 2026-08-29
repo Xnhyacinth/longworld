@@ -7,12 +7,13 @@ import hashlib
 import json
 import math
 import re
-from collections import Counter, OrderedDict
+from collections import Counter, OrderedDict, defaultdict
 from collections.abc import Callable
 from dataclasses import replace
 from functools import lru_cache
+from itertools import pairwise
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlparse
 
 from longworld.core.attestation import (
@@ -409,6 +410,26 @@ def _candidate_has_verified_real_source(candidate: dict[str, Any]) -> bool:
     )
 
 
+def _candidate_has_source_bound_proof(candidate: dict[str, Any]) -> bool:
+    classifications = candidate.get("artifact_classification")
+    return bool(
+        candidate.get("source_family_ids")
+        and any(
+            isinstance(candidate.get(field), dict)
+            for field in ("episode_replay_bundle", "source_workflow_bundle")
+        )
+        and isinstance(classifications, list)
+        and any(
+            isinstance(item, dict)
+            and item.get("source_origin")
+            in {"real_public", "real_private_export", "real_derived"}
+            and item.get("workflow_kind") in {"hybrid_causal", "real_source_derived"}
+            and item.get("evidence_role") in {"causal_gold", "causal_supporting"}
+            for item in classifications
+        )
+    )
+
+
 def _candidate_world_domains(candidates: list[dict[str, Any]]) -> dict[str, str]:
     domains_by_world: dict[str, str] = {}
     for candidate in candidates:
@@ -476,6 +497,126 @@ def _missing_required_exact_length_buckets_by_world(
     }
 
 
+def _cumulative_history_violations_by_world(
+    rows: list[dict[str, Any]], profile: Any
+) -> dict[str, tuple[str, ...]]:
+    required = tuple(profile.required_exact_length_buckets)
+    if len(required) < 2:
+        return {}
+    groups: defaultdict[tuple[str, str, str, str, str], list[dict[str, Any]]] = (
+        defaultdict(list)
+    )
+    violations: defaultdict[str, set[str]] = defaultdict(set)
+    for row in rows:
+        group_id = str(row.get("semantic_growth_group_id") or "")
+        bucket = str(row.get("length_bucket") or "")
+        if bucket not in required or not _candidate_has_source_bound_proof(row):
+            continue
+        world_id = str(row.get("world_id") or "")
+        if not group_id:
+            violations[world_id].add("missing_semantic_growth_group")
+            continue
+        groups[
+            (
+                world_id,
+                group_id,
+                str(row.get("query_timing") or ""),
+                str(row.get("view") or ""),
+                str(row.get("split") or ""),
+            )
+        ].append(row)
+
+    for (world_id, group_id, _timing, view, _split), group in groups.items():
+        rows_by_bucket: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
+        for row in group:
+            rows_by_bucket[str(row["length_bucket"])].append(row)
+        missing = [bucket for bucket in required if not rows_by_bucket[bucket]]
+        if missing:
+            violations[world_id].add(
+                f"{group_id}:{view}:missing_buckets={'+'.join(missing)}"
+            )
+            continue
+
+        def metrics(row: dict[str, Any]) -> tuple[int, int, int, int, int] | None:
+            semantic = row.get("semantic_tokens")
+            graph = row.get("graph")
+            relations = row.get("authentic_source_relation_edges")
+            if (
+                not isinstance(semantic, dict)
+                or not isinstance(graph, dict)
+                or not isinstance(relations, list)
+            ):
+                return None
+            raw_values = (
+                semantic.get("event_bearing"),
+                semantic.get("internal"),
+                row.get("strict_support_event_count"),
+                graph.get("n_essential_events"),
+                graph.get("proof_depth"),
+            )
+            if any(
+                isinstance(value, bool) or not isinstance(value, int) or value < 0
+                for value in raw_values
+            ):
+                return None
+            event_bearing, internal, support, essential, proof_depth = raw_values
+            return (
+                cast(int, event_bearing) + cast(int, internal),
+                cast(int, support),
+                cast(int, essential),
+                len(relations),
+                cast(int, proof_depth),
+            )
+
+        def relation_ids(row: dict[str, Any]) -> set[str] | None:
+            relations = row.get("authentic_source_relation_edges")
+            if not isinstance(relations, list) or any(
+                not isinstance(relation, dict) for relation in relations
+            ):
+                return None
+            return {_canonical_sha256(relation) for relation in relations}
+
+        metric_names = (
+            "event_bearing",
+            "strict_support",
+            "essential_events",
+            "authentic_relations",
+            "proof_depth",
+        )
+        for before_bucket, after_bucket in pairwise(required):
+            before_metrics = [metrics(row) for row in rows_by_bucket[before_bucket]]
+            after_metrics = [metrics(row) for row in rows_by_bucket[after_bucket]]
+            label = f"{group_id}:{view}:{before_bucket}->{after_bucket}"
+            if any(value is None for value in (*before_metrics, *after_metrics)):
+                violations[world_id].add(f"{label}:invalid_growth_metrics")
+                continue
+            for index, metric_name in enumerate(metric_names):
+                before_max = max(value[index] for value in before_metrics if value)
+                after_min = min(value[index] for value in after_metrics if value)
+                if after_min <= before_max:
+                    violations[world_id].add(
+                        f"{label}:{metric_name}_not_growing={before_max}->{after_min}"
+                    )
+            for before in rows_by_bucket[before_bucket]:
+                before_relations = relation_ids(before)
+                for after in rows_by_bucket[after_bucket]:
+                    after_relations = relation_ids(after)
+                    if (
+                        before_relations is None
+                        or after_relations is None
+                        or not before_relations < after_relations
+                    ):
+                        violations[world_id].add(
+                            f"{label}:authentic_relation_history_not_nested"
+                        )
+
+    return {
+        world_id: tuple(sorted(items))
+        for world_id, items in sorted(violations.items())
+        if items
+    }
+
+
 def candidate_structural_preflight(
     candidates: list[dict[str, Any]],
     release_profile_id: str,
@@ -504,29 +645,40 @@ def candidate_structural_preflight(
     missing_by_world = _missing_required_exact_length_buckets_by_world(
         candidates, profile
     )
+    cumulative_violations = _cumulative_history_violations_by_world(candidates, profile)
+    rejected_worlds = set(missing_by_world) | set(cumulative_violations)
     profile_digest = release_profile_sha256(release_profile_id)
     accepted = [
         candidate
         for candidate in candidates
-        if str(candidate["world_id"]) not in missing_by_world
+        if str(candidate["world_id"]) not in rejected_worlds
     ]
-    rejects = [
-        {
+    rejects = []
+    for candidate in candidates:
+        world_id = str(candidate["world_id"])
+        if world_id not in rejected_worlds:
+            continue
+        missing = missing_by_world.get(world_id, ())
+        cumulative = cumulative_violations.get(world_id, ())
+        reject: dict[str, Any] = {
             "schema_version": "candidate-structural-reject-v1",
             "candidate_sha256": candidate_sha256(candidate),
-            "world_id": str(candidate["world_id"]),
+            "world_id": world_id,
             "query_id": str(candidate.get("query_id") or ""),
             "release_profile_id": release_profile_id,
             "release_profile_sha256": profile_digest,
-            "missing_exact_length_buckets": missing_by_world[
-                str(candidate["world_id"])
-            ],
-            "reason": "missing required exact length buckets: "
-            + "+".join(missing_by_world[str(candidate["world_id"])]),
         }
-        for candidate in candidates
-        if str(candidate["world_id"]) in missing_by_world
-    ]
+        if missing:
+            reject["missing_exact_length_buckets"] = missing
+            reject["reason"] = "missing required exact length buckets: " + "+".join(
+                missing
+            )
+        else:
+            reject["cumulative_history_violations"] = cumulative
+            reject["reason"] = "invalid cumulative source history: " + ";".join(
+                cumulative
+            )
+        rejects.append(reject)
     return accepted, rejects
 
 
