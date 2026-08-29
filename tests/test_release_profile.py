@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import asdict, replace
 
 import pytest
 
@@ -85,6 +85,32 @@ def test_p7_source_rich_profile_requires_every_world_to_be_real() -> None:
     }
 
 
+def test_p12_current_gate_probe_is_a_new_strict_root() -> None:
+    profile = release_profile("p12-current-source-probe-12-v1")
+
+    assert profile.environment == "probe"
+    assert profile.predecessor_profile_id is None
+    assert profile.expected_promoted_worlds == 12
+    assert (profile.min_train_worlds, profile.min_eval_worlds) == (10, 2)
+    assert (profile.min_real_train_worlds, profile.min_real_eval_worlds) == (10, 2)
+    assert profile.min_source_families == 4
+    assert profile.min_unique_real_source_workflows == 12
+    assert profile.min_unique_executable_proofs == 12
+    assert profile.min_unique_answer_programs == 8
+    assert profile.min_unique_semantic_base_tasks == 8
+    assert profile.min_motifs == 8
+    assert dict(profile.promoted_domain_world_quotas) == {
+        "company": 4,
+        "researchlab": 4,
+        "codeforge": 4,
+    }
+    assert dict(profile.min_real_exact_64k_worlds_by_domain) == {
+        "company": 4,
+        "researchlab": 4,
+        "codeforge": 4,
+    }
+
+
 def test_current_production_profiles_require_source_rich_predecessors() -> None:
     production_48 = release_profile("p10-source-rich-production-48-v1")
     production_210 = release_profile("p10-source-rich-production-210-v1")
@@ -112,13 +138,19 @@ def test_current_production_profiles_require_source_rich_predecessors() -> None:
     assert production_210.min_unique_semantic_base_tasks == 210
 
 
-def test_only_current_production_profiles_are_issuable() -> None:
-    assert (
-        issuable_release_profile("p10-source-rich-production-48-v1").environment
-        == "production"
+def test_no_production_profile_is_issuable_before_the_current_probe_passes() -> None:
+    assert issuable_release_profile("p12-current-source-probe-12-v1").environment == (
+        "probe"
     )
-    with pytest.raises(ValueError, match="superseded production release profile"):
-        issuable_release_profile("p3-production-48-v1")
+    production_profile_ids = {
+        profile_id
+        for profile_id, profile in RELEASE_PROFILES.items()
+        if profile.environment == "production"
+    }
+    assert production_profile_ids
+    for profile_id in production_profile_ids:
+        with pytest.raises(ValueError, match="superseded production release profile"):
+            issuable_release_profile(profile_id)
 
 
 def test_release_profile_digest_binds_every_gate_value(monkeypatch) -> None:
@@ -163,6 +195,12 @@ def test_new_p7_gates_do_not_rewrite_frozen_p6_profile_digest() -> None:
     assert release_profile_sha256("p3-production-210-v1") == (
         "4ebb72d06a058b74d22360fc10a55b1b0621f8a37f76ab86e43e4f1d4508188f"
     )
+    assert release_profile_sha256("p7-source-rich-probe-12-v1") == (
+        "846b09bfc977672ef6f5985fd807ea7423ac1a279a24790080d0267c8ffa5a31"
+    )
+    assert release_profile_sha256("p10-source-rich-production-48-v1") == (
+        "de7da44b3710102fb215c26ed9cdb08bfe317f8b3e9c125208c3ea02e3ad877a"
+    )
 
 
 def test_p7_sec_slice_is_an_explicit_one_world_engineering_gate() -> None:
@@ -174,6 +212,36 @@ def test_p7_sec_slice_is_an_explicit_one_world_engineering_gate() -> None:
     assert profile.min_unique_real_source_workflows == 1
     assert profile.min_real_exact_64k_rows_by_domain == (("company", 1),)
     assert profile.min_real_exact_64k_worlds_by_domain == (("company", 1),)
+
+
+def test_p12_sec_slice_adds_128k_without_changing_historical_training_buckets() -> None:
+    historical = release_profile("p7-sec-source-slice-1-v1")
+    profile = release_profile("p12-sec-source-slice-1-v1")
+
+    assert all(
+        candidate.training_length_buckets == ("16k", "32k", "64k")
+        for profile_id, candidate in RELEASE_PROFILES.items()
+        if profile_id != profile.profile_id
+    )
+    assert historical.training_length_buckets == ("16k", "32k", "64k")
+    assert profile.training_length_buckets == ("16k", "32k", "64k", "128k")
+    assert historical.required_exact_length_buckets == ()
+    assert profile.required_exact_length_buckets == (
+        "16k",
+        "32k",
+        "64k",
+        "128k",
+    )
+    historical_contract = asdict(historical)
+    p12_contract = asdict(profile)
+    for field in (
+        "profile_id",
+        "training_length_buckets",
+        "required_exact_length_buckets",
+    ):
+        historical_contract.pop(field)
+        p12_contract.pop(field)
+    assert p12_contract == historical_contract
 
 
 def test_p7_wiki_slice_is_an_explicit_one_world_engineering_gate() -> None:

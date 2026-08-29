@@ -22,9 +22,12 @@ TRUST_ROOTS_PATH_ENV = "LONGWORLD_PRODUCTION_TRUST_ROOTS_PATH"
 TRUST_ROOTS_DIGEST_ENV = "LONGWORLD_PRODUCTION_TRUST_ROOTS_SHA256"
 APPROVAL_PATH_ENV = "LONGWORLD_PRODUCTION_APPROVAL_PATH"
 APPROVAL_DIGEST_ENV = "LONGWORLD_PRODUCTION_APPROVAL_SHA256"
+PACKAGE_APPROVAL_PATH_ENV = "LONGWORLD_PRODUCTION_PACKAGE_APPROVAL_PATH"
+PACKAGE_APPROVAL_DIGEST_ENV = "LONGWORLD_PRODUCTION_PACKAGE_APPROVAL_SHA256"
 
 TRUST_ROOTS_SCHEMA = "longworld-production-trust-roots-v1"
 APPROVAL_SCHEMA = "longworld-production-approval-v1"
+PACKAGE_APPROVAL_SCHEMA = "longworld-production-package-approval-v1"
 APPROVAL_SCHEME = "ecdsa-p256-sha256-v1"
 
 _STATEMENT_KEYS = {
@@ -37,6 +40,19 @@ _STATEMENT_KEYS = {
     "train_sha256",
     "eval_sha256",
     "release_selection_sha256",
+    "approval_authority",
+    "approval_nonce",
+    "issued_at",
+}
+_PACKAGE_STATEMENT_KEYS = {
+    "schema_version",
+    "approval_scope",
+    "decision",
+    "release_profile_id",
+    "release_profile_sha256",
+    "release_inventory_sha256",
+    "committed_sha256",
+    "training_manifest_sha256",
     "approval_authority",
     "approval_nonce",
     "issued_at",
@@ -260,6 +276,105 @@ def _verify_approval_envelope(
     }
 
 
+def _validate_package_statement(
+    statement: dict[str, Any],
+    *,
+    release_profile_id: str,
+    release_profile_sha256: str,
+    release_inventory_sha256: str,
+    committed_sha256: str,
+    training_manifest_sha256: str,
+) -> None:
+    if set(statement) != _PACKAGE_STATEMENT_KEYS:
+        raise ValueError("production package approval statement fields are invalid")
+    if (
+        statement.get("schema_version") != PACKAGE_APPROVAL_SCHEMA
+        or statement.get("approval_scope") != "longworld-production-package"
+        or statement.get("decision") != "approved"
+        or not str(statement.get("approval_authority") or "").strip()
+        or not str(statement.get("approval_nonce") or "").strip()
+        or not str(statement.get("issued_at") or "").endswith("Z")
+    ):
+        raise ValueError("production package approval decision is invalid")
+    expected = {
+        "release_profile_id": release_profile_id,
+        "release_profile_sha256": release_profile_sha256,
+        "release_inventory_sha256": release_inventory_sha256,
+        "committed_sha256": committed_sha256,
+        "training_manifest_sha256": training_manifest_sha256,
+    }
+    if any(statement.get(field) != value for field, value in expected.items()):
+        raise ValueError("production package approval does not bind package bytes")
+    if any(
+        not _valid_sha256(statement.get(field))
+        for field in expected
+        if field != "release_profile_id"
+    ):
+        raise ValueError("production package approval contains an invalid digest")
+
+
+def _verify_package_approval_envelope(
+    approval: dict[str, Any],
+    *,
+    roots: dict[str, Any],
+    roots_digest: str,
+    release_profile_id: str,
+    release_profile_sha256: str,
+    release_inventory_sha256: str,
+    committed_sha256: str,
+    training_manifest_sha256: str,
+) -> dict[str, Any]:
+    if set(approval) != {"statement", "signature"}:
+        raise ValueError("production package approval envelope fields are invalid")
+    statement = approval.get("statement")
+    signature = approval.get("signature")
+    if not isinstance(statement, dict) or not isinstance(signature, dict):
+        raise TypeError("production package approval envelope is invalid")
+    if (
+        set(signature) != {"scheme", "key_id", "value_base64"}
+        or signature.get("scheme") != APPROVAL_SCHEME
+    ):
+        raise ValueError("production package approval signature metadata is invalid")
+    key_id = str(signature.get("key_id") or "")
+    authority = str(statement.get("approval_authority") or "")
+    public_key = _load_trust_key(roots, key_id, authority)
+    _validate_package_statement(
+        statement,
+        release_profile_id=release_profile_id,
+        release_profile_sha256=release_profile_sha256,
+        release_inventory_sha256=release_inventory_sha256,
+        committed_sha256=committed_sha256,
+        training_manifest_sha256=training_manifest_sha256,
+    )
+    statement_bytes = canonical_approval_statement(statement)
+    try:
+        signature_bytes = base64.b64decode(
+            str(signature.get("value_base64") or ""), validate=True
+        )
+        public_key.verify(
+            signature_bytes,
+            statement_bytes,
+            ec.ECDSA(hashes.SHA256()),
+        )
+    except (binascii.Error, InvalidSignature, ValueError) as error:
+        raise ValueError("production package approval signature is invalid") from error
+    envelope_sha256 = _sha256(
+        json.dumps(
+            approval, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
+    )
+    return {
+        "verified": True,
+        "scheme": APPROVAL_SCHEME,
+        "approval_key_id": key_id,
+        "approval_envelope_sha256": envelope_sha256,
+        "trust_roots_sha256": roots_digest,
+        "approval_statement_sha256": _sha256(statement_bytes),
+        "statement": statement,
+        "signature": signature,
+    }
+
+
 def verify_production_approval_from_env(
     *,
     release_profile_id: str,
@@ -286,6 +401,41 @@ def verify_production_approval_from_env(
         release_profile_sha256=release_profile_sha256,
         source_file_sha256=source_file_sha256,
         release_selection_sha256=release_selection_sha256,
+    )
+
+
+def verify_production_package_approval_from_env(
+    *,
+    release_profile_id: str,
+    release_profile_sha256: str,
+    release_inventory_sha256: str,
+    committed_sha256: str,
+    training_manifest_sha256: str,
+) -> dict[str, Any]:
+    """Verify an independent KMS approval of the final package byte identities."""
+    approval_path = os.environ.get(PACKAGE_APPROVAL_PATH_ENV, "")
+    approval_digest = os.environ.get(PACKAGE_APPROVAL_DIGEST_ENV, "")
+    if not approval_path or not _valid_sha256(approval_digest):
+        raise ValueError("external production package approval is not configured")
+    approval, _actual_approval_digest = _read_pinned_json(
+        approval_path,
+        approval_digest,
+        label="package approval",
+    )
+    roots, roots_digest = _read_pinned_json(
+        os.environ.get(TRUST_ROOTS_PATH_ENV, ""),
+        os.environ.get(TRUST_ROOTS_DIGEST_ENV, ""),
+        label="trust roots",
+    )
+    return _verify_package_approval_envelope(
+        approval,
+        roots=roots,
+        roots_digest=roots_digest,
+        release_profile_id=release_profile_id,
+        release_profile_sha256=release_profile_sha256,
+        release_inventory_sha256=release_inventory_sha256,
+        committed_sha256=committed_sha256,
+        training_manifest_sha256=training_manifest_sha256,
     )
 
 

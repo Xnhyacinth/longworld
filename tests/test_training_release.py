@@ -7,12 +7,21 @@ from pathlib import Path
 
 import pytest
 
-from longworld.core.attestation import ATTESTATION_ENV, attestation_key_from_env
-from longworld.core.release_profile import release_profile_sha256
+from longworld.core.attestation import (
+    ATTESTATION_ENV,
+    LOCAL_PROBE_COMBINED_ROLES_ENV,
+    LOCAL_PROBE_TRUST_ISOLATION_VALUE,
+    attestation_key_from_env,
+)
+from longworld.core.record_contract import exact_token_metadata_valid
+from longworld.core.release_profile import release_profile, release_profile_sha256
 from longworld.core.training_manifest import (
+    LLAMAFACTORY_SHAREGPT_SYSTEM_V4,
+    LLAMAFACTORY_SHAREGPT_TRANSFORM_V4,
     create_training_manifest,
     file_sha256,
     resolve_training_manifest_path,
+    validate_deterministic_training_transform,
     validate_training_manifest,
 )
 
@@ -20,6 +29,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import quality_gate
+from export_llamafactory import validate_release_transform
 from quality_gate import (
     load_and_create_release_gate_receipt,
     validate_gate_receipt_output,
@@ -94,6 +104,49 @@ def test_loaded_release_metrics_feed_the_gate_receipt_world_count(
     assert receipt["tokenizer_model_id"] == "Qwen/Qwen3.5-4B"
     assert len(receipt["tokenizer_revision"]) == 40
     assert receipt["tokenizer_asset_manifest_sha256"] is None
+
+
+def test_combined_probe_gate_receipt_explicitly_disables_production_trust(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "quality_report.json").write_text(
+        json.dumps(
+            {
+                "data_stage": "train_ready",
+                "release_profile_id": "p3-probe-12-v1",
+                "release_profile_sha256": release_profile_sha256("p3-probe-12-v1"),
+            }
+        )
+    )
+    _write_jsonl(tmp_path / "train.jsonl", [{"split": "train"}])
+    _write_jsonl(tmp_path / "eval.jsonl", [{"split": "eval"}])
+    monkeypatch.setattr(
+        quality_gate,
+        "evaluate_quality",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "errors": [],
+            "n_rows": 2,
+            "n_worlds_observed": 12,
+        },
+    )
+    monkeypatch.setenv("LONGWORLD_ATTESTATION_ENVIRONMENT", "probe")
+    monkeypatch.setenv("LONGWORLD_AUDITOR_ATTESTATION_KEY", KEY.decode())
+    monkeypatch.setenv("LONGWORLD_AUDITOR_ATTESTATION_KEY_ID", "probe-gate-v1")
+    monkeypatch.setenv(
+        LOCAL_PROBE_COMBINED_ROLES_ENV, LOCAL_PROBE_TRUST_ISOLATION_VALUE
+    )
+
+    _, receipt = load_and_create_release_gate_receipt(
+        tmp_path,
+        "p3-probe-12-v1",
+        attestation_key=KEY,
+    )
+
+    assert receipt["trust_scope"] == "local_probe"
+    assert receipt["diagnostic_only"] is True
+    assert receipt["trust_valid_for_production"] is False
+    assert receipt["production_eligible"] is False
 
 
 def test_gate_receipt_rejects_non_green_metrics(
@@ -348,3 +401,357 @@ def test_training_manifest_validates_after_release_directory_relocation(
         expected_transform_revision="sharegpt-v-test",
         attestation_key=attestation_key_from_env("training_export_manifest"),
     )
+
+
+def test_training_export_rows_are_exact_deterministic_promoted_projections(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from longworld.core import training_manifest
+
+    monkeypatch.setattr(training_manifest, "sft_row_errors", lambda _row: [])
+    monkeypatch.setattr(
+        training_manifest,
+        "release_profile",
+        lambda _profile_id: type(
+            "Profile",
+            (),
+            {
+                "training_conditions": ("B1",),
+                "training_length_buckets": ("32k",),
+                "training_export_seed": 0,
+            },
+        )(),
+    )
+    root = tmp_path / "release"
+    source = root / "04_promoted"
+    output = root / "05_training"
+    source.mkdir(parents=True)
+    output.mkdir()
+    promoted = {
+        "data_stage": "train_ready",
+        "split": "train",
+        "world_id": "world-1",
+        "query_id": "query-1",
+        "dossier_id": "dossier-1",
+        "view": "full",
+        "query_type": "version_selection",
+        "query_timing": "first",
+        "length_bucket": "32k",
+        "context": "release history and CI evidence",
+        "answer": "v2.1.0",
+        "difficulty": {"context_tokens": 32_000, "max_evidence_distance": 24_000},
+        "dependency_class": "long_range",
+        "base_task_id": "task-1",
+        "executable_proof_id": "proof-1",
+        "source_relation_id": "relation-1",
+        "answer_program_id": "program-1",
+        "source_origins": ["real_public"],
+        "workflow_kinds": ["hybrid_causal"],
+        "workflow_ids": ["workflow-1"],
+        "evidence_roles": ["essential"],
+        "composition_method": "source_bound_workflow",
+        "training_objective": "long_context_sft",
+    }
+    (source / "quality_report.json").write_text("{}\n")
+    second = {
+        **promoted,
+        "query_id": "query-2",
+        "dossier_id": "dossier-2",
+        "context": "a second source-bound release history",
+        "answer": "v2.2.0",
+        "base_task_id": "task-2",
+        "executable_proof_id": "proof-2",
+    }
+    _write_jsonl(source / "train.jsonl", [promoted, second])
+    (source / "eval.jsonl").write_text("")
+    transformed = {
+        "conversations": [
+            {"from": "system", "value": LLAMAFACTORY_SHAREGPT_SYSTEM_V4},
+            {"from": "human", "value": promoted["context"]},
+            {"from": "gpt", "value": promoted["answer"]},
+        ],
+        "world_id": "world-1",
+        "query_id": "query-1",
+        "dossier_id": "dossier-1",
+        "view": "full",
+        "query_type": "version_selection",
+        "query_timing": "first",
+        "length_bucket": "32k",
+        "evidence_distance": 24_000,
+        "dependency_class": "long_range",
+        "sample_weight": 1,
+        "base_task_id": "task-1",
+        "executable_proof_id": "proof-1",
+        "source_relation_id": "relation-1",
+        "answer_program_id": "program-1",
+        "source_origins": ["real_public"],
+        "workflow_kinds": ["hybrid_causal"],
+        "workflow_ids": ["workflow-1"],
+        "evidence_roles": ["essential"],
+        "composition_method": "source_bound_workflow",
+        "training_objective": "long_context_sft",
+    }
+    transformed_second = json.loads(json.dumps(transformed))
+    transformed_second.update(
+        {
+            "query_id": second["query_id"],
+            "dossier_id": second["dossier_id"],
+            "base_task_id": second["base_task_id"],
+            "executable_proof_id": second["executable_proof_id"],
+        }
+    )
+    transformed_second["conversations"][1]["value"] = second["context"]
+    transformed_second["conversations"][2]["value"] = second["answer"]
+    shard = output / "B1.json"
+    expected_rows = [transformed, transformed_second]
+    shard.write_text(json.dumps(expected_rows) + "\n")
+    manifest_path = output / "training_export_manifest.json"
+    manifest = create_training_manifest(
+        manifest_path,
+        release_root=root,
+        source_data_dir=source,
+        release_profile_id="p3-probe-12-v1",
+        transform_revision="longworld-llamafactory-sharegpt-v4",
+        output_paths=[shard],
+        source_file_sha256=_source_digests(source),
+        attestation_key=attestation_key_from_env("training_export_manifest"),
+    )
+
+    assert validate_deterministic_training_transform(manifest_path, manifest) == 2
+
+    with pytest.raises(ValueError, match="production trust"):
+        validate_deterministic_training_transform(
+            manifest_path,
+            manifest,
+            require_production_trust=True,
+        )
+
+    production_trust = {
+        "trust_scope": "production",
+        "diagnostic_only": False,
+        "content_gate_eligible": True,
+        "trust_valid_for_production": True,
+        "production_eligible": True,
+    }
+    promoted.update(production_trust)
+    second.update(production_trust)
+    _write_jsonl(source / "train.jsonl", [promoted, second])
+    manifest = create_training_manifest(
+        manifest_path,
+        release_root=root,
+        source_data_dir=source,
+        release_profile_id="p3-probe-12-v1",
+        transform_revision="longworld-llamafactory-sharegpt-v4",
+        output_paths=[shard],
+        source_file_sha256=_source_digests(source),
+        attestation_key=attestation_key_from_env("training_export_manifest"),
+    )
+    assert (
+        validate_deterministic_training_transform(
+            manifest_path,
+            manifest,
+            require_production_trust=True,
+        )
+        == 2
+    )
+
+    shard.write_text(json.dumps([transformed]) + "\n")
+    manifest = create_training_manifest(
+        manifest_path,
+        release_root=root,
+        source_data_dir=source,
+        release_profile_id="p3-probe-12-v1",
+        transform_revision="longworld-llamafactory-sharegpt-v4",
+        output_paths=[shard],
+        source_file_sha256=_source_digests(source),
+        attestation_key=attestation_key_from_env("training_export_manifest"),
+    )
+    with pytest.raises(ValueError, match="deterministic transform"):
+        validate_deterministic_training_transform(manifest_path, manifest)
+
+
+def test_p12_sec_profile_deterministically_exports_legal_128k_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from longworld.core import training_manifest
+
+    monkeypatch.setattr(training_manifest, "sft_row_errors", lambda _row: [])
+    asset_digest = "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb"
+    bucket_tokens = {
+        "16k": 16_000,
+        "32k": 32_000,
+        "64k": 64_000,
+        "128k": 128_000,
+    }
+    rows = []
+    for bucket, tokens in bucket_tokens.items():
+        for view in ("full", "cf", "ordered_artifact_view"):
+            row = {
+                "data_stage": "train_ready",
+                "split": "train",
+                "world_id": "sec-world",
+                "query_id": f"sec-{bucket}-{view}",
+                "dossier_id": (
+                    f"sec-{bucket}-twin"
+                    if view in {"full", "cf"}
+                    else f"sec-{bucket}-ordered"
+                ),
+                "view": view,
+                "query_type": "sec_financial_reconstruction",
+                "query_timing": "first",
+                "length_bucket": bucket,
+                "context": f"source-bound SEC reconstruction {bucket} {view}",
+                "answer": f"answer-{bucket}-{view}",
+                "difficulty": {
+                    "context_tokens": tokens,
+                    "max_evidence_distance": tokens - 1_000,
+                },
+                "dependency_class": "deep_dependency",
+                "base_task_id": f"task-{bucket}",
+                "executable_proof_id": f"proof-{bucket}",
+                "source_relation_id": f"relation-{bucket}",
+                "answer_program_id": "sec-reconstruction",
+                "source_origins": ["real_public"],
+                "workflow_kinds": ["hybrid_causal"],
+                "workflow_ids": ["sec-workflow"],
+                "evidence_roles": ["causal_gold"],
+                "composition_method": (
+                    "causal_timeline"
+                    if view == "ordered_artifact_view"
+                    else "same_case_dossier"
+                ),
+                "training_objective": "sft",
+            }
+            if bucket == "128k":
+                row.update(
+                    tokenizer_context_tokens=tokens,
+                    tokenizer_model_id="Qwen/Qwen3.5-4B",
+                    tokenizer_revision=("a7b0d22b993d71000cf2eadfb37222a67cee521e"),
+                    tokenizer_asset_manifest_sha256=asset_digest,
+                    promotion={"tokenizer_asset_manifest_sha256": asset_digest},
+                )
+                assert exact_token_metadata_valid(row, require_asset_manifest=True)
+                assert (
+                    row["promotion"]["tokenizer_asset_manifest_sha256"]
+                    == (row["tokenizer_asset_manifest_sha256"])
+                )
+            rows.append(row)
+
+    historical_outputs = training_manifest._expected_sharegpt_outputs(
+        rows, {"release_profile_id": "p7-sec-source-slice-1-v1"}
+    )
+    assert release_profile("p7-sec-source-slice-1-v1").training_length_buckets == (
+        "16k",
+        "32k",
+        "64k",
+    )
+    assert not any(
+        row["length_bucket"] == "128k"
+        for output in historical_outputs.values()
+        for row in output
+    )
+
+    profile_id = "p12-sec-source-slice-1-v1"
+    validate_release_transform(
+        profile_id,
+        conditions=release_profile(profile_id).training_conditions,
+        train_buckets=set(bucket_tokens),
+        seed=0,
+        token_budget=None,
+    )
+    with pytest.raises(ValueError, match="immutable profile"):
+        validate_release_transform(
+            "p7-sec-source-slice-1-v1",
+            conditions=release_profile("p7-sec-source-slice-1-v1").training_conditions,
+            train_buckets=set(bucket_tokens),
+            seed=0,
+            token_budget=None,
+        )
+    expected_outputs = training_manifest._expected_sharegpt_outputs(
+        rows, {"release_profile_id": profile_id}
+    )
+    assert any(
+        row["length_bucket"] == "128k"
+        for output in expected_outputs.values()
+        for row in output
+    )
+
+    root = tmp_path / "release"
+    source = root / "04_promoted"
+    output = root / "05_training"
+    source.mkdir(parents=True)
+    output.mkdir()
+    (source / "quality_report.json").write_text("{}\n")
+    _write_jsonl(source / "train.jsonl", rows)
+    (source / "eval.jsonl").write_text("")
+    output_paths = []
+    for name, expected_rows in expected_outputs.items():
+        path = output / name
+        path.write_text(json.dumps(expected_rows) + "\n")
+        output_paths.append(path)
+    manifest_path = output / "training_export_manifest.json"
+    manifest = create_training_manifest(
+        manifest_path,
+        release_root=root,
+        source_data_dir=source,
+        release_profile_id=profile_id,
+        transform_revision=LLAMAFACTORY_SHAREGPT_TRANSFORM_V4,
+        output_paths=output_paths,
+        source_file_sha256=_source_digests(source),
+        attestation_key=attestation_key_from_env("training_export_manifest"),
+    )
+
+    assert validate_deterministic_training_transform(manifest_path, manifest) == sum(
+        len(output_rows) for output_rows in expected_outputs.values()
+    )
+
+
+def test_deterministic_b5w_transform_uses_weights_without_copying_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from longworld.core import training_manifest
+
+    monkeypatch.setattr(training_manifest, "sft_row_errors", lambda _row: [])
+    monkeypatch.setattr(
+        training_manifest,
+        "release_profile",
+        lambda _profile_id: type(
+            "Profile",
+            (),
+            {
+                "training_conditions": ("B5w",),
+                "training_length_buckets": ("32k",),
+                "training_export_seed": 0,
+            },
+        )(),
+    )
+    base = {
+        "data_stage": "train_ready",
+        "split": "train",
+        "world_id": "world-1",
+        "query_type": "version_selection",
+        "query_timing": "first",
+        "length_bucket": "32k",
+        "answer": "v2.1.0",
+        "difficulty": {"context_tokens": 32_000, "max_evidence_distance": 24_000},
+        "dependency_class": "long_range",
+    }
+    rows = [
+        {
+            **base,
+            "query_id": f"query-{view}",
+            "dossier_id": "dossier-twin" if view in {"full", "cf"} else "dossier-2",
+            "view": view,
+            "context": f"source-bound {view} context",
+        }
+        for view in ("full", "cf", "ordered_artifact_view")
+    ]
+
+    expected = training_manifest._expected_sharegpt_outputs(
+        rows,
+        {"release_profile_id": "p3-probe-12-v1"},
+    )
+
+    assert set(expected) == {"B5w.json"}
+    assert len(expected["B5w.json"]) == len(rows)
+    assert {row["sample_weight"] for row in expected["B5w.json"]} == {2}

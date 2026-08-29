@@ -10,10 +10,13 @@ import pytest
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
+import longworld.core.release_profile as release_profile_module
 from longworld.core.attestation import attach_attestation
 from longworld.core.production_trust import (
     APPROVAL_DIGEST_ENV,
     APPROVAL_PATH_ENV,
+    PACKAGE_APPROVAL_DIGEST_ENV,
+    PACKAGE_APPROVAL_PATH_ENV,
     TRUST_ROOTS_DIGEST_ENV,
     TRUST_ROOTS_PATH_ENV,
     canonical_approval_statement,
@@ -39,6 +42,16 @@ SUPERSEDED_PRODUCTION_PROFILE = "p3-production-48-v1"
 TRANSFORM = "sharegpt-v-test"
 AUDITOR_KEY = b"release-package-auditor-test-key-32b"
 REPORT_KEY = b"release-package-report-test-key-32by"
+
+
+def _allow_historical_production_profile_for_contract_test(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        release_profile_module,
+        "ISSUABLE_PRODUCTION_PROFILE_IDS",
+        frozenset({PRODUCTION_PROFILE}),
+    )
 
 
 def _write_release_sources(
@@ -325,6 +338,41 @@ def test_release_package_is_portable_allowlisted_and_committed_last(
     )
 
 
+def test_committed_historical_profile_remains_verifiable_when_issuance_is_disabled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_root = _prepare_release(
+        tmp_path,
+        monkeypatch,
+        release_profile_id=PRODUCTION_PROFILE,
+    )
+    destination = tmp_path / "historical-profile-local-package"
+    build_release_package(
+        source_release_root=source_root,
+        destination=destination,
+        promoted_dir=source_root / "04_promoted",
+        training_manifest_path=(
+            source_root / "05_training" / "training_export_manifest.json"
+        ),
+        data_card_path=source_root / "DATA_CARD.md",
+        release_profile_id=PRODUCTION_PROFILE,
+        transform_revision=TRANSFORM,
+        training_attestation_key=REPORT_KEY,
+        gate_attestation_key=AUDITOR_KEY,
+        inventory_attestation_key=REPORT_KEY,
+    )
+
+    assert release_profile_module.ISSUABLE_PRODUCTION_PROFILE_IDS == frozenset()
+    validate_release_inventory(
+        destination,
+        expected_release_profile_id=PRODUCTION_PROFILE,
+        expected_transform_revision=TRANSFORM,
+        training_attestation_key=REPORT_KEY,
+        gate_attestation_key=AUDITOR_KEY,
+        inventory_attestation_key=REPORT_KEY,
+    )
+
+
 def test_release_inventory_rejects_extra_files(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -448,6 +496,45 @@ def test_release_builder_leaves_no_partial_destination_on_gate_failure(
 
     assert not destination.exists()
     assert not list(tmp_path.glob(".hf-private-stage.*"))
+
+
+@pytest.mark.parametrize(
+    "payload,error",
+    [
+        ("contact=owner@example.org\n", "PII"),
+        ("token=ghp_abcdefghijklmnopqrstuvwxyz123456\n", "secret"),
+    ],
+)
+def test_release_builder_scans_final_payload_bytes_before_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    payload: str,
+    error: str,
+) -> None:
+    source_root = _prepare_release(tmp_path, monkeypatch)
+    (source_root / "DATA_CARD.md").write_text(payload)
+    destination = tmp_path / "hf-private-stage"
+
+    with pytest.raises(ValueError, match=error):
+        _build_local_release(source_root, destination)
+
+    assert not destination.exists()
+
+
+def test_release_builder_rejects_candidate_stage_in_signed_training_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_root = _prepare_release(tmp_path, monkeypatch)
+    (source_root / "05_training" / "B5.json").write_text(
+        '[{"data_stage":"candidate"}]\n'
+    )
+    _resign_training_outputs(source_root)
+    destination = tmp_path / "hf-private-stage"
+
+    with pytest.raises(ValueError, match="non-release data stage"):
+        _build_local_release(source_root, destination)
+
+    assert not destination.exists()
 
 
 def test_release_builder_rejects_signed_absolute_sampler_paths(
@@ -654,6 +741,7 @@ def test_superseded_production_profile_cannot_issue_a_new_package(
 def test_production_release_package_rejects_hmac_only_gate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    _allow_historical_production_profile_for_contract_test(monkeypatch)
     source_root = _prepare_release(
         tmp_path,
         monkeypatch,
@@ -685,6 +773,7 @@ def test_production_release_package_rejects_hmac_only_gate(
 def test_production_release_package_blocks_until_packaging_contract_is_ready(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    _allow_historical_production_profile_for_contract_test(monkeypatch)
     source_root = _prepare_release(
         tmp_path,
         monkeypatch,
@@ -704,6 +793,88 @@ def test_production_release_package_blocks_until_packaging_contract_is_ready(
     destination = tmp_path / "hf-private-stage"
 
     with pytest.raises(ValueError, match="production packaging contract is not ready"):
+        build_release_package(
+            source_release_root=source_root,
+            destination=destination,
+            promoted_dir=promoted,
+            training_manifest_path=(
+                source_root / "05_training" / "training_export_manifest.json"
+            ),
+            data_card_path=source_root / "DATA_CARD.md",
+            release_profile_id=PRODUCTION_PROFILE,
+            transform_revision=TRANSFORM,
+            training_attestation_key=REPORT_KEY,
+            gate_attestation_key=AUDITOR_KEY,
+            inventory_attestation_key=REPORT_KEY,
+            trust_mode="production",
+        )
+
+    assert not destination.exists()
+
+
+def test_production_package_fails_closed_without_final_package_approval(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import build_release_package as package_builder
+
+    from longworld.core import release_inventory
+
+    _allow_historical_production_profile_for_contract_test(monkeypatch)
+    source_root = _prepare_release(
+        tmp_path,
+        monkeypatch,
+        release_profile_id=PRODUCTION_PROFILE,
+        environment="production",
+    )
+    promoted = source_root / "04_promoted"
+    source_file_sha256 = {
+        name: file_sha256(promoted / name)
+        for name in ("quality_report.json", "train.jsonl", "eval.jsonl")
+    }
+    approval = _production_approval(tmp_path, monkeypatch, source_file_sha256)
+    receipt = json.loads((promoted / "release_gate_pass.json").read_text())
+    receipt["production_approval"] = approval
+    receipt = attach_attestation(receipt, AUDITOR_KEY, purpose=RELEASE_GATE_PURPOSE)
+    (promoted / "release_gate_pass.json").write_text(json.dumps(receipt) + "\n")
+    monkeypatch.setattr(
+        release_inventory,
+        "PRODUCTION_PACKAGE_READY_PROFILE_IDS",
+        frozenset({PRODUCTION_PROFILE}),
+    )
+    monkeypatch.setattr(
+        package_builder,
+        "validate_deterministic_training_transform",
+        lambda *_args, **_kwargs: 0,
+    )
+    monkeypatch.delenv(PACKAGE_APPROVAL_PATH_ENV, raising=False)
+    monkeypatch.delenv(PACKAGE_APPROVAL_DIGEST_ENV, raising=False)
+    destination = tmp_path / "hf-private-stage"
+
+    with pytest.raises(ValueError, match="external production package approval"):
+        build_release_package(
+            source_release_root=source_root,
+            destination=destination,
+            promoted_dir=promoted,
+            training_manifest_path=(
+                source_root / "05_training" / "training_export_manifest.json"
+            ),
+            data_card_path=source_root / "DATA_CARD.md",
+            release_profile_id=PRODUCTION_PROFILE,
+            transform_revision=TRANSFORM,
+            training_attestation_key=REPORT_KEY,
+            gate_attestation_key=AUDITOR_KEY,
+            inventory_attestation_key=REPORT_KEY,
+            trust_mode="production",
+        )
+
+    assert not destination.exists()
+
+    monkeypatch.setattr(
+        package_builder,
+        "verify_production_package_approval_from_env",
+        lambda **_kwargs: {"verified": True},
+    )
+    with pytest.raises(ValueError, match="approval sidecar contract is not ready"):
         build_release_package(
             source_release_root=source_root,
             destination=destination,

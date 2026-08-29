@@ -14,6 +14,9 @@ ATTESTATION_ENV = "LONGWORLD_ATTESTATION_KEY"
 ATTESTATION_SCHEME = "hmac-sha256"
 ATTESTATION_V2_SCHEME = "hmac-sha256-v2"
 ATTESTATION_ENVIRONMENT_ENV = "LONGWORLD_ATTESTATION_ENVIRONMENT"
+LOCAL_PROBE_COMBINED_ROLES_ENV = "LONGWORLD_LOCAL_PROBE_COMBINED_ROLES"
+LOCAL_PROBE_TRUST_ISOLATION_FIELD = "local_probe_trust_isolation"
+LOCAL_PROBE_TRUST_ISOLATION_VALUE = "non_independent_local_diagnostic"
 ATTESTATION_ROLES = (
     "source",
     "candidate",
@@ -49,6 +52,23 @@ PURPOSE_ROLES = {
 }
 _REJECTED_KEYS = {b"use-a-secret-of-at-least-32-bytes"}
 _NON_PRODUCTION_KEY_ID_PREFIXES = ("probe", "dev", "test", "local", "example")
+
+
+def local_probe_diagnostic_metadata() -> dict[str, Any]:
+    """Return signed trust labels for an explicitly combined local probe."""
+    if (
+        os.environ.get(ATTESTATION_ENVIRONMENT_ENV, "").strip().lower() == "probe"
+        and os.environ.get(LOCAL_PROBE_COMBINED_ROLES_ENV, "").strip()
+        == LOCAL_PROBE_TRUST_ISOLATION_VALUE
+    ):
+        return {
+            "trust_scope": "local_probe",
+            "diagnostic_only": True,
+            "content_gate_eligible": True,
+            "trust_valid_for_production": False,
+            "production_eligible": False,
+        }
+    return {}
 
 
 def attestation_environment_names() -> tuple[str, ...]:
@@ -142,6 +162,19 @@ def attach_attestation(
     if not _valid_key(key):
         raise ValueError("attestation key must contain at least 32 bytes")
     signed = dict(value)
+    combined_mode = os.environ.get(LOCAL_PROBE_COMBINED_ROLES_ENV, "").strip()
+    declared_isolation = signed.get(LOCAL_PROBE_TRUST_ISOLATION_FIELD)
+    if combined_mode == LOCAL_PROBE_TRUST_ISOLATION_VALUE:
+        if os.environ.get(
+            ATTESTATION_ENVIRONMENT_ENV, ""
+        ).strip().lower() != "probe" or declared_isolation not in {
+            None,
+            LOCAL_PROBE_TRUST_ISOLATION_VALUE,
+        }:
+            raise ValueError("local probe trust isolation marker is invalid")
+        signed[LOCAL_PROBE_TRUST_ISOLATION_FIELD] = LOCAL_PROBE_TRUST_ISOLATION_VALUE
+    elif declared_isolation is not None:
+        raise ValueError("local probe trust isolation marker is not active")
     identity = _role_identity_for_key(key, purpose)
     if identity is None:
         signed["attestation"] = {
@@ -274,6 +307,8 @@ def production_attestation_errors() -> list[str]:
         "production"
     ):
         errors.append("attestation environment must be production")
+    if os.environ.get(LOCAL_PROBE_COMBINED_ROLES_ENV):
+        errors.append("combined local-probe roles cannot be used in production")
     keys: list[bytes] = []
     key_ids: list[str] = []
     for role in ATTESTATION_ROLES:

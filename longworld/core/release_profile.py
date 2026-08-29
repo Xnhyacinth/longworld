@@ -20,6 +20,7 @@ class ReleaseProfile:
     split_strategy: str
     training_conditions: tuple[str, ...]
     training_length_buckets: tuple[str, ...]
+    required_exact_length_buckets: tuple[str, ...]
     training_export_seed: int
     max_training_token_spread: float
     llamafactory_transform_revision: str
@@ -76,6 +77,8 @@ def _profile(
     min_unique_answer_programs: int = 0,
     min_unique_semantic_base_tasks: int = 0,
     bind_tokenizer_assets: bool = False,
+    training_length_buckets: tuple[str, ...] = ("16k", "32k", "64k"),
+    required_exact_length_buckets: tuple[str, ...] = (),
 ) -> ReleaseProfile:
     return ReleaseProfile(
         profile_id=profile_id,
@@ -88,7 +91,8 @@ def _profile(
         min_real_eval_worlds=min_real_eval_worlds,
         split_strategy="world_atomic_hash_v1",
         training_conditions=("B1", "B3", "B5", "B5w"),
-        training_length_buckets=("16k", "32k", "64k"),
+        training_length_buckets=training_length_buckets,
+        required_exact_length_buckets=required_exact_length_buckets,
         training_export_seed=0,
         max_training_token_spread=0.05,
         llamafactory_transform_revision="longworld-llamafactory-sharegpt-v4",
@@ -229,6 +233,47 @@ RELEASE_PROFILES = {
         ),
         bind_tokenizer_assets=True,
     ),
+    "p12-current-source-probe-12-v1": _profile(
+        profile_id="p12-current-source-probe-12-v1",
+        environment="probe",
+        expected_promoted_worlds=12,
+        min_source_families=4,
+        min_real_base_tasks=12,
+        min_real_source_relations=12,
+        min_real_64k_rows=48,
+        min_train_worlds=10,
+        min_eval_worlds=2,
+        min_real_train_worlds=10,
+        min_real_eval_worlds=2,
+        predecessor_profile_id=None,
+        min_domains=3,
+        promoted_domain_world_quotas=(
+            ("company", 4),
+            ("researchlab", 4),
+            ("codeforge", 4),
+        ),
+        min_exact_64k_rows_by_domain=(
+            ("company", 12),
+            ("researchlab", 12),
+            ("codeforge", 12),
+        ),
+        min_unique_real_source_workflows=12,
+        min_real_exact_64k_rows_by_domain=(
+            ("company", 12),
+            ("researchlab", 12),
+            ("codeforge", 12),
+        ),
+        min_real_exact_64k_worlds_by_domain=(
+            ("company", 4),
+            ("researchlab", 4),
+            ("codeforge", 4),
+        ),
+        min_motifs=8,
+        min_unique_executable_proofs=12,
+        min_unique_answer_programs=8,
+        min_unique_semantic_base_tasks=8,
+        bind_tokenizer_assets=True,
+    ),
     "p7-sec-source-slice-1-v1": _profile(
         profile_id="p7-sec-source-slice-1-v1",
         environment="probe",
@@ -250,6 +295,30 @@ RELEASE_PROFILES = {
         min_real_exact_64k_worlds_by_domain=(("company", 1),),
         min_motifs=1,
         bind_tokenizer_assets=True,
+    ),
+    "p12-sec-source-slice-1-v1": _profile(
+        profile_id="p12-sec-source-slice-1-v1",
+        environment="probe",
+        expected_promoted_worlds=1,
+        min_source_families=1,
+        min_real_base_tasks=1,
+        min_real_source_relations=1,
+        min_real_64k_rows=1,
+        min_train_worlds=1,
+        min_eval_worlds=0,
+        min_real_train_worlds=1,
+        min_real_eval_worlds=0,
+        predecessor_profile_id=None,
+        min_domains=1,
+        promoted_domain_world_quotas=(("company", 1),),
+        min_exact_64k_rows_by_domain=(("company", 1),),
+        min_unique_real_source_workflows=1,
+        min_real_exact_64k_rows_by_domain=(("company", 1),),
+        min_real_exact_64k_worlds_by_domain=(("company", 1),),
+        min_motifs=1,
+        bind_tokenizer_assets=True,
+        training_length_buckets=("16k", "32k", "64k", "128k"),
+        required_exact_length_buckets=("16k", "32k", "64k", "128k"),
     ),
     "p7-wiki-source-slice-1-v1": _profile(
         profile_id="p7-wiki-source-slice-1-v1",
@@ -456,12 +525,29 @@ RELEASE_PROFILES = {
     ),
 }
 
-ISSUABLE_PRODUCTION_PROFILE_IDS = frozenset(
+RELATION_PROVENANCE_SPLIT_PROFILE_IDS = frozenset(
+    {
+        "p7-source-rich-probe-12-v1",
+        "p7-sec-source-slice-1-v1",
+        "p12-sec-source-slice-1-v1",
+        "p7-wiki-source-slice-1-v1",
+        "p7-paper-source-slice-1-v1",
+        "p7-github-source-slice-1-v1",
+        "p10-source-rich-production-48-v1",
+        "p10-source-rich-production-210-v1",
+        "p12-current-source-probe-12-v1",
+    }
+)
+SUBSTANTIAL_REAL_PROOF_GROWTH_PROFILE_IDS = RELATION_PROVENANCE_SPLIT_PROFILE_IDS
+CURRENT_RELEASE_GATE_ONLY_PROFILE_IDS = frozenset(
     {
         "p10-source-rich-production-48-v1",
         "p10-source-rich-production-210-v1",
+        "p12-current-source-probe-12-v1",
     }
 )
+
+ISSUABLE_PRODUCTION_PROFILE_IDS: frozenset[str] = frozenset()
 
 
 def release_profile(profile_id: str) -> ReleaseProfile:
@@ -485,6 +571,8 @@ def issuable_release_profile(profile_id: str) -> ReleaseProfile:
 def release_profile_sha256(profile_id: str) -> str:
     """Bind an ID to the exact immutable gate values active for a release."""
     profile = asdict(release_profile(profile_id))
+    if not profile["required_exact_length_buckets"]:
+        profile.pop("required_exact_length_buckets")
     if profile["min_unique_real_source_workflows"] == 0:
         profile.pop("min_unique_real_source_workflows")
     if not profile["min_real_exact_64k_rows_by_domain"]:

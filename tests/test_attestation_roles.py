@@ -7,6 +7,8 @@ import pytest
 from longworld.core.attestation import (
     ATTESTATION_ENV,
     ATTESTATION_ENVIRONMENT_ENV,
+    LOCAL_PROBE_TRUST_ISOLATION_FIELD,
+    LOCAL_PROBE_TRUST_ISOLATION_VALUE,
     ROLE_KEY_ENVS,
     ROLE_KEY_ID_ENVS,
     attach_attestation,
@@ -170,6 +172,42 @@ def test_probe_artifact_semantics_use_the_source_role_and_fail_closed(
     monkeypatch.setenv(ROLE_KEY_ID_ENVS["source"], "prod-source-semantic-v1")
     monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "production")
     assert not verify_attestation(signed, source_key, purpose="artifact_semantics")
+
+
+def test_combined_local_probe_isolation_marker_is_signed_and_cannot_be_forged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(
+        "LONGWORLD_LOCAL_PROBE_COMBINED_ROLES", LOCAL_PROBE_TRUST_ISOLATION_VALUE
+    )
+    candidate_key = _configure_role(monkeypatch, "candidate", "combined-v1")
+
+    signed = attach_attestation({"row": 1}, candidate_key, purpose="candidate_row")
+
+    assert signed[LOCAL_PROBE_TRUST_ISOLATION_FIELD] == (
+        LOCAL_PROBE_TRUST_ISOLATION_VALUE
+    )
+    assert verify_attestation(signed, candidate_key, purpose="candidate_row")
+    signed[LOCAL_PROBE_TRUST_ISOLATION_FIELD] = "independent"
+    assert not verify_attestation(signed, candidate_key, purpose="candidate_row")
+
+
+def test_local_probe_isolation_marker_cannot_be_claimed_without_combined_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    candidate_key = _configure_role(monkeypatch, "candidate", "single-v1")
+
+    with pytest.raises(ValueError, match="local probe trust isolation"):
+        attach_attestation(
+            {
+                "row": 1,
+                LOCAL_PROBE_TRUST_ISOLATION_FIELD: LOCAL_PROBE_TRUST_ISOLATION_VALUE,
+            },
+            candidate_key,
+            purpose="candidate_row",
+        )
 
 
 def test_production_readiness_rejects_missing_duplicate_or_probe_roles(

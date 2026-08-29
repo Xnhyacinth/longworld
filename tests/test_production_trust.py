@@ -12,12 +12,15 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from longworld.core.production_trust import (
     APPROVAL_DIGEST_ENV,
     APPROVAL_PATH_ENV,
+    PACKAGE_APPROVAL_DIGEST_ENV,
+    PACKAGE_APPROVAL_PATH_ENV,
     TRUST_ROOTS_DIGEST_ENV,
     TRUST_ROOTS_PATH_ENV,
     canonical_approval_statement,
     is_verified_production_approval_receipt,
     verify_embedded_production_approval_from_env,
     verify_production_approval_from_env,
+    verify_production_package_approval_from_env,
 )
 
 
@@ -214,4 +217,91 @@ def test_production_approval_fails_closed_without_external_configuration(
                 "eval.jsonl": "d" * 64,
             },
             release_selection_sha256="e" * 64,
+        )
+
+
+def test_external_kms_package_approval_binds_inventory_and_commit_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    public_key = private_key.public_key()
+    public_der = public_key.public_bytes(
+        serialization.Encoding.DER,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    key_id = (
+        "aws-kms://arn:aws:kms:us-east-1:123456789012:"
+        "key/99999999-2222-3333-4444-555555555555"
+    )
+    statement = {
+        "schema_version": "longworld-production-package-approval-v1",
+        "approval_scope": "longworld-production-package",
+        "decision": "approved",
+        "release_profile_id": "p10-source-rich-production-48-v1",
+        "release_profile_sha256": "a" * 64,
+        "release_inventory_sha256": "b" * 64,
+        "committed_sha256": "c" * 64,
+        "training_manifest_sha256": "d" * 64,
+        "approval_authority": "dataset-publication-governance",
+        "approval_nonce": "package-approval-2026-08-28-001",
+        "issued_at": "2026-08-28T12:00:00Z",
+    }
+    signature = private_key.sign(
+        canonical_approval_statement(statement), ec.ECDSA(hashes.SHA256())
+    )
+    approval = {
+        "statement": statement,
+        "signature": {
+            "scheme": "ecdsa-p256-sha256-v1",
+            "key_id": key_id,
+            "value_base64": base64.b64encode(signature).decode(),
+        },
+    }
+    roots = {
+        "schema_version": "longworld-production-trust-roots-v1",
+        "keys": [
+            {
+                "key_id": key_id,
+                "scheme": "ecdsa-p256-sha256-v1",
+                "public_key_pem": public_key.public_bytes(
+                    serialization.Encoding.PEM,
+                    serialization.PublicFormat.SubjectPublicKeyInfo,
+                ).decode(),
+                "public_key_sha256": hashlib.sha256(public_der).hexdigest(),
+                "provider": "aws-kms",
+                "approval_authorities": ["dataset-publication-governance"],
+            }
+        ],
+    }
+    approval_path = tmp_path / "package-approval.json"
+    roots_path = tmp_path / "package-trust-roots.json"
+    approval_path.write_text(json.dumps(approval, sort_keys=True))
+    roots_path.write_text(json.dumps(roots, sort_keys=True))
+    monkeypatch.setenv(PACKAGE_APPROVAL_PATH_ENV, str(approval_path))
+    monkeypatch.setenv(
+        PACKAGE_APPROVAL_DIGEST_ENV,
+        hashlib.sha256(approval_path.read_bytes()).hexdigest(),
+    )
+    monkeypatch.setenv(TRUST_ROOTS_PATH_ENV, str(roots_path))
+    monkeypatch.setenv(
+        TRUST_ROOTS_DIGEST_ENV, hashlib.sha256(roots_path.read_bytes()).hexdigest()
+    )
+
+    receipt = verify_production_package_approval_from_env(
+        release_profile_id=statement["release_profile_id"],
+        release_profile_sha256=statement["release_profile_sha256"],
+        release_inventory_sha256=statement["release_inventory_sha256"],
+        committed_sha256=statement["committed_sha256"],
+        training_manifest_sha256=statement["training_manifest_sha256"],
+    )
+
+    assert receipt["verified"] is True
+    assert receipt["statement"] == statement
+    with pytest.raises(ValueError, match="package bytes"):
+        verify_production_package_approval_from_env(
+            release_profile_id=statement["release_profile_id"],
+            release_profile_sha256=statement["release_profile_sha256"],
+            release_inventory_sha256="0" * 64,
+            committed_sha256=statement["committed_sha256"],
+            training_manifest_sha256=statement["training_manifest_sha256"],
         )

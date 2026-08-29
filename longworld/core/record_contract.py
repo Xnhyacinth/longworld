@@ -5,7 +5,12 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from longworld.core.attestation import attestation_key_from_env, verify_attestation
+from longworld.core.attestation import (
+    LOCAL_PROBE_TRUST_ISOLATION_FIELD,
+    LOCAL_PROBE_TRUST_ISOLATION_VALUE,
+    attestation_key_from_env,
+    verify_attestation,
+)
 from longworld.core.realworkflow import EPISODE_REPLAY_BUNDLE_SCHEMA
 from longworld.core.sourcebundle import (
     SOURCE_WORKFLOW_BUNDLE_SCHEMA,
@@ -43,7 +48,13 @@ _SOURCE_ORIGINS = {
 }
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _COMMIT_SHA = re.compile(r"[0-9a-f]{40}")
-_STRICT_EXACT_BUCKETS = {"16k", "32k", "64k"}
+EXACT_TOKEN_BAND_RANGES: dict[str, tuple[int, int]] = {
+    "16k": (16_000, 16_384),
+    "32k": (32_000, 32_768),
+    "64k": (64_000, 65_536),
+    "128k": (128_000, 131_072),
+}
+_STRICT_EXACT_BUCKETS = frozenset(EXACT_TOKEN_BAND_RANGES)
 STRICT_REPLAY_REVISION = "longworld-strict-replay-v5"
 _DENSE_PROMOTION_CONTRACT = {
     "dense_model_provider": "huggingface",
@@ -58,6 +69,36 @@ _DENSE_CHUNKING_CONTRACT = {
     "overlap_tokens": 32,
     "aggregation": "max_similarity",
 }
+
+
+def exact_token_band_reject_reason(length_bucket: str, tokens: int) -> str | None:
+    """Return a stable reject reason when an exact-token band is mislabeled."""
+    bounds = EXACT_TOKEN_BAND_RANGES.get(length_bucket)
+    if bounds is None:
+        return None
+    lower, upper = bounds
+    if not lower <= tokens <= upper:
+        return f"exact_{length_bucket}_out_of_range:{tokens}"
+    return None
+
+
+def exact_token_metadata_valid(
+    row: dict[str, Any], *, require_asset_manifest: bool
+) -> bool:
+    """Validate immutable exact-token identity fields without loading the asset."""
+    length_bucket = str(row.get("length_bucket") or "")
+    tokens = row.get("tokenizer_context_tokens")
+    revision = str(row.get("tokenizer_revision") or "")
+    asset_digest = str(row.get("tokenizer_asset_manifest_sha256") or "")
+    return bool(
+        length_bucket in EXACT_TOKEN_BAND_RANGES
+        and isinstance(tokens, int)
+        and not isinstance(tokens, bool)
+        and exact_token_band_reject_reason(length_bucket, tokens) is None
+        and str(row.get("tokenizer_model_id") or "")
+        and _COMMIT_SHA.fullmatch(revision) is not None
+        and (not require_asset_manifest or _SHA256.fullmatch(asset_digest) is not None)
+    )
 
 
 def _mapping(value: Any) -> dict[str, Any]:
@@ -114,6 +155,23 @@ def sft_row_errors(
         errors.append("not_sft_objective")
     if row.get("data_stage") != "train_ready":
         errors.append("not_train_ready")
+    diagnostic_expected = {
+        "trust_scope": "local_probe",
+        "diagnostic_only": True,
+        "content_gate_eligible": True,
+        "trust_valid_for_production": False,
+        "production_eligible": False,
+    }
+    diagnostic_declared = row.get(LOCAL_PROBE_TRUST_ISOLATION_FIELD) is not None or any(
+        field in row for field in diagnostic_expected
+    )
+    local_probe_diagnostic = row.get(
+        LOCAL_PROBE_TRUST_ISOLATION_FIELD
+    ) == LOCAL_PROBE_TRUST_ISOLATION_VALUE and all(
+        row.get(field) == value for field, value in diagnostic_expected.items()
+    )
+    if diagnostic_declared and not local_probe_diagnostic:
+        errors.append("invalid_local_probe_diagnostic_boundary")
     if row.get("composition_method") not in _SFT_COMPOSITIONS:
         errors.append("invalid_composition_method")
     if row.get("composition_method") != _COMPOSITION_BY_VIEW.get(
@@ -135,18 +193,23 @@ def sft_row_errors(
     if verification.get("embedding_topk_insufficient") is not True:
         errors.append("dense_retrieval_gate_failed")
     promotion = _mapping(row.get("promotion"))
+    length_bucket = str(row.get("length_bucket") or "")
     exact_asset_digest = str(row.get("tokenizer_asset_manifest_sha256") or "")
     has_exact_asset_binding = (
         row.get("tokenizer_asset_manifest_sha256") is not None
         or promotion.get("tokenizer_asset_manifest_sha256") is not None
     )
     strict_exact_asset_valid = not (
-        str(row.get("length_bucket") or "") in _STRICT_EXACT_BUCKETS
-        and has_exact_asset_binding
+        length_bucket in _STRICT_EXACT_BUCKETS and has_exact_asset_binding
     ) or (
         _SHA256.fullmatch(exact_asset_digest) is not None
         and promotion.get("tokenizer_asset_manifest_sha256") == exact_asset_digest
     )
+    if length_bucket == "128k" and (
+        not exact_token_metadata_valid(row, require_asset_manifest=True)
+        or promotion.get("tokenizer_asset_manifest_sha256") != exact_asset_digest
+    ):
+        errors.append("invalid_exact_token_binding")
     promotion_valid = (
         promotion.get("schema_version") == "train-ready-promotion-v1"
         and all(
@@ -176,7 +239,13 @@ def sft_row_errors(
     if not promotion_valid:
         errors.append("missing_or_invalid_promotion")
     view_verification = _mapping(row.get("view_verification"))
-    if not view_verification.get("production_eligible"):
+    if local_probe_diagnostic:
+        if (
+            view_verification.get("content_gate_eligible") is not True
+            or view_verification.get("production_eligible") is not False
+        ):
+            errors.append("invalid_local_probe_diagnostic_boundary")
+    elif not view_verification.get("production_eligible"):
         errors.append("view_not_production_eligible")
     if any(
         not view_verification.get(field)
