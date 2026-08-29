@@ -24,20 +24,20 @@ There is currently no missing HF upload.
 
 ## Current stricter-gate result
 
-The current local content-gate corpus covers **29 rows across 4 unique
-source-bound worlds**, with **1,120,639 receipt-reported exact Qwen context
-tokens**. It contains 12 ResearchLab rows, 9 Company rows, and 8 CodeForge rows;
-the exact 16K/32K/64K distribution is 9/10/10. All four source identities and
+The current local content-gate corpus covers **35 rows across 5 unique
+source-bound worlds**, with **1,347,609 receipt-reported exact Qwen context
+tokens**. It contains 12 ResearchLab rows, 9 Company rows, and 14 CodeForge rows;
+the exact 16K/32K/64K distribution is 11/12/12. All five source identities and
 release receipts validate under the current protected local-probe root.
 
 The schema-v2 neutral inventory is
-`data/releases/p12-current-four-source-bound-union-v1.json`. It verifies four
-distinct world IDs, 29 distinct canonical content hashes, source-workflow
+`data/releases/p12-current-five-source-bound-union-v1.json`. It verifies five
+distinct world IDs, 35 distinct canonical content hashes, source-workflow
 ownership, tokenizer/bucket metadata, release-file hashes, and the union row-set
-digest `a7492852bf702018bda25a6313aab1e2ce63447229961e32f6f0f00b67434b58`.
+digest `a1b0abd5c2f478c63a17b7ed4fb4b55bc8b9f5d5da18c9786ed3b3ca5b4de680`.
 It reports `inventory_integrity_ok=true`, but deliberately reports
 `target_gate_evaluated=false`, `target_gate_passed=false`, and
-`production_eligible=false`: four worlds do not satisfy the 12-world profile.
+`production_eligible=false`: five worlds do not satisfy the 12-world profile.
 The six-world inventory and Jefferson/Newton v5 receipts are retained as
 diagnostic evidence but are excluded from current-state accounting after
 independent semantic review found no value-level dependency on revision deltas.
@@ -162,8 +162,9 @@ and extend it with real CI/history at 64K.
 Independent CodeForge review also found and fixed a monorepo release-lineage
 bug: prefixed tags now retain a strict normalized family, so `crates_v*` and
 `napi_v*` cannot be joined as one supersession chain. This correctness fix does
-not promote Deno, Ruff, Oxc, or dprint; their incomplete-band and retrieval
-failures remain unchanged.
+not promote Deno, Ruff, or Oxc; their incomplete-band and retrieval failures
+remain unchanged. A later dprint patch-history run does qualify independently
+below.
 
 Four earlier Wikimedia API probes produced 8 page revisions and 4 Wikidata
 revisions, but only two page revisions were new relative to the existing local
@@ -324,16 +325,18 @@ OpenReview API v1/v2 and the forum page returned access challenges, so no review
 record was scraped or simulated as authentic source; the fetch observation is
 an unsigned operator ledger, not source evidence.
 
-Five dprint releases (0.52.0→0.56.0) are now source-signed as a prospective
-CodeForge world: 346 real records, 429 links, 138,857 exact Qwen source-record
-tokens, and one authentic CI failure→origin→same-name recovery→release chain.
-The v12 diagnostic retains five candidate rows without padding or essential
-truncation: full/CF 16K version selection at 16,369 tokens and full/CF/ordered
-64K three-cycle traces at 65,260 tokens. The 32K two-cycle proof remains rejected
-because its dependency distance is 11,806 < 16,000; the CI proof now has depth
-two but its real episode is only 14,073 tokens, below the 16K band. These five
-rows are candidates only and have not entered dense audit or a complete-world
-gate. NVIDIA
+The replacement dprint patch-history world binds five authentic release/PR/CI
+episodes (0.53.1, 0.53.2, 0.54.0, 0.55.1, and 0.55.2): 233 records, 317 links,
+and 119,812 exact Qwen source-record tokens. It contributes six promoted rows,
+two per 16K/32K/64K band and 226,970 total exact context tokens. Strict support
+events grow 14→28→42, graph-essential events grow 12→24→36, authentic
+source-relation edges grow 24→48→72, total context relations grow 24→49→74,
+replayed proof depth grows 2→3→4, and event-bearing tokens grow
+15,855→32,212→63,930 with zero generic background. All six rows passed dense
+audit, strict replay,
+counterfactual, remove-one, text-corruption, window, BM25, embedding top-k,
+promotion, and the unchanged one-world release gate. This remains a
+`local_probe` content result, not production trust. NVIDIA
 FY2022–FY2025 issuer acquisition likewise remains source discovery only because
 the issuer detail page returned a challenge and the downloader failed closed.
 Microsoft FY2025 now has issuer-owned GCS bytes, a signed source manifest/bundle,
@@ -350,12 +353,12 @@ they use four real annual issuer filings rather than the single-filing facet
 timeline.
 Candidate-only ResearchLab and failed/superseded or stale CodeForge rows are not a new
 `COMMITTED` production package and are not eligible for HF upload. The
-current per-world content-gated baseline is **29 rows, 4 unique worlds, and
-1,120,639 exact Qwen context tokens**, but it has not passed the new 12-world
+current per-world content-gated baseline is **35 rows, 5 unique worlds, and
+1,347,609 exact Qwen context tokens**, but it has not passed the new 12-world
 union profile and its trust receipts are not a production KMS chain. The neutral
 signed inventory at
-`data/releases/p12-current-four-source-bound-union-v1.json` verifies four distinct
-world IDs, 29 distinct content hashes, source identities, and exact release-byte
+`data/releases/p12-current-five-source-bound-union-v1.json` verifies five distinct
+world IDs, 35 distinct content hashes, source identities, and exact release-byte
 bindings; it explicitly records that the 12-world target gate was not evaluated.
 Trust-valid P12 publication therefore remains zero; 48/210 remain blocked.
 
@@ -371,17 +374,16 @@ use GitHub only after final review.
 
 ## Current expansion matrix
 
-| Evidence stage              | Worlds | Rows | Exact/context source tokens | Meaning                                                                                                                                |
-| --------------------------- | -----: | ---: | --------------------------: | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Current local-probe union   |      4 |   29 |                   1,120,639 | 16/32/64K rows passed individual strict chains and the neutral union identity/byte audit; the 12-world target gate remains unevaluated |
-| dprint incomplete candidate |      1 |    5 |                     228,518 | 16K/64K rows pass generation, but missing 32K and undersized CI history block dense audit and complete-world promotion                 |
-| P12 production/KMS release  |      0 |    0 |                           0 | independent approval and the 12-world union remain blocked                                                                             |
+| Evidence stage             | Worlds | Rows | Exact/context source tokens | Meaning                                                                                                                                |
+| -------------------------- | -----: | ---: | --------------------------: | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Current local-probe union  |      5 |   35 |                   1,347,609 | 16/32/64K rows passed individual strict chains and the neutral union identity/byte audit; the 12-world target gate remains unevaluated |
+| P12 production/KMS release |      0 |    0 |                           0 | independent approval and the 12-world union remain blocked                                                                             |
 
 The implemented query surface currently contains 47 literal task types across
 the CodeForge, Company, and ResearchLab adapters (15/17/15), 48 literal motifs,
 and 81 literal answer-program operators. This is implementation capacity, not
-qualified semantic diversity: the 29 content-gated rows currently exercise only
-seven query types, 11 answer programs, and 12 executable proofs. Wikimedia/KB
+qualified semantic diversity: the 35 content-gated rows currently exercise only
+seven query types, 11 answer programs, and 15 executable proofs. Wikimedia/KB
 and paper workflows are separate real source families but currently share the
 ResearchLab adapter. Expansion is therefore measured by newly exercised source
 relations/programs/proofs, not by counting unused templates or multiplying
@@ -408,7 +410,7 @@ length by view.
    `p10-source-rich-production-210-v1` remains readable for verification but is
    not an issuable current path. The new gate must require 210
    source-independent semantic task templates, 210 executable proofs, and at
-   least 24 answer programs—strictly more than the current four-world union's 11
+   least 24 answer programs—strictly more than the current five-world union's 11
    programs—plus production trust, unseen evaluation, and external benchmark
    evidence.
 

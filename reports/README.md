@@ -10,9 +10,11 @@ Face dataset, but production KMS approval remains blocked. This is not a
 
 ## P12 current source-bound inventory (2026-08-29)
 
-See `p12_current_four_source_bound_inventory_v1.md`. The current stricter
-content gate retains 29 rows from four real source-bound worlds. The 12-world
+See `p12_current_five_source_bound_inventory_v1.md`. The current stricter
+content gate retains 35 rows from five real source-bound worlds. The 12-world
 target was not evaluated, so this inventory is not an HF release authorization.
+`p12_current_four_source_bound_inventory_v1.md` remains as the immediately
+preceding snapshot.
 
 ## P4 multidomain local probe (2026-08-24)
 

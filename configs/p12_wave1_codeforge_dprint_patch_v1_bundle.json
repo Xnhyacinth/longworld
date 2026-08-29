@@ -1,0 +1,35 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "data/source_inventory/p12_wave1_codeforge_dprint_patch_v1/dprint_pr1114_0.53.1.json",
+      "sha256": "1aef6393a3334be2e8f7c73dfa1bebd444e7fdb25abb23473525f2fb8c0858ee"
+    },
+    {
+      "path": "data/source_inventory/p12_wave1_codeforge_dprint_patch_v1/dprint_pr1121_0.53.2.json",
+      "sha256": "00f16a2ecaa2ee94a2690f93ed2a3f1a263db29993d87b7ea3568ab90503170d"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_dprint_signed_v2/dprint_pr1127_0.54.0.json",
+      "sha256": "b6151b29ca8fae5224c504b35e814cbf74956419ec2d66cd45d8470cc21968f2"
+    },
+    {
+      "path": "data/source_inventory/p12_wave1_codeforge_dprint_patch_v1/dprint_pr1194_0.55.1.json",
+      "sha256": "7bf17a97492d412bac3abe6fa04c60f91e52ddda4af05b9081b30b62b5e4e061"
+    },
+    {
+      "path": "data/source_inventory/p12_wave1_codeforge_dprint_patch_v1/dprint_pr1203_0.55.2.json",
+      "sha256": "8394eb7e06f8a3142ee3f5743d8dee937d95fa3ecef94e71c6af1d9a8dd5584a"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "probe-source-3a689228f9679b0522a18cadd07f1e97",
+    "environment": "probe",
+    "digest": "768efcc69d6ec15310c6e6f2c47ea6c50ea423b3b797f6a8272b541745352b48"
+  }
+}
