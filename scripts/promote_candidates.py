@@ -24,6 +24,7 @@ from longworld.core.promotion import (
     RELEASE_SELECTION_SCHEMA,
     PromotionError,
     candidate_sha256,
+    candidate_structural_preflight,
     create_dense_audit,
     create_train_ready_report,
     promote_candidate,
@@ -64,24 +65,72 @@ def _index(
     return indexed
 
 
-def _write_jsonl_atomic(path: Path, rows: list[dict[str, Any]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-    )
+def _write_jsonl_batch_atomic(
+    outputs: list[tuple[Path, list[dict[str, Any]]]],
+) -> None:
+    if not outputs:
+        raise ValueError("JSONL output batch is empty")
+    resolved: set[Path] = set()
+    for path, _rows in outputs:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.parent.is_dir():
+            raise ValueError(f"output parent is not a directory: {path.parent}")
+        if path.is_dir():
+            raise ValueError(f"output target is a directory: {path}")
+        identity = path.resolve()
+        if identity in resolved:
+            raise ValueError(f"batch output path alias: {path}")
+        resolved.add(identity)
+
+    staged: list[tuple[Path, Path]] = []
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            for row in rows:
-                handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary_name, path)
+        for path, rows in outputs:
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+            )
+            temporary_path = Path(temporary_name)
+            staged.append((temporary_path, path))
+            try:
+                with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                    for row in rows:
+                        handle.write(
+                            json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n"
+                        )
+                    handle.flush()
+                    os.fsync(handle.fileno())
+            except BaseException:
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+                raise
+        for temporary_path, path in staged:
+            os.replace(temporary_path, path)
     except BaseException:
-        try:
-            os.unlink(temporary_name)
-        except FileNotFoundError:
-            pass
+        for temporary_path, _path in staged:
+            try:
+                temporary_path.unlink()
+            except FileNotFoundError:
+                pass
         raise
+
+
+def _write_jsonl_atomic(path: Path, rows: list[dict[str, Any]]) -> None:
+    _write_jsonl_batch_atomic([(path, rows)])
+
+
+def _reject_path_aliases(paths: dict[str, Path | None]) -> None:
+    resolved: dict[Path, str] = {}
+    for label, path in paths.items():
+        if path is None:
+            continue
+        identity = path.resolve()
+        previous = resolved.get(identity)
+        if previous is not None:
+            raise ValueError(
+                f"path alias: {previous} and {label} resolve to {identity}"
+            )
+        resolved[identity] = label
 
 
 def _candidate_sort_key(candidate: dict[str, Any]) -> tuple[str, str, str, str]:
@@ -91,6 +140,52 @@ def _candidate_sort_key(candidate: dict[str, Any]) -> tuple[str, str, str, str]:
         str(candidate.get("view") or ""),
         candidate_sha256(candidate),
     )
+
+
+def _preflight_reject_sort_key(reject: dict[str, Any]) -> tuple[str, str, str]:
+    return (
+        str(reject.get("world_id") or ""),
+        str(reject.get("query_id") or ""),
+        str(reject.get("candidate_sha256") or ""),
+    )
+
+
+def preflight_candidates(
+    candidates_path: Path,
+    accepted_candidates_path: Path,
+    rejects_path: Path,
+    *,
+    release_profile_id: str,
+) -> int:
+    """Filter structurally incomplete worlds before external dense ranking."""
+    _reject_path_aliases(
+        {
+            "candidates": candidates_path,
+            "accepted_candidates": accepted_candidates_path,
+            "rejects": rejects_path,
+        }
+    )
+    candidate_key = attestation_key_from_env("candidate_row")
+    if candidate_key is None:
+        raise ValueError("candidate attestation key is required")
+    candidates = _read_jsonl(candidates_path)
+    if not candidates:
+        raise ValueError("candidate input is empty")
+    accepted, rejects = candidate_structural_preflight(
+        candidates,
+        release_profile_id,
+        candidate_attestation_key=candidate_key,
+    )
+    _write_jsonl_batch_atomic(
+        [
+            (
+                accepted_candidates_path,
+                sorted(accepted, key=_candidate_sort_key),
+            ),
+            (rejects_path, sorted(rejects, key=_preflight_reject_sort_key)),
+        ]
+    )
+    return len(accepted)
 
 
 def _world_batches(
@@ -344,6 +439,23 @@ def audit_rankings(
         episode_bundle_path is not None or source_bundle_path is not None
     ):
         raise ValueError("replay registry cannot be combined with a single bundle path")
+    filter_mode = accepted_candidates_path is not None or rejects_path is not None
+    if filter_mode and (accepted_candidates_path is None or rejects_path is None):
+        raise ValueError(
+            "accepted_candidates_path and rejects_path must be provided together"
+        )
+    _reject_path_aliases(
+        {
+            "candidates": candidates_path,
+            "rankings": rankings_path,
+            "audit_output": output_path,
+            "accepted_candidates": accepted_candidates_path,
+            "rejects": rejects_path,
+            "episode_bundle": episode_bundle_path,
+            "source_bundle": source_bundle_path,
+            "replay_registry": replay_registry_path,
+        }
+    )
     replay_registry = (
         _load_replay_registry(replay_registry_path)
         if replay_registry_path is not None
@@ -361,16 +473,46 @@ def audit_rankings(
     source_key = attestation_key_from_env("episode_replay_bundle")
     if candidate_key is None or ranking_key is None or audit_key is None:
         raise ValueError("candidate, ranker, and auditor attestation keys are required")
-    candidates, rankings = _matched_inputs(
-        candidates_path, rankings_path, receipt_label="ranking"
-    )
-    filter_mode = accepted_candidates_path is not None or rejects_path is not None
-    if filter_mode and (accepted_candidates_path is None or rejects_path is None):
-        raise ValueError(
-            "accepted_candidates_path and rejects_path must be provided together"
+    candidates = _read_jsonl(candidates_path)
+    if not candidates:
+        raise ValueError("candidate input is empty")
+    structurally_accepted = candidates
+    structural_rejects: list[dict[str, Any]] = []
+    if release_profile_id is not None:
+        structurally_accepted, structural_rejects = candidate_structural_preflight(
+            candidates,
+            release_profile_id,
+            candidate_attestation_key=candidate_key,
         )
-    batches = _world_batches(candidates, rankings)
-    if workers == 1:
+    if structural_rejects and not filter_mode:
+        missing_by_world = {
+            str(reject["world_id"]): tuple(reject["missing_exact_length_buckets"])
+            for reject in structural_rejects
+        }
+        details = ",".join(
+            f"{world_id}={'+'.join(missing_by_world[world_id])}"
+            for world_id in sorted(missing_by_world)
+        )
+        raise PromotionError("candidate structural preflight failed: " + details)
+    candidates_by_digest: dict[str, dict[str, Any]] = {}
+    for candidate in candidates:
+        digest = candidate_sha256(candidate)
+        if digest in candidates_by_digest:
+            raise ValueError(f"duplicate candidate candidate_sha256: {digest}")
+        candidates_by_digest[digest] = candidate
+    rankings = _index(
+        _read_jsonl(rankings_path), label="ranking", key_field="candidate_sha256"
+    )
+    accepted_ids = {candidate_sha256(candidate) for candidate in structurally_accepted}
+    missing = sorted(accepted_ids - set(rankings))
+    extra = sorted(set(rankings) - accepted_ids)
+    if missing or extra:
+        raise ValueError(f"ranking coverage mismatch: missing={missing}, extra={extra}")
+    rankings = {digest: rankings[digest] for digest in accepted_ids}
+    batches = _world_batches(structurally_accepted, rankings)
+    if not batches:
+        results = []
+    elif workers == 1:
         results = [
             _audit_world(
                 batch,
@@ -409,18 +551,18 @@ def audit_rankings(
             ]
             results = [future.result() for future in futures]
     audits = [audit for result in results for audit in result[0]]
-    candidates_by_digest = {
-        candidate_sha256(candidate): candidate for candidate in candidates
-    }
     accepted = [
         candidates_by_digest[digest] for result in results for digest in result[1]
     ]
-    rejects = [reject for result in results for reject in result[2]]
-    _write_jsonl_atomic(output_path, audits)
+    rejects = sorted(
+        structural_rejects + [reject for result in results for reject in result[2]],
+        key=_preflight_reject_sort_key,
+    )
+    outputs = [(output_path, audits)]
     if filter_mode:
         assert accepted_candidates_path is not None and rejects_path is not None
-        _write_jsonl_atomic(accepted_candidates_path, accepted)
-        _write_jsonl_atomic(rejects_path, rejects)
+        outputs.extend([(accepted_candidates_path, accepted), (rejects_path, rejects)])
+    _write_jsonl_batch_atomic(outputs)
     return len(audits)
 
 
@@ -672,6 +814,15 @@ def main() -> None:
     audit.add_argument("--rejects", type=Path)
     audit.add_argument("--workers", type=int, default=1)
 
+    preflight = subparsers.add_parser(
+        "preflight",
+        help="filter worlds missing required exact bands before dense ranking",
+    )
+    preflight.add_argument("--candidates", type=Path, required=True)
+    preflight.add_argument("--accepted-candidates", type=Path, required=True)
+    preflight.add_argument("--rejects", type=Path, required=True)
+    preflight.add_argument("--release-profile", required=True)
+
     promote = subparsers.add_parser(
         "promote", help="strictly replay audited candidates and sign train-ready rows"
     )
@@ -708,7 +859,14 @@ def main() -> None:
     report.add_argument("--release-selection", type=Path, required=True)
 
     args = parser.parse_args()
-    if args.command == "audit":
+    if args.command == "preflight":
+        count = preflight_candidates(
+            args.candidates,
+            args.accepted_candidates,
+            args.rejects,
+            release_profile_id=args.release_profile,
+        )
+    elif args.command == "audit":
         count = audit_rankings(
             args.candidates,
             args.rankings,
@@ -754,7 +912,13 @@ def main() -> None:
             args.output,
             args.release_selection,
         )
-    output = args.receipt if args.command == "select" else args.output
+    output = (
+        args.receipt
+        if args.command == "select"
+        else args.accepted_candidates
+        if args.command == "preflight"
+        else args.output
+    )
     print(json.dumps({"command": args.command, "rows": count, "output": str(output)}))
 
 

@@ -476,6 +476,60 @@ def _missing_required_exact_length_buckets_by_world(
     }
 
 
+def candidate_structural_preflight(
+    candidates: list[dict[str, Any]],
+    release_profile_id: str,
+    *,
+    candidate_attestation_key: bytes,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Reject whole worlds that cannot satisfy the profile's exact token bands."""
+    profile = release_profile(release_profile_id)
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not verify_attestation(
+            candidate,
+            candidate_attestation_key,
+            purpose=CANDIDATE_ATTESTATION_PURPOSE,
+        ):
+            raise PromotionError(
+                "candidate structural preflight attestation is invalid"
+            )
+        if not str(candidate.get("world_id") or ""):
+            raise PromotionError("candidate structural preflight world id is missing")
+        digest = candidate_sha256(candidate)
+        if digest in seen:
+            raise PromotionError("candidate structural preflight input is duplicated")
+        seen.add(digest)
+
+    missing_by_world = _missing_required_exact_length_buckets_by_world(
+        candidates, profile
+    )
+    profile_digest = release_profile_sha256(release_profile_id)
+    accepted = [
+        candidate
+        for candidate in candidates
+        if str(candidate["world_id"]) not in missing_by_world
+    ]
+    rejects = [
+        {
+            "schema_version": "candidate-structural-reject-v1",
+            "candidate_sha256": candidate_sha256(candidate),
+            "world_id": str(candidate["world_id"]),
+            "query_id": str(candidate.get("query_id") or ""),
+            "release_profile_id": release_profile_id,
+            "release_profile_sha256": profile_digest,
+            "missing_exact_length_buckets": missing_by_world[
+                str(candidate["world_id"])
+            ],
+            "reason": "missing required exact length buckets: "
+            + "+".join(missing_by_world[str(candidate["world_id"])]),
+        }
+        for candidate in candidates
+        if str(candidate["world_id"]) in missing_by_world
+    ]
+    return accepted, rejects
+
+
 def _selection_audit_matches_candidate(
     audit: dict[str, Any], candidate: dict[str, Any], dense_top_k: int
 ) -> bool:

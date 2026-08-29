@@ -51,6 +51,7 @@ from longworld.core.promotion import (
     _resolved_local_tokenizer_revision,
     _synthetic_replay_materialization,
     candidate_sha256,
+    candidate_structural_preflight,
     create_dense_audit,
     create_train_ready_report,
     promote_candidate,
@@ -4178,3 +4179,360 @@ def test_world_parallel_failure_propagates_without_publishing_output(
     with pytest.raises(PromotionError, match="surface gate"):
         audit_rankings(candidates_path, rankings_path, output_path, k=3, workers=2)
     assert not output_path.exists()
+
+
+def _with_world_id(candidate: dict, world_id: str) -> dict:
+    updated = {
+        **{key: value for key, value in candidate.items() if key != "attestation"},
+        "world_id": world_id,
+    }
+    return attach_attestation(updated, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+
+
+def test_candidate_structural_preflight_filters_only_worlds_missing_exact_bands() -> (
+    None
+):
+    complete, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    incomplete, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "64k"))
+    complete = [_with_world_id(row, "complete-world") for row in complete]
+    incomplete = [_with_world_id(row, "incomplete-world") for row in incomplete]
+
+    accepted, rejects = candidate_structural_preflight(
+        incomplete + complete,
+        "p12-wiki-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+    )
+
+    assert {row["world_id"] for row in accepted} == {"complete-world"}
+    assert {row["world_id"] for row in rejects} == {"incomplete-world"}
+    assert {row["missing_exact_length_buckets"] for row in rejects} == {("32k",)}
+    assert all(
+        row["reason"] == "missing required exact length buckets: 32k" for row in rejects
+    )
+
+
+def test_candidate_structural_preflight_does_not_replace_authoritative_selection() -> (
+    None
+):
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+
+    accepted, rejects = candidate_structural_preflight(
+        candidates,
+        "p12-wiki-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+    )
+
+    assert accepted == candidates
+    assert rejects == []
+    with pytest.raises(PromotionError, match="insufficient fully audited worlds"):
+        select_release_worlds(
+            accepted,
+            [],
+            "p12-wiki-source-slice-1-v1",
+            candidate_attestation_key=KEY,
+            audit_attestation_key=KEY,
+        )
+
+
+def test_candidate_preflight_cli_is_byte_deterministic_and_world_atomic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from promote_candidates import preflight_candidates
+
+    complete, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    incomplete, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "64k"))
+    candidates = [
+        *[_with_world_id(row, "complete-world") for row in complete],
+        *[_with_world_id(row, "incomplete-world") for row in incomplete],
+    ]
+    monkeypatch.setenv("LONGWORLD_ATTESTATION_KEY", KEY.decode())
+
+    outputs: list[tuple[Path, Path]] = []
+    for index, rows in enumerate((candidates, list(reversed(candidates)))):
+        candidates_path = tmp_path / f"candidates-{index}.jsonl"
+        accepted_path = tmp_path / f"accepted-{index}.jsonl"
+        rejects_path = tmp_path / f"rejects-{index}.jsonl"
+        candidates_path.write_text(
+            "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+        )
+
+        assert (
+            preflight_candidates(
+                candidates_path,
+                accepted_path,
+                rejects_path,
+                release_profile_id="p12-wiki-source-slice-1-v1",
+            )
+            == 3
+        )
+        outputs.append((accepted_path, rejects_path))
+
+    assert outputs[0][0].read_bytes() == outputs[1][0].read_bytes()
+    assert outputs[0][1].read_bytes() == outputs[1][1].read_bytes()
+
+
+@pytest.mark.parametrize("aliased_output", ("accepted", "rejects"))
+def test_candidate_preflight_rejects_input_and_output_path_aliases(
+    tmp_path: Path, aliased_output: str
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from promote_candidates import preflight_candidates
+
+    candidate, _ = _candidate()
+    candidates_path = tmp_path / "candidates.jsonl"
+    candidates_path.write_text(json.dumps(candidate) + "\n", encoding="utf-8")
+    accepted_path = tmp_path / "accepted.jsonl"
+    rejects_path = tmp_path / "rejects.jsonl"
+    if aliased_output == "accepted":
+        accepted_path = candidates_path.parent / "." / candidates_path.name
+    else:
+        rejects_path = accepted_path.parent / "." / accepted_path.name
+
+    with pytest.raises(ValueError, match="path alias"):
+        preflight_candidates(
+            candidates_path,
+            accepted_path,
+            rejects_path,
+            release_profile_id="p12-wiki-source-slice-1-v1",
+        )
+
+
+def test_jsonl_batch_writer_rejects_second_directory_before_first_publish(
+    tmp_path: Path,
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from promote_candidates import _write_jsonl_batch_atomic
+
+    first = tmp_path / "first.jsonl"
+    second = tmp_path / "second.jsonl"
+    second.mkdir()
+
+    with pytest.raises(ValueError, match="output target is a directory"):
+        _write_jsonl_batch_atomic([(first, [{"row": 1}]), (second, [{"row": 2}])])
+
+    assert not first.exists()
+
+
+def test_jsonl_batch_writer_cleans_all_staging_on_second_fsync_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import promote_candidates as promote_script
+
+    first = tmp_path / "first.jsonl"
+    second = tmp_path / "second.jsonl"
+    actual_fsync = promote_script.os.fsync
+    calls = 0
+
+    def fail_second_fsync(descriptor: int) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("injected second staging failure")
+        actual_fsync(descriptor)
+
+    monkeypatch.setattr(promote_script.os, "fsync", fail_second_fsync)
+
+    with pytest.raises(OSError, match="second staging failure"):
+        promote_script._write_jsonl_batch_atomic(
+            [(first, [{"row": 1}]), (second, [{"row": 2}])]
+        )
+
+    assert not first.exists()
+    assert not second.exists()
+    assert list(tmp_path.glob(".*.tmp")) == []
+
+
+def test_audit_preflight_skips_incomplete_world_before_strict_replay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import promote_candidates as promote_script
+
+    complete, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    incomplete, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "64k"))
+    complete = [_with_world_id(row, "complete-world") for row in complete]
+    incomplete = [_with_world_id(row, "incomplete-world") for row in incomplete]
+    candidates = incomplete + complete
+    rankings = [
+        {"candidate_sha256": candidate_sha256(candidate)} for candidate in complete
+    ]
+    candidates_path = tmp_path / "candidates.jsonl"
+    rankings_path = tmp_path / "rankings.jsonl"
+    audits_path = tmp_path / "audits.jsonl"
+    accepted_path = tmp_path / "accepted.jsonl"
+    rejects_path = tmp_path / "rejects.jsonl"
+    candidates_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in candidates), encoding="utf-8"
+    )
+    rankings_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rankings), encoding="utf-8"
+    )
+    replayed_worlds: list[str] = []
+
+    def fake_dense_audit(candidate: dict, _ranking: dict, **_kwargs) -> dict:
+        replayed_worlds.append(str(candidate["world_id"]))
+        return {"candidate_sha256": candidate_sha256(candidate)}
+
+    monkeypatch.setattr(promote_script, "create_dense_audit", fake_dense_audit)
+
+    assert (
+        promote_script.audit_rankings(
+            candidates_path,
+            rankings_path,
+            audits_path,
+            k=3,
+            accepted_candidates_path=accepted_path,
+            rejects_path=rejects_path,
+            release_profile_id="p12-wiki-source-slice-1-v1",
+        )
+        == 3
+    )
+    assert replayed_worlds == ["complete-world"] * 3
+    assert {
+        json.loads(line)["world_id"]
+        for line in rejects_path.read_text(encoding="utf-8").splitlines()
+    } == {"incomplete-world"}
+
+
+def test_audit_preflight_rejects_rankings_for_structurally_rejected_worlds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import promote_candidates as promote_script
+
+    complete, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    incomplete, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "64k"))
+    complete = [_with_world_id(row, "complete-world") for row in complete]
+    incomplete = [_with_world_id(row, "incomplete-world") for row in incomplete]
+    candidates = incomplete + complete
+    candidates_path = tmp_path / "candidates.jsonl"
+    rankings_path = tmp_path / "rankings.jsonl"
+    candidates_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in candidates), encoding="utf-8"
+    )
+    rankings_path.write_text(
+        "".join(
+            json.dumps({"candidate_sha256": candidate_sha256(candidate)}) + "\n"
+            for candidate in candidates
+        ),
+        encoding="utf-8",
+    )
+
+    def unexpected_replay(*_args, **_kwargs):
+        raise AssertionError("strict replay must not run")
+
+    monkeypatch.setattr(promote_script, "create_dense_audit", unexpected_replay)
+
+    with pytest.raises(ValueError, match="ranking coverage mismatch.*extra="):
+        promote_script.audit_rankings(
+            candidates_path,
+            rankings_path,
+            tmp_path / "audits.jsonl",
+            k=3,
+            accepted_candidates_path=tmp_path / "accepted.jsonl",
+            rejects_path=tmp_path / "rejects.jsonl",
+            release_profile_id="p12-wiki-source-slice-1-v1",
+        )
+
+
+@pytest.mark.parametrize(
+    ("first_output", "second_output"),
+    (("audit", "accepted"), ("audit", "rejects"), ("accepted", "rejects")),
+)
+def test_audit_rejects_output_path_aliases(
+    tmp_path: Path, first_output: str, second_output: str
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from promote_candidates import audit_rankings
+
+    candidate, artifacts = _candidate()
+    candidates_path = tmp_path / "candidates.jsonl"
+    rankings_path = tmp_path / "rankings.jsonl"
+    candidates_path.write_text(json.dumps(candidate) + "\n", encoding="utf-8")
+    rankings_path.write_text(
+        json.dumps(_ranking(candidate, artifacts)) + "\n", encoding="utf-8"
+    )
+    paths = {
+        "audit": tmp_path / "audits.jsonl",
+        "accepted": tmp_path / "accepted.jsonl",
+        "rejects": tmp_path / "rejects.jsonl",
+    }
+    paths[second_output] = paths[first_output].parent / "." / paths[first_output].name
+
+    with pytest.raises(ValueError, match="path alias"):
+        audit_rankings(
+            candidates_path,
+            rankings_path,
+            paths["audit"],
+            k=3,
+            accepted_candidates_path=paths["accepted"],
+            rejects_path=paths["rejects"],
+        )
+
+
+def test_audit_preflight_without_filter_outputs_fails_before_strict_replay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import promote_candidates as promote_script
+
+    incomplete, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "64k"))
+    candidates_path = tmp_path / "candidates.jsonl"
+    rankings_path = tmp_path / "rankings.jsonl"
+    output_path = tmp_path / "must-not-exist.jsonl"
+    candidates_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in incomplete), encoding="utf-8"
+    )
+    rankings_path.write_text("", encoding="utf-8")
+
+    def unexpected_replay(*_args, **_kwargs):
+        raise AssertionError("strict replay must not run")
+
+    monkeypatch.setattr(promote_script, "create_dense_audit", unexpected_replay)
+
+    with pytest.raises(PromotionError, match="structural preflight.*32k"):
+        promote_script.audit_rankings(
+            candidates_path,
+            rankings_path,
+            output_path,
+            k=3,
+            release_profile_id="p12-wiki-source-slice-1-v1",
+        )
+    assert not output_path.exists()
+
+
+def test_parallel_audit_preflight_handles_an_all_rejected_candidate_pool(
+    tmp_path: Path,
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from promote_candidates import audit_rankings
+
+    incomplete, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "64k"))
+    candidates_path = tmp_path / "candidates.jsonl"
+    rankings_path = tmp_path / "rankings.jsonl"
+    audits_path = tmp_path / "audits.jsonl"
+    accepted_path = tmp_path / "accepted.jsonl"
+    rejects_path = tmp_path / "rejects.jsonl"
+    candidates_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in incomplete), encoding="utf-8"
+    )
+    rankings_path.write_text("", encoding="utf-8")
+
+    assert (
+        audit_rankings(
+            candidates_path,
+            rankings_path,
+            audits_path,
+            k=3,
+            accepted_candidates_path=accepted_path,
+            rejects_path=rejects_path,
+            release_profile_id="p12-wiki-source-slice-1-v1",
+            workers=2,
+        )
+        == 0
+    )
+    assert audits_path.read_bytes() == b""
+    assert accepted_path.read_bytes() == b""
+    assert len(rejects_path.read_text(encoding="utf-8").splitlines()) == 2
