@@ -14,6 +14,7 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -66,6 +67,8 @@ _SEC_FAIR_ACCESS_URL = (
     "https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data"
 )
 SEC_IDENTITY_FIELDS = ("accession", "form", "filing_date", "report_date")
+SEC_ANNUAL_IDENTITY_FIELDS = (*SEC_IDENTITY_FIELDS, "cik")
+SEC_ANNUAL_RELATION_FIELDS = ("cik", "form", "filing_date", "report_date")
 SEC_REQUIRED_COMPONENT_TYPES = ("10-K", "EX-31.1", "EX-31.2", "EX-32.1")
 SEC_OPTIONAL_COMPONENT_TYPES = ("EX-32.2",)
 SEC_EXTRACTABLE_COMPONENT_TYPES = (
@@ -77,6 +80,8 @@ SEC_HYBRID_CHILD_EVENT_TYPES = frozenset(
         "sec_filing_eligibility_policy",
         "sec_filing_approval",
         "sec_amendment_resolution",
+        "sec_prior_annual_filing_relation",
+        "sec_annual_revenue_change",
         "sec_filing_publication_ratification",
         "sec_financial_answer",
     }
@@ -773,7 +778,7 @@ def parse_sec_identity_spans(text: str, raw_facts: object) -> dict[str, str] | N
         assert isinstance(offset, int)
         assert isinstance(length, int)
         if (
-            field not in SEC_IDENTITY_FIELDS
+            field not in SEC_ANNUAL_IDENTITY_FIELDS
             or field in parsed
             or not quote
             or start < 0
@@ -785,10 +790,15 @@ def parse_sec_identity_spans(text: str, raw_facts: object) -> dict[str, str] | N
         ):
             return None
         parsed[field] = quote[offset : offset + length]
-    if set(parsed) != set(SEC_IDENTITY_FIELDS):
+    parsed_fields = frozenset(parsed)
+    if parsed_fields not in {
+        frozenset(SEC_IDENTITY_FIELDS),
+        frozenset(SEC_ANNUAL_IDENTITY_FIELDS),
+    }:
         return None
     if (
         _ACCESSION.fullmatch(parsed["accession"]) is None
+        or ("cik" in parsed and _CIK.fullmatch(parsed["cik"]) is None)
         or _FORM.fullmatch(parsed["form"]) is None
         or not re.fullmatch(r"(?:\d{8}|\d{4}-\d{2}-\d{2})", parsed["filing_date"])
         or not re.fullmatch(r"(?:\d{8}|\d{4}-\d{2}-\d{2})", parsed["report_date"])
@@ -805,12 +815,34 @@ def parse_sec_identity_spans(text: str, raw_facts: object) -> dict[str, str] | N
         )
     except ValueError:
         return None
-    return {
+    identity = {
         "accession": parsed["accession"],
         "form": parsed["form"],
         "filing_date": filing_date.isoformat(),
         "report_date": report_date.isoformat(),
     }
+    if "cik" in parsed:
+        identity["cik"] = parsed["cik"]
+    return identity
+
+
+def _has_grounded_annual_identity(filing: dict[str, Any]) -> bool:
+    facts = filing.get("derived_facts")
+    if not isinstance(facts, list) or not all(isinstance(fact, dict) for fact in facts):
+        return False
+    by_field: dict[str, list[dict[str, Any]]] = {}
+    for fact in facts:
+        by_field.setdefault(str(fact.get("field") or ""), []).append(fact)
+    if any(len(by_field.get(field, ())) != 1 for field in SEC_ANNUAL_RELATION_FIELDS):
+        return False
+    return (
+        str(by_field["cik"][0].get("value") or "") == str(filing.get("cik") or "")
+        and str(by_field["form"][0].get("value") or "") == str(filing.get("form") or "")
+        and str(by_field["filing_date"][0].get("value") or "").replace("-", "")
+        == str(filing.get("filing_date") or "").replace("-", "")
+        and str(by_field["report_date"][0].get("value") or "").replace("-", "")
+        == str(filing.get("report_date") or "").replace("-", "")
+    )
 
 
 def _filing_relations(filings: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -854,6 +886,62 @@ def _filing_relations(filings: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 ],
             }
         )
+
+    annual_groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for filing in filings:
+        form = str(filing.get("form") or "")
+        if form != "10-K" or not _has_grounded_annual_identity(filing):
+            continue
+        annual_groups.setdefault((str(filing.get("cik") or ""), form), []).append(
+            filing
+        )
+    for annual_filings in annual_groups.values():
+        try:
+            ordered = sorted(
+                annual_filings,
+                key=lambda filing: (
+                    date.fromisoformat(str(filing["report_date"])),
+                    date.fromisoformat(str(filing["filing_date"])),
+                    str(filing["record_id"]),
+                ),
+            )
+        except (KeyError, ValueError):
+            continue
+        report_dates = [str(filing["report_date"]) for filing in ordered]
+        if len(set(report_dates)) != len(report_dates):
+            continue
+        for prior, current in pairwise(ordered):
+            if date.fromisoformat(str(current["report_date"])) <= date.fromisoformat(
+                str(prior["report_date"])
+            ) or date.fromisoformat(str(current["filing_date"])) <= date.fromisoformat(
+                str(prior["filing_date"])
+            ):
+                continue
+            relations.append(
+                {
+                    "relation_id": (
+                        f"{current['record_id']}:prior_annual:{prior['record_id']}"
+                    ),
+                    "relation_type": "prior_annual_filing",
+                    "from_record_id": current["record_id"],
+                    "to_record_id": prior["record_id"],
+                    "current_report_date": current["report_date"],
+                    "prior_report_date": prior["report_date"],
+                    "derivation_rule": (
+                        "adjacent_same_cik_same_form_grounded_annual_filings"
+                    ),
+                    "evidence": [
+                        {
+                            "record_id": current["record_id"],
+                            "fact_ids": list(SEC_ANNUAL_RELATION_FIELDS),
+                        },
+                        {
+                            "record_id": prior["record_id"],
+                            "fact_ids": list(SEC_ANNUAL_RELATION_FIELDS),
+                        },
+                    ],
+                }
+            )
     return sorted(relations, key=lambda relation: relation["relation_id"])
 
 
@@ -996,6 +1084,164 @@ def validated_sec_amendment_endpoints(
     return amendment, original
 
 
+def validated_sec_annual_endpoints(
+    workflow: Any, relation: Any
+) -> tuple[Any, Any] | None:
+    """Return current/prior annual records only for an exact grounded SEC edge."""
+    if (
+        getattr(workflow, "source_kind", "") != "sec_filing"
+        or not getattr(relation, "relation_id", "")
+        or getattr(relation, "kind", "") != "prior_annual_filing"
+        or getattr(relation, "source_record_id", "")
+        == getattr(relation, "target_record_id", "")
+    ):
+        return None
+    raw_records = tuple(getattr(workflow, "records", ()))
+    records = {record.record_id: record for record in raw_records}
+    if (
+        len(records) != len(raw_records)
+        or len({record.source_sha256 for record in raw_records}) != len(raw_records)
+        or len({record.provenance_id for record in raw_records}) != len(raw_records)
+        or set(getattr(workflow, "provenance_ids", ()))
+        != {record.provenance_id for record in raw_records}
+    ):
+        return None
+    current = records.get(relation.source_record_id)
+    prior = records.get(relation.target_record_id)
+    if current is None or prior is None:
+        return None
+    if (
+        any(
+            getattr(getattr(record, "source_origin", None), "value", "")
+            not in {"real_public", "real_private_export"}
+            or record.provenance_id != f"sha256:{record.source_sha256}"
+            or hashlib.sha256(record.text.encode()).hexdigest() != record.text_sha256
+            for record in (current, prior)
+        )
+        or current.source_sha256 == prior.source_sha256
+    ):
+        return None
+
+    attributes_by_record = {
+        record.record_id: dict(record.attributes) for record in (current, prior)
+    }
+    for record in (current, prior):
+        attributes = attributes_by_record[record.record_id]
+        facts_by_field = {
+            field: [fact for fact in record.facts if fact.field == field]
+            for field in SEC_ANNUAL_IDENTITY_FIELDS
+        }
+        if any(len(facts) != 1 for facts in facts_by_field.values()):
+            return None
+        for fact in (facts[0] for facts in facts_by_field.values()):
+            if (
+                fact.record_id != record.record_id
+                or fact.source_sha256 != record.source_sha256
+                or fact.char_start < 0
+                or fact.char_end != fact.char_start + len(fact.evidence_quote)
+                or record.text[fact.char_start : fact.char_end] != fact.evidence_quote
+                or fact.value_offset < 0
+                or fact.evidence_quote[
+                    fact.value_offset : fact.value_offset + len(fact.value)
+                ]
+                != fact.value
+            ):
+                return None
+        if (
+            facts_by_field["cik"][0].value != attributes.get("cik")
+            or facts_by_field["accession"][0].value != attributes.get("accession")
+            or facts_by_field["form"][0].value != attributes.get("form")
+            or facts_by_field["filing_date"][0].value.replace("-", "")
+            != str(attributes.get("filing_date", "")).replace("-", "")
+            or facts_by_field["report_date"][0].value.replace("-", "")
+            != str(attributes.get("report_date", "")).replace("-", "")
+            or record.record_id != f"sec:{attributes.get('accession', '')}"
+        ):
+            return None
+
+    current_attributes = attributes_by_record[current.record_id]
+    prior_attributes = attributes_by_record[prior.record_id]
+    try:
+        current_filing_day = date.fromisoformat(
+            str(current_attributes.get("filing_date") or "")
+        )
+        prior_filing_day = date.fromisoformat(
+            str(prior_attributes.get("filing_date") or "")
+        )
+        current_report_day = date.fromisoformat(
+            str(current_attributes.get("report_date") or "")
+        )
+        prior_report_day = date.fromisoformat(
+            str(prior_attributes.get("report_date") or "")
+        )
+        intermediate = [
+            record
+            for record in raw_records
+            if record.record_id not in {current.record_id, prior.record_id}
+            and record.attribute("cik") == current_attributes.get("cik")
+            and record.attribute("form") == current_attributes.get("form")
+            and prior_report_day
+            < date.fromisoformat(record.attribute("report_date"))
+            < current_report_day
+        ]
+    except ValueError:
+        return None
+    if (
+        relation.relation_id != f"{current.record_id}:prior_annual:{prior.record_id}"
+        or current_attributes.get("cik") != prior_attributes.get("cik")
+        or current_attributes.get("form") != "10-K"
+        or prior_attributes.get("form") != "10-K"
+        or current_report_day <= prior_report_day
+        or current_filing_day <= prior_filing_day
+        or current.occurred_at[:10] != current_filing_day.isoformat()
+        or prior.occurred_at[:10] != prior_filing_day.isoformat()
+        or intermediate
+    ):
+        return None
+
+    facts = {
+        (record.record_id, fact.fact_id): fact
+        for record in (current, prior)
+        for fact in record.facts
+    }
+    required = {
+        (record.record_id, field)
+        for record in (current, prior)
+        for field in SEC_ANNUAL_RELATION_FIELDS
+    }
+    grounded: set[tuple[str, str]] = set()
+    if len(relation.evidence) != len(required):
+        return None
+    for evidence in relation.evidence:
+        record = records.get(evidence.record_id)
+        if (
+            evidence.record_id not in {current.record_id, prior.record_id}
+            or record is None
+            or evidence.source_sha256 != record.source_sha256
+            or evidence.char_start < 0
+            or evidence.char_end <= evidence.char_start
+            or record.text[evidence.char_start : evidence.char_end]
+            != evidence.evidence_quote
+            or len(evidence.fact_ids) != 1
+        ):
+            return None
+        fact = facts.get((evidence.record_id, evidence.fact_ids[0]))
+        if (
+            fact is None
+            or fact.field not in set(SEC_ANNUAL_RELATION_FIELDS)
+            or fact.evidence_quote != evidence.evidence_quote
+            or fact.char_start != evidence.char_start
+            or fact.char_end != evidence.char_end
+            or fact.source_sha256 != evidence.source_sha256
+        ):
+            return None
+        identity = (record.record_id, fact.field)
+        if identity in grounded:
+            return None
+        grounded.add(identity)
+    return (current, prior) if grounded == required else None
+
+
 def _sec_source_event_matches_record(event: Any, record: Any) -> bool:
     params = getattr(event, "params", None)
     if not isinstance(params, Mapping) or getattr(event, "type", "") != "sec_filing":
@@ -1016,13 +1262,25 @@ def _sec_source_event_matches_record(event: Any, record: Any) -> bool:
     if (
         not isinstance(fact_spans, Sequence)
         or isinstance(fact_spans, (str, bytes))
-        or len(fact_spans) != len(SEC_IDENTITY_FIELDS)
+        or len(fact_spans)
+        not in {
+            len(SEC_IDENTITY_FIELDS),
+            len(SEC_ANNUAL_IDENTITY_FIELDS),
+        }
         or not all(isinstance(span, Mapping) for span in fact_spans)
     ):
         return False
+    observed_fields = {str(span.get("field") or "") for span in fact_spans}
+    expected_fields = (
+        set(SEC_ANNUAL_IDENTITY_FIELDS)
+        if observed_fields == set(SEC_ANNUAL_IDENTITY_FIELDS)
+        else set(SEC_IDENTITY_FIELDS)
+    )
+    if observed_fields != expected_fields:
+        return False
     facts_by_field = {
         field: [fact for fact in record.facts if fact.field == field]
-        for field in SEC_IDENTITY_FIELDS
+        for field in expected_fields
     }
     if any(len(facts) != 1 for facts in facts_by_field.values()):
         return False
@@ -1048,7 +1306,7 @@ def _sec_source_event_matches_record(event: Any, record: Any) -> bool:
         ):
             return False
         seen_fields.add(field)
-    if seen_fields != set(SEC_IDENTITY_FIELDS):
+    if seen_fields != expected_fields:
         return False
 
     if corridor_start == 0 and len(text) == len(record.text):
@@ -1150,11 +1408,13 @@ def selected_sec_source_relation_edges(
         for relation in getattr(workflow, "relations", ()):
             endpoints = validated_sec_amendment_endpoints(workflow, relation)
             if endpoints is None:
+                endpoints = validated_sec_annual_endpoints(workflow, relation)
+            if endpoints is None:
                 continue
-            amendment, original = endpoints
+            child, parent = endpoints
             if {
-                (workflow_id, amendment.record_id),
-                (workflow_id, original.record_id),
+                (workflow_id, child.record_id),
+                (workflow_id, parent.record_id),
             } - selected.keys():
                 continue
             if any(
@@ -1162,17 +1422,17 @@ def selected_sec_source_relation_edges(
                     _sec_source_event_matches_record(event, workflow_records[record_id])
                     for event in selected[(workflow_id, record_id)]
                 )
-                for record_id in (amendment.record_id, original.record_id)
+                for record_id in (child.record_id, parent.record_id)
             ):
                 continue
             edges.append(
                 {
-                    "parent_record_id": original.record_id,
-                    "child_record_id": amendment.record_id,
+                    "parent_record_id": parent.record_id,
+                    "child_record_id": child.record_id,
                     "relation": relation.kind,
                     "relation_provenance": "authentic_source",
-                    "parent_source_url": original.source_url,
-                    "child_source_url": amendment.source_url,
+                    "parent_source_url": parent.source_url,
+                    "child_source_url": child.source_url,
                 }
             )
     return sorted(

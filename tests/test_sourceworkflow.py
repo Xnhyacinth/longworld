@@ -36,23 +36,33 @@ def _fact(text: str, fact_id: str, field: str, value: str) -> dict:
 
 
 def _sec_filing(
-    accession: str, form: str, revenue: str, *, cik: str = "0000000001"
+    accession: str,
+    form: str,
+    revenue: str,
+    *,
+    cik: str = "0000000001",
+    filing_date: str = "2026-02-20",
+    report_date: str = "2025-12-31",
 ) -> dict:
+    compact_filing_date = filing_date.replace("-", "")
+    compact_report_date = report_date.replace("-", "")
     text = "\n".join(
         (
             f"ACCESSION NUMBER: {accession}",
+            f"CENTRAL INDEX KEY: {cik}",
             f"CONFORMED SUBMISSION TYPE: {form}",
-            "FILED AS OF DATE: 20260220",
-            "CONFORMED PERIOD OF REPORT: 20251231",
+            f"FILED AS OF DATE: {compact_filing_date}",
+            f"CONFORMED PERIOD OF REPORT: {compact_report_date}",
             f"Revenue after audit adjustment: {revenue}",
         )
     )
     source_sha256 = _digest(text)
     facts = [
         _fact(text, "accession", "accession", accession),
+        _fact(text, "cik", "cik", cik),
         _fact(text, "form", "form", form),
-        _fact(text, "filing_date", "filing_date", "20260220"),
-        _fact(text, "report_date", "report_date", "20251231"),
+        _fact(text, "filing_date", "filing_date", compact_filing_date),
+        _fact(text, "report_date", "report_date", compact_report_date),
         _fact(text, "revenue", "revenue", revenue),
     ]
     for fact in facts:
@@ -62,8 +72,8 @@ def _sec_filing(
         "accession": accession,
         "cik": cik,
         "form": form,
-        "filing_date": "2026-02-20",
-        "report_date": "2025-12-31",
+        "filing_date": filing_date,
+        "report_date": report_date,
         "source_url": f"https://www.sec.gov/Archives/{accession}.txt",
         "source_file": f"{accession}.txt",
         "source_sha256": source_sha256,
@@ -368,6 +378,115 @@ def test_sec_adapter_accepts_one_authentic_filing_without_inventing_a_relation()
     assert len(workflow.records) == 1
     assert workflow.relations == ()
     assert workflow.records[0].facts
+
+
+def _annual_sec_manifest(prior: dict, current: dict) -> dict:
+    return {
+        **_sec_manifest(),
+        "n": 2,
+        "filings": [prior, current],
+        "filing_relations": [
+            {
+                "relation_id": (
+                    f"{current['record_id']}:prior_annual:{prior['record_id']}"
+                ),
+                "relation_type": "prior_annual_filing",
+                "from_record_id": current["record_id"],
+                "to_record_id": prior["record_id"],
+                "current_report_date": current["report_date"],
+                "prior_report_date": prior["report_date"],
+                "evidence": [
+                    {
+                        "record_id": current["record_id"],
+                        "fact_ids": ["cik", "form", "filing_date", "report_date"],
+                    },
+                    {
+                        "record_id": prior["record_id"],
+                        "fact_ids": ["cik", "form", "filing_date", "report_date"],
+                    },
+                ],
+            }
+        ],
+    }
+
+
+def test_sec_adapter_accepts_grounded_adjacent_annual_relation() -> None:
+    prior = _sec_filing(
+        "0000000001-24-000001",
+        "10-K",
+        "USD 40 million",
+        filing_date="2024-02-20",
+        report_date="2023-12-31",
+    )
+    current = _sec_filing(
+        "0000000001-25-000001",
+        "10-K",
+        "USD 42 million",
+        filing_date="2025-02-20",
+        report_date="2024-12-31",
+    )
+    manifest = _annual_sec_manifest(prior, current)
+
+    [workflow] = adapt_sec_manifest(manifest, signed_bundle_authorized=True)
+
+    assert workflow.relations[0].kind == "prior_annual_filing"
+    assert workflow.relations[0].source_record_id == current["record_id"]
+    assert workflow.relations[0].target_record_id == prior["record_id"]
+    assert len(workflow.relations[0].evidence) == 8
+
+
+def test_sec_adapter_rejects_nonadjacent_or_tampered_annual_relation() -> None:
+    prior = _sec_filing(
+        "0000000001-24-000001",
+        "10-K",
+        "USD 40 million",
+        filing_date="2024-02-20",
+        report_date="2023-12-31",
+    )
+    current = _sec_filing(
+        "0000000001-25-000001",
+        "10-K",
+        "USD 42 million",
+        filing_date="2025-02-20",
+        report_date="2024-12-31",
+    )
+    middle = _sec_filing(
+        "0000000001-24-000002",
+        "10-K",
+        "USD 41 million",
+        filing_date="2024-08-20",
+        report_date="2024-06-30",
+    )
+    nonadjacent = _annual_sec_manifest(prior, current)
+    nonadjacent["filings"].append(middle)
+    nonadjacent["n"] = 3
+
+    with pytest.raises(ProvenanceError, match="crosses workflow boundaries"):
+        adapt_sec_manifest(nonadjacent, signed_bundle_authorized=True)
+
+    tampered = _annual_sec_manifest(prior, current)
+    tampered["filing_relations"][0]["prior_report_date"] = "2023-12-30"
+    with pytest.raises(ProvenanceError, match="crosses workflow boundaries"):
+        adapt_sec_manifest(tampered, signed_bundle_authorized=True)
+
+    incomplete = _annual_sec_manifest(prior, current)
+    incomplete["filing_relations"][0]["evidence"][0]["fact_ids"].pop()
+    with pytest.raises(ProvenanceError, match="evidence facts are incomplete"):
+        adapt_sec_manifest(incomplete, signed_bundle_authorized=True)
+
+    cross_cik_prior = _sec_filing(
+        "0000000001-24-000001",
+        "10-K",
+        "USD 40 million",
+        cik="0000000002",
+        filing_date="2024-02-20",
+        report_date="2023-12-31",
+    )
+    with pytest.raises(ProvenanceError, match="crosses workflow boundaries"):
+        adapt_sec_manifest(
+            _annual_sec_manifest(cross_cik_prior, current),
+            signed_bundle_authorized=True,
+        )
 
 
 def test_v1_sec_adapter_keeps_rejecting_relationless_singletons() -> None:

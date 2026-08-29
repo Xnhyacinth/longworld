@@ -8,7 +8,11 @@ from html import unescape
 from typing import Any
 
 from longworld.core.cascade import cascade_events
-from longworld.core.filingworkflow import validated_sec_amendment_endpoints
+from longworld.core.filingworkflow import (
+    SEC_ANNUAL_IDENTITY_FIELDS,
+    validated_sec_amendment_endpoints,
+    validated_sec_annual_endpoints,
+)
 from longworld.core.grounded import grounded_events
 from longworld.core.issuerfilingworkflow import (
     ISSUER_IR_OPERATIONS_SECTION,
@@ -1278,10 +1282,21 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
                 )
             )
             continue
+        annual_record_ids = {
+            record.record_id
+            for relation in workflow.relations
+            for endpoints in [validated_sec_annual_endpoints(workflow, relation)]
+            if endpoints is not None
+            for record in endpoints
+        }
         for record_index, record in enumerate(workflow.records):
             if record_id_counts[record.record_id] != 1:
                 continue
-            required_fields = {"accession", "form", "filing_date", "report_date"}
+            required_fields = (
+                set(SEC_ANNUAL_IDENTITY_FIELDS)
+                if record.record_id in annual_record_ids
+                else {"accession", "form", "filing_date", "report_date"}
+            )
             facts_by_field = {
                 field: [fact for fact in record.facts if fact.field == field]
                 for field in required_fields
@@ -1477,51 +1492,152 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
         }
         for relation_index, relation in enumerate(workflow.relations):
             endpoints = validated_sec_amendment_endpoints(workflow, relation)
-            if endpoints is None:
+            if endpoints is not None:
+                amendment, original = endpoints
+                if any(
+                    record_id_counts[record.record_id] != 1
+                    for record in (amendment, original)
+                ):
+                    continue
+                amendment_source_id = (
+                    f"{prefix}.sec_filing_{workflow_index}_"
+                    f"{record_indexes[amendment.record_id]}"
+                )
+                original_source_id = (
+                    f"{prefix}.sec_filing_{workflow_index}_"
+                    f"{record_indexes[original.record_id]}"
+                )
+                resolution_id = (
+                    f"{prefix}.sec_amendment_resolution_"
+                    f"{workflow_index}_{relation_index}"
+                )
+                relation_day = date.fromisoformat(amendment.occurred_at[:10])
+                events.append(
+                    Event(
+                        id=resolution_id,
+                        type="sec_amendment_resolution",
+                        time=relation_day + timedelta(days=3),
+                        params={
+                            "workflow_id": workflow.workflow_id,
+                            "record_id": amendment.record_id,
+                            "target_record_id": original.record_id,
+                            "source_relation_id": relation.relation_id,
+                            "resolution_kind": "amends_report",
+                            "answer_key": (
+                                f"sec_amendment_resolution:{relation.relation_id}"
+                            ),
+                            "control_stage": "amendment graph resolution",
+                            "ground_values": ["amendment relation evaluated"],
+                        },
+                        visibility=[resolution_id],
+                        causal_inputs=[original_source_id, amendment_source_id],
+                        required_inputs=[original_source_id, amendment_source_id],
+                        relation_kinds={
+                            original_source_id: "amends_target",
+                            amendment_source_id: "amendment_source",
+                        },
+                    )
+                )
                 continue
-            amendment, original = endpoints
+
+            annual_endpoints = validated_sec_annual_endpoints(workflow, relation)
+            if annual_endpoints is None:
+                continue
+            current, prior = annual_endpoints
             if any(
-                record_id_counts[record.record_id] != 1
-                for record in (amendment, original)
+                record_id_counts[record.record_id] != 1 for record in (current, prior)
             ):
                 continue
-            amendment_source_id = (
+            revenue_sections = {
+                record.record_id: [
+                    event
+                    for event in events
+                    if event.type == "sec_source_section"
+                    and event.params.get("record_id") == record.record_id
+                    and any(
+                        span.get("kind", "xbrl") == "xbrl"
+                        and span.get("role") == "total_revenue"
+                        for span in event.params.get("fact_spans") or []
+                        if isinstance(span, dict)
+                    )
+                ]
+                for record in (current, prior)
+            }
+            if any(len(matches) != 1 for matches in revenue_sections.values()):
+                continue
+            current_source_id = (
                 f"{prefix}.sec_filing_{workflow_index}_"
-                f"{record_indexes[amendment.record_id]}"
+                f"{record_indexes[current.record_id]}"
             )
-            original_source_id = (
+            prior_source_id = (
                 f"{prefix}.sec_filing_{workflow_index}_"
-                f"{record_indexes[original.record_id]}"
+                f"{record_indexes[prior.record_id]}"
             )
-            resolution_id = (
-                f"{prefix}.sec_amendment_resolution_{workflow_index}_{relation_index}"
+            relation_id = f"{prefix}.sec_prior_annual_{workflow_index}_{relation_index}"
+            answer_id = (
+                f"{prefix}.sec_annual_revenue_change_{workflow_index}_{relation_index}"
             )
-            relation_day = date.fromisoformat(amendment.occurred_at[:10])
-            events.append(
-                Event(
-                    id=resolution_id,
-                    type="sec_amendment_resolution",
-                    time=relation_day + timedelta(days=3),
-                    params={
-                        "workflow_id": workflow.workflow_id,
-                        "record_id": amendment.record_id,
-                        "target_record_id": original.record_id,
-                        "source_relation_id": relation.relation_id,
-                        "resolution_kind": "amends_report",
-                        "answer_key": (
-                            f"sec_amendment_resolution:{relation.relation_id}"
-                        ),
-                        "control_stage": "amendment graph resolution",
-                        "ground_values": ["amendment relation evaluated"],
-                    },
-                    visibility=[resolution_id],
-                    causal_inputs=[original_source_id, amendment_source_id],
-                    required_inputs=[original_source_id, amendment_source_id],
-                    relation_kinds={
-                        original_source_id: "amends_target",
-                        amendment_source_id: "amendment_source",
-                    },
-                )
+            relation_day = date.fromisoformat(current.occurred_at[:10])
+            current_revenue = revenue_sections[current.record_id][0]
+            prior_revenue = revenue_sections[prior.record_id][0]
+            events.extend(
+                [
+                    Event(
+                        id=relation_id,
+                        type="sec_prior_annual_filing_relation",
+                        time=relation_day + timedelta(days=3),
+                        params={
+                            "workflow_id": workflow.workflow_id,
+                            "record_id": current.record_id,
+                            "target_record_id": prior.record_id,
+                            "source_relation_id": relation.relation_id,
+                            "resolution_kind": "prior_annual_filing",
+                            "relation_provenance": "authentic_source",
+                            "adjacency_proof": "manifest_adapter_canonical_recomputation",
+                            "answer_key": f"sec_prior_annual:{relation.relation_id}",
+                            "ground_values": ["prior annual relation evaluated"],
+                        },
+                        visibility=[relation_id],
+                        causal_inputs=[prior_source_id, current_source_id],
+                        required_inputs=[prior_source_id, current_source_id],
+                        relation_kinds={
+                            prior_source_id: "prior_annual_source",
+                            current_source_id: "current_annual_source",
+                        },
+                    ),
+                    Event(
+                        id=answer_id,
+                        type="sec_annual_revenue_change",
+                        time=relation_day + timedelta(days=4),
+                        params={
+                            "workflow_id": workflow.workflow_id,
+                            "record_id": current.record_id,
+                            "target_record_id": prior.record_id,
+                            "required_relation_id": relation.relation_id,
+                            "required_role": "total_revenue",
+                            "answer_key": (
+                                f"sec_annual_revenue_change:{relation.relation_id}"
+                            ),
+                            "ground_values": ["annual revenue delta computed"],
+                        },
+                        visibility=[answer_id],
+                        causal_inputs=[
+                            prior_revenue.id,
+                            current_revenue.id,
+                            relation_id,
+                        ],
+                        required_inputs=[
+                            prior_revenue.id,
+                            current_revenue.id,
+                            relation_id,
+                        ],
+                        relation_kinds={
+                            prior_revenue.id: "reads_prior_revenue",
+                            current_revenue.id: "reads_current_revenue",
+                            relation_id: "requires_prior_annual_relation",
+                        },
+                    ),
+                ]
             )
     return events
 

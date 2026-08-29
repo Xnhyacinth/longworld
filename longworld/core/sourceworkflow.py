@@ -15,6 +15,7 @@ import re
 from collections import deque
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 from longworld.core.documentworkflow import (
@@ -22,7 +23,10 @@ from longworld.core.documentworkflow import (
     PAPER_WORKFLOW_MANIFEST_SCHEMA,
     WIKIPEDIA_WORKFLOW_MANIFEST_SCHEMA,
 )
-from longworld.core.filingworkflow import SEC_FILING_MANIFEST_SCHEMA
+from longworld.core.filingworkflow import (
+    SEC_ANNUAL_RELATION_FIELDS,
+    SEC_FILING_MANIFEST_SCHEMA,
+)
 from longworld.core.issuerfilingworkflow import (
     ISSUER_IR_FILING_MANIFEST_SCHEMA,
     ISSUER_IR_SOURCE_FAMILY,
@@ -370,7 +374,7 @@ def _sec_relation(
     target_id = str(raw.get("to_record_id") or "")
     if (
         not relation_id
-        or kind != "amends_report"
+        or kind not in {"amends_report", "prior_annual_filing"}
         or source_id == target_id
         or source_id not in records
         or target_id not in records
@@ -378,17 +382,53 @@ def _sec_relation(
         raise ProvenanceError("SEC source relation identity is invalid")
     source = records[source_id]
     target = records[target_id]
-    shared_report_date = str(raw.get("shared_report_date") or "")
     source_form = source.attribute("form")
-    if (
-        source.attribute("cik") != target.attribute("cik")
-        or not source_form.endswith("/A")
-        or source_form.removesuffix("/A") != target.attribute("form")
-        or not shared_report_date
-        or source.attribute("report_date") != shared_report_date
-        or target.attribute("report_date") != shared_report_date
-    ):
-        raise ProvenanceError("SEC source relation crosses workflow boundaries")
+    if kind == "amends_report":
+        shared_report_date = str(raw.get("shared_report_date") or "")
+        if (
+            source.attribute("cik") != target.attribute("cik")
+            or not source_form.endswith("/A")
+            or source_form.removesuffix("/A") != target.attribute("form")
+            or not shared_report_date
+            or source.attribute("report_date") != shared_report_date
+            or target.attribute("report_date") != shared_report_date
+        ):
+            raise ProvenanceError("SEC source relation crosses workflow boundaries")
+        required_fields: set[str] | None = None
+    else:
+        current_report = source.attribute("report_date")
+        prior_report = target.attribute("report_date")
+        try:
+            current_report_day = date.fromisoformat(current_report)
+            prior_report_day = date.fromisoformat(prior_report)
+            current_filing_day = date.fromisoformat(source.attribute("filing_date"))
+            prior_filing_day = date.fromisoformat(target.attribute("filing_date"))
+        except ValueError as exc:
+            raise ProvenanceError("SEC annual relation dates are invalid") from exc
+        expected_relation_id = f"{source_id}:prior_annual:{target_id}"
+        intermediate = [
+            record
+            for record in records.values()
+            if record.record_id not in {source_id, target_id}
+            and record.attribute("cik") == source.attribute("cik")
+            and record.attribute("form") == source_form
+            and prior_report_day
+            < date.fromisoformat(record.attribute("report_date"))
+            < current_report_day
+        ]
+        if (
+            relation_id != expected_relation_id
+            or source.attribute("cik") != target.attribute("cik")
+            or source_form != "10-K"
+            or target.attribute("form") != source_form
+            or str(raw.get("current_report_date") or "") != current_report
+            or str(raw.get("prior_report_date") or "") != prior_report
+            or current_report_day <= prior_report_day
+            or current_filing_day <= prior_filing_day
+            or intermediate
+        ):
+            raise ProvenanceError("SEC source relation crosses workflow boundaries")
+        required_fields = set(SEC_ANNUAL_RELATION_FIELDS)
 
     raw_evidence = _objects(raw.get("evidence"), "relation evidence")
     fact_index = {
@@ -428,6 +468,16 @@ def _sec_relation(
             referenced.add(identity)
     if evidence_records != {source_id, target_id}:
         raise ProvenanceError("SEC source relation evidence omits an endpoint")
+    grounded_fields = {
+        (record_id, fact_index[record_id][fact_id].field)
+        for record_id, fact_id in referenced
+    }
+    if required_fields is not None and grounded_fields != {
+        (record_id, field)
+        for record_id in (source_id, target_id)
+        for field in required_fields
+    }:
+        raise ProvenanceError("SEC source relation evidence facts are incomplete")
     return SourceRelation(
         relation_id=relation_id,
         kind=kind,

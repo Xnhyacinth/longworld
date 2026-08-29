@@ -296,6 +296,8 @@ def render_company(sim: SimulatedWorld) -> list[Artifact]:
             "sec_filing_eligibility_policy",
             "sec_filing_approval",
             "sec_amendment_resolution",
+            "sec_prior_annual_filing_relation",
+            "sec_annual_revenue_change",
             "sec_filing_publication_ratification",
             "sec_source_section",
             "sec_financial_answer",
@@ -386,6 +388,39 @@ def render_company(sim: SimulatedWorld) -> list[Artifact]:
                     f"Current filing record: {params['record_id']}.\n"
                     f"Target filing record: {params['target_record_id']}.\n"
                     "Status: amendment relation evaluated."
+                )
+                source_origin = SourceOrigin.SYNTHETIC_WORLD
+                workflow_kind = WorkflowKind.HYBRID_CAUSAL
+                provenance_id = (
+                    "derived-sha256:" + hashlib.sha256(text.encode()).hexdigest()
+                )
+                evidence_role = EvidenceRole.CAUSAL_GOLD
+                real_record = False
+            elif event.type == "sec_prior_annual_filing_relation":
+                text = (
+                    "SEC annual-filing temporal relation control\n"
+                    f"Current filing record: {params['record_id']}.\n"
+                    f"Prior filing record: {params['target_record_id']}.\n"
+                    "Status: prior-annual-filing-validated. This control binds "
+                    "the two source filings without restating their facts. Control "
+                    "outcome: prior annual relation evaluated. Adjacency comes from "
+                    "the canonical source-relation proof; the displayed dates only "
+                    "confirm endpoint ordering."
+                )
+                source_origin = SourceOrigin.SYNTHETIC_WORLD
+                workflow_kind = WorkflowKind.HYBRID_CAUSAL
+                provenance_id = (
+                    "derived-sha256:" + hashlib.sha256(text.encode()).hexdigest()
+                )
+                evidence_role = EvidenceRole.CAUSAL_SUPPORTING
+                real_record = False
+            elif event.type == "sec_annual_revenue_change":
+                text = (
+                    "SEC annual revenue comparison control\n"
+                    "Status: comparison-scope-approved. Read the two source-bound "
+                    "total-revenue facts under the validated prior-annual relation; "
+                    "control outcome: annual revenue delta computed. This control does "
+                    "not restate either value or the result."
                 )
                 source_origin = SourceOrigin.SYNTHETIC_WORLD
                 workflow_kind = WorkflowKind.HYBRID_CAUSAL

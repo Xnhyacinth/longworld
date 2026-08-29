@@ -1551,6 +1551,128 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
             )
         )
 
+    annual_relations = {
+        str(event.params.get("source_relation_id") or ""): event
+        for event in world.events
+        if event.type == "sec_prior_annual_filing_relation"
+    }
+    annual_sections: dict[tuple[str, str], list[Event]] = {}
+    for event in world.events:
+        if event.type != "sec_source_section":
+            continue
+        record_id = str(event.params.get("record_id") or "")
+        for span in event.params.get("fact_spans") or []:
+            if (
+                isinstance(span, dict)
+                and span.get("kind", "xbrl") == "xbrl"
+                and span.get("role") == "total_revenue"
+            ):
+                annual_sections.setdefault((record_id, "total_revenue"), []).append(
+                    event
+                )
+    for answer_event in (
+        event for event in world.events if event.type == "sec_annual_revenue_change"
+    ):
+        current_id = str(answer_event.params.get("record_id") or "")
+        prior_id = str(answer_event.params.get("target_record_id") or "")
+        relation_id = str(answer_event.params.get("required_relation_id") or "")
+        relation_event = annual_relations.get(relation_id)
+        current_source = sources_by_record.get(current_id)
+        prior_source = sources_by_record.get(prior_id)
+        current_sections = annual_sections.get((current_id, "total_revenue"), [])
+        prior_sections = annual_sections.get((prior_id, "total_revenue"), [])
+        if (
+            relation_event is None
+            or current_source is None
+            or prior_source is None
+            or len(current_sections) != 1
+            or len(prior_sections) != 1
+        ):
+            continue
+        current_section = current_sections[0]
+        prior_section = prior_sections[0]
+        cf_updates = _financial_cf_updates(current_section, "total_revenue")
+        if cf_updates is None:
+            continue
+        relation_key = hashlib.sha256(relation_id.encode()).hexdigest()[:12]
+        essential = [
+            prior_source,
+            current_source,
+            prior_section,
+            current_section,
+            relation_event,
+            answer_event,
+        ]
+        queries.append(
+            QuerySpec(
+                query_id=f"{qid}:sec_annual_revenue_change:{relation_key}:32k",
+                query_type="sec_annual_revenue_change",
+                question=(
+                    "Read both source-bound annual filings and their authentic "
+                    "prior-annual relation, then compute the change in total revenue. "
+                    "Reply exactly as ANNUAL_REVENUE_CHANGE | <current report date> "
+                    "| <current revenue in base units> | <prior report date> | "
+                    "<prior revenue in base units> | <current minus prior>."
+                ),
+                answer="",
+                as_of=answer_event.time,
+                answer_key=str(answer_event.params["answer_key"]),
+                essential_event_ids=[event.id for event in essential],
+                essential_artifact_ids=[
+                    f"{world.spec['world_id']}.{event.visibility[0]}"
+                    for event in essential
+                ],
+                sufficient_event_ids=[event.id for event in essential],
+                cf_event_id=current_section.id,
+                cf_param_updates=cf_updates,
+                cf_answer="",
+                invariance_event_id=current_source.id,
+                invariance_param_updates={
+                    "retrieval_url": "https://www.sec.gov/Archives/"
+                },
+                gold_expression=(
+                    "READ_SOURCE_SPANS(prior/current annual identity) THEN "
+                    "VALIDATE_PRIOR_ANNUAL_FILING THEN "
+                    "READ_XBRL_FACT(prior/current total_revenue) THEN SUBTRACT"
+                ),
+                proof_depth=4,
+                cf_op="numeric",
+                motif="real_filing_annual_revenue_change",
+                topology_id=instance_topology(
+                    "company.real_sec_annual_revenue_change", relation_id
+                ),
+                domain="company",
+                truth_regime="real_source_derived",
+                program_ops=[
+                    {
+                        "op": "READ_SOURCE_SPAN",
+                        "record": "prior",
+                        "field": "report_date",
+                    },
+                    {
+                        "op": "READ_SOURCE_SPAN",
+                        "record": "current",
+                        "field": "report_date",
+                    },
+                    {"op": "VALIDATE_PRIOR_ANNUAL_FILING"},
+                    {
+                        "op": "READ_XBRL_FACT",
+                        "record": "prior",
+                        "role": "total_revenue",
+                    },
+                    {
+                        "op": "READ_XBRL_FACT",
+                        "record": "current",
+                        "role": "total_revenue",
+                    },
+                    {"op": "SUBTRACT_CURRENT_MINUS_PRIOR"},
+                ],
+                preferred_length_buckets=["32k"],
+                semantic_growth_group="company_real_sec_annual_revenue_change",
+                base_task_group=f"sec_annual_revenue_change:{relation_key}",
+            )
+        )
+
     computes: dict[str, dict[str, Event]] = {}
     facet_answers: dict[str, dict[str, Event]] = {}
     sections: dict[str, dict[str, Event]] = {}

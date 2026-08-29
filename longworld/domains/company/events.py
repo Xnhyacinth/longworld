@@ -104,6 +104,28 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
         ):
             return False, "sec_amendment_endpoint_missing"
         return True, None
+    if ev.type == "sec_prior_annual_filing_relation":
+        facts = state.values.get("sec_filing_facts") or {}
+        if any(
+            str(ev.params.get(field) or "") not in facts
+            for field in ("record_id", "target_record_id")
+        ):
+            return False, "sec_annual_endpoint_missing"
+        return True, None
+    if ev.type == "sec_annual_revenue_change":
+        current_id = str(ev.params.get("record_id") or "")
+        prior_id = str(ev.params.get("target_record_id") or "")
+        role = str(ev.params.get("required_role") or "")
+        xbrl = state.values.get("sec_xbrl_facts") or {}
+        if not role or any(
+            role not in (xbrl.get(record_id) or {})
+            for record_id in (current_id, prior_id)
+        ):
+            return False, "sec_annual_financial_fact_missing"
+        relation_id = str(ev.params.get("required_relation_id") or "")
+        if relation_id not in (state.values.get("sec_filing_relations") or {}):
+            return False, "sec_annual_relation_missing"
+        return True, None
     if ev.type == "sec_filing_publication_ratification":
         approvals = state.values.get("sec_eligibility_approvals") or {}
         if str(ev.params.get("record_id") or "") not in approvals:
@@ -332,7 +354,12 @@ def apply_event(state: WorldState, ev: Event) -> None:
         approvals = dict(state.values.get("sec_eligibility_approvals") or {})
         approvals[record_id] = answer
         state.set("sec_eligibility_approvals", approvals, eid, day)
-    elif t in {"sec_amendment_resolution", "sec_filing_publication_ratification"}:
+    elif t in {
+        "sec_amendment_resolution",
+        "sec_prior_annual_filing_relation",
+        "sec_annual_revenue_change",
+        "sec_filing_publication_ratification",
+    }:
         if t == "sec_amendment_resolution":
             amendment_id = str(p.get("record_id") or "")
             original_id = str(p.get("target_record_id") or "")
@@ -367,6 +394,84 @@ def apply_event(state: WorldState, ev: Event) -> None:
             relations = dict(state.values.get("sec_filing_relations") or {})
             relations[str(p.get("source_relation_id") or "")] = answer
             state.set("sec_filing_relations", relations, eid, day)
+            state.set(answer_key, answer, eid, day)
+            return
+        if t == "sec_prior_annual_filing_relation":
+            current_id = str(p.get("record_id") or "")
+            prior_id = str(p.get("target_record_id") or "")
+            filing_facts = state.values.get("sec_filing_facts") or {}
+            current = filing_facts.get(current_id)
+            prior = filing_facts.get(prior_id)
+            answer_key = str(p.get("answer_key") or "")
+            relation_id = str(p.get("source_relation_id") or "")
+            if (
+                not isinstance(current, dict)
+                or not isinstance(prior, dict)
+                or not answer_key
+                or not relation_id
+                or p.get("resolution_kind") != "prior_annual_filing"
+                or p.get("relation_provenance") != "authentic_source"
+                or p.get("adjacency_proof")
+                != "manifest_adapter_canonical_recomputation"
+            ):
+                return
+            try:
+                ordered = date.fromisoformat(
+                    str(current.get("filing_date") or "")
+                ) > date.fromisoformat(
+                    str(prior.get("filing_date") or "")
+                ) and date.fromisoformat(
+                    str(current.get("report_date") or "")
+                ) > date.fromisoformat(str(prior.get("report_date") or ""))
+            except ValueError:
+                return
+            valid = (
+                isinstance(current.get("cik"), str)
+                and len(current["cik"]) == 10
+                and current["cik"].isdigit()
+                and current.get("cik") == prior.get("cik")
+                and current.get("form") == "10-K"
+                and prior.get("form") == "10-K"
+                and ordered
+            )
+            status = "PRIOR_ANNUAL" if valid else "INVALID_RELATION"
+            answer = (
+                f"{status} | {current.get('accession')} | "
+                f"{prior.get('accession')} | {current.get('report_date')} | "
+                f"{prior.get('report_date')}"
+            )
+            relations = dict(state.values.get("sec_filing_relations") or {})
+            relations[relation_id] = answer
+            state.set("sec_filing_relations", relations, eid, day)
+            state.set(answer_key, answer, eid, day)
+            return
+        if t == "sec_annual_revenue_change":
+            current_id = str(p.get("record_id") or "")
+            prior_id = str(p.get("target_record_id") or "")
+            role = str(p.get("required_role") or "")
+            relation_id = str(p.get("required_relation_id") or "")
+            relations = state.values.get("sec_filing_relations") or {}
+            relation_answer = str(relations.get(relation_id) or "")
+            xbrl = state.values.get("sec_xbrl_facts") or {}
+            facts = state.values.get("sec_filing_facts") or {}
+            answer_key = str(p.get("answer_key") or "")
+            if (
+                not relation_answer.startswith("PRIOR_ANNUAL |")
+                or not answer_key
+                or not role
+            ):
+                return
+            try:
+                current_value = int(xbrl[current_id][role])
+                prior_value = int(xbrl[prior_id][role])
+                current_report = str(facts[current_id]["report_date"])
+                prior_report = str(facts[prior_id]["report_date"])
+            except (KeyError, TypeError, ValueError):
+                return
+            answer = (
+                f"ANNUAL_REVENUE_CHANGE | {current_report} | {current_value} | "
+                f"{prior_report} | {prior_value} | {current_value - prior_value}"
+            )
             state.set(answer_key, answer, eid, day)
             return
         record_id = str(p.get("record_id") or "")

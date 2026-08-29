@@ -653,6 +653,12 @@ def parse_sec_ixbrl_facts(
             seen.add(fact_id)
         else:
             attrs = dict(_IX_ATTR.findall(match.group(2)))
+            if match.group(0).rstrip().endswith("/>"):
+                if attrs.get("xsi:nil", "").lower() != "true":
+                    raise ProvenanceError(
+                        "SEC self-closing iXBRL fact is not explicitly nil"
+                    )
+                continue
             stack.append((match.start(), attrs, match.end()))
     if stack:
         raise ProvenanceError("SEC iXBRL fact has unmatched open tag")

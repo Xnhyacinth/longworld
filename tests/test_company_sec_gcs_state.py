@@ -16,7 +16,9 @@ from longworld.core.attestation import (
     ROLE_KEY_ID_ENVS,
     attach_attestation,
 )
+from longworld.core.provenance import ProvenanceError
 from longworld.core.sampler import materialize
+from longworld.core.secxbrl import parse_sec_financial_program
 from longworld.core.sourcebundle import load_source_workflow_bundle
 from longworld.core.verify import verify_question
 from longworld.core.views import render_cf_view
@@ -30,6 +32,11 @@ SOURCE_BUNDLE = (
 )
 SOURCE_DIRECTORY = SOURCE_BUNDLE.parent
 TEST_SOURCE_KEY = b"microsoft-gcs-state-test-source-key-32-bytes"
+FY2024_SOURCE = (
+    Path(__file__).resolve().parents[1]
+    / "data/source_inventory/p12_wave1_company_microsoft_gcs_history_v1/"
+    "msft-20240630.html"
+)
 
 
 def _microsoft_materialization(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -93,6 +100,54 @@ def test_declared_source_workflow_buckets_fail_closed_when_query_is_missing() ->
             routing={
                 "sec_financial_reconstruction": ["16k", "32k", "64k"],
             },
+        )
+
+
+@pytest.mark.skipif(
+    not FY2024_SOURCE.is_file(), reason="requires the local Microsoft FY2024 source"
+)
+def test_microsoft_fy2024_gcs_financial_program_parses_exact_source() -> None:
+    source = FY2024_SOURCE.read_text(encoding="utf-8")
+    source_sha256 = hashlib.sha256(source.encode()).hexdigest()
+
+    program = parse_sec_financial_program(
+        source, source_sha256, report_date="2024-06-30"
+    )
+
+    assert len(program.sections) == 12
+    assert len(program.roles) == 27
+    assert program.n_category == 10
+    assert program.n_geo == 2
+    assert set(program.certifications) == {
+        "ex_31_1",
+        "ex_31_2",
+        "ex_32_1",
+        "ex_32_2",
+    }
+
+
+@pytest.mark.skipif(
+    not FY2024_SOURCE.is_file(), reason="requires the local Microsoft FY2024 source"
+)
+def test_microsoft_fy2024_parser_still_fails_closed_on_real_tag_corruption() -> None:
+    source = FY2024_SOURCE.read_text(encoding="utf-8")
+    unmatched = source.replace("</ix:nonFraction>", "", 1)
+    assert unmatched != source
+
+    with pytest.raises(ProvenanceError, match="unmatched open tag"):
+        parse_sec_financial_program(
+            unmatched,
+            hashlib.sha256(unmatched.encode()).hexdigest(),
+            report_date="2024-06-30",
+        )
+
+    non_nil = source.replace('xsi:nil="true"/>', 'xsi:nil="false"/>', 1)
+    assert non_nil != source
+    with pytest.raises(ProvenanceError, match="not explicitly nil"):
+        parse_sec_financial_program(
+            non_nil,
+            hashlib.sha256(non_nil.encode()).hexdigest(),
+            report_date="2024-06-30",
         )
 
 
