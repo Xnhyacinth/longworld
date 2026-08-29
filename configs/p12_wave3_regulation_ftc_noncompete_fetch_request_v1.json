@@ -1,0 +1,23 @@
+{
+  "schema_version": "longworld.regulation-fetch-request.v1",
+  "user_agent": "LongWorld/0.2 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "p12-wave3-regulation-ftc-noncompete-public-v1",
+    "scope": "bounded public FTC rulemaking metadata for FTC-2023-0007",
+    "basis": "public-source research authorization; metadata only; comments excluded",
+    "reviewed_at": "2026-08-29T00:00:00Z",
+    "allowed_actions": [
+      "fetch_federal_register_document",
+      "fetch_regulations_docket_metadata"
+    ]
+  },
+  "docket_id": "FTC-2023-0007",
+  "federal_register_document_numbers": [
+    "2023-00414",
+    "2023-07036",
+    "2024-09171"
+  ],
+  "regulations_api_key_env": "REGULATIONS_GOV_API_KEY",
+  "requests_per_second": 2.0,
+  "max_retries": 3
+}
