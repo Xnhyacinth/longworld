@@ -17,12 +17,14 @@ from longworld.core.groundedspan import (
     validate_grounded_source,
     validate_grounded_sources,
 )
+from longworld.core.provenance import ProvenanceError
 from longworld.core.scholarly import format_revision_added_delta
 from longworld.core.state import WorldState
 from longworld.core.wikiparse import (
     WIKI_ENTITY_VIEW_PREFIX,
     WIKI_SECTION_REVISION,
     WIKI_SECTION_VIEW_PREFIX,
+    extract_wikipedia_wikitext,
 )
 from longworld.core.world import Event
 
@@ -30,6 +32,8 @@ _ARXIV_SOURCE_ENVELOPE_REVISION = "researchlab-arxiv-source-envelope-v1"
 _WIKI_FACT_PARSER_REVISION = "researchlab-wiki-claim-exact-v2"
 _WIKI_LEGACY_FACT_PARSER_REVISION = "researchlab-wiki-claim-exact-v1"
 _WIKI_REVISION_HUNK = "wiki_revision_hunk_v1"
+_WIKI_CANONICAL_FACT_SPAN = "wiki_canonical_fact_span_v1"
+_WIKI_CANONICAL_FACT_SPAN_MAX_CHARS = 12_288
 _WIKI_ANSWER_TAG = re.compile(r"[A-Z][A-Z0-9_]{1,31}")
 _WIKI_LEGACY_ROLE_TAGS = {
     "born": "BORN",
@@ -669,6 +673,39 @@ def _wiki_source_claims(
             "parent_sha256": parent_sha256,
             "section_sha256": section_sha256,
         }
+    elif operation == _WIKI_CANONICAL_FACT_SPAN:
+        start = params.get("source_char_start")
+        end = params.get("source_char_end")
+        source_span = source.visible_text[len(prefix) :]
+        if (
+            provenance_class != "verified_derived"
+            or params.get("source_origin") != "real_derived"
+            or section_id.startswith("revision_")
+            or not source.facts
+            or isinstance(start, bool)
+            or isinstance(end, bool)
+            or not isinstance(start, int)
+            or not isinstance(end, int)
+            or start < 0
+            or start >= end
+            or end - start != len(source_span)
+            or len(source_span) > _WIKI_CANONICAL_FACT_SPAN_MAX_CHARS
+            or source.visible_text != prefix + source_span
+            or hashlib.sha256(source_span.encode()).hexdigest()
+            != params.get("source_span_sha256")
+            or not str(params.get("source_body_sha256") or "")
+        ):
+            return None
+        digest_payload = {
+            "operation": operation,
+            "section_id": section_id,
+            "parent_sha256": parent_sha256,
+            "source_body_sha256": params.get("source_body_sha256"),
+            "source_char_start": start,
+            "source_char_end": end,
+            "source_span_sha256": params.get("source_span_sha256"),
+            "section_sha256": section_sha256,
+        }
     elif operation == _WIKI_REVISION_HUNK:
         start = params.get("source_char_start")
         end = params.get("source_char_end")
@@ -749,6 +786,8 @@ def _wiki_source_claims(
     spans = params.get("fact_spans")
     if not isinstance(spans, list):
         return None
+    if operation == _WIKI_CANONICAL_FACT_SPAN and len(source.facts) != len(spans):
+        return None
     if section_id == "appendix_rest":
         return ({}, {}) if not spans else None
     if section_id.startswith("revision_") and not spans:
@@ -769,7 +808,12 @@ def _wiki_source_claims(
             or fact.normalized_quote
             != normalize_fact_value(str(span.get("evidence_quote") or ""))
             or (
-                operation in {WIKI_SECTION_REVISION, _WIKI_REVISION_HUNK}
+                operation
+                in {
+                    WIKI_SECTION_REVISION,
+                    _WIKI_REVISION_HUNK,
+                    _WIKI_CANONICAL_FACT_SPAN,
+                }
                 and span.get("parent_sha256") != parent_sha256
             )
         ):
@@ -803,6 +847,75 @@ def _wiki_source_claims(
 
 def _wiki_source_binding_valid(ev: Event, source: GroundedSource) -> bool:
     return _wiki_source_claims(ev, source) is not None
+
+
+def _source_event_envelope_sha256(ev: Event) -> str:
+    return _canonical_digest(
+        {
+            "id": ev.id,
+            "type": ev.type,
+            "time": ev.time.isoformat(),
+            "params": ev.params,
+            "visibility": list(ev.visibility),
+            "preconditions": list(ev.preconditions),
+            "causal_inputs": list(ev.causal_inputs),
+            "required_inputs": list(ev.required_inputs),
+            "relation_kinds": dict(ev.relation_kinds),
+            "skipped": ev.skipped,
+            "skip_reason": ev.skip_reason,
+        }
+    )
+
+
+def _wiki_canonical_record_span_valid(
+    state: WorldState, ev: Event, source: GroundedSource
+) -> bool:
+    operation = str(ev.params.get("provenance_operation") or "")
+    canonical_operations = {
+        WIKI_SECTION_REVISION,
+        _WIKI_CANONICAL_FACT_SPAN,
+        _WIKI_REVISION_HUNK,
+    }
+    if operation not in canonical_operations:
+        return True
+    event_digests = state.values.get("canonical_wiki_source_event_sha256") or {}
+    if event_digests.get(ev.id) != _source_event_envelope_sha256(ev):
+        return False
+    if operation == WIKI_SECTION_REVISION:
+        return True
+    records = state.values.get("canonical_wiki_source_records") or {}
+    record = records.get(str(ev.params.get("section_record_id") or "")) or {}
+    body = record.get("body")
+    start = ev.params.get("source_char_start")
+    end = ev.params.get("source_char_end")
+    prefix = (
+        WIKI_ENTITY_VIEW_PREFIX
+        if ev.params.get("section_id") == "wikidata_entity"
+        else WIKI_SECTION_VIEW_PREFIX
+    )
+    visible_span = (
+        source.facts[0].quote
+        if operation == _WIKI_REVISION_HUNK and len(source.facts) == 1
+        else source.visible_text[len(prefix) :]
+    )
+    if (
+        not isinstance(body, str)
+        or isinstance(start, bool)
+        or isinstance(end, bool)
+        or not isinstance(start, int)
+        or not isinstance(end, int)
+        or not 0 <= start < end <= len(body)
+        or visible_span != body[start:end]
+    ):
+        return False
+    return (
+        ev.params.get("source_body_sha256") == record.get("body_sha256")
+        and ev.params.get("parent_source_sha256") == record.get("text_sha256")
+        and ev.params.get("source_sha256") == record.get("source_sha256")
+        and ev.params.get("parent_provenance_id") == record.get("provenance_id")
+        and ev.params.get("source_span_sha256")
+        == hashlib.sha256(body[start:end].encode()).hexdigest()
+    )
 
 
 def _wiki_relation_binding_valid(state: WorldState, ev: Event) -> bool:
@@ -903,7 +1016,60 @@ def _relation_binding_valid(state: WorldState, ev: Event) -> bool:
     return True
 
 
-def init_values(project: dict[str, Any]) -> dict[str, Any]:
+def _canonical_wiki_source_records(project: dict[str, Any]) -> dict[str, Any]:
+    records: dict[str, Any] = {}
+    for workflow in project.get("source_workflows") or []:
+        if getattr(workflow, "source_kind", "") != "wikimedia":
+            continue
+        for record in getattr(workflow, "records", ()):
+            if record.kind == "wikipedia_revision":
+                try:
+                    body = extract_wikipedia_wikitext(record.text)[2]
+                except ProvenanceError:
+                    continue
+            elif record.kind == "wikidata_entity_revision":
+                body = record.text
+            else:
+                continue
+            text_sha256 = hashlib.sha256(record.text.encode()).hexdigest()
+            if text_sha256 != record.text_sha256:
+                raise ValueError("canonical Wikimedia record text hash mismatches")
+            value = {
+                "body": body,
+                "body_sha256": hashlib.sha256(body.encode()).hexdigest(),
+                "text_sha256": text_sha256,
+                "source_sha256": record.source_sha256,
+                "provenance_id": record.provenance_id,
+            }
+            prior = records.get(record.record_id)
+            if prior is not None and prior != value:
+                raise ValueError("canonical Wikimedia record ID is ambiguous")
+            records[record.record_id] = value
+    return records
+
+
+def _canonical_wiki_source_event_sha256(events: list[Event]) -> dict[str, str]:
+    digests: dict[str, str] = {}
+    for event in events:
+        if event.type != "wiki_source_section" or event.params.get(
+            "provenance_operation"
+        ) not in {
+            WIKI_SECTION_REVISION,
+            _WIKI_CANONICAL_FACT_SPAN,
+            _WIKI_REVISION_HUNK,
+        }:
+            continue
+        digest = _source_event_envelope_sha256(event)
+        prior = digests.get(event.id)
+        if prior is not None and prior != digest:
+            raise ValueError("canonical Wikimedia source event ID is ambiguous")
+        digests[event.id] = digest
+    return digests
+
+
+def init_values(
+    project: dict[str, Any], *, canonical_source_events: list[Event] | None = None
+) -> dict[str, Any]:
     return {
         "reported_score": None,
         "eval_stale": False,
@@ -962,6 +1128,10 @@ def init_values(project: dict[str, Any]) -> dict[str, Any]:
         "wiki_claims": {},
         "wiki_claim_tags": {},
         "wiki_source_relations": [],
+        "canonical_wiki_source_records": _canonical_wiki_source_records(project),
+        "canonical_wiki_source_event_sha256": _canonical_wiki_source_event_sha256(
+            canonical_source_events or []
+        ),
     }
 
 
@@ -1043,7 +1213,9 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
             source = _source_binding(ev)
         except (GroundedSpanError, TypeError):
             return False, "source_grounded_binding_invalid"
-        if not _wiki_source_binding_valid(ev, source):
+        if not _wiki_source_binding_valid(
+            ev, source
+        ) or not _wiki_canonical_record_span_valid(state, ev, source):
             return False, "source_derived_lineage_invalid"
         return True, None
     if t == "wiki_source_relation":

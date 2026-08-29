@@ -66,6 +66,8 @@ _WIKI_LEGACY_ROLE_TAGS = {
     "popular_culture": "POP",
 }
 _WIKI_REVISION_HUNK = "wiki_revision_hunk_v1"
+_WIKI_CANONICAL_FACT_SPAN = "wiki_canonical_fact_span_v1"
+_WIKI_CANONICAL_FACT_SPAN_MAX_CHARS = 12_288
 _WIKI_MAINTENANCE_CHANGE = re.compile(
     r"\b(?:bot|citation|copyedit|formatting|maintenance|revert|rvv|template|typo)\b",
     re.IGNORECASE,
@@ -82,6 +84,14 @@ class _WikiRevisionHunk:
     after_start: int
     after_end: int
     after_span: str
+
+
+@dataclass(frozen=True)
+class _WikiCanonicalFactSpan:
+    section_start: int
+    source_start: int
+    source_end: int
+    source_span: str
 
 
 def _date(start: date, months: int, extra_days: int = 0) -> date:
@@ -291,6 +301,157 @@ def _wiki_grounded_source(
         ),
     ]
     return _grounded_source(source_id=event_id, text=section_text, facts=facts), spans
+
+
+def _wiki_canonical_fact_span(
+    *, section: Any, source_body: str
+) -> _WikiCanonicalFactSpan | None:
+    """Select the one complete source paragraph containing every exact fact."""
+    if not section.facts or source_body.count(section.wikitext) != 1:
+        return None
+    fact_start = min(int(fact.char_start) for fact in section.facts)
+    fact_end = max(int(fact.char_end) for fact in section.facts)
+    if not 0 <= fact_start < fact_end <= len(section.wikitext):
+        return None
+    paragraph_starts = [0]
+    paragraph_ends: list[int] = []
+    for separator in re.finditer(r"\n[ \t]*\n", section.wikitext):
+        paragraph_ends.append(separator.start())
+        paragraph_starts.append(separator.end())
+    paragraph_ends.append(len(section.wikitext))
+    containing = [
+        (start, end)
+        for start, end in zip(paragraph_starts, paragraph_ends, strict=True)
+        if start <= fact_start and fact_end <= end
+    ]
+    if len(containing) != 1:
+        return None
+    section_start, section_end = containing[0]
+    while section_start < section_end and section.wikitext[section_start].isspace():
+        section_start += 1
+    while section_end > section_start and section.wikitext[section_end - 1].isspace():
+        section_end -= 1
+    if section_end - section_start > _WIKI_CANONICAL_FACT_SPAN_MAX_CHARS:
+        return None
+    parent_section_start = source_body.index(section.wikitext)
+    source_start = parent_section_start + section_start
+    source_end = parent_section_start + section_end
+    source_span = source_body[source_start:source_end]
+    if (
+        not source_span
+        or source_body.count(source_span) != 1
+        or any(
+            source_span.count(fact.evidence_quote) != 1
+            or source_span[
+                fact.char_start - section_start : fact.char_end - section_start
+            ]
+            != fact.evidence_quote
+            for fact in section.facts
+        )
+    ):
+        return None
+    return _WikiCanonicalFactSpan(
+        section_start=section_start,
+        source_start=source_start,
+        source_end=source_end,
+        source_span=source_span,
+    )
+
+
+def _wiki_canonical_fact_span_event(
+    *,
+    workflow: Any,
+    record: Any,
+    section: Any,
+    event_id: str,
+    section_text_prefix: str,
+    fact_parser_revision: str,
+    answer_record_id: str,
+    event_time: date,
+) -> Event | None:
+    source_body = (
+        record.text
+        if section.section_id == "wikidata_entity"
+        else extract_wikipedia_wikitext(record.text)[2]
+    )
+    canonical_span = _wiki_canonical_fact_span(
+        section=section,
+        source_body=source_body,
+    )
+    if canonical_span is None:
+        return None
+    section_text = section_text_prefix + canonical_span.source_span
+    fact_spans: list[dict[str, Any]] = []
+    facts: list[dict[str, Any]] = []
+    for fact in section.facts:
+        fact_id = f"{event_id}:{fact.role}"
+        span = fact.to_span(
+            shift=len(section_text_prefix) - canonical_span.section_start
+        )
+        span["fact_id"] = fact_id
+        fact_spans.append(span)
+        facts.append(
+            _grounded_fact(
+                source_id=event_id,
+                text=section_text,
+                fact_id=fact_id,
+                quote=fact.evidence_quote,
+                char_start=int(span["char_start"]),
+            )
+        )
+    section_sha256 = hashlib.sha256(canonical_span.source_span.encode()).hexdigest()
+    source_body_sha256 = hashlib.sha256(source_body.encode()).hexdigest()
+    source_span_sha256 = hashlib.sha256(canonical_span.source_span.encode()).hexdigest()
+    provenance_id = "derived-sha256:" + _canonical_digest(
+        {
+            "operation": _WIKI_CANONICAL_FACT_SPAN,
+            "section_id": section.section_id,
+            "parent_sha256": section.parent_sha256,
+            "source_body_sha256": source_body_sha256,
+            "source_char_start": canonical_span.source_start,
+            "source_char_end": canonical_span.source_end,
+            "source_span_sha256": source_span_sha256,
+            "section_sha256": section_sha256,
+        }
+    )
+    return Event(
+        id=event_id,
+        type="wiki_source_section",
+        time=event_time,
+        params={
+            "workflow_id": workflow.workflow_id,
+            "record_id": answer_record_id,
+            "section_record_id": record.record_id,
+            "section_id": section.section_id,
+            "source_body_sha256": source_body_sha256,
+            "source_char_start": canonical_span.source_start,
+            "source_char_end": canonical_span.source_end,
+            "source_span_sha256": source_span_sha256,
+            "text": section_text,
+            "text_sha256": hashlib.sha256(section_text.encode()).hexdigest(),
+            "source_sha256": record.source_sha256,
+            "parent_source_sha256": section.parent_sha256,
+            "section_sha256": section_sha256,
+            "parent_provenance_id": record.provenance_id,
+            "provenance_id": provenance_id,
+            "provenance_operation": _WIKI_CANONICAL_FACT_SPAN,
+            "source_binding_provenance": "verified_derived",
+            "fact_parser_revision": fact_parser_revision,
+            "minimum_tier": section.minimum_tier,
+            "source_origin": "real_derived",
+            "source_family": record.source_family,
+            "source_url": record.source_url,
+            "retrieval_url": record.retrieval_url,
+            "fact_spans": fact_spans,
+            "grounded_source": _grounded_source(
+                source_id=event_id,
+                text=section_text,
+                facts=facts,
+            ),
+            "ground_values": [],
+        },
+        visibility=[event_id],
+    )
 
 
 def _trimmed_span(text: str, start: int, end: int) -> tuple[int, int, str]:
@@ -705,6 +866,29 @@ def _wikipedia_source_workflow_events(
             f"{prefix}.wiki_section_{section.section_id}_{workflow_index}_"
             f"{later.record_id}"
         )
+        section_offset = _WIKI_SECTION_OFFSETS.get(
+            section.section_id, early_offsets.get(section.section_id)
+        )
+        if section_offset is None:
+            return []
+        if len(ordered_wiki_records) == 3:
+            if not section.facts:
+                continue
+            fact_span_event = _wiki_canonical_fact_span_event(
+                workflow=workflow,
+                record=record,
+                section=section,
+                event_id=event_id,
+                section_text_prefix=prefix_text,
+                fact_parser_revision=program.fact_parser_revision,
+                answer_record_id=later.record_id,
+                event_time=later_day + timedelta(days=section_offset),
+            )
+            if fact_span_event is None:
+                return []
+            section_ids[section.section_id] = event_id
+            events.append(fact_span_event)
+            continue
         section_ids[section.section_id] = event_id
         grounded_source, fact_spans = _wiki_grounded_source(
             event_id=event_id,
@@ -712,11 +896,6 @@ def _wikipedia_source_workflow_events(
             section_text=section_text,
             prefix_text=prefix_text,
         )
-        section_offset = _WIKI_SECTION_OFFSETS.get(
-            section.section_id, early_offsets.get(section.section_id)
-        )
-        if section_offset is None:
-            return []
         events.append(
             Event(
                 id=event_id,
@@ -2907,6 +3086,7 @@ def simulate_lab(spec: dict[str, Any]) -> dict[str, SimulatedWorld]:
         (f"par{i}", p) for i, p in enumerate(spec["parallels"])
     ]
     for prefix, project in projects:
+        evs = events_for_lab(project, prefix)
         sim = WorldSimulator(
             spec={
                 **spec,
@@ -2914,11 +3094,10 @@ def simulate_lab(spec: dict[str, Any]) -> dict[str, SimulatedWorld]:
                 "project": project,
                 "domain": "researchlab",
             },
-            init_values=init_values(project),
+            init_values=init_values(project, canonical_source_events=evs),
             check_preconditions=check_preconditions,
             apply_event=apply_event,
         )
-        evs = events_for_lab(project, prefix)
         worlds[prefix] = sim.run(evs)
         worlds[prefix].spec["project"] = project
         worlds[prefix].spec["prefix"] = prefix

@@ -25,6 +25,7 @@ from longworld.core.sourceworkflow import (
     SourceRelation,
     SourceWorkflow,
 )
+from longworld.core.state import WorldState
 from longworld.core.taxonomy import SourceOrigin, artifact_classification
 from longworld.core.verify import verify_question
 from longworld.core.views import render_cf_view
@@ -527,6 +528,130 @@ def test_large_body_bounded_estimated_pack_contract(
     records = {
         record.record_id: record for record in _three_revision_workflow().records
     }
+    canonical_fact_events = [
+        event
+        for event in world.events
+        if event.type == "wiki_source_section"
+        and not str(event.params.get("section_id") or "").startswith("revision_")
+    ]
+    assert canonical_fact_events
+    assert all(
+        event.params["provenance_operation"] == "wiki_canonical_fact_span_v1"
+        for event in canonical_fact_events
+    )
+    canonical_ranges: dict[str, list[tuple[int, int]]] = {}
+    for event in canonical_fact_events:
+        section_record_id = str(event.params["section_record_id"])
+        record = records[section_record_id]
+        if event.params["section_id"] == "wikidata_entity":
+            source_body = record.text
+        else:
+            _title, _entity_id, source_body = extract_wikipedia_wikitext(record.text)
+        start = int(event.params["source_char_start"])
+        end = int(event.params["source_char_end"])
+        source_span = source_body[start:end]
+        assert 0 <= start < end <= len(source_body)
+        assert len(source_span) <= 12_288
+        assert (
+            event.params["source_span_sha256"]
+            == hashlib.sha256(source_span.encode()).hexdigest()
+        )
+        assert str(event.params["text"]).endswith(source_span)
+        assert all(
+            source_span.count(str(fact_span["evidence_quote"])) == 1
+            for fact_span in event.params["fact_spans"]
+        )
+        canonical_ranges.setdefault(section_record_id, []).append((start, end))
+    assert all(
+        first_end <= second_start or second_end <= first_start
+        for ranges in canonical_ranges.values()
+        for index, (first_start, first_end) in enumerate(ranges)
+        for second_start, second_end in ranges[index + 1 :]
+    )
+    canonical_event = canonical_fact_events[0]
+    assert check_preconditions(
+        WorldState(values=dict(world.init_values)), canonical_event
+    ) == (True, None)
+    tampered_params = dict(canonical_event.params)
+    tampered_params["source_char_start"] = int(tampered_params["source_char_start"]) + 1
+    tampered_params["source_char_end"] = int(tampered_params["source_char_end"]) + 1
+    tampered_params["source_body_sha256"] = "f" * 64
+    tampered_payload = {
+        "operation": tampered_params["provenance_operation"],
+        "section_id": tampered_params["section_id"],
+        "parent_sha256": tampered_params["parent_source_sha256"],
+        "source_body_sha256": tampered_params["source_body_sha256"],
+        "source_char_start": tampered_params["source_char_start"],
+        "source_char_end": tampered_params["source_char_end"],
+        "source_span_sha256": tampered_params["source_span_sha256"],
+        "section_sha256": tampered_params["section_sha256"],
+    }
+    tampered_params["provenance_id"] = (
+        "derived-sha256:"
+        + hashlib.sha256(
+            json.dumps(
+                tampered_payload,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+    )
+    coordinated_tamper = replace(canonical_event, params=tampered_params)
+    assert check_preconditions(
+        WorldState(values=dict(world.init_values)), coordinated_tamper
+    ) == (False, "source_derived_lineage_invalid")
+    canonical_record = records[str(canonical_event.params["section_record_id"])]
+    _title, _entity_id, canonical_body = extract_wikipedia_wikitext(
+        canonical_record.text
+    )
+    canonical_start = int(canonical_event.params["source_char_start"])
+    canonical_end = int(canonical_event.params["source_char_end"])
+    canonical_span = canonical_body[canonical_start:canonical_end]
+    replacement_record = records["page-974-r1370153023"]
+    _title, _entity_id, replacement_body = extract_wikipedia_wikitext(
+        replacement_record.text
+    )
+    assert replacement_body.count(canonical_span) == 1
+    replacement_start = replacement_body.index(canonical_span)
+    substituted_params = {
+        **canonical_event.params,
+        "record_id": replacement_record.record_id,
+        "section_record_id": replacement_record.record_id,
+        "source_body_sha256": hashlib.sha256(replacement_body.encode()).hexdigest(),
+        "source_char_start": replacement_start,
+        "source_char_end": replacement_start + len(canonical_span),
+        "source_sha256": replacement_record.source_sha256,
+        "parent_source_sha256": replacement_record.text_sha256,
+        "parent_provenance_id": replacement_record.provenance_id,
+        "fact_spans": [
+            {**span, "parent_sha256": replacement_record.text_sha256}
+            for span in canonical_event.params["fact_spans"]
+        ],
+    }
+    substituted_payload = {
+        "operation": substituted_params["provenance_operation"],
+        "section_id": substituted_params["section_id"],
+        "parent_sha256": substituted_params["parent_source_sha256"],
+        "source_body_sha256": substituted_params["source_body_sha256"],
+        "source_char_start": substituted_params["source_char_start"],
+        "source_char_end": substituted_params["source_char_end"],
+        "source_span_sha256": substituted_params["source_span_sha256"],
+        "section_sha256": substituted_params["section_sha256"],
+    }
+    substituted_params["provenance_id"] = (
+        "derived-sha256:"
+        + hashlib.sha256(
+            json.dumps(
+                substituted_payload,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+    )
+    coordinated_substitution = replace(canonical_event, params=substituted_params)
+    assert check_preconditions(
+        WorldState(values=dict(world.init_values)), coordinated_substitution
+    ) == (False, "source_derived_lineage_invalid")
     hunk_texts = []
     source_ranges: dict[str, list[tuple[int, int]]] = {}
     for event in hunk_events.values():
