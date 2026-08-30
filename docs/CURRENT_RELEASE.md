@@ -22,7 +22,27 @@ The remote contains 19 release payload files plus the Hub-managed
 `.gitattributes`; the payload matches the local immutable P6 v4 staging package.
 There is currently no missing HF upload.
 
-## Source-native 64K/128K CPT candidate
+## Longitudinal 64K/128K CPT candidate
+
+The new longitudinal successor contains **1,000 64K rows and 1,000 128K rows**
+with **192,731,120 exact Qwen context tokens**. Every row now contains multiple
+distinct real commits: observed minima are 10 at 64K and 23 at 128K, with
+71,294 non-reused commit events and 280,183 non-reused source records across
+eight public repositories. The independent audit verified 99 signed source
+manifests, recomputed all lengths, reconstructed all 2,000 training rows, and
+found zero context, used-source-body, source-record, event, or cross-band
+overlap. See
+`reports/p12_cpt_git_history_longitudinal_1000x2_20260830.md`.
+
+This remains a local-probe **CPT candidate**, not executable SFT or 2,000
+worlds. It is `train_ready=false` and `production_eligible=false`. The event
+gate removes the earlier single-large-commit failure mode, but it does not yet
+require a release boundary or answer-changing dependency; median calendar spans
+are 2.17 days at 64K and 5.04 days at 128K, and one 64K row has zero elapsed
+calendar time because distinct commits share a timestamp. No HF publication is
+authorized from this candidate.
+
+## Earlier source-native long-document CPT candidate
 
 The v2 Git-history CPT batch now contains **1,000 64K rows and 1,000 128K
 rows**, totaling **192,776,946 exact Qwen context tokens**. Its independent
@@ -488,6 +508,7 @@ use GitHub only after final review.
 | Evidence stage                         | Complete worlds | Rows/candidates | Exact context tokens | Meaning                                                                         |
 | -------------------------------------- | --------------: | --------------: | -------------------: | ------------------------------------------------------------------------------- |
 | Current promotion-v2 local-probe union |               2 |              12 |              454,846 | Strict current-code rows; arXiv/ResearchLab only; 12-world target not evaluated |
+| Longitudinal Git-history CPT candidate |               0 |           2,000 |          192,731,120 | Eight repos; 71,294 non-reused commit events; local CPT candidate only          |
 | Historical pre-v2 union                |               5 |              35 |            1,347,609 | Regeneration inputs only; obsolete replay-growth schema                         |
 | CISA KEV candidate history             |               0 |               3 |              112,451 | One unsigned executable task × three bands; not promotion-v2                    |
 | Amazon finance candidate history       |               0 |               3 |              112,759 | Four issuer-owned annual filings; candidate-only, not promotion-v2              |
