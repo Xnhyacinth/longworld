@@ -1,6 +1,6 @@
 # Current release status
 
-Last updated: 2026-08-29
+Last updated: 2026-08-30
 
 This file is the canonical publication-status summary. Historical receipts and
 `.hl/` logs remain useful for reproducibility, but they do not override this
@@ -24,11 +24,13 @@ There is currently no missing HF upload.
 
 ## Current stricter-gate result
 
-The current local content-gate corpus covers **35 rows across 5 unique
+The previous local content-gate corpus covers **35 rows across 5 unique
 source-bound worlds**, with **1,347,609 receipt-reported exact Qwen context
 tokens**. It contains 12 ResearchLab rows, 9 Company rows, and 14 CodeForge rows;
-the exact 16K/32K/64K distribution is 11/12/12. All five source identities and
-release receipts validate under the current protected local-probe root.
+the exact 16K/32K/64K distribution is 11/12/12. Those rows predate the mandatory
+`train-ready-promotion-v2` replay-growth contract and are now historical inputs
+that must be regenerated. Current v2-qualified complete worlds and promoted rows
+are therefore both zero.
 
 The schema-v2 neutral inventory is
 `data/releases/p12-current-five-source-bound-union-v1.json`. It verifies five
@@ -48,24 +50,27 @@ combined-role artifact is cryptographically labeled
 not independent production trust. Production/KMS-qualified P12 rows therefore
 remain zero, and no raw promoted JSONL is authorized for HF publication.
 
-Wave 3 expanded real-source diagnostics without changing that baseline. Ruff
+Wave 3 expanded real-source diagnostics without producing a new complete world. Ruff
 produced only a valid 16K group, Deno only a valid 64K group, and the four-revision
 Megatron-LM workflow reached roughly 50K rather than the exact 64K band; all
 failed world-atomic preflight before dense promotion. RFC 9421 now has 20 draft
 revisions, a signed 22-record/20-relation bundle, and a standalone byte-bound
 state→answer→CF/remove-one replay contract. Its real 18→19 diff does not contain
 a unique single-keyword normative replacement, so actual task retention remains
-zero and it is not a training world. New NVD+CISA, Federal Register+
-Regulations.gov, and ClinicalTrials+openFDA inventories add 9 official records
-and 8 evidence-bound relations, but remain disabled source-only artifacts with
-zero training rows. See
-`reports/p12_wave3_source_scaleout_diagnostics_v1.md`; none of these diagnostics
-is qualified or uploadable training data.
+zero and it is not a training world. NVD+CISA, Federal Register+Regulations.gov,
+and ClinicalTrials+openFDA now produce three source-attested executable task
+candidates with real answer/CF/remove-one replay. Together they bind 9 official
+records, 8 relations, and 55,640 source-body Qwen tokens, but they are explicitly
+ignored non-world candidates with zero training rows. See
+`reports/p12_executable_domains_strict_growth_20260830.md`; none of these
+diagnostics is qualified or uploadable training data.
 
 The candidate preflight now enforces cumulative source-bound 16/32/64K history
 before dense ranking. Bands must share one semantic growth identity and grow in
 event-bearing/internal content, strict support, essential events, proof depth,
-and nested authentic relations. Real-source-derived causal evidence counts;
+and nested authentic relations. `internal` is the inclusive workflow-owned
+total and `event_bearing` is its subset; the gate does not add them together.
+Real-source-derived causal evidence counts;
 an unrelated real hard negative does not. This is a structural check over
 signed candidates, not a substitute for independent strict replay.
 
