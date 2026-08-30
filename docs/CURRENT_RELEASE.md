@@ -440,6 +440,15 @@ domain/source family, and its local-probe receipts are not a production KMS
 chain. Trust-valid P12 publication therefore remains zero; 48/210 remain
 blocked.
 
+The finance cumulative-history adapter now materializes one additional
+candidate-only Amazon 2021--2024 annual-report task at 16,078 / 32,478 / 64,203
+exact Qwen tokens. The bands add 2/3/4 filings, 18/27/36 essential fact rows,
+and 19/29/39 answer-bearing source relations. Executed CF, per-essential remove-one,
+digest-consistent semantic corruption, exact-span replay, and cumulative growth
+all pass. The three rows remain outside the qualified union because common
+dense retrieval, signed promotion-v2 replay, and the 12-world release gate have
+not run.
+
 Replay data, source bytes, releases, and pinned model caches remain under
 `/workspace/wynckeliao`. The workspace permission controller repeatedly restores
 shared ACLs on the top-level credential directory, so runners correctly reject
@@ -457,6 +466,7 @@ use GitHub only after final review.
 | Current promotion-v2 local-probe union |               2 |              12 |              454,846 | Strict current-code rows; arXiv/ResearchLab only; 12-world target not evaluated |
 | Historical pre-v2 union                |               5 |              35 |            1,347,609 | Regeneration inputs only; obsolete replay-growth schema                         |
 | CISA KEV candidate history             |               0 |               3 |              112,451 | One unsigned executable task × three bands; not promotion-v2                    |
+| Amazon finance candidate history       |               0 |               3 |              112,759 | Four issuer-owned annual filings; candidate-only, not promotion-v2              |
 | dprint incomplete candidate history    |               0 |               5 |              229,180 | 16K/64K only; rejected because the complete 32K band is absent                  |
 | P12 production/KMS release             |               0 |               0 |                    0 | Independent approval and the 12-world multidomain union remain blocked          |
 

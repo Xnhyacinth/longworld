@@ -26,6 +26,10 @@ See `p12_wave3_source_scaleout_diagnostics_v1.md` for the corresponding Ruff,
 Deno, Megatron-LM, and RFC 9421 scale-out results. Wave 3 adds an audited IETF
 source contract but no new promoted rows.
 
+See `p12_finance_amazon_multifiling_history_20260830.md` for the candidate-only
+Amazon 2021--2024 multi-filing history. It adds three executable 16/32/64K
+finance candidates and zero promotion-v2 qualified worlds.
+
 ## P4 multidomain local probe (2026-08-24)
 
 See `p4_multidomain_local48_v1.md` for the current expanded local release and
