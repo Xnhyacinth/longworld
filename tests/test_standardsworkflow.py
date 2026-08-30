@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from longworld.core import standardsworkflow
 from longworld.core.attestation import verify_attestation
 from longworld.core.provenance import ProvenanceError
 from longworld.core.standardsworkflow import (
@@ -38,7 +39,12 @@ def _write(path: Path, body: bytes) -> dict[str, object]:
     }
 
 
-def _inventory(tmp_path: Path) -> tuple[dict[str, object], Path]:
+def _inventory(
+    tmp_path: Path,
+    *,
+    draft00_body: bytes | None = None,
+    draft01_body: bytes | None = None,
+) -> tuple[dict[str, object], Path]:
     private_key_block = (
         b"-----BEGIN PRIVATE KEY-----\npublic RFC test vector\n"
         b"-----END PRIVATE KEY-----"
@@ -92,11 +98,17 @@ def _inventory(tmp_path: Path) -> tuple[dict[str, object], Path]:
             },
             sort_keys=True,
         ).encode(),
-        "draft00": (
+        "draft00": draft00_body
+        or (
             b"Internet-Draft draft-ietf-demo-00\n1 January 2024\n"
             b"Endpoints SHOULD reject stale tokens.\nContact: editor@example.org\n"
         ),
         "draft01": (
+            draft01_body + b"\n" + private_key_block + b"\n"
+            if draft01_body is not None and private_key_block not in draft01_body
+            else draft01_body
+        )
+        or (
             b"Internet-Draft draft-ietf-demo-01\n2 February 2024\n"
             b"Endpoints MUST reject stale tokens.\n" + private_key_block + b"\n"
         ),
@@ -416,10 +428,18 @@ def test_normative_change_task_replays_source_relations_cf_and_negative_gates(
 
     assert task["query_type"] == "normative_change_introducer"
     assert task["answer_program_id"] == "ietf.normative_change_introducer.v1"
+    assert task["data_stage"] == "candidate_task"
+    assert task["train_ready"] is False
+    assert task["production_eligible"] is False
+    assert task["promotion_eligible"] is False
+    assert task["complete_world"] is False
+    assert task["promoted"] is False
+    assert task["generation_integration"] == "disabled"
+    assert task["source_attestation_verified"] is False
     assert replay_ietf_normative_change_task(task) == task["answer"]
     assert task["answer"] == (
         "draft-ietf-demo-01 | RFC 9999 | SHOULD -> MUST | "
-        "Endpoints MUST reject stale tokens."
+        "Endpoints SHOULD reject stale tokens. => Endpoints MUST reject stale tokens."
     )
     essentials = task["essential_evidence_ids"]
     assert len(essentials) == 4
@@ -454,7 +474,23 @@ def test_normative_change_task_replays_source_relations_cf_and_negative_gates(
         "essential_single_doc_insufficient": True,
         "essential_surface_gold_free": True,
         "essential_text_grounded": True,
+        "source_workflow_binding_valid": False,
     }
+
+    transformed_surface = deepcopy(task)
+    publication = next(
+        item
+        for item in transformed_surface["evidence_items"]
+        if item["kind"] == "published_as"
+    )
+    publication["surface_text"] = task["answer"].replace(" | ", " / ")
+    assert replay_ietf_normative_change_task(transformed_surface) == task["answer"]
+    assert not audit_ietf_normative_change_task(transformed_surface)[
+        "essential_surface_gold_free"
+    ]
+
+    with pytest.raises(ProvenanceError, match="evidence selection"):
+        replay_ietf_normative_change_task(task, evidence_ids=[["not", "hashable"]])
 
     corrupted = deepcopy(task)
     latest = next(
@@ -488,6 +524,164 @@ def test_normative_change_task_replays_source_relations_cf_and_negative_gates(
     twin["keyword_char_end"] += 1
     with pytest.raises(ProvenanceError, match="counterfactual replacement"):
         replay_ietf_normative_change_task(prefixed_cf, counterfactual=True)
+
+
+def test_normative_change_supports_multiline_statement_with_stable_anchor(
+    tmp_path: Path,
+) -> None:
+    prior = (
+        b"Internet-Draft draft-ietf-demo-00\n1 January 2024\n\n"
+        b"A verifier processing a stale token across\n"
+        b"multiple protocol layers SHOULD reject it before use.\n\n"
+        b"Clients MAY cache successful results.\n"
+    )
+    latest = (
+        b"Internet-Draft draft-ietf-demo-01\n2 February 2024\n\n"
+        b"A verifier processing a stale token across\n"
+        b"multiple protocol layers SHOULD immediately reject it before use.\n\n"
+        b"Clients MAY cache successful results.\n"
+    )
+    inventory, _path = _inventory(tmp_path, draft00_body=prior, draft01_body=latest)
+    manifest = build_ietf_workflow_from_fetch_inventory(
+        inventory,
+        tmp_path,
+        generated_at="2026-08-29T02:00:00Z",
+        fetch_inventory_sha256="a" * 64,
+    )
+    task = build_ietf_normative_change_task(manifest)
+    before = next(
+        item for item in task["evidence_items"] if item["kind"] == "normative_before"
+    )
+    after = next(
+        item for item in task["evidence_items"] if item["kind"] == "normative_after"
+    )
+    assert "\n" in before["evidence_quote"]
+    assert "\n" in after["evidence_quote"]
+    assert before["normalized_anchor"] == after["normalized_anchor"]
+    assert before["anchor_sha256"] == after["anchor_sha256"]
+    assert "<NORMATIVE>" in after["normalized_anchor"]
+    assert "substantive normative statement delta" in task["question"]
+    assert "SHOULD -> SHOULD" in task["answer"]
+    assert before["evidence_quote"] in task["answer"]
+    assert after["evidence_quote"] in task["answer"]
+    assert replay_ietf_normative_change_task(task) == task["answer"]
+    assert audit_ietf_normative_change_task(task)["remove_one_fails"]
+
+    unrelated = deepcopy(task)
+    unrelated_after = next(
+        item
+        for item in unrelated["evidence_items"]
+        if item["kind"] == "normative_after"
+    )
+    unrelated_latest = next(
+        record
+        for record in unrelated["source_records"]
+        if record["record_id"] == unrelated_after["record_id"]
+    )
+    unrelated_quote = "Clients MAY cache successful results."
+    unrelated_start = unrelated_latest["text"].index(unrelated_quote)
+    unrelated_anchor = "Clients <NORMATIVE> cache successful results."
+    unrelated_after.update(
+        {
+            "evidence_quote": unrelated_quote,
+            "surface_text": unrelated_quote,
+            "keyword": "MAY",
+            "normalized_anchor": unrelated_anchor,
+            "anchor_sha256": hashlib.sha256(unrelated_anchor.encode()).hexdigest(),
+            "char_start": unrelated_start,
+            "char_end": unrelated_start + len(unrelated_quote),
+            "keyword_char_start": unrelated_start + len("Clients "),
+            "keyword_char_end": unrelated_start + len("Clients MAY"),
+        }
+    )
+    with pytest.raises(ProvenanceError, match="normative delta"):
+        replay_ietf_normative_change_task(unrelated)
+
+
+def test_normative_change_does_not_pair_unrelated_document_keywords(
+    tmp_path: Path,
+) -> None:
+    inventory, _path = _inventory(
+        tmp_path,
+        draft00_body=(
+            b"Internet-Draft draft-ietf-demo-00\n1 January 2024\n\n"
+            b"Clients SHOULD cache successful responses.\n"
+        ),
+        draft01_body=(
+            b"Internet-Draft draft-ietf-demo-01\n2 February 2024\n\n"
+            b"Servers MUST reject unauthenticated requests.\n"
+        ),
+    )
+    manifest = build_ietf_workflow_from_fetch_inventory(
+        inventory,
+        tmp_path,
+        generated_at="2026-08-29T02:00:00Z",
+        fetch_inventory_sha256="a" * 64,
+    )
+    with pytest.raises(ProvenanceError, match="uniquely select"):
+        build_ietf_normative_change_task(manifest)
+
+
+def test_normative_change_rejects_boundary_anchor_collision(tmp_path: Path) -> None:
+    inventory, _path = _inventory(
+        tmp_path,
+        draft00_body=(
+            b"Internet-Draft draft-ietf-demo-00\n1 January 2024\n\n"
+            b"A verifier processing a stale token across multiple protocol layers "
+            b"SHOULD reject unsigned input and complete processing before use.\n"
+        ),
+        draft01_body=(
+            b"Internet-Draft draft-ietf-demo-01\n2 February 2024\n\n"
+            b"A verifier processing a fresh response through unrelated storage systems "
+            b"MAY archive validated output then complete processing before use.\n"
+        ),
+    )
+    manifest = build_ietf_workflow_from_fetch_inventory(
+        inventory,
+        tmp_path,
+        generated_at="2026-08-29T02:00:00Z",
+        fetch_inventory_sha256="a" * 64,
+    )
+    with pytest.raises(ProvenanceError, match="uniquely select"):
+        build_ietf_normative_change_task(manifest)
+
+
+def test_normative_change_extracts_each_revision_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inventory, _path = _inventory(
+        tmp_path,
+        draft00_body=(
+            b"Internet-Draft draft-ietf-demo-00\n1 January 2024\n\n"
+            b"Endpoints SHOULD reject stale tokens.\n\n"
+            b"Clients MAY cache successful results.\n"
+        ),
+        draft01_body=(
+            b"Internet-Draft draft-ietf-demo-01\n2 February 2024\n\n"
+            b"Endpoints MUST reject stale tokens.\n\n"
+            b"Clients MAY cache successful results.\n"
+        ),
+    )
+    manifest = build_ietf_workflow_from_fetch_inventory(
+        inventory,
+        tmp_path,
+        generated_at="2026-08-29T02:00:00Z",
+        fetch_inventory_sha256="a" * 64,
+    )
+    calls: dict[str, int] = {}
+    original = standardsworkflow._normative_statements
+
+    def counted(record: dict[str, object]) -> list[dict[str, object]]:
+        record_id = str(record["record_id"])
+        calls[record_id] = calls.get(record_id, 0) + 1
+        return original(record)
+
+    monkeypatch.setattr(standardsworkflow, "_normative_statements", counted)
+    build_ietf_normative_change_task(manifest)
+    assert calls == {
+        "ietf:draft:draft-ietf-demo-00": 1,
+        "ietf:draft:draft-ietf-demo-01": 1,
+    }
 
 
 def test_direct_task_builder_audits_receipt_lineage(tmp_path: Path) -> None:
@@ -546,7 +740,10 @@ def test_attested_standards_manifest_bundle_materializes_executable_task(
         attach_attestation,
     )
     from longworld.core.sourceworkflow import STANDARDS_SOURCE_KIND
-    from longworld.core.standardsworkflow import materialize_ietf_normative_change_task
+    from longworld.core.standardsworkflow import (
+        _task_component_digest,
+        materialize_ietf_normative_change_task,
+    )
     from scripts.build_source_workflow_bundle import build_source_workflow_bundle
 
     key = b"standards-source-bundle-test-key-material"
@@ -577,7 +774,48 @@ def test_attested_standards_manifest_bundle_materializes_executable_task(
     assert workflow.target_domain == "standards"
     task = materialize_ietf_normative_change_task(workflow)
     assert replay_ietf_normative_change_task(task) == task["answer"]
-    assert audit_ietf_normative_change_task(task)["counterfactual_replay_sufficient"]
+    monkeypatch.delenv(ATTESTATION_ENVIRONMENT_ENV)
+    monkeypatch.delenv(ROLE_KEY_ENVS["source"])
+    monkeypatch.delenv(ROLE_KEY_ID_ENVS["source"])
+    audit = audit_ietf_normative_change_task(task, source_attestation_key=key)
+    assert audit["counterfactual_replay_sufficient"]
+    assert audit["source_workflow_binding_valid"]
+
+    coordinated = deepcopy(task)
+    supporting_rfc = next(
+        record
+        for record in coordinated["source_records"]
+        if record["record_id"] == "ietf:rfc:7777"
+    )
+    supporting_rfc["text"] = supporting_rfc["text"].replace(
+        "Historic baseline", "Altered baseline"
+    )
+    supporting_rfc["text_sha256"] = hashlib.sha256(
+        supporting_rfc["text"].encode()
+    ).hexdigest()
+    coordinated["source_bindings"][supporting_rfc["record_id"]] = supporting_rfc[
+        "text_sha256"
+    ]
+    records = {record["record_id"]: record for record in coordinated["source_records"]}
+    component_digest = _task_component_digest(
+        records, coordinated["source_workflow_relations"]
+    )
+    coordinated["source_workflow_binding"]["component_digest"] = component_digest
+    coordinated["source_workflow_binding"]["workflow_id"] = (
+        f"source:ietf_standards:{component_digest[:24]}"
+    )
+    assert replay_ietf_normative_change_task(coordinated) == coordinated["answer"]
+    assert not audit_ietf_normative_change_task(
+        coordinated, source_attestation_key=key
+    )["source_workflow_binding_valid"]
+
+    forged_binding = deepcopy(task)
+    forged_binding["source_workflow_binding"]["component_digest"] = "a" * 64
+    forged_binding["source_workflow_binding"]["workflow_id"] = (
+        f"source:ietf_standards:{'a' * 24}"
+    )
+    with pytest.raises(ProvenanceError, match="component digest"):
+        replay_ietf_normative_change_task(forged_binding)
 
 
 def test_core_sourceworkflow_import_does_not_require_repo_scripts_package(

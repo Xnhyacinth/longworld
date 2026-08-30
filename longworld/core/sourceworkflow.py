@@ -147,6 +147,7 @@ class SourceWorkflow:
     provenance_ids: tuple[str, ...]
     records: tuple[SourceRecord, ...]
     relations: tuple[SourceRelation, ...]
+    source_authorization: dict[str, Any] | None = None
 
 
 def _objects(

@@ -9,12 +9,20 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from copy import deepcopy
 from datetime import datetime, timezone
+from difflib import SequenceMatcher
 from itertools import pairwise
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from longworld.core.attestation import (
+    ATTESTATION_V2_SCHEME,
+    LOCAL_PROBE_TRUST_ISOLATION_FIELD,
+    verify_attestation,
+    verify_attestation_identity,
+)
 from longworld.core.provenance import (
     MAX_SOURCE_BYTES,
     ProvenanceError,
@@ -911,13 +919,51 @@ def build_ietf_workflow_from_fetch_inventory(
 
 
 IETF_NORMATIVE_TASK_SCHEMA = "longworld.ietf-normative-change-task.v1"
-_NORMATIVE_LINE = re.compile(
-    r"(?m)^(?P<prefix>[^\r\n]{1,240}?)(?P<keyword>MUST NOT|SHOULD NOT|MUST|SHOULD|MAY)"
-    r"(?P<suffix>[^\r\n]{1,400})$"
-)
+_SOURCE_WORKFLOW_COMPONENT_SCHEMA = "longworld.source-workflow-component-binding.v1"
+_SOURCE_WORKFLOW_COMPONENT_PURPOSE = "source_workflow_component"
 _NORMATIVE_KEYWORD = re.compile(
     r"(?<![A-Z])(?:MUST NOT|SHOULD NOT|MUST|SHOULD|MAY)(?![A-Z])"
 )
+_NORMATIVE_ANCHOR_TOKEN = "<NORMATIVE>"
+_SUBSTANTIVE_DELTA_TOKEN = "<SUBSTANTIVE-DELTA>"
+_MAX_NORMATIVE_STATEMENT_CHARS = 1600
+_MAX_NORMATIVE_STATEMENT_LINES = 12
+_MIN_NORMATIVE_STATEMENT_SIMILARITY = 0.75
+
+
+def _normalized_normative_text(quote: str, keyword_match: re.Match[str]) -> str:
+    return " ".join(
+        (
+            quote[: keyword_match.start()]
+            + f" {_NORMATIVE_ANCHOR_TOKEN} "
+            + quote[keyword_match.end() :]
+        ).split()
+    )
+
+
+def _normalized_normative_anchor(quote: str, keyword_match: re.Match[str]) -> str:
+    normalized = _normalized_normative_text(quote, keyword_match)
+    tokens = normalized.split()
+    if len(tokens) <= 10:
+        return normalized
+    return " ".join(
+        [
+            *tokens[:4],
+            _SUBSTANTIVE_DELTA_TOKEN,
+            _NORMATIVE_ANCHOR_TOKEN,
+            *tokens[-4:],
+        ]
+    )
+
+
+def _normative_statement_similarity(before_quote: str, after_quote: str) -> float:
+    before_matches = list(_NORMATIVE_KEYWORD.finditer(before_quote))
+    after_matches = list(_NORMATIVE_KEYWORD.finditer(after_quote))
+    if len(before_matches) != 1 or len(after_matches) != 1:
+        return 0.0
+    before = _normalized_normative_text(before_quote, before_matches[0]).split()
+    after = _normalized_normative_text(after_quote, after_matches[0]).split()
+    return SequenceMatcher(None, before, after, autojunk=False).ratio()
 
 
 def audit_ietf_workflow_manifest(manifest: dict[str, Any]) -> None:
@@ -1100,35 +1146,91 @@ def audit_ietf_workflow_manifest(manifest: dict[str, Any]) -> None:
         ) from error
 
 
-def _normative_lines(record: dict[str, Any]) -> list[dict[str, Any]]:
+def _normative_statement(
+    text: str, start: int, end: int, *, single_line: bool
+) -> dict[str, Any] | None:
+    raw = text[start:end]
+    left_trimmed = len(raw) - len(raw.lstrip())
+    quote = raw.strip()
+    start += left_trimmed
+    if (
+        not quote
+        or len(quote) > _MAX_NORMATIVE_STATEMENT_CHARS
+        or quote.count("\n") + 1 > _MAX_NORMATIVE_STATEMENT_LINES
+        or (single_line and (quote[-1] not in ".!?" or not quote[0].isupper()))
+    ):
+        return None
+    keyword_matches = list(_NORMATIVE_KEYWORD.finditer(quote))
+    if len(keyword_matches) != 1:
+        return None
+    keyword_match = keyword_matches[0]
+    before_words = re.findall(r"[A-Za-z0-9]+", quote[: keyword_match.start()])
+    after_words = re.findall(r"[A-Za-z0-9]+", quote[keyword_match.end() :])
+    if not before_words or not after_words:
+        return None
+    normalized_anchor = _normalized_normative_anchor(quote, keyword_match)
+    return {
+        "quote": quote,
+        "keyword": keyword_match.group(0),
+        "normalized_anchor": normalized_anchor,
+        "anchor_sha256": hashlib.sha256(normalized_anchor.encode()).hexdigest(),
+        "char_start": start,
+        "char_end": start + len(quote),
+        "keyword_char_start": start + keyword_match.start(),
+        "keyword_char_end": start + keyword_match.end(),
+    }
+
+
+def _normative_statements(record: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract bounded sentence/paragraph statements with stable byte spans."""
     text = str(record.get("text") or "")
-    matches: list[dict[str, Any]] = []
-    for match in _NORMATIVE_LINE.finditer(text):
-        quote = match.group(0).strip()
-        start = text.index(quote, match.start(), match.end())
-        matches.append(
-            {
-                "quote": quote,
-                "keyword": match.group("keyword"),
-                "anchor": (
-                    " ".join(match.group("prefix").split()),
-                    " ".join(match.group("suffix").split()),
-                ),
-                "char_start": start,
-                "char_end": start + len(quote),
-            }
-        )
-    return matches
+    ranges: set[tuple[int, int, bool]] = set()
+    paragraph_start = 0
+    for separator in re.finditer(r"\n[ \t]*\n", text):
+        if separator.start() > paragraph_start:
+            ranges.add((paragraph_start, separator.start(), False))
+        paragraph_start = separator.end()
+    if paragraph_start < len(text):
+        ranges.add((paragraph_start, len(text), False))
+
+    sentence_ranges: set[tuple[int, int, bool]] = set()
+    for start, end, _single_line in ranges:
+        paragraph = text[start:end]
+        cursor = 0
+        for sentence in re.finditer(r"(?s).*?[.!?](?=\s|$)", paragraph):
+            sentence_ranges.add(
+                (start + sentence.start(), start + sentence.end(), False)
+            )
+            cursor = sentence.end()
+        if cursor < len(paragraph):
+            sentence_ranges.add((start + cursor, end, False))
+    ranges = sentence_ranges
+    ranges.update(
+        (match.start(), match.end(), True)
+        for match in re.finditer(r"(?m)^[^\r\n]+$", text)
+    )
+    statements: dict[tuple[int, int], dict[str, Any]] = {}
+    for start, end, single_line in sorted(ranges):
+        statement = _normative_statement(text, start, end, single_line=single_line)
+        if statement is not None:
+            statements[(statement["char_start"], statement["char_end"])] = statement
+    return [statements[key] for key in sorted(statements)]
 
 
 def _normative_hunk(
     prior: dict[str, Any], latest: dict[str, Any]
 ) -> tuple[dict[str, Any], dict[str, Any]]:
+    before_statements = _normative_statements(prior)
+    after_statements = _normative_statements(latest)
     changed = [
         (before, after)
-        for before in _normative_lines(prior)
-        for after in _normative_lines(latest)
-        if before["anchor"] == after["anchor"] and before["keyword"] != after["keyword"]
+        for before in before_statements
+        for after in after_statements
+        if before["normalized_anchor"] == after["normalized_anchor"]
+        and before["anchor_sha256"] == after["anchor_sha256"]
+        and " ".join(before["quote"].split()) != " ".join(after["quote"].split())
+        and _normative_statement_similarity(before["quote"], after["quote"])
+        >= _MIN_NORMATIVE_STATEMENT_SIMILARITY
     ]
     if len(changed) != 1:
         raise ProvenanceError(
@@ -1185,7 +1287,22 @@ def _task_span(
         raise ProvenanceError("IETF task evidence byte binding is invalid")
     keyword_matches = list(_NORMATIVE_KEYWORD.finditer(quote))
     declared_keyword = str(item.get("keyword") or "")
-    if len(keyword_matches) != 1 or declared_keyword != keyword_matches[0].group(0):
+    normalized_anchor = ""
+    keyword_start = keyword_end = -1
+    if len(keyword_matches) == 1:
+        keyword_match = keyword_matches[0]
+        keyword_start = start + keyword_match.start()
+        keyword_end = start + keyword_match.end()
+        normalized_anchor = _normalized_normative_anchor(quote, keyword_match)
+    if (
+        len(keyword_matches) != 1
+        or declared_keyword != keyword_matches[0].group(0)
+        or item.get("normalized_anchor") != normalized_anchor
+        or item.get("anchor_sha256")
+        != hashlib.sha256(normalized_anchor.encode()).hexdigest()
+        or item.get("keyword_char_start") != keyword_start
+        or item.get("keyword_char_end") != keyword_end
+    ):
         raise ProvenanceError("IETF task normative keyword binding is invalid")
     return quote, declared_keyword
 
@@ -1253,6 +1370,203 @@ def _task_fact_value(record: dict[str, Any], fact_id: str) -> str:
     return value
 
 
+def _task_component_digest(
+    records: dict[str, dict[str, Any]], relations: list[dict[str, Any]]
+) -> str:
+    def sort_key(value: dict[str, Any]) -> str:
+        return json.dumps(value, sort_keys=True, ensure_ascii=False)
+
+    record_signatures: list[dict[str, Any]] = []
+    for record in records.values():
+        facts = record.get("facts")
+        if not isinstance(facts, list):
+            raise ProvenanceError("IETF source workflow component facts are invalid")
+        fact_signatures: list[dict[str, Any]] = []
+        for fact in facts:
+            if not isinstance(fact, dict):
+                raise ProvenanceError(
+                    "IETF source workflow component facts are invalid"
+                )
+            signature = {
+                "field": fact.get("field"),
+                "value": fact.get("value"),
+                "evidence_quote": fact.get("evidence_quote"),
+                "char_start": fact.get("char_start"),
+                "char_end": fact.get("char_end"),
+                "source_sha256": fact.get("source_sha256"),
+            }
+            if signature["source_sha256"] != record.get("source_sha256"):
+                raise ProvenanceError(
+                    "IETF source workflow component fact binding is invalid"
+                )
+            fact_signatures.append(signature)
+        record_signatures.append(
+            {
+                "kind": record.get("kind"),
+                "occurred_at": record.get("occurred_at"),
+                "source_url": record.get("source_url"),
+                "retrieval_url": record.get("retrieval_url"),
+                "source_family": record.get("source_family"),
+                "source_origin": record.get("source_origin"),
+                "provenance_id": record.get("provenance_id"),
+                "source_sha256": record.get("source_sha256"),
+                "text_sha256": record.get("text_sha256"),
+                "facts": sorted(fact_signatures, key=sort_key),
+            }
+        )
+
+    relation_signatures: list[dict[str, Any]] = []
+    for relation in relations:
+        if not isinstance(relation, dict):
+            raise ProvenanceError("IETF source workflow component relation is invalid")
+        source = records.get(str(relation.get("source_record_id") or ""))
+        target = records.get(str(relation.get("target_record_id") or ""))
+        evidence = relation.get("evidence")
+        if source is None or target is None or not isinstance(evidence, list):
+            raise ProvenanceError("IETF source workflow component relation is invalid")
+        evidence_signatures: list[dict[str, Any]] = []
+        for item in evidence:
+            if not isinstance(item, dict):
+                raise ProvenanceError(
+                    "IETF source workflow component relation evidence is invalid"
+                )
+            evidence_record = records.get(str(item.get("record_id") or ""))
+            start, end = item.get("char_start"), item.get("char_end")
+            quote = item.get("evidence_quote")
+            if (
+                evidence_record is None
+                or item.get("source_sha256") != evidence_record.get("source_sha256")
+                or not isinstance(start, int)
+                or not isinstance(end, int)
+                or not isinstance(quote, str)
+                or start < 0
+                or end != start + len(quote)
+                or evidence_record["text"][start:end] != quote
+            ):
+                raise ProvenanceError(
+                    "IETF source workflow component relation evidence is invalid"
+                )
+            evidence_signatures.append(
+                {
+                    "source_sha256": item["source_sha256"],
+                    "evidence_quote": quote,
+                    "char_start": start,
+                    "char_end": end,
+                }
+            )
+        relation_signatures.append(
+            {
+                "kind": relation.get("kind"),
+                "source_sha256": source["source_sha256"],
+                "target_sha256": target["source_sha256"],
+                "evidence": sorted(evidence_signatures, key=sort_key),
+            }
+        )
+    payload = {
+        "source_kind": "ietf_standards",
+        "records": sorted(record_signatures, key=sort_key),
+        "relations": sorted(relation_signatures, key=sort_key),
+    }
+    canonical = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def _task_source_workflow_component_valid(
+    task: dict[str, Any], records: dict[str, dict[str, Any]]
+) -> bool:
+    binding = task.get("source_workflow_binding")
+    raw_relations = task.get("source_workflow_relations")
+    if binding is None and raw_relations is None:
+        return False
+    if (
+        not isinstance(binding, dict)
+        or set(binding) - {LOCAL_PROBE_TRUST_ISOLATION_FIELD}
+        != {
+            "schema_version",
+            "workflow_id",
+            "component_digest",
+            "source_kind",
+            "target_domain",
+            "bundle_sha256",
+            "binding_digest",
+            "adapter_revision",
+            "attestation",
+        }
+        or not isinstance(raw_relations, list)
+        or not raw_relations
+        or not all(isinstance(relation, dict) for relation in raw_relations)
+    ):
+        raise ProvenanceError("IETF source workflow binding is invalid")
+    relations = list(raw_relations)
+    digest = _task_component_digest(records, relations)
+    if not (
+        binding.get("schema_version") == _SOURCE_WORKFLOW_COMPONENT_SCHEMA
+        and binding.get("source_kind") == "ietf_standards"
+        and binding.get("target_domain") == "standards"
+        and binding.get("component_digest") == digest
+        and binding.get("workflow_id") == f"source:ietf_standards:{digest[:24]}"
+        and _SHA256.fullmatch(str(binding.get("bundle_sha256") or "")) is not None
+        and _SHA256.fullmatch(str(binding.get("binding_digest") or "")) is not None
+        and bool(str(binding.get("adapter_revision") or ""))
+    ):
+        raise ProvenanceError("IETF source workflow component digest is invalid")
+    relation_by_id = {
+        str(relation.get("relation_id") or ""): relation for relation in relations
+    }
+    if len(relation_by_id) != len(relations):
+        raise ProvenanceError("IETF source workflow relations are invalid")
+    evidence_items = task.get("evidence_items")
+    if not isinstance(evidence_items, list):
+        raise ProvenanceError("IETF source workflow task evidence is invalid")
+    for item in evidence_items:
+        if not isinstance(item, dict) or item.get("kind") not in {
+            "revision_of",
+            "published_as",
+        }:
+            continue
+        relation = item.get("relation")
+        if (
+            not isinstance(relation, dict)
+            or relation_by_id.get(str(relation.get("relation_id") or "")) != relation
+        ):
+            raise ProvenanceError("IETF source workflow task relation is unbound")
+    return True
+
+
+def _task_source_workflow_binding_valid(
+    task: dict[str, Any],
+    records: dict[str, dict[str, Any]],
+    source_attestation_key: bytes | None,
+) -> bool:
+    if source_attestation_key is None:
+        return False
+    try:
+        if not _task_source_workflow_component_valid(task, records):
+            return False
+    except ProvenanceError:
+        return False
+    binding = task.get("source_workflow_binding")
+    attestation = binding.get("attestation") if isinstance(binding, dict) else None
+    if not isinstance(binding, dict) or not isinstance(attestation, dict):
+        return False
+    if attestation.get("scheme") == ATTESTATION_V2_SCHEME:
+        return verify_attestation_identity(
+            binding,
+            source_attestation_key,
+            purpose=_SOURCE_WORKFLOW_COMPONENT_PURPOSE,
+            role="source",
+            key_id=str(attestation.get("key_id") or ""),
+            environment=str(attestation.get("environment") or ""),
+        )
+    return verify_attestation(
+        binding,
+        source_attestation_key,
+        purpose=_SOURCE_WORKFLOW_COMPONENT_PURPOSE,
+    )
+
+
 def _normative_answer(
     *,
     prior_record_id: str,
@@ -1264,6 +1578,7 @@ def _normative_answer(
     rfc_number: str,
     before_keyword: str,
     after_keyword: str,
+    before_quote: str,
     after_quote: str,
 ) -> str:
     if (
@@ -1272,12 +1587,12 @@ def _normative_answer(
         or revision_source_id != latest_record_id
         or revision_target_id != prior_record_id
         or publication_source_id != latest_record_id
-        or not all((before_keyword, after_keyword, after_quote))
+        or not all((before_keyword, after_keyword, before_quote, after_quote))
     ):
         return "unknown"
     return (
         f"{draft_identity} | RFC {rfc_number} | "
-        f"{before_keyword} -> {after_keyword} | {after_quote}"
+        f"{before_keyword} -> {after_keyword} | {before_quote} => {after_quote}"
     )
 
 
@@ -1292,9 +1607,16 @@ def replay_ietf_normative_change_task(
         task.get("schema_version") != IETF_NORMATIVE_TASK_SCHEMA
         or task.get("data_stage") != "candidate_task"
         or task.get("train_ready") is not False
+        or task.get("production_eligible") is not False
+        or task.get("promotion_eligible") is not False
+        or task.get("complete_world") is not False
+        or task.get("promoted") is not False
+        or task.get("generation_integration") != "disabled"
+        or task.get("source_attestation_verified") is not False
     ):
         raise ProvenanceError("IETF normative task contract is invalid")
     records = _task_record_map(task)
+    _task_source_workflow_component_valid(task, records)
     raw_items = task.get("evidence_items")
     if not isinstance(raw_items, list):
         raise ProvenanceError("IETF task evidence items are invalid")
@@ -1311,12 +1633,29 @@ def replay_ietf_normative_change_task(
         or set(essentials) != set(items)
     ):
         raise ProvenanceError("IETF task essential evidence contract is invalid")
-    selected = set(essentials if evidence_ids is None else evidence_ids)
+    expected_kinds = {
+        "normative_before",
+        "normative_after",
+        "revision_of",
+        "published_as",
+    }
+    item_kinds = [str(item.get("kind") or "") for item in items.values()]
+    if set(item_kinds) != expected_kinds or any(
+        item_kinds.count(kind) != 1 for kind in expected_kinds
+    ):
+        raise ProvenanceError("IETF task evidence kind contract is invalid")
+    selected_values = essentials if evidence_ids is None else evidence_ids
+    if not isinstance(selected_values, list) or any(
+        not isinstance(item, str) for item in selected_values
+    ):
+        raise ProvenanceError("IETF task evidence selection is invalid")
+    selected = set(selected_values)
     if not selected.issubset(items):
         raise ProvenanceError("IETF task evidence selection is invalid")
 
     before_keyword = ""
     after_keyword = ""
+    before_quote = ""
     after_quote = ""
     prior_record_id = ""
     latest_record_id = ""
@@ -1329,7 +1668,7 @@ def replay_ietf_normative_change_task(
         item = items[evidence_id]
         kind = item.get("kind")
         if kind == "normative_before":
-            _quote, before_keyword = _task_span(item, records)
+            before_quote, before_keyword = _task_span(item, records)
             prior_record_id = str(item["record_id"])
         elif kind == "normative_after":
             after_quote, after_keyword = _task_span(item, records)
@@ -1381,6 +1720,7 @@ def replay_ietf_normative_change_task(
         replacement = str(twin.get("keyword") or "")
         expected_text = ""
         expected_quote = ""
+        expected_anchor = ""
         if latest is not None and _NORMATIVE_KEYWORD.fullmatch(replacement):
             expected_text = (
                 latest["text"][:keyword_start]
@@ -1391,6 +1731,12 @@ def replay_ietf_normative_change_task(
                 parent_quote[: keyword_match.start()]
                 + replacement
                 + parent_quote[keyword_match.end() :]
+            )
+            replacement_match = _NORMATIVE_KEYWORD.search(expected_quote)
+            expected_anchor = (
+                _normalized_normative_anchor(expected_quote, replacement_match)
+                if replacement_match is not None
+                else ""
             )
         if (
             latest is None
@@ -1409,6 +1755,9 @@ def replay_ietf_normative_change_task(
             or twin.get("text_sha256") != digest
             or text != expected_text
             or twin.get("evidence_quote") != expected_quote
+            or twin.get("normalized_anchor") != expected_anchor
+            or twin.get("anchor_sha256")
+            != hashlib.sha256(expected_anchor.encode()).hexdigest()
             or twin.get("char_start") != parent_start
             or twin.get("char_end") != parent_start + len(expected_quote)
         ):
@@ -1416,6 +1765,22 @@ def replay_ietf_normative_change_task(
         if after_item["evidence_id"] in selected:
             after_quote = expected_quote
             after_keyword = replacement
+
+    if before_quote and after_quote:
+        before_item = next(
+            item for item in items.values() if item.get("kind") == "normative_before"
+        )
+        after_item = next(
+            item for item in items.values() if item.get("kind") == "normative_after"
+        )
+        if (
+            before_item.get("normalized_anchor") != after_item.get("normalized_anchor")
+            or before_item.get("anchor_sha256") != after_item.get("anchor_sha256")
+            or " ".join(before_quote.split()) == " ".join(after_quote.split())
+            or _normative_statement_similarity(before_quote, after_quote)
+            < _MIN_NORMATIVE_STATEMENT_SIMILARITY
+        ):
+            raise ProvenanceError("IETF task normative delta binding is invalid")
 
     return _normative_answer(
         prior_record_id=prior_record_id,
@@ -1427,6 +1792,7 @@ def replay_ietf_normative_change_task(
         rfc_number=rfc_number,
         before_keyword=before_keyword,
         after_keyword=after_keyword,
+        before_quote=before_quote,
         after_quote=after_quote,
     )
 
@@ -1504,8 +1870,12 @@ def _compile_ietf_normative_change_task(manifest: dict[str, Any]) -> dict[str, A
             "evidence_quote": before["quote"],
             "surface_text": before["quote"],
             "keyword": before["keyword"],
+            "normalized_anchor": before["normalized_anchor"],
+            "anchor_sha256": before["anchor_sha256"],
             "char_start": before["char_start"],
             "char_end": before["char_end"],
+            "keyword_char_start": before["keyword_char_start"],
+            "keyword_char_end": before["keyword_char_end"],
         },
         {
             "evidence_id": "normative_after",
@@ -1514,8 +1884,12 @@ def _compile_ietf_normative_change_task(manifest: dict[str, Any]) -> dict[str, A
             "evidence_quote": after["quote"],
             "surface_text": after["quote"],
             "keyword": after["keyword"],
+            "normalized_anchor": after["normalized_anchor"],
+            "anchor_sha256": after["anchor_sha256"],
             "char_start": after["char_start"],
             "char_end": after["char_end"],
+            "keyword_char_start": after["keyword_char_start"],
+            "keyword_char_end": after["keyword_char_end"],
         },
         {
             "evidence_id": "revision_relation",
@@ -1551,12 +1925,18 @@ def _compile_ietf_normative_change_task(manifest: dict[str, Any]) -> dict[str, A
         "schema_version": IETF_NORMATIVE_TASK_SCHEMA,
         "data_stage": "candidate_task",
         "train_ready": False,
+        "production_eligible": False,
+        "promotion_eligible": False,
+        "complete_world": False,
+        "promoted": False,
+        "generation_integration": "disabled",
+        "source_attestation_verified": False,
         "query_type": "normative_change_introducer",
         "answer_program_id": "ietf.normative_change_introducer.v1",
         "question": (
-            "Which draft revision introduced the normative keyword change, and "
-            "which RFC was that revision published as? Return the prior and current "
-            "keywords plus the exact current normative statement."
+            "Which draft revision introduced the substantive normative statement "
+            "delta, and which RFC was that revision published as? Return the prior "
+            "and current modal keywords plus both exact statements."
         ),
         "answer": "",
         "cf_answer": "",
@@ -1578,6 +1958,8 @@ def _compile_ietf_normative_change_task(manifest: dict[str, Any]) -> dict[str, A
             "text": cf_text,
             "text_sha256": hashlib.sha256(cf_text.encode()).hexdigest(),
             "evidence_quote": cf_quote,
+            "normalized_anchor": after["normalized_anchor"],
+            "anchor_sha256": after["anchor_sha256"],
             "keyword": replacement,
             "char_start": after["char_start"],
             "char_end": after["char_start"] + len(cf_quote),
@@ -1627,6 +2009,7 @@ def materialize_ietf_normative_change_task(workflow: Any) -> dict[str, Any]:
                     "evidence_quote": fact.evidence_quote,
                     "char_start": fact.char_start,
                     "char_end": fact.char_end,
+                    "source_sha256": fact.source_sha256,
                 }
                 for fact in record.facts
             ],
@@ -1673,14 +2056,17 @@ def materialize_ietf_normative_change_task(workflow: Any) -> dict[str, Any]:
         "relations": relations,
     }
     task = _compile_ietf_normative_change_task(manifest)
-    task["source_workflow_binding"] = {
-        "workflow_id": workflow.workflow_id,
-        "component_digest": workflow.component_digest,
-    }
+    task["source_workflow_relations"] = relations
+    authorization = getattr(workflow, "source_authorization", None)
+    if not isinstance(authorization, dict):
+        raise ProvenanceError("IETF source workflow authorization is missing")
+    task["source_workflow_binding"] = deepcopy(authorization)
     return task
 
 
-def audit_ietf_normative_change_task(task: dict[str, Any]) -> dict[str, bool]:
+def audit_ietf_normative_change_task(
+    task: dict[str, Any], *, source_attestation_key: bytes | None = None
+) -> dict[str, bool]:
     """Replay strict, CF, remove-one, surface, and byte-grounding gates."""
     essentials = list(task.get("essential_evidence_ids") or [])
     answer = str(task.get("answer") or "")
@@ -1699,8 +2085,35 @@ def audit_ietf_normative_change_task(task: dict[str, Any]) -> dict[str, bool]:
         for removed in essentials
     ]
     items = task.get("evidence_items") or []
-    surface_free = bool(items) and all(
-        answer not in str(item.get("surface_text") or "") for item in items
+    records = _task_record_map(task)
+    before = next(item for item in items if item.get("kind") == "normative_before")
+    after = next(item for item in items if item.get("kind") == "normative_after")
+    publication = next(item for item in items if item.get("kind") == "published_as")
+    publication_relation = publication["relation"]
+    publication_source = records[str(publication_relation["source_record_id"])]
+    publication_target = records[str(publication_relation["target_record_id"])]
+    answer_inputs = {
+        str(before["keyword"]),
+        str(after["keyword"]),
+        str(before["evidence_quote"]),
+        str(after["evidence_quote"]),
+        _task_fact_value(publication_source, "draft_revision"),
+        f"RFC {_task_fact_value(publication_target, 'rfc_number')}",
+    }
+    canonical_answer = " ".join(re.findall(r"[a-z0-9]+", answer.casefold()))
+    canonical_inputs = {
+        " ".join(re.findall(r"[a-z0-9]+", value.casefold())) for value in answer_inputs
+    }
+    surfaces = [
+        " ".join(
+            re.findall(r"[a-z0-9]+", str(item.get("surface_text") or "").casefold())
+        )
+        for item in items
+    ]
+    surface_free = bool(surfaces) and all(
+        canonical_answer not in surface
+        and not all(value in surface for value in canonical_inputs)
+        for surface in surfaces
     )
     return {
         "strict_replay_sufficient": strict,
@@ -1712,4 +2125,7 @@ def audit_ietf_normative_change_task(task: dict[str, Any]) -> dict[str, bool]:
         and all(value != answer for value in singles),
         "essential_surface_gold_free": surface_free,
         "essential_text_grounded": strict,
+        "source_workflow_binding_valid": _task_source_workflow_binding_valid(
+            task, records, source_attestation_key
+        ),
     }

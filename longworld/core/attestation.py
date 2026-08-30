@@ -39,6 +39,7 @@ PURPOSE_ROLES = {
     "git_workflow": "source",
     "episode_replay_bundle": "source",
     "source_workflow_bundle": "source",
+    "source_workflow_component": "source",
     "candidate_row": "candidate",
     "dense_ranking": "ranker",
     "dense_retrieval_audit": "auditor",

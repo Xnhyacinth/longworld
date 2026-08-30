@@ -15,13 +15,14 @@ import hashlib
 import json
 import stat
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 from longworld.core.attestation import (
     ATTESTATION_V2_SCHEME,
     PURPOSE_ROLES,
+    attach_attestation,
     attestation_key_from_env,
     verify_attestation,
 )
@@ -71,6 +72,8 @@ from longworld.core.standardsworkflow import (
 
 SOURCE_WORKFLOW_BUNDLE_SCHEMA = "longworld.source-workflow-bundle.v1"
 SOURCE_WORKFLOW_BUNDLE_PURPOSE = "source_workflow_bundle"
+SOURCE_WORKFLOW_COMPONENT_PURPOSE = "source_workflow_component"
+SOURCE_WORKFLOW_COMPONENT_SCHEMA = "longworld.source-workflow-component-binding.v1"
 SOURCE_WORKFLOW_ADAPTER_REVISION = SOURCE_WORKFLOW_ADAPTER_REVISION_V1
 SOURCE_WORKFLOW_ADAPTER_REVISION_LATEST = SOURCE_WORKFLOW_ADAPTER_REVISION_V2
 MAX_SOURCE_WORKFLOW_BUNDLE_BYTES = 2_000_000
@@ -410,10 +413,35 @@ def load_source_workflow_bundle(
         )
 
     immutable_bindings = tuple(bindings)
+    bundle_sha256 = hashlib.sha256(raw_bundle).hexdigest()
+    binding_digest = _binding_digest(immutable_bindings)
+    if key is None:
+        raise ProvenanceError("source workflow component authorization key is missing")
+    adapter_revision = next(iter(adapter_revisions))
+    authorized_workflows = tuple(
+        replace(
+            workflow,
+            source_authorization=attach_attestation(
+                {
+                    "schema_version": SOURCE_WORKFLOW_COMPONENT_SCHEMA,
+                    "workflow_id": workflow.workflow_id,
+                    "component_digest": workflow.component_digest,
+                    "source_kind": workflow.source_kind,
+                    "target_domain": workflow.target_domain,
+                    "bundle_sha256": bundle_sha256,
+                    "binding_digest": binding_digest,
+                    "adapter_revision": adapter_revision,
+                },
+                key,
+                purpose=SOURCE_WORKFLOW_COMPONENT_PURPOSE,
+            ),
+        )
+        for workflow in sorted(workflows, key=lambda item: item.workflow_id)
+    )
     return LoadedSourceWorkflowBundle(
-        bundle_sha256=hashlib.sha256(raw_bundle).hexdigest(),
-        binding_digest=_binding_digest(immutable_bindings),
-        adapter_revision=adapter_revisions.pop(),
+        bundle_sha256=bundle_sha256,
+        binding_digest=binding_digest,
+        adapter_revision=adapter_revision,
         bindings=immutable_bindings,
-        workflows=tuple(sorted(workflows, key=lambda workflow: workflow.workflow_id)),
+        workflows=authorized_workflows,
     )
