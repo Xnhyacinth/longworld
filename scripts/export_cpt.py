@@ -53,6 +53,12 @@ _BULK_METADATA_FIELDS = {
     "tokenizer_asset_manifest_sha256",
     "source_record_count",
 }
+_LONGITUDINAL_METADATA_FIELDS = {
+    "longitudinal_gate_revision",
+    "minimum_source_event_count",
+    "source_elapsed_seconds",
+    "source_event_count",
+}
 _BULK_BANDS = {"64k": (64_000, 65_536), "128k": (128_000, 131_072)}
 
 
@@ -148,6 +154,23 @@ def _reject_reason(row: dict) -> str | None:
             or row.get("source_record_count") != len(records)
         ):
             return "invalid_bulk_metadata"
+    present_longitudinal_fields = _LONGITUDINAL_METADATA_FIELDS.intersection(row)
+    if present_longitudinal_fields:
+        if present_longitudinal_fields != _LONGITUDINAL_METADATA_FIELDS:
+            return "incomplete_longitudinal_metadata"
+        event_count = row.get("source_event_count")
+        minimum_event_count = row.get("minimum_source_event_count")
+        elapsed_seconds = row.get("source_elapsed_seconds")
+        if (
+            not isinstance(event_count, int)
+            or not isinstance(minimum_event_count, int)
+            or not isinstance(elapsed_seconds, int)
+            or minimum_event_count <= 0
+            or event_count < minimum_event_count
+            or elapsed_seconds < 0
+            or row.get("longitudinal_gate_revision") != "git-distinct-commit-v1"
+        ):
+            return "invalid_longitudinal_metadata"
 
     seen: set[str] = set()
     previous_time: datetime | None = None
@@ -298,6 +321,18 @@ def export_cpt_rows(rows: Iterable[dict], destination: Path) -> dict:
                         }
                     )
                     metadata["source_export_digest"] = row["source_export_digest"]
+                if _LONGITUDINAL_METADATA_FIELDS.issubset(row):
+                    metadata.update(
+                        {
+                            field: row[field]
+                            for field in (
+                                "longitudinal_gate_revision",
+                                "minimum_source_event_count",
+                                "source_elapsed_seconds",
+                                "source_event_count",
+                            )
+                        }
+                    )
                 output.write(
                     json.dumps(
                         {"text": document, "metadata": metadata},

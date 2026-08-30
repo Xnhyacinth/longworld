@@ -18,6 +18,7 @@ sys.path.insert(0, str(SCRIPTS))
 from materialize_git_history_cpt import (
     _deduplicate_extraction,
     _source_manifest,
+    _source_slices,
     validate_remote_identity,
 )
 
@@ -39,6 +40,32 @@ def test_source_text_dedup_breaks_the_chain_instead_of_bridging_it() -> None:
     assert filtered.records[1].links == ()
     assert filtered.reject_reasons == {"duplicate_source_record_text": 2}
     assert len(seen) == 3
+
+
+def test_source_slices_expand_repositories_in_round_robin_order() -> None:
+    sources = [
+        {"repository": "example/a", "checkout": "a"},
+        {"repository": "example/b", "checkout": "b"},
+    ]
+
+    expanded = _source_slices(
+        sources,
+        slice_commits=1000,
+        commit_count=lambda source: (
+            2500 if source["repository"] == "example/a" else 1500
+        ),
+    )
+
+    assert [
+        (source["repository"], source["skip_commits"], source["max_commits"])
+        for source in expanded
+    ] == [
+        ("example/a", 0, 1000),
+        ("example/b", 0, 1000),
+        ("example/a", 1000, 1000),
+        ("example/b", 1000, 500),
+        ("example/a", 2000, 500),
+    ]
 
 
 def test_git_history_remote_identity_requires_public_head_and_license() -> None:
@@ -118,6 +145,7 @@ def test_git_history_source_manifest_normalizes_yaml_timestamp(
         max_commits=1,
         skip_commits=0,
         max_record_tokens=768,
+        max_chunks_per_commit=0,
     )
 
     assert manifest["authorization"]["reviewed_at"] == "2026-01-01T00:00:00Z"

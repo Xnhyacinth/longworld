@@ -252,6 +252,10 @@ def test_cpt_export_preserves_signed_bulk_length_and_lineage_metadata(
             "tokenizer_revision": "a" * 40,
             "tokenizer_asset_manifest_sha256": "b" * 64,
             "source_record_count": 2,
+            "source_event_count": 2,
+            "minimum_source_event_count": 2,
+            "source_elapsed_seconds": 86_400,
+            "longitudinal_gate_revision": "git-distinct-commit-v1",
         }
     )
     row = _sign(row)
@@ -271,5 +275,9 @@ def test_cpt_export_preserves_signed_bulk_length_and_lineage_metadata(
         "tokenizer_revision": "a" * 40,
         "tokenizer_asset_manifest_sha256": "b" * 64,
         "source_record_count": 2,
+        "source_event_count": 2,
+        "minimum_source_event_count": 2,
+        "source_elapsed_seconds": 86_400,
+        "longitudinal_gate_revision": "git-distinct-commit-v1",
         "source_export_digest": row["source_export_digest"],
     }

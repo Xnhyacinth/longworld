@@ -156,3 +156,78 @@ def test_bulk_windows_only_retokenize_near_exact_band_boundary() -> None:
 
     assert len(result.windows) == 3
     assert calls <= 18
+
+
+def test_bulk_windows_require_distinct_source_events_not_chunk_count() -> None:
+    workflow = _workflow()
+    records = []
+    for index, record in enumerate(workflow.records):
+        records.append(
+            WorkflowRecord(
+                record_id=record.record_id,
+                kind=record.kind,
+                occurred_at=record.occurred_at,
+                text=record.text,
+                links=record.links,
+                attributes={"source_event": "giant" if index < 4 else f"e{index}"},
+                source_pointer=record.source_pointer,
+            )
+        )
+    chunked = RealWorkflow(
+        workflow_id=workflow.workflow_id,
+        source_kind=workflow.source_kind,
+        source_origin=workflow.source_origin,
+        lineage=workflow.lineage,
+        records=tuple(records),
+        facts={},
+    )
+
+    result = pack_disjoint_workflow_windows(
+        chunked,
+        requests=(
+            CPTWindowRequest(CPTBand("64k", 28, 40), count=1, min_source_events=3),
+        ),
+        token_counter=_tokens,
+        source_event_id=lambda record: str(record.attributes["source_event"]),
+    )
+
+    assert result.windows[0].record_ids == ("r6", "r7", "r8")
+    assert result.windows[0].source_event_count == 3
+    assert result.reject_reasons["window_exceeds_upper_bound"] == 6
+
+
+def test_bulk_windows_do_not_reuse_a_source_event_across_windows() -> None:
+    workflow = _workflow()
+    records = tuple(
+        WorkflowRecord(
+            record_id=record.record_id,
+            kind=record.kind,
+            occurred_at=record.occurred_at,
+            text=record.text,
+            links=record.links,
+            attributes={"source_event": f"e{index // 2}"},
+            source_pointer=record.source_pointer,
+        )
+        for index, record in enumerate(workflow.records)
+    )
+    chunked = RealWorkflow(
+        workflow_id=workflow.workflow_id,
+        source_kind=workflow.source_kind,
+        source_origin=workflow.source_origin,
+        lineage=workflow.lineage,
+        records=records,
+        facts={},
+    )
+
+    result = pack_disjoint_workflow_windows(
+        chunked,
+        requests=(
+            CPTWindowRequest(CPTBand("64k", 28, 40), count=2, min_source_events=2),
+        ),
+        token_counter=_tokens,
+        source_event_id=lambda record: str(record.attributes["source_event"]),
+    )
+
+    first, second = result.windows
+    assert set(first.source_event_ids).isdisjoint(second.source_event_ids)
+    assert result.reject_reasons["source_event_tail_records_discarded"] == 2

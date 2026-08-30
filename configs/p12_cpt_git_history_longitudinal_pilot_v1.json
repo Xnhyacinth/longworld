@@ -1,0 +1,49 @@
+{
+  "schema_version": "longworld.git-history-cpt-materialization.v1",
+  "materializer_revision": "longitudinal_event_gate_v1",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "bands": {
+    "64k": {
+      "lower_tokens": 64000,
+      "upper_tokens": 65536
+    },
+    "128k": {
+      "lower_tokens": 128000,
+      "upper_tokens": 131072
+    }
+  },
+  "target_rows": {
+    "64k": 20,
+    "128k": 20
+  },
+  "attempt_multiplier": 2,
+  "max_record_tokens": 768,
+  "max_chunks_per_commit": 10,
+  "minimum_source_events": {
+    "64k": 8,
+    "128k": 16
+  },
+  "sources": [
+    {
+      "repository": "dprint/dprint",
+      "checkout": "data/source_cache/git_history/dprint",
+      "max_commits": 1000,
+      "skip_commits": 0
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 0
+    },
+    {
+      "repository": "bytecodealliance/wasmtime",
+      "checkout": "data/source_cache/git_history/wasmtime",
+      "max_commits": 1000,
+      "skip_commits": 0
+    }
+  ]
+}

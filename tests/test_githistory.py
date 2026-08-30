@@ -166,3 +166,51 @@ def test_git_history_commit_slices_do_not_overlap(tmp_path: Path) -> None:
     newest_shas = {record.attributes["sha"] for record in newest.records}
     older_shas = {record.attributes["sha"] for record in older.records}
     assert newest_shas.isdisjoint(older_shas)
+
+
+def test_git_history_caps_a_commit_without_breaking_the_parent_chain(
+    tmp_path: Path,
+) -> None:
+    result = extract_first_parent_history(
+        _repo(tmp_path),
+        repository="example/repo",
+        tokenizer=FakeTokenizer(),
+        max_commits=3,
+        max_record_tokens=5,
+        max_chunks_per_commit=1,
+    )
+
+    assert len(result.records) == 3
+    assert result.reject_reasons["commits_truncated"] == 3
+    assert result.reject_reasons["commit_chunks_truncated"] > 3
+    assert result.records[0].links == ()
+    assert result.records[1].links == (result.records[0].record_id,)
+    assert result.records[2].links == (result.records[1].record_id,)
+
+
+def test_git_history_framing_is_not_ambiguous_with_control_bytes(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    (repo / "control.txt").write_bytes(b"real patch \x1e record \x1f field\n")
+    _git(repo, "add", "control.txt")
+    _git(
+        repo,
+        "commit",
+        "-q",
+        "-m",
+        "control byte regression",
+        "--date",
+        "2026-01-04T00:00:00Z",
+    )
+
+    result = extract_first_parent_history(
+        repo,
+        repository="example/repo",
+        tokenizer=FakeTokenizer(),
+        max_commits=4,
+        max_record_tokens=40,
+    )
+
+    assert result.commit_count == 4
+    assert any("control byte regression" in record.text for record in result.records)

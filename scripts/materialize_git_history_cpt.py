@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 from collections import Counter
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -53,6 +54,7 @@ SOURCE_SCHEMA = "longworld.git-history-source-manifest.v1"
 RELEASE_SCHEMA = "longworld.git-history-cpt-release.v1"
 MAX_CONFIG_BYTES = 256_000
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+MAX_SOURCE_SLICES = 1_000
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -258,6 +260,7 @@ def _source_manifest(
     max_commits: int,
     skip_commits: int,
     max_record_tokens: int,
+    max_chunks_per_commit: int,
 ) -> dict[str, Any]:
     key = attestation_key_from_env("source_manifest")
     if key is None:
@@ -294,12 +297,14 @@ def _source_manifest(
         },
         "parser": {
             "name": "git_first_parent_patch",
-            "revision": "v2",
+            "revision": "v3",
             "first_parent": True,
             "source_text_deduplication": "global_sha256_fail_closed",
             "max_commits": max_commits,
             "skip_commits": skip_commits,
             "max_record_tokens": max_record_tokens,
+            "max_chunks_per_commit": max_chunks_per_commit,
+            "oversized_commit_policy": "real_prefix_chunks_with_audited_omission",
             "renames": "disabled_for_determinism",
         },
         "observed_commit_count": extraction.commit_count,
@@ -311,6 +316,7 @@ def _source_manifest(
                 "occurred_at": record.occurred_at,
                 "source_pointer": record.source_pointer,
                 "text_sha256": hashlib.sha256(record.text.encode()).hexdigest(),
+                "source_event_id": str(record.attributes.get("sha") or ""),
                 "predecessor_ids": list(record.links),
             }
             for record in extraction.records
@@ -319,14 +325,56 @@ def _source_manifest(
     return attach_attestation(unsigned, key, purpose="source_manifest")
 
 
-def _requests(bands: dict[str, CPTBand], target: dict[str, int], multiplier: int):
+def _requests(
+    bands: dict[str, CPTBand],
+    target: dict[str, int],
+    multiplier: int,
+    minimum_source_events: dict[str, int],
+):
     requests: list[CPTWindowRequest] = []
     maximum = max(target.values()) * multiplier
     for index in range(maximum):
         for name in ("128k", "64k"):
             if index < target[name] * multiplier:
-                requests.append(CPTWindowRequest(bands[name], count=1))
+                requests.append(
+                    CPTWindowRequest(
+                        bands[name],
+                        count=1,
+                        min_source_events=minimum_source_events[name],
+                    )
+                )
     return tuple(requests)
+
+
+def _source_slices(
+    sources: list[dict[str, Any]],
+    *,
+    slice_commits: int,
+    commit_count: Callable[[dict[str, Any]], int],
+) -> list[dict[str, Any]]:
+    """Expand whole repositories into deterministic round-robin history slices."""
+    if slice_commits <= 0 or slice_commits > 10_000:
+        raise ValueError("Git history source slice size is invalid")
+    if any("max_commits" in source or "skip_commits" in source for source in sources):
+        raise ValueError("automatic source slicing cannot mix explicit commit ranges")
+    totals = [commit_count(source) for source in sources]
+    if any(total <= 0 or total > 100_000 for total in totals):
+        raise ValueError("Git history first-parent commit count is invalid")
+    expanded: list[dict[str, Any]] = []
+    for skip_commits in range(0, max(totals), slice_commits):
+        for source, total in zip(sources, totals, strict=True):
+            if skip_commits >= total:
+                continue
+            expanded.append(
+                {
+                    **source,
+                    "max_commits": min(slice_commits, total - skip_commits),
+                    "skip_commits": skip_commits,
+                }
+            )
+            if len(expanded) > MAX_SOURCE_SLICES:
+                raise ValueError("Git history config expands to too many source slices")
+    return expanded
 
 
 def _deduplicate_extraction(
@@ -407,6 +455,23 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     max_record_tokens = int(config.get("max_record_tokens") or 0)
     if max_record_tokens <= 0:
         raise ValueError("Git history CPT record token limit is invalid")
+    raw_minimum_source_events = config.get("minimum_source_events")
+    longitudinal = raw_minimum_source_events is not None
+    if longitudinal:
+        if not isinstance(raw_minimum_source_events, dict) or set(
+            raw_minimum_source_events
+        ) != set(bands):
+            raise ValueError("Git history CPT source-event minimums are invalid")
+        minimum_source_events = {
+            name: int(raw_minimum_source_events.get(name) or 0) for name in bands
+        }
+        if any(value <= 1 for value in minimum_source_events.values()):
+            raise ValueError("longitudinal CPT requires multiple source events")
+    else:
+        minimum_source_events = {name: 1 for name in bands}
+    max_chunks_per_commit = int(config.get("max_chunks_per_commit") or 0)
+    if max_chunks_per_commit < 0 or (longitudinal and max_chunks_per_commit <= 0):
+        raise ValueError("longitudinal CPT requires a source-event chunk cap")
     source_client = _file_receipt(Path("/usr/bin/gh"))
     history_client = _file_receipt(Path("/usr/bin/git"))
     tokenizer_asset_sha256 = resolved_tokenizer_asset_manifest_sha256(
@@ -419,16 +484,38 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     pack_rejects: Counter[str] = Counter()
     cpt_rejects: Counter[str] = Counter()
     used_record_ids: set[str] = set()
+    used_source_event_ids: set[str] = set()
     seen_source_text_sha256: set[str] = set()
+    validated_checkouts: set[tuple[str, Path]] = set()
+    remote_identities: dict[tuple[str, str, str], dict[str, Any]] = {}
 
     raw_sources = config.get("sources")
     if not isinstance(raw_sources, list) or not raw_sources:
         raise ValueError("Git history CPT config has no sources")
+    if not all(isinstance(source, dict) for source in raw_sources):
+        raise TypeError("Git history CPT source config is invalid")
+    slice_commits = int(config.get("source_slice_commits") or 0)
+    if slice_commits:
+
+        def first_parent_commit_count(source: dict[str, Any]) -> int:
+            repository = str(source.get("repository") or "")
+            checkout = Path(str(source.get("checkout") or ""))
+            if not checkout.is_absolute():
+                checkout = ROOT / checkout
+            checkout_key = (repository, checkout.resolve())
+            if checkout_key not in validated_checkouts:
+                _validate_checkout(checkout, repository)
+                validated_checkouts.add(checkout_key)
+            return int(_git(checkout, "rev-list", "--first-parent", "--count", "HEAD"))
+
+        raw_sources = _source_slices(
+            raw_sources,
+            slice_commits=slice_commits,
+            commit_count=first_parent_commit_count,
+        )
     for source in raw_sources:
         if all(len(accepted_by_band[name]) >= target[name] for name in bands):
             break
-        if not isinstance(source, dict):
-            raise TypeError("Git history CPT source config is invalid")
         repository = str(source.get("repository") or "")
         checkout_value = str(source.get("checkout") or "")
         checkout = Path(checkout_value)
@@ -439,7 +526,10 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             raise ValueError(f"repository is not public and allowlisted: {repository}")
         if "commit" not in set(policy.get("allowed_record_kinds") or []):
             raise ValueError(f"repository does not allow commit records: {repository}")
-        _validate_checkout(checkout, repository)
+        checkout_key = (repository, checkout.resolve())
+        if checkout_key not in validated_checkouts:
+            _validate_checkout(checkout, repository)
+            validated_checkouts.add(checkout_key)
         extraction = extract_first_parent_history(
             checkout,
             repository=repository,
@@ -447,13 +537,19 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             max_commits=int(source.get("max_commits") or 0),
             skip_commits=int(source.get("skip_commits") or 0),
             max_record_tokens=max_record_tokens,
+            max_chunks_per_commit=max_chunks_per_commit,
         )
         extraction = _deduplicate_extraction(extraction, seen_source_text_sha256)
-        remote_identity = validate_remote_identity(
-            repository,
-            extraction.head_revision,
-            str(policy.get("license") or ""),
-        )
+        license_id = str(policy.get("license") or "")
+        remote_key = (repository, extraction.head_revision, license_id)
+        remote_identity = remote_identities.get(remote_key)
+        if remote_identity is None:
+            remote_identity = validate_remote_identity(
+                repository,
+                extraction.head_revision,
+                license_id,
+            )
+            remote_identities[remote_key] = remote_identity
         source_manifest = _source_manifest(
             repository=repository,
             policy=policy,
@@ -466,6 +562,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             max_commits=int(source.get("max_commits") or 0),
             skip_commits=int(source.get("skip_commits") or 0),
             max_record_tokens=max_record_tokens,
+            max_chunks_per_commit=max_chunks_per_commit,
         )
         source_key = attestation_key_from_env("source_manifest")
         if not verify_attestation(
@@ -493,7 +590,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             url=f"https://github.com/{repository}",
             license=str(policy.get("license") or ""),
             retrieved_at=exported_at,
-            parser="git_first_parent_patch@2",
+            parser="git_first_parent_patch@3",
             sha256=source_digest,
             revision=extraction.head_revision,
             source_path=str(manifest_path),
@@ -509,8 +606,9 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         remaining = {name: target[name] - len(accepted_by_band[name]) for name in bands}
         packing = pack_disjoint_workflow_windows(
             workflow,
-            requests=_requests(bands, remaining, multiplier),
+            requests=_requests(bands, remaining, multiplier, minimum_source_events),
             token_counter=token_counter,
+            source_event_id=lambda record: str(record.attributes.get("sha") or ""),
         )
         pack_rejects.update(packing.reject_reasons)
         for window in packing.windows:
@@ -518,6 +616,8 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 continue
             if used_record_ids.intersection(window.record_ids):
                 raise ValueError("Git history CPT source record was reused")
+            if used_source_event_ids.intersection(window.source_event_ids):
+                raise ValueError("Git history CPT source event was reused")
             row = cpt_row_from_workflow(window.workflow)
             unsigned = {
                 key: value for key, value in row.items() if key != "attestation"
@@ -536,6 +636,23 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
                     "base_workflow_id": workflow.workflow_id,
                 }
             )
+            if longitudinal:
+                occurred_at = [
+                    datetime.fromisoformat(record.occurred_at.replace("Z", "+00:00"))
+                    for record in window.workflow.records
+                ]
+                unsigned.update(
+                    {
+                        "longitudinal_gate_revision": "git-distinct-commit-v1",
+                        "minimum_source_event_count": minimum_source_events[
+                            window.band.name
+                        ],
+                        "source_elapsed_seconds": int(
+                            (max(occurred_at) - min(occurred_at)).total_seconds()
+                        ),
+                        "source_event_count": window.source_event_count,
+                    }
+                )
             promotion_key = attestation_key_from_env("cpt_row")
             if promotion_key is None:
                 raise ValueError("promotion role key is required")
@@ -547,6 +664,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             accepted_by_band[window.band.name].append(_canonical_bytes(row))
             accepted_tokens[window.band.name] += window.context_tokens
             used_record_ids.update(window.record_ids)
+            used_source_event_ids.update(window.source_event_ids)
         source_manifests.append(
             {
                 "repository": repository,
@@ -602,6 +720,16 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         "cpt_rows_sha256": cpt_rows_sha256,
         "train_sha256": _sha256_file(export_path),
     }
+    if longitudinal:
+        manifest.update(
+            {
+                "longitudinal_gate_revision": "git-distinct-commit-v1",
+                "max_chunks_per_commit": max_chunks_per_commit,
+                "minimum_source_events": minimum_source_events,
+                "unique_source_events": len(used_source_event_ids),
+                "cross_band_source_event_overlap": 0,
+            }
+        )
     _atomic_write(output_dir / "MANIFEST.json", _canonical_bytes(manifest) + b"\n")
     return manifest
 

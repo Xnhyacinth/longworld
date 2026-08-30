@@ -15,8 +15,9 @@ from longworld.core.realworkflow import WorkflowRecord
 
 _REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 _GIT_SHA = re.compile(r"[0-9a-f]{40}\Z")
-_RECORD_SEPARATOR = "\x1e"
-_FIELD_SEPARATOR = "\x1f"
+_RECORD_SEPARATOR = "\x00LONGWORLD_RECORD\x00"
+_FIELD_SEPARATOR = "\x00"
+_PATCH_PREFIX = "LONGWORLD_PATCH\x00"
 _MAX_COMMITS = 100_000
 _MAX_TOKENIZER_CHARS = 128_000
 
@@ -66,10 +67,7 @@ def _git_output(checkout: Path, *args: str) -> str:
 
 
 def _history_segments(checkout: Path, max_commits: int, skip_commits: int) -> list[str]:
-    pretty = (
-        f"{_RECORD_SEPARATOR}%H{_FIELD_SEPARATOR}%P{_FIELD_SEPARATOR}"
-        f"%cI{_FIELD_SEPARATOR}%B{_FIELD_SEPARATOR}"
-    )
+    pretty = "%x00LONGWORLD_RECORD%x00%H%x00%P%x00%cI%x00%B%x00LONGWORLD_PATCH%x00"
     completed = subprocess.run(
         [
             "/usr/bin/git",
@@ -103,7 +101,11 @@ def _history_segments(checkout: Path, max_commits: int, skip_commits: int) -> li
             "GIT_TERMINAL_PROMPT": "0",
         },
     )
-    return [segment for segment in completed.stdout.split(_RECORD_SEPARATOR) if segment]
+    return [
+        segment
+        for segment in completed.stdout.split(_RECORD_SEPARATOR)
+        if segment.strip()
+    ]
 
 
 def _token_offsets(tokenizer: OffsetTokenizer, text: str) -> list[tuple[int, int]]:
@@ -185,6 +187,7 @@ def extract_first_parent_history(
     max_commits: int,
     skip_commits: int = 0,
     max_record_tokens: int = 768,
+    max_chunks_per_commit: int = 0,
 ) -> GitHistoryExtraction:
     """Extract chronological commit messages and patches without inventing edges."""
     if _REPOSITORY.fullmatch(repository) is None:
@@ -195,6 +198,8 @@ def extract_first_parent_history(
         raise ValueError("Git history commit offset is invalid")
     if max_record_tokens <= 0:
         raise ValueError("Git history record token limit is invalid")
+    if max_chunks_per_commit < 0 or max_chunks_per_commit > 10_000:
+        raise ValueError("Git history commit chunk cap is invalid")
     if not checkout.is_dir():
         raise ValueError("Git history checkout is unavailable")
     head_revision = _git_output(checkout, "rev-parse", "HEAD")
@@ -210,7 +215,10 @@ def extract_first_parent_history(
         fields = segment.split(_FIELD_SEPARATOR, 4)
         if len(fields) != 5:
             raise ValueError("Git history stream has an invalid record boundary")
-        sha, raw_parents, occurred_at, message, patch = fields
+        sha, raw_parents, occurred_at, message, patch_payload = fields
+        if not patch_payload.startswith(_PATCH_PREFIX):
+            raise ValueError("Git history stream has an invalid patch boundary")
+        patch = patch_payload.removeprefix(_PATCH_PREFIX)
         sha = sha.strip()
         raw_parents = raw_parents.strip()
         occurred_at = occurred_at.strip()
@@ -240,6 +248,10 @@ def extract_first_parent_history(
             rejects["empty_commit"] += 1
             previous_record_id = ""
             continue
+        if max_chunks_per_commit and len(chunks) > max_chunks_per_commit:
+            rejects["commit_chunks_truncated"] += len(chunks) - max_chunks_per_commit
+            rejects["commits_truncated"] += 1
+            chunks = chunks[:max_chunks_per_commit]
         for chunk_index, (char_start, char_end, chunk) in enumerate(chunks):
             record_id = f"git:{repository}:commit:{sha}:chunk:{chunk_index:04d}"
             records.append(

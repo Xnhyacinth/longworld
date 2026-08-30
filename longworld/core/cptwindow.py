@@ -29,10 +29,13 @@ class CPTBand:
 class CPTWindowRequest:
     band: CPTBand
     count: int
+    min_source_events: int = 1
 
     def __post_init__(self) -> None:
-        if self.count <= 0:
-            raise ValueError("CPT window count must be positive")
+        if self.count <= 0 or self.min_source_events <= 0:
+            raise ValueError(
+                "CPT window count and source-event minimum must be positive"
+            )
 
 
 @dataclass(frozen=True)
@@ -41,6 +44,8 @@ class PackedCPTWindow:
     workflow: RealWorkflow
     context_tokens: int
     record_ids: tuple[str, ...]
+    source_event_ids: tuple[str, ...]
+    source_event_count: int
     source_start_index: int
     source_end_index: int
 
@@ -104,6 +109,7 @@ def pack_disjoint_workflow_windows(
     *,
     requests: Sequence[CPTWindowRequest],
     token_counter: Callable[[str], int],
+    source_event_id: Callable[[WorkflowRecord], str] | None = None,
 ) -> CPTWindowPackingResult:
     """Consume source records once while satisfying exact token-band requests.
 
@@ -123,6 +129,7 @@ def pack_disjoint_workflow_windows(
         while produced < request.count and cursor < len(records):
             selected: list[WorkflowRecord] = []
             selected_ids: set[str] = set()
+            selected_event_ids: set[str] = set()
             estimated_tokens = 0
             start_index = cursor
             while cursor < len(records):
@@ -138,6 +145,7 @@ def pack_disjoint_workflow_windows(
                         rejects["short_disconnected_component"] += len(selected)
                         selected = []
                         selected_ids = set()
+                        selected_event_ids = set()
                         estimated_tokens = 0
                     rejects["record_exceeds_band_slack"] += 1
                     cursor += 1
@@ -147,12 +155,21 @@ def pack_disjoint_workflow_windows(
                     rejects["short_disconnected_component"] += len(selected)
                     selected = []
                     selected_ids = set()
+                    selected_event_ids = set()
                     estimated_tokens = 0
                     start_index = cursor
+                event_id = (
+                    source_event_id(record)
+                    if source_event_id is not None
+                    else record.record_id
+                )
+                if not event_id:
+                    raise ValueError("CPT source event identity is empty")
                 if selected:
                     estimated_tokens += separator_tokens
                 selected.append(record)
                 selected_ids.add(record.record_id)
+                selected_event_ids.add(event_id)
                 estimated_tokens += record_tokens
                 cursor += 1
                 exact_margin = min(
@@ -160,6 +177,8 @@ def pack_disjoint_workflow_windows(
                     max(32, len(selected) * 2),
                 )
                 if estimated_tokens < request.band.lower_tokens - exact_margin:
+                    continue
+                if len(selected_event_ids) < request.min_source_events:
                     continue
                 context = _context(selected)
                 context_tokens = token_counter(context)
@@ -169,11 +188,20 @@ def pack_disjoint_workflow_windows(
                     rejects["window_exceeds_upper_bound"] += len(selected)
                     selected = []
                     selected_ids = set()
+                    selected_event_ids = set()
                     estimated_tokens = 0
                     start_index = cursor
                     continue
                 packed_workflow = _derived_workflow(
                     workflow, selected, request.band, context
+                )
+                ordered_event_ids = tuple(
+                    dict.fromkeys(
+                        source_event_id(record)
+                        if source_event_id is not None
+                        else record.record_id
+                        for record in selected
+                    )
                 )
                 windows.append(
                     PackedCPTWindow(
@@ -181,10 +209,22 @@ def pack_disjoint_workflow_windows(
                         workflow=packed_workflow,
                         context_tokens=context_tokens,
                         record_ids=tuple(record.record_id for record in selected),
+                        source_event_ids=ordered_event_ids,
+                        source_event_count=len(ordered_event_ids),
                         source_start_index=start_index,
                         source_end_index=cursor,
                     )
                 )
+                if source_event_id is not None:
+                    last_event_id = ordered_event_ids[-1]
+                    while cursor < len(records):
+                        next_event_id = source_event_id(records[cursor])
+                        if not next_event_id:
+                            raise ValueError("CPT source event identity is empty")
+                        if next_event_id != last_event_id:
+                            break
+                        rejects["source_event_tail_records_discarded"] += 1
+                        cursor += 1
                 produced += 1
                 break
             else:
