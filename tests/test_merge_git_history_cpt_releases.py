@@ -8,7 +8,10 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from merge_git_history_cpt_releases import _select_disjoint_rows
+from merge_git_history_cpt_releases import (
+    _select_disjoint_rows,
+    _validate_release_row_bindings,
+)
 
 
 def _row(bucket: str, record_id: str) -> dict:
@@ -88,3 +91,22 @@ def test_merge_skips_cross_shard_source_body_duplicates_and_refills() -> None:
         "r3",
     ]
     assert stats["duplicate_source_body_rows_skipped"] == 1
+
+
+def test_release_rows_must_match_signed_source_bindings() -> None:
+    row = _row("64k", "r1")
+    row["workflow_records"][0]["sha256"] = "signed-body"
+
+    _validate_release_row_bindings(
+        [row],
+        source_event_by_record={"r1": "e1"},
+        source_binding_by_record={"r1": ("signed-body", "source:r1")},
+    )
+
+    row["workflow_records"][0]["sha256"] = "forged-body"
+    with pytest.raises(ValueError, match="source binding"):
+        _validate_release_row_bindings(
+            [row],
+            source_event_by_record={"r1": "e1"},
+            source_binding_by_record={"r1": ("signed-body", "source:r1")},
+        )

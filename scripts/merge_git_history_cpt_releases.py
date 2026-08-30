@@ -141,6 +141,25 @@ def _source_path(release_dir: Path, value: object) -> Path:
     return resolved
 
 
+def _validate_release_row_bindings(
+    rows: list[dict[str, Any]],
+    *,
+    source_event_by_record: dict[str, str],
+    source_binding_by_record: dict[str, tuple[str, str]],
+) -> None:
+    for row in rows:
+        source_digest = str(row.get("source_export_digest") or "")
+        for record in row["workflow_records"]:
+            record_id = str(record["record_id"])
+            expected = source_binding_by_record.get(record_id)
+            if (
+                record_id not in source_event_by_record
+                or expected is None
+                or expected != (str(record.get("sha256") or ""), source_digest)
+            ):
+                raise ValueError("input CPT row source binding is invalid")
+
+
 def _load_release(
     release_dir: Path,
 ) -> tuple[
@@ -206,6 +225,11 @@ def _load_release(
         reason = _reject_reason(row)
         if reason:
             raise ValueError(f"input CPT row contract failed during merge: {reason}")
+    _validate_release_row_bindings(
+        rows,
+        source_event_by_record=source_event_by_record,
+        source_binding_by_record=source_binding_by_record,
+    )
     return (
         release,
         release_raw,

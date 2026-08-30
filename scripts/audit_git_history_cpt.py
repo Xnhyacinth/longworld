@@ -28,6 +28,7 @@ from longworld.core.provenance import _read_regular_file
 from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
 from longworld.core.tokenizer_assets import resolved_tokenizer_asset_manifest_sha256
 from scripts.export_cpt import _reject_reason, iter_jsonl
+from scripts.merge_git_history_cpt_releases import _load_release
 
 MAX_MANIFEST_BYTES = 64_000_000
 AUDIT_SCHEMA = "longworld.git-history-cpt-audit.v1"
@@ -108,6 +109,101 @@ def _validate_retained_count_contract(
     )
     if invalid:
         raise ValueError("release row counts do not match audited rows")
+
+
+def _cross_release_references(release: dict[str, Any]) -> list[dict[str, str]]:
+    legacy = release.get("cross_release_reference")
+    multiple = release.get("cross_release_references")
+    if legacy is not None and multiple is not None:
+        raise ValueError("cross-release reference contract is ambiguous")
+    raw = [legacy] if legacy is not None else multiple
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or not raw:
+        raise ValueError("cross-release reference contract is invalid")
+    references: list[dict[str, str]] = []
+    for reference in raw:
+        if not isinstance(reference, dict) or set(reference) != {
+            "path",
+            "release_manifest_sha256",
+        }:
+            raise ValueError("cross-release reference contract is invalid")
+        references.append(
+            {
+                "path": str(reference["path"]),
+                "release_manifest_sha256": str(reference["release_manifest_sha256"]),
+            }
+        )
+    if len({item["release_manifest_sha256"] for item in references}) != len(references):
+        raise ValueError("cross-release reference contract is duplicated")
+    return references
+
+
+def _reference_path_text(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
+def _reference_receipt_for_path(value: object) -> dict[str, str]:
+    path = _release_path(value)
+    _, raw, *_ = _load_release(path)
+    return {
+        "path": _reference_path_text(path),
+        "release_manifest_sha256": hashlib.sha256(raw).hexdigest(),
+    }
+
+
+def _load_reference_closure(
+    references: list[dict[str, str]],
+) -> list[
+    tuple[
+        dict[str, str],
+        dict[str, Any],
+        list[dict[str, Any]],
+        dict[str, str],
+        dict[str, tuple[str, str]],
+    ]
+]:
+    loaded: dict[
+        str,
+        tuple[
+            dict[str, str],
+            dict[str, Any],
+            list[dict[str, Any]],
+            dict[str, str],
+            dict[str, tuple[str, str]],
+        ],
+    ] = {}
+    active: set[str] = set()
+
+    def visit(reference: dict[str, str]) -> None:
+        reference_dir = _release_path(reference["path"])
+        release, raw, rows, events, bindings, _ = _load_release(reference_dir)
+        digest = hashlib.sha256(raw).hexdigest()
+        if digest != reference["release_manifest_sha256"]:
+            raise ValueError("cross-release reference manifest hash mismatch")
+        if digest in active:
+            raise ValueError("cross-release reference cycle is invalid")
+        canonical_path = _reference_path_text(reference_dir)
+        if digest in loaded:
+            if loaded[digest][0]["path"] != canonical_path:
+                raise ValueError("cross-release reference manifest has path aliases")
+            return
+        active.add(digest)
+        for parent in _cross_release_references(release):
+            visit(parent)
+        active.remove(digest)
+        receipt = {
+            "path": canonical_path,
+            "release_manifest_sha256": digest,
+        }
+        loaded[digest] = (receipt, release, rows, events, bindings)
+
+    for reference in references:
+        visit(reference)
+    return [loaded[digest] for digest in sorted(loaded)]
 
 
 def audit_release(release_dir: Path) -> dict[str, Any]:
@@ -365,41 +461,29 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
         raise ValueError("release source-event accounting does not match audit")
 
     reference_report: dict[str, Any] = {}
-    reference = release.get("cross_release_reference")
-    if reference is not None:
-        if not isinstance(reference, dict) or set(reference) != {
-            "path",
-            "release_manifest_sha256",
-        }:
-            raise ValueError("cross-release reference contract is invalid")
-        from scripts.merge_git_history_cpt_releases import _load_release
-
-        reference_dir = _release_path(reference["path"])
-        (
-            _,
-            reference_raw,
-            reference_rows,
-            reference_events,
-            _,
-            _,
-        ) = _load_release(reference_dir)
-        if hashlib.sha256(reference_raw).hexdigest() != reference.get(
-            "release_manifest_sha256"
-        ):
-            raise ValueError("cross-release reference manifest hash mismatch")
+    references = _cross_release_references(release)
+    if references:
         reference_bodies: set[str] = set()
         reference_event_ids: set[str] = set()
         reference_contexts: set[str] = set()
-        for reference_row in reference_rows:
-            reference_contexts.add(
-                hashlib.sha256(
-                    str(reference_row["document_context"]).encode()
-                ).hexdigest()
-            )
-            for record in reference_row["workflow_records"]:
-                record_id = str(record["record_id"])
-                reference_bodies.add(str(record["sha256"]))
-                reference_event_ids.add(reference_events[record_id])
+        reference_closure = _load_reference_closure(references)
+        for (
+            _,
+            _,
+            reference_rows,
+            reference_events,
+            reference_bindings,
+        ) in reference_closure:
+            for reference_row in reference_rows:
+                reference_contexts.add(
+                    hashlib.sha256(
+                        str(reference_row["document_context"]).encode()
+                    ).hexdigest()
+                )
+                for record in reference_row["workflow_records"]:
+                    record_id = str(record["record_id"])
+                    reference_bodies.add(reference_bindings[record_id][0])
+                    reference_event_ids.add(reference_events[record_id])
         if (
             used_source_record_texts.intersection(reference_bodies)
             or used_source_events.intersection(reference_event_ids)
@@ -408,6 +492,7 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
             raise ValueError("cross-release source identity overlap remains")
         reference_report = {
             "cross_release_reference_replayed": True,
+            "cross_release_reference_count": len(reference_closure),
             "cross_release_source_body_overlap": 0,
             "cross_release_source_event_overlap": 0,
             "cross_release_context_overlap": 0,

@@ -15,6 +15,11 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from scripts.audit_git_history_cpt import (
+    _cross_release_references,
+    _load_reference_closure,
+    _reference_receipt_for_path,
+)
 from scripts.export_cpt import export_cpt_rows, iter_jsonl
 from scripts.materialize_git_history_cpt import (
     _atomic_write,
@@ -64,7 +69,9 @@ def _select_disjoint_from_reference(
 
 
 def _used_sets(
-    rows: list[dict[str, Any]], source_event_by_record: dict[str, str]
+    rows: list[dict[str, Any]],
+    source_event_by_record: dict[str, str],
+    source_binding_by_record: dict[str, tuple[str, str]],
 ) -> tuple[set[str], set[str], set[str]]:
     bodies: set[str] = set()
     events: set[str] = set()
@@ -73,32 +80,87 @@ def _used_sets(
         contexts.add(hashlib.sha256(str(row["document_context"]).encode()).hexdigest())
         for record in row["workflow_records"]:
             record_id = str(record["record_id"])
-            bodies.add(str(record["sha256"]))
+            bodies.add(source_binding_by_record[record_id][0])
             events.add(source_event_by_record[record_id])
     return bodies, events, contexts
 
 
+def _validate_selected_identities(
+    rows: list[dict[str, Any]], source_event_by_record: dict[str, str]
+) -> tuple[set[str], set[str]]:
+    used_records: set[str] = set()
+    used_events: set[str] = set()
+    used_bodies: set[str] = set()
+    used_contexts: set[str] = set()
+    for row in rows:
+        records = row["workflow_records"]
+        row_records = {str(record["record_id"]) for record in records}
+        row_bodies = {str(record["sha256"]) for record in records}
+        row_events = {source_event_by_record[record_id] for record_id in row_records}
+        context_digest = hashlib.sha256(
+            str(row["document_context"]).encode()
+        ).hexdigest()
+        if (
+            len(row_records) != len(records)
+            or len(row_bodies) != len(records)
+            or used_records.intersection(row_records)
+            or used_events.intersection(row_events)
+            or used_bodies.intersection(row_bodies)
+            or context_digest in used_contexts
+        ):
+            raise ValueError("filtered CPT source identity is reused")
+        used_records.update(row_records)
+        used_events.update(row_events)
+        used_bodies.update(row_bodies)
+        used_contexts.add(context_digest)
+    return used_records, used_events
+
+
 def filter_release(
-    reference_dir: Path, candidate_dir: Path, output_dir: Path
+    reference_dirs: list[Path], candidate_dir: Path, output_dir: Path
 ) -> dict[str, Any]:
-    reference = _load_release(reference_dir)
+    if not reference_dirs or len(set(reference_dirs)) != len(reference_dirs):
+        raise ValueError("reference release paths are missing or duplicated")
     candidate = _load_release(candidate_dir)
-    reference_release, reference_raw, reference_rows, reference_events, _, _ = reference
     candidate_release, _, candidate_rows, candidate_events, _, candidate_sources = (
         candidate
     )
-    for field in (
-        "tokenizer_model_id",
-        "tokenizer_revision",
-        "tokenizer_asset_manifest_sha256",
-        "max_chunks_per_commit",
+    inherited = _cross_release_references(candidate_release)
+    reference_bodies: set[str] = set()
+    reference_event_ids: set[str] = set()
+    reference_contexts: set[str] = set()
+    direct_references = [
+        *inherited,
+        *(_reference_receipt_for_path(path) for path in reference_dirs),
+    ]
+    if len({item["release_manifest_sha256"] for item in direct_references}) != len(
+        direct_references
     ):
-        if reference_release.get(field) != candidate_release.get(field):
-            raise ValueError("reference and candidate CPT contracts are incompatible")
-
-    reference_bodies, reference_event_ids, reference_contexts = _used_sets(
-        reference_rows, reference_events
-    )
+        raise ValueError("reference release manifests are duplicated")
+    reference_closure = _load_reference_closure(direct_references)
+    for (
+        _,
+        reference_release,
+        reference_rows,
+        reference_events,
+        bindings,
+    ) in reference_closure:
+        for field in (
+            "tokenizer_model_id",
+            "tokenizer_revision",
+            "tokenizer_asset_manifest_sha256",
+            "max_chunks_per_commit",
+        ):
+            if reference_release.get(field) != candidate_release.get(field):
+                raise ValueError(
+                    "reference and candidate CPT contracts are incompatible"
+                )
+        bodies, events, contexts = _used_sets(
+            reference_rows, reference_events, bindings
+        )
+        reference_bodies.update(bodies)
+        reference_event_ids.update(events)
+        reference_contexts.update(contexts)
     selected, reject_reasons = _select_disjoint_from_reference(
         candidate_rows,
         source_event_by_record=candidate_events,
@@ -139,35 +201,15 @@ def filter_release(
 
     retained_rows: Counter[str] = Counter()
     retained_tokens: Counter[str] = Counter()
-    used_records: set[str] = set()
-    used_events: set[str] = set()
-    used_bodies: set[str] = set()
-    used_contexts: set[str] = set()
+    used_records, used_events = _validate_selected_identities(
+        selected, candidate_events
+    )
     workflows: set[str] = set()
     for row in selected:
         band = str(row["length_bucket"])
         retained_rows[band] += 1
         retained_tokens[band] += int(row["tokenizer_context_tokens"])
         workflows.add(str(row["base_workflow_id"]))
-        context_digest = hashlib.sha256(
-            str(row["document_context"]).encode()
-        ).hexdigest()
-        if context_digest in used_contexts:
-            raise ValueError("filtered CPT context is duplicated")
-        used_contexts.add(context_digest)
-        for record in row["workflow_records"]:
-            record_id = str(record["record_id"])
-            event_id = candidate_events[record_id]
-            body_digest = str(record["sha256"])
-            if (
-                record_id in used_records
-                or event_id in used_events
-                or body_digest in used_bodies
-            ):
-                raise ValueError("filtered CPT source identity is reused")
-            used_records.add(record_id)
-            used_events.add(event_id)
-            used_bodies.add(body_digest)
     ordered_bands = tuple(candidate_release["target_rows"])
     retained_by_band = {name: retained_rows[name] for name in ordered_bands}
     manifest = {
@@ -185,22 +227,20 @@ def filter_release(
         "unique_source_records": len(used_records),
         "unique_source_events": len(used_events),
         "source_manifests": source_summaries,
-        "cross_release_reference": {
-            "path": str(reference_dir),
-            "release_manifest_sha256": hashlib.sha256(reference_raw).hexdigest(),
-        },
+        "cross_release_references": [item[0] for item in reference_closure],
         "cross_release_reject_reasons": reject_reasons,
         "export_report": export_report,
         "cpt_rows_sha256": cpt_rows_sha256,
         "train_sha256": _sha256_file(train_path),
     }
+    manifest.pop("cross_release_reference", None)
     _atomic_write(output_dir / "MANIFEST.json", _canonical_bytes(manifest) + b"\n")
     return manifest
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--reference-dir", type=Path, required=True)
+    parser.add_argument("--reference-dir", action="append", type=Path, required=True)
     parser.add_argument("--candidate-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
