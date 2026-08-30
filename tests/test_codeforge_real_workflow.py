@@ -5,6 +5,7 @@ import json
 import sys
 from copy import deepcopy
 from dataclasses import replace
+from itertools import pairwise
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,7 @@ from longworld.core.engine import answer_from_artifacts, semantic_answer_from_ar
 from longworld.core.graph import proof_depth as replayed_proof_depth
 from longworld.core.groundedspan import GroundedSpanError, sha256_text
 from longworld.core.pack import estimate_tokens, join_artifacts
-from longworld.core.promotion import _replayed_source_metadata
+from longworld.core.promotion import _replayed_source_metadata, stable_answer_program_id
 from longworld.core.provenance import SourceLineage
 from longworld.core.realworkflow import RealWorkflow, WorkflowRecord
 from longworld.core.sampler import materialize
@@ -24,7 +25,10 @@ from longworld.core.taxonomy import (
 )
 from longworld.core.verify import verify_question
 from longworld.core.views import render_cf_view
-from longworld.domains.codeforge.multiband import bind_cumulative_release_history
+from longworld.domains.codeforge.multiband import (
+    _authentic_relation_edges,
+    bind_cumulative_release_history,
+)
 from longworld.domains.codeforge.queries import build_code_queries
 from longworld.domains.codeforge.render import render_code
 from longworld.domains.codeforge.schema import sample_code_spec
@@ -38,6 +42,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 from generate import (
     _real_source_tokens,
+    _semantic_tokens,
     real_source_relation_edges,
     real_workflow_artifacts_for_query,
 )
@@ -584,8 +589,123 @@ def test_release_cycles_create_band_specific_executable_proofs() -> None:
         for query in (short, middle, long)
     )
     assert short.program_ops != middle.program_ops != long.program_ops
+    assert stable_answer_program_id(short) != stable_answer_program_id(middle)
+    assert stable_answer_program_id(middle) == stable_answer_program_id(long)
+    assert short.invariance_event_id is not None
+    malformed_short = replace(
+        short,
+        sufficient_event_ids=[
+            *short.sufficient_event_ids,
+            short.invariance_event_id,
+        ],
+    )
+    with pytest.raises(
+        ValueError,
+        match="release-history strict support is not the exact cycle closure",
+    ):
+        bind_cumulative_release_history(world, [malformed_short])
+    malformed_middle = replace(
+        middle,
+        answer_key="|".join(
+            [
+                middle.answer_key.split("|")[0],
+                long.answer_key.split("|")[-1],
+            ]
+        ),
+    )
+    with pytest.raises(
+        ValueError, match="release-history cycles are not an ordered cumulative history"
+    ):
+        bind_cumulative_release_history(world, [short, malformed_middle, long])
+    malformed_long = replace(
+        long,
+        program_ops=[
+            *long.program_ops[:-1],
+            {"op": "SELECT_RELEASE_REVISION", "cycle_count": 3},
+        ],
+    )
+    with pytest.raises(
+        ValueError, match="release-history trace program identity changes across bands"
+    ):
+        bind_cumulative_release_history(world, [short, middle, malformed_long])
+    malformed_long = replace(
+        long,
+        program_ops=[
+            dict(op, cycle_count=2) if "cycle_count" in op else dict(op)
+            for op in long.program_ops
+        ],
+    )
+    assert stable_answer_program_id(malformed_long) == stable_answer_program_id(long)
+    with pytest.raises(
+        ValueError, match="release-history declared cycle count disagrees with answer"
+    ):
+        bind_cumulative_release_history(world, [short, middle, malformed_long])
     assert releases[1].params["synthetic_relation_inputs"] == [releases[0].id]
     assert releases[2].params["synthetic_relation_inputs"] == [releases[1].id]
+    unmarked_synthetic_world = deepcopy(world)
+    unmarked_releases = sorted(
+        (
+            event
+            for event in unmarked_synthetic_world.events
+            if event.type == "repo_record"
+            and event.params.get("record_kind") == "release"
+        ),
+        key=lambda event: (event.time, event.id),
+    )
+    unmarked_releases[1].params.pop("synthetic_relation_inputs", None)
+    unmarked_edges = _authentic_relation_edges(
+        unmarked_synthetic_world, long.sufficient_event_ids
+    )
+    assert (
+        unmarked_releases[0].id,
+        unmarked_releases[1].id,
+        "supersedes",
+    ) not in unmarked_edges
+    unmarked_strict = [
+        artifact
+        for artifact in render_code(unmarked_synthetic_world)
+        if set(artifact.reveals_events).intersection(long.sufficient_event_ids)
+    ]
+    assert not any(
+        edge["relation"] == "supersedes"
+        and edge["relation_provenance"] == "authentic_source"
+        for edge in _replayed_source_metadata(
+            unmarked_synthetic_world, long, unmarked_strict
+        )["source_relation_edges"]
+    )
+
+    forged_relation_world = deepcopy(world)
+    forged_events = {event.id: event for event in forged_relation_world.events}
+    forged_child = forged_events[releases[1].id]
+    forged_parent = next(
+        forged_events[event_id]
+        for event_id in short.sufficient_event_ids
+        if forged_events[event_id].params.get("record_kind") == "ci_run"
+    )
+    forged_child.causal_inputs.append(forged_parent.id)
+    forged_child.relation_kinds[forged_parent.id] = "derived_from"
+    forged_edges = _authentic_relation_edges(
+        forged_relation_world, long.sufficient_event_ids
+    )
+    assert (
+        forged_parent.id,
+        forged_child.id,
+        "derived_from",
+    ) not in forged_edges
+
+    tampered_binding_world = deepcopy(world)
+    authentic_edge = next(
+        iter(_authentic_relation_edges(world, short.sufficient_event_ids))
+    )
+    tampered_child = next(
+        event
+        for event in tampered_binding_world.events
+        if event.id == authentic_edge[1]
+    )
+    tampered_child.params["source_record_binding_sha256"] = "0" * 64
+    assert authentic_edge not in _authentic_relation_edges(
+        tampered_binding_world, short.sufficient_event_ids
+    )
     trace_essential = [
         artifact
         for artifact in render_code(world)
@@ -636,6 +756,15 @@ def test_release_cycles_create_band_specific_executable_proofs() -> None:
     )
     assert estimate_tokens(join_artifacts(trace_strict)) > estimate_tokens(
         join_artifacts(middle_strict)
+    )
+    semantic_history = [
+        _semantic_tokens(artifacts, workflow_id=world.world_id)
+        for artifacts in (short_strict, middle_strict, trace_strict)
+    ]
+    assert all(
+        before["event_bearing"] < after["event_bearing"]
+        and before["internal"] < after["internal"]
+        for before, after in pairwise(semantic_history)
     )
     assert {
         edge["relation_provenance"]

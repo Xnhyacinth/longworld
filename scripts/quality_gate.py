@@ -568,9 +568,7 @@ def _semantic_growth_errors(
         total = _semantic_context_tokens(row)
         if total < 64000:
             continue
-        workflow_tokens = int(semantic.get("event_bearing") or 0) + int(
-            semantic.get("internal") or 0
-        )
+        workflow_tokens = int(semantic.get("internal") or 0)
         generic_share = int(semantic.get("generic_background") or 0) / max(1, total)
         if (
             workflow_tokens < min_internal_growth
@@ -618,11 +616,8 @@ def _semantic_growth_errors(
         for before, after in growth_pairs:
             before_sem = before["semantic_tokens"]
             after_sem = after["semantic_tokens"]
-            workflow_growth = (
-                int(after_sem.get("event_bearing") or 0)
-                + int(after_sem.get("internal") or 0)
-                - int(before_sem.get("event_bearing") or 0)
-                - int(before_sem.get("internal") or 0)
+            workflow_growth = int(after_sem.get("internal") or 0) - int(
+                before_sem.get("internal") or 0
             )
             generic_growth = max(
                 0,

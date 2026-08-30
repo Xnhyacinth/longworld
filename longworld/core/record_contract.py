@@ -211,7 +211,7 @@ def sft_row_errors(
     ):
         errors.append("invalid_exact_token_binding")
     promotion_valid = (
-        promotion.get("schema_version") == "train-ready-promotion-v1"
+        promotion.get("schema_version") == "train-ready-promotion-v2"
         and all(
             _SHA256.fullmatch(str(promotion.get(field) or "")) is not None
             for field in (

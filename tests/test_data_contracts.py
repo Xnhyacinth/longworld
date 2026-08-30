@@ -886,7 +886,7 @@ def test_b5w_uses_weight_without_duplicate_rows(tmp_path: Path) -> None:
         },
         "data_stage": "train_ready",
         "promotion": {
-            "schema_version": "train-ready-promotion-v1",
+            "schema_version": "train-ready-promotion-v2",
             "candidate_sha256": "a" * 64,
             "dense_audit_sha256": "b" * 64,
             "dense_ranking_sha256": "c" * 64,
@@ -1041,7 +1041,7 @@ def test_sharegpt_export_keeps_full_cf_dossier_twins_atomic_under_cap(
         },
         "data_stage": "train_ready",
         "promotion": {
-            "schema_version": "train-ready-promotion-v1",
+            "schema_version": "train-ready-promotion-v2",
             "candidate_sha256": "a" * 64,
             "dense_audit_sha256": "b" * 64,
             "dense_ranking_sha256": "c" * 64,
@@ -1488,7 +1488,7 @@ def test_semantic_growth_compares_distinct_length_bands_not_same_band_variants()
             "actual_context_tokens": 16000,
             "semantic_tokens": {
                 "event_bearing": 15000,
-                "internal": 0,
+                "internal": 15000,
                 "generic_background": 0,
             },
         },
@@ -1499,7 +1499,7 @@ def test_semantic_growth_compares_distinct_length_bands_not_same_band_variants()
             "actual_context_tokens": 32800,
             "semantic_tokens": {
                 "event_bearing": 31500,
-                "internal": 0,
+                "internal": 31500,
                 "generic_background": 0,
             },
         },
@@ -1510,7 +1510,7 @@ def test_semantic_growth_compares_distinct_length_bands_not_same_band_variants()
             "actual_context_tokens": 36900,
             "semantic_tokens": {
                 "event_bearing": 35400,
-                "internal": 0,
+                "internal": 35400,
                 "generic_background": 0,
             },
         },
@@ -1546,7 +1546,7 @@ def test_quality_gate_requires_a_lower_band_for_every_real_64k_view() -> None:
         "semantic_growth_group_id": "real-growth",
         "semantic_tokens": {
             "event_bearing": 50000,
-            "internal": 1000,
+            "internal": 50000,
             "generic_background": 13000,
             "proof_bearing": 2000,
             "causal_supporting": 3000,
@@ -1586,7 +1586,7 @@ def test_quality_gate_uses_pinned_tokens_for_real_64k_semantic_growth() -> None:
         "semantic_growth_group_id": "real-exact-growth",
         "semantic_tokens": {
             "event_bearing": 50000,
-            "internal": 1000,
+            "internal": 50000,
             "generic_background": 4000,
         },
     }
@@ -1634,6 +1634,32 @@ def test_128k_semantic_density_uses_exact_not_estimated_total() -> None:
     )
 
 
+def test_semantic_density_does_not_double_count_event_bearing_subset() -> None:
+    row = {
+        "base_task_id": "inclusive-internal-density",
+        "world_id": "inclusive-internal-world",
+        "query_timing": "late",
+        "view": "full",
+        "split": "train",
+        "length_bucket": "64k",
+        "actual_context_tokens": 64_000,
+        "semantic_tokens": {
+            "event_bearing": 3_000,
+            "internal": 3_000,
+            "generic_background": 58_000,
+        },
+    }
+
+    errors = quality_gate._semantic_growth_errors(
+        [row], min_internal_growth=5_000, max_generic_growth_share=1.0
+    )
+
+    assert any(
+        error.startswith("semantic_density:inclusive-internal-density:")
+        for error in errors
+    )
+
+
 def test_exact_band_growth_uses_exact_token_delta_denominator() -> None:
     base = {
         "base_task_id": "exact-growth-denominator",
@@ -1651,7 +1677,7 @@ def test_exact_band_growth_uses_exact_token_delta_denominator() -> None:
         "tokenizer_context_tokens": 64_100,
         "semantic_tokens": {
             "event_bearing": 20_000,
-            "internal": 0,
+            "internal": 20_000,
             "generic_background": 1_000,
         },
     }
@@ -1663,7 +1689,7 @@ def test_exact_band_growth_uses_exact_token_delta_denominator() -> None:
         "tokenizer_asset_manifest_sha256": "b" * 64,
         "semantic_tokens": {
             "event_bearing": 25_000,
-            "internal": 0,
+            "internal": 25_000,
             "generic_background": 21_000,
         },
     }
@@ -1703,7 +1729,7 @@ def test_intrinsic_long_source_does_not_require_artificial_truncation() -> None:
         "semantic_growth_group_id": "intrinsic-paper-growth",
         "semantic_tokens": {
             "event_bearing": 54500,
-            "internal": 0,
+            "internal": 54500,
             "generic_background": 0,
         },
     }
@@ -1748,7 +1774,7 @@ def test_intrinsic_long_source_compares_exact_span_in_exact_token_units() -> Non
         "semantic_growth_group_id": "intrinsic-exact-growth",
         "semantic_tokens": {
             "event_bearing": 54_500,
-            "internal": 0,
+            "internal": 54_500,
             "generic_background": 0,
         },
     }
@@ -1792,7 +1818,7 @@ def test_sec_intrinsic_long_source_requires_raw_exact_span() -> None:
         "semantic_growth_group_id": "sec-exact-growth",
         "semantic_tokens": {
             "event_bearing": 54_500,
-            "internal": 0,
+            "internal": 54_500,
             "generic_background": 0,
         },
     }
@@ -1825,7 +1851,7 @@ def test_real_band_growth_requires_more_replayed_causal_history() -> None:
         "semantic_growth_group_id": "real-growth",
         "semantic_tokens": {
             "event_bearing": 12000,
-            "internal": 1000,
+            "internal": 12000,
             "generic_background": 1000,
             "proof_bearing": 2000,
             "causal_supporting": 3000,
@@ -1930,7 +1956,7 @@ def test_p7_real_growth_rejects_nominal_proof_increment_over_background_growth()
         "graph": {"proof_depth": 4, "hop_count": 4},
         "semantic_tokens": {
             "event_bearing": 10000,
-            "internal": 0,
+            "internal": 10000,
             "generic_background": 0,
             "proof_bearing": 8200,
             "causal_supporting": 100,
@@ -1948,6 +1974,7 @@ def test_p7_real_growth_rejects_nominal_proof_increment_over_background_growth()
         "semantic_tokens": {
             **base["semantic_tokens"],
             "event_bearing": 26000,
+            "internal": 26000,
             "causal_supporting": 180,
         },
     }
@@ -3128,7 +3155,7 @@ def test_semantic_growth_uses_replayed_graph_depth_not_difficulty_copy() -> None
         "difficulty": {"proof_depth": 99},
         "semantic_tokens": {
             "event_bearing": 15_000,
-            "internal": 0,
+            "internal": 15_000,
             "generic_background": 0,
             "proof_bearing": 8_000,
             "causal_supporting": 100,
@@ -3151,6 +3178,7 @@ def test_semantic_growth_uses_replayed_graph_depth_not_difficulty_copy() -> None
         "semantic_tokens": {
             **base["semantic_tokens"],
             "event_bearing": 31_000,
+            "internal": 31_000,
             "proof_bearing": 9_000,
         },
     }

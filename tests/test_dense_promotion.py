@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+import longworld.core.promotion as promotion_module
 from longworld.core.attestation import (
     ATTESTATION_ENVIRONMENT_ENV,
     LOCAL_PROBE_COMBINED_ROLES_ENV,
@@ -35,6 +36,7 @@ from longworld.core.promotion import (
     DENSE_AUDIT_PURPOSE,
     DENSE_RANKING_PURPOSE,
     LEGACY_RELEASE_GATE_REVISION,
+    PROMOTION_SCHEMA,
     QUALITY_REPORT_BINDING_REVISION,
     RELEASE_GATE_PURPOSE,
     RELEASE_GATE_REVISION,
@@ -42,6 +44,7 @@ from longworld.core.promotion import (
     RELEASE_SELECTION_SCHEMA,
     STRICT_REPLAY_REVISION,
     PromotionError,
+    _candidate_has_source_bound_proof,
     _candidate_has_verified_real_source,
     _candidate_include_program_joins,
     _candidate_n_workstreams,
@@ -1444,9 +1447,12 @@ def test_promotion_recomputes_quality_metrics_from_replayed_serialized_view() ->
     assert promoted["n_unique_docs"] == len(artifacts)
     assert promoted["n_clones"] == 0
     assert sum(
-        promoted["semantic_tokens"][key]
-        for key in ("event_bearing", "internal", "generic_background")
+        promoted["semantic_tokens"][key] for key in ("internal", "generic_background")
     ) == sum(estimate_tokens(artifact.text) for artifact in artifacts)
+    assert (
+        promoted["semantic_tokens"]["event_bearing"]
+        <= promoted["semantic_tokens"]["internal"]
+    )
     assert promoted["semantic_tokens"] != candidate["semantic_tokens"]
     expected_graph = promoted["graph"]
     assert promoted["difficulty"]["proof_depth"] == expected_graph["proof_depth"]
@@ -1604,6 +1610,54 @@ def test_promotion_rejects_a_resigned_incorrect_audited_dup_ratio() -> None:
         promote_candidate(candidate, tampered, KEY)
 
 
+def test_promotion_rejects_resigned_strict_growth_metric_tamper() -> None:
+    candidate, artifacts = _candidate()
+    audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+    payload = {key: value for key, value in audit.items() if key != "attestation"}
+    metrics = dict(payload["strict_growth_metrics"])
+    semantic = dict(metrics["semantic_tokens"])
+    semantic["event_bearing"] += 1
+    metrics["semantic_tokens"] = semantic
+    payload["strict_growth_metrics"] = metrics
+    tampered = attach_attestation(payload, KEY, purpose=DENSE_AUDIT_PURPOSE)
+
+    with pytest.raises(PromotionError, match="strict-growth replay binding mismatch"):
+        promote_candidate(candidate, tampered, KEY)
+
+
+def test_sft_contract_rejects_legacy_promotion_schema() -> None:
+    candidate, artifacts = _candidate()
+    audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+    promoted = promote_candidate(candidate, audit, KEY)
+    payload = {key: value for key, value in promoted.items() if key != "attestation"}
+    payload["promotion"] = {
+        **dict(payload["promotion"]),
+        "schema_version": "train-ready-promotion-v1",
+    }
+    legacy = attach_attestation(payload, KEY, purpose="sft_row")
+
+    assert "missing_or_invalid_promotion" in sft_row_errors(legacy, attestation_key=KEY)
+
+
+def test_dense_audit_attests_replayed_strict_growth_metrics() -> None:
+    candidate, artifacts = _candidate()
+    payload = {key: value for key, value in candidate.items() if key != "attestation"}
+    payload["semantic_tokens"] = {
+        "event_bearing": 999_999,
+        "internal": 999_999,
+        "generic_background": 0,
+    }
+    candidate = attach_attestation(payload, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+
+    audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+
+    replayed = audit["strict_growth_metrics"]
+    assert replayed["semantic_tokens"] != payload["semantic_tokens"]
+    assert replayed["semantic_tokens"]["internal"] > 0
+    assert replayed["strict_support_event_count"] > 0
+    assert replayed["graph"]["proof_depth"] > 0
+
+
 def test_promotion_digest_binds_complete_auditor_attestation() -> None:
     candidate, artifacts = _candidate()
     audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
@@ -1631,7 +1685,9 @@ def test_promotion_digest_binds_complete_auditor_attestation() -> None:
     )
 
 
-def test_train_ready_report_binds_the_exact_promoted_row_set() -> None:
+def test_train_ready_report_binds_the_exact_promoted_row_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     candidate, artifacts = _candidate()
     audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
     promoted = promote_candidate(candidate, audit, KEY)
@@ -1668,6 +1724,14 @@ def test_train_ready_report_binds_the_exact_promoted_row_set() -> None:
     assert report["promoted_row_set_sha256"] == promoted_row_set_sha256([promoted])
     changed = {**promoted, "answer": "tampered"}
     assert report["promoted_row_set_sha256"] != promoted_row_set_sha256([changed])
+
+    monkeypatch.setattr(
+        promotion_module,
+        "_cumulative_history_violations_by_world",
+        lambda _rows, _profile: {"world-focal": ("flat_strict_growth",)},
+    )
+    with pytest.raises(PromotionError, match="strict cumulative source history"):
+        create_train_ready_report(candidate_report, [candidate], [promoted], KEY)
 
     other_candidate, _ = _candidate("cf")
     other_report = attach_attestation(
@@ -1738,6 +1802,7 @@ def _mark_candidate_as_real(candidate: dict) -> None:
         **candidate["artifact_classification"][0],
         "workflow_kind": "hybrid_causal",
         "source_origin": "real_public",
+        "evidence_role": "causal_supporting",
     }
 
 
@@ -1756,7 +1821,7 @@ def _selection_audit(
     if near_dup_sentence_ratio is None:
         near_dup_sentence_ratio = float(candidate.get("near_dup_sentence_ratio") or 0.0)
     payload = {
-        "schema_version": "train-ready-promotion-v1",
+        "schema_version": PROMOTION_SCHEMA,
         "query_id": candidate["query_id"],
         "candidate_sha256": candidate_sha256(candidate),
         "ranking_sha256": "b" * 64,
@@ -1781,6 +1846,26 @@ def _selection_audit(
         "embedding_topk_insufficient": True,
         "verification_replay_sha256": "c" * 64,
         "near_dup_sentence_ratio": near_dup_sentence_ratio,
+        "strict_growth_metrics": {
+            "semantic_growth_group_id": candidate.get("semantic_growth_group_id", ""),
+            "semantic_tokens": {
+                "event_bearing": 0,
+                "internal": 0,
+                **dict(candidate.get("semantic_tokens") or {}),
+            },
+            "strict_support_event_count": candidate.get(
+                "strict_support_event_count", 0
+            ),
+            "graph": {
+                "n_essential_events": (candidate.get("graph") or {}).get(
+                    "n_essential_events", 0
+                ),
+                "proof_depth": (candidate.get("graph") or {}).get("proof_depth", 0),
+            },
+            "authentic_source_relation_edges": list(
+                candidate.get("authentic_source_relation_edges") or []
+            ),
+        },
     }
     asset_digest = candidate.get("tokenizer_asset_manifest_sha256")
     if asset_digest:
@@ -1802,6 +1887,7 @@ def _p12_sec_exact_bucket_selection_inputs(
     candidates = []
     audits = []
     for band in bands:
+        level = {"16k": 1, "32k": 2, "64k": 3, "128k": 4}[band]
         candidate = {
             **json.loads(
                 json.dumps(
@@ -1824,6 +1910,32 @@ def _p12_sec_exact_bucket_selection_inputs(
             ),
         }
         _mark_candidate_as_real(candidate)
+        relations = [
+            {
+                "parent_record_id": f"filing-{index}",
+                "child_record_id": f"filing-{index + 1}",
+                "relation_provenance": "authentic_source",
+            }
+            for index in range(level)
+        ]
+        candidate.update(
+            {
+                "semantic_growth_group_id": "p12-sec-real-history",
+                "semantic_tokens": {
+                    "event_bearing": 8_000 * level,
+                    "internal": 10_000 * level,
+                    "generic_background": 0,
+                },
+                "strict_support_event_count": 4 * level,
+                "source_relation_edges": relations,
+                "authentic_source_relation_edges": relations,
+                "graph": {
+                    **dict(candidate.get("graph") or {}),
+                    "n_essential_events": 2 * level,
+                    "proof_depth": level + 1,
+                },
+            }
+        )
         candidate = attach_attestation(
             candidate, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
         )
@@ -1900,6 +2012,7 @@ def _p12_wiki_exact_bucket_selection_inputs(
             ),
         }
         _mark_candidate_as_real(candidate)
+        candidate["artifact_classification"] = _source_bound_classifications(candidate)
         relations = [
             {
                 "parent_record_id": f"revision-{index}",
@@ -1913,7 +2026,7 @@ def _p12_wiki_exact_bucket_selection_inputs(
                 "semantic_growth_group_id": "p12-wiki-real-history",
                 "semantic_tokens": {
                     "event_bearing": 10_000 * level,
-                    "internal": 0,
+                    "internal": 12_000 * level,
                     "generic_background": 0,
                 },
                 "strict_support_event_count": 4 * level,
@@ -1960,6 +2073,50 @@ def test_p12_wiki_selection_accepts_all_three_required_exact_buckets() -> None:
 
     assert {row["length_bucket"] for row in selected} == {"16k", "32k", "64k"}
     assert receipt["n_selected_worlds"] == 1
+
+
+def test_p12_wiki_selection_uses_replayed_not_candidate_growth() -> None:
+    candidates, audits = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    replayed = []
+    for audit in audits:
+        payload = {key: value for key, value in audit.items() if key != "attestation"}
+        payload["strict_growth_metrics"] = {
+            "semantic_growth_group_id": "p12-wiki-real-history",
+            "semantic_tokens": {"event_bearing": 10_000, "internal": 10_000},
+            "strict_support_event_count": 4,
+            "graph": {"n_essential_events": 2, "proof_depth": 2},
+            "authentic_source_relation_edges": [
+                {
+                    "parent_record_id": "revision-0",
+                    "child_record_id": "revision-1",
+                    "relation_provenance": "authentic_source",
+                }
+            ],
+        }
+        replayed.append(attach_attestation(payload, KEY, purpose=DENSE_AUDIT_PURPOSE))
+
+    with pytest.raises(PromotionError, match="strict replay cumulative history"):
+        select_release_worlds(
+            candidates,
+            replayed,
+            "p12-wiki-source-slice-1-v1",
+            candidate_attestation_key=KEY,
+            audit_attestation_key=KEY,
+        )
+
+
+def test_strict_growth_metrics_require_event_bearing_to_be_internal_subset() -> None:
+    metrics = {
+        "semantic_growth_group_id": "invalid-semantic-partition",
+        "semantic_tokens": {"event_bearing": 2, "internal": 1},
+        "strict_support_event_count": 1,
+        "graph": {"n_essential_events": 1, "proof_depth": 1},
+        "authentic_source_relation_edges": [],
+    }
+
+    assert not promotion_module._strict_growth_metrics_are_valid(metrics)
+    metrics["semantic_tokens"]["event_bearing"] = "not-an-int"
+    assert not promotion_module._strict_growth_metrics_are_valid(metrics)
 
 
 def _p12_wiki_promoted_rows(candidates: list[dict], receipt: dict) -> list[dict]:
@@ -4278,7 +4435,7 @@ def test_candidate_structural_preflight_rejects_non_growing_real_history() -> No
             "artifact_classification": _source_bound_classifications(candidate),
             "semantic_tokens": {
                 "event_bearing": 12_000,
-                "internal": 0,
+                "internal": 12_000,
                 "generic_background": 0,
             },
             "strict_support_event_count": 8,
@@ -4326,17 +4483,88 @@ def test_candidate_structural_preflight_rejects_non_growing_real_history() -> No
     assert any("proof_depth_not_growing" in item for item in violations)
 
 
+def test_candidate_structural_preflight_requires_event_bearing_to_grow_independently() -> (
+    None
+):
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    event_tokens = {"16k": 12_000, "32k": 8_000, "64k": 4_000}
+    internal_tokens = {"16k": 12_000, "32k": 16_000, "64k": 20_000}
+    resigned = []
+    for candidate in candidates:
+        band = str(candidate["length_bucket"])
+        payload = {
+            **{key: value for key, value in candidate.items() if key != "attestation"},
+            "semantic_tokens": {
+                "event_bearing": event_tokens[band],
+                "internal": internal_tokens[band],
+                "generic_background": 0,
+            },
+        }
+        resigned.append(
+            attach_attestation(payload, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+        )
+
+    accepted, rejects = candidate_structural_preflight(
+        resigned,
+        "p12-wiki-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+    )
+
+    assert accepted == []
+    assert any(
+        "event_bearing_not_growing" in violation
+        for violation in rejects[0]["cumulative_history_violations"]
+    )
+
+
+def test_candidate_structural_preflight_rejects_event_outside_internal_total() -> None:
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    invalid = []
+    for candidate in candidates:
+        payload = {
+            key: value for key, value in candidate.items() if key != "attestation"
+        }
+        internal = int(payload["semantic_tokens"]["internal"])
+        payload["semantic_tokens"] = {
+            **payload["semantic_tokens"],
+            "event_bearing": internal + 1,
+        }
+        invalid.append(
+            attach_attestation(payload, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+        )
+
+    accepted, rejects = candidate_structural_preflight(
+        invalid,
+        "p12-wiki-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+    )
+
+    assert accepted == []
+    assert all(
+        any(
+            "invalid_growth_metrics" in violation
+            for violation in reject["cumulative_history_violations"]
+        )
+        for reject in rejects
+    )
+
+
 def test_candidate_structural_preflight_does_not_treat_real_hard_negative_as_proof() -> (
     None
 ):
     candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
     resigned = []
     for candidate in candidates:
+        classifications = [
+            {**item, "evidence_role": "real_hard_negative"}
+            for item in candidate["artifact_classification"]
+        ]
         payload = {
             **{key: value for key, value in candidate.items() if key != "attestation"},
+            "artifact_classification": classifications,
             "semantic_tokens": {
                 "event_bearing": 12_000,
-                "internal": 0,
+                "internal": 12_000,
                 "generic_background": 0,
             },
         }
@@ -4352,6 +4580,35 @@ def test_candidate_structural_preflight_does_not_treat_real_hard_negative_as_pro
 
     assert accepted == resigned
     assert rejects == []
+
+
+def test_real_hard_negative_world_cannot_satisfy_real_world_quota() -> None:
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    hard_negatives = []
+    for candidate in candidates:
+        payload = {
+            key: value for key, value in candidate.items() if key != "attestation"
+        }
+        payload["artifact_classification"] = [
+            {**item, "evidence_role": "real_hard_negative"}
+            for item in candidate["artifact_classification"]
+        ]
+        hard_negatives.append(
+            attach_attestation(payload, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+        )
+    audits = [_selection_audit(candidate) for candidate in hard_negatives]
+
+    assert all(_candidate_has_verified_real_source(row) for row in hard_negatives)
+    assert not any(_candidate_has_source_bound_proof(row) for row in hard_negatives)
+
+    with pytest.raises(PromotionError, match="real workflow worlds"):
+        select_release_worlds(
+            hard_negatives,
+            audits,
+            "p12-wiki-source-slice-1-v1",
+            candidate_attestation_key=KEY,
+            audit_attestation_key=KEY,
+        )
 
 
 def test_candidate_structural_preflight_accepts_growing_real_history() -> None:
@@ -4374,7 +4631,7 @@ def test_candidate_structural_preflight_accepts_growing_real_history() -> None:
             "artifact_classification": _source_bound_classifications(candidate),
             "semantic_tokens": {
                 "event_bearing": 10_000 * level,
-                "internal": 0,
+                "internal": 12_000 * level,
                 "generic_background": 0,
             },
             "strict_support_event_count": 4 * level,
@@ -4813,7 +5070,7 @@ def test_audit_preflight_reports_cumulative_reject_before_strict_replay(
             "artifact_classification": _source_bound_classifications(candidate),
             "semantic_tokens": {
                 "event_bearing": 12_000,
-                "internal": 0,
+                "internal": 12_000,
                 "generic_background": 0,
             },
         }

@@ -274,6 +274,7 @@ def _split_for_spec(
 
 
 def _semantic_tokens(artifacts: list, *, workflow_id: str) -> dict[str, int]:
+    """Count workflow-owned internal tokens; event-bearing is an inclusive subset."""
     event_bearing = 0
     internal = 0
     generic = 0
@@ -281,13 +282,10 @@ def _semantic_tokens(artifacts: list, *, workflow_id: str) -> dict[str, int]:
         tokens = estimate_tokens(artifact.text)
         classification = artifact_classification(artifact)
         same_workflow = classification.workflow_id == workflow_id
-        if same_workflow and artifact.reveals_events:
-            event_bearing += tokens
-        elif same_workflow and classification.evidence_role in {
-            EvidenceRole.CAUSAL_GOLD,
-            EvidenceRole.CAUSAL_SUPPORTING,
-        }:
+        if same_workflow:
             internal += tokens
+            if artifact.reveals_events:
+                event_bearing += tokens
         else:
             generic += tokens
     return {

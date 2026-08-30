@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Iterable
 from itertools import pairwise
 from typing import TYPE_CHECKING
 
-from longworld.core.world import SimulatedWorld
+from longworld.core.world import Event, SimulatedWorld
 
 if TYPE_CHECKING:
     from longworld.domains.company.queries import QuerySpec
@@ -14,23 +16,150 @@ _RELEASE_HISTORY_QUERY_TYPES = {
     "version_selection",
     "release_supersession_trace",
 }
+_BAND_CYCLE_COUNT = {"16k": 1, "32k": 2, "64k": 3}
+_REAL_SOURCE_ORIGINS = {"real_public", "real_private_export", "real_derived"}
+_SOURCE_RELATION_KINDS = {"derived_from", "source_context"}
 
 
-def _authentic_relation_count(world: SimulatedWorld, event_ids: Iterable[str]) -> int:
+def _release_cycle_keys(query: QuerySpec) -> tuple[str, ...]:
+    keys: tuple[str, ...]
+    if query.query_type == "version_selection":
+        prefix = "real:release:"
+        if not query.answer_key.startswith(prefix):
+            raise ValueError("release-history version answer has no release key")
+        keys = (query.answer_key.removeprefix(prefix),)
+    else:
+        keys = tuple(query.answer_key.split("|"))
+    if not all(keys) or len(keys) != len(set(keys)):
+        raise ValueError("release-history answer has invalid release cycles")
+    return keys
+
+
+def _trace_program_identity(query: QuerySpec) -> str:
+    def without_scale(value: object) -> object:
+        if isinstance(value, dict):
+            return {
+                str(key): without_scale(item)
+                for key, item in value.items()
+                if key != "cycle_count"
+            }
+        if isinstance(value, list):
+            return [without_scale(item) for item in value]
+        return value
+
+    return json.dumps(
+        without_scale(query.program_ops), sort_keys=True, separators=(",", ":")
+    )
+
+
+def _release_cycle_closure(world: SimulatedWorld, release_key: str) -> set[str]:
+    events = {event.id: event for event in world.events}
+    releases = [
+        event
+        for event in world.events
+        if event.type == "repo_record"
+        and event.params.get("record_kind") == "release"
+        and event.params.get("record_key") == release_key
+    ]
+    if len(releases) != 1:
+        raise ValueError("release-history answer does not identify one release event")
+    selected: set[str] = set()
+
+    def visit(event_id: str) -> None:
+        if event_id in selected:
+            return
+        event = events.get(event_id)
+        if event is None:
+            raise ValueError("release-history release cycle has a missing input")
+        for parent_id in event.required_inputs:
+            if event.relation_kinds.get(parent_id) != "supersedes":
+                visit(parent_id)
+        selected.add(event_id)
+
+    visit(releases[0].id)
+    return selected
+
+
+def _authentic_relation_edges(
+    world: SimulatedWorld, event_ids: Iterable[str]
+) -> set[tuple[str, str, str]]:
     selected = set(event_ids)
     events = {
         event.id: event
         for event in world.events
         if event.id in selected and event.type == "repo_record"
     }
-    count = 0
+    edges: set[tuple[str, str, str]] = set()
     for event in events.values():
         synthetic_inputs = set(event.params.get("synthetic_relation_inputs") or [])
-        count += sum(
-            parent_id in events and parent_id not in synthetic_inputs
+        edges.update(
+            (
+                parent_id,
+                event.id,
+                str(event.relation_kinds.get(parent_id) or "causal_input"),
+            )
             for parent_id in event.causal_inputs
+            if parent_id in events
+            and parent_id not in synthetic_inputs
+            and _has_authentic_source_relation(events[parent_id], event, parent_id)
         )
-    return count
+    return edges
+
+
+def _valid_source_record_binding(event: Event) -> bool:
+    params = event.params
+    if str(params.get("source_origin") or "") not in _REAL_SOURCE_ORIGINS:
+        return False
+    identity = {
+        "workflow_id": str(params.get("workflow_id") or ""),
+        "record_key": str(params.get("record_key") or ""),
+        "record_id": str(params.get("record_id") or ""),
+        "provenance_id": str(params.get("provenance_id") or ""),
+        "grounded_source_id": str(params.get("grounded_source_id") or ""),
+        "source_body_sha256": str(params.get("source_body_sha256") or ""),
+    }
+    if not str(params.get("source_url") or "") or not all(identity.values()):
+        return False
+    binding = params.get("source_record_binding")
+    if not isinstance(binding, dict) or any(
+        str(binding.get(key) or "") != value for key, value in identity.items()
+    ):
+        return False
+    binding_sha256 = hashlib.sha256(
+        json.dumps(binding, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return binding_sha256 == params.get("source_record_binding_sha256")
+
+
+def _has_authentic_source_relation(parent: Event, child: Event, parent_id: str) -> bool:
+    relation_kind = str(child.relation_kinds.get(parent_id) or "")
+    if relation_kind not in _SOURCE_RELATION_KINDS:
+        return False
+    if not _valid_source_record_binding(parent) or not _valid_source_record_binding(
+        child
+    ):
+        return False
+    if (
+        parent.params.get("workflow_id") != child.params.get("workflow_id")
+        or parent.params.get("provenance_id") != child.params.get("provenance_id")
+        or parent.params.get("source_url") != child.params.get("source_url")
+    ):
+        return False
+    child_binding = child.params["source_record_binding"]
+    links = child_binding.get("links")
+    if not isinstance(links, list):
+        return False
+    expected = {
+        "record_key": str(parent.params["record_key"]),
+        "record_id": str(parent.params["record_id"]),
+        "target_workflow_id": str(parent.params["workflow_id"]),
+        "target_grounded_source_id": str(parent.params["grounded_source_id"]),
+    }
+    return any(
+        isinstance(link, dict)
+        and all(str(link.get(key) or "") == value for key, value in expected.items())
+        for link in links
+    )
 
 
 def bind_cumulative_release_history(
@@ -59,9 +188,62 @@ def bind_cumulative_release_history(
         if bands != expected:
             raise ValueError("release-history group has a non-cumulative band sequence")
 
-        base_task_group = f"codeforge.release_history|{group_id}"
-        for query in group:
-            query.base_task_group = base_task_group
+        cycle_keys = [_release_cycle_keys(query) for query in group]
+        cycle_support = [
+            set().union(*(_release_cycle_closure(world, key) for key in keys))
+            for keys in cycle_keys
+        ]
+        for query, band, keys in zip(group, bands, cycle_keys, strict=True):
+            expected_query_type = (
+                "version_selection" if band == "16k" else "release_supersession_trace"
+            )
+            if query.query_type != expected_query_type:
+                raise ValueError("release-history band uses the wrong answer operator")
+            if len(keys) != _BAND_CYCLE_COUNT[band]:
+                raise ValueError("release-history band has the wrong cycle count")
+            declared_counts = [
+                op["cycle_count"] for op in query.program_ops if "cycle_count" in op
+            ]
+            if query.query_type == "release_supersession_trace" and (
+                not declared_counts
+                or any(
+                    type(count) is not int or count != len(keys)
+                    for count in declared_counts
+                )
+            ):
+                raise ValueError(
+                    "release-history declared cycle count disagrees with answer"
+                )
+
+        longest = cycle_keys[-1]
+        orientations = {"prefix", "suffix"}
+        for keys in cycle_keys[:-1]:
+            matching: set[str] = set()
+            if keys == longest[: len(keys)]:
+                matching.add("prefix")
+            if keys == longest[-len(keys) :]:
+                matching.add("suffix")
+            orientations &= matching
+        if not orientations:
+            raise ValueError(
+                "release-history cycles are not an ordered cumulative history"
+            )
+
+        trace_identities = {
+            _trace_program_identity(query)
+            for query in group
+            if query.query_type == "release_supersession_trace"
+        }
+        if len(trace_identities) > 1:
+            raise ValueError(
+                "release-history trace program identity changes across bands"
+            )
+        execution_work = [
+            len(query.program_ops) * len(keys)
+            for query, keys in zip(group, cycle_keys, strict=True)
+        ]
+        if any(before >= after for before, after in pairwise(execution_work)):
+            raise ValueError("release-history executable answer program does not grow")
 
         for before, after in pairwise(group):
             if not set(before.essential_event_ids) < set(after.essential_event_ids):
@@ -70,9 +252,18 @@ def bind_cumulative_release_history(
                 raise ValueError("release-history strict support does not grow")
             if before.proof_depth >= after.proof_depth:
                 raise ValueError("release-history proof depth does not grow")
-            if _authentic_relation_count(
+            if not _authentic_relation_edges(
                 world, before.sufficient_event_ids
-            ) >= _authentic_relation_count(world, after.sufficient_event_ids):
+            ) < _authentic_relation_edges(world, after.sufficient_event_ids):
                 raise ValueError(
                     "release-history authentic source relations do not grow"
                 )
+        for query, expected_support in zip(group, cycle_support, strict=True):
+            if set(query.sufficient_event_ids) != expected_support:
+                raise ValueError(
+                    "release-history strict support is not the exact cycle closure"
+                )
+
+        base_task_group = f"codeforge.release_history|{group_id}"
+        for query in group:
+            query.base_task_group = base_task_group

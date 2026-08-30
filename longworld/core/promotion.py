@@ -88,6 +88,7 @@ from longworld.core.verify import (
 )
 from longworld.core.views import render_cf_view
 from longworld.core.wikiparse import WIKI_HYBRID_CHILD_EVENT_TYPES
+from longworld.domains.codeforge.multiband import _has_authentic_source_relation
 from longworld.domains.company.queries import QuerySpec
 from longworld.domains.researchlab.simulate import (
     selected_wiki_source_relation_edges,
@@ -98,11 +99,11 @@ DENSE_AUDIT_PURPOSE = "dense_retrieval_audit"
 DENSE_RANKING_PURPOSE = "dense_ranking"
 CANDIDATE_ATTESTATION_PURPOSE = "candidate_row"
 DENSE_RANKING_SCHEMA = "dense-ranking-v2"
-PROMOTION_SCHEMA = "train-ready-promotion-v1"
+PROMOTION_SCHEMA = "train-ready-promotion-v2"
 REAL_REPLAY_BUNDLE_PURPOSE = "episode_replay_bundle"
 QUALITY_REPORT_PURPOSE = "quality_report"
-QUALITY_REPORT_BINDING_REVISION = "longworld-quality-binding-v3"
-RELEASE_SELECTION_SCHEMA = "longworld-release-world-selection-v1"
+QUALITY_REPORT_BINDING_REVISION = "longworld-quality-binding-v4"
+RELEASE_SELECTION_SCHEMA = "longworld-release-world-selection-v2"
 RELEASE_SELECTION_PURPOSE = "release_world_selection"
 RELEASE_GATE_SCHEMA = "longworld-release-gate-pass-v1"
 RELEASE_GATE_PURPOSE = "release_gate_pass"
@@ -537,7 +538,7 @@ def _cumulative_history_violations_by_world(
             )
             continue
 
-        def metrics(row: dict[str, Any]) -> tuple[int, int, int, int, int] | None:
+        def metrics(row: dict[str, Any]) -> tuple[int, int, int, int, int, int] | None:
             semantic = row.get("semantic_tokens")
             graph = row.get("graph")
             relations = row.get("authentic_source_relation_edges")
@@ -560,8 +561,11 @@ def _cumulative_history_violations_by_world(
             ):
                 return None
             event_bearing, internal, support, essential, proof_depth = raw_values
+            if cast(int, event_bearing) > cast(int, internal):
+                return None
             return (
-                cast(int, event_bearing) + cast(int, internal),
+                cast(int, event_bearing),
+                cast(int, internal),
                 cast(int, support),
                 cast(int, essential),
                 len(relations),
@@ -578,6 +582,7 @@ def _cumulative_history_violations_by_world(
 
         metric_names = (
             "event_bearing",
+            "internal",
             "strict_support",
             "essential_events",
             "authentic_relations",
@@ -702,6 +707,7 @@ def _selection_audit_matches_candidate(
         and _SHA256.fullmatch(str(audit.get("ranking_sha256") or "")) is not None
         and _SHA256.fullmatch(str(audit.get("verification_replay_sha256") or ""))
         is not None
+        and _strict_growth_metrics_are_valid(audit.get("strict_growth_metrics"))
         and (
             str(candidate.get("length_bucket") or "") not in EXACT_TOKEN_BAND_RANGES
             or (
@@ -733,6 +739,73 @@ def _selection_audit_matches_candidate(
             "aggregation": "max_similarity",
         }
     )
+
+
+def _strict_growth_metrics_are_valid(value: Any) -> bool:
+    if not isinstance(value, dict) or set(value) != {
+        "semantic_growth_group_id",
+        "semantic_tokens",
+        "strict_support_event_count",
+        "graph",
+        "authentic_source_relation_edges",
+    }:
+        return False
+    semantic = value.get("semantic_tokens")
+    graph = value.get("graph")
+    relations = value.get("authentic_source_relation_edges")
+    integers = (
+        value.get("strict_support_event_count"),
+        semantic.get("event_bearing") if isinstance(semantic, dict) else None,
+        semantic.get("internal") if isinstance(semantic, dict) else None,
+        graph.get("n_essential_events") if isinstance(graph, dict) else None,
+        graph.get("proof_depth") if isinstance(graph, dict) else None,
+    )
+    return bool(
+        isinstance(value.get("semantic_growth_group_id"), str)
+        and isinstance(semantic, dict)
+        and isinstance(graph, dict)
+        and isinstance(relations, list)
+        and all(isinstance(item, dict) for item in relations)
+        and all(
+            isinstance(item, int) and not isinstance(item, bool) and item >= 0
+            for item in integers
+        )
+        and semantic["event_bearing"] <= semantic["internal"]
+    )
+
+
+def _strict_growth_metrics(
+    replayed_quality: dict[str, Any],
+    replayed_task: dict[str, Any],
+    replayed_source: dict[str, Any],
+) -> dict[str, Any]:
+    graph = replayed_task["graph"]
+    return {
+        "semantic_growth_group_id": replayed_task["semantic_growth_group_id"],
+        "semantic_tokens": dict(replayed_quality["semantic_tokens"]),
+        "strict_support_event_count": replayed_task["strict_support_event_count"],
+        "graph": {
+            "n_essential_events": graph["n_essential_events"],
+            "proof_depth": graph["proof_depth"],
+        },
+        "authentic_source_relation_edges": list(
+            replayed_source["authentic_source_relation_edges"]
+        ),
+    }
+
+
+def _candidate_with_strict_growth(
+    candidate: dict[str, Any], audit: dict[str, Any]
+) -> dict[str, Any]:
+    metrics = audit["strict_growth_metrics"]
+    return {
+        **candidate,
+        "semantic_growth_group_id": metrics["semantic_growth_group_id"],
+        "semantic_tokens": metrics["semantic_tokens"],
+        "strict_support_event_count": metrics["strict_support_event_count"],
+        "graph": metrics["graph"],
+        "authentic_source_relation_edges": metrics["authentic_source_relation_edges"],
+    }
 
 
 def validate_predecessor_gate_receipt(
@@ -917,6 +990,20 @@ def select_release_worlds(
         ],
         profile,
     )
+    strict_growth_violations = _cumulative_history_violations_by_world(
+        [
+            _candidate_with_strict_growth(candidate, audits_by_candidate[digest])
+            for world_id in fully_audited_worlds
+            if world_id not in missing_required_buckets
+            for digest, candidate in by_world[world_id]
+        ],
+        profile,
+    )
+    fully_audited_worlds = [
+        world_id
+        for world_id in fully_audited_worlds
+        if world_id not in strict_growth_violations
+    ]
     eligible_worlds = [
         world_id
         for world_id in fully_audited_worlds
@@ -924,6 +1011,14 @@ def select_release_worlds(
     ]
     target = profile.expected_promoted_worlds
     if len(eligible_worlds) < target:
+        if strict_growth_violations:
+            details = ",".join(
+                f"{world_id}={';'.join(violations)}"
+                for world_id, violations in strict_growth_violations.items()
+            )
+            raise PromotionError(
+                "insufficient worlds after strict replay cumulative history: " + details
+            )
         if missing_required_buckets:
             details = ",".join(
                 f"{world_id}={'+'.join(missing)}"
@@ -940,7 +1035,7 @@ def select_release_worlds(
         world_id
         for world_id in eligible_worlds
         if any(
-            _candidate_has_verified_real_source(candidate)
+            _candidate_has_source_bound_proof(candidate)
             for _digest, candidate in by_world[world_id]
         )
     ]
@@ -948,7 +1043,7 @@ def select_release_worlds(
         world_id
         for world_id in real_eligible_worlds
         if any(
-            _candidate_has_verified_real_source(candidate)
+            _candidate_has_source_bound_proof(candidate)
             and candidate.get("length_bucket") == "64k"
             and isinstance(candidate.get("tokenizer_context_tokens"), int)
             and not isinstance(candidate.get("tokenizer_context_tokens"), bool)
@@ -1273,6 +1368,15 @@ def create_train_ready_report(
         raise PromotionError(
             "promoted rows are missing required exact length buckets: " + details
         )
+    strict_growth_violations = _cumulative_history_violations_by_world(rows, profile)
+    if strict_growth_violations:
+        details = ";".join(
+            f"{world_id}={','.join(violations)}"
+            for world_id, violations in strict_growth_violations.items()
+        )
+        raise PromotionError(
+            "promoted rows fail strict cumulative source history: " + details
+        )
     for row in rows:
         if str(row.get("length_bucket") or "") not in EXACT_TOKEN_BAND_RANGES:
             continue
@@ -1398,7 +1502,7 @@ def create_train_ready_report(
         selected_real_worlds = {
             str(candidate.get("world_id") or "")
             for candidate in selected_candidates
-            if _candidate_has_verified_real_source(candidate)
+            if _candidate_has_source_bound_proof(candidate)
         }
         expected_real_worlds_by_split = {
             split: sorted(
@@ -2339,6 +2443,7 @@ def _replayed_source_metadata(
                         if parent_id in synthetic_inputs
                         or endpoint_is_real.get(parent_id, True) is not True
                         or endpoint_is_real.get(child.id, True) is not True
+                        or not _has_authentic_source_relation(parent, child, parent_id)
                         else "authentic_source"
                     ),
                     "parent_source_url": str(parent.params["source_url"]),
@@ -2514,6 +2619,8 @@ def _replayed_quality_metrics(
     if candidate.get("position_bucket") != metrics.position_bucket:
         raise PromotionError("candidate view position metadata is not truthful")
 
+    # ``internal`` is the inclusive workflow-owned total. ``event_bearing`` is
+    # its event-revealing subset, so both can grow without background masking.
     semantic_tokens = {
         "event_bearing": 0,
         "internal": 0,
@@ -2535,10 +2642,10 @@ def _replayed_quality_metrics(
             classification.workflow_kind.value == "unclassified"
             and artifact.artifact_id.startswith(world.world_id)
         )
-        if same_workflow and artifact.reveals_events:
-            semantic_tokens["event_bearing"] += tokens
-        elif same_workflow and artifact.artifact_id in essential_ids:
+        if same_workflow:
             semantic_tokens["internal"] += tokens
+            if artifact.reveals_events:
+                semantic_tokens["event_bearing"] += tokens
         else:
             semantic_tokens["generic_background"] += tokens
         if artifact.artifact_id in essential_ids:
@@ -2813,6 +2920,8 @@ def create_dense_audit(
         replayed_notes,
         token_counter=_token_counter_for(replay_tokenizer),
     )
+    replayed_task = _replayed_task_metadata(candidate, world, spec, artifacts)
+    replayed_source = _replayed_source_metadata(world, spec, artifacts)
     verification_replay_sha256 = _canonical_sha256(
         {
             "verification": replayed_verification.model_dump(),
@@ -2846,6 +2955,9 @@ def create_dense_audit(
         "embedding_topk_insufficient": True,
         "verification_replay_sha256": verification_replay_sha256,
         "near_dup_sentence_ratio": replayed_quality["near_dup_sentence_ratio"],
+        "strict_growth_metrics": _strict_growth_metrics(
+            replayed_quality, replayed_task, replayed_source
+        ),
     }
     exact_replay = replayed_notes.get("exact_token_replay")
     if isinstance(exact_replay, dict):
@@ -2934,11 +3046,17 @@ def promote_candidate(
         replayed_notes,
         token_counter=_token_counter_for(replay_tokenizer),
     )
+    replayed_task = _replayed_task_metadata(candidate, world, spec, artifacts)
+    replayed_source = _replayed_source_metadata(world, spec, artifacts)
     if (
         _audited_near_dup_sentence_ratio(dense_audit)
         != replayed_quality["near_dup_sentence_ratio"]
     ):
         raise PromotionError("dense audit near-duplicate replay binding mismatch")
+    if dense_audit.get("strict_growth_metrics") != _strict_growth_metrics(
+        replayed_quality, replayed_task, replayed_source
+    ):
+        raise PromotionError("dense audit strict-growth replay binding mismatch")
     selected_split = expected_split
     selection_digest = ""
     if release_selection_receipt is not None:
@@ -3028,9 +3146,7 @@ def promote_candidate(
         raise PromotionError("production verification gates are not green")
     promoted = {key: value for key, value in candidate.items() if key != "attestation"}
     promoted.update(replayed_quality)
-    replayed_task = _replayed_task_metadata(candidate, world, spec, artifacts)
     promoted.update(replayed_task)
-    replayed_source = _replayed_source_metadata(world, spec, artifacts)
     promoted.update(replayed_source)
     if selected_split is not None:
         promoted["split"] = selected_split

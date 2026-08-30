@@ -1053,7 +1053,7 @@ def test_export_drops_local_or_mixed_on_long_buckets(monkeypatch):
             "embedding_topk_insufficient": True,
         },
         "promotion": {
-            "schema_version": "train-ready-promotion-v1",
+            "schema_version": "train-ready-promotion-v2",
             "candidate_sha256": "0" * 64,
             "dense_audit_sha256": "1" * 64,
             "dense_ranking_sha256": "2" * 64,
