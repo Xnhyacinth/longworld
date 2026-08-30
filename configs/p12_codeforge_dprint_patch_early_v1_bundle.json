@@ -1,0 +1,51 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "data/source_inventory/p12_codeforge_dprint_patch_early_v1/dprint_pr1014_support.json",
+      "sha256": "f9f12f91dbc803686e78879e91ea27be54d7f1bc911c901149fd3b6c00f87539"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_dprint_patch_early_v1/dprint_pr1021_0.50.2.json",
+      "sha256": "ae9b303760daeaf25f366d9e4c31b13f4c9b4ee5aa80dc989266665fd5cf2a3c"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_dprint_patch_early_v1/dprint_pr1040_support.json",
+      "sha256": "fbd97dc1debdfb9f5365ef6530991c650c69766e185ed6eedb476901ab9c1f10"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_dprint_patch_early_v1/dprint_pr1049_support.json",
+      "sha256": "fbea7386e02fe60e9db80b828c85022dbc9de7b95864417d84decd3a3433dc82"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_dprint_patch_early_v1/dprint_pr1053_support.json",
+      "sha256": "846f9877fe83c1f70b09f77167147a4d7b87d1bd8b48af4ae30babad86d1d077"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_dprint_patch_early_v1/dprint_pr1054_0.51.0.json",
+      "sha256": "91804efa60e5cbd13848bea8dd6e34283364521e70eb5da5e6c03eb3cdd48219"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_dprint_patch_early_v1/dprint_pr1058_support.json",
+      "sha256": "050c9ddd4f70a3acd395df5b382b42a62c5b71a6ad33f58e11944a0ac557dec4"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_dprint_patch_early_v1/dprint_pr1059_support.json",
+      "sha256": "593a396e73c74809e2dec0a26f63c13c2fe2b27e41b7f19d457f3a3e18b1e998"
+    },
+    {
+      "path": "data/source_inventory/p12_codeforge_dprint_patch_early_v1/dprint_pr1062_0.51.1.json",
+      "sha256": "86bdef87fb334de68557748d61b99925bfc23982b080226c04a4245e54165e0a"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "probe-source-3a689228f9679b0522a18cadd07f1e97",
+    "environment": "probe",
+    "digest": "39fc075c0264160f07cf00a530c69458f7c8b10b4ff32af60fc5198446669137"
+  }
+}
