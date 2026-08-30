@@ -6,8 +6,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
+import tempfile
 from collections import Counter
 from collections.abc import Iterable
 from datetime import datetime
@@ -40,6 +42,18 @@ QA_PROMPT_RE = re.compile(
     r"[\"']role[\"']\s*:\s*[\"'](?:assistant|user|system)[\"']"
 )
 MAX_JSONL_LINE_BYTES = 16_000_000
+_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+_COMMIT_SHA = re.compile(r"[0-9a-f]{40}\Z")
+_BULK_METADATA_FIELDS = {
+    "base_workflow_id",
+    "length_bucket",
+    "tokenizer_context_tokens",
+    "tokenizer_model_id",
+    "tokenizer_revision",
+    "tokenizer_asset_manifest_sha256",
+    "source_record_count",
+}
+_BULK_BANDS = {"64k": (64_000, 65_536), "128k": (128_000, 131_072)}
 
 
 def iter_jsonl(path: Path):
@@ -115,6 +129,25 @@ def _reject_reason(row: dict) -> str | None:
     }
     if "" in record_ids or record_ids != class_ids or len(record_ids) != len(records):
         return "workflow_record_mismatch"
+    present_bulk_fields = _BULK_METADATA_FIELDS.intersection(row)
+    if present_bulk_fields:
+        if present_bulk_fields != _BULK_METADATA_FIELDS:
+            return "incomplete_bulk_metadata"
+        bucket = str(row.get("length_bucket") or "")
+        token_range = _BULK_BANDS.get(bucket)
+        context_tokens = row.get("tokenizer_context_tokens")
+        if (
+            token_range is None
+            or not isinstance(context_tokens, int)
+            or not token_range[0] <= context_tokens <= token_range[1]
+            or not str(row.get("base_workflow_id") or "")
+            or not str(row.get("tokenizer_model_id") or "")
+            or _COMMIT_SHA.fullmatch(str(row.get("tokenizer_revision") or "")) is None
+            or _SHA256.fullmatch(str(row.get("tokenizer_asset_manifest_sha256") or ""))
+            is None
+            or row.get("source_record_count") != len(records)
+        ):
+            return "invalid_bulk_metadata"
 
     seen: set[str] = set()
     previous_time: datetime | None = None
@@ -226,33 +259,61 @@ def export_cpt_rows(rows: Iterable[dict], destination: Path) -> dict:
     destination.parent.mkdir(parents=True, exist_ok=True)
     rejects: Counter = Counter()
     seen: set[str] = set()
-    exported: list[dict] = []
+    exported_count = 0
     duplicates = 0
-    for row in rows:
-        reason = _reject_reason(row)
-        if reason:
-            rejects[reason] += 1
-            continue
-        text = str(row["document_context"])
-        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
-        if digest in seen:
-            duplicates += 1
-            continue
-        seen.add(digest)
-        exported.append(
-            {
-                "text": text,
-                "metadata": {
+    temporary_name: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=destination.parent, delete=False
+        ) as output:
+            temporary_name = output.name
+            for row in rows:
+                reason = _reject_reason(row)
+                if reason:
+                    rejects[reason] += 1
+                    continue
+                document = str(row["document_context"])
+                digest = hashlib.sha256(document.encode("utf-8")).hexdigest()
+                if digest in seen:
+                    duplicates += 1
+                    continue
+                seen.add(digest)
+                metadata = {
                     "workflow_id": row["workflow_ids"][0],
                     "composition_method": row["composition_method"],
-                },
-            }
-        )
-    with destination.open("w", encoding="utf-8") as output:
-        for row in exported:
-            output.write(json.dumps(row, ensure_ascii=False) + "\n")
+                }
+                if _BULK_METADATA_FIELDS.issubset(row):
+                    metadata.update(
+                        {
+                            field: row[field]
+                            for field in (
+                                "base_workflow_id",
+                                "length_bucket",
+                                "tokenizer_context_tokens",
+                                "tokenizer_model_id",
+                                "tokenizer_revision",
+                                "tokenizer_asset_manifest_sha256",
+                                "source_record_count",
+                            )
+                        }
+                    )
+                    metadata["source_export_digest"] = row["source_export_digest"]
+                output.write(
+                    json.dumps(
+                        {"text": document, "metadata": metadata},
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+                exported_count += 1
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary_name, destination)
+    finally:
+        if temporary_name is not None and os.path.exists(temporary_name):
+            os.unlink(temporary_name)
     return {
-        "n_exported": len(exported),
+        "n_exported": exported_count,
         "n_duplicates": duplicates,
         "reject_reasons": dict(rejects),
     }

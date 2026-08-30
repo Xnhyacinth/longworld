@@ -1,0 +1,182 @@
+{
+  "schema_version": "longworld.git-history-cpt-materialization.v1",
+  "materializer_revision": "source_text_dedup_v2",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "bands": {
+    "64k": {
+      "lower_tokens": 64000,
+      "upper_tokens": 65536
+    },
+    "128k": {
+      "lower_tokens": 128000,
+      "upper_tokens": 131072
+    }
+  },
+  "target_rows": {
+    "64k": 1000,
+    "128k": 1000
+  },
+  "attempt_multiplier": 1,
+  "max_record_tokens": 768,
+  "sources": [
+    {
+      "repository": "dprint/dprint",
+      "checkout": "data/source_cache/git_history/dprint",
+      "max_commits": 1336,
+      "skip_commits": 0
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 0
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 1000
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 2000
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 3000
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 4000
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 5000
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 6000
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 7000
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 8000
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 9000
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 10000
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 11000
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 12000
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 13000
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 14000
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 1000,
+      "skip_commits": 15000
+    },
+    {
+      "repository": "astral-sh/ruff",
+      "checkout": "data/source_cache/git_history/ruff",
+      "max_commits": 982,
+      "skip_commits": 16000
+    },
+    {
+      "repository": "astral-sh/uv",
+      "checkout": "data/source_cache/git_history/uv",
+      "max_commits": 2000,
+      "skip_commits": 0
+    },
+    {
+      "repository": "astral-sh/uv",
+      "checkout": "data/source_cache/git_history/uv",
+      "max_commits": 2000,
+      "skip_commits": 2000
+    },
+    {
+      "repository": "astral-sh/uv",
+      "checkout": "data/source_cache/git_history/uv",
+      "max_commits": 2000,
+      "skip_commits": 4000
+    },
+    {
+      "repository": "astral-sh/uv",
+      "checkout": "data/source_cache/git_history/uv",
+      "max_commits": 2000,
+      "skip_commits": 6000
+    },
+    {
+      "repository": "astral-sh/uv",
+      "checkout": "data/source_cache/git_history/uv",
+      "max_commits": 2000,
+      "skip_commits": 8000
+    },
+    {
+      "repository": "bytecodealliance/wasmtime",
+      "checkout": "data/source_cache/git_history/wasmtime",
+      "max_commits": 3000,
+      "skip_commits": 0
+    },
+    {
+      "repository": "bytecodealliance/wasmtime",
+      "checkout": "data/source_cache/git_history/wasmtime",
+      "max_commits": 3000,
+      "skip_commits": 3000
+    },
+    {
+      "repository": "bytecodealliance/wasmtime",
+      "checkout": "data/source_cache/git_history/wasmtime",
+      "max_commits": 3000,
+      "skip_commits": 6000
+    }
+  ]
+}

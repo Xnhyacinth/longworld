@@ -22,6 +22,30 @@ The remote contains 19 release payload files plus the Hub-managed
 `.gitattributes`; the payload matches the local immutable P6 v4 staging package.
 There is currently no missing HF upload.
 
+## Source-native 64K/128K CPT candidate
+
+The v2 Git-history CPT batch now contains **1,000 64K rows and 1,000 128K
+rows**, totaling **192,776,946 exact Qwen context tokens**. Its independent
+local-probe audit recomputed every token count, verified 17 signed source
+manifests and 259,861 used source records, reconstructed all 2,000 training
+rows, and found zero cross-band record reuse, zero exact context duplicates,
+and zero exact source-body duplicates. Construction rejected 11,153 repeated
+source bodies, 7 credential-shaped commits, and 90 QA/chat-contaminated
+windows. The old v1 batch is explicitly invalidated because its distinct IDs
+hid 11,146 repeated source bodies. See
+`reports/p12_cpt_git_history_1000x2_20260830.md`.
+
+This is a real-source long-document **CPT candidate**, not 2,000 worlds or an
+executable SFT set. It remains `train_ready=false` and
+`production_eligible=false`: it uses two code repositories and combined local
+probe trust, lacks per-historical-commit license verification and semantic
+near-duplicate review, and has no answer/CF program. More importantly, 569 64K
+rows and 518 128K rows are dominated by one large authentic commit. They are
+coherent source documents but do not establish long-time workflow evolution.
+The next longitudinal batch must require multiple distinct commits/release
+cycles per window before it can support the stronger LongWorld claim. No HF
+publication is authorized from this candidate.
+
 ## Current stricter-gate result
 
 The current promotion-v2 local-probe corpus contains **12 rows across 2 unique

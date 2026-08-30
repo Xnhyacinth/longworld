@@ -237,3 +237,39 @@ def test_cpt_export_rejects_incomplete_or_unbound_source_lineage(
         "invalid_source_lineage": 1,
         "source_classification_mismatch": 1,
     }
+
+
+def test_cpt_export_preserves_signed_bulk_length_and_lineage_metadata(
+    tmp_path: Path,
+) -> None:
+    row = _row()
+    row.update(
+        {
+            "base_workflow_id": "git-history:example/repo@head",
+            "length_bucket": "64k",
+            "tokenizer_context_tokens": 64_123,
+            "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+            "tokenizer_revision": "a" * 40,
+            "tokenizer_asset_manifest_sha256": "b" * 64,
+            "source_record_count": 2,
+        }
+    )
+    row = _sign(row)
+    destination = tmp_path / "cpt.jsonl"
+
+    result = export_cpt_rows([row], destination)
+
+    exported = json.loads(destination.read_text())
+    assert result["n_exported"] == 1
+    assert exported["metadata"] == {
+        "workflow_id": "git:repo@abc",
+        "base_workflow_id": "git-history:example/repo@head",
+        "composition_method": "provenance_graph",
+        "length_bucket": "64k",
+        "tokenizer_context_tokens": 64_123,
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "a" * 40,
+        "tokenizer_asset_manifest_sha256": "b" * 64,
+        "source_record_count": 2,
+        "source_export_digest": row["source_export_digest"],
+    }
