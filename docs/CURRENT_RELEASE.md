@@ -24,15 +24,27 @@ There is currently no missing HF upload.
 
 ## Current stricter-gate result
 
-The previous local content-gate corpus covers **35 rows across 5 unique
-source-bound worlds**, with **1,347,609 receipt-reported exact Qwen context
-tokens**. It contains 12 ResearchLab rows, 9 Company rows, and 14 CodeForge rows;
-the exact 16K/32K/64K distribution is 11/12/12. Those rows predate the mandatory
-`train-ready-promotion-v2` replay-growth contract and are now historical inputs
-that must be regenerated. Current v2-qualified complete worlds and promoted rows
-are therefore both zero.
+The current promotion-v2 local-probe corpus contains **12 rows across 2 unique
+source-bound worlds**, with **454,846 exact Qwen context tokens**. The MLRC and
+Attention revision workflows each contribute two views at 16K, 32K, and 64K,
+so the combined band distribution is 4/4/4. Fresh dense ranking, strict replay,
+world selection, promotion-v2 reporting, and the unchanged one-world quality
+gate accepted every row. The exact union inventory is
+`data/releases/p12-current-v2-source-bound-union-v1.json`; it records 6 unique
+executable proofs, 6 answer programs, 18 exercised program operations, 12
+distinct content hashes, and 454,846 exact context tokens.
 
-The schema-v2 neutral inventory is
+This is still a narrow ResearchLab/arXiv local-probe subset, not a complete P12
+release. Its union inventory explicitly records `production_eligible=false`,
+`target_gate_evaluated=false`, and `target_gate_passed=false`; the 12-world
+multidomain boundary and independent production trust are both unmet.
+
+The previous local content-gate corpus covered **35 rows across 5 worlds** and
+1,347,609 exact tokens, but those rows predate the mandatory
+`train-ready-promotion-v2` replay-growth contract. They remain historical
+regeneration inputs rather than current qualified rows.
+
+The historical schema-v2 neutral inventory is
 `data/releases/p12-current-five-source-bound-union-v1.json`. It verifies five
 distinct world IDs, 35 distinct canonical content hashes, source-workflow
 ownership, tokenizer/bucket metadata, release-file hashes, and the union row-set
@@ -64,6 +76,24 @@ records, 8 relations, and 55,640 source-body Qwen tokens, but they are explicitl
 ignored non-world candidates with zero training rows. See
 `reports/p12_executable_domains_strict_growth_20260830.md`; none of these
 diagnostics is qualified or uploadable training data.
+
+The first cumulative-domain materialization now adds one real CISA KEV catalog
+task at 16,201/32,125/64,125 exact tokens. The three strict prefixes contain
+82/159/314 unique records, 81/158/313 authentic catalog-membership relations,
+and 80/157/312 verified-derived chronological edges. All per-row replay, actual
+CF, remove-one, single-evidence, corruption, digest, exact-band, and cumulative
+growth checks pass. These are deliberately unsigned candidate histories with
+`real_source_verified=false`, `complete_world=false`, and `train_ready=false`;
+they add one executable task, not three worlds or training rows. Clinical and
+Regulation remain capacity-rejected at 5,167 and 748 source-body tokens. See
+`reports/p12_domain_history_wave1_20260830.md`.
+
+A new dprint diagnostic binds nine public episodes, 502 records, and 546,115
+source-body characters. It produced two 16K and three 64K candidates, but the
+32K attempt reached only 30,361 tokens with insufficient evidence distance and
+local-window shortcuts. Complete-world retention is therefore zero and dense
+promotion was not run. See
+`reports/p12_codeforge_dprint_patch_early_20260830.md`.
 
 The candidate preflight now enforces cumulative source-bound 16/32/64K history
 before dense ranking. Bands must share one semantic growth identity and grow in
@@ -402,16 +432,13 @@ because 32K/64K/128K are absent. Thus the rerun saves replay work but still adds
 zero qualified rows; three, four, and five real annual filings are required for
 the higher tiers.
 
-Candidate-only ResearchLab and failed/superseded or stale CodeForge rows are not a new
-`COMMITTED` production package and are not eligible for HF upload. The
-current per-world content-gated baseline is **35 rows, 5 unique worlds, and
-1,347,609 exact Qwen context tokens**, but it has not passed the new 12-world
-union profile and its trust receipts are not a production KMS chain. The neutral
-signed inventory at
-`data/releases/p12-current-five-source-bound-union-v1.json` verifies five distinct
-world IDs, 35 distinct content hashes, source identities, and exact release-byte
-bindings; it explicitly records that the 12-world target gate was not evaluated.
-Trust-valid P12 publication therefore remains zero; 48/210 remain blocked.
+Candidate-only histories and failed/superseded rows are not a new `COMMITTED`
+production package and are not eligible for HF upload. The current-code
+promotion-v2 baseline is **12 rows, 2 unique worlds, and 454,846 exact Qwen
+context tokens**. It has not passed the 12-world union profile, covers only one
+domain/source family, and its local-probe receipts are not a production KMS
+chain. Trust-valid P12 publication therefore remains zero; 48/210 remain
+blocked.
 
 Replay data, source bytes, releases, and pinned model caches remain under
 `/workspace/wynckeliao`. The workspace permission controller repeatedly restores
@@ -425,16 +452,19 @@ use GitHub only after final review.
 
 ## Current expansion matrix
 
-| Evidence stage             | Worlds | Rows | Exact/context source tokens | Meaning                                                                                                                                |
-| -------------------------- | -----: | ---: | --------------------------: | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Current local-probe union  |      5 |   35 |                   1,347,609 | 16/32/64K rows passed individual strict chains and the neutral union identity/byte audit; the 12-world target gate remains unevaluated |
-| P12 production/KMS release |      0 |    0 |                           0 | independent approval and the 12-world union remain blocked                                                                             |
+| Evidence stage                         | Complete worlds | Rows/candidates | Exact context tokens | Meaning                                                                         |
+| -------------------------------------- | --------------: | --------------: | -------------------: | ------------------------------------------------------------------------------- |
+| Current promotion-v2 local-probe union |               2 |              12 |              454,846 | Strict current-code rows; arXiv/ResearchLab only; 12-world target not evaluated |
+| Historical pre-v2 union                |               5 |              35 |            1,347,609 | Regeneration inputs only; obsolete replay-growth schema                         |
+| CISA KEV candidate history             |               0 |               3 |              112,451 | One unsigned executable task × three bands; not promotion-v2                    |
+| dprint incomplete candidate history    |               0 |               5 |              229,180 | 16K/64K only; rejected because the complete 32K band is absent                  |
+| P12 production/KMS release             |               0 |               0 |                    0 | Independent approval and the 12-world multidomain union remain blocked          |
 
 The implemented query surface currently contains 47 literal task types across
 the CodeForge, Company, and ResearchLab adapters (15/17/15), 48 literal motifs,
 and 81 literal answer-program operators. This is implementation capacity, not
-qualified semantic diversity: the 35 content-gated rows currently exercise only
-seven query types, 11 answer programs, and 15 executable proofs. Wikimedia/KB
+qualified semantic diversity: the current 12 promotion-v2 rows exercise only
+two query types, 6 answer programs, and 6 executable proofs. Wikimedia/KB
 and paper workflows are separate real source families but currently share the
 ResearchLab adapter. Expansion is therefore measured by newly exercised source
 relations/programs/proofs, not by counting unused templates or multiplying
@@ -461,7 +491,7 @@ length by view.
    `p10-source-rich-production-210-v1` remains readable for verification but is
    not an issuable current path. The new gate must require 210
    source-independent semantic task templates, 210 executable proofs, and at
-   least 24 answer programs—strictly more than the current five-world union's 11
+   least 24 answer programs—strictly more than the current two-world union's 6
    programs—plus production trust, unseen evaluation, and external benchmark
    evidence.
 
