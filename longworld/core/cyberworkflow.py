@@ -15,7 +15,12 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from longworld.core.attestation import attestation_key_from_env, verify_attestation
+from longworld.core.attestation import (
+    ATTESTATION_V2_SCHEME,
+    attestation_key_from_env,
+    verify_attestation,
+    verify_attestation_identity,
+)
 from longworld.core.provenance import (
     MAX_SOURCE_BYTES,
     ProvenanceError,
@@ -32,6 +37,7 @@ from longworld.core.publicscan import (
 CYBER_FETCH_REQUEST_SCHEMA = "longworld.cyber-fetch-request.v1"
 CYBER_FETCH_INVENTORY_SCHEMA = "longworld.cyber-fetch-inventory.v1"
 CYBER_WORKFLOW_MANIFEST_SCHEMA = "longworld.cyber-workflow-manifest.v1"
+CYBER_KEV_REMEDIATION_TASK_SCHEMA = "longworld.cyber-kev-remediation-task.v1"
 NVD_CVE_API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 CISA_KEV_URL = (
     "https://www.cisa.gov/sites/default/files/feeds/"
@@ -931,3 +937,834 @@ def load_cyber_workflow_manifest(
         raise ProvenanceError("cyber workflow manifest has no valid attestation")
     audit_cyber_workflow_manifest(payload)
     return payload
+
+
+_CYBER_KEV_QUESTION = (
+    "For the CVE joined across the NVD record and the CISA KEV catalog, return "
+    "the NVD vulnerability status, the KEV date added, remediation due date, "
+    "and the exact required action."
+)
+_CYBER_KEV_ESSENTIALS = {
+    "date_added",
+    "due_date",
+    "listed_in_kev_relation",
+    "required_action",
+    "vulnerability_status",
+}
+_CYBER_TASK_FIELDS = {
+    "schema_version",
+    "data_stage",
+    "train_ready",
+    "production_eligible",
+    "promotion_eligible",
+    "complete_world",
+    "promoted",
+    "generation_integration",
+    "source_attestation_verified",
+    "query_type",
+    "answer_program_id",
+    "question",
+    "answer",
+    "cf_answer",
+    "essential_evidence_ids",
+    "evidence_items",
+    "source_bindings",
+    "source_records",
+    "source_receipt",
+    "source_manifest_binding",
+    "counterfactual_twin",
+}
+_CYBER_RECORD_FIELDS = {
+    "record_id",
+    "kind",
+    "cve_id",
+    "observed_at",
+    "temporal_semantics",
+    "source_family",
+    "source_origin",
+    "source_url",
+    "retrieval_url",
+    "source_sha256",
+    "source_record_sha256",
+    "text_sha256",
+    "provenance_id",
+    "license",
+    "attribution",
+    "terms_url",
+    "parser",
+    "text",
+    "facts",
+    "privacy_review",
+}
+_CYBER_BINDING_FIELDS = {
+    "text_sha256",
+    "source_record_sha256",
+    "source_sha256",
+    "source_url",
+    "retrieval_url",
+    "observed_at",
+}
+_CYBER_RECEIPT_FIELDS = {
+    "started_at",
+    "completed_at",
+    "requests_per_second",
+    "max_retries",
+    "allowed_actions",
+    "request_file",
+    "request_sha256",
+    "user_agent_sha256",
+    "source_policies",
+    "retrievals",
+}
+_CYBER_RETRIEVAL_FIELDS = {
+    "kind",
+    "requested_url",
+    "final_url",
+    "status",
+    "content_type",
+    "redirect_chain",
+    "observed_at",
+    "sha256",
+    "retrieval_file",
+}
+_CYBER_SOURCE_MANIFEST_BINDING_FIELDS = {
+    "source_manifest_sha256",
+    "manifest_metadata",
+    "attestation",
+}
+
+
+def _cyber_manifest_digest(manifest: dict[str, Any]) -> str:
+    canonical = json.dumps(
+        manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def _cyber_task_contract(task: dict[str, Any]) -> None:
+    source_binding = task.get("source_manifest_binding")
+    manifest_metadata = (
+        source_binding.get("manifest_metadata")
+        if isinstance(source_binding, dict)
+        else None
+    )
+    attestation = (
+        source_binding.get("attestation") if isinstance(source_binding, dict) else None
+    )
+    if set(task) != _CYBER_TASK_FIELDS or not (
+        task.get("schema_version") == CYBER_KEV_REMEDIATION_TASK_SCHEMA
+        and task.get("data_stage") == "candidate_task"
+        and task.get("train_ready") is False
+        and task.get("production_eligible") is False
+        and task.get("promotion_eligible") is False
+        and task.get("complete_world") is False
+        and task.get("promoted") is False
+        and task.get("generation_integration") == "disabled"
+        and task.get("source_attestation_verified") is False
+        and task.get("query_type") == "kev_remediation_window"
+        and task.get("answer_program_id") == "cyber.kev_remediation_window.v1"
+        and task.get("question") == _CYBER_KEV_QUESTION
+        and isinstance(task.get("answer"), str)
+        and isinstance(task.get("cf_answer"), str)
+        and isinstance(source_binding, dict)
+        and set(source_binding) == _CYBER_SOURCE_MANIFEST_BINDING_FIELDS
+        and _SHA256.fullmatch(str(source_binding.get("source_manifest_sha256") or ""))
+        is not None
+        and isinstance(manifest_metadata, dict)
+        and not {
+            "records",
+            "relations",
+            "fetch_receipt",
+            "attestation",
+        }.intersection(manifest_metadata)
+        and (attestation is None or isinstance(attestation, dict))
+    ):
+        raise ProvenanceError("cyber KEV task contract is invalid")
+
+
+def _cyber_task_bound_manifest(task: dict[str, Any]) -> dict[str, Any] | None:
+    binding = task.get("source_manifest_binding")
+    items = task.get("evidence_items")
+    if not isinstance(binding, dict) or not isinstance(items, list):
+        return None
+    metadata = binding.get("manifest_metadata")
+    relation_items = [
+        item
+        for item in items
+        if isinstance(item, dict) and item.get("kind") == "source_relation"
+    ]
+    if not isinstance(metadata, dict) or len(relation_items) != 1:
+        return None
+    manifest = {
+        **metadata,
+        "fetch_receipt": task.get("source_receipt"),
+        "records": task.get("source_records"),
+        "relations": [relation_items[0].get("relation")],
+    }
+    attestation = binding.get("attestation")
+    if attestation is not None:
+        manifest["attestation"] = attestation
+    if binding.get("source_manifest_sha256") != _cyber_manifest_digest(manifest):
+        return None
+    return manifest
+
+
+def _cyber_task_source_attestation_verified(
+    task: dict[str, Any], source_attestation_key: bytes | None
+) -> bool:
+    if source_attestation_key is None:
+        return False
+    signed = _cyber_task_bound_manifest(task)
+    attestation = signed.get("attestation") if isinstance(signed, dict) else None
+    if not isinstance(signed, dict) or not isinstance(attestation, dict):
+        return False
+    if attestation.get("scheme") == ATTESTATION_V2_SCHEME:
+        signature_valid = verify_attestation_identity(
+            signed,
+            source_attestation_key,
+            purpose="source_manifest",
+            role="source",
+            key_id=str(attestation.get("key_id") or ""),
+            environment=str(attestation.get("environment") or ""),
+        )
+    else:
+        signature_valid = verify_attestation(
+            signed, source_attestation_key, purpose="source_manifest"
+        )
+    if not signature_valid:
+        return False
+    try:
+        audit_cyber_workflow_manifest(signed)
+    except ProvenanceError:
+        return False
+    return True
+
+
+def _cyber_task_record_map(task: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    raw_records = task.get("source_records")
+    bindings = task.get("source_bindings")
+    if (
+        not isinstance(raw_records, list)
+        or len(raw_records) != 2
+        or not isinstance(bindings, dict)
+        or len(bindings) != 2
+    ):
+        raise ProvenanceError("cyber task source binding is invalid")
+    records: dict[str, dict[str, Any]] = {}
+    for record in raw_records:
+        if not isinstance(record, dict) or set(record) != _CYBER_RECORD_FIELDS:
+            raise ProvenanceError("cyber task source binding is invalid")
+        record_id = str(record.get("record_id") or "")
+        kind = record.get("kind")
+        cve_id = str(record.get("cve_id") or "")
+        expected_record_id = (
+            f"nvd:{cve_id}" if kind == "nvd_cve" else f"cisa-kev:{cve_id}"
+        )
+        expected_url = (
+            f"{NVD_CVE_API_URL}?cveId={cve_id}" if kind == "nvd_cve" else CISA_KEV_URL
+        )
+        expected_family = "nvd" if kind == "nvd_cve" else "cisa_kev"
+        text = record.get("text")
+        digest = hashlib.sha256(str(text).encode()).hexdigest()
+        binding = bindings.get(record_id)
+        if (
+            kind not in {"nvd_cve", "cisa_kev_entry"}
+            or _CVE_ID.fullmatch(cve_id) is None
+            or record_id != expected_record_id
+            or record_id in records
+            or not isinstance(text, str)
+            or not text
+            or record.get("text_sha256") != digest
+            or record.get("source_record_sha256") != digest
+            or record.get("source_origin") != "real_public"
+            or record.get("temporal_semantics") != "current_snapshot_observation"
+            or record.get("source_family") != expected_family
+            or record.get("source_url") != expected_url
+            or record.get("retrieval_url") != expected_url
+            or _SHA256.fullmatch(str(record.get("source_sha256") or "")) is None
+            or record.get("provenance_id") != f"sha256:{record.get('source_sha256')}"
+            or not isinstance(binding, dict)
+            or set(binding) != _CYBER_BINDING_FIELDS
+            or any(binding[field] != record[field] for field in _CYBER_BINDING_FIELDS)
+        ):
+            raise ProvenanceError("cyber task source binding is invalid")
+        _parse_timestamp(str(record.get("observed_at") or ""), "record observed_at")
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as error:
+            raise ProvenanceError("cyber task source state is invalid") from error
+        identity_field = "id" if kind == "nvd_cve" else "cveID"
+        if not isinstance(parsed, dict) or parsed.get(identity_field) != cve_id:
+            raise ProvenanceError("cyber task source state identity is invalid")
+        required_fact_ids = (
+            {"cve_id", "published", "last_modified", "vulnerability_status"}
+            if kind == "nvd_cve"
+            else {"cve_id", "date_added", "due_date", "required_action"}
+        )
+        facts = record.get("facts")
+        if (
+            not isinstance(facts, list)
+            or len(facts) != len(required_fact_ids)
+            or {
+                str(fact.get("fact_id") or "")
+                for fact in facts
+                if isinstance(fact, dict)
+            }
+            != required_fact_ids
+        ):
+            raise ProvenanceError("cyber task source state is invalid")
+        for fact in facts:
+            _validate_fact(record, fact)
+        records[record_id] = record
+    if len({record["cve_id"] for record in records.values()}) != 1:
+        raise ProvenanceError("cyber task source state identity is invalid")
+    _cyber_task_receipt(task, records)
+    return records
+
+
+def _cyber_task_receipt(
+    task: dict[str, Any], records: dict[str, dict[str, Any]]
+) -> None:
+    receipt = task.get("source_receipt")
+    if not isinstance(receipt, dict) or set(receipt) != _CYBER_RECEIPT_FIELDS:
+        raise ProvenanceError("cyber task receipt binding is invalid")
+    rate = receipt.get("requests_per_second")
+    retries = receipt.get("max_retries")
+    if not (
+        isinstance(rate, (int, float))
+        and not isinstance(rate, bool)
+        and 0 < float(rate) <= 1.0
+        and isinstance(retries, int)
+        and not isinstance(retries, bool)
+        and 0 <= retries <= 8
+        and receipt.get("allowed_actions") == sorted(_ALLOWED_ACTIONS)
+        and receipt.get("source_policies") == _source_policies()
+        and isinstance(receipt.get("request_file"), str)
+        and Path(str(receipt["request_file"])).name == receipt["request_file"]
+        and _SHA256.fullmatch(str(receipt.get("request_sha256") or "")) is not None
+        and _SHA256.fullmatch(str(receipt.get("user_agent_sha256") or "")) is not None
+    ):
+        raise ProvenanceError("cyber task receipt binding is invalid")
+    _parse_timestamp(str(receipt.get("started_at") or ""), "receipt started_at")
+    _parse_timestamp(str(receipt.get("completed_at") or ""), "receipt completed_at")
+    raw_retrievals = receipt.get("retrievals")
+    if not isinstance(raw_retrievals, list) or len(raw_retrievals) != len(records):
+        raise ProvenanceError("cyber task receipt binding is invalid")
+    retrievals: dict[tuple[str, str], dict[str, Any]] = {}
+    for retrieval in raw_retrievals:
+        if not isinstance(retrieval, dict) or set(retrieval) != _CYBER_RETRIEVAL_FIELDS:
+            raise ProvenanceError("cyber task receipt binding is invalid")
+        key = (
+            str(retrieval.get("kind") or ""),
+            str(retrieval.get("requested_url") or ""),
+        )
+        if (
+            key in retrievals
+            or retrieval.get("final_url") != key[1]
+            or retrieval.get("status") != 200
+            or retrieval.get("content_type") != "application/json"
+            or retrieval.get("redirect_chain") != []
+            or _SHA256.fullmatch(str(retrieval.get("sha256") or "")) is None
+            or not isinstance(retrieval.get("retrieval_file"), str)
+            or Path(str(retrieval["retrieval_file"])).name
+            != retrieval["retrieval_file"]
+        ):
+            raise ProvenanceError("cyber task receipt binding is invalid")
+        _parse_timestamp(
+            str(retrieval.get("observed_at") or ""), "retrieval observed_at"
+        )
+        retrievals[key] = retrieval
+    for record in records.values():
+        kind = "nvd_cve" if record["kind"] == "nvd_cve" else "cisa_kev"
+        expected_url = (
+            f"{NVD_CVE_API_URL}?cveId={record['cve_id']}"
+            if kind == "nvd_cve"
+            else CISA_KEV_URL
+        )
+        retrieval = retrievals.get((kind, expected_url))
+        if (
+            retrieval is None
+            or record["source_url"] != expected_url
+            or record["retrieval_url"] != expected_url
+            or retrieval["sha256"] != record["source_sha256"]
+            or retrieval["observed_at"] != record["observed_at"]
+        ):
+            raise ProvenanceError("cyber task receipt binding is invalid")
+
+
+def _cyber_task_fact(item: dict[str, Any], records: dict[str, dict[str, Any]]) -> str:
+    if set(item) != {
+        "evidence_id",
+        "kind",
+        "record_id",
+        "fact_id",
+        "field",
+        "value",
+        "evidence_quote",
+        "surface_text",
+        "char_start",
+        "char_end",
+    }:
+        raise ProvenanceError("cyber task fact evidence is invalid")
+    evidence_id = str(item.get("evidence_id") or "")
+    expected = {
+        "vulnerability_status": ("nvd_cve", "vulnerability_status", "vulnStatus"),
+        "date_added": ("cisa_kev_entry", "date_added", "dateAdded"),
+        "due_date": ("cisa_kev_entry", "due_date", "dueDate"),
+        "required_action": (
+            "cisa_kev_entry",
+            "required_action",
+            "requiredAction",
+        ),
+    }.get(evidence_id)
+    record = records.get(str(item.get("record_id") or ""))
+    if expected is None or record is None or record.get("kind") != expected[0]:
+        raise ProvenanceError("cyber task fact state is invalid")
+    matching_facts = [
+        fact
+        for fact in record["facts"]
+        if isinstance(fact, dict) and fact.get("fact_id") == expected[1]
+    ]
+    if len(matching_facts) != 1:
+        raise ProvenanceError("cyber task fact state is invalid")
+    fact = matching_facts[0]
+    _validate_fact(record, fact)
+    if item != {
+        "evidence_id": evidence_id,
+        "kind": "source_fact",
+        "record_id": record["record_id"],
+        "fact_id": expected[1],
+        "field": expected[2],
+        "value": fact["value"],
+        "evidence_quote": fact["evidence_quote"],
+        "surface_text": fact["evidence_quote"],
+        "char_start": fact["char_start"],
+        "char_end": fact["char_end"],
+    }:
+        raise ProvenanceError("cyber task fact evidence byte binding is invalid")
+    return str(fact["value"])
+
+
+def _cyber_task_relation(
+    item: dict[str, Any], records: dict[str, dict[str, Any]]
+) -> str:
+    if set(item) != {"evidence_id", "kind", "surface_text", "relation"} or not (
+        item.get("evidence_id") == "listed_in_kev_relation"
+        and item.get("kind") == "source_relation"
+    ):
+        raise ProvenanceError("cyber task relation evidence is invalid")
+    relation = item.get("relation")
+    if not isinstance(relation, dict) or set(relation) != {
+        "relation_id",
+        "kind",
+        "source_record_id",
+        "target_record_id",
+        "evidence",
+    }:
+        raise ProvenanceError("cyber task relation evidence is invalid")
+    source = records.get(str(relation.get("source_record_id") or ""))
+    target = records.get(str(relation.get("target_record_id") or ""))
+    if (
+        source is None
+        or target is None
+        or source["kind"] != "cisa_kev_entry"
+        or target["kind"] != "nvd_cve"
+        or source["cve_id"] != target["cve_id"]
+        or relation.get("kind") != "listed_in_kev"
+        or relation.get("relation_id") != f"cyber:listed-in-kev:{source['cve_id']}"
+    ):
+        raise ProvenanceError("cyber task relation state is invalid")
+    evidence = relation.get("evidence")
+    if not isinstance(evidence, list) or len(evidence) != 2:
+        raise ProvenanceError("cyber task relation evidence is invalid")
+    expected_evidence: list[dict[str, Any]] = []
+    for record in (source, target):
+        cve_facts = [
+            fact
+            for fact in record["facts"]
+            if isinstance(fact, dict) and fact.get("fact_id") == "cve_id"
+        ]
+        if len(cve_facts) != 1:
+            raise ProvenanceError("cyber task relation evidence is invalid")
+        fact = cve_facts[0]
+        _validate_fact(record, fact)
+        expected_evidence.append(
+            {
+                "record_id": record["record_id"],
+                "fact_ids": ["cve_id"],
+                "evidence_quote": fact["evidence_quote"],
+                "char_start": fact["char_start"],
+                "char_end": fact["char_end"],
+                "source_sha256": record["source_sha256"],
+            }
+        )
+    if evidence != expected_evidence or item.get("surface_text") != "\n".join(
+        str(evidence_item["evidence_quote"]) for evidence_item in expected_evidence
+    ):
+        raise ProvenanceError("cyber task relation evidence byte binding is invalid")
+    return str(source["cve_id"])
+
+
+def _cyber_remediation_answer(
+    *,
+    cve_id: str,
+    vulnerability_status: str,
+    date_added: str,
+    due_date: str,
+    required_action: str,
+) -> str:
+    if not all(
+        (cve_id, vulnerability_status, date_added, due_date, required_action)
+    ) or not (
+        _CVE_ID.fullmatch(cve_id)
+        and re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_added)
+        and re.fullmatch(r"\d{4}-\d{2}-\d{2}", due_date)
+        and date_added <= due_date
+    ):
+        return "unknown"
+    return (
+        f"{cve_id} | NVD status: {vulnerability_status} | "
+        f"KEV added: {date_added} | due: {due_date} | "
+        f"required action: {required_action}"
+    )
+
+
+def _cyber_counterfactual_due_date(
+    task: dict[str, Any],
+    items: dict[str, dict[str, Any]],
+    records: dict[str, dict[str, Any]],
+) -> str:
+    due_item = items.get("due_date")
+    twin = task.get("counterfactual_twin")
+    if due_item is None or not isinstance(twin, dict):
+        raise ProvenanceError("cyber counterfactual replacement is invalid")
+    parent_record = records.get(str(due_item.get("record_id") or ""))
+    parent_value = str(due_item.get("value") or "")
+    replacement = str(twin.get("value") or "")
+    quote = str(due_item.get("evidence_quote") or "")
+    start = due_item.get("char_start")
+    end = due_item.get("char_end")
+    encoded_parent = json.dumps(parent_value, ensure_ascii=False)
+    encoded_replacement = json.dumps(replacement, ensure_ascii=False)
+    expected_quote = ""
+    expected_text = ""
+    expected_end: int | None = None
+    if (
+        parent_record is not None
+        and type(start) is int
+        and type(end) is int
+        and quote.count(encoded_parent) == 1
+        and re.fullmatch(r"\d{4}-\d{2}-\d{2}", replacement)
+    ):
+        expected_quote = quote.replace(encoded_parent, encoded_replacement, 1)
+        expected_text = (
+            str(parent_record["text"])[:start]
+            + expected_quote
+            + str(parent_record["text"])[end:]
+        )
+        expected_end = start + len(expected_quote)
+    text = twin.get("text")
+    if set(twin) != {
+        "record_id",
+        "source_origin",
+        "provenance_operation",
+        "parent_text_sha256",
+        "parent_evidence_quote",
+        "parent_char_start",
+        "parent_char_end",
+        "parent_value",
+        "text",
+        "text_sha256",
+        "evidence_quote",
+        "value",
+        "char_start",
+        "char_end",
+    } or not (
+        parent_record is not None
+        and replacement != parent_value
+        and twin.get("record_id") == parent_record["record_id"]
+        and twin.get("source_origin") == "synthetic_counterfactual"
+        and twin.get("provenance_operation") == "replace_kev_due_date"
+        and twin.get("parent_text_sha256") == parent_record["text_sha256"]
+        and twin.get("parent_evidence_quote") == quote
+        and twin.get("parent_char_start") == start
+        and twin.get("parent_char_end") == end
+        and twin.get("parent_value") == parent_value
+        and isinstance(text, str)
+        and twin.get("text_sha256") == hashlib.sha256(text.encode()).hexdigest()
+        and text == expected_text
+        and twin.get("evidence_quote") == expected_quote
+        and twin.get("char_start") == start
+        and twin.get("char_end") == expected_end
+    ):
+        raise ProvenanceError("cyber counterfactual replacement is invalid")
+    return replacement
+
+
+def replay_cyber_kev_remediation_task(
+    task: dict[str, Any],
+    *,
+    evidence_ids: list[str] | None = None,
+    counterfactual: bool = False,
+) -> str:
+    """Replay the NVD-to-KEV answer program from byte-bound source state."""
+    _cyber_task_contract(task)
+    records = _cyber_task_record_map(task)
+    raw_items = task.get("evidence_items")
+    essentials = task.get("essential_evidence_ids")
+    if not isinstance(raw_items, list) or not isinstance(essentials, list):
+        raise ProvenanceError("cyber task essential evidence contract is invalid")
+    items = {
+        str(item.get("evidence_id") or ""): item
+        for item in raw_items
+        if isinstance(item, dict)
+    }
+    if (
+        len(raw_items) != len(items)
+        or any(not isinstance(item, str) for item in essentials)
+        or len(essentials) != len(set(essentials))
+        or set(essentials) != _CYBER_KEV_ESSENTIALS
+        or set(items) != _CYBER_KEV_ESSENTIALS
+    ):
+        raise ProvenanceError("cyber task essential evidence contract is invalid")
+    selected_values = essentials if evidence_ids is None else evidence_ids
+    if not isinstance(selected_values, list) or any(
+        not isinstance(item, str) for item in selected_values
+    ):
+        raise ProvenanceError("cyber task evidence selection is invalid")
+    if len(selected_values) != len(set(selected_values)) or not set(
+        selected_values
+    ).issubset(items):
+        raise ProvenanceError("cyber task evidence selection is invalid")
+    cve_id = ""
+    values = {
+        "vulnerability_status": "",
+        "date_added": "",
+        "due_date": "",
+        "required_action": "",
+    }
+    for evidence_id in selected_values:
+        item = items[evidence_id]
+        if evidence_id == "listed_in_kev_relation":
+            cve_id = _cyber_task_relation(item, records)
+        else:
+            values[evidence_id] = _cyber_task_fact(item, records)
+    replacement_due_date = _cyber_counterfactual_due_date(task, items, records)
+    if counterfactual and "due_date" in selected_values:
+        values["due_date"] = replacement_due_date
+    return _cyber_remediation_answer(cve_id=cve_id, **values)
+
+
+def _cyber_task_fact_item(record: dict[str, Any], evidence_id: str) -> dict[str, Any]:
+    facts = [
+        fact
+        for fact in record["facts"]
+        if isinstance(fact, dict) and fact.get("fact_id") == evidence_id
+    ]
+    if len(facts) != 1:
+        raise ProvenanceError("cyber task source fact is not unique")
+    fact = facts[0]
+    return {
+        "evidence_id": evidence_id,
+        "kind": "source_fact",
+        "record_id": record["record_id"],
+        "fact_id": fact["fact_id"],
+        "field": fact["field"],
+        "value": fact["value"],
+        "evidence_quote": fact["evidence_quote"],
+        "surface_text": fact["evidence_quote"],
+        "char_start": fact["char_start"],
+        "char_end": fact["char_end"],
+    }
+
+
+def build_cyber_kev_remediation_task(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Compile one disabled standalone candidate from one audited NVD/KEV join."""
+    audit_cyber_workflow_manifest(manifest)
+    records = manifest.get("records")
+    relations = manifest.get("relations")
+    if (
+        not isinstance(records, list)
+        or len(records) != 2
+        or not isinstance(relations, list)
+        or len(relations) != 1
+    ):
+        raise ProvenanceError("cyber manifest does not uniquely select one KEV task")
+    record_map = {
+        str(record.get("kind") or ""): record
+        for record in records
+        if isinstance(record, dict)
+    }
+    nvd = record_map.get("nvd_cve")
+    kev = record_map.get("cisa_kev_entry")
+    if nvd is None or kev is None:
+        raise ProvenanceError("cyber manifest does not uniquely select one KEV task")
+    relation = relations[0]
+    evidence_items = [
+        _cyber_task_fact_item(nvd, "vulnerability_status"),
+        _cyber_task_fact_item(kev, "date_added"),
+        _cyber_task_fact_item(kev, "due_date"),
+        _cyber_task_fact_item(kev, "required_action"),
+        {
+            "evidence_id": "listed_in_kev_relation",
+            "kind": "source_relation",
+            "surface_text": "\n".join(
+                str(item["evidence_quote"]) for item in relation["evidence"]
+            ),
+            "relation": relation,
+        },
+    ]
+    due_item = next(
+        item for item in evidence_items if item["evidence_id"] == "due_date"
+    )
+    parent_value = str(due_item["value"])
+    replacement = "2099-12-31" if parent_value != "2099-12-31" else "2098-12-31"
+    encoded_parent = json.dumps(parent_value, ensure_ascii=False)
+    encoded_replacement = json.dumps(replacement, ensure_ascii=False)
+    parent_quote = str(due_item["evidence_quote"])
+    if parent_quote.count(encoded_parent) != 1:
+        raise ProvenanceError("cyber due-date evidence is not uniquely replaceable")
+    cf_quote = parent_quote.replace(encoded_parent, encoded_replacement, 1)
+    cf_text = (
+        str(kev["text"])[: due_item["char_start"]]
+        + cf_quote
+        + str(kev["text"])[due_item["char_end"] :]
+    )
+    copied_records = json.loads(json.dumps(records, ensure_ascii=False))
+    copied_receipt = json.loads(
+        json.dumps(manifest["fetch_receipt"], ensure_ascii=False)
+    )
+    copied_manifest = json.loads(json.dumps(manifest, ensure_ascii=False))
+    manifest_metadata = {
+        key: value
+        for key, value in copied_manifest.items()
+        if key not in {"records", "relations", "fetch_receipt", "attestation"}
+    }
+    task: dict[str, Any] = {
+        "schema_version": CYBER_KEV_REMEDIATION_TASK_SCHEMA,
+        "data_stage": "candidate_task",
+        "train_ready": False,
+        "production_eligible": False,
+        "promotion_eligible": False,
+        "complete_world": False,
+        "promoted": False,
+        "generation_integration": "disabled",
+        "source_attestation_verified": False,
+        "query_type": "kev_remediation_window",
+        "answer_program_id": "cyber.kev_remediation_window.v1",
+        "question": _CYBER_KEV_QUESTION,
+        "answer": "",
+        "cf_answer": "",
+        "essential_evidence_ids": [str(item["evidence_id"]) for item in evidence_items],
+        "evidence_items": json.loads(json.dumps(evidence_items, ensure_ascii=False)),
+        "source_bindings": {
+            record["record_id"]: {
+                field: record[field] for field in _CYBER_BINDING_FIELDS
+            }
+            for record in copied_records
+        },
+        "source_records": copied_records,
+        "source_receipt": copied_receipt,
+        "source_manifest_binding": {
+            "source_manifest_sha256": _cyber_manifest_digest(copied_manifest),
+            "manifest_metadata": manifest_metadata,
+            "attestation": copied_manifest.get("attestation"),
+        },
+        "counterfactual_twin": {
+            "record_id": kev["record_id"],
+            "source_origin": "synthetic_counterfactual",
+            "provenance_operation": "replace_kev_due_date",
+            "parent_text_sha256": kev["text_sha256"],
+            "parent_evidence_quote": parent_quote,
+            "parent_char_start": due_item["char_start"],
+            "parent_char_end": due_item["char_end"],
+            "parent_value": parent_value,
+            "text": cf_text,
+            "text_sha256": hashlib.sha256(cf_text.encode()).hexdigest(),
+            "evidence_quote": cf_quote,
+            "value": replacement,
+            "char_start": due_item["char_start"],
+            "char_end": due_item["char_start"] + len(cf_quote),
+        },
+    }
+    task["answer"] = replay_cyber_kev_remediation_task(task)
+    task["cf_answer"] = replay_cyber_kev_remediation_task(task, counterfactual=True)
+    audit = audit_cyber_kev_remediation_task(task)
+    if not all(
+        value for name, value in audit.items() if name != "source_attestation_verified"
+    ):
+        raise ProvenanceError("cyber KEV task failed executable audit")
+    return task
+
+
+def audit_cyber_kev_remediation_task(
+    task: dict[str, Any], *, source_attestation_key: bytes | None = None
+) -> dict[str, bool]:
+    """Run strict, counterfactual, remove-one, and surface-negative gates."""
+    essentials = list(task.get("essential_evidence_ids") or [])
+    answer = str(task.get("answer") or "")
+    cf_answer = str(task.get("cf_answer") or "")
+    strict_replay = replay_cyber_kev_remediation_task(task)
+    cf_replay = replay_cyber_kev_remediation_task(task, counterfactual=True)
+    singles = [
+        replay_cyber_kev_remediation_task(task, evidence_ids=[evidence_id])
+        for evidence_id in essentials
+    ]
+    removals = [
+        replay_cyber_kev_remediation_task(
+            task,
+            evidence_ids=[item for item in essentials if item != removed],
+        )
+        for removed in essentials
+    ]
+    items = task.get("evidence_items")
+    if not isinstance(items, list):
+        raise ProvenanceError("cyber task evidence items are invalid")
+    item_map = {
+        str(item.get("evidence_id") or ""): item
+        for item in items
+        if isinstance(item, dict)
+    }
+    records = _cyber_task_record_map(task)
+    answer_inputs = {
+        _cyber_task_relation(item_map["listed_in_kev_relation"], records),
+        *(
+            str(item_map[evidence_id]["value"])
+            for evidence_id in _CYBER_KEV_ESSENTIALS
+            if evidence_id != "listed_in_kev_relation"
+        ),
+    }
+    canonical_answer = " ".join(re.findall(r"[a-z0-9]+", answer.casefold()))
+    canonical_inputs = {
+        " ".join(re.findall(r"[a-z0-9]+", value.casefold())) for value in answer_inputs
+    }
+    surfaces = [
+        " ".join(
+            re.findall(r"[a-z0-9]+", str(item.get("surface_text") or "").casefold())
+        )
+        for item in items
+        if isinstance(item, dict)
+    ]
+    surface_free = (
+        bool(surfaces)
+        and len(surfaces) == len(items)
+        and all(
+            canonical_answer not in surface
+            and not all(value in surface for value in canonical_inputs)
+            for surface in surfaces
+        )
+    )
+    return {
+        "strict_replay_sufficient": strict_replay == answer,
+        "counterfactual_replay_sufficient": cf_replay == cf_answer,
+        "counterfactual_changes_answer": cf_answer != answer,
+        "remove_one_fails": bool(removals)
+        and all(value == "unknown" for value in removals),
+        "essential_single_doc_insufficient": bool(singles)
+        and all(value == "unknown" for value in singles),
+        "essential_surface_gold_free": surface_free,
+        "essential_text_grounded": strict_replay == answer,
+        "source_attestation_verified": _cyber_task_source_attestation_verified(
+            task, source_attestation_key
+        ),
+    }

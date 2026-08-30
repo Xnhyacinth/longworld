@@ -12,12 +12,17 @@ import pytest
 
 from longworld.core.attestation import attach_attestation, verify_attestation
 from longworld.core.cyberworkflow import (
+    CYBER_KEV_REMEDIATION_TASK_SCHEMA,
     CYBER_WORKFLOW_MANIFEST_SCHEMA,
+    audit_cyber_kev_remediation_task,
     audit_cyber_workflow_manifest,
+    build_cyber_kev_remediation_task,
     build_cyber_workflow_from_fetch_inventory,
     load_cyber_workflow_manifest,
+    replay_cyber_kev_remediation_task,
 )
 from longworld.core.provenance import ProvenanceError
+from scripts.export_cyber_task import export_cyber_task_candidate
 from scripts.export_cyber_workflow import export_cyber_workflow
 from scripts.fetch_cyber_workflow import HttpResponse, fetch_cyber_workflow
 from tests.test_fetch_cyber_workflow import _kev_body, _nvd_body, _request
@@ -263,3 +268,266 @@ def test_export_attests_only_valid_disabled_source_manifest(tmp_path: Path) -> N
     loaded = load_cyber_workflow_manifest(output, attestation_key=key)
     assert loaded["production_eligible"] is False
     assert loaded["generation_integration"] == "disabled"
+
+
+def test_kev_task_replays_real_state_counterfactual_and_negative_gates(
+    tmp_path: Path,
+) -> None:
+    task = build_cyber_kev_remediation_task(_build(tmp_path))
+
+    assert task["schema_version"] == CYBER_KEV_REMEDIATION_TASK_SCHEMA
+    assert task["data_stage"] == "candidate_task"
+    assert task["train_ready"] is False
+    assert task["production_eligible"] is False
+    assert task["promotion_eligible"] is False
+    assert task["complete_world"] is False
+    assert task["promoted"] is False
+    assert task["generation_integration"] == "disabled"
+    assert task["source_attestation_verified"] is False
+    assert task["answer"] == (
+        "CVE-2021-44228 | NVD status: Analyzed | KEV added: 2021-12-10 | "
+        "due: 2021-12-24 | required action: Apply mitigations per vendor "
+        "instructions."
+    )
+    assert replay_cyber_kev_remediation_task(task) == task["answer"]
+    assert (
+        replay_cyber_kev_remediation_task(task, counterfactual=True)
+        == task["cf_answer"]
+    )
+    assert task["cf_answer"] != task["answer"]
+
+    essentials = task["essential_evidence_ids"]
+    assert len(essentials) == 5
+    assert all(
+        replay_cyber_kev_remediation_task(task, evidence_ids=[evidence_id]) == "unknown"
+        for evidence_id in essentials
+    )
+    assert all(
+        replay_cyber_kev_remediation_task(
+            task,
+            evidence_ids=[item for item in essentials if item != removed],
+        )
+        == "unknown"
+        for removed in essentials
+    )
+    audit = audit_cyber_kev_remediation_task(task)
+    assert audit["source_attestation_verified"] is False
+    assert all(
+        value for name, value in audit.items() if name != "source_attestation_verified"
+    )
+
+
+def test_kev_task_rejects_body_corruption_even_with_updated_task_hashes(
+    tmp_path: Path,
+) -> None:
+    task = build_cyber_kev_remediation_task(_build(tmp_path))
+    corrupted = deepcopy(task)
+    nvd = next(
+        record for record in corrupted["source_records"] if record["kind"] == "nvd_cve"
+    )
+    nvd["text"] = nvd["text"].replace("Analyzed", "Modified", 1)
+    digest = hashlib.sha256(nvd["text"].encode()).hexdigest()
+    nvd["text_sha256"] = digest
+    nvd["source_record_sha256"] = digest
+    corrupted["source_bindings"][nvd["record_id"]]["text_sha256"] = digest
+    corrupted["source_bindings"][nvd["record_id"]]["source_record_sha256"] = digest
+
+    with pytest.raises(ProvenanceError, match="evidence|state|binding"):
+        replay_cyber_kev_remediation_task(corrupted)
+
+
+def test_kev_task_rejects_coordinated_receipt_and_record_endpoint_tamper(
+    tmp_path: Path,
+) -> None:
+    task = build_cyber_kev_remediation_task(_build(tmp_path))
+    forged = deepcopy(task)
+    nvd = next(
+        record for record in forged["source_records"] if record["kind"] == "nvd_cve"
+    )
+    receipt = next(
+        item
+        for item in forged["source_receipt"]["retrievals"]
+        if item["kind"] == "nvd_cve"
+    )
+    forged_url = "https://evil.example/CVE-2021-44228.json"
+    nvd["source_url"] = forged_url
+    nvd["retrieval_url"] = forged_url
+    receipt["requested_url"] = forged_url
+    receipt["final_url"] = forged_url
+    binding = forged["source_bindings"][nvd["record_id"]]
+    binding["source_url"] = forged_url
+    binding["retrieval_url"] = forged_url
+
+    with pytest.raises(ProvenanceError, match="source binding|receipt binding"):
+        replay_cyber_kev_remediation_task(forged)
+
+
+def test_kev_task_rejects_declared_or_extra_byte_counterfactual(
+    tmp_path: Path,
+) -> None:
+    task = build_cyber_kev_remediation_task(_build(tmp_path))
+    forged = deepcopy(task)
+    twin = forged["counterfactual_twin"]
+    twin["text"] = "X" + twin["text"]
+    twin["text_sha256"] = hashlib.sha256(twin["text"].encode()).hexdigest()
+    twin["char_start"] += 1
+    twin["char_end"] += 1
+
+    with pytest.raises(ProvenanceError, match="counterfactual replacement"):
+        replay_cyber_kev_remediation_task(forged, counterfactual=True)
+
+
+def test_kev_task_builder_rejects_coordinated_manifest_source_tamper(
+    tmp_path: Path,
+) -> None:
+    manifest = _build(tmp_path)
+    forged = deepcopy(manifest)
+    nvd = next(record for record in forged["records"] if record["kind"] == "nvd_cve")
+    receipt = next(
+        item
+        for item in forged["fetch_receipt"]["retrievals"]
+        if item["kind"] == "nvd_cve"
+    )
+    forged_url = "https://evil.example/CVE-2021-44228.json"
+    nvd["source_url"] = forged_url
+    nvd["retrieval_url"] = forged_url
+    receipt["requested_url"] = forged_url
+    receipt["final_url"] = forged_url
+
+    with pytest.raises(ProvenanceError, match="fetch receipt lineage"):
+        build_cyber_kev_remediation_task(forged)
+
+
+def test_kev_task_rejects_non_string_evidence_identifiers_fail_closed(
+    tmp_path: Path,
+) -> None:
+    task = build_cyber_kev_remediation_task(_build(tmp_path))
+    task["essential_evidence_ids"][0] = ["not", "hashable"]
+
+    with pytest.raises(ProvenanceError, match="essential evidence contract"):
+        replay_cyber_kev_remediation_task(task)
+
+
+def test_exports_ignored_cyber_candidate_with_executable_audit(
+    tmp_path: Path,
+) -> None:
+    key = b"cyber-task-source-test-key-32-bytes"
+    manifest_path = tmp_path / "cyber-source.signed.json"
+    manifest_path.write_text(
+        json.dumps(
+            attach_attestation(_build(tmp_path), key, purpose="source_manifest")
+        ),
+        encoding="utf-8",
+    )
+    candidate_path = tmp_path / "cyber-task-candidate.jsonl"
+    audit_path = tmp_path / "cyber-task-audit.json"
+
+    export_cyber_task_candidate(
+        manifest_path,
+        candidate_path,
+        audit_path,
+        attestation_key=key,
+    )
+
+    task = json.loads(candidate_path.read_text())
+    receipt = json.loads(audit_path.read_text())
+    assert task["complete_world"] is False
+    assert task["promotion_eligible"] is False
+    assert task["promoted"] is False
+    assert task["source_attestation_verified"] is False
+    assert "signed_manifest" not in task["source_manifest_binding"]
+    assert task["source_manifest_binding"]["attestation"]
+    assert task["source_manifest_binding"]["manifest_metadata"]
+    assert receipt["data_stage"] == "candidate_task_audit"
+    assert receipt["promotion_status"] == "ignored_non_world_candidate"
+    assert receipt["source_attestation_verified"] is True
+    assert receipt["promoted"] is False
+    assert all(receipt["audit"].values())
+    assert audit_cyber_kev_remediation_task(task, source_attestation_key=key)[
+        "source_attestation_verified"
+    ]
+    assert not audit_cyber_kev_remediation_task(task, source_attestation_key=b"w" * 32)[
+        "source_attestation_verified"
+    ]
+
+
+def test_source_attestation_rejects_coordinated_unused_fact_tamper(
+    tmp_path: Path,
+) -> None:
+    key = b"cyber-task-source-test-key-32-bytes"
+    signed = attach_attestation(_build(tmp_path), key, purpose="source_manifest")
+    task = build_cyber_kev_remediation_task(signed)
+    forged = deepcopy(task)
+    nvd = next(
+        record for record in forged["source_records"] if record["kind"] == "nvd_cve"
+    )
+    published = next(fact for fact in nvd["facts"] if fact["fact_id"] == "published")
+    prior = str(published["value"])
+    replacement = prior.replace("2021-12-10", "2021-12-09")
+    assert replacement != prior and len(replacement) == len(prior)
+    nvd["text"] = nvd["text"].replace(prior, replacement, 1)
+    published["value"] = replacement
+    published["evidence_quote"] = published["evidence_quote"].replace(
+        prior, replacement, 1
+    )
+    digest = hashlib.sha256(nvd["text"].encode()).hexdigest()
+    nvd["text_sha256"] = digest
+    nvd["source_record_sha256"] = digest
+    binding = forged["source_bindings"][nvd["record_id"]]
+    binding["text_sha256"] = digest
+    binding["source_record_sha256"] = digest
+
+    assert replay_cyber_kev_remediation_task(forged) == forged["answer"]
+    assert not audit_cyber_kev_remediation_task(forged, source_attestation_key=key)[
+        "source_attestation_verified"
+    ]
+
+
+def test_source_attestation_v2_revalidates_from_explicit_key_without_producer_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from longworld.core.attestation import (
+        ATTESTATION_ENVIRONMENT_ENV,
+        ROLE_KEY_ENVS,
+        ROLE_KEY_ID_ENVS,
+    )
+
+    key = b"cyber-v2-source-key-material-32-bytes"
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(ROLE_KEY_ENVS["source"], key.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["source"], "probe-cyber-source-v2")
+    signed = attach_attestation(_build(tmp_path), key, purpose="source_manifest")
+    task = build_cyber_kev_remediation_task(signed)
+    monkeypatch.delenv(ATTESTATION_ENVIRONMENT_ENV)
+    monkeypatch.delenv(ROLE_KEY_ENVS["source"])
+    monkeypatch.delenv(ROLE_KEY_ID_ENVS["source"])
+
+    assert audit_cyber_kev_remediation_task(task, source_attestation_key=key)[
+        "source_attestation_verified"
+    ]
+
+
+def test_kev_task_rejects_surface_with_all_answer_inputs(tmp_path: Path) -> None:
+    inventory, inventory_path = _inventory(tmp_path)
+    kev = next(
+        item
+        for item in inventory["fetch_receipt"]["retrievals"]
+        if item["kind"] == "cisa_kev"
+    )
+    raw_path = inventory_path.parent / kev["retrieval_file"]
+    raw = json.loads(raw_path.read_text())
+    raw["vulnerabilities"][0]["requiredAction"] = (
+        "CVE-2021-44228 Analyzed 2021-12-10 2021-12-24"
+    )
+    changed = json.dumps(raw).encode()
+    raw_path.write_bytes(changed)
+    kev["sha256"] = hashlib.sha256(changed).hexdigest()
+    manifest = build_cyber_workflow_from_fetch_inventory(
+        inventory,
+        inventory_path.parent,
+        generated_at="2026-08-29T02:00:00Z",
+        fetch_inventory_sha256=hashlib.sha256(inventory_path.read_bytes()).hexdigest(),
+    )
+
+    with pytest.raises(ProvenanceError, match="executable audit"):
+        build_cyber_kev_remediation_task(manifest)

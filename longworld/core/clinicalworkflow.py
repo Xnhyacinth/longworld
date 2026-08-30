@@ -10,16 +10,19 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from copy import deepcopy
 from itertools import pairwise
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from longworld.core.attestation import (
+    ATTESTATION_V2_SCHEME,
     LOCAL_PROBE_TRUST_ISOLATION_FIELD,
     LOCAL_PROBE_TRUST_ISOLATION_VALUE,
     attestation_key_from_env,
     verify_attestation,
+    verify_attestation_identity,
 )
 from longworld.core.provenance import (
     MAX_MANIFEST_BYTES,
@@ -1240,4 +1243,716 @@ def load_clinical_workflow_manifest(
         raise ProvenanceError("clinical workflow manifest attestation is invalid")
     unsigned = {key: value for key, value in payload.items() if key != "attestation"}
     _validate_manifest(unsigned)
-    return unsigned
+    return payload
+
+
+CLINICAL_TRIAL_APPROVAL_TASK_SCHEMA = "longworld.clinical-trial-approval-task.v2"
+
+
+def _task_source_manifest(task: dict[str, Any]) -> dict[str, Any]:
+    if not (
+        task.get("schema_version") == CLINICAL_TRIAL_APPROVAL_TASK_SCHEMA
+        and task.get("data_stage") == "candidate_task"
+        and task.get("train_ready") is False
+        and task.get("production_eligible") is False
+        and task.get("promotion_eligible") is False
+        and task.get("complete_world") is False
+        and task.get("promoted") is False
+        and task.get("generation_integration") == "disabled"
+        and task.get("source_attestation_verified") is False
+    ):
+        raise ProvenanceError("clinical trial approval task contract is invalid")
+    manifest = task.get("source_manifest")
+    if not isinstance(manifest, dict):
+        raise ProvenanceError("clinical task source manifest is missing")
+    unsigned = {key: value for key, value in manifest.items() if key != "attestation"}
+    _validate_manifest(unsigned)
+    if (
+        task.get("source_manifest_sha256")
+        != hashlib.sha256(_canonical_bytes(manifest)).hexdigest()
+    ):
+        raise ProvenanceError("clinical task source manifest binding is invalid")
+    if task.get("source_records") != unsigned.get("records"):
+        raise ProvenanceError("clinical task source manifest projection is invalid")
+    if task.get("source_receipt") != unsigned.get("fetch_receipt"):
+        raise ProvenanceError("clinical task source receipt binding is invalid")
+    inventory = unsigned.get("fetch_inventory")
+    receipt = unsigned.get("fetch_receipt")
+    if not isinstance(inventory, dict) or not isinstance(receipt, dict):
+        raise ProvenanceError("clinical task source manifest lineage is invalid")
+    if task.get("source_inventory_binding") != {
+        "fetch_inventory_sha256": inventory.get("sha256"),
+        "receipt_sha256": hashlib.sha256(_canonical_bytes(receipt)).hexdigest(),
+    }:
+        raise ProvenanceError("clinical task source manifest lineage is invalid")
+    manifest_relations = {
+        str(relation.get("kind") or ""): relation
+        for relation in unsigned.get("relations", [])
+        if isinstance(relation, dict)
+    }
+    evidence_items = task.get("evidence_items")
+    if not isinstance(evidence_items, list):
+        raise ProvenanceError("clinical task evidence contract is invalid")
+    task_relations = {
+        str(item.get("kind") or ""): item.get("relation")
+        for item in evidence_items
+        if isinstance(item, dict) and isinstance(item.get("relation"), dict)
+    }
+    if task_relations != manifest_relations:
+        raise ProvenanceError("clinical task source relation binding is invalid")
+    return manifest
+
+
+def _task_source_attestation_verified(
+    task: dict[str, Any], source_attestation_key: bytes | None
+) -> bool:
+    if source_attestation_key is None:
+        return False
+    try:
+        manifest = _task_source_manifest(task)
+    except ProvenanceError:
+        return False
+    attestation = manifest.get("attestation")
+    if isinstance(attestation, dict) and (
+        attestation.get("scheme") == ATTESTATION_V2_SCHEME
+    ):
+        return verify_attestation_identity(
+            manifest,
+            source_attestation_key,
+            purpose="source_manifest",
+            role="source",
+            key_id=str(attestation.get("key_id") or ""),
+            environment=str(attestation.get("environment") or ""),
+        )
+    return verify_attestation(
+        manifest, source_attestation_key, purpose="source_manifest"
+    )
+
+
+def _task_record_map(task: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    raw_records = task.get("source_records")
+    bindings = task.get("source_bindings")
+    if not isinstance(raw_records, list) or len(raw_records) != 3:
+        raise ProvenanceError("clinical task source records are invalid")
+    records = {
+        str(record.get("record_id") or ""): record
+        for record in raw_records
+        if isinstance(record, dict)
+    }
+    if (
+        len(records) != len(raw_records)
+        or not isinstance(bindings, dict)
+        or set(bindings) != set(records)
+    ):
+        raise ProvenanceError("clinical task source bindings are invalid")
+    for record_id, record in records.items():
+        binding = bindings.get(record_id)
+        text = record.get("text")
+        state = record.get("state")
+        if not isinstance(binding, dict) or set(binding) != {
+            "text_sha256",
+            "projection_sha256",
+            "response_sha256",
+        }:
+            raise ProvenanceError("clinical task source binding schema is invalid")
+        if not isinstance(text, str) or not isinstance(state, dict):
+            raise ProvenanceError("clinical task source state is invalid")
+        expected_text = json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True)
+        text_sha256 = hashlib.sha256(text.encode()).hexdigest()
+        projection_sha256 = hashlib.sha256(_canonical_bytes(state)).hexdigest()
+        if (
+            text != expected_text
+            or record.get("text_sha256") != text_sha256
+            or record.get("source_projection_sha256") != projection_sha256
+            or binding.get("text_sha256") != text_sha256
+            or binding.get("projection_sha256") != projection_sha256
+            or binding.get("response_sha256") != record.get("source_response_sha256")
+        ):
+            raise ProvenanceError("clinical task source byte/state binding is invalid")
+    return records
+
+
+def _task_receipt_binding_valid(
+    task: dict[str, Any], records: dict[str, dict[str, Any]]
+) -> bool:
+    receipt = task.get("source_receipt")
+    inventory_binding = task.get("source_inventory_binding")
+    if (
+        not isinstance(receipt, dict)
+        or set(receipt)
+        != {
+            "started_at",
+            "completed_at",
+            "max_retries",
+            "allowed_actions",
+            "request_file",
+            "request_sha256",
+            "user_agent_sha256",
+            "source_policies",
+            "retrievals",
+        }
+        or not isinstance(inventory_binding, dict)
+        or set(inventory_binding)
+        != {
+            "fetch_inventory_sha256",
+            "receipt_sha256",
+        }
+        or _SHA256.fullmatch(str(inventory_binding.get("fetch_inventory_sha256") or ""))
+        is None
+        or inventory_binding.get("receipt_sha256")
+        != hashlib.sha256(_canonical_bytes(receipt)).hexdigest()
+    ):
+        raise ProvenanceError("clinical task receipt binding is invalid")
+    retries = receipt.get("max_retries")
+    if (
+        receipt.get("source_policies") != _policies()
+        or receipt.get("allowed_actions") != sorted(_ALLOWED_ACTIONS)
+        or receipt.get("request_file") != "clinical_fetch_request.json"
+        or _SHA256.fullmatch(str(receipt.get("request_sha256") or "")) is None
+        or _SHA256.fullmatch(str(receipt.get("user_agent_sha256") or "")) is None
+        or isinstance(retries, bool)
+        or not isinstance(retries, int)
+        or not 0 <= retries <= 8
+    ):
+        raise ProvenanceError("clinical task receipt binding is invalid")
+    started = _parse_timestamp(
+        str(receipt.get("started_at") or ""), "clinical task receipt started_at"
+    )
+    completed = _parse_timestamp(
+        str(receipt.get("completed_at") or ""), "clinical task receipt completed_at"
+    )
+    if completed < started:
+        raise ProvenanceError("clinical task receipt binding is invalid")
+    by_kind = {record["kind"]: record for record in records.values()}
+    if set(by_kind) != {"clinical_trial", "fda_application", "fda_label"}:
+        raise ProvenanceError("clinical task receipt binding is invalid")
+    request = {
+        "nct_id": by_kind["clinical_trial"]["identity"],
+        "fda_application_number": by_kind["fda_application"]["identity"],
+    }
+    raw_retrievals = receipt.get("retrievals")
+    if not isinstance(raw_retrievals, list) or len(raw_retrievals) != 3:
+        raise ProvenanceError("clinical task receipt binding is invalid")
+    retrievals: dict[str, dict[str, Any]] = {}
+    for raw_retrieval in raw_retrievals:
+        retrieval = _validate_retrieval_metadata(raw_retrieval, request)
+        kind = str(retrieval["kind"])
+        if kind in retrievals:
+            raise ProvenanceError("clinical task receipt binding is invalid")
+        retrievals[kind] = retrieval
+    if set(retrievals) != set(by_kind):
+        raise ProvenanceError("clinical task receipt binding is invalid")
+    for kind, record in by_kind.items():
+        retrieval = retrievals[kind]
+        observed = _parse_timestamp(
+            str(retrieval.get("observed_at") or ""),
+            "clinical task receipt observed_at",
+        )
+        if not (
+            started <= observed <= completed
+            and retrieval["requested_url"] == record["source_url"]
+            and retrieval["final_url"] == record["retrieval_url"]
+            and retrieval["response_sha256"] == record["source_response_sha256"]
+            and retrieval["projection_sha256"] == record["source_projection_sha256"]
+            and retrieval["projection_bytes"] == len(_canonical_bytes(record["state"]))
+            and retrieval["observed_at"] == record["observed_at"]
+        ):
+            raise ProvenanceError("clinical task receipt binding is invalid")
+    return True
+
+
+def _task_fact(record: dict[str, Any], fact_id: str) -> dict[str, Any]:
+    facts = record.get("facts")
+    matches = [
+        fact
+        for fact in facts or []
+        if isinstance(fact, dict) and fact.get("fact_id") == fact_id
+    ]
+    if len(matches) != 1:
+        raise ProvenanceError("clinical task fact is not unique")
+    fact = matches[0]
+    start, end = fact.get("char_start"), fact.get("char_end")
+    quote = fact.get("evidence_quote")
+    if (
+        not isinstance(start, int)
+        or not isinstance(end, int)
+        or not isinstance(quote, str)
+        or start < 0
+        or end != start + len(quote)
+        or record["text"][start:end] != quote
+        or record["state"].get(fact.get("field")) != fact.get("value")
+    ):
+        raise ProvenanceError("clinical task fact evidence binding is invalid")
+    return fact
+
+
+def _task_fact_group(
+    item: dict[str, Any], records: dict[str, dict[str, Any]]
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    record = records.get(str(item.get("record_id") or ""))
+    fact_ids = item.get("fact_ids")
+    if (
+        record is None
+        or not isinstance(fact_ids, list)
+        or not fact_ids
+        or any(not isinstance(fact_id, str) for fact_id in fact_ids)
+        or len(fact_ids) != len(set(fact_ids))
+    ):
+        raise ProvenanceError("clinical task fact group is invalid")
+    facts = {fact_id: _task_fact(record, fact_id) for fact_id in fact_ids}
+    surface = "\n".join(str(fact["evidence_quote"]) for fact in facts.values())
+    if item.get("surface_text") != surface:
+        raise ProvenanceError("clinical task fact group evidence is invalid")
+    return record, facts
+
+
+def _task_relation(
+    item: dict[str, Any], records: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    relation = item.get("relation")
+    if not isinstance(relation, dict):
+        raise ProvenanceError("clinical task relation is invalid")
+    source = records.get(str(relation.get("source_record_id") or ""))
+    target = records.get(str(relation.get("target_record_id") or ""))
+    evidence = relation.get("evidence")
+    if source is None or target is None or not isinstance(evidence, list):
+        raise ProvenanceError("clinical task relation is invalid")
+    evidence_ids: set[str] = set()
+    for raw_evidence in evidence:
+        if not isinstance(raw_evidence, dict):
+            raise ProvenanceError("clinical task relation evidence is invalid")
+        record = records.get(str(raw_evidence.get("record_id") or ""))
+        start, end = raw_evidence.get("char_start"), raw_evidence.get("char_end")
+        quote = raw_evidence.get("evidence_quote")
+        if (
+            record is None
+            or raw_evidence.get("source_projection_sha256")
+            != record.get("source_projection_sha256")
+            or not isinstance(start, int)
+            or not isinstance(end, int)
+            or not isinstance(quote, str)
+            or start < 0
+            or end != start + len(quote)
+            or record["text"][start:end] != quote
+        ):
+            raise ProvenanceError("clinical task relation evidence binding is invalid")
+        evidence_ids.add(record["record_id"])
+    if not {source["record_id"], target["record_id"]}.issubset(evidence_ids):
+        raise ProvenanceError("clinical task relation endpoint evidence is incomplete")
+    surface = "\n".join(
+        str(evidence_item["evidence_quote"]) for evidence_item in evidence
+    )
+    if item.get("surface_text") != surface:
+        raise ProvenanceError("clinical task relation surface binding is invalid")
+    kind = relation.get("kind")
+    join_key = relation.get("join_key")
+    if not isinstance(join_key, dict):
+        raise ProvenanceError("clinical task relation join is invalid")
+    if kind == "label_explicitly_references_trial":
+        value = target["state"].get("nct_id")
+        valid = (
+            source["kind"] == "fda_label"
+            and target["kind"] == "clinical_trial"
+            and join_key == {"kind": "nct_id", "value": value}
+            and value in source["state"].get("referenced_nct_ids", [])
+            and value in source["state"].get("clinical_studies", "")
+        )
+    elif kind == "label_matches_application":
+        value = target["state"].get("application_number")
+        valid = (
+            source["kind"] == "fda_label"
+            and target["kind"] == "fda_application"
+            and join_key == {"kind": "fda_application_number", "value": value}
+            and source["state"].get("application_number") == value
+        )
+    else:
+        valid = False
+    if not valid:
+        raise ProvenanceError("clinical task relation join is invalid")
+    return relation
+
+
+def _clinical_answer(
+    *,
+    trial_record_id: str,
+    application_record_id: str,
+    label_record_id: str,
+    trial_relation: dict[str, Any] | None,
+    application_relation: dict[str, Any] | None,
+    nct_id: str,
+    overall_status: str,
+    primary_outcome: str,
+    application_number: str,
+    approval_date: str,
+    effective_date: str,
+) -> str:
+    if (
+        trial_relation is None
+        or application_relation is None
+        or trial_relation.get("source_record_id") != label_record_id
+        or trial_relation.get("target_record_id") != trial_record_id
+        or application_relation.get("source_record_id") != label_record_id
+        or application_relation.get("target_record_id") != application_record_id
+        or trial_relation.get("join_key") != {"kind": "nct_id", "value": nct_id}
+        or application_relation.get("join_key")
+        != {"kind": "fda_application_number", "value": application_number}
+        or not all(
+            (
+                nct_id,
+                overall_status,
+                primary_outcome,
+                application_number,
+                approval_date,
+                effective_date,
+            )
+        )
+    ):
+        return "unknown"
+    return (
+        f"{nct_id} | {overall_status} | {primary_outcome} | {application_number} | "
+        f"original approval {approval_date} | label effective {effective_date}"
+    )
+
+
+def _clinical_surface_is_gold_free(surface: str, answer: str) -> bool:
+    """Reject verbatim or format-transformed disclosure of every answer input."""
+    parts = answer.split(" | ")
+    if (
+        len(parts) != 6
+        or not parts[4].startswith("original approval ")
+        or not parts[5].startswith("label effective ")
+    ):
+        return False
+    answer_inputs = (
+        *parts[:4],
+        parts[4].removeprefix("original approval "),
+        parts[5].removeprefix("label effective "),
+    )
+    return answer not in surface and not all(
+        value in surface for value in answer_inputs
+    )
+
+
+def replay_clinical_trial_approval_task(
+    task: dict[str, Any],
+    *,
+    evidence_ids: list[str] | None = None,
+    counterfactual: bool = False,
+) -> str:
+    """Strictly execute the clinical task from source bodies and receipt bindings."""
+    _task_source_manifest(task)
+    if (
+        task.get("query_type") != "trial_approval_trace"
+        or task.get("answer_program_id") != "clinical.trial_approval_trace.v1"
+    ):
+        raise ProvenanceError("clinical trial approval task contract is invalid")
+    records = _task_record_map(task)
+    _task_receipt_binding_valid(task, records)
+    raw_items = task.get("evidence_items")
+    essentials = task.get("essential_evidence_ids")
+    if not isinstance(raw_items, list) or not isinstance(essentials, list):
+        raise ProvenanceError("clinical task evidence contract is invalid")
+    items = {
+        str(item.get("evidence_id") or ""): item
+        for item in raw_items
+        if isinstance(item, dict)
+    }
+    if any(not isinstance(item, str) for item in essentials):
+        raise ProvenanceError("clinical task essential evidence contract is invalid")
+    if (
+        len(items) != len(raw_items)
+        or set(items) != set(essentials)
+        or len(essentials) != len(set(essentials))
+    ):
+        raise ProvenanceError("clinical task essential evidence contract is invalid")
+    selected_ids = essentials if evidence_ids is None else evidence_ids
+    if any(not isinstance(item, str) for item in selected_ids):
+        raise ProvenanceError("clinical task evidence selection is invalid")
+    selected = set(selected_ids)
+    if not selected.issubset(items):
+        raise ProvenanceError("clinical task evidence selection is invalid")
+
+    nct_id = overall_status = primary_outcome = ""
+    application_number = approval_date = effective_date = ""
+    trial_record_id = application_record_id = label_record_id = ""
+    trial_relation: dict[str, Any] | None = None
+    application_relation: dict[str, Any] | None = None
+    for evidence_id in selected:
+        item = items[evidence_id]
+        kind = item.get("kind")
+        if kind == "trial_summary":
+            record, facts = _task_fact_group(item, records)
+            trial_record_id = record["record_id"]
+            nct_id = str(facts["nct_id"]["value"])
+            overall_status = str(facts["overall_status"]["value"])
+            primary_outcome = str(facts["primary_outcome_measure"]["value"])
+        elif kind == "approval_date":
+            record, facts = _task_fact_group(item, records)
+            application_record_id = record["record_id"]
+            approval_date = str(facts["original_approval_date"]["value"])
+        elif kind == "label_effective_date":
+            record, facts = _task_fact_group(item, records)
+            label_record_id = record["record_id"]
+            effective_date = str(facts["effective_date"]["value"])
+        elif kind == "label_explicitly_references_trial":
+            trial_relation = _task_relation(item, records)
+        elif kind == "label_matches_application":
+            application_relation = _task_relation(item, records)
+            join_key = application_relation["join_key"]
+            application_number = str(join_key["value"])
+        else:
+            raise ProvenanceError("clinical task evidence kind is invalid")
+
+    if counterfactual and items:
+        twin = task.get("counterfactual_twin")
+        parent = next(
+            (
+                item
+                for item in items.values()
+                if item.get("kind") == "label_effective_date"
+            ),
+            None,
+        )
+        if not isinstance(twin, dict) or parent is None:
+            raise ProvenanceError("clinical counterfactual twin is missing")
+        parent_record, parent_facts = _task_fact_group(parent, records)
+        fact = parent_facts["effective_date"]
+        parent_value = str(fact["value"])
+        replacement = str(twin.get("value") or "")
+        value_start = parent_record["text"].find(
+            parent_value, int(fact["char_start"]), int(fact["char_end"])
+        )
+        value_end = value_start + len(parent_value)
+        expected_state = dict(parent_record["state"])
+        expected_state["effective_date"] = replacement
+        expected_text = json.dumps(
+            expected_state, ensure_ascii=False, indent=2, sort_keys=True
+        )
+        expected_quote = str(fact["evidence_quote"]).replace(
+            parent_value, replacement, 1
+        )
+        text = twin.get("text")
+        if (
+            twin.get("record_id") != parent_record["record_id"]
+            or twin.get("source_origin") != "synthetic_counterfactual"
+            or twin.get("provenance_operation") != "replace_label_effective_date"
+            or twin.get("parent_text_sha256") != parent_record["text_sha256"]
+            or twin.get("parent_evidence_quote") != fact["evidence_quote"]
+            or twin.get("parent_value") != parent_value
+            or replacement == parent_value
+            or _DATE.fullmatch(replacement) is None
+            or value_start < 0
+            or twin.get("value_char_start") != value_start
+            or twin.get("value_char_end") != value_start + len(replacement)
+            or twin.get("state") != expected_state
+            or not isinstance(text, str)
+            or text != expected_text
+            or twin.get("text_sha256") != hashlib.sha256(text.encode()).hexdigest()
+            or twin.get("evidence_quote") != expected_quote
+            or twin.get("char_start") != fact["char_start"]
+            or twin.get("char_end") != int(fact["char_start"]) + len(expected_quote)
+            or value_end > int(fact["char_end"])
+        ):
+            raise ProvenanceError("clinical counterfactual replacement is invalid")
+        if parent["evidence_id"] in selected:
+            effective_date = replacement
+
+    return _clinical_answer(
+        trial_record_id=trial_record_id,
+        application_record_id=application_record_id,
+        label_record_id=label_record_id,
+        trial_relation=trial_relation,
+        application_relation=application_relation,
+        nct_id=nct_id,
+        overall_status=overall_status,
+        primary_outcome=primary_outcome,
+        application_number=application_number,
+        approval_date=approval_date,
+        effective_date=effective_date,
+    )
+
+
+def build_clinical_trial_approval_task(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Audit a disabled source inventory and compile one executable candidate."""
+    source_manifest = deepcopy(manifest)
+    unsigned_manifest = {
+        key: value for key, value in source_manifest.items() if key != "attestation"
+    }
+    _validate_manifest(unsigned_manifest)
+    records = deepcopy(unsigned_manifest["records"])
+    by_kind = {record["kind"]: record for record in records}
+    relations = {
+        relation["kind"]: relation
+        for relation in deepcopy(unsigned_manifest["relations"])
+    }
+
+    def fact_item(
+        evidence_id: str, kind: str, record: dict[str, Any], fact_ids: list[str]
+    ) -> dict[str, Any]:
+        facts = [_task_fact(record, fact_id) for fact_id in fact_ids]
+        return {
+            "evidence_id": evidence_id,
+            "kind": kind,
+            "record_id": record["record_id"],
+            "fact_ids": fact_ids,
+            "surface_text": "\n".join(str(fact["evidence_quote"]) for fact in facts),
+        }
+
+    def relation_item(evidence_id: str, relation: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "evidence_id": evidence_id,
+            "kind": relation["kind"],
+            "surface_text": "\n".join(
+                str(item["evidence_quote"]) for item in relation["evidence"]
+            ),
+            "relation": relation,
+        }
+
+    trial = by_kind["clinical_trial"]
+    application = by_kind["fda_application"]
+    label = by_kind["fda_label"]
+    evidence_items = [
+        fact_item(
+            "trial_summary",
+            "trial_summary",
+            trial,
+            ["nct_id", "overall_status", "primary_outcome_measure"],
+        ),
+        relation_item(
+            "trial_label_relation", relations["label_explicitly_references_trial"]
+        ),
+        relation_item(
+            "label_application_relation", relations["label_matches_application"]
+        ),
+        fact_item(
+            "approval_date",
+            "approval_date",
+            application,
+            ["original_approval_date"],
+        ),
+        fact_item(
+            "label_effective_date",
+            "label_effective_date",
+            label,
+            ["effective_date"],
+        ),
+    ]
+    effective_fact = _task_fact(label, "effective_date")
+    parent_value = str(effective_fact["value"])
+    replacement = "2030-01-01"
+    value_start = label["text"].find(
+        parent_value,
+        int(effective_fact["char_start"]),
+        int(effective_fact["char_end"]),
+    )
+    twin_state = dict(label["state"])
+    twin_state["effective_date"] = replacement
+    twin_text = json.dumps(twin_state, ensure_ascii=False, indent=2, sort_keys=True)
+    twin_quote = str(effective_fact["evidence_quote"]).replace(
+        parent_value, replacement, 1
+    )
+    receipt = deepcopy(unsigned_manifest["fetch_receipt"])
+    task: dict[str, Any] = {
+        "schema_version": CLINICAL_TRIAL_APPROVAL_TASK_SCHEMA,
+        "data_stage": "candidate_task",
+        "train_ready": False,
+        "production_eligible": False,
+        "promotion_eligible": False,
+        "complete_world": False,
+        "promoted": False,
+        "generation_integration": "disabled",
+        "source_attestation_verified": False,
+        "query_type": "trial_approval_trace",
+        "answer_program_id": "clinical.trial_approval_trace.v1",
+        "question": (
+            "For the completed registered trial explicitly referenced by the FDA "
+            "label, return its NCT ID, status and primary outcome measure; then "
+            "follow the label's exact application-number relation to the original "
+            "approval date and report the label effective date."
+        ),
+        "answer": "",
+        "cf_answer": "",
+        "essential_evidence_ids": [item["evidence_id"] for item in evidence_items],
+        "evidence_items": evidence_items,
+        "source_bindings": {
+            record["record_id"]: {
+                "text_sha256": record["text_sha256"],
+                "projection_sha256": record["source_projection_sha256"],
+                "response_sha256": record["source_response_sha256"],
+            }
+            for record in records
+        },
+        "source_records": records,
+        "source_manifest": source_manifest,
+        "source_manifest_sha256": hashlib.sha256(
+            _canonical_bytes(source_manifest)
+        ).hexdigest(),
+        "source_inventory_binding": {
+            "fetch_inventory_sha256": unsigned_manifest["fetch_inventory"]["sha256"],
+            "receipt_sha256": hashlib.sha256(_canonical_bytes(receipt)).hexdigest(),
+        },
+        "source_receipt": receipt,
+        "counterfactual_twin": {
+            "record_id": label["record_id"],
+            "source_origin": "synthetic_counterfactual",
+            "provenance_operation": "replace_label_effective_date",
+            "parent_text_sha256": label["text_sha256"],
+            "parent_evidence_quote": effective_fact["evidence_quote"],
+            "parent_value": parent_value,
+            "value": replacement,
+            "state": twin_state,
+            "text": twin_text,
+            "text_sha256": hashlib.sha256(twin_text.encode()).hexdigest(),
+            "evidence_quote": twin_quote,
+            "char_start": effective_fact["char_start"],
+            "char_end": int(effective_fact["char_start"]) + len(twin_quote),
+            "value_char_start": value_start,
+            "value_char_end": value_start + len(replacement),
+        },
+    }
+    task["answer"] = replay_clinical_trial_approval_task(task)
+    task["cf_answer"] = replay_clinical_trial_approval_task(task, counterfactual=True)
+    return task
+
+
+def audit_clinical_trial_approval_task(
+    task: dict[str, Any], *, source_attestation_key: bytes | None = None
+) -> dict[str, bool]:
+    """Run strict, CF, remove-one, surface and receipt gates."""
+    essentials = list(task.get("essential_evidence_ids") or [])
+    answer = str(task.get("answer") or "")
+    cf_answer = str(task.get("cf_answer") or "")
+    strict = replay_clinical_trial_approval_task(task) == answer
+    cf_replay = replay_clinical_trial_approval_task(task, counterfactual=True)
+    singles = [
+        replay_clinical_trial_approval_task(task, evidence_ids=[evidence_id])
+        for evidence_id in essentials
+    ]
+    removals = [
+        replay_clinical_trial_approval_task(
+            task,
+            evidence_ids=[item for item in essentials if item != removed],
+        )
+        for removed in essentials
+    ]
+    evidence_items = task.get("evidence_items") or []
+    surface_free = bool(evidence_items) and all(
+        _clinical_surface_is_gold_free(str(item.get("surface_text") or ""), answer)
+        for item in evidence_items
+    )
+    records = _task_record_map(task)
+    return {
+        "strict_replay_sufficient": strict,
+        "counterfactual_replay_sufficient": cf_replay == cf_answer,
+        "counterfactual_changes_answer": cf_answer != answer,
+        "remove_one_fails": bool(removals)
+        and all(value == "unknown" for value in removals),
+        "essential_single_doc_insufficient": bool(singles)
+        and all(value == "unknown" for value in singles),
+        "essential_surface_gold_free": surface_free,
+        "essential_text_grounded": strict,
+        "receipt_binding_valid": _task_receipt_binding_valid(task, records),
+        "source_attestation_verified": _task_source_attestation_verified(
+            task, source_attestation_key
+        ),
+    }
