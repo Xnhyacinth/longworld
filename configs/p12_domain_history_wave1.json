@@ -1,0 +1,27 @@
+{
+  "schema_version": "longworld.domain-history-materialization.v1",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "bands": [
+    { "name": "16k", "lower_tokens": 16000, "upper_tokens": 16384 },
+    { "name": "32k", "lower_tokens": 32000, "upper_tokens": 32768 },
+    { "name": "64k", "lower_tokens": 64000, "upper_tokens": 65536 }
+  ],
+  "cyber_kev_history": {
+    "world_id": "cyber_cisa_kev_catalog_20260829_v1",
+    "signed_manifest": "data/source_inventory/p12_wave3_cyber_log4shell_v1/cyber_workflow_manifest.signed.v4.json",
+    "catalog_response": "data/source_inventory/p12_wave3_cyber_log4shell_v1/cisa-known-exploited-vulnerabilities.json"
+  },
+  "capacity_checks": [
+    {
+      "domain": "clinical",
+      "candidate": "data/task_candidates/clinical_veklury_v2/task_candidate.jsonl"
+    },
+    {
+      "domain": "regulation",
+      "candidate": "data/task_candidates/regulation_ftc_noncompete_v1/task_candidate.jsonl"
+    }
+  ]
+}
