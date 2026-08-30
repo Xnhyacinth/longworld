@@ -100,3 +100,63 @@ repositories:
       reviewed_at: 2026-08-30T00:00:00Z
     allowed_record_kinds:
       [pull_request, review, commit, ci_run, merge, release, license]
+  godotengine/godot:
+    visibility: public
+    license: MIT
+    authorization:
+      record_id: PUBLIC-GITHUB-TERMS-2026-08
+      scope: read-only workflow export
+      basis: public repository under recorded license
+      reviewed_at: 2026-08-30T00:00:00Z
+    allowed_record_kinds:
+      [pull_request, review, commit, ci_run, merge, release, license]
+  bitcoin/bitcoin:
+    visibility: public
+    license: MIT
+    authorization:
+      record_id: PUBLIC-GITHUB-TERMS-2026-08
+      scope: read-only workflow export
+      basis: public repository under recorded license
+      reviewed_at: 2026-08-30T00:00:00Z
+    allowed_record_kinds:
+      [pull_request, review, commit, ci_run, merge, release, license]
+  duckdb/duckdb:
+    visibility: public
+    license: MIT
+    authorization:
+      record_id: PUBLIC-GITHUB-TERMS-2026-08
+      scope: read-only workflow export
+      basis: public repository under recorded license
+      reviewed_at: 2026-08-30T00:00:00Z
+    allowed_record_kinds:
+      [pull_request, review, commit, ci_run, merge, release, license]
+  pandas-dev/pandas:
+    visibility: public
+    license: BSD-3-Clause
+    authorization:
+      record_id: PUBLIC-GITHUB-TERMS-2026-08
+      scope: read-only workflow export
+      basis: public repository under recorded license
+      reviewed_at: 2026-08-30T00:00:00Z
+    allowed_record_kinds:
+      [pull_request, review, commit, ci_run, merge, release, license]
+  scikit-learn/scikit-learn:
+    visibility: public
+    license: BSD-3-Clause
+    authorization:
+      record_id: PUBLIC-GITHUB-TERMS-2026-08
+      scope: read-only workflow export
+      basis: public repository under recorded license
+      reviewed_at: 2026-08-30T00:00:00Z
+    allowed_record_kinds:
+      [pull_request, review, commit, ci_run, merge, release, license]
+  pallets/flask:
+    visibility: public
+    license: BSD-3-Clause
+    authorization:
+      record_id: PUBLIC-GITHUB-TERMS-2026-08
+      scope: read-only workflow export
+      basis: public repository under recorded license
+      reviewed_at: 2026-08-30T00:00:00Z
+    allowed_record_kinds:
+      [pull_request, review, commit, ci_run, merge, release, license]

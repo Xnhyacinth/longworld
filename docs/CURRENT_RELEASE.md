@@ -39,8 +39,40 @@ worlds. It is `train_ready=false` and `production_eligible=false`. The event
 gate removes the earlier single-large-commit failure mode, but it does not yet
 require a release boundary or answer-changing dependency; median calendar spans
 are 2.17 days at 64K and 5.04 days at 128K, and one 64K row has zero elapsed
-calendar time because distinct commits share a timestamp. No HF publication is
+calendar time because distinct commits share a timestamp. A later full review
+found two such 64K rows. No HF publication is
 authorized from this candidate.
+
+## Multiband Git-history CPT capacity candidate
+
+The shared bulk pipeline now supports registered exact 16K, 32K, 64K, 128K,
+and 256K bands instead of hard-coding only 64K/128K. A capacity scan over the
+previously unused 5,748-commit tail of the Transformers first-parent history
+naturally retained 31×16K, 31×32K, and 29×256K rows before cross-release
+subtraction. Three 256K rows contained source bodies already used by the prior
+64K/128K candidate and were removed as whole rows.
+
+The final disjoint increment is
+`p12-cpt-git-history-multiband-transformers-tail-capacity-v3-dedup`: **31 16K,
+31 32K, and 26 256K rows**, totaling **8,168,552 exact Qwen context tokens**,
+4,345 non-reused real commits, and 12,609 non-reused source records. The
+independent audit recomputed lengths and exports, verified source/CPT/report
+attestations, reloaded the referenced old release, and found zero cross-release
+source-body, event, or context overlap. No band hit its 1,000-row safety cap, so
+these non-round counts are observed source capacity rather than balanced quotas.
+
+This is still a one-repository local-probe CPT candidate with no executable
+answer program and no production trust. It remains `train_ready=false` and
+`production_eligible=false`; it is recorded as a real, independently audited
+increment, not published training data.
+
+The next capacity wave has source caches ready for Flask (2,275 first-parent
+commits), scikit-learn (19,440), and DuckDB (10,597), covering distinct web,
+ML/scientific, and analytical-database workflows. Their clones and commit counts
+are acquisition capacity only and are not counted as data until materialization,
+cross-release subtraction, and independent audit pass. Godot, Bitcoin, pandas,
+and the three ready repositories have been added to the exact-license public
+allowlist; only the ready three are configured for the next five-band scan.
 
 ## Earlier source-native long-document CPT candidate
 
