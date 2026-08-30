@@ -21,6 +21,7 @@ from longworld.core.attestation import (
     verify_attestation,
 )
 from longworld.core.provenance import _read_regular_file
+from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
 from scripts.export_cpt import _reject_reason, export_cpt_rows, iter_jsonl
 from scripts.materialize_git_history_cpt import (
     RELEASE_SCHEMA,
@@ -54,8 +55,15 @@ def _select_disjoint_rows(
     source_event_by_record: dict[str, str],
     source_text_by_record: dict[str, str],
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    if set(target) != {"64k", "128k"} or any(value <= 0 for value in target.values()):
+    if (
+        not target
+        or not set(target).issubset(EXACT_TOKEN_BAND_RANGES)
+        or any(value <= 0 for value in target.values())
+    ):
         raise ValueError("merged Git history CPT target is invalid")
+    ordered_bands = tuple(
+        sorted(target, key=lambda name: EXACT_TOKEN_BAND_RANGES[name][0])
+    )
     selected: list[dict[str, Any]] = []
     retained_rows: Counter[str] = Counter()
     retained_tokens: Counter[str] = Counter()
@@ -102,9 +110,9 @@ def _select_disjoint_rows(
         base_workflows.add(str(row.get("base_workflow_id") or ""))
         source_digests.add(str(row.get("source_export_digest") or ""))
     return selected, {
-        "retained_rows": {name: retained_rows[name] for name in ("64k", "128k")},
+        "retained_rows": {name: retained_rows[name] for name in ordered_bands},
         "retained_context_tokens": {
-            name: retained_tokens[name] for name in ("64k", "128k")
+            name: retained_tokens[name] for name in ordered_bands
         },
         "unique_source_records": len(used_records),
         "unique_source_events": len(used_events),
@@ -301,7 +309,7 @@ def merge_releases(
     for release, *_ in loaded:
         pack_rejects.update(release.get("pack_reject_reasons") or {})
         cpt_rejects.update(release.get("cpt_reject_reasons") or {})
-    for key in ("global_quota_unfilled", "unfilled_64k", "unfilled_128k"):
+    for key in ("global_quota_unfilled", *(f"unfilled_{name}" for name in target)):
         pack_rejects.pop(key, None)
     manifest = {
         **{field: first_release[field] for field in _COMPATIBLE_FIELDS},
@@ -339,13 +347,27 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-dir", action="append", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--target-64k", type=int, required=True)
-    parser.add_argument("--target-128k", type=int, required=True)
+    parser.add_argument(
+        "--target",
+        action="append",
+        required=True,
+        metavar="BAND=COUNT",
+        help="repeat for each exact band, for example --target 16k=100",
+    )
     args = parser.parse_args()
+    target: dict[str, int] = {}
+    for value in args.target:
+        name, separator, count = value.partition("=")
+        if not separator or name in target:
+            parser.error(f"invalid or repeated target: {value}")
+        try:
+            target[name] = int(count)
+        except ValueError:
+            parser.error(f"invalid target count: {value}")
     report = merge_releases(
         args.input_dir,
         args.output_dir,
-        target={"64k": args.target_64k, "128k": args.target_128k},
+        target=target,
     )
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
 

@@ -53,6 +53,7 @@ EXACT_TOKEN_BAND_RANGES: dict[str, tuple[int, int]] = {
     "32k": (32_000, 32_768),
     "64k": (64_000, 65_536),
     "128k": (128_000, 131_072),
+    "256k": (256_000, 262_144),
 }
 _STRICT_EXACT_BUCKETS = frozenset(EXACT_TOKEN_BAND_RANGES)
 STRICT_REPLAY_REVISION = "longworld-strict-replay-v5"

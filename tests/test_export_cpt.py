@@ -281,3 +281,28 @@ def test_cpt_export_preserves_signed_bulk_length_and_lineage_metadata(
         "longitudinal_gate_revision": "git-distinct-commit-v1",
         "source_export_digest": row["source_export_digest"],
     }
+
+
+@pytest.mark.parametrize(
+    ("bucket", "tokens"),
+    [("16k", 16_123), ("32k", 32_123), ("256k", 256_123)],
+)
+def test_cpt_export_accepts_every_registered_exact_bulk_band(
+    tmp_path: Path, bucket: str, tokens: int
+) -> None:
+    row = _row()
+    row.update(
+        {
+            "base_workflow_id": "git-history:example/repo@head",
+            "length_bucket": bucket,
+            "tokenizer_context_tokens": tokens,
+            "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+            "tokenizer_revision": "a" * 40,
+            "tokenizer_asset_manifest_sha256": "b" * 64,
+            "source_record_count": 2,
+        }
+    )
+
+    result = export_cpt_rows([_sign(row)], tmp_path / "cpt.jsonl")
+
+    assert result["n_exported"] == 1

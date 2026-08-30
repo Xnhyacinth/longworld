@@ -17,10 +17,13 @@ sys.path.insert(0, str(SCRIPTS))
 
 from materialize_git_history_cpt import (
     _deduplicate_extraction,
+    _requests,
     _source_manifest,
     _source_slices,
     validate_remote_identity,
 )
+
+from longworld.core.cptwindow import CPTBand
 
 
 def test_source_text_dedup_breaks_the_chain_instead_of_bridging_it() -> None:
@@ -66,6 +69,29 @@ def test_source_slices_expand_repositories_in_round_robin_order() -> None:
         ("example/b", 1000, 500),
         ("example/a", 2000, 500),
     ]
+
+
+def test_window_requests_support_configured_multiband_curriculum() -> None:
+    bands = {
+        "16k": CPTBand("16k", 16_000, 16_384),
+        "32k": CPTBand("32k", 32_000, 32_768),
+        "256k": CPTBand("256k", 256_000, 262_144),
+    }
+
+    requests = _requests(
+        bands,
+        {"16k": 2, "32k": 1, "256k": 1},
+        multiplier=1,
+        minimum_source_events={"16k": 4, "32k": 8, "256k": 32},
+    )
+
+    assert [request.band.name for request in requests] == [
+        "256k",
+        "32k",
+        "16k",
+        "16k",
+    ]
+    assert [request.min_source_events for request in requests] == [32, 8, 4, 4]
 
 
 def test_git_history_remote_identity_requires_public_head_and_license() -> None:

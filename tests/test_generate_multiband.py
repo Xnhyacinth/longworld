@@ -218,6 +218,17 @@ def test_exact_64k_generation_range_is_closed_on_both_sides() -> None:
     assert exact_64k_reject_reason(65_537) == "exact_64k_out_of_range:65537"
 
 
+def test_256k_generation_range_is_registered() -> None:
+    assert exact_token_band_reject_reason("256k", 255_999) == (
+        "exact_256k_out_of_range:255999"
+    )
+    assert exact_token_band_reject_reason("256k", 256_000) is None
+    assert exact_token_band_reject_reason("256k", 262_144) is None
+    assert exact_token_band_reject_reason("256k", 262_145) == (
+        "exact_256k_out_of_range:262145"
+    )
+
+
 def test_exact_token_band_ranges_are_closed_and_do_not_relax() -> None:
     assert exact_token_band_reject_reason("16k", 15_999) == (
         "exact_16k_out_of_range:15999"

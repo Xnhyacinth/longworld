@@ -25,6 +25,7 @@ from longworld.core.attestation import (
 )
 from longworld.core.provenance import ProvenanceError, SourceLineage
 from longworld.core.realworkflow import RealWorkflow
+from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
 
 COHERENT_WORKFLOW_KINDS = {
     "real_source_derived",
@@ -59,7 +60,7 @@ _LONGITUDINAL_METADATA_FIELDS = {
     "source_elapsed_seconds",
     "source_event_count",
 }
-_BULK_BANDS = {"64k": (64_000, 65_536), "128k": (128_000, 131_072)}
+_BULK_BANDS = EXACT_TOKEN_BAND_RANGES
 
 
 def iter_jsonl(path: Path):

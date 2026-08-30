@@ -39,6 +39,22 @@ def test_merge_selects_only_missing_band_quota_without_event_reuse() -> None:
     assert stats["unique_source_events"] == 2
 
 
+def test_merge_selects_registered_multiband_target() -> None:
+    rows = [_row("16k", "r1"), _row("256k", "r2")]
+    rows[0]["tokenizer_context_tokens"] = 16_100
+    rows[1]["tokenizer_context_tokens"] = 256_100
+
+    selected, stats = _select_disjoint_rows(
+        rows,
+        target={"16k": 1, "256k": 1},
+        source_event_by_record={"r1": "e1", "r2": "e2"},
+        source_text_by_record={"r1": "t1", "r2": "t2"},
+    )
+
+    assert len(selected) == 2
+    assert stats["retained_rows"] == {"16k": 1, "256k": 1}
+
+
 def test_merge_rejects_cross_shard_source_event_reuse() -> None:
     with pytest.raises(ValueError, match="source event is reused"):
         _select_disjoint_rows(

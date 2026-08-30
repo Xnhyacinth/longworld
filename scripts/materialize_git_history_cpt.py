@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Materialize exact, disjoint 64K/128K CPT rows from public Git histories."""
+"""Materialize exact, disjoint CPT rows from public Git histories."""
 
 from __future__ import annotations
 
@@ -39,6 +39,7 @@ from longworld.core.githistory import GitHistoryExtraction, extract_first_parent
 from longworld.core.provenance import SourceLineage
 from longworld.core.publicscan import PUBLIC_SCANNER, PUBLIC_SCANNER_REVISION
 from longworld.core.realworkflow import RealWorkflow, WorkflowRecord
+from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
 from longworld.core.taxonomy import SourceOrigin
 from longworld.core.tokenizer_assets import resolved_tokenizer_asset_manifest_sha256
 from scripts.export_cpt import (
@@ -333,8 +334,11 @@ def _requests(
 ):
     requests: list[CPTWindowRequest] = []
     maximum = max(target.values()) * multiplier
+    ordered_names = sorted(
+        bands, key=lambda name: bands[name].lower_tokens, reverse=True
+    )
     for index in range(maximum):
-        for name in ("128k", "64k"):
+        for name in ordered_names:
             if index < target[name] * multiplier:
                 requests.append(
                     CPTWindowRequest(
@@ -344,6 +348,25 @@ def _requests(
                     )
                 )
     return tuple(requests)
+
+
+def _configured_bands(raw_bands: object) -> dict[str, CPTBand]:
+    if not isinstance(raw_bands, dict) or not raw_bands:
+        raise ValueError("Git history CPT requires at least one exact token band")
+    if not set(raw_bands).issubset(EXACT_TOKEN_BAND_RANGES):
+        raise ValueError("Git history CPT band is not registered")
+    bands: dict[str, CPTBand] = {}
+    for name, value in raw_bands.items():
+        if not isinstance(value, dict):
+            raise TypeError("Git history CPT band config is invalid")
+        bounds = (
+            int(value.get("lower_tokens") or 0),
+            int(value.get("upper_tokens") or 0),
+        )
+        if bounds != EXACT_TOKEN_BAND_RANGES[name]:
+            raise ValueError(f"Git history CPT band bounds do not match {name}")
+        bands[name] = CPTBand(name, *bounds)
+    return bands
 
 
 def _source_slices(
@@ -429,26 +452,16 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         with sanitized_attestation_environment():
             return len(tokenizer.encode(text, add_special_tokens=False))
 
-    raw_bands = config.get("bands")
-    if not isinstance(raw_bands, dict) or set(raw_bands) != {"64k", "128k"}:
-        raise ValueError("Git history CPT requires exact 64k and 128k bands")
-    bands = {
-        name: CPTBand(
-            name,
-            int(value.get("lower_tokens") or 0),
-            int(value.get("upper_tokens") or 0),
-        )
-        for name, value in raw_bands.items()
-        if isinstance(value, dict)
-    }
-    if set(bands) != set(raw_bands):
-        raise ValueError("Git history CPT band config is invalid")
+    bands = _configured_bands(config.get("bands"))
     raw_target = config.get("target_rows")
     if not isinstance(raw_target, dict):
         raise TypeError("Git history CPT target rows are missing")
     target = {name: int(raw_target.get(name) or 0) for name in bands}
     if any(count <= 0 for count in target.values()):
         raise ValueError("Git history CPT target rows must be positive")
+    require_full_target = config.get("require_full_target", True)
+    if not isinstance(require_full_target, bool):
+        raise TypeError("Git history CPT target policy is invalid")
     multiplier = int(config.get("attempt_multiplier") or 1)
     if multiplier <= 0 or multiplier > 4:
         raise ValueError("Git history CPT attempt multiplier is invalid")
@@ -683,7 +696,10 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             }
         )
 
-    serialized_rows = [*accepted_by_band["64k"], *accepted_by_band["128k"]]
+    ordered_band_names = sorted(bands, key=lambda name: bands[name].lower_tokens)
+    serialized_rows = [
+        row for name in ordered_band_names for row in accepted_by_band[name]
+    ]
     if any(len(accepted_by_band[name]) < target[name] for name in bands):
         pack_rejects["global_quota_unfilled"] += sum(
             max(0, target[name] - len(accepted_by_band[name])) for name in bands
@@ -703,11 +719,17 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         "tokenizer_revision": revision,
         "tokenizer_asset_manifest_sha256": tokenizer_asset_sha256,
         "target_rows": target,
+        "selection_mode": "quota" if require_full_target else "capacity_scan",
+        "require_full_target": require_full_target,
         "retained_rows": {
-            name: len(accepted_by_band[name]) for name in ("64k", "128k")
+            name: len(accepted_by_band[name]) for name in ordered_band_names
         },
         "retained_context_tokens": {
-            name: accepted_tokens[name] for name in ("64k", "128k")
+            name: accepted_tokens[name] for name in ordered_band_names
+        },
+        "capacity_censored_by_band": {
+            name: len(accepted_by_band[name]) == target[name]
+            for name in ordered_band_names
         },
         "unique_workflows": len({str(item["repository"]) for item in source_manifests}),
         "unique_source_windows": len(serialized_rows),
@@ -741,7 +763,9 @@ def main() -> None:
     args = parser.parse_args()
     report = materialize(args.config, args.output_dir)
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
-    if report["retained_rows"] != report["target_rows"]:
+    if report["require_full_target"] and (
+        report["retained_rows"] != report["target_rows"]
+    ):
         raise SystemExit("Git history CPT quota was not filled")
 
 

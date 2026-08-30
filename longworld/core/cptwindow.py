@@ -138,19 +138,6 @@ def pack_disjoint_workflow_windows(
                 if record_tokens is None:
                     record_tokens = token_counter(record.text)
                     token_cache[record.record_id] = record_tokens
-                if record_tokens > (
-                    request.band.upper_tokens - request.band.lower_tokens
-                ):
-                    if selected:
-                        rejects["short_disconnected_component"] += len(selected)
-                        selected = []
-                        selected_ids = set()
-                        selected_event_ids = set()
-                        estimated_tokens = 0
-                    rejects["record_exceeds_band_slack"] += 1
-                    cursor += 1
-                    start_index = cursor
-                    continue
                 if selected and not selected_ids.intersection(record.links):
                     rejects["short_disconnected_component"] += len(selected)
                     selected = []

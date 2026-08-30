@@ -107,7 +107,7 @@ def test_bulk_windows_report_unfilled_quota_and_short_tail() -> None:
     assert result.reject_reasons == {"short_tail_records": 2, "unfilled_128k": 1}
 
 
-def test_bulk_windows_reject_a_record_coarser_than_band_slack() -> None:
+def test_bulk_windows_can_pack_records_larger_than_band_slack() -> None:
     workflow = _workflow()
     records = list(workflow.records)
     records[0] = WorkflowRecord(
@@ -133,8 +133,9 @@ def test_bulk_windows_reject_a_record_coarser_than_band_slack() -> None:
         token_counter=_tokens,
     )
 
-    assert result.reject_reasons["record_exceeds_band_slack"] == 1
-    assert "r0" not in result.windows[0].record_ids
+    assert result.windows[0].context_tokens == 30
+    assert result.windows[0].record_ids == ("r0", "r1")
+    assert "record_exceeds_band_slack" not in result.reject_reasons
 
 
 def test_bulk_windows_only_retokenize_near_exact_band_boundary() -> None:
