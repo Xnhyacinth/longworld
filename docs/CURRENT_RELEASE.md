@@ -66,13 +66,28 @@ answer program and no production trust. It remains `train_ready=false` and
 `production_eligible=false`; it is recorded as a real, independently audited
 increment, not published training data.
 
-The next capacity wave has source caches ready for Flask (2,275 first-parent
-commits), scikit-learn (19,440), and DuckDB (10,597), covering distinct web,
-ML/scientific, and analytical-database workflows. Their clones and commit counts
-are acquisition capacity only and are not counted as data until materialization,
-cross-release subtraction, and independent audit pass. Godot, Bitcoin, pandas,
-and the three ready repositories have been added to the exact-license public
-allowlist; only the ready three are configured for the next five-band scan.
+The next five-band capacity wave over Flask, scikit-learn, and DuckDB is now
+materialized, union-subtracted, and independently audited. Its raw 547 rows lost
+ten complete rows to signed-source-body overlap with earlier releases. The final
+`p12-cpt-git-history-multiband-diverse-wave1-capacity-v2-dedup` increment retains
+102/105/111/109/110 rows at 16/32/64/128/256K respectively: **537 rows and
+54,383,671 exact Qwen tokens** from 26,113 non-reused commits and 82,423 source
+records. The audit recursively replays two pinned prior releases and finds zero
+remaining source-body, event, or context overlap.
+
+Across the three mutually disjoint current longitudinal/multiband CPT releases,
+the local candidate inventory is now **2,625 rows and 255,283,343 exact context
+tokens**: 133×16K, 136×32K, 1,111×64K, 1,109×128K, and 136×256K. These are
+non-round natural capacity counts except for the earlier configured 1,000-row
+64K/128K quotas. They span eleven repositories in one Git-history source family.
+
+This does not yet establish broad semantic diversity. The new wave is 51.4%
+scikit-learn, 45.1% DuckDB, and 3.5% Flask; 84.9% of its rows span less than 30
+days, and only 1.1% span at least one year. It proves real chronological,
+multi-commit, non-copied CPT contexts, not answer-changing long-range dependence.
+All three releases remain `train_ready=false` and `production_eligible=false`.
+Godot, Bitcoin, and pandas are allowlisted future source capacity, not retained
+data.
 
 ## Earlier source-native long-document CPT candidate
 

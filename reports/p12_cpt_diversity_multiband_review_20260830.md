@@ -124,3 +124,49 @@ The increment uses 4,345 real commits and 12,609 source records. Independent
 audit reloaded the referenced old release and recomputed zero source-body,
 commit-event, and full-context overlap across releases. The counts are non-round
 because no band reached its 1,000-row capacity safety cap.
+
+## Three-repository five-band capacity wave
+
+The next scan consumed 32,312 first-parent commits from Flask, scikit-learn,
+and DuckDB. The raw capacity pass retained 547 rows. A union subtraction against
+both earlier audited releases removed ten whole rows whose signed source bodies
+had already appeared; the final release retained 537 rows and 54,383,671 exact
+Qwen tokens:
+
+| Band | Rows | Exact Qwen tokens | Median commits | Median span |
+| ---- | ---: | ----------------: | -------------: | ----------: |
+| 16K  |  102 |         1,651,872 |              7 |   1.48 days |
+| 32K  |  105 |         3,396,683 |             13 |   3.39 days |
+| 64K  |  111 |         7,146,190 |             27 |   6.97 days |
+| 128K |  109 |        13,990,158 |             51 |  14.08 days |
+| 256K |  110 |        28,198,768 |          109.5 |  30.44 days |
+
+The final release contains 26,113 unique commits, 82,423 unique source records,
+and 537 unique contexts. The repaired independent audit verifies the full
+transitive reference closure, keeps inherited manifest pins immutable, derives
+body identities from signed source indexes, and reports zero cross-release body,
+event, or context overlap.
+
+This wave is length-balanced but not entity-balanced: scikit-learn contributes
+276 rows, DuckDB 242, and Flask 19. Its overall median span is 7.15 days; 456 of
+537 rows span less than 30 days, while only six span at least one year. Every
+window is chronological and connected, but a Git-history CPT predecessor chain
+is structural dependence rather than an executable answer-changing semantic
+proof. The accurate product label is therefore **multiband chronological CPT
+capacity probe**, not broad-domain LongWorld SFT.
+
+Across the three mutually source-disjoint audited CPT releases, the local-probe
+candidate inventory now contains 2,625 rows and 255,283,343 exact context tokens:
+
+| Band |  Rows | Exact Qwen tokens |
+| ---- | ----: | ----------------: |
+| 16K  |   133 |         2,154,097 |
+| 32K  |   136 |         4,399,685 |
+| 64K  | 1,111 |        71,516,827 |
+| 128K | 1,109 |       142,350,641 |
+| 256K |   136 |        34,862,093 |
+
+These remain `train_ready=false` and `production_eligible=false`. Exact and
+cross-release duplication filters are proven; semantic near-duplicate,
+release-cycle, executable long-range dependency, independent KMS trust, and
+training-effect gates are not.
