@@ -13,10 +13,16 @@ from longworld.core.financehistory import (
     FinancialFact,
     FinancialFiling,
     FinancialSourceRow,
+    audit_finance_dense_ranking,
+    audit_finance_pipeline_candidate,
     audit_financial_history_candidate,
+    build_finance_pipeline_candidate,
     build_financial_history_candidates,
+    replay_finance_pipeline_selection,
     replay_financial_history,
 )
+from longworld.core.pack import SEP
+from longworld.core.promotion import candidate_sha256
 from longworld.core.provenance import ProvenanceError
 
 
@@ -160,6 +166,80 @@ def test_builds_nested_multi_filing_financial_histories() -> None:
         assert row["real_source_token_ratio"] == pytest.approx(
             row["semantic_tokens"]["event_bearing"] / row["semantic_tokens"]["internal"]
         )
+
+
+def test_adapts_financial_history_for_dense_ranking_and_strict_selection() -> None:
+    row = _build()[0]
+
+    candidate = build_finance_pipeline_candidate(row)
+
+    documents = candidate["document_context"].split(SEP)
+    classifications = candidate["artifact_classification"]
+    assert len(documents) == len(classifications)
+    assert candidate["query_id"].endswith(":16k:full")
+    assert candidate["pipeline_capabilities"] == {
+        "dense_ranking": True,
+        "finance_strict_replay": True,
+        "generic_strict_replay": False,
+        "generic_promotion": False,
+    }
+    assert candidate["source_family_ids"] == ["issuer_ir_rendered_xbrl"]
+    assert all(url.startswith("https://") for url in candidate["source_urls"])
+    assert (
+        candidate["finance_state"]["filing_chain"]
+        == json.loads(row["answer"])["filing_chain"]
+    )
+    assert all(audit_finance_pipeline_candidate(candidate).values())
+
+    corrupted = deepcopy(candidate)
+    corrupted["document_context"] = corrupted["document_context"].replace(
+        "1,000", "9,000", 1
+    )
+    assert not audit_finance_pipeline_candidate(corrupted)["document_binding_valid"]
+
+    essentials = candidate["essential_artifact_ids"]
+    assert (
+        replay_finance_pipeline_selection(candidate, essentials)["answer"]
+        == row["answer"]
+    )
+    for removed in essentials:
+        assert (
+            replay_finance_pipeline_selection(
+                candidate, [value for value in essentials if value != removed]
+            )["answer"]
+            != row["answer"]
+        )
+
+
+def test_dense_ranking_audit_replays_ranked_finance_documents() -> None:
+    candidate = build_finance_pipeline_candidate(_build()[0])
+    documents = candidate["document_context"].split(SEP)
+    classifications = candidate["artifact_classification"]
+    ranking = {
+        "schema_version": "dense-ranking-v2",
+        "ranker_type": "dense_embedding",
+        "query_id": candidate["query_id"],
+        "candidate_sha256": candidate_sha256(candidate),
+        "query_sha256": hashlib.sha256(candidate["question"].encode()).hexdigest(),
+        "artifacts": [
+            {
+                "rank": rank,
+                "artifact_id": classification["artifact_id"],
+                "text_sha256": hashlib.sha256(document.encode()).hexdigest(),
+                "score": 1.0 - rank / 1000,
+                "chunk_count": 1,
+            }
+            for rank, (classification, document) in enumerate(
+                zip(classifications, documents, strict=True), start=1
+            )
+        ],
+    }
+
+    audit = audit_finance_dense_ranking(candidate, ranking, k=3)
+
+    assert audit["embedding_topk_insufficient"] is True
+    assert audit["full_pool_strict_replay_sufficient"] is True
+    assert audit["generic_promotion_ready"] is False
 
 
 def test_replay_recomputes_answer_cf_remove_one_and_corruption() -> None:

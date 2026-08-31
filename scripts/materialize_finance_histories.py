@@ -136,6 +136,11 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         tokenizer_model_id=model_id,
         tokenizer_revision=revision,
     )
+    tokenizer_asset_manifest_sha256 = resolved_tokenizer_asset_manifest_sha256(
+        model_id, revision
+    )
+    for row in rows:
+        row["tokenizer_asset_manifest_sha256"] = tokenizer_asset_manifest_sha256
     audits = [audit_financial_history_candidate(row) for row in rows]
     cumulative_errors = audit_cumulative_history(rows)
     if not all(audit and all(audit.values()) for audit in audits) or cumulative_errors:
@@ -156,9 +161,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         "exact_token_counts_recomputed": True,
         "tokenizer_model_id": model_id,
         "tokenizer_revision": revision,
-        "tokenizer_asset_manifest_sha256": (
-            resolved_tokenizer_asset_manifest_sha256(model_id, revision)
-        ),
+        "tokenizer_asset_manifest_sha256": tokenizer_asset_manifest_sha256,
         "source_filing_count": len(filings),
         "unique_available_source_row_count": sum(
             len(filing.rows) for filing in filings

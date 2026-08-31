@@ -9,19 +9,23 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from collections.abc import Callable, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, replace
+from itertools import pairwise
 from typing import Any
 from urllib.parse import urlparse
 
 from longworld.core.domainhistory import HistoryBand, audit_cumulative_history
 from longworld.core.issuerfilingworkflow import parse_issuer_ir_rendered_metrics
+from longworld.core.pack import SEP
 from longworld.core.provenance import ProvenanceError
 
 FINANCIAL_HISTORY_SCHEMA = "longworld.financial-cumulative-history.v1"
 FINANCIAL_HISTORY_REPLAY_REVISION = "longworld.financial-history-replay.v1"
+FINANCE_PIPELINE_CANDIDATE_SCHEMA = "longworld.finance-pipeline-candidate.v1"
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _ROW = re.compile(r"<tr\b[^>]*>.*?</tr>", re.IGNORECASE | re.DOTALL)
@@ -921,6 +925,404 @@ def build_financial_history_candidates(
             "financial history failed cumulative growth: " + ",".join(cumulative_errors)
         )
     return output
+
+
+def _pipeline_artifact_id(record: dict[str, Any]) -> str:
+    if record.get("record_type") == "filing_relation":
+        value = record.get("relation_id")
+    else:
+        value = record.get("source_record_id")
+    if not isinstance(value, str) or not value:
+        raise ProvenanceError("financial pipeline record identity is invalid")
+    return value
+
+
+def _pipeline_relation_partitions(task: dict[str, Any]) -> dict[str, Any]:
+    def records(value: object, provenance: str) -> list[dict[str, str]]:
+        if not isinstance(value, list):
+            raise ProvenanceError("financial pipeline relation partition is invalid")
+        output: list[dict[str, str]] = []
+        for edge in value:
+            if (
+                not isinstance(edge, list)
+                or len(edge) != 3
+                or any(not isinstance(item, str) or not item for item in edge)
+            ):
+                raise ProvenanceError("financial pipeline relation edge is invalid")
+            output.append(
+                {
+                    "source_record_id": edge[0],
+                    "target_record_id": edge[1],
+                    "relation_id": edge[2],
+                    "relation_provenance": provenance,
+                }
+            )
+        return output
+
+    return {
+        "authentic_exact_span_containment": records(
+            task.get("authentic_source_relation_edges"),
+            "authentic_exact_span_containment",
+        ),
+        "verified_derived_temporal": records(
+            task.get("verified_derived_relation_edges"),
+            "verified_derived_temporal_same_issuer",
+        ),
+    }
+
+
+def build_finance_pipeline_candidate(task: dict[str, Any]) -> dict[str, Any]:
+    """Adapt an audited finance history to the shared document-ranker boundary.
+
+    The result intentionally remains candidate-only.  The shared promotion core
+    cannot yet dispatch a finance replay adapter, so the capability boundary is
+    serialized instead of being represented as a green generic promotion gate.
+    """
+    finance_audit = audit_financial_history_candidate(task)
+    if not finance_audit or not all(finance_audit.values()):
+        failed = sorted(name for name, passed in finance_audit.items() if not passed)
+        raise ProvenanceError(
+            "financial pipeline input failed executable audit: " + ",".join(failed)
+        )
+    records = _parse_context(task.get("context"))
+    artifact_records = records[1:]
+    artifact_ids = [_pipeline_artifact_id(record) for record in artifact_records]
+    if len(artifact_ids) != len(set(artifact_ids)):
+        raise ProvenanceError("financial pipeline artifact identities are duplicated")
+    filing_ids = {
+        _pipeline_artifact_id(record)
+        for record in artifact_records
+        if record.get("record_type") == "filing"
+    }
+    relation_ids = {
+        _pipeline_artifact_id(record)
+        for record in artifact_records
+        if record.get("record_type") == "filing_relation"
+    }
+    essential_rows = set(task.get("essential_evidence_ids") or [])
+    essential_ids = [
+        artifact_id
+        for artifact_id in artifact_ids
+        if artifact_id in filing_ids
+        or artifact_id in relation_ids
+        or artifact_id in essential_rows
+    ]
+    replay = replay_financial_history(task)
+    answer = json.loads(str(task["answer"]))
+    filing_chain = answer.get("filing_chain")
+    if (
+        replay["answer"] != task.get("answer")
+        or not isinstance(filing_chain, list)
+        or filing_ids != set(filing_chain)
+    ):
+        raise ProvenanceError("financial pipeline state replay is invalid")
+
+    classifications: list[dict[str, str]] = []
+    source_urls: set[str] = set()
+    for artifact_id, record in zip(artifact_ids, artifact_records, strict=True):
+        record_type = str(record.get("record_type") or "")
+        if record_type == "financial_source_row":
+            source_origin = "real_derived"
+            provenance_id = "exact-span-sha256:" + str(
+                record.get("source_text_sha256") or ""
+            )
+            source_urls.add(str(record.get("source_url") or ""))
+        elif record_type == "filing":
+            source_origin = "real_public"
+            provenance_id = "source-sha256:" + str(record.get("source_sha256") or "")
+            source_urls.add(str(record.get("source_url") or ""))
+        elif record_type == "filing_relation":
+            source_origin = "real_derived"
+            provenance_id = "derived-relation-sha256:" + _sha256_text(
+                _canonical_json(record)
+            )
+        else:
+            raise ProvenanceError("financial pipeline record type is unsupported")
+        classifications.append(
+            {
+                "artifact_id": artifact_id,
+                "source_origin": source_origin,
+                "workflow_kind": "real_source_derived",
+                "evidence_role": (
+                    "causal_gold"
+                    if artifact_id in essential_ids
+                    else "natural_background"
+                ),
+                "workflow_id": str(task["world_id"]),
+                "provenance_id": provenance_id,
+            }
+        )
+    source_binding = task.get("source_binding")
+    source_family = (
+        str(source_binding.get("source_family") or "")
+        if isinstance(source_binding, dict)
+        else ""
+    )
+    if "" in source_urls or not source_family:
+        raise ProvenanceError("financial pipeline source identity is invalid")
+
+    candidate = deepcopy(task)
+    candidate.update(
+        {
+            "schema_version": FINANCE_PIPELINE_CANDIDATE_SCHEMA,
+            "data_stage": "candidate",
+            "training_objective": "sft",
+            "query_id": (
+                f"{task['world_id']}:{task['answer_program_id']}:"
+                f"{task['length_bucket']}:full"
+            ),
+            "view": "full",
+            "query_timing": "late",
+            "composition_method": "same_case_dossier",
+            "document_context": SEP.join(
+                _canonical_json(record) for record in artifact_records
+            ),
+            "artifact_classification": classifications,
+            "essential_artifact_ids": essential_ids,
+            "source_family_ids": [source_family],
+            "source_urls": sorted(source_urls),
+            "source_relation_partitions": _pipeline_relation_partitions(task),
+            "finance_state": {
+                "schema_version": "longworld.finance-state.v1",
+                "filing_chain": filing_chain,
+                "selected_filing_count": task["selected_filing_count"],
+                "event_count": task["event_count"],
+                "strict_support_event_count": task["strict_support_event_count"],
+            },
+            "finance_task": {
+                "query_type": task["query_type"],
+                "answer_program_id": task["answer_program_id"],
+                "answer_program_operations": list(task["answer_program_operations"]),
+            },
+            "finance_replay_contract": {
+                "adapter_id": "finance.multi_filing.v1",
+                "revision": FINANCIAL_HISTORY_REPLAY_REVISION,
+                "counterfactual_twin": deepcopy(task["counterfactual_twin"]),
+                "input_audit": finance_audit,
+            },
+            "pipeline_capabilities": {
+                "dense_ranking": True,
+                "finance_strict_replay": True,
+                "generic_strict_replay": False,
+                "generic_promotion": False,
+            },
+            "generation_integration": "finance_dense_candidate",
+        }
+    )
+    return candidate
+
+
+def replay_finance_pipeline_selection(
+    candidate: dict[str, Any],
+    artifact_ids: Sequence[str],
+    *,
+    counterfactual: bool = False,
+) -> dict[str, Any]:
+    """Strictly replay only the documents selected by a retrieval stage."""
+    if (
+        candidate.get("schema_version") != FINANCE_PIPELINE_CANDIDATE_SCHEMA
+        or not isinstance(artifact_ids, Sequence)
+        or isinstance(artifact_ids, (str, bytes))
+        or any(not isinstance(value, str) or not value for value in artifact_ids)
+        or len(artifact_ids) != len(set(artifact_ids))
+    ):
+        return {"answer": "unknown"}
+    try:
+        records = _parse_context(candidate.get("context"))
+        by_id = {_pipeline_artifact_id(record): record for record in records[1:]}
+        if not set(artifact_ids) <= by_id.keys():
+            raise ProvenanceError("financial pipeline selection is not source-bound")
+        selected = [
+            records[0],
+            *(
+                record
+                for record in records[1:]
+                if _pipeline_artifact_id(record) in artifact_ids
+            ),
+        ]
+        replay_task = deepcopy(candidate)
+        replay_task["context"] = _context(selected)
+        replay_task["context_sha256"] = _sha256_text(replay_task["context"])
+        return replay_financial_history(replay_task, counterfactual=counterfactual)
+    except (KeyError, ProvenanceError):
+        return {"answer": "unknown"}
+
+
+def audit_finance_pipeline_candidate(candidate: dict[str, Any]) -> dict[str, bool]:
+    """Audit the finance adapter without claiming generic promotion support."""
+    try:
+        records = _parse_context(candidate.get("context"))
+        artifact_records = records[1:]
+        artifact_ids = [_pipeline_artifact_id(record) for record in artifact_records]
+        classifications = candidate.get("artifact_classification")
+        documents = str(candidate.get("document_context") or "").split(SEP)
+        classified_ids = [
+            str(item.get("artifact_id") or "")
+            for item in classifications or []
+            if isinstance(item, dict)
+        ]
+        document_binding = (
+            isinstance(classifications, list)
+            and len(documents) == len(artifact_records) == len(classifications)
+            and documents == [_canonical_json(record) for record in artifact_records]
+            and classified_ids == artifact_ids
+        )
+        essentials = candidate.get("essential_artifact_ids")
+        essentials = essentials if isinstance(essentials, list) else []
+        base = replay_finance_pipeline_selection(candidate, essentials)
+        cf = replay_finance_pipeline_selection(
+            candidate, essentials, counterfactual=True
+        )
+        removals = [
+            replay_finance_pipeline_selection(
+                candidate, [value for value in essentials if value != removed]
+            )["answer"]
+            for removed in essentials
+        ]
+        partitions = candidate.get("source_relation_partitions")
+        authentic = (
+            partitions.get("authentic_exact_span_containment")
+            if isinstance(partitions, dict)
+            else None
+        )
+        derived = (
+            partitions.get("verified_derived_temporal")
+            if isinstance(partitions, dict)
+            else None
+        )
+        relation_split = bool(
+            isinstance(authentic, list)
+            and isinstance(derived, list)
+            and authentic
+            and derived
+            and {
+                str(item.get("relation_id") or "")
+                for item in authentic
+                if isinstance(item, dict)
+            }.isdisjoint(
+                {
+                    str(item.get("relation_id") or "")
+                    for item in derived
+                    if isinstance(item, dict)
+                }
+            )
+        )
+        input_audit = audit_financial_history_candidate(candidate)
+        return {
+            "input_finance_audit_green": bool(input_audit)
+            and all(input_audit.values()),
+            "document_binding_valid": document_binding,
+            "selected_strict_replay_sufficient": base["answer"]
+            == candidate.get("answer"),
+            "selected_counterfactual_replay_sufficient": cf["answer"]
+            == candidate.get("cf_answer"),
+            "selected_counterfactual_changes_answer": cf["answer"] != base["answer"],
+            "selected_remove_one_fails": bool(removals)
+            and all(answer != candidate.get("answer") for answer in removals),
+            "authentic_derived_relation_split": relation_split,
+            "candidate_only_boundary": candidate.get("pipeline_capabilities")
+            == {
+                "dense_ranking": True,
+                "finance_strict_replay": True,
+                "generic_strict_replay": False,
+                "generic_promotion": False,
+            }
+            and all(
+                candidate.get(field) is False
+                for field in (
+                    "train_ready",
+                    "production_eligible",
+                    "promotion_eligible",
+                    "complete_world",
+                    "promoted",
+                )
+            ),
+        }
+    except (KeyError, ProvenanceError):
+        return {"adapter_valid": False}
+
+
+def audit_finance_dense_ranking(
+    candidate: dict[str, Any], ranking: dict[str, Any], *, k: int = 3
+) -> dict[str, Any]:
+    """Replay a shared dense-ranking result through the finance adapter."""
+    pipeline_audit = audit_finance_pipeline_candidate(candidate)
+    if not pipeline_audit or not all(pipeline_audit.values()):
+        raise ProvenanceError("finance dense audit received an invalid candidate")
+    unsigned_candidate = {
+        key: value for key, value in candidate.items() if key != "attestation"
+    }
+    expected_candidate_sha256 = _sha256_text(_canonical_json(unsigned_candidate))
+    if (
+        ranking.get("schema_version") != "dense-ranking-v2"
+        or ranking.get("ranker_type") != "dense_embedding"
+        or ranking.get("query_id") != candidate.get("query_id")
+        or ranking.get("candidate_sha256") != expected_candidate_sha256
+        or ranking.get("query_sha256")
+        != _sha256_text(str(candidate.get("question") or ""))
+    ):
+        raise ProvenanceError("finance dense ranking identity is invalid")
+    classifications = candidate.get("artifact_classification")
+    documents = str(candidate.get("document_context") or "").split(SEP)
+    if not isinstance(classifications, list) or len(classifications) != len(documents):
+        raise ProvenanceError("finance dense candidate document binding is invalid")
+    expected = {
+        str(classification["artifact_id"]): _sha256_text(document)
+        for classification, document in zip(classifications, documents, strict=True)
+        if isinstance(classification, dict)
+    }
+    raw_artifacts = ranking.get("artifacts")
+    if not isinstance(raw_artifacts, list) or len(raw_artifacts) != len(expected):
+        raise ProvenanceError("finance dense ranking artifact pool is incomplete")
+    ranked_ids: list[str] = []
+    scores: list[float] = []
+    for expected_rank, item in enumerate(raw_artifacts, start=1):
+        if not isinstance(item, dict) or item.get("rank") != expected_rank:
+            raise ProvenanceError("finance dense ranking order is invalid")
+        artifact_id = str(item.get("artifact_id") or "")
+        try:
+            score = float(item["score"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ProvenanceError("finance dense ranking score is invalid") from error
+        if (
+            artifact_id in ranked_ids
+            or artifact_id not in expected
+            or item.get("text_sha256") != expected[artifact_id]
+            or not math.isfinite(score)
+            or not isinstance(item.get("chunk_count"), int)
+            or isinstance(item.get("chunk_count"), bool)
+            or int(item["chunk_count"]) < 1
+        ):
+            raise ProvenanceError("finance dense ranking artifact is invalid")
+        ranked_ids.append(artifact_id)
+        scores.append(score)
+    if set(ranked_ids) != set(expected) or any(
+        left < right for left, right in pairwise(scores)
+    ):
+        raise ProvenanceError("finance dense ranking pool or scores are invalid")
+    if k < 1 or k >= len(ranked_ids):
+        raise ProvenanceError("finance dense top-k is outside the artifact pool")
+    prefix_answers = [
+        replay_finance_pipeline_selection(candidate, ranked_ids[:prefix])["answer"]
+        for prefix in range(1, k + 1)
+    ]
+    full_answer = replay_finance_pipeline_selection(candidate, ranked_ids)["answer"]
+    expected_answer = str(candidate.get("answer") or "")
+    if expected_answer in prefix_answers or full_answer != expected_answer:
+        raise ProvenanceError("finance dense retrieval gate failed")
+    return {
+        "schema_version": "longworld.finance-dense-audit.v1",
+        "candidate_sha256": expected_candidate_sha256,
+        "query_id": candidate["query_id"],
+        "k": k,
+        "top_k_artifact_ids": ranked_ids[:k],
+        "strict_replay_prefix_answers": prefix_answers,
+        "expected_answer": expected_answer,
+        "embedding_topk_insufficient": True,
+        "full_pool_strict_replay_sufficient": True,
+        "strict_replay_revision": FINANCIAL_HISTORY_REPLAY_REVISION,
+        "generic_promotion_ready": False,
+    }
 
 
 def audit_financial_history_candidate(task: dict[str, Any]) -> dict[str, bool]:

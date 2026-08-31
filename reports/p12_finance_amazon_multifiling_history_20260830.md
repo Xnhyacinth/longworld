@@ -68,3 +68,26 @@ source exporters rather than relabeling issuer filings.
 
 Materialized diagnostic output:
 `data/releases/p12-finance-amazon-multifiling-history-v1/`.
+
+## Shared-pipeline adapter update — 2026-08-31
+
+The three histories now also materialize as signed document-ranking candidates
+under `longworld.finance-pipeline-candidate.v1`. The shared pinned MiniLM dense
+ranker produced three complete-pool rankings, and the finance-specific strict
+selection replay confirmed that dense top-3 is insufficient while the complete
+artifact pool reproduces the answer for all three bands. The adapted rows have
+29/62/120 distinct artifacts and 21/32/43 retrieval-essential artifacts at
+16/32/64K. The source candidates retain exact Qwen counts of
+16,078/32,478/64,203 tokens and preserve authentic exact-span containment
+separately from verified-derived prior-filing relations.
+
+This reaches candidate → shared dense ranking → signed finance replay audit. It
+does not reach shared promotion. A direct shared audit rejects the row with
+`candidate verification is malformed`; after an adapter-aware verification
+contract is added, `_reconstruct_candidate` must also dispatch the Finance
+replay and load a producer-attested Finance source sidecar. Until both shared
+interfaces exist, `generic_strict_replay_ready=false`,
+`generic_promotion_ready=false`, and the rows remain non-train-ready candidates.
+
+Materialized adapter output:
+`data/releases/p12-finance-amazon-multifiling-pipeline-v1/`.
