@@ -35,7 +35,12 @@ from longworld.core.githistory import (
     LICENSE_BINDING_RECEIPT_SCHEMA,
     TOKEN_COUNT_CACHE_REVISION,
     DeterministicTokenCountCache,
+    git_history_scan_coverage,
+    git_object_path_proof_history_anchor,
     git_truncation_quality,
+    validate_git_object_proof_public_export_governance,
+    verify_git_object_path_absence_proof,
+    verify_git_object_path_proof,
 )
 from longworld.core.provenance import _read_regular_file
 from longworld.core.realworkflow import (
@@ -155,13 +160,24 @@ def _validate_source_manifest_schema(source: dict[str, Any]) -> None:
         raise ValueError("unsupported Git history source manifest schema")
 
 
+def _validate_source_export_governance(source: dict[str, Any]) -> None:
+    binding = source.get("license_binding")
+    binding_schema = (
+        binding.get("schema_version") if isinstance(binding, dict) else None
+    )
+    if binding_schema == LICENSE_BINDING_RECEIPT_SCHEMA:
+        validate_git_object_proof_public_export_governance(source)
+        return
+    _validate_public_export_governance(source)
+
+
 def _validate_license_binding_receipt(
     source: dict[str, Any],
     *,
     canonical_policy: dict[str, Any] | None = None,
     canonical_repository_policy_sha256: str | None = None,
 ) -> str:
-    """Replay v2 license history bindings or identify an explicit legacy source."""
+    """Replay object-backed license history or identify an explicit legacy source."""
     environment = os.environ.get(ATTESTATION_ENVIRONMENT_ENV, "").strip().lower()
     remote = source.get("remote_identity")
     parser = source.get("parser")
@@ -170,16 +186,26 @@ def _validate_license_binding_receipt(
     binding = source.get("license_binding")
     if binding is None:
         if environment == "production":
-            raise ValueError("production audit requires license-binding v2")
-        if parser.get("revision") == "v5":
-            raise ValueError("Git parser v5 requires a license-binding v2 receipt")
+            raise ValueError("production audit requires object-backed license binding")
+        if parser.get("revision") in {"v5", "v6"}:
+            raise ValueError("modern Git parser requires a license receipt")
         if parser.get("revision") not in {"v1", "v2", "v3", "v4"}:
             raise ValueError("Git legacy parser revision is unsupported")
         if remote.get("license_file_classifier_spdx_id") == "NOASSERTION":
             raise ValueError("legacy Git license binding cannot accept NOASSERTION")
         return "legacy-remote-head-v1"
-    if parser.get("revision") != "v5":
-        raise ValueError("license-binding v2 requires Git parser v5")
+    binding_schema = (
+        binding.get("schema_version") if isinstance(binding, dict) else None
+    )
+    object_backed = binding_schema == LICENSE_BINDING_RECEIPT_SCHEMA
+    objectless_v2 = binding_schema == "longworld.git-license-binding-receipt.v2"
+    if not object_backed and not objectless_v2:
+        raise ValueError("Git license-binding receipt revision is invalid")
+    if objectless_v2 and environment == "production":
+        raise ValueError("production audit requires object-backed license binding")
+    expected_parser_revision = "v6" if object_backed else "v5"
+    if parser.get("revision") != expected_parser_revision:
+        raise ValueError("Git license binding does not match parser revision")
     if canonical_policy is None and canonical_repository_policy_sha256 is None:
         canonical_policy, canonical_repository_policy_sha256 = (
             _canonical_license_policy(source)
@@ -198,10 +224,10 @@ def _validate_license_binding_receipt(
         "observed_license_blobs",
         "transition_count",
     }
+    if object_backed:
+        expected_binding_fields.add("object_path_proof")
     if not isinstance(binding, dict) or set(binding) != expected_binding_fields:
-        raise ValueError("Git license-binding v2 receipt shape is invalid")
-    if binding.get("schema_version") != LICENSE_BINDING_RECEIPT_SCHEMA:
-        raise ValueError("Git license-binding receipt revision is invalid")
+        raise ValueError("Git object-backed license receipt shape is invalid")
     policy = binding.get("policy")
     if not isinstance(policy, dict) or set(policy) != {
         "schema_version",
@@ -330,6 +356,18 @@ def _validate_license_binding_receipt(
     }
     if not record_events.issubset(revisions):
         raise ValueError("Git source records escape license-bound history")
+    if object_backed:
+        verify_git_object_path_proof(
+            binding.get("object_path_proof"),
+            expected_path=approved_path,
+            expected_commit_bindings=commit_bindings,
+            expected_license_blobs=binding.get("observed_license_blobs"),
+        )
+        proof = binding.get("object_path_proof")
+        if not isinstance(proof, dict) or source.get(
+            "git_object_proof_privacy_review"
+        ) != proof.get("public_metadata_review"):
+            raise ValueError("Git object proof privacy review is unbound")
     expected_remote_fields = {
         "repository_response_sha256",
         "commit_response_sha256",
@@ -384,7 +422,11 @@ def _validate_license_binding_receipt(
         )
     ):
         raise ValueError("Git remote license tip is not bound to selected history")
-    return "git-license-binding-v2"
+    return (
+        "git-license-binding-v3"
+        if object_backed
+        else "git-license-binding-v2-objectless"
+    )
 
 
 def _source_path(release_dir: Path, value: object) -> Path:
@@ -438,14 +480,37 @@ def _validate_retained_count_contract(
     *,
     target: dict[str, int],
     require_full_target: bool,
+    require_nonempty: bool = False,
 ) -> None:
     invalid = (
         set(observed) != set(target)
         or any(observed[name] > target[name] for name in target)
         or (require_full_target and observed != target)
+        or (require_nonempty and sum(observed.values()) == 0)
     )
     if invalid:
         raise ValueError("release row counts do not match audited rows")
+
+
+def _validate_complete_scan_contract(
+    source_manifests: object,
+    scan_coverage: object,
+    *,
+    required: bool,
+) -> None:
+    if not required:
+        return
+    if (
+        not isinstance(source_manifests, list)
+        or not source_manifests
+        or not isinstance(scan_coverage, list)
+        or not scan_coverage
+        or any(
+            not isinstance(item, dict) or item.get("source_scan_complete") is not True
+            for item in scan_coverage
+        )
+    ):
+        raise ValueError("required complete source scan is incomplete")
 
 
 def _validate_source_truncation_contract(
@@ -556,9 +621,99 @@ def _validate_source_summary_binding(
         "record_count": source.get("accepted_record_count"),
         "reject_reasons": source.get("reject_reasons"),
         "truncation_quality": source.get("truncation_quality"),
+        "history_coverage": source.get("history_coverage"),
+        "history_slice_anchor": source.get("history_slice_anchor"),
     }
     if any(summary.get(field) != value for field, value in expected.items()):
         raise ValueError("source manifest summary is not bound to signed source")
+
+
+def _validate_history_coverage(source: dict[str, Any]) -> bool:
+    coverage = source.get("history_coverage")
+    parser = source.get("parser")
+    if coverage is None:
+        if os.environ.get(ATTESTATION_ENVIRONMENT_ENV, "").strip().lower() == (
+            "production"
+        ):
+            raise ValueError("production audit requires Git history coverage")
+        return False
+    if not isinstance(coverage, dict) or not isinstance(parser, dict):
+        raise TypeError("Git history coverage is missing")
+    common_fields = {
+        "schema_version",
+        "scope",
+        "root_revision",
+        "total_first_parent_commits",
+        "included_commit_count",
+        "excluded_commit_count",
+    }
+    scope = coverage.get("scope")
+    expected_fields = set(common_fields)
+    if scope == "approved_license_path_contiguous_suffix":
+        expected_fields.update(
+            {
+                "oldest_included_revision",
+                "first_excluded_revision",
+                "approved_path",
+                "exclusion_reason",
+            }
+        )
+    if (
+        set(coverage) != expected_fields
+        or coverage.get("schema_version")
+        != "longworld.git-history-coverage-boundary.v1"
+        or scope
+        not in {
+            "complete_first_parent_history",
+            "approved_license_path_contiguous_suffix",
+        }
+        or coverage.get("root_revision") != parser.get("root_revision")
+    ):
+        raise ValueError("Git history coverage contract is invalid")
+    total = coverage.get("total_first_parent_commits")
+    included = coverage.get("included_commit_count")
+    excluded = coverage.get("excluded_commit_count")
+    skip = parser.get("skip_commits")
+    observed = source.get("observed_commit_count")
+    if (
+        any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 0
+            for value in (total, included, excluded, skip, observed)
+        )
+        or total <= 0
+        or included <= 0
+        or included + excluded != total
+        or skip + observed > included
+        or (scope == "complete_first_parent_history" and excluded != 0)
+    ):
+        raise ValueError("Git history coverage counts are invalid")
+    if scope == "approved_license_path_contiguous_suffix":
+        binding = source.get("license_binding")
+        policy = binding.get("policy") if isinstance(binding, dict) else None
+        for field in ("oldest_included_revision", "first_excluded_revision"):
+            value = coverage.get(field)
+            if not isinstance(value, str) or _GIT_SHA.fullmatch(value) is None:
+                raise ValueError("Git history coverage boundary is invalid")
+        if (
+            excluded <= 0
+            or coverage.get("exclusion_reason") != "approved_license_path_absent"
+            or not isinstance(policy, dict)
+            or coverage.get("approved_path") != policy.get("approved_path")
+        ):
+            raise ValueError("Git history coverage boundary is invalid")
+        verify_git_object_path_absence_proof(
+            source.get("history_coverage_absence_proof"),
+            expected_commit_revision=str(coverage["first_excluded_revision"]),
+            expected_path=str(coverage["approved_path"]),
+        )
+    elif source.get("history_coverage_absence_proof") is not None:
+        raise ValueError("complete Git history has an unexpected absence proof")
+    binding = source.get("license_binding")
+    proof = binding.get("object_path_proof") if isinstance(binding, dict) else None
+    anchor = git_object_path_proof_history_anchor(proof)
+    if source.get("history_slice_anchor") != anchor:
+        raise ValueError("Git history slice anchor does not replay")
+    return True
 
 
 def _validate_source_record_binding(
@@ -737,9 +892,15 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
     band_names = tuple(
         sorted(raw_target_rows, key=lambda name: EXACT_TOKEN_BAND_RANGES[name][0])
     )
+    environment = os.environ.get(ATTESTATION_ENVIRONMENT_ENV, "").strip().lower()
     require_full_target = release.get("require_full_target", True)
     if not isinstance(require_full_target, bool):
         raise TypeError("Git history CPT target policy is invalid")
+    require_complete_source_scan = release.get("require_complete_source_scan", False)
+    if not isinstance(require_complete_source_scan, bool):
+        raise TypeError("Git history complete source scan policy is invalid")
+    if environment == "production" and require_complete_source_scan is not True:
+        raise ValueError("production audit requires a complete source scan")
     raw_minimum_source_events = release.get("minimum_source_events")
     longitudinal = raw_minimum_source_events is not None
     if longitudinal:
@@ -808,8 +969,12 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
     source_records: dict[str, SourceRecordBinding] = {}
     base_workflows: set[str] = set()
     verified_source_manifests = 0
+    history_coverage_manifests = 0
     license_binding_revisions: Counter[str] = Counter()
-    for summary in release.get("source_manifests") or []:
+    source_manifests = release.get("source_manifests")
+    if not isinstance(source_manifests, list):
+        raise TypeError("release source manifests are invalid")
+    for summary in source_manifests:
         if not isinstance(summary, dict):
             raise TypeError("source manifest summary is invalid")
         path = _source_path(release_dir, summary.get("path"))
@@ -826,7 +991,7 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
             raise ValueError("source manifest payload hash mismatch")
         if not verify_attestation(source, source_key, purpose="source_manifest"):
             raise ValueError("source manifest attestation failed")
-        _validate_public_export_governance(source)
+        _validate_source_export_governance(source)
         provenance_id = (
             "sha256:" + hashlib.sha256(canonical_attested_payload(source)).hexdigest()
         )
@@ -841,17 +1006,18 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
         ):
             raise ValueError("source remote identity is unbound")
         license_binding_revisions[_validate_license_binding_receipt(source)] += 1
+        history_coverage_manifests += int(_validate_history_coverage(source))
         parser = source.get("parser")
         if longitudinal and (
             not isinstance(parser, dict)
-            or parser.get("revision") not in {"v3", "v4", "v5"}
+            or parser.get("revision") not in {"v3", "v4", "v5", "v6"}
             or parser.get("max_chunks_per_commit")
             != release.get("max_chunks_per_commit")
             or parser.get("oversized_commit_policy")
             != "real_prefix_chunks_with_audited_omission"
         ):
             raise ValueError("longitudinal source parser contract is invalid")
-        if isinstance(parser, dict) and parser.get("revision") in {"v4", "v5"}:
+        if isinstance(parser, dict) and parser.get("revision") in {"v4", "v5", "v6"}:
             _validate_source_truncation_contract(
                 source, maximum_truncated_commit_ratio_ppm
             )
@@ -902,6 +1068,18 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
                 manifest_record_count=manifest_record_count,
             )
         verified_source_manifests += 1
+
+    release_scan_coverage = release.get("source_scan_coverage")
+    if release_scan_coverage is None:
+        if environment == "production":
+            raise ValueError("production audit requires source scan coverage")
+    elif release_scan_coverage != git_history_scan_coverage(source_manifests):
+        raise ValueError("release source scan coverage does not replay")
+    _validate_complete_scan_contract(
+        source_manifests,
+        release_scan_coverage,
+        required=require_complete_source_scan,
+    )
 
     model_id = str(release.get("tokenizer_model_id") or "")
     revision = str(release.get("tokenizer_revision") or "")
@@ -1069,6 +1247,7 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
         observed_counts,
         target=raw_target_rows,
         require_full_target=require_full_target,
+        require_nonempty=environment == "production",
     )
     if observed_tokens != release.get("retained_context_tokens"):
         raise ValueError("release token counts do not match audited rows")
@@ -1149,9 +1328,14 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
         "exact_duplicate_contexts": 0,
         "exact_duplicate_source_record_texts": 0,
         "verified_source_manifests": verified_source_manifests,
+        "history_coverage_source_manifests": history_coverage_manifests,
+        "source_scan_coverage": release_scan_coverage,
         "license_binding_revisions": dict(sorted(license_binding_revisions.items())),
-        "license_binding_v2_source_manifests": license_binding_revisions[
-            "git-license-binding-v2"
+        "object_backed_license_source_manifests": license_binding_revisions[
+            "git-license-binding-v3"
+        ],
+        "objectless_v2_license_source_manifests": license_binding_revisions[
+            "git-license-binding-v2-objectless"
         ],
         "legacy_license_binding_source_manifests": license_binding_revisions[
             "legacy-remote-head-v1"

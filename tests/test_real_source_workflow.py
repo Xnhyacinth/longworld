@@ -131,6 +131,21 @@ def test_probe_export_governance_rejects_unknown_allowlist_pin(monkeypatch) -> N
         _validate_public_export_governance(_public_governance())
 
 
+def test_generic_export_governance_rejects_git_metadata_exception(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(PUBLIC_POLICY_SHA256_ENV, "d" * 64)
+    monkeypatch.setenv(GH_BINARY_SHA256_ENV, "e" * 64)
+    payload = _public_governance()
+    payload["privacy_review"]["emails"] = (
+        "redacted_training_text_public_git_metadata_retained"
+    )
+
+    with pytest.raises(ProvenanceError, match="privacy review"):
+        _validate_public_export_governance(payload)
+
+
 def _write_v2_pack(pack_dir: Path, *, text: str = RFC_FIXTURE) -> None:
     pack_dir.mkdir()
     source = pack_dir / "misleading-filename.txt"

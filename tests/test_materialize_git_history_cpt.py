@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -12,6 +13,7 @@ import pytest
 
 from longworld.core.attestation import ATTESTATION_ENV, verify_attestation
 from longworld.core.githistory import (
+    GitCommitTruncation,
     GitHistoryExtraction,
     bind_git_license_history,
     extract_first_parent_history,
@@ -27,9 +29,13 @@ from materialize_git_history_cpt import (
     _configured_truncation_ratio,
     _deduplicate_extraction,
     _load_allowlist,
+    _load_slice_checkpoint,
     _requests,
+    _slice_checkpoint_identity,
     _source_manifest,
     _source_slices,
+    _validated_history_coverage,
+    _write_slice_checkpoint,
     validate_remote_identity,
 )
 
@@ -85,6 +91,47 @@ def _license_history_repo(
     return repo, tuple(revisions), bodies
 
 
+def test_history_coverage_boundary_requires_first_missing_license_path(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "coverage-repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.name", "LongWorld Test")
+    _git(repo, "config", "user.email", "test@example.com")
+    (repo / "history.txt").write_text("pre-license\n", encoding="utf-8")
+    _git(repo, "add", "history.txt")
+    _git(repo, "commit", "-q", "-m", "pre-license")
+    first_excluded = _git(repo, "rev-parse", "HEAD")
+    (repo / "LICENSE.txt").write_text("approved license\n", encoding="utf-8")
+    _git(repo, "add", "LICENSE.txt")
+    _git(repo, "commit", "-q", "-m", "add license")
+    root_revision = _git(repo, "rev-parse", "HEAD")
+    source = {
+        "history_commit_limit": 1,
+        "history_coverage": {
+            "schema_version": "longworld.git-history-coverage-boundary.v1",
+            "scope": "approved_license_path_contiguous_suffix",
+            "root_revision": root_revision,
+            "total_first_parent_commits": 2,
+            "included_commit_count": 1,
+            "excluded_commit_count": 1,
+            "oldest_included_revision": root_revision,
+            "first_excluded_revision": first_excluded,
+            "approved_path": "LICENSE.txt",
+            "exclusion_reason": "approved_license_path_absent",
+        },
+    }
+
+    assert (
+        _validated_history_coverage(source, repo, root_revision, 2)
+        == source["history_coverage"]
+    )
+    source["history_coverage"]["first_excluded_revision"] = "f" * 40
+    with pytest.raises(ValueError, match="boundary revisions disagree"):
+        _validated_history_coverage(source, repo, root_revision, 2)
+
+
 def _license_policy(repo: Path, revisions: tuple[str, ...]) -> dict[str, object]:
     approved_blobs = []
     for revision in revisions:
@@ -127,12 +174,125 @@ def test_source_text_dedup_breaks_the_chain_instead_of_bridging_it() -> None:
     assert len(seen) == 3
 
 
+def test_slice_checkpoint_is_deterministic_and_identity_bound(
+    tmp_path: Path,
+) -> None:
+    config = {
+        "schema_version": "longworld.git-history-cpt-materialization.v1",
+        "source_slice_commits": 1000,
+        "target_rows": {"16k": 2},
+    }
+    identity = _slice_checkpoint_identity(
+        config=config,
+        repository="example/repo",
+        checkout=tmp_path / "checkout",
+        root_revision="a" * 40,
+        max_commits=1000,
+        skip_commits=2000,
+        max_record_tokens=4096,
+        max_chunks_per_commit=3,
+        tokenizer_model_id="example/tokenizer",
+        tokenizer_revision="b" * 40,
+        tokenizer_asset_manifest_sha256="c" * 64,
+        public_policy_sha256="d" * 64,
+        history_client={"sha256": "e" * 64, "size": "123"},
+    )
+    extraction = GitHistoryExtraction(
+        records=(
+            WorkflowRecord(
+                record_id="git:example/repo:commit:0",
+                kind="commit",
+                occurred_at="2026-01-01T00:00:00Z",
+                text="real patch body",
+                links=(),
+                attributes={"sha": "e" * 40, "chunk_index": 0},
+                source_pointer="https://github.com/example/repo/commit/" + "e" * 40,
+            ),
+        ),
+        commit_count=1,
+        head_revision="e" * 40,
+        reject_reasons={"binary_patch": 1},
+        truncated_commits=(GitCommitTruncation("e" * 40, 3, 1),),
+        commit_revisions=("e" * 40,),
+    )
+    key = b"slice-checkpoint-source-role-key-0001"
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+
+    _write_slice_checkpoint(first, identity, extraction, key)
+    _write_slice_checkpoint(second, identity, extraction, key)
+
+    assert first.read_bytes() == second.read_bytes()
+    assert _load_slice_checkpoint(first, identity, key) == extraction
+
+    changed_identities = (
+        {**identity, "config_sha256": "0" * 64},
+        {**identity, "tokenizer_asset_manifest_sha256": "1" * 64},
+        {**identity, "root_revision": "f" * 40},
+        {**identity, "skip_commits": 3000},
+        {**identity, "history_client": {"sha256": "f" * 64, "size": "123"}},
+    )
+    for changed_identity in changed_identities:
+        with pytest.raises(ValueError, match="identity does not match"):
+            _load_slice_checkpoint(first, changed_identity, key)
+    with pytest.raises(ValueError, match="authentication failed"):
+        _load_slice_checkpoint(first, identity, b"different-source-role-key-000000001")
+    symlink = tmp_path / "checkpoint-link.json"
+    symlink.symlink_to(first)
+    with pytest.raises(ValueError, match="unreadable"):
+        _load_slice_checkpoint(symlink, identity, key)
+
+
+def test_slice_checkpoint_corruption_fails_closed_and_raw_dedup_is_replayed(
+    tmp_path: Path,
+) -> None:
+    identity = _slice_checkpoint_identity(
+        config={"schema_version": "longworld.git-history-cpt-materialization.v1"},
+        repository="example/repo",
+        checkout=tmp_path / "checkout",
+        root_revision="a" * 40,
+        max_commits=2,
+        skip_commits=0,
+        max_record_tokens=4096,
+        max_chunks_per_commit=2,
+        tokenizer_model_id="example/tokenizer",
+        tokenizer_revision="b" * 40,
+        tokenizer_asset_manifest_sha256="c" * 64,
+        public_policy_sha256="d" * 64,
+        history_client={"sha256": "e" * 64, "size": "123"},
+    )
+    extraction = GitHistoryExtraction(
+        records=(
+            WorkflowRecord("r0", "commit", "2026-01-01T00:00:00Z", "duplicate", ()),
+            WorkflowRecord("r1", "commit", "2026-01-02T00:00:00Z", "fresh", ("r0",)),
+        ),
+        commit_count=2,
+        head_revision="f" * 40,
+        reject_reasons={},
+        commit_revisions=("e" * 40, "f" * 40),
+    )
+    key = b"slice-checkpoint-source-role-key-0001"
+    checkpoint = tmp_path / "checkpoint.json"
+    _write_slice_checkpoint(checkpoint, identity, extraction, key)
+
+    restored = _load_slice_checkpoint(checkpoint, identity, key)
+    seen = {hashlib.sha256(b"duplicate").hexdigest()}
+    deduplicated = _deduplicate_extraction(restored, seen)
+    assert [record.record_id for record in deduplicated.records] == ["r1"]
+    assert deduplicated.records[0].links == ()
+
+    payload = json.loads(checkpoint.read_text(encoding="utf-8"))
+    payload["extraction"]["records"][0]["text"] = "corrupted"
+    checkpoint.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="authentication failed"):
+        _load_slice_checkpoint(checkpoint, identity, key)
+
+
 def test_source_slices_expand_repositories_in_round_robin_order() -> None:
     sources = [
         {"repository": "example/a", "checkout": "a"},
         {"repository": "example/b", "checkout": "b"},
     ]
-
     expanded = _source_slices(
         sources,
         slice_commits=1000,
@@ -151,6 +311,43 @@ def test_source_slices_expand_repositories_in_round_robin_order() -> None:
         ("example/b", 1000, 500),
         ("example/a", 2000, 500),
     ]
+
+
+def test_source_slices_honor_verified_history_commit_limit() -> None:
+    source = {
+        "repository": "example/a",
+        "checkout": "a",
+        "history_commit_limit": 1800,
+    }
+
+    expanded = _source_slices(
+        [source],
+        slice_commits=1000,
+        commit_count=lambda _: 2500,
+    )
+
+    assert [(item["skip_commits"], item["max_commits"]) for item in expanded] == [
+        (0, 1000),
+        (1000, 800),
+    ]
+
+
+@pytest.mark.parametrize("limit", [None, False, "1000", 0, -1, 2501])
+def test_source_slices_reject_invalid_or_unavailable_history_limit(
+    limit: object,
+) -> None:
+    source = {
+        "repository": "example/a",
+        "checkout": "a",
+        "history_commit_limit": limit,
+    }
+
+    with pytest.raises(ValueError, match="history commit limit"):
+        _source_slices(
+            [source],
+            slice_commits=1000,
+            commit_count=lambda _: 2500,
+        )
 
 
 def test_window_requests_support_configured_multiband_curriculum() -> None:
@@ -409,6 +606,10 @@ def test_git_history_source_manifest_normalizes_yaml_timestamp(
 ) -> None:
     key = b"git-history-source-manifest-test-key"
     monkeypatch.setenv(ATTESTATION_ENV, key.decode())
+    monkeypatch.setattr(
+        "materialize_git_history_cpt.validate_git_object_proof_public_export_governance",
+        lambda _payload: None,
+    )
     extraction = SimpleNamespace(
         head_revision="a" * 40,
         commit_revisions=("a" * 40,),
@@ -475,7 +676,7 @@ def test_git_history_source_manifest_normalizes_yaml_timestamp(
             ),
         },
         license_binding={
-            "schema_version": "longworld.git-license-binding-receipt.v2",
+            "schema_version": "longworld.git-license-binding-receipt.v3",
             "policy": {
                 "schema_version": "longworld.repo-license-binding-policy.v1",
                 "approved_path": "LICENSE.txt",
@@ -501,6 +702,7 @@ def test_git_history_source_manifest_normalizes_yaml_timestamp(
                 }
             ],
             "transition_count": 0,
+            "object_path_proof": {"public_metadata_review": {}},
         },
         root_revision="a" * 40,
         max_commits=1,
@@ -508,6 +710,20 @@ def test_git_history_source_manifest_normalizes_yaml_timestamp(
         max_record_tokens=768,
         max_chunks_per_commit=0,
         maximum_truncated_commit_ratio_ppm=0,
+        history_coverage={
+            "schema_version": "longworld.git-history-coverage-boundary.v1",
+            "scope": "complete_first_parent_history",
+            "root_revision": "a" * 40,
+            "total_first_parent_commits": 1,
+            "included_commit_count": 1,
+            "excluded_commit_count": 0,
+        },
+        history_slice_anchor={
+            "oldest_revision": "a" * 40,
+            "newest_revision": "a" * 40,
+            "oldest_first_parent_revision": None,
+        },
+        history_coverage_absence_proof=None,
     )
 
     assert manifest["authorization"]["reviewed_at"] == "2026-01-01T00:00:00Z"
@@ -515,7 +731,55 @@ def test_git_history_source_manifest_normalizes_yaml_timestamp(
     assert manifest["record_index"][0]["commit_chunk_count_total"] == 1
     assert manifest["remote_identity"]["repository_license_spdx_id"] == "MIT"
     assert manifest["remote_identity"]["license_file_sha256"] == "2" * 64
-    assert manifest["license_binding"]["schema_version"].endswith(".v2")
-    assert manifest["parser"]["revision"] == "v5"
+    assert manifest["license_binding"]["schema_version"].endswith(".v3")
+    assert manifest["parser"]["revision"] == "v6"
     assert manifest["parser"]["root_revision"] == "a" * 40
+    assert manifest["history_coverage"]["excluded_commit_count"] == 0
     assert verify_attestation(manifest, key, purpose="source_manifest")
+
+
+def test_git_history_source_manifest_rejects_oversized_signed_payload(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("materialize_git_history_cpt.MAX_SOURCE_MANIFEST_BYTES", 8)
+    monkeypatch.setattr(
+        "materialize_git_history_cpt.validate_git_object_proof_public_export_governance",
+        lambda _payload: None,
+    )
+    monkeypatch.setenv(ATTESTATION_ENV, "git-history-source-manifest-test-key")
+    with pytest.raises(ValueError, match="audit size limit"):
+        _source_manifest(
+            repository="example/repo",
+            policy={
+                "license": "MIT",
+                "authorization": {
+                    "record_id": "PUBLIC",
+                    "scope": "read-only",
+                    "basis": "public repository",
+                    "reviewed_at": "2026-01-01T00:00:00Z",
+                },
+            },
+            policy_sha256="a" * 64,
+            extraction=SimpleNamespace(
+                head_revision="b" * 40,
+                commit_revisions=("b" * 40,),
+                commit_count=0,
+                reject_reasons={},
+                truncated_commits=(),
+                records=(),
+            ),
+            exported_at="2026-01-02T00:00:00Z",
+            source_client={"path": "/usr/bin/gh", "sha256": "c" * 64},
+            history_client={"path": "/usr/bin/git", "sha256": "d" * 64},
+            remote_identity={},
+            license_binding={"object_path_proof": {"public_metadata_review": {}}},
+            root_revision="b" * 40,
+            max_commits=1,
+            skip_commits=0,
+            max_record_tokens=768,
+            max_chunks_per_commit=1,
+            maximum_truncated_commit_ratio_ppm=None,
+            history_coverage={},
+            history_slice_anchor={},
+            history_coverage_absence_proof=None,
+        )

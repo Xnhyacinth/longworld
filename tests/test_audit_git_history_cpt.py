@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import sys
@@ -8,6 +9,8 @@ from pathlib import Path
 
 import pytest
 import yaml
+
+from longworld.core.githistory import git_object_path_proof_history_anchor
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -18,8 +21,11 @@ from audit_git_history_cpt import (
     _canonical_license_policy,
     _cross_release_references,
     _load_reference_closure,
+    _validate_complete_scan_contract,
+    _validate_history_coverage,
     _validate_license_binding_receipt,
     _validate_retained_count_contract,
+    _validate_source_export_governance,
     _validate_source_manifest_schema,
     _validate_source_record_binding,
     _validate_source_summary_binding,
@@ -29,27 +35,111 @@ from audit_git_history_cpt import (
 
 
 def _license_bound_source() -> dict[str, object]:
+    def git_object(object_type: str, content: bytes) -> tuple[str, dict[str, object]]:
+        object_id = hashlib.sha1(
+            f"{object_type} {len(content)}\0".encode() + content,
+            usedforsecurity=False,
+        ).hexdigest()
+        return object_id, {
+            "oid": object_id,
+            "type": object_type,
+            "size": len(content),
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "content_base64": base64.b64encode(content).decode("ascii"),
+        }
+
+    blob1, blob1_object = git_object("blob", b"license-v1\n")
+    blob2, blob2_object = git_object("blob", b"license-v2\n")
+    tree1, tree1_object = git_object(
+        "tree", b"100644 LICENSE.txt\0" + bytes.fromhex(blob1)
+    )
+    tree2, tree2_object = git_object(
+        "tree", b"100644 LICENSE.txt\0" + bytes.fromhex(blob2)
+    )
+    commit1, commit1_object = git_object("commit", f"tree {tree1}\n\nfirst\n".encode())
+    commit2, commit2_object = git_object(
+        "commit", f"tree {tree2}\nparent {commit1}\n\nsecond\n".encode()
+    )
     policy = {
         "schema_version": "longworld.repo-license-binding-policy.v1",
         "approved_path": "LICENSE.txt",
         "approved_blobs": [
-            {"git_blob_sha": "b" * 40, "sha256": "c" * 64, "size": 12},
-            {"git_blob_sha": "d" * 40, "sha256": "e" * 64, "size": 13},
+            {
+                "git_blob_sha": blob1,
+                "sha256": hashlib.sha256(b"license-v1\n").hexdigest(),
+                "size": len(b"license-v1\n"),
+            },
+            {
+                "git_blob_sha": blob2,
+                "sha256": hashlib.sha256(b"license-v2\n").hexdigest(),
+                "size": len(b"license-v2\n"),
+            },
         ],
     }
     bindings = [
-        {"revision": "1" * 40, "git_blob_sha": "b" * 40},
-        {"revision": "2" * 40, "git_blob_sha": "d" * 40},
+        {"revision": commit1, "git_blob_sha": blob1},
+        {"revision": commit2, "git_blob_sha": blob2},
     ]
     canonical = lambda value: json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     ).encode()
+    proof = {
+        "schema_version": "longworld.git-object-path-proof.v1",
+        "hash_algorithm": "sha1",
+        "path": "LICENSE.txt",
+        "commit_bindings": bindings,
+        "objects": sorted(
+            (
+                blob1_object,
+                blob2_object,
+                tree1_object,
+                tree2_object,
+                commit1_object,
+                commit2_object,
+            ),
+            key=lambda item: str(item["oid"]),
+        ),
+        "object_count": 6,
+        "total_raw_bytes": sum(
+            int(item["size"])
+            for item in (
+                blob1_object,
+                blob2_object,
+                tree1_object,
+                tree2_object,
+                commit1_object,
+                commit2_object,
+            )
+        ),
+        "public_metadata_review": {
+            "scope": "portable_public_git_commit_tree_license_objects",
+            "author_committer_emails": (
+                "retained_public_git_metadata_not_training_text"
+            ),
+            "commit_messages": "credential_scanned_public_metadata",
+            "commit_header_email_count": 0,
+            "commit_message_email_count": 0,
+            "commit_header_decode_replacement_count": 0,
+            "commit_message_decode_replacement_count": 0,
+            "proof_artifact_emails": ("retained_public_git_metadata_not_training_text"),
+            "blob_email_count": 0,
+            "tree_name_email_count": 0,
+            "blob_decode_replacement_count": 0,
+            "tree_name_decode_replacement_count": 0,
+            "commit_count": 2,
+            "tree_count": 2,
+            "blob_count": 2,
+            "scanner": "longworld-public-secret-patterns",
+            "scanner_revision": "v2",
+        },
+    }
+    proof["proof_sha256"] = hashlib.sha256(canonical(proof)).hexdigest()
     return {
         "schema_version": "longworld.git-history-source-manifest.v1",
-        "revision": "2" * 40,
+        "revision": commit2,
         "repository_url": "https://github.com/example/repo",
         "license": "MIT",
-        "parser": {"revision": "v5"},
+        "parser": {"revision": "v6"},
         "public_policy": {
             "record_id": "PUBLIC",
             "sha256": "a" * 64,
@@ -60,44 +150,46 @@ def _license_bound_source() -> dict[str, object]:
         },
         "observed_commit_count": 2,
         "record_index": [
-            {"source_event_id": "1" * 40},
-            {"source_event_id": "2" * 40},
+            {"source_event_id": commit1},
+            {"source_event_id": commit2},
         ],
         "remote_identity": {
             "repository_response_sha256": "f" * 64,
             "commit_response_sha256": "0" * 64,
             "license_response_sha256": "9" * 64,
-            "head_revision": "2" * 40,
+            "head_revision": commit2,
             "repository_url": "https://github.com/example/repo",
             "license": "MIT",
             "repository_license_spdx_id": "MIT",
             "license_file_classifier_spdx_id": "NOASSERTION",
-            "license_file_revision": "2" * 40,
+            "license_file_revision": commit2,
             "license_file_path": "LICENSE.txt",
-            "license_file_git_blob_sha": "d" * 40,
-            "license_file_size": 13,
-            "license_file_sha256": "e" * 64,
+            "license_file_git_blob_sha": blob2,
+            "license_file_size": len(b"license-v2\n"),
+            "license_file_sha256": hashlib.sha256(b"license-v2\n").hexdigest(),
             "license_file_html_url": (
-                "https://github.com/example/repo/blob/" + "2" * 40 + "/LICENSE.txt"
+                "https://github.com/example/repo/blob/" + commit2 + "/LICENSE.txt"
             ),
             "license_file_download_url": (
                 "https://raw.githubusercontent.com/example/repo/"
-                + "2" * 40
+                + commit2
                 + "/LICENSE.txt"
             ),
         },
         "license_binding": {
-            "schema_version": "longworld.git-license-binding-receipt.v2",
+            "schema_version": "longworld.git-license-binding-receipt.v3",
             "policy": policy,
             "policy_sha256": hashlib.sha256(canonical(policy)).hexdigest(),
             "selected_commit_count": 2,
-            "selected_first_revision": "1" * 40,
-            "selected_last_revision": "2" * 40,
+            "selected_first_revision": commit1,
+            "selected_last_revision": commit2,
             "commit_bindings": bindings,
             "commit_bindings_sha256": hashlib.sha256(canonical(bindings)).hexdigest(),
             "observed_license_blobs": policy["approved_blobs"],
             "transition_count": 1,
+            "object_path_proof": proof,
         },
+        "git_object_proof_privacy_review": proof["public_metadata_review"],
     }
 
 
@@ -111,6 +203,34 @@ def _validate_bound_fixture(source: dict[str, object]) -> str:
     )
 
 
+def test_history_coverage_audit_replays_counts_root_and_license_path() -> None:
+    source = _license_bound_source()
+    root = str(source["revision"])
+    source["parser"] = {
+        "revision": "v6",
+        "root_revision": root,
+        "skip_commits": 0,
+    }
+    source["history_coverage"] = {
+        "schema_version": "longworld.git-history-coverage-boundary.v1",
+        "scope": "complete_first_parent_history",
+        "root_revision": root,
+        "total_first_parent_commits": 2,
+        "included_commit_count": 2,
+        "excluded_commit_count": 0,
+    }
+    source["history_slice_anchor"] = git_object_path_proof_history_anchor(
+        source["license_binding"]["object_path_proof"]
+    )
+    source["history_coverage_absence_proof"] = None
+
+    assert _validate_history_coverage(source) is True
+    source["history_coverage"]["included_commit_count"] = 1
+    source["history_coverage"]["excluded_commit_count"] = 1
+    with pytest.raises(ValueError, match="counts"):
+        _validate_history_coverage(source)
+
+
 def test_capacity_scan_accepts_natural_partial_retention() -> None:
     _validate_retained_count_contract(
         {"16k": 73, "256k": 11},
@@ -119,17 +239,60 @@ def test_capacity_scan_accepts_natural_partial_retention() -> None:
     )
 
 
-def test_v2_license_binding_replays_policy_history_and_remote_tip() -> None:
+def test_object_backed_license_binding_replays_policy_history_and_remote_tip() -> None:
     source = _license_bound_source()
 
-    assert _validate_bound_fixture(source) == "git-license-binding-v2"
+    assert _validate_bound_fixture(source) == "git-license-binding-v3"
 
     source["license_binding"]["commit_bindings_sha256"] = "0" * 64
     with pytest.raises(ValueError, match="commit binding digest"):
         _validate_bound_fixture(source)
 
 
-def test_v2_license_binding_rejects_policy_or_remote_tampering() -> None:
+@pytest.mark.parametrize("object_type", ("commit", "tree", "blob"))
+def test_license_auditor_independently_rejects_tampered_git_objects(
+    object_type: str,
+) -> None:
+    source = _license_bound_source()
+    proof = source["license_binding"]["object_path_proof"]
+    target = next(item for item in proof["objects"] if item["type"] == object_type)
+    raw = bytearray(base64.b64decode(target["content_base64"], validate=True))
+    raw[-1] ^= 1
+    target["content_base64"] = base64.b64encode(raw).decode("ascii")
+    target["sha256"] = hashlib.sha256(raw).hexdigest()
+    proof["proof_sha256"] = hashlib.sha256(
+        json.dumps(
+            {key: value for key, value in proof.items() if key != "proof_sha256"},
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+
+    with pytest.raises(ValueError, match="Git object identity"):
+        _validate_bound_fixture(source)
+
+
+def test_probe_accepts_v2_as_objectless_but_production_rejects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _license_bound_source()
+    source["parser"]["revision"] = "v5"
+    source["license_binding"]["schema_version"] = (
+        "longworld.git-license-binding-receipt.v2"
+    )
+    source["license_binding"].pop("object_path_proof")
+    monkeypatch.setenv("LONGWORLD_ATTESTATION_ENVIRONMENT", "probe")
+    monkeypatch.setenv("LONGWORLD_PUBLIC_POLICY_SHA256", "a" * 64)
+
+    assert _validate_bound_fixture(source) == "git-license-binding-v2-objectless"
+
+    monkeypatch.setenv("LONGWORLD_ATTESTATION_ENVIRONMENT", "production")
+    with pytest.raises(ValueError, match="object-backed license binding"):
+        _validate_bound_fixture(source)
+
+
+def test_object_backed_license_binding_rejects_policy_or_remote_tampering() -> None:
     source = _license_bound_source()
     source["public_policy"]["license_binding_policy_sha256"] = "0" * 64
     with pytest.raises(ValueError, match="policy binding"):
@@ -141,7 +304,7 @@ def test_v2_license_binding_rejects_policy_or_remote_tampering() -> None:
         _validate_bound_fixture(source)
 
 
-def test_v2_license_binding_rejects_policy_not_pinned_by_canonical_allowlist() -> None:
+def test_object_backed_license_rejects_unpinned_canonical_allowlist() -> None:
     source = _license_bound_source()
     canonical_policy = json.loads(json.dumps(source["license_binding"]["policy"]))
     canonical_policy["approved_blobs"][0]["sha256"] = "7" * 64
@@ -156,7 +319,7 @@ def test_v2_license_binding_rejects_policy_not_pinned_by_canonical_allowlist() -
         )
 
 
-def test_v2_license_binding_accepts_historical_approved_allowlist_digest(
+def test_object_backed_license_accepts_historical_approved_allowlist_digest(
     monkeypatch,
 ) -> None:
     source = _license_bound_source()
@@ -164,7 +327,7 @@ def test_v2_license_binding_accepts_historical_approved_allowlist_digest(
     monkeypatch.setenv("LONGWORLD_ATTESTATION_ENVIRONMENT", "probe")
     monkeypatch.setenv("LONGWORLD_PUBLIC_POLICY_SHA256", "7" * 64 + "," + "a" * 64)
 
-    assert _validate_bound_fixture(source) == "git-license-binding-v2"
+    assert _validate_bound_fixture(source) == "git-license-binding-v3"
 
     source["public_policy"]["sha256"] = "6" * 64
     with pytest.raises(ValueError, match="independently approved"):
@@ -205,6 +368,30 @@ def test_git_history_source_manifest_schema_is_closed() -> None:
         _validate_source_manifest_schema({"schema_version": "future.v2"})
 
 
+def test_objectless_v2_source_uses_legacy_governance_dispatch(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        audit_module,
+        "_validate_public_export_governance",
+        lambda source: calls.append(source),
+    )
+    monkeypatch.setattr(
+        audit_module,
+        "validate_git_object_proof_public_export_governance",
+        lambda _source: pytest.fail("v2 source used v3 Git governance"),
+    )
+    source = {
+        "parser": {"revision": "v5"},
+        "license_binding": {
+            "schema_version": "longworld.git-license-binding-receipt.v2"
+        },
+    }
+
+    _validate_source_export_governance(source)
+
+    assert calls == [source]
+
+
 def test_legacy_license_branch_is_explicit_and_never_accepts_noassertion(
     monkeypatch,
 ) -> None:
@@ -233,11 +420,11 @@ def test_legacy_license_branch_is_explicit_and_never_accepts_noassertion(
 
     source["remote_identity"].pop("license_file_classifier_spdx_id")
     source["parser"]["revision"] = "v6"
-    with pytest.raises(ValueError, match="legacy parser"):
+    with pytest.raises(ValueError, match="modern Git parser"):
         _validate_license_binding_receipt(source)
 
     source["parser"]["revision"] = "v5"
-    with pytest.raises(ValueError, match="v2 receipt"):
+    with pytest.raises(ValueError, match="modern Git parser"):
         _validate_license_binding_receipt(source)
 
 
@@ -253,6 +440,26 @@ def test_capacity_scan_never_accepts_rows_above_its_safety_cap() -> None:
         _validate_retained_count_contract(
             {"16k": 1001}, target={"16k": 1000}, require_full_target=False
         )
+
+
+def test_production_retention_contract_rejects_empty_release() -> None:
+    with pytest.raises(ValueError, match="row counts"):
+        _validate_retained_count_contract(
+            {"16k": 0},
+            target={"16k": 1000},
+            require_full_target=False,
+            require_nonempty=True,
+        )
+
+
+def test_required_complete_scan_rejects_vacuous_evidence() -> None:
+    with pytest.raises(ValueError, match="complete source scan"):
+        _validate_complete_scan_contract([], [], required=True)
+    _validate_complete_scan_contract(
+        [{"path": "source.json"}],
+        [{"source_scan_complete": True}],
+        required=True,
+    )
 
 
 def test_cross_release_references_accept_legacy_and_list_contracts() -> None:

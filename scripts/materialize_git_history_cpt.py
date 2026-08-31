@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -41,18 +42,22 @@ from longworld.core.githistory import (
     LICENSE_BINDING_POLICY_SCHEMA,
     TOKEN_COUNT_CACHE_REVISION,
     DeterministicTokenCountCache,
+    GitCommitTruncation,
     GitHistoryExtraction,
     bind_git_license_history,
+    build_git_object_path_absence_proof,
     extract_first_parent_history,
+    git_history_scan_coverage,
+    git_object_path_proof_history_anchor,
     git_truncation_quality,
+    validate_git_object_proof_public_export_governance,
 )
-from longworld.core.provenance import SourceLineage
+from longworld.core.provenance import ProvenanceError, SourceLineage, _read_regular_file
 from longworld.core.publicscan import PUBLIC_SCANNER, PUBLIC_SCANNER_REVISION
 from longworld.core.realworkflow import (
     PUBLIC_POLICY_SHA256_ENV,
     RealWorkflow,
     WorkflowRecord,
-    _validate_public_export_governance,
     approved_public_policy_digests,
 )
 from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
@@ -73,6 +78,12 @@ MAX_CONFIG_BYTES = 256_000
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _GIT_OBJECT_ID = re.compile(r"[0-9a-f]{40,64}\Z")
 MAX_SOURCE_SLICES = 1_000
+SLICE_CHECKPOINT_SCHEMA = "longworld.git-history-slice-checkpoint.v1"
+SLICE_CHECKPOINT_PURPOSE = b"longworld.git-history-slice-checkpoint.v1\0"
+MAX_SLICE_CHECKPOINT_BYTES = 512_000_000
+MAX_SOURCE_MANIFEST_BYTES = 60_000_000
+GIT_HISTORY_EXTRACTION_REVISION = "git-first-parent-extraction-v6"
+HISTORY_COVERAGE_SCHEMA = "longworld.git-history-coverage-boundary.v1"
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -390,6 +401,9 @@ def _source_manifest(
     max_record_tokens: int,
     max_chunks_per_commit: int,
     maximum_truncated_commit_ratio_ppm: int | None,
+    history_coverage: dict[str, Any],
+    history_slice_anchor: dict[str, str | None],
+    history_coverage_absence_proof: dict[str, Any] | None,
 ) -> dict[str, Any]:
     key = attestation_key_from_env("source_manifest")
     if key is None:
@@ -479,16 +493,22 @@ def _source_manifest(
         "public_policy": public_policy,
         "source_client": source_client,
         "history_client": history_client,
+        "history_coverage": history_coverage,
+        "history_slice_anchor": history_slice_anchor,
+        "history_coverage_absence_proof": history_coverage_absence_proof,
+        "git_object_proof_privacy_review": license_binding["object_path_proof"][
+            "public_metadata_review"
+        ],
         "remote_identity": remote_identity,
         "privacy_review": {
-            "emails": "redacted",
+            "emails": "redacted_training_text_public_git_metadata_retained",
             "secrets": "fail_closed",
             "scanner": PUBLIC_SCANNER,
             "scanner_revision": PUBLIC_SCANNER_REVISION,
         },
         "parser": {
             "name": "git_first_parent_patch",
-            "revision": "v5",
+            "revision": "v6",
             "first_parent": True,
             "source_text_deduplication": "global_sha256_fail_closed",
             "root_revision": root_revision,
@@ -507,8 +527,11 @@ def _source_manifest(
         "record_index": record_index,
         "license_binding": license_binding,
     }
-    _validate_public_export_governance(unsigned)
-    return attach_attestation(unsigned, key, purpose="source_manifest")
+    validate_git_object_proof_public_export_governance(unsigned)
+    signed = attach_attestation(unsigned, key, purpose="source_manifest")
+    if len(_canonical_bytes(signed)) + 1 > MAX_SOURCE_MANIFEST_BYTES:
+        raise ValueError("Git history source manifest exceeds the audit size limit")
+    return signed
 
 
 def _requests(
@@ -583,6 +606,73 @@ def _configured_truncation_ratio(raw: object) -> int | None:
     return raw
 
 
+def _validated_history_coverage(
+    source: dict[str, Any], checkout: Path, root_revision: str, total: int
+) -> dict[str, Any]:
+    limit = source.get("history_commit_limit")
+    if limit is None:
+        return {
+            "schema_version": HISTORY_COVERAGE_SCHEMA,
+            "scope": "complete_first_parent_history",
+            "root_revision": root_revision,
+            "total_first_parent_commits": total,
+            "included_commit_count": total,
+            "excluded_commit_count": 0,
+        }
+    coverage = source.get("history_coverage")
+    expected_fields = {
+        "schema_version",
+        "scope",
+        "root_revision",
+        "total_first_parent_commits",
+        "included_commit_count",
+        "excluded_commit_count",
+        "oldest_included_revision",
+        "first_excluded_revision",
+        "approved_path",
+        "exclusion_reason",
+    }
+    if (
+        not isinstance(limit, int)
+        or isinstance(limit, bool)
+        or not isinstance(coverage, dict)
+        or set(coverage) != expected_fields
+        or coverage.get("schema_version") != HISTORY_COVERAGE_SCHEMA
+        or coverage.get("scope") != "approved_license_path_contiguous_suffix"
+        or coverage.get("root_revision") != root_revision
+        or coverage.get("total_first_parent_commits") != total
+        or coverage.get("included_commit_count") != limit
+        or coverage.get("excluded_commit_count") != total - limit
+        or coverage.get("exclusion_reason") != "approved_license_path_absent"
+    ):
+        raise ValueError("Git history coverage boundary is invalid")
+    approved_path = str(coverage.get("approved_path") or "")
+    if not approved_path or limit <= 0 or limit >= total:
+        raise ValueError("Git history coverage boundary is invalid")
+    oldest_included = _git(checkout, "rev-parse", f"{root_revision}~{limit - 1}")
+    first_excluded = _git(checkout, "rev-parse", f"{root_revision}~{limit}")
+    if (
+        coverage.get("oldest_included_revision") != oldest_included
+        or coverage.get("first_excluded_revision") != first_excluded
+    ):
+        raise ValueError("Git history coverage boundary revisions disagree")
+    try:
+        _git(checkout, "cat-file", "-e", f"{oldest_included}:{approved_path}")
+    except subprocess.CalledProcessError as error:
+        raise ValueError(
+            "Git history included boundary lacks the approved license path"
+        ) from error
+    try:
+        _git(checkout, "cat-file", "-e", f"{first_excluded}:{approved_path}")
+    except subprocess.CalledProcessError:
+        pass
+    else:
+        raise ValueError(
+            "Git history first excluded revision still has the approved path"
+        )
+    return dict(coverage)
+
+
 def _source_slices(
     sources: list[dict[str, Any]],
     *,
@@ -594,9 +684,27 @@ def _source_slices(
         raise ValueError("Git history source slice size is invalid")
     if any("max_commits" in source or "skip_commits" in source for source in sources):
         raise ValueError("automatic source slicing cannot mix explicit commit ranges")
-    totals = [commit_count(source) for source in sources]
-    if any(total <= 0 or total > 100_000 for total in totals):
-        raise ValueError("Git history first-parent commit count is invalid")
+    totals: list[int] = []
+    for source in sources:
+        total = commit_count(source)
+        if (
+            isinstance(total, bool)
+            or not isinstance(total, int)
+            or total <= 0
+            or total > 100_000
+        ):
+            raise ValueError("Git history first-parent commit count is invalid")
+        if "history_commit_limit" in source:
+            limit = source.get("history_commit_limit")
+            if (
+                isinstance(limit, bool)
+                or not isinstance(limit, int)
+                or limit <= 0
+                or limit > total
+            ):
+                raise ValueError("Git history commit limit is invalid or unavailable")
+            total = limit
+        totals.append(total)
     expanded: list[dict[str, Any]] = []
     for skip_commits in range(0, max(totals), slice_commits):
         for source, total in zip(sources, totals, strict=True):
@@ -651,6 +759,259 @@ def _deduplicate_extraction(
         truncated_commits=extraction.truncated_commits,
         commit_revisions=extraction.commit_revisions,
     )
+
+
+def _slice_checkpoint_identity(
+    *,
+    config: dict[str, Any],
+    repository: str,
+    checkout: Path,
+    root_revision: str,
+    max_commits: int,
+    skip_commits: int,
+    max_record_tokens: int,
+    max_chunks_per_commit: int,
+    tokenizer_model_id: str,
+    tokenizer_revision: str,
+    tokenizer_asset_manifest_sha256: str,
+    public_policy_sha256: str,
+    history_client: dict[str, str],
+) -> dict[str, Any]:
+    """Bind a raw-extraction cache to every input that changes its meaning."""
+    return {
+        "config_sha256": hashlib.sha256(_canonical_bytes(config)).hexdigest(),
+        "repository": repository,
+        "checkout": str(checkout.resolve()),
+        "root_revision": root_revision,
+        "max_commits": max_commits,
+        "skip_commits": skip_commits,
+        "max_record_tokens": max_record_tokens,
+        "max_chunks_per_commit": max_chunks_per_commit,
+        "tokenizer_model_id": tokenizer_model_id,
+        "tokenizer_revision": tokenizer_revision,
+        "tokenizer_asset_manifest_sha256": tokenizer_asset_manifest_sha256,
+        "public_policy_sha256": public_policy_sha256,
+        "history_client": history_client,
+        "extractor_revision": GIT_HISTORY_EXTRACTION_REVISION,
+        "parser": "git_first_parent_patch@6",
+        "public_scanner": PUBLIC_SCANNER,
+        "public_scanner_revision": PUBLIC_SCANNER_REVISION,
+    }
+
+
+def _checkpoint_extraction(extraction: GitHistoryExtraction) -> dict[str, Any]:
+    return {
+        "records": [
+            {
+                "record_id": record.record_id,
+                "kind": record.kind,
+                "occurred_at": record.occurred_at,
+                "text": record.text,
+                "links": list(record.links),
+                "attributes": record.attributes,
+                "source_pointer": record.source_pointer,
+            }
+            for record in extraction.records
+        ],
+        "commit_count": extraction.commit_count,
+        "head_revision": extraction.head_revision,
+        "reject_reasons": extraction.reject_reasons,
+        "truncated_commits": [
+            {
+                "sha": item.sha,
+                "total_chunk_count": item.total_chunk_count,
+                "emitted_chunk_count": item.emitted_chunk_count,
+            }
+            for item in extraction.truncated_commits
+        ],
+        "commit_revisions": list(extraction.commit_revisions),
+    }
+
+
+def _restore_checkpoint_extraction(raw: object) -> GitHistoryExtraction:
+    expected_keys = {
+        "records",
+        "commit_count",
+        "head_revision",
+        "reject_reasons",
+        "truncated_commits",
+        "commit_revisions",
+    }
+    if not isinstance(raw, dict) or set(raw) != expected_keys:
+        raise ValueError("Git history slice checkpoint extraction is invalid")
+    commit_count = raw.get("commit_count")
+    head_revision = raw.get("head_revision")
+    raw_revisions = raw.get("commit_revisions")
+    if (
+        isinstance(commit_count, bool)
+        or not isinstance(commit_count, int)
+        or commit_count <= 0
+        or commit_count > 100_000
+        or not isinstance(head_revision, str)
+        or _GIT_OBJECT_ID.fullmatch(head_revision) is None
+        or not isinstance(raw_revisions, list)
+        or len(raw_revisions) != commit_count
+        or any(
+            not isinstance(revision, str) or _GIT_OBJECT_ID.fullmatch(revision) is None
+            for revision in raw_revisions
+        )
+        or raw_revisions[-1] != head_revision
+    ):
+        raise ValueError("Git history slice checkpoint revision index is invalid")
+    raw_rejects = raw.get("reject_reasons")
+    if not isinstance(raw_rejects, dict) or any(
+        not isinstance(reason, str)
+        or not reason
+        or isinstance(count, bool)
+        or not isinstance(count, int)
+        or count < 0
+        for reason, count in raw_rejects.items()
+    ):
+        raise ValueError("Git history slice checkpoint reject counters are invalid")
+    raw_records = raw.get("records")
+    if not isinstance(raw_records, list):
+        raise TypeError("Git history slice checkpoint records are invalid")
+    records: list[WorkflowRecord] = []
+    record_ids: set[str] = set()
+    record_keys = {
+        "record_id",
+        "kind",
+        "occurred_at",
+        "text",
+        "links",
+        "attributes",
+        "source_pointer",
+    }
+    for item in raw_records:
+        if not isinstance(item, dict) or set(item) != record_keys:
+            raise ValueError("Git history slice checkpoint record is invalid")
+        record_id = item.get("record_id")
+        links = item.get("links")
+        if (
+            not isinstance(record_id, str)
+            or not record_id
+            or record_id in record_ids
+            or not isinstance(item.get("kind"), str)
+            or not isinstance(item.get("occurred_at"), str)
+            or not isinstance(item.get("text"), str)
+            or not isinstance(links, list)
+            or any(not isinstance(link, str) or not link for link in links)
+            or not isinstance(item.get("attributes"), dict)
+            or not isinstance(item.get("source_pointer"), str)
+        ):
+            raise ValueError("Git history slice checkpoint record is invalid")
+        record_ids.add(record_id)
+        records.append(
+            WorkflowRecord(
+                record_id=record_id,
+                kind=item["kind"],
+                occurred_at=item["occurred_at"],
+                text=item["text"],
+                links=tuple(links),
+                attributes=item["attributes"],
+                source_pointer=item["source_pointer"],
+            )
+        )
+    raw_truncated = raw.get("truncated_commits")
+    if not isinstance(raw_truncated, list):
+        raise TypeError("Git history slice checkpoint truncation index is invalid")
+    truncated: list[GitCommitTruncation] = []
+    for item in raw_truncated:
+        if not isinstance(item, dict) or set(item) != {
+            "sha",
+            "total_chunk_count",
+            "emitted_chunk_count",
+        }:
+            raise ValueError("Git history slice checkpoint truncation entry is invalid")
+        sha = item.get("sha")
+        total = item.get("total_chunk_count")
+        emitted = item.get("emitted_chunk_count")
+        if (
+            not isinstance(sha, str)
+            or _GIT_OBJECT_ID.fullmatch(sha) is None
+            or isinstance(total, bool)
+            or not isinstance(total, int)
+            or isinstance(emitted, bool)
+            or not isinstance(emitted, int)
+            or not 0 < emitted < total
+        ):
+            raise ValueError("Git history slice checkpoint truncation entry is invalid")
+        truncated.append(GitCommitTruncation(sha, total, emitted))
+    return GitHistoryExtraction(
+        records=tuple(records),
+        commit_count=commit_count,
+        head_revision=head_revision,
+        reject_reasons=dict(raw_rejects),
+        truncated_commits=tuple(truncated),
+        commit_revisions=tuple(raw_revisions),
+    )
+
+
+def _write_slice_checkpoint(
+    path: Path,
+    identity: dict[str, Any],
+    extraction: GitHistoryExtraction,
+    source_key: bytes,
+) -> None:
+    if len(source_key) < 32:
+        raise ValueError("source role key is required for slice checkpoint")
+    unsigned = {
+        "schema_version": SLICE_CHECKPOINT_SCHEMA,
+        "identity": identity,
+        "extraction": _checkpoint_extraction(extraction),
+    }
+    authentication = hmac.new(
+        source_key,
+        SLICE_CHECKPOINT_PURPOSE + _canonical_bytes(unsigned),
+        hashlib.sha256,
+    ).hexdigest()
+    checkpoint = {**unsigned, "authentication_hmac_sha256": authentication}
+    _atomic_write(path, _canonical_bytes(checkpoint) + b"\n")
+
+
+def _load_slice_checkpoint(
+    path: Path,
+    expected_identity: dict[str, Any],
+    source_key: bytes,
+) -> GitHistoryExtraction:
+    if len(source_key) < 32:
+        raise ValueError("source role key is required for slice checkpoint")
+    try:
+        checkpoint = json.loads(
+            _read_regular_file(path, MAX_SLICE_CHECKPOINT_BYTES).decode("utf-8")
+        )
+    except (
+        OSError,
+        ProvenanceError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+    ) as error:
+        raise ValueError("Git history slice checkpoint is unreadable") from error
+    if not isinstance(checkpoint, dict) or set(checkpoint) != {
+        "schema_version",
+        "identity",
+        "extraction",
+        "authentication_hmac_sha256",
+    }:
+        raise ValueError("Git history slice checkpoint envelope is invalid")
+    if checkpoint.get("schema_version") != SLICE_CHECKPOINT_SCHEMA:
+        raise ValueError("Git history slice checkpoint schema is unsupported")
+    if checkpoint.get("identity") != expected_identity:
+        raise ValueError("Git history slice checkpoint identity does not match")
+    observed = checkpoint.get("authentication_hmac_sha256")
+    unsigned = {
+        key: value
+        for key, value in checkpoint.items()
+        if key != "authentication_hmac_sha256"
+    }
+    expected = hmac.new(
+        source_key,
+        SLICE_CHECKPOINT_PURPOSE + _canonical_bytes(unsigned),
+        hashlib.sha256,
+    ).hexdigest()
+    if not isinstance(observed, str) or not hmac.compare_digest(observed, expected):
+        raise ValueError("Git history slice checkpoint authentication failed")
+    return _restore_checkpoint_extraction(checkpoint.get("extraction"))
 
 
 def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
@@ -718,6 +1079,9 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         tokenizer_asset_sha256,
         exact_token_counter,
     )
+    source_key = attestation_key_from_env("source_manifest")
+    if source_key is None:
+        raise ValueError("source role key is required")
     exported_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     source_manifests: list[dict[str, Any]] = []
     accepted_by_band: dict[str, list[bytes]] = {name: [] for name in bands}
@@ -736,6 +1100,19 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     if not all(isinstance(source, dict) for source in raw_sources):
         raise TypeError("Git history CPT source config is invalid")
     slice_commits = int(config.get("source_slice_commits") or 0)
+    if not slice_commits and any(
+        "history_commit_limit" in source for source in raw_sources
+    ):
+        raise ValueError("Git history commit limit requires automatic source slicing")
+    slice_checkpoint_resume = config.get("slice_checkpoint_resume", bool(slice_commits))
+    if not isinstance(slice_checkpoint_resume, bool):
+        raise TypeError("Git history slice checkpoint policy is invalid")
+    checkpoint_loaded = 0
+    checkpoint_written = 0
+    require_complete_source_scan = config.get("require_complete_source_scan", False)
+    if not isinstance(require_complete_source_scan, bool):
+        raise TypeError("Git history complete source scan policy is invalid")
+    coverage_absence_proofs: dict[tuple[str, str, str], dict[str, Any]] = {}
     if slice_commits:
 
         def first_parent_commit_count(source: dict[str, Any]) -> int:
@@ -751,7 +1128,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             if _GIT_OBJECT_ID.fullmatch(root_revision) is None:
                 raise ValueError("Git history source root revision is invalid")
             source["root_revision"] = root_revision
-            return int(
+            total = int(
                 _git(
                     checkout,
                     "rev-list",
@@ -760,6 +1137,10 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
                     root_revision,
                 )
             )
+            source["history_coverage"] = _validated_history_coverage(
+                source, checkout, root_revision, total
+            )
+            return total
 
         raw_sources = _source_slices(
             raw_sources,
@@ -767,7 +1148,9 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             commit_count=first_parent_commit_count,
         )
     for source in raw_sources:
-        if all(len(accepted_by_band[name]) >= target[name] for name in bands):
+        if not require_complete_source_scan and all(
+            len(accepted_by_band[name]) >= target[name] for name in bands
+        ):
             break
         repository = str(source.get("repository") or "")
         checkout_value = str(source.get("checkout") or "")
@@ -788,16 +1171,54 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             root_revision = _git(checkout, "rev-parse", "HEAD")
         if _GIT_OBJECT_ID.fullmatch(root_revision) is None:
             raise ValueError("Git history source root revision is invalid")
-        extraction = extract_first_parent_history(
-            checkout,
+        max_commits = int(source.get("max_commits") or 0)
+        skip_commits = int(source.get("skip_commits") or 0)
+        slice_name = f"skip-{skip_commits:06d}-count-{max_commits:06d}"
+        checkpoint_path = (
+            output_dir
+            / "checkpoints"
+            / repository.replace("/", "__")
+            / slice_name
+            / "CHECKPOINT.json"
+        )
+        checkpoint_identity = _slice_checkpoint_identity(
+            config=config,
             repository=repository,
-            tokenizer=tokenizer,
-            max_commits=int(source.get("max_commits") or 0),
-            skip_commits=int(source.get("skip_commits") or 0),
+            checkout=checkout,
             root_revision=root_revision,
+            max_commits=max_commits,
+            skip_commits=skip_commits,
             max_record_tokens=max_record_tokens,
             max_chunks_per_commit=max_chunks_per_commit,
+            tokenizer_model_id=model_id,
+            tokenizer_revision=revision,
+            tokenizer_asset_manifest_sha256=tokenizer_asset_sha256,
+            public_policy_sha256=policy_sha256,
+            history_client=history_client,
         )
+        if slice_checkpoint_resume and checkpoint_path.exists():
+            if _git(checkout, "cat-file", "-t", root_revision) != "commit":
+                raise ValueError("Git history source root revision is not a commit")
+            extraction = _load_slice_checkpoint(
+                checkpoint_path, checkpoint_identity, source_key
+            )
+            checkpoint_loaded += 1
+        else:
+            extraction = extract_first_parent_history(
+                checkout,
+                repository=repository,
+                tokenizer=tokenizer,
+                max_commits=max_commits,
+                skip_commits=skip_commits,
+                root_revision=root_revision,
+                max_record_tokens=max_record_tokens,
+                max_chunks_per_commit=max_chunks_per_commit,
+            )
+            if slice_checkpoint_resume:
+                _write_slice_checkpoint(
+                    checkpoint_path, checkpoint_identity, extraction, source_key
+                )
+                checkpoint_written += 1
         extraction = _deduplicate_extraction(extraction, seen_source_text_sha256)
         license_id = str(policy.get("license") or "")
         raw_license_binding_policy = policy.get("license_binding")
@@ -812,6 +1233,25 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             extraction.commit_revisions,
             raw_license_binding_policy,
         )
+        history_slice_anchor = git_object_path_proof_history_anchor(
+            license_binding["object_path_proof"]
+        )
+        history_coverage = dict(source["history_coverage"])
+        history_coverage_absence_proof: dict[str, Any] | None = None
+        if history_coverage["scope"] == "approved_license_path_contiguous_suffix":
+            absence_key = (
+                repository,
+                str(history_coverage["first_excluded_revision"]),
+                str(history_coverage["approved_path"]),
+            )
+            history_coverage_absence_proof = coverage_absence_proofs.get(absence_key)
+            if history_coverage_absence_proof is None:
+                history_coverage_absence_proof = build_git_object_path_absence_proof(
+                    checkout,
+                    commit_revision=absence_key[1],
+                    path=absence_key[2],
+                )
+                coverage_absence_proofs[absence_key] = history_coverage_absence_proof
         remote_key = (repository, extraction.head_revision, license_id)
         remote_identity = remote_identities.get(remote_key)
         if remote_identity is None:
@@ -855,8 +1295,10 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             max_record_tokens=max_record_tokens,
             max_chunks_per_commit=max_chunks_per_commit,
             maximum_truncated_commit_ratio_ppm=(maximum_truncated_commit_ratio_ppm),
+            history_coverage=history_coverage,
+            history_slice_anchor=history_slice_anchor,
+            history_coverage_absence_proof=history_coverage_absence_proof,
         )
-        source_key = attestation_key_from_env("source_manifest")
         if not verify_attestation(
             source_manifest, source_key, purpose="source_manifest"
         ):
@@ -864,10 +1306,6 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         source_digest = hashlib.sha256(
             canonical_attested_payload(source_manifest)
         ).hexdigest()
-        slice_name = (
-            f"skip-{int(source.get('skip_commits') or 0):06d}-"
-            f"count-{int(source.get('max_commits') or 0):06d}"
-        )
         manifest_path = (
             output_dir
             / "sources"
@@ -882,7 +1320,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             url=f"https://github.com/{repository}",
             license=str(policy.get("license") or ""),
             retrieved_at=exported_at,
-            parser="git_first_parent_patch@5",
+            parser="git_first_parent_patch@6",
             sha256=source_digest,
             revision=extraction.head_revision,
             source_path=str(manifest_path),
@@ -989,6 +1427,8 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 "record_count": len(extraction.records),
                 "reject_reasons": extraction.reject_reasons,
                 "truncation_quality": source_manifest["truncation_quality"],
+                "history_coverage": source_manifest["history_coverage"],
+                "history_slice_anchor": source_manifest["history_slice_anchor"],
             }
         )
 
@@ -1004,6 +1444,11 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     cpt_rows_sha256 = _atomic_write_jsonl(cpt_path, serialized_rows)
     export_path = output_dir / "train.jsonl"
     export_report = export_cpt_rows(iter_jsonl(cpt_path), export_path)
+    source_scan_coverage = git_history_scan_coverage(source_manifests)
+    if require_complete_source_scan and any(
+        item["source_scan_complete"] is not True for item in source_scan_coverage
+    ):
+        raise ValueError("required complete Git source scan is incomplete")
     manifest = {
         "schema_version": RELEASE_SCHEMA,
         "data_stage": "local_probe_candidate",
@@ -1016,9 +1461,17 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         "tokenizer_asset_manifest_sha256": tokenizer_asset_sha256,
         "token_count_cache_revision": TOKEN_COUNT_CACHE_REVISION,
         "token_count_cache": token_counter.stats(),
+        "slice_checkpoint": {
+            "schema_version": SLICE_CHECKPOINT_SCHEMA,
+            "resume_enabled": slice_checkpoint_resume,
+            "loaded": checkpoint_loaded,
+            "written": checkpoint_written,
+            "scope": "raw_extraction_only",
+        },
         "target_rows": target,
         "selection_mode": "quota" if require_full_target else "capacity_scan",
         "require_full_target": require_full_target,
+        "require_complete_source_scan": require_complete_source_scan,
         "retained_rows": {
             name: len(accepted_by_band[name]) for name in ordered_band_names
         },
@@ -1034,6 +1487,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         "unique_source_records": len(used_record_ids),
         "cross_band_source_record_overlap": 0,
         "source_manifests": source_manifests,
+        "source_scan_coverage": source_scan_coverage,
         "pack_reject_reasons": dict(pack_rejects),
         "cpt_reject_reasons": dict(cpt_rejects),
         "export_report": export_report,
