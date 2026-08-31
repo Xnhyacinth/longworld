@@ -9,6 +9,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from merge_git_history_cpt_releases import (
+    _COMPATIBLE_FIELDS,
     _select_disjoint_rows,
     _validate_release_row_bindings,
 )
@@ -110,3 +111,13 @@ def test_release_rows_must_match_signed_source_bindings() -> None:
             source_event_by_record={"r1": "e1"},
             source_binding_by_record={"r1": ("signed-body", "source:r1")},
         )
+
+
+def test_merge_preserves_span_truncation_and_cache_contracts() -> None:
+    assert {
+        "source_span_gate_revision",
+        "minimum_source_elapsed_seconds",
+        "truncation_quality_gate_revision",
+        "maximum_truncated_commit_ratio_ppm",
+        "token_count_cache_revision",
+    }.issubset(_COMPATIBLE_FIELDS)

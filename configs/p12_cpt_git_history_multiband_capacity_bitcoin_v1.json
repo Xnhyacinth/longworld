@@ -13,6 +13,12 @@
   "require_full_target": false,
   "attempt_multiplier": 1,
   "minimum_source_events": { "16k": 4, "32k": 8, "256k": 48 },
+  "minimum_source_elapsed_seconds": {
+    "16k": 86400,
+    "32k": 259200,
+    "256k": 2592000
+  },
+  "maximum_truncated_commit_ratio_ppm": 200000,
   "max_record_tokens": 768,
   "max_chunks_per_commit": 10,
   "source_slice_commits": 1000,

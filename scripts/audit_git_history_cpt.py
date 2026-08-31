@@ -10,6 +10,7 @@ import os
 import sys
 import tempfile
 from collections import Counter
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,11 @@ from longworld.core.attestation import (
     sanitized_attestation_environment,
     verify_attestation,
 )
+from longworld.core.githistory import (
+    TOKEN_COUNT_CACHE_REVISION,
+    DeterministicTokenCountCache,
+    git_truncation_quality,
+)
 from longworld.core.provenance import _read_regular_file
 from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
 from longworld.core.tokenizer_assets import resolved_tokenizer_asset_manifest_sha256
@@ -32,6 +38,18 @@ from scripts.merge_git_history_cpt_releases import _load_release
 
 MAX_MANIFEST_BYTES = 64_000_000
 AUDIT_SCHEMA = "longworld.git-history-cpt-audit.v1"
+
+
+@dataclass(frozen=True)
+class SourceRecordBinding:
+    text_sha256: str
+    provenance_id: str
+    source_event_id: str
+    occurred_at: str
+    source_pointer: str
+    predecessor_ids: tuple[str, ...]
+    ordinal: int
+    manifest_record_count: int
 
 
 def _sha256_file(path: Path) -> str:
@@ -109,6 +127,181 @@ def _validate_retained_count_contract(
     )
     if invalid:
         raise ValueError("release row counts do not match audited rows")
+
+
+def _validate_source_truncation_contract(
+    source: dict[str, Any], maximum_truncated_commit_ratio_ppm: int | None
+) -> None:
+    observed_commit_count = source.get("observed_commit_count")
+    if (
+        isinstance(observed_commit_count, bool)
+        or not isinstance(observed_commit_count, int)
+        or observed_commit_count < 0
+    ):
+        raise ValueError("source observed commit count is invalid")
+    reject_reasons = source.get("reject_reasons")
+    if not isinstance(reject_reasons, dict) or any(
+        not isinstance(key, str)
+        or isinstance(value, bool)
+        or not isinstance(value, int)
+        or value < 0
+        for key, value in reject_reasons.items()
+    ):
+        raise ValueError("source truncation counters are invalid")
+    expected = git_truncation_quality(
+        observed_commit_count,
+        reject_reasons,
+        maximum_truncated_commit_ratio_ppm=maximum_truncated_commit_ratio_ppm,
+    )
+    if source.get("truncation_quality") != expected:
+        raise ValueError("source truncation quality does not replay")
+    raw_index = source.get("truncated_commit_index")
+    if not isinstance(raw_index, list):
+        raise TypeError("source truncation event index is invalid")
+    seen_events: set[str] = set()
+    truncated_event_shape: dict[str, tuple[int, int]] = {}
+    omitted_chunks = 0
+    for item in raw_index:
+        if not isinstance(item, dict) or set(item) != {
+            "source_event_id",
+            "commit_chunk_count_total",
+            "commit_chunk_count_emitted",
+        }:
+            raise ValueError("source truncation event index is invalid")
+        event_id = item["source_event_id"]
+        total = item["commit_chunk_count_total"]
+        emitted = item["commit_chunk_count_emitted"]
+        if (
+            not isinstance(event_id, str)
+            or not event_id
+            or event_id in seen_events
+            or isinstance(total, bool)
+            or not isinstance(total, int)
+            or isinstance(emitted, bool)
+            or not isinstance(emitted, int)
+            or not 0 < emitted < total
+        ):
+            raise ValueError("source truncation event index is invalid")
+        seen_events.add(event_id)
+        truncated_event_shape[event_id] = (total, emitted)
+        omitted_chunks += total - emitted
+    if (
+        len(seen_events) != expected["truncated_commit_count"]
+        or omitted_chunks != expected["omitted_chunk_count"]
+    ):
+        raise ValueError("source truncation event index does not replay")
+    truncated_record_events: set[str] = set()
+    for record in source.get("record_index") or []:
+        if not isinstance(record, dict):
+            raise TypeError("source truncation record metadata is invalid")
+        chunk_index = record.get("chunk_index")
+        total = record.get("commit_chunk_count_total")
+        emitted = record.get("commit_chunk_count_emitted")
+        was_truncated = record.get("commit_was_truncated")
+        if (
+            isinstance(chunk_index, bool)
+            or not isinstance(chunk_index, int)
+            or isinstance(total, bool)
+            or not isinstance(total, int)
+            or isinstance(emitted, bool)
+            or not isinstance(emitted, int)
+            or not isinstance(was_truncated, bool)
+            or not 0 <= chunk_index < emitted <= total
+            or was_truncated != (emitted < total)
+        ):
+            raise ValueError("source truncation record metadata is invalid")
+        event_id = str(record.get("source_event_id") or "")
+        event_is_indexed = event_id in truncated_event_shape
+        if event_is_indexed != was_truncated or (
+            was_truncated and truncated_event_shape[event_id] != (total, emitted)
+        ):
+            raise ValueError("source truncation record is not indexed")
+        if was_truncated:
+            truncated_record_events.add(event_id)
+    if truncated_record_events != seen_events:
+        raise ValueError("source truncation event has no emitted record")
+
+
+def _validate_source_summary_binding(
+    summary: dict[str, Any], source: dict[str, Any]
+) -> None:
+    parser = source.get("parser")
+    expected = {
+        "repository": str(source.get("repository_url") or "").removeprefix(
+            "https://github.com/"
+        ),
+        "commit_count": source.get("observed_commit_count"),
+        "skip_commits": parser.get("skip_commits")
+        if isinstance(parser, dict)
+        else None,
+        "record_count": source.get("accepted_record_count"),
+        "reject_reasons": source.get("reject_reasons"),
+        "truncation_quality": source.get("truncation_quality"),
+    }
+    if any(summary.get(field) != value for field, value in expected.items()):
+        raise ValueError("source manifest summary is not bound to signed source")
+
+
+def _validate_source_record_binding(
+    expected: SourceRecordBinding,
+    record: dict[str, Any],
+    row_source_digest: object,
+) -> None:
+    if (
+        expected.text_sha256 != str(record.get("sha256") or "")
+        or expected.provenance_id != str(row_source_digest or "")
+        or expected.occurred_at != str(record.get("occurred_at") or "")
+        or expected.source_pointer != str(record.get("source_pointer") or "")
+    ):
+        raise ValueError("CPT row source record binding mismatch")
+
+
+def _validate_source_window_binding(
+    expected_records: list[SourceRecordBinding],
+    row_records: list[dict[str, Any]],
+    row_source_digest: object,
+    *,
+    source_start_index: object,
+    source_end_index: object,
+) -> None:
+    if (
+        not expected_records
+        or len(expected_records) != len(row_records)
+        or isinstance(source_start_index, bool)
+        or not isinstance(source_start_index, int)
+        or isinstance(source_end_index, bool)
+        or not isinstance(source_end_index, int)
+        or source_start_index < 0
+        or source_end_index <= source_start_index
+        or source_end_index - source_start_index != len(row_records)
+        or [record.ordinal for record in expected_records]
+        != list(range(source_start_index, source_end_index))
+        or any(
+            record.manifest_record_count != expected_records[0].manifest_record_count
+            or source_end_index > record.manifest_record_count
+            for record in expected_records
+        )
+    ):
+        raise ValueError("CPT row source window is not contiguous")
+    selected_ids = {str(record.get("record_id") or "") for record in row_records}
+    for index, (expected, record) in enumerate(
+        zip(expected_records, row_records, strict=True)
+    ):
+        _validate_source_record_binding(expected, record, row_source_digest)
+        expected_predecessors = (
+            ()
+            if index == 0
+            else tuple(
+                predecessor
+                for predecessor in expected.predecessor_ids
+                if predecessor in selected_ids
+            )
+        )
+        raw_predecessors = record.get("predecessor_ids")
+        if not isinstance(raw_predecessors, list) or tuple(raw_predecessors) != (
+            expected_predecessors
+        ):
+            raise ValueError("CPT row source record binding mismatch")
 
 
 def _cross_release_references(release: dict[str, Any]) -> list[dict[str, str]]:
@@ -246,6 +439,43 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
             raise ValueError("longitudinal source-event minimum is invalid")
     else:
         minimum_source_events = {name: 1 for name in band_names}
+    raw_minimum_source_elapsed_seconds = release.get("minimum_source_elapsed_seconds")
+    span_gated = raw_minimum_source_elapsed_seconds is not None
+    if span_gated:
+        if (
+            not longitudinal
+            or not isinstance(raw_minimum_source_elapsed_seconds, dict)
+            or set(raw_minimum_source_elapsed_seconds) != set(band_names)
+            or release.get("source_span_gate_revision")
+            != "git-observed-committer-timestamp-span-v1"
+        ):
+            raise ValueError("source timestamp-span release contract is invalid")
+        minimum_source_elapsed_seconds = {}
+        for name in band_names:
+            value = raw_minimum_source_elapsed_seconds.get(name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError("source timestamp-span minimum is invalid")
+            minimum_source_elapsed_seconds[name] = value
+    else:
+        if release.get("source_span_gate_revision") is not None:
+            raise ValueError("source timestamp-span release contract is incomplete")
+        minimum_source_elapsed_seconds = {}
+    raw_maximum_truncation_ratio = release.get("maximum_truncated_commit_ratio_ppm")
+    truncation_gated = raw_maximum_truncation_ratio is not None
+    if truncation_gated:
+        if (
+            isinstance(raw_maximum_truncation_ratio, bool)
+            or not isinstance(raw_maximum_truncation_ratio, int)
+            or not 0 <= raw_maximum_truncation_ratio <= 1_000_000
+            or release.get("truncation_quality_gate_revision")
+            != "git-observed-prefix-truncation-v1"
+        ):
+            raise ValueError("source truncation release contract is invalid")
+        maximum_truncated_commit_ratio_ppm = raw_maximum_truncation_ratio
+    else:
+        if release.get("truncation_quality_gate_revision") is not None:
+            raise ValueError("source truncation release contract is incomplete")
+        maximum_truncated_commit_ratio_ppm = None
     cpt_path = release_dir / "cpt_rows.jsonl"
     train_path = release_dir / "train.jsonl"
     if _sha256_file(cpt_path) != release.get("cpt_rows_sha256"):
@@ -256,7 +486,7 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
     source_key = attestation_key_from_env("source_manifest")
     if source_key is None:
         raise ValueError("source audit key is unavailable")
-    source_records: dict[str, tuple[str, str, str]] = {}
+    source_records: dict[str, SourceRecordBinding] = {}
     base_workflows: set[str] = set()
     verified_source_manifests = 0
     for summary in release.get("source_manifests") or []:
@@ -291,27 +521,62 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
         parser = source.get("parser")
         if longitudinal and (
             not isinstance(parser, dict)
-            or parser.get("revision") != "v3"
+            or parser.get("revision") not in {"v3", "v4"}
             or parser.get("max_chunks_per_commit")
             != release.get("max_chunks_per_commit")
             or parser.get("oversized_commit_policy")
             != "real_prefix_chunks_with_audited_omission"
         ):
             raise ValueError("longitudinal source parser contract is invalid")
-        for record in source.get("record_index") or []:
+        if isinstance(parser, dict) and parser.get("revision") == "v4":
+            _validate_source_truncation_contract(
+                source, maximum_truncated_commit_ratio_ppm
+            )
+        elif truncation_gated:
+            raise ValueError("truncation-gated source parser is not replayable")
+        _validate_source_summary_binding(summary, source)
+        source_record_index = source.get("record_index")
+        if not isinstance(source_record_index, list) or not source_record_index:
+            raise TypeError("source record index is invalid")
+        manifest_record_count = len(source_record_index)
+        for ordinal, record in enumerate(source_record_index):
             if not isinstance(record, dict):
                 raise TypeError("source record index is invalid")
             record_id = str(record.get("record_id") or "")
             text_sha256 = str(record.get("text_sha256") or "")
             source_event_id = str(record.get("source_event_id") or "")
+            source_occurred_at = str(record.get("occurred_at") or "")
             if not record_id or record_id in source_records:
                 raise ValueError("source record index is duplicated")
             if longitudinal and not source_event_id:
                 raise ValueError("longitudinal source event identity is missing")
-            source_records[record_id] = (
-                text_sha256,
-                provenance_id,
-                source_event_id or record_id,
+            try:
+                source_timestamp = datetime.fromisoformat(
+                    source_occurred_at.replace("Z", "+00:00")
+                )
+            except ValueError as error:
+                raise ValueError("source record timestamp is invalid") from error
+            if source_timestamp.tzinfo is None:
+                raise ValueError("source record timestamp lacks a timezone")
+            source_pointer = str(record.get("source_pointer") or "")
+            predecessor_ids = record.get("predecessor_ids")
+            if (
+                not source_pointer
+                or not isinstance(predecessor_ids, list)
+                or any(
+                    not isinstance(value, str) or not value for value in predecessor_ids
+                )
+            ):
+                raise ValueError("source record lineage is invalid")
+            source_records[record_id] = SourceRecordBinding(
+                text_sha256=text_sha256,
+                provenance_id=provenance_id,
+                source_event_id=source_event_id or record_id,
+                occurred_at=source_occurred_at,
+                source_pointer=source_pointer,
+                predecessor_ids=tuple(predecessor_ids),
+                ordinal=ordinal,
+                manifest_record_count=manifest_record_count,
             )
         verified_source_manifests += 1
 
@@ -321,6 +586,17 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
     if asset_digest != release.get("tokenizer_asset_manifest_sha256"):
         raise ValueError("tokenizer asset digest does not match release")
     tokenizer = _load_tokenizer(model_id, revision)
+
+    def exact_token_counter(text: str) -> int:
+        with sanitized_attestation_environment():
+            return len(tokenizer.encode(text, add_special_tokens=False))
+
+    if release.get("token_count_cache_revision") not in {
+        None,
+        TOKEN_COUNT_CACHE_REVISION,
+    }:
+        raise ValueError("token count cache revision is invalid")
+    token_counter = DeterministicTokenCountCache(asset_digest, exact_token_counter)
     band_counts: Counter[str] = Counter()
     band_tokens: Counter[str] = Counter()
     used_source_records: set[str] = set()
@@ -330,14 +606,16 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
     minimum_observed_source_events: dict[str, int | None] = {
         name: None for name in band_names
     }
+    minimum_observed_source_elapsed_seconds: dict[str, int | None] = {
+        name: None for name in band_names
+    }
     contexts: dict[str, dict[str, Any]] = {}
     for row in iter_jsonl(cpt_path):
         reason = _reject_reason(row)
         if reason:
             raise ValueError(f"CPT row contract failed during audit: {reason}")
         text = str(row["document_context"])
-        with sanitized_attestation_environment():
-            exact_tokens = len(tokenizer.encode(text, add_special_tokens=False))
+        exact_tokens = token_counter(text)
         if exact_tokens != row.get("tokenizer_context_tokens"):
             raise ValueError("CPT row exact token count mismatch")
         bucket = str(row.get("length_bucket") or "")
@@ -347,6 +625,7 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
         if digest in contexts:
             raise ValueError("CPT context is duplicated")
         record_ids: list[str] = []
+        expected_source_records: list[SourceRecordBinding] = []
         row_source_events: set[str] = set()
         occurred_at: list[datetime] = []
         for record in row["workflow_records"]:
@@ -354,24 +633,27 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
             expected_source_record = source_records.get(record_id)
             if expected_source_record is None:
                 raise ValueError("CPT row references an unknown source record")
-            if expected_source_record[:2] != (
-                record["sha256"],
-                row["source_export_digest"],
-            ):
-                raise ValueError("CPT row source record binding mismatch")
             if record_id in used_source_records:
                 raise ValueError("CPT source record is reused across windows")
-            if expected_source_record[0] in used_source_record_texts:
+            if expected_source_record.text_sha256 in used_source_record_texts:
                 raise ValueError("CPT source record text is reused across windows")
             used_source_records.add(record_id)
-            used_source_record_texts.add(expected_source_record[0])
+            used_source_record_texts.add(expected_source_record.text_sha256)
             record_ids.append(record_id)
-            row_source_events.add(expected_source_record[2])
+            expected_source_records.append(expected_source_record)
+            row_source_events.add(expected_source_record.source_event_id)
             occurred_at.append(
                 datetime.fromisoformat(
                     str(record["occurred_at"]).replace("Z", "+00:00")
                 )
             )
+        _validate_source_window_binding(
+            expected_source_records,
+            row["workflow_records"],
+            row.get("source_export_digest"),
+            source_start_index=row.get("source_start_index"),
+            source_end_index=row.get("source_end_index"),
+        )
         if longitudinal:
             expected_minimum = minimum_source_events.get(bucket)
             elapsed_seconds = int((max(occurred_at) - min(occurred_at)).total_seconds())
@@ -393,6 +675,25 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
                 if observed_minimum is None
                 else min(observed_minimum, len(row_source_events))
             )
+            observed_elapsed = minimum_observed_source_elapsed_seconds[bucket]
+            minimum_observed_source_elapsed_seconds[bucket] = (
+                elapsed_seconds
+                if observed_elapsed is None
+                else min(observed_elapsed, elapsed_seconds)
+            )
+        row_span_revision = row.get("source_span_gate_revision")
+        row_minimum_elapsed = row.get("minimum_source_elapsed_seconds")
+        if span_gated:
+            expected_elapsed = minimum_source_elapsed_seconds.get(bucket)
+            if (
+                expected_elapsed is None
+                or row_span_revision != "git-observed-committer-timestamp-span-v1"
+                or row_minimum_elapsed != expected_elapsed
+                or elapsed_seconds < expected_elapsed
+            ):
+                raise ValueError("source timestamp-span CPT row contract failed")
+        elif row_span_revision is not None or row_minimum_elapsed is not None:
+            raise ValueError("source timestamp-span CPT row is undeclared")
         base_workflow = str(row.get("base_workflow_id") or "")
         base_workflows.add(base_workflow)
         band_counts[bucket] += 1
@@ -510,6 +811,8 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
         "tokenizer_model_id": model_id,
         "tokenizer_revision": revision,
         "tokenizer_asset_manifest_sha256": asset_digest,
+        "token_count_cache_revision": TOKEN_COUNT_CACHE_REVISION,
+        "token_count_cache": token_counter.stats(),
         "retained_rows": observed_counts,
         "require_full_target": require_full_target,
         "capacity_censored_by_band": {
@@ -540,6 +843,32 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
                 "minimum_source_events": minimum_source_events,
                 "source_event_contract_replayed": True,
                 "unique_source_events": len(used_source_events),
+            }
+        )
+    if span_gated:
+        report.update(
+            {
+                "source_span_gate_revision": (
+                    "git-observed-committer-timestamp-span-v1"
+                ),
+                "minimum_source_elapsed_seconds": minimum_source_elapsed_seconds,
+                "minimum_observed_source_elapsed_seconds": {
+                    name: int(minimum_observed_source_elapsed_seconds[name] or 0)
+                    for name in band_names
+                },
+                "source_timestamp_span_contract_replayed": True,
+            }
+        )
+    if truncation_gated:
+        report.update(
+            {
+                "truncation_quality_gate_revision": (
+                    "git-observed-prefix-truncation-v1"
+                ),
+                "maximum_truncated_commit_ratio_ppm": (
+                    maximum_truncated_commit_ratio_ppm
+                ),
+                "source_truncation_contract_replayed": True,
             }
         )
     return attach_attestation(report, report_key, purpose="quality_report")

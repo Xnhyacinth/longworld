@@ -35,7 +35,13 @@ from longworld.core.cptwindow import (
     CPTWindowRequest,
     pack_disjoint_workflow_windows,
 )
-from longworld.core.githistory import GitHistoryExtraction, extract_first_parent_history
+from longworld.core.githistory import (
+    TOKEN_COUNT_CACHE_REVISION,
+    DeterministicTokenCountCache,
+    GitHistoryExtraction,
+    extract_first_parent_history,
+    git_truncation_quality,
+)
 from longworld.core.provenance import SourceLineage
 from longworld.core.publicscan import PUBLIC_SCANNER, PUBLIC_SCANNER_REVISION
 from longworld.core.realworkflow import RealWorkflow, WorkflowRecord
@@ -262,6 +268,7 @@ def _source_manifest(
     skip_commits: int,
     max_record_tokens: int,
     max_chunks_per_commit: int,
+    maximum_truncated_commit_ratio_ppm: int | None,
 ) -> dict[str, Any]:
     key = attestation_key_from_env("source_manifest")
     if key is None:
@@ -275,6 +282,63 @@ def _source_manifest(
         if reviewed_at.tzinfo is None:
             raise ValueError("repository authorization timestamp lacks timezone")
         authorization["reviewed_at"] = reviewed_at.isoformat().replace("+00:00", "Z")
+    truncation_quality = git_truncation_quality(
+        extraction.commit_count,
+        extraction.reject_reasons,
+        maximum_truncated_commit_ratio_ppm=maximum_truncated_commit_ratio_ppm,
+    )
+    truncated_commit_index = [
+        {
+            "source_event_id": item.sha,
+            "commit_chunk_count_total": item.total_chunk_count,
+            "commit_chunk_count_emitted": item.emitted_chunk_count,
+        }
+        for item in extraction.truncated_commits
+    ]
+    if (
+        len(truncated_commit_index) != truncation_quality["truncated_commit_count"]
+        or sum(
+            item["commit_chunk_count_total"] - item["commit_chunk_count_emitted"]
+            for item in truncated_commit_index
+        )
+        != truncation_quality["omitted_chunk_count"]
+    ):
+        raise ValueError("Git history truncation event index is inconsistent")
+    record_index: list[dict[str, Any]] = []
+    for record in extraction.records:
+        attributes = record.attributes
+        chunk_index = attributes.get("chunk_index")
+        total_chunks = attributes.get("commit_chunk_count_total")
+        emitted_chunks = attributes.get("commit_chunk_count_emitted")
+        was_truncated = attributes.get("commit_was_truncated")
+        if (
+            isinstance(chunk_index, bool)
+            or not isinstance(chunk_index, int)
+            or chunk_index < 0
+            or isinstance(total_chunks, bool)
+            or not isinstance(total_chunks, int)
+            or total_chunks <= 0
+            or isinstance(emitted_chunks, bool)
+            or not isinstance(emitted_chunks, int)
+            or not 0 < emitted_chunks <= total_chunks
+            or not isinstance(was_truncated, bool)
+            or was_truncated != (emitted_chunks < total_chunks)
+        ):
+            raise ValueError("Git history record truncation metadata is invalid")
+        record_index.append(
+            {
+                "record_id": record.record_id,
+                "occurred_at": record.occurred_at,
+                "source_pointer": record.source_pointer,
+                "text_sha256": hashlib.sha256(record.text.encode()).hexdigest(),
+                "source_event_id": str(attributes.get("sha") or ""),
+                "predecessor_ids": list(record.links),
+                "chunk_index": chunk_index,
+                "commit_chunk_count_total": total_chunks,
+                "commit_chunk_count_emitted": emitted_chunks,
+                "commit_was_truncated": was_truncated,
+            }
+        )
     unsigned = {
         "schema_version": SOURCE_SCHEMA,
         "source_origin": "real_public",
@@ -298,7 +362,7 @@ def _source_manifest(
         },
         "parser": {
             "name": "git_first_parent_patch",
-            "revision": "v3",
+            "revision": "v4",
             "first_parent": True,
             "source_text_deduplication": "global_sha256_fail_closed",
             "max_commits": max_commits,
@@ -311,17 +375,9 @@ def _source_manifest(
         "observed_commit_count": extraction.commit_count,
         "accepted_record_count": len(extraction.records),
         "reject_reasons": extraction.reject_reasons,
-        "record_index": [
-            {
-                "record_id": record.record_id,
-                "occurred_at": record.occurred_at,
-                "source_pointer": record.source_pointer,
-                "text_sha256": hashlib.sha256(record.text.encode()).hexdigest(),
-                "source_event_id": str(record.attributes.get("sha") or ""),
-                "predecessor_ids": list(record.links),
-            }
-            for record in extraction.records
-        ],
+        "truncation_quality": truncation_quality,
+        "truncated_commit_index": truncated_commit_index,
+        "record_index": record_index,
     }
     return attach_attestation(unsigned, key, purpose="source_manifest")
 
@@ -367,6 +423,35 @@ def _configured_bands(raw_bands: object) -> dict[str, CPTBand]:
             raise ValueError(f"Git history CPT band bounds do not match {name}")
         bands[name] = CPTBand(name, *bounds)
     return bands
+
+
+def _configured_minimum_source_elapsed_seconds(
+    raw: object,
+    bands: dict[str, CPTBand],
+    *,
+    longitudinal: bool,
+) -> dict[str, int] | None:
+    if raw is None:
+        return None
+    if not longitudinal:
+        raise ValueError("source elapsed-time gate requires longitudinal metadata")
+    if not isinstance(raw, dict) or set(raw) != set(bands):
+        raise ValueError("Git history CPT source elapsed minimums are invalid")
+    configured: dict[str, int] = {}
+    for name in bands:
+        value = raw.get(name)
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ValueError("Git history CPT source elapsed minimums are invalid")
+        configured[name] = value
+    return configured
+
+
+def _configured_truncation_ratio(raw: object) -> int | None:
+    if raw is None:
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, int) or not 0 <= raw <= 1_000_000:
+        raise ValueError("Git history CPT truncation ratio maximum is invalid")
+    return raw
 
 
 def _source_slices(
@@ -434,6 +519,7 @@ def _deduplicate_extraction(
         commit_count=extraction.commit_count,
         head_revision=extraction.head_revision,
         reject_reasons=dict(rejects),
+        truncated_commits=extraction.truncated_commits,
     )
 
 
@@ -448,7 +534,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     tokenizer = _load_tokenizer(model_id, revision)
     tokenizer.model_max_length = max(int(tokenizer.model_max_length), 1_000_000_000)
 
-    def token_counter(text: str) -> int:
+    def exact_token_counter(text: str) -> int:
         with sanitized_attestation_environment():
             return len(tokenizer.encode(text, add_special_tokens=False))
 
@@ -482,6 +568,14 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             raise ValueError("longitudinal CPT requires multiple source events")
     else:
         minimum_source_events = {name: 1 for name in bands}
+    minimum_source_elapsed_seconds = _configured_minimum_source_elapsed_seconds(
+        config.get("minimum_source_elapsed_seconds"),
+        bands,
+        longitudinal=longitudinal,
+    )
+    maximum_truncated_commit_ratio_ppm = _configured_truncation_ratio(
+        config.get("maximum_truncated_commit_ratio_ppm")
+    )
     max_chunks_per_commit = int(config.get("max_chunks_per_commit") or 0)
     if max_chunks_per_commit < 0 or (longitudinal and max_chunks_per_commit <= 0):
         raise ValueError("longitudinal CPT requires a source-event chunk cap")
@@ -489,6 +583,10 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     history_client = _file_receipt(Path("/usr/bin/git"))
     tokenizer_asset_sha256 = resolved_tokenizer_asset_manifest_sha256(
         model_id, revision
+    )
+    token_counter = DeterministicTokenCountCache(
+        tokenizer_asset_sha256,
+        exact_token_counter,
     )
     exported_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     source_manifests: list[dict[str, Any]] = []
@@ -576,6 +674,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             skip_commits=int(source.get("skip_commits") or 0),
             max_record_tokens=max_record_tokens,
             max_chunks_per_commit=max_chunks_per_commit,
+            maximum_truncated_commit_ratio_ppm=(maximum_truncated_commit_ratio_ppm),
         )
         source_key = attestation_key_from_env("source_manifest")
         if not verify_attestation(
@@ -603,7 +702,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             url=f"https://github.com/{repository}",
             license=str(policy.get("license") or ""),
             retrieved_at=exported_at,
-            parser="git_first_parent_patch@3",
+            parser="git_first_parent_patch@4",
             sha256=source_digest,
             revision=extraction.head_revision,
             source_path=str(manifest_path),
@@ -631,6 +730,17 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 raise ValueError("Git history CPT source record was reused")
             if used_source_event_ids.intersection(window.source_event_ids):
                 raise ValueError("Git history CPT source event was reused")
+            occurred_at = [
+                datetime.fromisoformat(record.occurred_at.replace("Z", "+00:00"))
+                for record in window.workflow.records
+            ]
+            elapsed_seconds = int((max(occurred_at) - min(occurred_at)).total_seconds())
+            if (
+                minimum_source_elapsed_seconds is not None
+                and elapsed_seconds < minimum_source_elapsed_seconds[window.band.name]
+            ):
+                pack_rejects["source_elapsed_below_minimum"] += 1
+                continue
             row = cpt_row_from_workflow(window.workflow)
             unsigned = {
                 key: value for key, value in row.items() if key != "attestation"
@@ -650,20 +760,25 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 }
             )
             if longitudinal:
-                occurred_at = [
-                    datetime.fromisoformat(record.occurred_at.replace("Z", "+00:00"))
-                    for record in window.workflow.records
-                ]
                 unsigned.update(
                     {
                         "longitudinal_gate_revision": "git-distinct-commit-v1",
                         "minimum_source_event_count": minimum_source_events[
                             window.band.name
                         ],
-                        "source_elapsed_seconds": int(
-                            (max(occurred_at) - min(occurred_at)).total_seconds()
-                        ),
+                        "source_elapsed_seconds": elapsed_seconds,
                         "source_event_count": window.source_event_count,
+                    }
+                )
+            if minimum_source_elapsed_seconds is not None:
+                unsigned.update(
+                    {
+                        "source_span_gate_revision": (
+                            "git-observed-committer-timestamp-span-v1"
+                        ),
+                        "minimum_source_elapsed_seconds": (
+                            minimum_source_elapsed_seconds[window.band.name]
+                        ),
                     }
                 )
             promotion_key = attestation_key_from_env("cpt_row")
@@ -693,6 +808,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 "skip_commits": int(source.get("skip_commits") or 0),
                 "record_count": len(extraction.records),
                 "reject_reasons": extraction.reject_reasons,
+                "truncation_quality": source_manifest["truncation_quality"],
             }
         )
 
@@ -718,6 +834,8 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         "tokenizer_model_id": model_id,
         "tokenizer_revision": revision,
         "tokenizer_asset_manifest_sha256": tokenizer_asset_sha256,
+        "token_count_cache_revision": TOKEN_COUNT_CACHE_REVISION,
+        "token_count_cache": token_counter.stats(),
         "target_rows": target,
         "selection_mode": "quota" if require_full_target else "capacity_scan",
         "require_full_target": require_full_target,
@@ -750,6 +868,26 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 "minimum_source_events": minimum_source_events,
                 "unique_source_events": len(used_source_event_ids),
                 "cross_band_source_event_overlap": 0,
+            }
+        )
+    if minimum_source_elapsed_seconds is not None:
+        manifest.update(
+            {
+                "source_span_gate_revision": (
+                    "git-observed-committer-timestamp-span-v1"
+                ),
+                "minimum_source_elapsed_seconds": minimum_source_elapsed_seconds,
+            }
+        )
+    if maximum_truncated_commit_ratio_ppm is not None:
+        manifest.update(
+            {
+                "truncation_quality_gate_revision": (
+                    "git-observed-prefix-truncation-v1"
+                ),
+                "maximum_truncated_commit_ratio_ppm": (
+                    maximum_truncated_commit_ratio_ppm
+                ),
             }
         )
     _atomic_write(output_dir / "MANIFEST.json", _canonical_bytes(manifest) + b"\n")

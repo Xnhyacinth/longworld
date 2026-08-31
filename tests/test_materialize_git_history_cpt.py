@@ -16,6 +16,8 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from materialize_git_history_cpt import (
+    _configured_minimum_source_elapsed_seconds,
+    _configured_truncation_ratio,
     _deduplicate_extraction,
     _requests,
     _source_manifest,
@@ -94,6 +96,24 @@ def test_window_requests_support_configured_multiband_curriculum() -> None:
     assert [request.min_source_events for request in requests] == [32, 8, 4, 4]
 
 
+def test_quality_gate_config_requires_real_longitudinal_metadata() -> None:
+    bands = {
+        "16k": CPTBand("16k", 16_000, 16_384),
+        "32k": CPTBand("32k", 32_000, 32_768),
+    }
+
+    assert _configured_minimum_source_elapsed_seconds(
+        {"16k": 86_400, "32k": 172_800}, bands, longitudinal=True
+    ) == {"16k": 86_400, "32k": 172_800}
+    with pytest.raises(ValueError, match="requires longitudinal"):
+        _configured_minimum_source_elapsed_seconds(
+            {"16k": 86_400, "32k": 172_800}, bands, longitudinal=False
+        )
+    with pytest.raises(ValueError, match="truncation ratio"):
+        _configured_truncation_ratio(True)
+    assert _configured_truncation_ratio(125_000) == 125_000
+
+
 def test_git_history_remote_identity_requires_public_head_and_license() -> None:
     head = "a" * 40
     responses = {
@@ -132,6 +152,7 @@ def test_git_history_source_manifest_normalizes_yaml_timestamp(
         head_revision="a" * 40,
         commit_count=1,
         reject_reasons={},
+        truncated_commits=(),
         records=(
             WorkflowRecord(
                 record_id="r1",
@@ -139,6 +160,14 @@ def test_git_history_source_manifest_normalizes_yaml_timestamp(
                 occurred_at="2026-01-01T00:00:00Z",
                 text="real patch",
                 links=(),
+                attributes={
+                    "sha": "a" * 40,
+                    "chunk_index": 0,
+                    "chunk_count": 1,
+                    "commit_chunk_count_total": 1,
+                    "commit_chunk_count_emitted": 1,
+                    "commit_was_truncated": False,
+                },
                 source_pointer="https://github.com/example/repo/commit/" + "a" * 40,
             ),
         ),
@@ -172,7 +201,10 @@ def test_git_history_source_manifest_normalizes_yaml_timestamp(
         skip_commits=0,
         max_record_tokens=768,
         max_chunks_per_commit=0,
+        maximum_truncated_commit_ratio_ppm=0,
     )
 
     assert manifest["authorization"]["reviewed_at"] == "2026-01-01T00:00:00Z"
+    assert manifest["truncation_quality"]["tier"] == "complete"
+    assert manifest["record_index"][0]["commit_chunk_count_total"] == 1
     assert verify_attestation(manifest, key, purpose="source_manifest")

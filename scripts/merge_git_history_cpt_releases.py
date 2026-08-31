@@ -45,6 +45,11 @@ _COMPATIBLE_FIELDS = (
     "longitudinal_gate_revision",
     "max_chunks_per_commit",
     "minimum_source_events",
+    "source_span_gate_revision",
+    "minimum_source_elapsed_seconds",
+    "truncation_quality_gate_revision",
+    "maximum_truncated_commit_ratio_ppm",
+    "token_count_cache_revision",
 )
 
 
@@ -336,7 +341,11 @@ def merge_releases(
     for key in ("global_quota_unfilled", *(f"unfilled_{name}" for name in target)):
         pack_rejects.pop(key, None)
     manifest = {
-        **{field: first_release[field] for field in _COMPATIBLE_FIELDS},
+        **{
+            field: first_release[field]
+            for field in _COMPATIBLE_FIELDS
+            if field in first_release
+        },
         "target_rows": target,
         "retained_rows": stats["retained_rows"],
         "retained_context_tokens": stats["retained_context_tokens"],

@@ -3,10 +3,14 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from longworld.core.githistory import (
     _MAX_TOKENIZER_CHARS,
+    DeterministicTokenCountCache,
     _split_exact_source_text,
     extract_first_parent_history,
+    git_truncation_quality,
 )
 
 
@@ -186,6 +190,61 @@ def test_git_history_caps_a_commit_without_breaking_the_parent_chain(
     assert result.records[0].links == ()
     assert result.records[1].links == (result.records[0].record_id,)
     assert result.records[2].links == (result.records[1].record_id,)
+    assert all(record.attributes["commit_was_truncated"] for record in result.records)
+    assert all(
+        record.attributes["commit_chunk_count_total"]
+        > record.attributes["commit_chunk_count_emitted"]
+        == 1
+        for record in result.records
+    )
+    assert (
+        sum(
+            item.total_chunk_count - item.emitted_chunk_count
+            for item in result.truncated_commits
+        )
+        == result.reject_reasons["commit_chunks_truncated"]
+    )
+
+
+def test_git_truncation_quality_is_exact_and_fail_closed() -> None:
+    quality = git_truncation_quality(
+        5,
+        {"commits_truncated": 1, "commit_chunks_truncated": 7},
+        maximum_truncated_commit_ratio_ppm=200_000,
+    )
+
+    assert quality == {
+        "revision": "git-observed-prefix-truncation-v1",
+        "observed_commit_count": 5,
+        "truncated_commit_count": 1,
+        "omitted_chunk_count": 7,
+        "truncated_commit_ratio_ppm": 200_000,
+        "maximum_truncated_commit_ratio_ppm": 200_000,
+        "tier": "within_configured_limit",
+    }
+    with pytest.raises(ValueError, match="exceeds configured maximum"):
+        git_truncation_quality(
+            5,
+            {"commits_truncated": 2, "commit_chunks_truncated": 7},
+            maximum_truncated_commit_ratio_ppm=200_000,
+        )
+
+
+def test_token_count_cache_is_deterministic_and_asset_namespaced() -> None:
+    calls: list[str] = []
+
+    def count(text: str) -> int:
+        calls.append(text)
+        return len(text.split())
+
+    first = DeterministicTokenCountCache("asset-a", count)
+    second = DeterministicTokenCountCache("asset-b", count)
+
+    assert first("real history") == 2
+    assert first("real history") == 2
+    assert first.stats() == {"entries": 1, "hits": 1, "misses": 1}
+    assert second("real history") == 2
+    assert calls == ["real history", "real history"]
 
 
 def test_git_history_framing_is_not_ambiguous_with_control_bytes(
