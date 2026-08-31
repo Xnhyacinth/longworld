@@ -23,10 +23,14 @@ minimum-span 与 truncation-quality gate 目前只覆盖新增 Bitcoin/pandas 38
 promotion-v2 SFT，也不能把 authentic source history 等同于 answer-changing
 long-range dependency。
 
-本轮冻结代码验证结果为 **1,409 passed / 1 expected xfail**；聚焦 task、promotion、
-report 和 training snapshot 的测试、Ruff、MyPy、compileall、Bash syntax 与
-`git diff --check` 均通过。最终独立审查为 0 个 P0/P1；Swift v2 deterministic
-validator 缺失作为已记录的非阻塞 P2 保持 fail closed。
+提交 `776c8cb93b60c7548b35e2a8963789032555aae7` 之前的冻结验证结果为
+**1,409 passed / 1 expected xfail**；它不代表本报告之后仍在修改的 Git-history
+license-binding 工作树。当前 diff 在最后两项 audit guard 之前完成全量
+**1,419 passed / 1 expected xfail**；guard 加入后的 Git-history、CPT window 和
+shared public-source governance 聚焦验证为 76 passed。对应命令覆盖
+`test_githistory`、`test_cptwindow`、materialize、audit、filter、merge 和
+`test_real_source_workflow` 七个文件；精确最终树的全量回归仍待重跑。Swift v2
+deterministic validator 缺失仍保持 fail closed。
 
 ## 与公开 baseline 的诚实对照
 
@@ -76,6 +80,42 @@ token 预算和固定训练配置下，source-bound executable workflow 是否�
 所有结果应同时报告绝对值、相对无 LongWorld control 的 delta、三个或更多固定 seed
 或可复现 bootstrap 置信区间、短上下文 retention 和 closed-book 变化。当前 12 条 SFT
 只适合 pipeline smoke test，不适合作为模型效果结论。
+
+## 12→48→210 的容量预算
+
+现有 release profile 只定义质量下限，不规定“每个 world 必须生成固定行数”。因此下表
+将不可放松的代码门禁与为了形成可训练 scaling curve 的建议产能分开；建议数不是已经
+通过的 release，也不能用 `band × view` 替代新的 semantic task、proof 或 source
+relation。
+
+| 阶段      | 当前事实、已有代码下限或明确 proposal                                                                                                                                               |                                                                                         建议可训练产能 | 建议语义规模                                                                                           |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------------------------------------------------------------------------------: | ------------------------------------------------------------------------------------------------------ |
+| 当前      | 2 worlds、12 rows、454,846 tokens；仅 arXiv/ResearchLab                                                                                                                             |                                                                                    只作 pipeline smoke | 2 query types、2 motifs、6 programs/proofs                                                             |
+| 12-world  | 代码当前只约束 4 Company + 4 ResearchLab + 4 CodeForge 等总量下限；把 ResearchLab 再分成 2 paper + 2 KB、10 train/2 eval、48 条真实 64K 是本轮 proposal，尚未写入 selection receipt |                                                    每档 96 条 16/32/64K，共 288 rows，约 10.75M tokens | 每 world 4 个 source-independent tasks/programs；至少 48 semantic tasks、144 个 band-specific proofs   |
+| 48-world  | 当前可发行 profile 尚未定义；历史 profile 只能作为 48 worlds、144 条真实 64K、12 programs 的下限参考                                                                                |                                                 每档 768 条 16/32/64K，共 2,304 rows，约 86.02M tokens | 建议至少 32 entities、384 semantic tasks、1,152 band proofs、16 relation kinds、24 program families    |
+| 210-world | 当前可发行 profile 尚未定义；必须继承新 48-world receipt                                                                                                                            | 16/32/64K core 10,080 rows；真实增长通过后再加 840×128K 和 210×256K，共 11,130 rows、约 537.60M tokens | 建议至少 120 entities、1,680 semantic tasks、5,040 band proofs、32 relation kinds、48 program families |
+
+首轮建议的 canonical 12-world 真实实体组合是：SEC 使用 Amazon、NVIDIA、Microsoft、
+Apple；GitHub 使用 dprint、Pulumi、Deno、Ruff；paper 使用 Attention 与 MLRC；
+Wikimedia/KB 使用 Jefferson 与 Newton。CISA KEV、Oxc、uv、Wasmtime、Godot、
+Megatron-LM、Einstein 和 RFC 9421 是后续独立扩容来源；它们必须重新导出真实记录并
+改变 state/answer/replay，不能只替换实体字符串。
+
+从实验规模看，当前 0.286B CPT tokens 已足够运行 50M/150M/286.6M 的早期
+equal-token 曲线，但低于 LongRecipe 的约 1.8B 和 ProLong 的 40B，不能直接用论文
+原分数横比。CPT 的公平对照应是同源随机 packing、保留时间顺序但不做 dependency
+筛选、长度匹配的普通连贯长文和 dependency-score 选择；ACC 则是 SFT 对照，不属于
+CPT 轨道。LongWorld 达到至少 1,000 条 current-code promoted rows 后才可做趋势性
+ACC pilot；达到约 10K rows、完整 unseen splits 和相同底模/token/steps 后，才适合
+正式 matched comparison。
+
+CPT 的建议扩容阶梯单独按 token 而不是 SFT world row 计数：C0 保留当前
+50M/150M/286.6M 诊断曲线；C1 扩至约 1.8B tokens、至少 50 个真实实体和 6 个 source
+families，并限制单实体不超过 5%、单 domain 不超过 35%；只有 C1 相对 equal-token
+controls 在长上下文指标上有稳定增益且一般能力不下降，才进入约 5B 的 C2。ProLong
+的 40B 只作为远期量级参考，不应在 0.286B 尚未验证有效性时直接追量。新增 token
+必须来自新的真实时间段、filing/revision/release cycle 或跨源 workflow，不能靠重复
+窗口、实体换名或随机文档拼接。
 
 ## 本轮真实执行结果
 
@@ -186,6 +226,12 @@ benchmark snapshot；不能通过更名或目录移动把 local-probe 升格。
    source relation、proof/retrieval/semantic-growth 和 production trust gates。
 6. 只有这一步通过后才创建正式 HF train release；48/210 继续保持阻塞，不以 candidate
    数量或 CPT rows 替代 production-qualified world 数。
+
+Git-history license-binding v2 已逐 commit 检查 canonical path/blob，并把历史
+allowlist 整体 digest 作为受保护 approval pin、当前仓库 entry digest 作为必要身份。
+生产审计拒绝 legacy v1--v4 降级；但 auditor 尚未独立重放 commit/tree object 到
+license blob 的 Merkle 路径，因此新输出只能标记为 producer-executed local probe，
+不能称作 strict independent replay 或 production promotion。
 
 最终发布声明应同时列出 CPT/SFT、candidate/promoted/production 三组互斥计数。
 “内容门禁通过”“本地可诊断训练”和“正式可训练发布”是三个不同状态，任何一个都不能
