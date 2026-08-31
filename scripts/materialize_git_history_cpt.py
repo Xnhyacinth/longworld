@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -315,7 +316,7 @@ def validate_remote_identity(
         license_bytes = base64.b64decode(
             "".join(license_content.split()), validate=True
         )
-    except (ValueError, base64.binascii.Error) as error:
+    except (ValueError, binascii.Error) as error:
         raise ValueError("Git history revision license content is invalid") from error
     if len(license_bytes) != license_size:
         raise ValueError("Git history revision license size does not match content")
@@ -1090,6 +1091,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     cpt_rejects: Counter[str] = Counter()
     used_record_ids: set[str] = set()
     used_source_event_ids: set[str] = set()
+    used_base_workflow_ids: set[str] = set()
     seen_source_text_sha256: set[str] = set()
     validated_checkouts: set[tuple[str, Path]] = set()
     remote_identities: dict[tuple[str, str, str], dict[str, Any]] = {}
@@ -1411,6 +1413,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             accepted_tokens[window.band.name] += window.context_tokens
             used_record_ids.update(window.record_ids)
             used_source_event_ids.update(window.source_event_ids)
+            used_base_workflow_ids.add(workflow.workflow_id)
         source_manifests.append(
             {
                 "repository": repository,
@@ -1482,7 +1485,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             name: len(accepted_by_band[name]) == target[name]
             for name in ordered_band_names
         },
-        "unique_workflows": len({str(item["repository"]) for item in source_manifests}),
+        "unique_workflows": len(used_base_workflow_ids),
         "unique_source_windows": len(serialized_rows),
         "unique_source_records": len(used_record_ids),
         "cross_band_source_record_overlap": 0,
