@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import re
+from bisect import bisect_left, bisect_right
 from collections import Counter
 from collections.abc import Callable, Sequence
 from itertools import pairwise
@@ -15,9 +16,11 @@ from longworld.core.attestation import sanitized_attestation_environment
 from longworld.core.domainhistory import (
     audit_kev_pipeline_candidate,
     replay_kev_pipeline_candidate,
+    replay_kev_pipeline_raw_slice,
 )
 from longworld.core.financehistory import (
     audit_finance_pipeline_candidate,
+    replay_finance_pipeline_raw_slice,
     replay_finance_pipeline_selection,
 )
 from longworld.core.pack import SEP
@@ -29,7 +32,7 @@ from longworld.core.taskreplaysidecar import (
 )
 from longworld.core.verify import Verification
 
-TASK_PROOF_RECEIPT_SCHEMA = "longworld.task-proof-receipt.v2"
+TASK_PROOF_RECEIPT_SCHEMA = "longworld.task-proof-receipt.v4"
 TokenCounter = Callable[[str], int]
 _WINDOW_BANDS = {"4k": 4_096, "8k": 8_192, "16k": 16_384}
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -209,6 +212,31 @@ def _replay(
             counterfactual=counterfactual,
         )
     raise TaskProofError("task replay adapter is unsupported")
+
+
+def _replay_raw_slice(
+    candidate: dict[str, Any],
+    adapter_key: TaskReplayRegistryKey,
+    raw_document_context: str,
+    *,
+    left_framed: bool,
+    right_framed: bool,
+) -> dict[str, Any]:
+    if adapter_key == CYBER_KEV_TASK_REPLAY_ADAPTER:
+        return replay_kev_pipeline_raw_slice(
+            candidate,
+            raw_document_context,
+            left_framed=left_framed,
+            right_framed=right_framed,
+        )
+    if adapter_key == FINANCE_TASK_REPLAY_ADAPTER:
+        return replay_finance_pipeline_raw_slice(
+            candidate,
+            raw_document_context,
+            left_framed=left_framed,
+            right_framed=right_framed,
+        )
+    raise TaskProofError("task raw-slice replay adapter is unsupported")
 
 
 def _lexemes(text: str) -> list[str]:
@@ -408,6 +436,276 @@ def _contiguous_window_proof(
     return output, has_strict_evidence
 
 
+def _canonical_record_char_spans(document_context: str) -> list[tuple[int, int]]:
+    spans: list[tuple[int, int]] = []
+    cursor = 0
+    for framed_line in document_context.splitlines(keepends=True):
+        line = framed_line.removesuffix("\n")
+        if line and line != SEP.strip():
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise TaskProofError(
+                    "raw replay body contains an invalid framed record"
+                ) from error
+            canonical = json.dumps(
+                record,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            if not isinstance(record, dict) or canonical != line:
+                raise TaskProofError("raw replay body record is not canonical")
+            spans.append((cursor, cursor + len(line)))
+        cursor += len(framed_line)
+    if cursor != len(document_context) or not spans:
+        raise TaskProofError("raw replay body has no complete framed records")
+    return spans
+
+
+def _window_state_starts(
+    offsets: Sequence[tuple[int, int]],
+    spans: Sequence[tuple[int, int]],
+    limit: int,
+    *,
+    complete: bool,
+) -> list[int]:
+    """Return one start per interval where the visible record set is unchanged."""
+    if limit < 1 or limit > len(offsets):
+        raise TaskProofError("raw replay window limit is invalid")
+    starts = [start for start, _end in offsets]
+    ends = [end for _start, end in offsets]
+    max_start = len(offsets) - limit
+    changes = {0, max_start}
+    for char_start, char_end in spans:
+        if char_start < 0 or char_end <= char_start:
+            raise TaskProofError("raw replay record span is invalid")
+        if complete:
+            first_end = bisect_left(ends, char_end)
+            last_start = bisect_right(starts, char_start) - 1
+        else:
+            first_end = bisect_right(ends, char_start)
+            last_start = bisect_left(starts, char_end) - 1
+        if first_end == len(offsets) or last_start < 0:
+            continue
+        visible_from = max(0, first_end - limit + 1)
+        visible_through = min(max_start, last_start)
+        if visible_from > visible_through:
+            continue
+        changes.add(visible_from)
+        if visible_through < max_start:
+            changes.add(visible_through + 1)
+    return sorted(changes)
+
+
+def _semantic_window_starts(
+    offsets: Sequence[tuple[int, int]],
+    record_spans: Sequence[tuple[int, int]],
+    limit: int,
+) -> list[int]:
+    """Return exhaustive representatives for complete-record raw replay states."""
+    return _window_state_starts(offsets, record_spans, limit, complete=True)
+
+
+def _raw_token_window_proof(
+    *,
+    artifact_ids: list[str],
+    documents: list[str],
+    offset_tokenizer: Any,
+    replay_raw_answer: Callable[[str, bool, bool], str],
+    replay_artifact_answer: Callable[[Sequence[str]], str],
+    expected_answer: str,
+    expected_total_tokens: int,
+) -> tuple[dict[str, Any], bool, list[dict[str, int]]]:
+    """Replay exact raw slices and separately run a non-certifying upper bound."""
+    if len(documents) != len(artifact_ids) or not callable(offset_tokenizer):
+        raise TaskProofError("raw token window inputs are unbound")
+    document_context = SEP.join(documents)
+    try:
+        encoded = offset_tokenizer(
+            document_context,
+            add_special_tokens=False,
+            return_offsets_mapping=True,
+        )
+        token_ids = list(encoded["input_ids"])
+        raw_offsets = list(encoded["offset_mapping"])
+        if any(
+            not isinstance(item, (list, tuple)) or len(item) != 2
+            for item in raw_offsets
+        ):
+            raise TaskProofError("exact tokenizer produced malformed raw offsets")
+        offsets = [(item[0], item[1]) for item in raw_offsets]
+    except (KeyError, TypeError, ValueError, NotImplementedError) as error:
+        raise TaskProofError("exact tokenizer has no raw offset mapping") from error
+    if (
+        not token_ids
+        or len(token_ids) != len(offsets)
+        or any(
+            not isinstance(start, int)
+            or not isinstance(end, int)
+            or isinstance(start, bool)
+            or isinstance(end, bool)
+            or start < 0
+            or end <= start
+            or end > len(document_context)
+            for start, end in offsets
+        )
+        or any(
+            left_start > right_start or left_end > right_end
+            for (left_start, left_end), (right_start, right_end) in pairwise(offsets)
+        )
+    ):
+        raise TaskProofError("exact tokenizer produced invalid raw offsets")
+    token_starts = [start for start, _end in offsets]
+    token_ends = [end for _start, end in offsets]
+    record_char_spans = _canonical_record_char_spans(document_context)
+    artifact_char_spans: list[tuple[int, int]] = []
+    artifact_spans: list[tuple[int, int]] = []
+    cursor = 0
+    for index, document in enumerate(documents):
+        if index:
+            cursor += len(SEP)
+        char_start = cursor
+        cursor += len(document)
+        artifact_char_spans.append((char_start, cursor))
+        start = bisect_right(token_ends, char_start)
+        stop = bisect_left(token_starts, cursor)
+        if start >= stop:
+            raise TaskProofError("raw token window artifact has no token span")
+        artifact_spans.append((start, stop))
+
+    total_tokens = len(token_ids)
+    if total_tokens != expected_total_tokens:
+        raise TaskProofError("raw offset tokenizer count does not match exact counter")
+    output: dict[str, Any] = {}
+    has_strict_evidence = False
+    for label, limit in _WINDOW_BANDS.items():
+        if limit >= total_tokens:
+            output[label] = {
+                "window_tokens": limit,
+                "status": "full_control",
+                "strict_window_count": 0,
+                "exact_raw_executable": {
+                    "status": "full_control",
+                    "exhaustive_start_count": 0,
+                    "semantic_state_count": 0,
+                    "enumeration_sha256": None,
+                },
+                "conservative_intersection_upper_bound": {
+                    "status": "full_control",
+                    "can_establish_pass": False,
+                    "monotonicity_proven": False,
+                    "semantic_state_count": 0,
+                    "enumeration_sha256": None,
+                },
+                "enumeration_sha256": None,
+            }
+            continue
+        max_start = total_tokens - limit
+        exact_enumerated: list[dict[str, Any]] = []
+        seen_record_states: set[tuple[int, ...]] = set()
+        for start in _semantic_window_starts(offsets, record_char_spans, limit):
+            stop = start + limit
+            char_start = offsets[start][0]
+            char_end = offsets[stop - 1][1]
+            record_state = tuple(
+                index
+                for index, (record_start, record_end) in enumerate(record_char_spans)
+                if char_start <= record_start and record_end <= char_end
+            )
+            if record_state in seen_record_states:
+                continue
+            seen_record_states.add(record_state)
+            raw_slice = document_context[char_start:char_end]
+            answer = replay_raw_answer(
+                raw_slice,
+                char_start == 0 or document_context[char_start - 1] == "\n",
+                char_end == len(document_context)
+                or document_context[char_end : char_end + 1] == "\n",
+            )
+            exact_enumerated.append(
+                {
+                    "start_token": start,
+                    "end_token": stop,
+                    "start_char": char_start,
+                    "end_char": char_end,
+                    "raw_slice_sha256": hashlib.sha256(raw_slice.encode()).hexdigest(),
+                    "visible_record_count": len(record_state),
+                    "record_state_sha256": _canonical_sha256(record_state),
+                    "answer_sha256": hashlib.sha256(answer.encode()).hexdigest(),
+                }
+            )
+            if answer == expected_answer:
+                raise TaskProofError(
+                    f"exact raw token window {label} retrieves the gold answer: "
+                    f"{start}:{stop}"
+                )
+
+        upper_enumerated: list[dict[str, Any]] = []
+        seen_selections: set[tuple[str, ...]] = set()
+        for start in _window_state_starts(
+            offsets, artifact_char_spans, limit, complete=False
+        ):
+            stop = start + limit
+            char_start = offsets[start][0]
+            char_end = offsets[stop - 1][1]
+            selected = tuple(
+                artifact_id
+                for artifact_id, (artifact_start, artifact_end) in zip(
+                    artifact_ids, artifact_char_spans, strict=True
+                )
+                if artifact_start < char_end and artifact_end > char_start
+            )
+            if not selected or selected in seen_selections:
+                continue
+            seen_selections.add(selected)
+            answer = replay_artifact_answer(selected)
+            upper_enumerated.append(
+                {
+                    "start_token": start,
+                    "end_token": stop,
+                    "artifact_ids": list(selected),
+                    "answer_sha256": hashlib.sha256(answer.encode()).hexdigest(),
+                }
+            )
+            if answer == expected_answer:
+                raise TaskProofError(
+                    f"raw token window {label} intersecting-artifact upper bound "
+                    f"retrieves the gold answer: {start}:{stop}"
+                )
+        if not exact_enumerated or not upper_enumerated:
+            raise TaskProofError(f"raw token window {label} has no executable evidence")
+        has_strict_evidence = True
+        output[label] = {
+            "window_tokens": limit,
+            "status": "executable_insufficient",
+            "strict_window_count": len(exact_enumerated),
+            "exact_raw_executable": {
+                "status": "insufficient",
+                "exhaustive_start_count": max_start + 1,
+                "semantic_state_count": len(exact_enumerated),
+                "state_partition": "complete_canonical_record_visibility_v1",
+                "enumeration_sha256": _canonical_sha256(exact_enumerated),
+            },
+            "conservative_intersection_upper_bound": {
+                "status": "gold_absent_non_certifying",
+                "can_establish_pass": False,
+                "monotonicity_proven": False,
+                "semantic_state_count": len(upper_enumerated),
+                "max_artifact_count": max(
+                    len(item["artifact_ids"]) for item in upper_enumerated
+                ),
+                "enumeration_sha256": _canonical_sha256(upper_enumerated),
+            },
+            "enumeration_sha256": _canonical_sha256(exact_enumerated),
+        }
+    return (
+        output,
+        has_strict_evidence,
+        [{"start_token": start, "end_token": stop} for start, stop in artifact_spans],
+    )
+
+
 def _complexity_valid(candidate: dict[str, Any], essential_ids: list[str]) -> bool:
     graph = candidate.get("graph")
     return bool(
@@ -445,7 +743,10 @@ def _proof_input_sha256(candidate: dict[str, Any]) -> str:
 
 
 def compute_task_proof(
-    candidate: dict[str, Any], *, token_counter: TokenCounter
+    candidate: dict[str, Any],
+    *,
+    token_counter: TokenCounter,
+    offset_tokenizer: Any | None = None,
 ) -> dict[str, Any]:
     """Compute proof fields for later embedding in a separately signed candidate."""
     if not callable(token_counter):
@@ -506,6 +807,18 @@ def compute_task_proof(
 
         def answer(selected: Sequence[str]) -> str:
             return str(replay(selected).get("answer") or "")
+
+        def raw_answer(raw_slice: str, left_framed: bool, right_framed: bool) -> str:
+            return str(
+                _replay_raw_slice(
+                    candidate,
+                    adapter_key,
+                    raw_slice,
+                    left_framed=left_framed,
+                    right_framed=right_framed,
+                ).get("answer")
+                or ""
+            )
 
         expected_answer = str(candidate.get("answer") or "")
         expected_cf_answer = str(candidate.get("cf_answer") or "")
@@ -575,6 +888,19 @@ def compute_task_proof(
         )
         if not has_strict_window_evidence:
             raise TaskProofError("contiguous windows have no strict sub-full evidence")
+        if offset_tokenizer is None:
+            raise TaskProofError("raw token window proof requires an exact tokenizer")
+        raw_windows, has_raw_window_evidence, raw_spans = _raw_token_window_proof(
+            artifact_ids=artifact_ids,
+            documents=documents,
+            offset_tokenizer=offset_tokenizer,
+            replay_raw_answer=raw_answer,
+            replay_artifact_answer=answer,
+            expected_answer=expected_answer,
+            expected_total_tokens=document_context_tokens,
+        )
+        if not has_raw_window_evidence:
+            raise TaskProofError("raw token windows have no strict sub-full evidence")
         bm25 = _retrieval_proof(
             name="BM25",
             ranking=_bm25_ranking(str(candidate.get("question") or ""), documents),
@@ -607,6 +933,11 @@ def compute_task_proof(
             and all(
                 item["status"] in {"insufficient", "full_control"}
                 for item in windows.values()
+            ),
+            "raw_token_executable_windows_insufficient": has_raw_window_evidence
+            and all(
+                item["status"] in {"executable_insufficient", "full_control"}
+                for item in raw_windows.values()
             ),
             "bm25_top1_insufficient": bm25["top1_insufficient"] is True,
             "bm25_top3_prefixes_insufficient": bm25["all_prefixes_insufficient"]
@@ -668,7 +999,7 @@ def compute_task_proof(
                 **span,
             }
             for artifact_id, document, span in zip(
-                artifact_ids, documents, spans, strict=True
+                artifact_ids, documents, raw_spans, strict=True
             )
         ]
         receipt: dict[str, Any] = {
@@ -697,8 +1028,11 @@ def compute_task_proof(
                 "remove_one": remove_one,
                 "single_essential": singles,
             },
-            "window_scope": "artifact_aligned",
+            "window_scope": (
+                "exact_raw_slice_replay_with_separate_intersection_upper_bound"
+            ),
             "artifact_aligned_windows": windows,
+            "raw_token_offset_windows": raw_windows,
             "retrieval": {"bm25": bm25, "lexical_tfidf": lexical},
             "adapter_audit": adapter_audit,
             "checks": checks,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from dataclasses import replace
 from typing import Any
@@ -16,14 +17,19 @@ from longworld.core.domainhistory import (
     HistoryBand,
     build_kev_catalog_history_candidates,
     build_kev_pipeline_candidate,
+    replay_kev_pipeline_raw_slice,
 )
 from longworld.core.financehistory import (
     build_finance_pipeline_candidate,
     build_financial_history_candidates,
+    replay_finance_pipeline_raw_slice,
 )
+from longworld.core.pack import SEP
 from longworld.core.taskproof import (
     TaskProofError,
     _contiguous_window_proof,
+    _raw_token_window_proof,
+    _semantic_window_starts,
     compute_task_proof,
 )
 from longworld.core.taskreplaysidecar import (
@@ -56,6 +62,33 @@ def _binding(adapter: tuple[str, str, str]) -> dict[str, str]:
         "sidecar_schema_version": adapter[2],
         "sha256": "f" * 64,
     }
+
+
+class _CharacterOffsetTokenizer:
+    def __call__(
+        self,
+        text: str,
+        *,
+        add_special_tokens: bool,
+        return_offsets_mapping: bool,
+    ) -> dict[str, list[Any]]:
+        assert add_special_tokens is False
+        assert return_offsets_mapping is True
+        return {
+            "input_ids": list(range(len(text))),
+            "offset_mapping": [(index, index + 1) for index in range(len(text))],
+        }
+
+
+_CHARACTER_TOKENIZER = _CharacterOffsetTokenizer()
+
+
+def _proof(candidate: dict[str, Any]) -> dict[str, Any]:
+    return compute_task_proof(
+        candidate,
+        token_counter=len,
+        offset_tokenizer=_CHARACTER_TOKENIZER,
+    )
 
 
 def _long_cyber_candidate() -> dict[str, Any]:
@@ -91,7 +124,7 @@ def _long_cyber_candidate() -> dict[str, Any]:
         },
         candidate_attestation_key=KEYS["candidate"],
         task_replay_sidecar_binding=_binding(CYBER_KEV_TASK_REPLAY_ADAPTER),
-        document_shards=4,
+        document_shards=6,
     )
 
 
@@ -139,14 +172,11 @@ def _long_finance_candidate() -> dict[str, Any]:
     )
 
 
-@pytest.mark.parametrize("factory", (_long_cyber_candidate, _long_finance_candidate))
-def test_computes_closed_real_task_proof_without_mutating_candidate(
-    factory: Any,
-) -> None:
-    candidate = factory()
+def test_computes_closed_real_task_proof_without_mutating_candidate() -> None:
+    candidate = _long_finance_candidate()
     before = deepcopy(candidate)
 
-    proof = compute_task_proof(candidate, token_counter=len)
+    proof = _proof(candidate)
 
     assert candidate == before
     verification = Verification.model_validate(proof["verification"])
@@ -160,15 +190,23 @@ def test_computes_closed_real_task_proof_without_mutating_candidate(
     assert verification.no_shortcut is False
     assert proof["view_verification"]["global_proof_green"] is False
     receipt = proof["task_proof_receipt"]
-    assert receipt["window_scope"] == "artifact_aligned"
+    assert receipt["window_scope"] == (
+        "exact_raw_slice_replay_with_separate_intersection_upper_bound"
+    )
     assert set(receipt["artifact_aligned_windows"]) == {"4k", "8k", "16k"}
     assert all(
         item["status"] == "insufficient"
         for item in receipt["artifact_aligned_windows"].values()
     )
+    assert set(receipt["raw_token_offset_windows"]) == {"4k", "8k", "16k"}
     assert receipt["retrieval"]["bm25"]["all_prefixes_insufficient"] is True
     assert receipt["retrieval"]["lexical_tfidf"]["all_prefixes_insufficient"] is True
     assert all(receipt["checks"].values())
+
+
+def test_clustered_cyber_candidate_fails_raw_16k_replay() -> None:
+    with pytest.raises(TaskProofError, match="raw token window 16k"):
+        _proof(_long_cyber_candidate())
 
 
 def test_rejects_candidate_solved_by_a_strict_16k_contiguous_window() -> None:
@@ -194,7 +232,7 @@ def test_rejects_candidate_solved_by_a_strict_16k_contiguous_window() -> None:
     )
 
     with pytest.raises(TaskProofError, match="contiguous window.*16k"):
-        compute_task_proof(candidate, token_counter=len)
+        _proof(candidate)
 
 
 def test_rejects_source_body_corruption() -> None:
@@ -204,7 +242,7 @@ def test_rejects_source_body_corruption() -> None:
     )
 
     with pytest.raises(TaskProofError, match="body|adapter audit"):
-        compute_task_proof(candidate, token_counter=len)
+        _proof(candidate)
 
 
 def test_rejects_source_relation_edge_content_corruption() -> None:
@@ -214,7 +252,15 @@ def test_rejects_source_relation_edge_content_corruption() -> None:
     candidate["authentic_source_relation_edges"][0] = corrupted
 
     with pytest.raises(TaskProofError, match="source relation"):
-        compute_task_proof(candidate, token_counter=len)
+        _proof(candidate)
+
+
+def test_rejects_answer_exposed_on_question_surface() -> None:
+    candidate = _long_finance_candidate()
+    candidate["question"] += " " + candidate["answer"]
+
+    with pytest.raises(TaskProofError, match="surface"):
+        _proof(candidate)
 
 
 def test_contiguous_windows_count_each_bpe_substring_exactly() -> None:
@@ -241,11 +287,176 @@ def test_contiguous_windows_count_each_bpe_substring_exactly() -> None:
         )
 
 
-def test_artifact_aligned_window_does_not_claim_token_offset_exhaustive() -> None:
-    proof = compute_task_proof(_long_finance_candidate(), token_counter=len)
+def test_raw_token_window_proof_is_conservative_for_oversized_artifacts() -> None:
+    oversized = json.dumps(
+        {"payload": "x" * 5000, "record_type": "test"},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    control = '{"record_type":"control"}'
+    with pytest.raises(TaskProofError, match="raw token window 4k"):
+        _raw_token_window_proof(
+            artifact_ids=["oversized", "control"],
+            documents=[oversized, control],
+            offset_tokenizer=_CHARACTER_TOKENIZER,
+            replay_raw_answer=lambda _text, _left, _right: "unknown",
+            replay_artifact_answer=lambda selected: (
+                "gold" if "oversized" in selected else "unknown"
+            ),
+            expected_answer="gold",
+            expected_total_tokens=len(oversized + SEP + control),
+        )
+
+
+def test_raw_token_window_replays_the_exact_original_character_slice() -> None:
+    document = json.dumps(
+        {"payload": "x" * 5000, "record_type": "test"},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    observed: list[tuple[str, bool, bool]] = []
+
+    windows, strict, _spans = _raw_token_window_proof(
+        artifact_ids=["oversized"],
+        documents=[document],
+        offset_tokenizer=_CHARACTER_TOKENIZER,
+        replay_raw_answer=lambda text, left, right: (
+            observed.append((text, left, right)) or "unknown"
+        ),
+        replay_artifact_answer=lambda _selected: "unknown",
+        expected_answer="gold",
+        expected_total_tokens=len(document),
+    )
+
+    assert strict is True
+    assert observed == [(document[:4096], True, False)]
+    assert windows["4k"]["exact_raw_executable"]["status"] == "insufficient"
+    assert (
+        windows["4k"]["conservative_intersection_upper_bound"]["can_establish_pass"]
+        is False
+    )
+
+
+@pytest.mark.parametrize(
+    ("offsets", "record_spans", "limit"),
+    [
+        ([(index, index + 1) for index in range(12)], [(0, 2), (4, 7)], 4),
+        ([(0, 2), (1, 3), (4, 5), (6, 8), (9, 10)], [(1, 3), (6, 8)], 2),
+        ([(0, 1), (3, 4), (7, 8), (8, 9)], [(3, 4), (7, 9)], 2),
+        ([(0, 1), (1, 2), (2, 3), (3, 4)], [(0, 2), (2, 4)], 2),
+    ],
+)
+def test_semantic_window_starts_match_all_start_oracle(
+    offsets: list[tuple[int, int]],
+    record_spans: list[tuple[int, int]],
+    limit: int,
+) -> None:
+    max_start = len(offsets) - limit
+
+    def state(start: int) -> tuple[int, ...]:
+        char_start = offsets[start][0]
+        char_end = offsets[start + limit - 1][1]
+        return tuple(
+            index
+            for index, (record_start, record_end) in enumerate(record_spans)
+            if char_start <= record_start and record_end <= char_end
+        )
+
+    oracle = {state(start) for start in range(max_start + 1)}
+    representatives = _semantic_window_starts(offsets, record_spans, limit)
+
+    assert {state(start) for start in representatives} == oracle
+
+
+def test_domain_raw_slice_replay_ignores_partial_framing() -> None:
+    candidate = _long_cyber_candidate()
+    lines = candidate["document_context"].splitlines()
+    header = lines[0]
+    entry = next(line for line in lines[1:] if line.startswith('{"record_type"'))
+    raw = "partial-prefix\n" + header + "\n" + entry + "\npartial-suffix"
+
+    replay = replay_kev_pipeline_raw_slice(
+        candidate,
+        raw,
+        left_framed=False,
+        right_framed=False,
+    )
+
+    assert replay["answer"] != "unknown"
+    assert replay["raw_slice_record_count"] == 2
+
+
+def test_domain_raw_slice_replay_rejects_corrupted_or_surface_only_text() -> None:
+    candidate = _long_cyber_candidate()
+    line = next(
+        value
+        for value in candidate["document_context"].splitlines()
+        if value.startswith('{"record_type"')
+    )
+    corrupted = line.replace('"record_type"', '"forged_type"', 1)
+
+    assert (
+        replay_kev_pipeline_raw_slice(
+            candidate,
+            corrupted,
+            left_framed=True,
+            right_framed=True,
+        )["answer"]
+        == "unknown"
+    )
+    assert (
+        replay_kev_pipeline_raw_slice(
+            candidate,
+            str(candidate["answer"]),
+            left_framed=False,
+            right_framed=False,
+        )["answer"]
+        == "unknown"
+    )
+
+
+def test_finance_raw_slice_replay_revalidates_complete_records() -> None:
+    candidate = _long_finance_candidate()
+    documents = candidate["document_context"].split(SEP)
+    essential = set(candidate["essential_artifact_ids"])
+    selected = [
+        document
+        for document, classification in zip(
+            documents, candidate["artifact_classification"], strict=True
+        )
+        if classification["artifact_id"] in essential
+    ]
+    raw = SEP.join(selected)
+
+    replay = replay_finance_pipeline_raw_slice(
+        candidate,
+        raw,
+        left_framed=True,
+        right_framed=True,
+    )
+
+    assert replay["answer"] == candidate["answer"]
+    assert replay["raw_slice_record_count"] == len(selected)
+
+
+def test_task_proof_distinguishes_raw_executable_from_semantic_shortcut_proof() -> None:
+    proof = _proof(_long_finance_candidate())
     verification = Verification.model_validate(proof["verification"])
 
-    assert proof["task_proof_receipt"]["window_scope"] == "artifact_aligned"
+    receipt = proof["task_proof_receipt"]
+    assert receipt["window_scope"] == (
+        "exact_raw_slice_replay_with_separate_intersection_upper_bound"
+    )
+    assert all(
+        band["exact_raw_executable"]["status"] == "insufficient"
+        for band in receipt["raw_token_offset_windows"].values()
+    )
+    assert all(
+        band["conservative_intersection_upper_bound"]["can_establish_pass"] is False
+        for band in receipt["raw_token_offset_windows"].values()
+    )
+    assert receipt["checks"]["raw_token_executable_windows_insufficient"] is True
+    assert "raw_token_offset_windows_insufficient" not in receipt["checks"]
     assert verification.artifact_aligned_windows_insufficient is True
     assert verification.contiguous_windows_insufficient is False
     assert verification.local_window_insufficient is False

@@ -75,8 +75,29 @@ def _test_token_count(text: str) -> int:
     return max(1, len(text) // 4)
 
 
+class _TestOffsetTokenizer:
+    def __call__(
+        self,
+        text: str,
+        *,
+        add_special_tokens: bool,
+        return_offsets_mapping: bool,
+    ) -> dict[str, list[Any]]:
+        assert add_special_tokens is False
+        assert return_offsets_mapping is True
+        count = _test_token_count(text)
+        offsets = [
+            (index * 4, min(len(text), (index + 1) * 4)) for index in range(count)
+        ]
+        return {"input_ids": list(range(count)), "offset_mapping": offsets}
+
+
+_test_token_count.offset_tokenizer = _TestOffsetTokenizer()  # type: ignore[attr-defined]
+
+
 @pytest.fixture(autouse=True)
 def _role_identities(monkeypatch: pytest.MonkeyPatch) -> None:
+    _test_token_count.offset_tokenizer = _TestOffsetTokenizer()  # type: ignore[attr-defined]
     monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
     for role, key in KEYS.items():
         monkeypatch.setenv(ROLE_KEY_ENVS[role], key.decode())
@@ -275,7 +296,7 @@ def _cyber_candidate(
         tokenizer_asset_manifest_sha256=TOKENIZER_ASSET_SHA256,
         replay_manifest_binding=replay_binding,
         candidate_attestation_key=KEYS["candidate"],
-        document_shards=4,
+        document_shards=5,
     )
     loaded, binding = _loaded_sidecar(
         tmp_path,
@@ -298,7 +319,7 @@ def _cyber_candidate(
         replay_manifest_binding=replay_binding,
         candidate_attestation_key=KEYS["candidate"],
         task_replay_sidecar_binding=binding,
-        document_shards=4,
+        document_shards=5,
     )
     return candidate, loaded
 
@@ -746,7 +767,7 @@ def test_task_promotion_uses_signed_auditor_proof_when_candidate_has_none(
 
     assert "verification" not in candidate
     assert audit["task_proof"]["task_proof_receipt"]["window_scope"] == (
-        "artifact_aligned"
+        "exact_raw_slice_replay_with_separate_intersection_upper_bound"
     )
     with pytest.raises(PromotionError, match="requires signed release selection"):
         promote_task_candidate(

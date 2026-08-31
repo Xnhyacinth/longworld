@@ -119,6 +119,7 @@ def task_sidecar_token_counter(
     counter = _token_counter_for(tokenizer)
     if counter is None:
         raise PromotionError("task sidecar exact tokenizer is unavailable")
+    counter.offset_tokenizer = tokenizer
     return counter
 
 
@@ -602,9 +603,16 @@ def create_task_dense_audit(
     if k != _DENSE_TOP_K:
         raise PromotionError("task dense audit requires top-k=3")
     token_counter = task_sidecar_token_counter(sidecar)
+    offset_tokenizer = getattr(token_counter, "offset_tokenizer", None)
+    if offset_tokenizer is None:
+        raise PromotionError("task promotion requires exact tokenizer offsets")
     adapter_audit = _adapter_audit(candidate, sidecar, token_counter)
     try:
-        task_proof = compute_task_proof(candidate, token_counter=token_counter)
+        task_proof = compute_task_proof(
+            candidate,
+            token_counter=token_counter,
+            offset_tokenizer=offset_tokenizer,
+        )
     except TaskProofError as error:
         raise PromotionError(f"task upstream proof replay failed: {error}") from error
     selection_metrics = _task_selection_metrics(
@@ -839,9 +847,16 @@ def promote_task_candidate(
         source_attestation_key=source_attestation_key,
     )
     token_counter = task_sidecar_token_counter(sidecar)
+    offset_tokenizer = getattr(token_counter, "offset_tokenizer", None)
+    if offset_tokenizer is None:
+        raise PromotionError("task promotion requires exact tokenizer offsets")
     adapter_audit = _adapter_audit(candidate, sidecar, token_counter)
     try:
-        task_proof = compute_task_proof(candidate, token_counter=token_counter)
+        task_proof = compute_task_proof(
+            candidate,
+            token_counter=token_counter,
+            offset_tokenizer=offset_tokenizer,
+        )
         verification = Verification.model_validate(task_proof["verification"])
     except (TaskProofError, KeyError, ValueError) as error:
         raise PromotionError(f"task auditor proof replay failed: {error}") from error

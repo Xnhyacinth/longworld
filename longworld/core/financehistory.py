@@ -1172,6 +1172,79 @@ def replay_finance_pipeline_selection(
         return {"answer": "unknown"}
 
 
+def replay_finance_pipeline_raw_slice(
+    candidate: dict[str, Any],
+    raw_document_context: str,
+    *,
+    left_framed: bool,
+    right_framed: bool,
+    counterfactual: bool = False,
+) -> dict[str, Any]:
+    """Replay complete, digest-checked finance records visible in a raw slice."""
+    try:
+        if not isinstance(raw_document_context, str) or not raw_document_context:
+            raise ProvenanceError("financial raw replay slice is empty")
+        context_records = _parse_context(candidate.get("context"))
+        header = context_records[0]
+        source_records = {
+            _canonical_json(record): _pipeline_artifact_id(record)
+            for record in context_records[1:]
+        }
+        documents = str(candidate.get("document_context") or "").split(SEP)
+        approved_records: dict[str, str] = {}
+        for document in documents:
+            try:
+                record = json.loads(document)
+            except json.JSONDecodeError as error:
+                raise ProvenanceError("financial raw replay body is invalid") from error
+            if not isinstance(record, dict):
+                raise ProvenanceError("financial raw replay body is malformed")
+            artifact_id = _pipeline_artifact_id(record)
+            if (
+                _canonical_json(record) != document
+                or source_records.get(document) != artifact_id
+            ):
+                raise ProvenanceError("financial raw replay body is not source-bound")
+            approved_records[document] = artifact_id
+        parts = raw_document_context.split("\n")
+        records: list[dict[str, Any]] = []
+        for index, line in enumerate(parts):
+            if (index == 0 and not left_framed) or (
+                index == len(parts) - 1 and not right_framed
+            ):
+                continue
+            if not line or line == SEP.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise ProvenanceError(
+                    "financial raw slice has invalid framed JSON"
+                ) from error
+            if (
+                not isinstance(record, dict)
+                or _canonical_json(record) != line
+                or approved_records.get(line) != _pipeline_artifact_id(record)
+            ):
+                raise ProvenanceError("financial raw slice record is not source-bound")
+            records.append(record)
+        if not records:
+            raise ProvenanceError("financial raw slice has no complete records")
+        replay_task = deepcopy(candidate)
+        replay_task["context"] = _context([header, *records])
+        replay_task["context_sha256"] = _sha256_text(replay_task["context"])
+        replay = replay_financial_history(
+            replay_task,
+            counterfactual=counterfactual,
+        )
+        replay["raw_slice_record_count"] = len(records)
+        return replay
+    except (KeyError, TypeError, ValueError, ProvenanceError):
+        replay = replay_financial_history({"context": ""})
+        replay["raw_slice_record_count"] = 0
+        return replay
+
+
 def audit_finance_pipeline_candidate(candidate: dict[str, Any]) -> dict[str, bool]:
     """Audit the finance adapter without claiming generic promotion support."""
     try:

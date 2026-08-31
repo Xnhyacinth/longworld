@@ -1003,6 +1003,63 @@ def replay_kev_pipeline_candidate(
         }
 
 
+def replay_kev_pipeline_raw_slice(
+    candidate: dict[str, Any],
+    raw_document_context: str,
+    *,
+    left_framed: bool,
+    right_framed: bool,
+    counterfactual: bool = False,
+) -> dict[str, Any]:
+    """Replay only complete, source-bound JSONL records visible in a raw slice."""
+    try:
+        if not isinstance(raw_document_context, str) or not raw_document_context:
+            raise ProvenanceError("KEV raw replay slice is empty")
+        documents = str(candidate.get("document_context") or "").split(SEP)
+        approved_records = {
+            _canonical_json(record)
+            for document in documents
+            for record in _pipeline_document_records(document)
+        }
+        parts = raw_document_context.split("\n")
+        records: list[dict[str, Any]] = []
+        for index, line in enumerate(parts):
+            if (index == 0 and not left_framed) or (
+                index == len(parts) - 1 and not right_framed
+            ):
+                continue
+            if not line or line == SEP.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise ProvenanceError(
+                    "KEV raw slice has invalid framed JSON"
+                ) from error
+            if (
+                not isinstance(record, dict)
+                or _canonical_json(record) != line
+                or line not in approved_records
+            ):
+                raise ProvenanceError("KEV raw slice record is not source-bound")
+            records.append(record)
+        if not records:
+            raise ProvenanceError("KEV raw slice has no complete records")
+        replay = replay_kev_catalog_history(
+            {
+                "context": _context(records),
+                "counterfactual_twin": deepcopy(candidate.get("counterfactual_twin")),
+            },
+            counterfactual=counterfactual,
+        )
+        replay["raw_slice_record_count"] = len(records)
+        return replay
+    except (KeyError, TypeError, ValueError, ProvenanceError):
+        replay = replay_kev_catalog_history({"context": ""})
+        replay["raw_slice_record_count"] = 0
+        return replay
+
+
 def build_kev_pipeline_candidate(
     history: dict[str, Any],
     *,
