@@ -249,8 +249,8 @@ def test_materializer_writes_current_deterministic_candidate_manifest(
     )
     monkeypatch.setattr(
         materializer,
-        "load_cyber_workflow_manifest",
-        lambda path, attestation_key: {"fetch_receipt": {"retrievals": [retrieval]}},
+        "load_cyber_workflow_manifest_bytes",
+        lambda raw, attestation_key: {"fetch_receipt": {"retrievals": [retrieval]}},
     )
     monkeypatch.setattr(
         materializer, "verify_bound_json_retrieval", lambda path, receipt: _catalog()

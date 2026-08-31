@@ -10,7 +10,6 @@ import os
 import tempfile
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from functools import lru_cache
 from itertools import pairwise
 from pathlib import Path
 from typing import Any
@@ -291,7 +290,6 @@ def load_and_create_release_gate_receipt(
 def _conversation_digest(row: dict) -> str:
     payload = {
         "context": row.get("context") or "",
-        "question": row.get("question") or "",
         "answer": str(row.get("answer") or ""),
     }
     return hashlib.sha256(
@@ -304,8 +302,8 @@ def _prompt_digest(row: dict) -> str:
     return hashlib.sha256(str(row.get("context") or "").encode("utf-8")).hexdigest()
 
 
-@lru_cache(maxsize=4)
 def _load_exact_tokenizer(model_id: str, revision: str):
+    """Load a fresh tokenizer so a failed asset check cannot poison later gates."""
     from transformers import AutoTokenizer
 
     return AutoTokenizer.from_pretrained(

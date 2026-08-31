@@ -8,7 +8,12 @@ from typing import Any
 import pytest
 
 import scripts.materialize_domain_histories as materializer
-from longworld.core.attestation import verify_attestation
+from longworld.core.attestation import (
+    ATTESTATION_ENVIRONMENT_ENV,
+    ROLE_KEY_ENVS,
+    ROLE_KEY_ID_ENVS,
+    verify_attestation,
+)
 from longworld.core.domainhistory import (
     KEV_PIPELINE_REPLAY_MANIFEST_SCHEMA,
     HistoryBand,
@@ -242,6 +247,9 @@ def test_dense_ranker_consumes_candidate_but_shared_promotion_needs_adapter(
 def test_materializer_exports_ranker_ready_candidates_and_source_replay_sidecar(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(ROLE_KEY_ENVS["source"], SOURCE_KEY.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["source"], "probe-cyber-source-v1")
     source_manifest_path = tmp_path / "cyber_workflow_manifest.signed.v4.json"
     source_manifest_path.write_text("{}", encoding="utf-8")
     source_response_path = tmp_path / "cisa-known-exploited-vulnerabilities.json"
@@ -300,8 +308,8 @@ def test_materializer_exports_ranker_ready_candidates_and_source_replay_sidecar(
     )
     monkeypatch.setattr(
         materializer,
-        "load_cyber_workflow_manifest",
-        lambda path, attestation_key: {"fetch_receipt": {"retrievals": [retrieval]}},
+        "load_cyber_workflow_manifest_bytes",
+        lambda raw, attestation_key: {"fetch_receipt": {"retrievals": [retrieval]}},
     )
     monkeypatch.setattr(
         materializer,
@@ -320,14 +328,29 @@ def test_materializer_exports_ranker_ready_candidates_and_source_replay_sidecar(
         for line in (output_dir / "pipeline_candidates.jsonl").read_text().splitlines()
     ]
     replay_raw = (output_dir / "KEV_REPLAY_MANIFEST.json").read_bytes()
+    sidecar = json.loads(
+        (output_dir / "TASK_REPLAY_SIDECAR.json").read_text(encoding="utf-8")
+    )
+    registry = json.loads(
+        (output_dir / "REPLAY_PATH_REGISTRY.json").read_text(encoding="utf-8")
+    )
 
     assert report["pipeline_export"]["status"] == (
-        "ranker_ready_promotion_adapter_pending"
+        "task_dense_audit_ready_upstream_proof_pending"
     )
     assert report["pipeline_export"]["accepted_candidates"] == 1
-    assert report["pipeline_export"]["promotion_adapter_available"] is False
+    assert report["pipeline_export"]["promotion_adapter_available"] is True
+    assert report["pipeline_export"]["promotion_blocker_code"] == (
+        "missing_signed_upstream_proof_gates:cyber"
+    )
     assert all(
         audit_kev_pipeline_candidate(row, token_counter=len).values()
         for row in pipeline_rows
     )
     assert verify_kev_pipeline_replay_manifest_bytes(replay_raw, SOURCE_KEY)
+    assert sidecar["adapter_id"] == "cyber.kev_history.v1"
+    assert registry["task_replay_sidecars"] == {
+        report["pipeline_export"]["task_replay_sidecar_sha256"]: (
+            "TASK_REPLAY_SIDECAR.json"
+        )
+    }

@@ -11,21 +11,12 @@
   ],
   "cyber_kev_history": {
     "world_id": "cyber_cisa_kev_catalog_20260829_v1",
-    "signed_manifest": "data/source_inventory/p12_wave3_cyber_log4shell_v1/cyber_workflow_manifest.signed.v4.json",
+    "signed_manifest": "data/source_inventory/p12_wave3_cyber_log4shell_v1/cyber_workflow_manifest.signed.v5.json",
     "catalog_response": "data/source_inventory/p12_wave3_cyber_log4shell_v1/cisa-known-exploited-vulnerabilities.json"
   },
   "pipeline_candidate_export": {
     "enabled": true,
-    "document_shards": 4
+    "document_shards": 16
   },
-  "capacity_checks": [
-    {
-      "domain": "clinical",
-      "candidate": "data/task_candidates/clinical_veklury_v2/task_candidate.jsonl"
-    },
-    {
-      "domain": "regulation",
-      "candidate": "data/task_candidates/regulation_ftc_noncompete_v1/task_candidate.jsonl"
-    }
-  ]
+  "capacity_checks": []
 }

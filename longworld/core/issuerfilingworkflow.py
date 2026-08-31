@@ -1573,8 +1573,20 @@ def load_issuer_ir_filing_manifest(
 ) -> dict[str, Any]:
     try:
         raw = _read_regular_file(path, MAX_ISSUER_IR_MANIFEST_BYTES)
+    except OSError as exc:
+        raise ProvenanceError(f"cannot read issuer IR filing manifest: {exc}") from exc
+    return load_issuer_ir_filing_manifest_bytes(raw, attestation_key=attestation_key)
+
+
+def load_issuer_ir_filing_manifest_bytes(
+    raw: bytes, *, attestation_key: bytes | None = None
+) -> dict[str, Any]:
+    """Verify the exact issuer-manifest bytes supplied by the caller."""
+    if len(raw) > MAX_ISSUER_IR_MANIFEST_BYTES:
+        raise ProvenanceError("issuer IR filing manifest is too large")
+    try:
         payload = json.loads(raw.decode("utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ProvenanceError(f"cannot read issuer IR filing manifest: {exc}") from exc
     if not isinstance(payload, dict):
         raise ProvenanceError("issuer IR filing manifest must be an object")

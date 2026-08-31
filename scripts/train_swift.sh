@@ -30,6 +30,7 @@ CFG="$ROOT/configs/swift/${COND}.yaml"
 SWIFT_ROOT="${SWIFT_ROOT:-$ROOT/.vendor/ms-swift}"
 GPUS="${GPUS:-0}"
 HOLD="${HOLD_SH:-}"
+VALIDATED_SNAPSHOT=""
 if [[ "${SKIP_HOLD:-0}" != "1" && -z "$HOLD" && -x /workspace/wynckeliao/ops/gpu/hold.sh ]]; then
   HOLD="/workspace/wynckeliao/ops/gpu/hold.sh"
 fi
@@ -54,12 +55,39 @@ if [[ "$COND" =~ ^B(1|2|3|4|5|5w)$ ]]; then
   if [[ ! -x "$VERIFY_PY" ]]; then
     VERIFY_PY=python
   fi
-  "$VERIFY_PY" "$ROOT/scripts/validate_training_export.py" \
-    --manifest "$TRAINING_MANIFEST" \
-    --release-profile "$RELEASE_PROFILE" \
-    --expected-transform-revision "longworld-swift-messages-v2" \
-    --required-output "$COND.jsonl" \
-    --expected-output-path "$ROOT/data/sft/swift/$COND.jsonl"
+  SNAPSHOT_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/longworld-training.XXXXXX")"
+  chmod 700 "$SNAPSHOT_ROOT"
+  cleanup_training_snapshot() {
+    chmod -R u+w "$SNAPSHOT_ROOT" 2>/dev/null || true
+    rm -rf -- "$SNAPSHOT_ROOT"
+  }
+  trap cleanup_training_snapshot EXIT
+  VALIDATION_JSON="$(
+    "$VERIFY_PY" "$ROOT/scripts/validate_training_export.py" \
+      --manifest "$TRAINING_MANIFEST" \
+      --release-profile "$RELEASE_PROFILE" \
+      --expected-transform-revision "longworld-swift-messages-v2" \
+      --required-output "$COND.jsonl" \
+      --expected-output-path "$ROOT/data/sft/swift/$COND.jsonl" \
+      --snapshot-root "$SNAPSHOT_ROOT"
+  )"
+  VALIDATED_SNAPSHOT="$(
+    "$VERIFY_PY" -c 'import json,sys
+value = json.load(sys.stdin).get("snapshot_dir")
+if not isinstance(value, str) or not value:
+    raise SystemExit("training validator did not return a snapshot")
+print(value)
+' <<<"$VALIDATION_JSON"
+  )"
+  case "$VALIDATED_SNAPSHOT" in
+    "$SNAPSHOT_ROOT"/*) ;;
+    *) echo "training validator returned an invalid snapshot path" >&2; exit 1 ;;
+  esac
+  if [[ ! -d "$VALIDATED_SNAPSHOT" || -L "$VALIDATED_SNAPSHOT" ]]; then
+    echo "validated training snapshot is missing or unsafe" >&2
+    exit 1
+  fi
+  printf '%s\n' "$VALIDATION_JSON"
 fi
 
 # Validation is complete; producer credentials must not reach model code.
@@ -260,6 +288,12 @@ if [[ "$DS" != "none" && "$DS" != "0" ]]; then
   EXTRA+=("--deepspeed" "$DS")
 fi
 EXTRA+=("$@")
+if [[ -n "$VALIDATED_SNAPSHOT" ]]; then
+  EXTRA+=(
+    "--dataset" "$VALIDATED_SNAPSHOT/$COND.jsonl"
+    "--load_from_cache_file" "false"
+  )
+fi
 
 if [[ -x "$SWIFT_ROOT/.venv/bin/swift" ]]; then
   CLI=("$SWIFT_ROOT/.venv/bin/swift" sft "$CFG" "${EXTRA[@]}")

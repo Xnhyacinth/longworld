@@ -22,6 +22,14 @@ from longworld.core.financehistory import (
     build_finance_pipeline_candidate,
 )
 from longworld.core.promotion import CANDIDATE_ATTESTATION_PURPOSE, candidate_sha256
+from longworld.core.provenance import ProvenanceError, _read_regular_file
+from longworld.core.taskreplaysidecar import (
+    FINANCE_TASK_REPLAY_ADAPTER,
+    MAX_TASK_REPLAY_SIDECAR_BYTES,
+    load_task_replay_sidecar,
+    task_candidate_content_commitment,
+    task_replay_sidecar_binding,
+)
 from longworld.core.tokenizer_assets import resolved_tokenizer_asset_manifest_sha256
 
 
@@ -75,14 +83,97 @@ def prepare(input_path: Path, output_dir: Path) -> dict[str, Any]:
     key = attestation_key_from_env(CANDIDATE_ATTESTATION_PURPOSE)
     if key is None:
         raise ValueError("candidate-row attestation key is required")
+    source_key = attestation_key_from_env("task_replay_sidecar")
+    if source_key is None:
+        raise ValueError("source task-replay attestation key is required")
     input_rows = _read_jsonl(input_path)
-    unsigned = [build_finance_pipeline_candidate(row) for row in input_rows]
-    for row in unsigned:
-        row["tokenizer_asset_manifest_sha256"] = (
-            resolved_tokenizer_asset_manifest_sha256(
-                str(row["tokenizer_model_id"]), str(row["tokenizer_revision"])
-            )
+    source_bindings = [row.get("source_binding") for row in input_rows]
+    tokenizer_pins = [
+        (
+            str(row.get("tokenizer_model_id") or ""),
+            str(row.get("tokenizer_revision") or ""),
         )
+        for row in input_rows
+    ]
+    if (
+        any(not isinstance(value, dict) for value in source_bindings)
+        or any(value != source_bindings[0] for value in source_bindings[1:])
+        or any(value != tokenizer_pins[0] for value in tokenizer_pins[1:])
+    ):
+        raise ValueError("finance pipeline rows do not share one source identity")
+    source_binding = source_bindings[0]
+    assert isinstance(source_binding, dict)
+    model_id, revision = tokenizer_pins[0]
+    asset_digest = resolved_tokenizer_asset_manifest_sha256(model_id, revision)
+    sidecar_path = input_path.parent / "TASK_REPLAY_SIDECAR.json"
+    try:
+        sidecar_bytes = _read_regular_file(sidecar_path, MAX_TASK_REPLAY_SIDECAR_BYTES)
+    except OSError as error:
+        raise ProvenanceError(
+            "cannot read task replay sidecar: TASK_REPLAY_SIDECAR.json"
+        ) from error
+    sidecar_binding = task_replay_sidecar_binding(
+        sidecar_bytes, source_attestation_key=source_key
+    )
+    loaded_sidecar = load_task_replay_sidecar(
+        input_path.parent,
+        sidecar_path.name,
+        sidecar_binding,
+        source_attestation_key=source_key,
+    )
+    observed_replay_payload = dict(loaded_sidecar.replay_payload)
+    observed_commitments = observed_replay_payload.pop(
+        "candidate_content_commitments", None
+    )
+    expected_replay_payload = {
+        "signed_manifest_sha256": str(
+            source_binding.get("signed_manifest_sha256") or ""
+        ),
+        "source_family": str(source_binding.get("source_family") or ""),
+        "authorization_record_id": str(
+            source_binding.get("authorization_record_id") or ""
+        ),
+        "replay_revision": FINANCE_TASK_REPLAY_ADAPTER[1],
+        "tokenizer_model_id": model_id,
+        "tokenizer_revision": revision,
+        "tokenizer_asset_manifest_sha256": asset_digest,
+    }
+    if (
+        loaded_sidecar.registry_key != FINANCE_TASK_REPLAY_ADAPTER
+        or observed_replay_payload != expected_replay_payload
+    ):
+        raise ProvenanceError(
+            "finance task replay sidecar does not match verified history rows"
+        )
+    replay_registry_bytes = (
+        _canonical_bytes(
+            {
+                "schema_version": "longworld.replay-path-registry.v2",
+                "episode_replay_bundles": {},
+                "source_workflow_bundles": {},
+                "task_replay_sidecars": {
+                    sidecar_binding["sha256"]: "TASK_REPLAY_SIDECAR.json"
+                },
+            }
+        )
+        + b"\n"
+    )
+    unsigned = [
+        build_finance_pipeline_candidate(
+            row, task_replay_sidecar_binding=sidecar_binding
+        )
+        for row in input_rows
+    ]
+    candidate_commitments = sorted(
+        (task_candidate_content_commitment(row) for row in unsigned),
+        key=lambda item: (item["world_id"], item["length_bucket"]),
+    )
+    if observed_commitments != candidate_commitments:
+        raise ProvenanceError(
+            "finance task replay sidecar does not bind candidate content"
+        )
+    for row in unsigned:
+        row["tokenizer_asset_manifest_sha256"] = asset_digest
     audits = [audit_finance_pipeline_candidate(row) for row in unsigned]
     if not all(audit and all(audit.values()) for audit in audits):
         raise ValueError("finance pipeline candidate audit failed")
@@ -107,19 +198,23 @@ def prepare(input_path: Path, output_dir: Path) -> dict[str, Any]:
         ),
         "candidate_sha256s": [candidate_sha256(row) for row in candidates],
         "serialized_candidates_sha256": hashlib.sha256(candidate_bytes).hexdigest(),
+        "task_replay_sidecar_sha256": sidecar_binding["sha256"],
         "finance_strict_replay_green": True,
         "dense_ranking_ready": True,
+        "task_strict_replay_ready": True,
+        "task_promotion_adapter_available": True,
         "generic_strict_replay_ready": False,
         "generic_promotion_ready": False,
         "shared_interface_gap": (
-            "promotion candidate verification and _reconstruct_candidate need a "
-            "registered finance replay adapter plus a producer-attested finance "
-            "source sidecar"
+            "signed upstream window, BM25, lexical, closed-book, and view proof "
+            "gates are required before task promotion"
         ),
         "train_ready": False,
         "promoted": False,
     }
     _atomic_write(output_dir / "candidates.jsonl", candidate_bytes)
+    _atomic_write(output_dir / "TASK_REPLAY_SIDECAR.json", sidecar_bytes)
+    _atomic_write(output_dir / "REPLAY_PATH_REGISTRY.json", replay_registry_bytes)
     _atomic_write(output_dir / "MANIFEST.json", _canonical_bytes(manifest) + b"\n")
     return manifest
 

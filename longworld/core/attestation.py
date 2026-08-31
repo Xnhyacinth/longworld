@@ -40,6 +40,7 @@ PURPOSE_ROLES = {
     "episode_replay_bundle": "source",
     "source_workflow_bundle": "source",
     "source_workflow_component": "source",
+    "task_replay_sidecar": "source",
     "candidate_row": "candidate",
     "dense_ranking": "ranker",
     "dense_retrieval_audit": "auditor",
@@ -56,12 +57,8 @@ _NON_PRODUCTION_KEY_ID_PREFIXES = ("probe", "dev", "test", "local", "example")
 
 
 def local_probe_diagnostic_metadata() -> dict[str, Any]:
-    """Return signed trust labels for an explicitly combined local probe."""
-    if (
-        os.environ.get(ATTESTATION_ENVIRONMENT_ENV, "").strip().lower() == "probe"
-        and os.environ.get(LOCAL_PROBE_COMBINED_ROLES_ENV, "").strip()
-        == LOCAL_PROBE_TRUST_ISOLATION_VALUE
-    ):
+    """Return signed non-production trust labels for every probe environment."""
+    if os.environ.get(ATTESTATION_ENVIRONMENT_ENV, "").strip().lower() == "probe":
         return {
             "trust_scope": "local_probe",
             "diagnostic_only": True,

@@ -15,18 +15,28 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from longworld.core.attestation import sanitized_attestation_environment
+from longworld.core.attestation import (
+    attestation_key_from_env,
+    sanitized_attestation_environment,
+)
 from longworld.core.domainhistory import HistoryBand, audit_cumulative_history
 from longworld.core.financehistory import (
     audit_financial_history_candidate,
+    build_finance_pipeline_candidate,
     build_financial_history_candidates,
     extract_financial_filings,
 )
 from longworld.core.issuerfilingworkflow import (
     MAX_ISSUER_IR_MANIFEST_BYTES,
-    load_issuer_ir_filing_manifest,
+    load_issuer_ir_filing_manifest_bytes,
 )
 from longworld.core.provenance import ProvenanceError, _read_regular_file
+from longworld.core.taskreplaysidecar import (
+    FINANCE_TASK_REPLAY_ADAPTER,
+    build_task_replay_sidecar,
+    task_candidate_content_commitment,
+    task_replay_sidecar_binding,
+)
 from longworld.core.tokenizer_assets import resolved_tokenizer_asset_manifest_sha256
 
 MAX_CONFIG_BYTES = 256_000
@@ -89,7 +99,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         raise ProvenanceError("unsupported finance-history materialization config")
     manifest_path = _resolve_path(config.get("signed_issuer_manifest"))
     manifest_raw = _read_regular_file(manifest_path, MAX_ISSUER_IR_MANIFEST_BYTES)
-    manifest = load_issuer_ir_filing_manifest(manifest_path)
+    manifest = load_issuer_ir_filing_manifest_bytes(manifest_raw)
     filings = extract_financial_filings(manifest)
     tokenizer_config = config.get("tokenizer")
     if not isinstance(tokenizer_config, dict):
@@ -140,7 +150,48 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         model_id, revision
     )
     for row in rows:
+        row["source_verified_at_materialization"] = True
         row["tokenizer_asset_manifest_sha256"] = tokenizer_asset_manifest_sha256
+    pipeline_commitments = sorted(
+        (
+            task_candidate_content_commitment(build_finance_pipeline_candidate(row))
+            for row in rows
+        ),
+        key=lambda item: (item["world_id"], item["length_bucket"]),
+    )
+    source_key = attestation_key_from_env("task_replay_sidecar")
+    if source_key is None:
+        raise ProvenanceError("finance history requires source replay attestation key")
+    sidecar = build_task_replay_sidecar(
+        adapter_id=FINANCE_TASK_REPLAY_ADAPTER[0],
+        adapter_revision=FINANCE_TASK_REPLAY_ADAPTER[1],
+        replay_payload={
+            **source_binding,
+            "replay_revision": FINANCE_TASK_REPLAY_ADAPTER[1],
+            "tokenizer_model_id": model_id,
+            "tokenizer_revision": revision,
+            "tokenizer_asset_manifest_sha256": tokenizer_asset_manifest_sha256,
+            "candidate_content_commitments": pipeline_commitments,
+        },
+        source_attestation_key=source_key,
+    )
+    sidecar_bytes = _canonical_bytes(sidecar) + b"\n"
+    sidecar_binding = task_replay_sidecar_binding(
+        sidecar_bytes, source_attestation_key=source_key
+    )
+    replay_registry_bytes = (
+        _canonical_bytes(
+            {
+                "schema_version": "longworld.replay-path-registry.v2",
+                "episode_replay_bundles": {},
+                "source_workflow_bundles": {},
+                "task_replay_sidecars": {
+                    sidecar_binding["sha256"]: "TASK_REPLAY_SIDECAR.json"
+                },
+            }
+        )
+        + b"\n"
+    )
     audits = [audit_financial_history_candidate(row) for row in rows]
     cumulative_errors = audit_cumulative_history(rows)
     if not all(audit and all(audit.values()) for audit in audits) or cumulative_errors:
@@ -162,6 +213,8 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         "tokenizer_model_id": model_id,
         "tokenizer_revision": revision,
         "tokenizer_asset_manifest_sha256": tokenizer_asset_manifest_sha256,
+        "task_replay_sidecar": sidecar_binding,
+        "source_replay_sidecar_attested": True,
         "source_filing_count": len(filings),
         "unique_available_source_row_count": sum(
             len(filing.rows) for filing in filings
@@ -196,6 +249,8 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         "signed": False,
     }
     _atomic_write(output_dir / "candidates.jsonl", candidate_bytes)
+    _atomic_write(output_dir / "TASK_REPLAY_SIDECAR.json", sidecar_bytes)
+    _atomic_write(output_dir / "REPLAY_PATH_REGISTRY.json", replay_registry_bytes)
     _atomic_write(
         output_dir / "MANIFEST.json", _canonical_bytes(manifest_output) + b"\n"
     )

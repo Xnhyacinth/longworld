@@ -971,12 +971,16 @@ def _pipeline_relation_partitions(task: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def build_finance_pipeline_candidate(task: dict[str, Any]) -> dict[str, Any]:
+def build_finance_pipeline_candidate(
+    task: dict[str, Any],
+    *,
+    task_replay_sidecar_binding: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Adapt an audited finance history to the shared document-ranker boundary.
 
-    The result intentionally remains candidate-only.  The shared promotion core
-    cannot yet dispatch a finance replay adapter, so the capability boundary is
-    serialized instead of being represented as a green generic promotion gate.
+    The result remains candidate-only.  When a source-role task sidecar is
+    supplied, the shared task audit can dispatch Finance replay; independent
+    upstream proof gates are still required before promotion.
     """
     finance_audit = audit_financial_history_candidate(task)
     if not finance_audit or not all(finance_audit.values()):
@@ -1060,6 +1064,23 @@ def build_finance_pipeline_candidate(task: dict[str, Any]) -> dict[str, Any]:
     )
     if "" in source_urls or not source_family:
         raise ProvenanceError("financial pipeline source identity is invalid")
+    if task_replay_sidecar_binding is not None and (
+        set(task_replay_sidecar_binding)
+        != {
+            "adapter_id",
+            "adapter_revision",
+            "sidecar_schema_version",
+            "sha256",
+        }
+        or task_replay_sidecar_binding.get("adapter_id") != "finance.multi_filing.v1"
+        or task_replay_sidecar_binding.get("adapter_revision")
+        != FINANCIAL_HISTORY_REPLAY_REVISION
+        or task_replay_sidecar_binding.get("sidecar_schema_version")
+        != "longworld.task-replay-sidecar.v1"
+        or _SHA256.fullmatch(str(task_replay_sidecar_binding.get("sha256") or ""))
+        is None
+    ):
+        raise ProvenanceError("finance task replay sidecar binding is invalid")
 
     candidate = deepcopy(task)
     candidate.update(
@@ -1109,6 +1130,9 @@ def build_finance_pipeline_candidate(task: dict[str, Any]) -> dict[str, Any]:
             "generation_integration": "finance_dense_candidate",
         }
     )
+    if task_replay_sidecar_binding is not None:
+        candidate["task_replay_sidecar"] = deepcopy(task_replay_sidecar_binding)
+        candidate["generation_integration"] = "task_replay_sidecar_bound"
     return candidate
 
 

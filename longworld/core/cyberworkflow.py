@@ -922,8 +922,22 @@ def load_cyber_workflow_manifest(
     """Load and semantically audit a source-attested cyber inventory."""
     try:
         raw = _read_regular_file(path, MAX_CYBER_MANIFEST_BYTES)
+    except OSError as error:
+        raise ProvenanceError(
+            f"cannot read cyber workflow manifest: {error}"
+        ) from error
+    return load_cyber_workflow_manifest_bytes(raw, attestation_key=attestation_key)
+
+
+def load_cyber_workflow_manifest_bytes(
+    raw: bytes, *, attestation_key: bytes | None = None
+) -> dict[str, Any]:
+    """Audit the exact manifest bytes whose digest is bound downstream."""
+    if len(raw) > MAX_CYBER_MANIFEST_BYTES:
+        raise ProvenanceError("cyber workflow manifest exceeds size limit")
+    try:
         payload = json.loads(raw.decode("utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ProvenanceError(
             f"cannot read cyber workflow manifest: {error}"
         ) from error

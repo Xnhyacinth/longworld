@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import multiprocessing
 import os
@@ -29,10 +30,22 @@ from longworld.core.promotion import (
     create_train_ready_report,
     promote_candidate,
     select_release_worlds,
+    validate_task_candidate_content_uniqueness,
 )
+from longworld.core.provenance import ProvenanceError, _read_regular_file
 from longworld.core.release_profile import release_profile, release_profile_sha256
+from longworld.core.taskpromotion import (
+    create_task_dense_audit,
+    promote_task_candidate,
+)
+from longworld.core.taskreplaysidecar import (
+    LoadedTaskReplaySidecar,
+    load_task_replay_sidecar,
+)
 
 REPLAY_PATH_REGISTRY_SCHEMA = "longworld.replay-path-registry.v1"
+REPLAY_PATH_REGISTRY_SCHEMA_V2 = "longworld.replay-path-registry.v2"
+MAX_REPLAY_PATH_REGISTRY_BYTES = 1_000_000
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -171,6 +184,7 @@ def preflight_candidates(
     candidates = _read_jsonl(candidates_path)
     if not candidates:
         raise ValueError("candidate input is empty")
+    validate_task_candidate_content_uniqueness(candidates, label="preflight")
     accepted, rejects = candidate_structural_preflight(
         candidates,
         release_profile_id,
@@ -209,21 +223,44 @@ def _load_replay_registry(path: Path) -> dict[str, dict[str, Path]]:
     if path.is_symlink() or not path.is_file():
         raise ValueError("replay registry is missing or not a regular file")
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        payload = json.loads(
+            _read_regular_file(path, MAX_REPLAY_PATH_REGISTRY_BYTES).decode("utf-8")
+        )
+    except (
+        OSError,
+        ProvenanceError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+    ) as error:
         raise ValueError("replay registry is not valid UTF-8 JSON") from error
-    fields = {
+    legacy_fields = {
         "schema_version",
         "episode_replay_bundles",
         "source_workflow_bundles",
     }
-    if not isinstance(payload, dict) or set(payload) != fields:
+    current_fields = legacy_fields | {"task_replay_sidecars"}
+    if not isinstance(payload, dict):
+        raise TypeError("replay registry fields are invalid")
+    schema_version = payload.get("schema_version")
+    if (
+        schema_version == REPLAY_PATH_REGISTRY_SCHEMA and set(payload) != legacy_fields
+    ) or (
+        schema_version == REPLAY_PATH_REGISTRY_SCHEMA_V2
+        and set(payload) != current_fields
+    ):
         raise ValueError("replay registry fields are invalid")
-    if payload.get("schema_version") != REPLAY_PATH_REGISTRY_SCHEMA:
+    if schema_version not in {
+        REPLAY_PATH_REGISTRY_SCHEMA,
+        REPLAY_PATH_REGISTRY_SCHEMA_V2,
+    }:
         raise ValueError("replay registry schema is invalid")
     registry: dict[str, dict[str, Path]] = {}
-    for field in ("episode_replay_bundles", "source_workflow_bundles"):
-        raw_mapping = payload.get(field)
+    for field in (
+        "episode_replay_bundles",
+        "source_workflow_bundles",
+        "task_replay_sidecars",
+    ):
+        raw_mapping = payload.get(field, {})
         if not isinstance(raw_mapping, dict):
             raise TypeError(f"replay registry {field} is invalid")
         resolved: dict[str, Path] = {}
@@ -237,6 +274,15 @@ def _load_replay_registry(path: Path) -> dict[str, dict[str, Path]]:
             ):
                 raise ValueError(f"replay registry {field} entry is invalid")
             candidate = Path(raw_path)
+            if field == "task_replay_sidecars" and (
+                candidate.is_absolute()
+                or candidate.as_posix() != raw_path
+                or "\\" in raw_path
+                or glob.has_magic(raw_path)
+                or any(part in {"", ".", ".."} for part in candidate.parts)
+                or candidate.suffix.lower() != ".json"
+            ):
+                raise ValueError(f"replay registry {field} path is invalid")
             if not candidate.is_absolute():
                 candidate = path.parent / candidate
             if candidate.is_symlink() or not candidate.is_file():
@@ -252,12 +298,19 @@ def _candidate_replay_paths(
     source_bundle_path: Path | None,
     replay_registry: dict[str, dict[str, Path]] | None,
 ) -> tuple[Path | None, Path | None]:
-    if replay_registry is None:
-        return episode_bundle_path, source_bundle_path
     episode_binding = candidate.get("episode_replay_bundle")
     source_binding = candidate.get("source_workflow_bundle")
-    if episode_binding is not None and source_binding is not None:
+    task_binding = candidate.get("task_replay_sidecar")
+    if (
+        sum(
+            value is not None
+            for value in (episode_binding, source_binding, task_binding)
+        )
+        > 1
+    ):
         raise PromotionError("candidate cannot bind two replay bundle types")
+    if replay_registry is None:
+        return episode_bundle_path, source_bundle_path
     if isinstance(episode_binding, dict):
         digest = str(episode_binding.get("sha256") or "")
         path = replay_registry["episode_replay_bundles"].get(digest)
@@ -271,6 +324,43 @@ def _candidate_replay_paths(
             raise PromotionError("source workflow bundle is missing from registry")
         return None, path
     return None, None
+
+
+def _candidate_task_replay_path(
+    candidate: dict[str, Any],
+    replay_registry: dict[str, dict[str, Path]] | None,
+) -> Path | None:
+    binding = candidate.get("task_replay_sidecar")
+    if binding is None:
+        return None
+    if replay_registry is None or not isinstance(binding, dict):
+        raise PromotionError("task replay sidecar requires a replay registry")
+    digest = str(binding.get("sha256") or "")
+    path = replay_registry["task_replay_sidecars"].get(digest)
+    if path is None:
+        raise PromotionError("task replay sidecar is missing from registry")
+    return path
+
+
+def _load_candidate_task_sidecar(
+    candidate: dict[str, Any],
+    path: Path,
+    source_key: bytes | None,
+) -> LoadedTaskReplaySidecar:
+    binding = candidate.get("task_replay_sidecar")
+    if not isinstance(binding, dict) or source_key is None:
+        raise PromotionError("task replay sidecar requires a source attestation key")
+    try:
+        return load_task_replay_sidecar(
+            path.parent,
+            path.name,
+            binding,
+            source_attestation_key=source_key,
+        )
+    except ProvenanceError as error:
+        raise PromotionError(
+            f"task replay sidecar validation failed: {error}"
+        ) from error
 
 
 def _audit_world(
@@ -296,20 +386,44 @@ def _audit_world(
                 source_bundle_path,
                 replay_registry,
             )
-            audits.append(
-                create_dense_audit(
-                    candidate,
-                    ranking,
-                    k=k,
-                    episode_bundle_path=candidate_episode_path,
-                    source_bundle_path=candidate_source_path,
-                    candidate_attestation_key=candidate_key,
-                    ranking_attestation_key=ranking_key,
-                    audit_attestation_key=audit_key,
-                    episode_attestation_key=source_key,
-                    source_attestation_key=source_key,
-                )
+            candidate_task_path = _candidate_task_replay_path(
+                candidate, replay_registry
             )
+            if candidate_task_path is not None:
+                if source_key is None:
+                    raise PromotionError(
+                        "task replay sidecar requires a source attestation key"
+                    )
+                sidecar = _load_candidate_task_sidecar(
+                    candidate, candidate_task_path, source_key
+                )
+                audits.append(
+                    create_task_dense_audit(
+                        candidate,
+                        ranking,
+                        sidecar,
+                        k=k,
+                        candidate_attestation_key=candidate_key,
+                        ranking_attestation_key=ranking_key,
+                        audit_attestation_key=audit_key,
+                        source_attestation_key=source_key,
+                    )
+                )
+            else:
+                audits.append(
+                    create_dense_audit(
+                        candidate,
+                        ranking,
+                        k=k,
+                        episode_bundle_path=candidate_episode_path,
+                        source_bundle_path=candidate_source_path,
+                        candidate_attestation_key=candidate_key,
+                        ranking_attestation_key=ranking_key,
+                        audit_attestation_key=audit_key,
+                        episode_attestation_key=source_key,
+                        source_attestation_key=source_key,
+                    )
+                )
         except PromotionError as error:
             errors[digest] = str(error)
     if not errors:
@@ -367,21 +481,46 @@ def _promote_world(
                 source_bundle_path,
                 replay_registry,
             )
-            promoted.append(
-                promote_candidate(
-                    candidate,
-                    audit,
-                    episode_bundle_path=candidate_episode_path,
-                    source_bundle_path=candidate_source_path,
-                    candidate_attestation_key=candidate_key,
-                    audit_attestation_key=audit_key,
-                    promotion_attestation_key=promotion_key,
-                    episode_attestation_key=source_key,
-                    source_attestation_key=source_key,
-                    expected_split=expected_split,
-                    release_selection_receipt=release_selection,
-                )
+            candidate_task_path = _candidate_task_replay_path(
+                candidate, replay_registry
             )
+            if candidate_task_path is not None:
+                if source_key is None:
+                    raise PromotionError(
+                        "task replay sidecar requires a source attestation key"
+                    )
+                sidecar = _load_candidate_task_sidecar(
+                    candidate, candidate_task_path, source_key
+                )
+                promoted.append(
+                    promote_task_candidate(
+                        candidate,
+                        audit,
+                        sidecar,
+                        candidate_attestation_key=candidate_key,
+                        audit_attestation_key=audit_key,
+                        promotion_attestation_key=promotion_key,
+                        source_attestation_key=source_key,
+                        expected_split=expected_split,
+                        release_selection_receipt=release_selection,
+                    )
+                )
+            else:
+                promoted.append(
+                    promote_candidate(
+                        candidate,
+                        audit,
+                        episode_bundle_path=candidate_episode_path,
+                        source_bundle_path=candidate_source_path,
+                        candidate_attestation_key=candidate_key,
+                        audit_attestation_key=audit_key,
+                        promotion_attestation_key=promotion_key,
+                        episode_attestation_key=source_key,
+                        source_attestation_key=source_key,
+                        expected_split=expected_split,
+                        release_selection_receipt=release_selection,
+                    )
+                )
         except PromotionError as error:
             errors[digest] = str(error)
     if errors:
@@ -476,6 +615,7 @@ def audit_rankings(
     candidates = _read_jsonl(candidates_path)
     if not candidates:
         raise ValueError("candidate input is empty")
+    validate_task_candidate_content_uniqueness(candidates, label="ranking audit")
     structurally_accepted = candidates
     structural_rejects: list[dict[str, Any]] = []
     if release_profile_id is not None:
@@ -643,6 +783,7 @@ def promote_rows(
     candidates, audits = _matched_inputs(
         candidates_path, audits_path, receipt_label="dense audit"
     )
+    validate_task_candidate_content_uniqueness(candidates, label="promotion")
     batches = _world_batches(candidates, audits)
     if workers == 1:
         results = [

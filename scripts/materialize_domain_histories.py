@@ -20,7 +20,7 @@ from longworld.core.attestation import (
     sanitized_attestation_environment,
 )
 from longworld.core.clinicalworkflow import audit_clinical_trial_approval_task
-from longworld.core.cyberworkflow import load_cyber_workflow_manifest
+from longworld.core.cyberworkflow import load_cyber_workflow_manifest_bytes
 from longworld.core.domainhistory import (
     HistoryBand,
     audit_cumulative_history,
@@ -34,6 +34,12 @@ from longworld.core.domainhistory import (
 )
 from longworld.core.provenance import ProvenanceError, _read_regular_file
 from longworld.core.regulationworkflow import audit_regulation_rulemaking_task
+from longworld.core.taskreplaysidecar import (
+    CYBER_KEV_TASK_REPLAY_ADAPTER,
+    build_task_replay_sidecar,
+    task_candidate_content_commitment,
+    task_replay_sidecar_binding,
+)
 from longworld.core.tokenizer_assets import (
     resolved_tokenizer_asset_manifest_sha256,
 )
@@ -198,7 +204,9 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     manifest_path = _resolve_config_path(config_path, cyber.get("signed_manifest"))
     catalog_path = _resolve_config_path(config_path, cyber.get("catalog_response"))
     signed_manifest_raw = _read_regular_file(manifest_path, MAX_CANDIDATE_BYTES)
-    manifest = load_cyber_workflow_manifest(manifest_path, attestation_key=key)
+    manifest = load_cyber_workflow_manifest_bytes(
+        signed_manifest_raw, attestation_key=key
+    )
     receipt = manifest.get("fetch_receipt")
     retrievals = receipt.get("retrievals") if isinstance(receipt, dict) else None
     matching = [
@@ -260,15 +268,17 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     pipeline_audits: list[dict[str, bool]] = []
     pipeline_bytes = b""
     replay_manifest_bytes = b""
+    task_replay_sidecar_bytes = b""
+    replay_registry_bytes = b""
     pipeline_output: dict[str, Any] | None = None
     if pipeline_config["enabled"]:
         document_shards = pipeline_config.get("document_shards")
         if (
             isinstance(document_shards, bool)
             or not isinstance(document_shards, int)
-            or document_shards != 4
+            or not 4 <= document_shards <= 64
         ):
-            raise ProvenanceError("pipeline export requires exactly four shards")
+            raise ProvenanceError("pipeline export requires 4 to 64 shards")
         candidate_key = attestation_key_from_env("candidate_row")
         if candidate_key is None:
             raise ProvenanceError(
@@ -287,7 +297,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         replay_binding = kev_pipeline_replay_manifest_binding(
             replay_manifest_bytes, key
         )
-        pipeline_rows = [
+        provisional_pipeline_rows = [
             build_kev_pipeline_candidate(
                 row,
                 token_counter=token_counter,
@@ -298,6 +308,65 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             )
             for row in rows
         ]
+        pipeline_commitments = sorted(
+            (
+                task_candidate_content_commitment(row)
+                for row in provisional_pipeline_rows
+            ),
+            key=lambda item: (item["world_id"], item["length_bucket"]),
+        )
+        task_replay_sidecar = build_task_replay_sidecar(
+            adapter_id=CYBER_KEV_TASK_REPLAY_ADAPTER[0],
+            adapter_revision=CYBER_KEV_TASK_REPLAY_ADAPTER[1],
+            replay_payload={
+                "source_manifest_sha256": replay_binding["source_manifest_sha256"],
+                "source_response_sha256": replay_binding["source_response_sha256"],
+                "replay_manifest_sha256": replay_binding["sha256"],
+                "replay_revision": replay_binding["replay_revision"],
+                "tokenizer_model_id": model_id,
+                "tokenizer_revision": revision,
+                "tokenizer_asset_manifest_sha256": asset_digest,
+                "candidate_content_commitments": pipeline_commitments,
+            },
+            source_attestation_key=key,
+        )
+        task_replay_sidecar_bytes = _canonical_bytes(task_replay_sidecar) + b"\n"
+        task_binding = task_replay_sidecar_binding(
+            task_replay_sidecar_bytes, source_attestation_key=key
+        )
+        replay_registry_bytes = (
+            _canonical_bytes(
+                {
+                    "schema_version": "longworld.replay-path-registry.v2",
+                    "episode_replay_bundles": {},
+                    "source_workflow_bundles": {},
+                    "task_replay_sidecars": {
+                        task_binding["sha256"]: "TASK_REPLAY_SIDECAR.json"
+                    },
+                }
+            )
+            + b"\n"
+        )
+        pipeline_rows = [
+            build_kev_pipeline_candidate(
+                row,
+                token_counter=token_counter,
+                tokenizer_asset_manifest_sha256=asset_digest,
+                replay_manifest_binding=replay_binding,
+                candidate_attestation_key=candidate_key,
+                task_replay_sidecar_binding=task_binding,
+                document_shards=document_shards,
+            )
+            for row in rows
+        ]
+        if (
+            sorted(
+                (task_candidate_content_commitment(row) for row in pipeline_rows),
+                key=lambda item: (item["world_id"], item["length_bucket"]),
+            )
+            != pipeline_commitments
+        ):
+            raise ProvenanceError("KEV task sidecar content commitment mismatch")
         pipeline_audits = [
             audit_kev_pipeline_candidate(row, token_counter=token_counter)
             for row in pipeline_rows
@@ -311,14 +380,17 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             b"\n".join(_canonical_bytes(row) for row in pipeline_rows) + b"\n"
         )
         pipeline_output = {
-            "status": "ranker_ready_promotion_adapter_pending",
-            "promotion_adapter_available": False,
-            "promotion_blocker_code": "missing_domain_replay_adapter:cyber",
+            "status": "task_dense_audit_ready_upstream_proof_pending",
+            "promotion_adapter_available": True,
+            "promotion_blocker_code": "missing_signed_upstream_proof_gates:cyber",
             "attempts": len(pipeline_rows),
             "accepted_candidates": pipeline_accepted,
             "retention": pipeline_accepted / max(1, len(pipeline_rows)),
             "candidate_sha256": hashlib.sha256(pipeline_bytes).hexdigest(),
             "replay_manifest_sha256": hashlib.sha256(replay_manifest_bytes).hexdigest(),
+            "task_replay_sidecar_sha256": hashlib.sha256(
+                task_replay_sidecar_bytes
+            ).hexdigest(),
             "source_attestation_verified": True,
             "candidate_attestation_present": True,
             "strict_replay_verified": True,
@@ -405,6 +477,10 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     if pipeline_output is not None:
         _atomic_write(output_dir / "pipeline_candidates.jsonl", pipeline_bytes)
         _atomic_write(output_dir / "KEV_REPLAY_MANIFEST.json", replay_manifest_bytes)
+        _atomic_write(
+            output_dir / "TASK_REPLAY_SIDECAR.json", task_replay_sidecar_bytes
+        )
+        _atomic_write(output_dir / "REPLAY_PATH_REGISTRY.json", replay_registry_bytes)
     _atomic_write(
         output_dir / "MANIFEST.json", _canonical_bytes(manifest_output) + b"\n"
     )

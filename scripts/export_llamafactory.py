@@ -243,6 +243,7 @@ def write_condition(
     by_view_length: Counter = Counter()
     out_rows: list[dict] = []
     seen: set[str] = set()
+    answers_by_prompt: dict[str, str] = {}
     duplicates_dropped = 0
     contract_rejects = 0
     eligible: list[dict] = []
@@ -250,18 +251,22 @@ def write_condition(
         if sft_row_errors(r):
             contract_rejects += 1
             continue
-        digest = str(r.get("content_hash") or "")
-        if not digest:
-            digest = hashlib.sha256(
-                json.dumps(
-                    {"context": r.get("context"), "answer": str(r.get("answer"))},
-                    sort_keys=True,
-                ).encode("utf-8")
-            ).hexdigest()
+        digest = hashlib.sha256(
+            json.dumps(
+                {"context": r.get("context"), "answer": str(r.get("answer"))},
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()
         if digest in seen:
-            duplicates_dropped += 1
-            continue
+            raise ValueError("duplicate training content in export source")
         seen.add(digest)
+        prompt_digest = hashlib.sha256(
+            str(r.get("context") or "").encode("utf-8")
+        ).hexdigest()
+        answer = str(r.get("answer") or "")
+        previous_answer = answers_by_prompt.setdefault(prompt_digest, answer)
+        if previous_answer != answer:
+            raise ValueError("conflicting answers for one training prompt")
         eligible.append(r)
 
     units: list[list[dict]] = []
@@ -461,6 +466,11 @@ def main() -> None:
     except (TypeError, ValueError) as error:
         raise SystemExit(str(error)) from error
     rows = list(product.train_rows)
+    if rows and all(sft_row_errors(row) for row in rows):
+        raise SystemExit(
+            "no source row has a valid role-bound v2 SFT attestation; configure "
+            "the signed release trust environment or regenerate legacy rows"
+        )
     rng = random.Random(args.seed)
     rng.shuffle(rows)
 

@@ -4,10 +4,18 @@ import hashlib
 import json
 from copy import deepcopy
 from itertools import pairwise
+from pathlib import Path
 
 import pytest
 
+import scripts.materialize_finance_histories as finance_materializer
+import scripts.prepare_finance_pipeline_candidates as finance_preparer
 from longworld.core import financehistory
+from longworld.core.attestation import (
+    ATTESTATION_ENVIRONMENT_ENV,
+    ROLE_KEY_ENVS,
+    ROLE_KEY_ID_ENVS,
+)
 from longworld.core.domainhistory import HistoryBand, audit_cumulative_history
 from longworld.core.financehistory import (
     FinancialFact,
@@ -24,6 +32,15 @@ from longworld.core.financehistory import (
 from longworld.core.pack import SEP
 from longworld.core.promotion import candidate_sha256
 from longworld.core.provenance import ProvenanceError
+from longworld.core.taskreplaysidecar import (
+    FINANCE_TASK_REPLAY_ADAPTER,
+    build_task_replay_sidecar,
+    load_task_replay_sidecar,
+    task_candidate_content_commitment,
+)
+
+SOURCE_KEY = b"finance-source-test-key-material-at-least-32-bytes"
+CANDIDATE_KEY = b"finance-candidate-test-key-material-at-least-32-bytes"
 
 
 def _filings() -> tuple[FinancialFiling, ...]:
@@ -240,6 +257,185 @@ def test_dense_ranking_audit_replays_ranked_finance_documents() -> None:
     assert audit["embedding_topk_insufficient"] is True
     assert audit["full_pool_strict_replay_sufficient"] is True
     assert audit["generic_promotion_ready"] is False
+
+
+def _write_finance_sidecar(path: Path, rows: list[dict]) -> None:
+    source_binding = rows[0]["source_binding"]
+    for row in rows:
+        row["tokenizer_asset_manifest_sha256"] = "d" * 64
+    commitments = sorted(
+        (
+            task_candidate_content_commitment(build_finance_pipeline_candidate(row))
+            for row in rows
+        ),
+        key=lambda item: (item["world_id"], item["length_bucket"]),
+    )
+    sidecar = build_task_replay_sidecar(
+        adapter_id=FINANCE_TASK_REPLAY_ADAPTER[0],
+        adapter_revision=FINANCE_TASK_REPLAY_ADAPTER[1],
+        replay_payload={
+            "signed_manifest_sha256": source_binding["signed_manifest_sha256"],
+            "source_family": source_binding["source_family"],
+            "authorization_record_id": source_binding["authorization_record_id"],
+            "replay_revision": FINANCE_TASK_REPLAY_ADAPTER[1],
+            "tokenizer_model_id": rows[0]["tokenizer_model_id"],
+            "tokenizer_revision": rows[0]["tokenizer_revision"],
+            "tokenizer_asset_manifest_sha256": "d" * 64,
+            "candidate_content_commitments": commitments,
+        },
+        source_attestation_key=SOURCE_KEY,
+    )
+    path.write_text(
+        json.dumps(sidecar, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_preparer_verifies_and_binds_materializer_finance_task_sidecar(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(ROLE_KEY_ENVS["source"], SOURCE_KEY.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["source"], "probe-finance-source-v1")
+    monkeypatch.setenv(ROLE_KEY_ENVS["candidate"], CANDIDATE_KEY.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["candidate"], "probe-finance-candidate-v1")
+    monkeypatch.setattr(
+        finance_preparer,
+        "resolved_tokenizer_asset_manifest_sha256",
+        lambda model_id, revision: "d" * 64,
+    )
+    input_path = tmp_path / "histories.jsonl"
+    rows = _build()
+    _write_finance_sidecar(tmp_path / "TASK_REPLAY_SIDECAR.json", rows)
+    input_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+    )
+    output_dir = tmp_path / "out"
+
+    report = finance_preparer.prepare(input_path, output_dir)
+    candidates = [
+        json.loads(line)
+        for line in (output_dir / "candidates.jsonl").read_text().splitlines()
+    ]
+    sidecar_path = output_dir / "TASK_REPLAY_SIDECAR.json"
+    binding = candidates[0]["task_replay_sidecar"]
+    loaded = load_task_replay_sidecar(
+        output_dir, sidecar_path.name, binding, source_attestation_key=SOURCE_KEY
+    )
+
+    assert report["task_replay_sidecar_sha256"] == binding["sha256"]
+    assert all(row["task_replay_sidecar"] == binding for row in candidates)
+    assert loaded.replay_payload["signed_manifest_sha256"] == "a" * 64
+    assert loaded.replay_payload["source_family"] == "issuer_ir_rendered_xbrl"
+    registry = json.loads(
+        (output_dir / "REPLAY_PATH_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    assert registry["task_replay_sidecars"] == {
+        binding["sha256"]: "TASK_REPLAY_SIDECAR.json"
+    }
+
+
+def test_preparer_refuses_to_mint_missing_source_sidecar(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(ROLE_KEY_ENVS["source"], SOURCE_KEY.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["source"], "probe-finance-source-v1")
+    monkeypatch.setenv(ROLE_KEY_ENVS["candidate"], CANDIDATE_KEY.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["candidate"], "probe-finance-candidate-v1")
+    monkeypatch.setattr(
+        finance_preparer,
+        "resolved_tokenizer_asset_manifest_sha256",
+        lambda model_id, revision: "d" * 64,
+    )
+    input_path = tmp_path / "histories.jsonl"
+    input_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in _build()), encoding="utf-8"
+    )
+
+    with pytest.raises(ProvenanceError, match="cannot read task replay sidecar"):
+        finance_preparer.prepare(input_path, tmp_path / "out")
+
+
+def test_materializer_emits_source_sidecar_after_manifest_verification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(ROLE_KEY_ENVS["source"], SOURCE_KEY.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["source"], "probe-finance-source-v1")
+    source_path = tmp_path / "issuer.json"
+    source_path.write_text('{"signed":"source-bytes"}\n', encoding="utf-8")
+    manifest = {
+        "source_family": "issuer_ir_rendered_xbrl",
+        "authorization": {"record_id": "AUTH-1"},
+        "issuer": {"name": "Example Issuer", "cik": "0000000001"},
+    }
+    verified_bytes: list[bytes] = []
+
+    def verified_loader(raw: bytes) -> dict:
+        verified_bytes.append(raw)
+        return manifest
+
+    class CharacterTokenizer:
+        def encode(self, text: str, *, add_special_tokens: bool) -> list[str]:
+            assert add_special_tokens is False
+            return list(text)
+
+    monkeypatch.setattr(
+        finance_materializer, "load_issuer_ir_filing_manifest_bytes", verified_loader
+    )
+    monkeypatch.setattr(
+        finance_materializer, "extract_financial_filings", lambda _: _filings()
+    )
+    monkeypatch.setattr(
+        finance_materializer, "_load_tokenizer", lambda *_: CharacterTokenizer()
+    )
+    monkeypatch.setattr(
+        finance_materializer,
+        "resolved_tokenizer_asset_manifest_sha256",
+        lambda model_id, revision: "d" * 64,
+    )
+    config = {
+        "schema_version": "longworld.finance-history-materialization.v1",
+        "world_id": "finance-test",
+        "signed_issuer_manifest": str(source_path),
+        "tokenizer": {
+            "model_id": "Qwen/Qwen3.5-4B",
+            "revision": "b" * 40,
+        },
+        "bands": [
+            {
+                "name": band.name,
+                "lower_tokens": band.lower_tokens,
+                "upper_tokens": band.upper_tokens,
+            }
+            for band in _bands()
+        ],
+    }
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    output_dir = tmp_path / "history"
+
+    report = finance_materializer.materialize(config_path, output_dir)
+
+    assert verified_bytes == [source_path.read_bytes()]
+    materialized_rows = [
+        json.loads(line)
+        for line in (output_dir / "candidates.jsonl").read_text().splitlines()
+    ]
+    assert all(row["source_verified_at_materialization"] for row in materialized_rows)
+    binding = report["task_replay_sidecar"]
+    loaded = load_task_replay_sidecar(
+        output_dir,
+        "TASK_REPLAY_SIDECAR.json",
+        binding,
+        source_attestation_key=SOURCE_KEY,
+    )
+    assert (
+        loaded.replay_payload["signed_manifest_sha256"]
+        == hashlib.sha256(source_path.read_bytes()).hexdigest()
+    )
 
 
 def test_replay_recomputes_answer_cf_remove_one_and_corruption() -> None:

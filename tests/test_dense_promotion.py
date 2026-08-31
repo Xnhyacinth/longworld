@@ -4,6 +4,7 @@ import hashlib
 import json
 import sys
 from collections import Counter
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -80,6 +81,7 @@ from longworld.core.semantic import (
     sentence_near_dup_ratio,
 )
 from longworld.core.sourcebundle import LoadedSourceWorkflowBundle
+from longworld.core.taskreplaysidecar import task_candidate_content_commitment
 from longworld.core.taxonomy import artifact_classification
 from longworld.core.verify import Verification
 from longworld.core.views import render_cf_view
@@ -90,6 +92,12 @@ KEY = b"longworld-dense-promotion-test-key-32-bytes"
 @pytest.fixture(autouse=True)
 def _semantic_attestation_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LONGWORLD_ATTESTATION_KEY", KEY.decode())
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    for role, environment_name in ROLE_KEY_ENVS.items():
+        monkeypatch.setenv(environment_name, KEY.decode())
+        monkeypatch.setenv(ROLE_KEY_ID_ENVS[role], f"test-{role}-v1")
+    monkeypatch.setenv("LONGWORLD_PUBLIC_POLICY_SHA256", "d" * 64)
+    monkeypatch.setenv("LONGWORLD_GH_BINARY_SHA256", "e" * 64)
 
 
 def test_workstream_reconstruction_accepts_any_bound_workflow_stage() -> None:
@@ -964,6 +972,34 @@ def test_combined_probe_promotion_exposes_content_and_trust_eligibility(
     _materialize_synthetic_replay.cache_clear()
 
 
+def test_probe_promotion_cannot_be_resigned_as_legacy_production_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure_probe_role_keys(monkeypatch)
+    candidate, artifacts = _candidate()
+    audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
+    promoted = promote_candidate(candidate, audit, KEY)
+    stripped = deepcopy(promoted)
+    stripped.pop("attestation")
+    for field in (
+        "trust_scope",
+        "diagnostic_only",
+        "content_gate_eligible",
+        "trust_valid_for_production",
+        "production_eligible",
+    ):
+        stripped.pop(field, None)
+    stripped["view_verification"]["production_eligible"] = True
+
+    monkeypatch.delenv(ATTESTATION_ENVIRONMENT_ENV)
+    resigned = attach_attestation(stripped, KEY, purpose="sft_row")
+
+    assert resigned["attestation"]["scheme"] == "hmac-sha256"
+    assert "invalid_or_missing_attestation" in sft_row_errors(
+        resigned, attestation_key=KEY
+    )
+
+
 def test_strict_exact_sft_contract_requires_matching_tokenizer_asset_digests() -> None:
     candidate, artifacts = _candidate()
     audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
@@ -1658,11 +1694,15 @@ def test_dense_audit_attests_replayed_strict_growth_metrics() -> None:
     assert replayed["graph"]["proof_depth"] > 0
 
 
-def test_promotion_digest_binds_complete_auditor_attestation() -> None:
+def test_promotion_digest_binds_complete_auditor_attestation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     candidate, artifacts = _candidate()
     audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
     promoted = promote_candidate(candidate, audit, KEY)
     replacement_auditor_key = b"replacement-auditor-key-at-least-32-bytes"
+    monkeypatch.setenv(ROLE_KEY_ENVS["auditor"], replacement_auditor_key.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["auditor"], "test-auditor-replacement-v1")
     resigned_audit = attach_attestation(
         audit, replacement_auditor_key, purpose=DENSE_AUDIT_PURPOSE
     )
@@ -2865,14 +2905,24 @@ def test_production_predecessor_rejects_hmac_signed_fake_kms_metadata(
         )
 
 
-def test_promotion_chain_accepts_distinct_role_keys_and_rejects_cross_role_keys() -> (
-    None
-):
+def test_promotion_chain_accepts_distinct_role_keys_and_rejects_cross_role_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     candidate_key = b"candidate-role-key-material-at-least-32-bytes"
     ranking_key = b"ranking-role-key-material-at-least-32-bytes"
     audit_key = b"auditor-role-key-material-at-least-32-bytes"
     promotion_key = b"promotion-role-key-material-at-least-32-bytes"
     report_key = b"report-role-key-material-at-least-32-bytes"
+    role_keys = {
+        "candidate": candidate_key,
+        "ranker": ranking_key,
+        "auditor": audit_key,
+        "promotion": promotion_key,
+        "report": report_key,
+    }
+    for role, key in role_keys.items():
+        monkeypatch.setenv(ROLE_KEY_ENVS[role], key.decode())
+        monkeypatch.setenv(ROLE_KEY_ID_ENVS[role], f"test-distinct-{role}-v1")
     candidate, artifacts = _candidate()
     candidate = attach_attestation(
         candidate, candidate_key, purpose=CANDIDATE_ATTESTATION_PURPOSE
@@ -4416,6 +4466,531 @@ def test_candidate_structural_preflight_does_not_replace_authoritative_selection
             "p12-wiki-source-slice-1-v1",
             candidate_attestation_key=KEY,
             audit_attestation_key=KEY,
+        )
+
+
+def test_task_growth_waits_for_authoritative_post_replay_metrics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    task_candidates = []
+    for candidate in candidates:
+        unsigned = {
+            key: value for key, value in candidate.items() if key != "attestation"
+        }
+        unsigned["task_replay_sidecar"] = {
+            "adapter_id": "cyber.kev_history.v1",
+            "adapter_revision": "longworld.kev-catalog-history-replay.v1",
+            "sidecar_schema_version": "longworld.task-replay-sidecar.v1",
+            "sha256": "f" * 64,
+        }
+        unsigned["domain"] = "cyber"
+        unsigned["view"] = "ordered_artifact_view"
+        unsigned["composition_method"] = "causal_timeline"
+        unsigned["strict_replay_revision"] = "longworld.kev-catalog-history-replay.v1"
+        unsigned["domain_history_replay_manifest"] = {
+            "replay_revision": "longworld.kev-catalog-history-replay.v1"
+        }
+        unsigned["context"] = (
+            f"{unsigned['context']}\nlength-band:{unsigned['length_bucket']}"
+        )
+        task_candidates.append(
+            attach_attestation(unsigned, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+        )
+    observed: list[list[dict[str, Any]]] = []
+
+    def capture_growth_inputs(
+        rows: list[dict[str, Any]], _profile: Any
+    ) -> dict[str, tuple[str, ...]]:
+        observed.append(rows)
+        return {}
+
+    monkeypatch.setattr(
+        promotion_module,
+        "_cumulative_history_violations_by_world",
+        capture_growth_inputs,
+    )
+
+    accepted, rejects = candidate_structural_preflight(
+        task_candidates,
+        "p12-wiki-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+    )
+
+    assert accepted == task_candidates
+    assert rejects == []
+    assert observed == [[]]
+
+
+def test_task_growth_preflight_rejects_malformed_sidecar_marker() -> None:
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    malformed = []
+    for candidate in candidates:
+        unsigned = {
+            key: value for key, value in candidate.items() if key != "attestation"
+        }
+        unsigned["task_replay_sidecar"] = "skip-growth"
+        malformed.append(
+            attach_attestation(unsigned, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+        )
+
+    with pytest.raises(PromotionError, match="task replay sidecar is invalid"):
+        candidate_structural_preflight(
+            malformed,
+            "p12-wiki-source-slice-1-v1",
+            candidate_attestation_key=KEY,
+        )
+
+
+def test_task_growth_preflight_rejects_sidecar_for_wrong_domain() -> None:
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k", "32k", "64k"))
+    mismatched = []
+    for candidate in candidates:
+        unsigned = {
+            key: value for key, value in candidate.items() if key != "attestation"
+        }
+        unsigned["task_replay_sidecar"] = {
+            "adapter_id": "cyber.kev_history.v1",
+            "adapter_revision": "longworld.kev-catalog-history-replay.v1",
+            "sidecar_schema_version": "longworld.task-replay-sidecar.v1",
+            "sha256": "f" * 64,
+        }
+        mismatched.append(
+            attach_attestation(unsigned, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+        )
+
+    with pytest.raises(PromotionError, match="task replay sidecar is invalid"):
+        candidate_structural_preflight(
+            mismatched,
+            "p12-wiki-source-slice-1-v1",
+            candidate_attestation_key=KEY,
+        )
+
+
+def _duplicate_task_content_identity_candidates() -> tuple[dict, dict]:
+    candidates, _ = _p12_wiki_exact_bucket_selection_inputs(("16k",))
+    unsigned = {
+        key: value for key, value in candidates[0].items() if key != "attestation"
+    }
+    unsigned.update(
+        {
+            "task_replay_sidecar": {
+                "adapter_id": "cyber.kev_history.v1",
+                "adapter_revision": "longworld.kev-catalog-history-replay.v1",
+                "sidecar_schema_version": "longworld.task-replay-sidecar.v1",
+                "sha256": "f" * 64,
+            },
+            "domain": "cyber",
+            "view": "ordered_artifact_view",
+            "composition_method": "causal_timeline",
+            "strict_replay_revision": "longworld.kev-catalog-history-replay.v1",
+            "domain_history_replay_manifest": {
+                "replay_revision": "longworld.kev-catalog-history-replay.v1"
+            },
+        }
+    )
+    first = attach_attestation(unsigned, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+    variant = attach_attestation(
+        {**unsigned, "generation_integration": "metadata-only-variant"},
+        KEY,
+        purpose=CANDIDATE_ATTESTATION_PURPOSE,
+    )
+    return first, variant
+
+
+def test_task_growth_preflight_rejects_duplicate_content_identity() -> None:
+    first, variant = _duplicate_task_content_identity_candidates()
+
+    with pytest.raises(PromotionError, match="task content identity is duplicated"):
+        candidate_structural_preflight(
+            [first, variant],
+            "p12-wiki-source-slice-1-v1",
+            candidate_attestation_key=KEY,
+        )
+
+
+def test_task_growth_preflight_rejects_cross_world_training_clone() -> None:
+    first, _ = _duplicate_task_content_identity_candidates()
+    unsigned = {key: value for key, value in first.items() if key != "attestation"}
+    clone = attach_attestation(
+        {
+            **unsigned,
+            "world_id": "metadata-clone-world",
+            "query_id": "metadata-clone-query",
+        },
+        KEY,
+        purpose=CANDIDATE_ATTESTATION_PURPOSE,
+    )
+
+    with pytest.raises(PromotionError, match="task training content is duplicated"):
+        candidate_structural_preflight(
+            [first, clone],
+            "p12-wiki-source-slice-1-v1",
+            candidate_attestation_key=KEY,
+        )
+
+
+def test_world_selection_rejects_duplicate_task_content_identity() -> None:
+    first, variant = _duplicate_task_content_identity_candidates()
+
+    with pytest.raises(PromotionError, match="task content identity is duplicated"):
+        select_release_worlds(
+            [first, variant],
+            [],
+            "p12-wiki-source-slice-1-v1",
+            candidate_attestation_key=KEY,
+            audit_attestation_key=KEY,
+        )
+
+
+def test_ranking_audit_without_profile_rejects_task_clone_and_prompt_conflict(
+    tmp_path: Path,
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from promote_candidates import audit_rankings
+
+    first, _ = _duplicate_task_content_identity_candidates()
+    unsigned = {key: value for key, value in first.items() if key != "attestation"}
+    clone = attach_attestation(
+        {**unsigned, "world_id": "clone-world", "query_id": "clone-query"},
+        KEY,
+        purpose=CANDIDATE_ATTESTATION_PURPOSE,
+    )
+    conflict = attach_attestation(
+        {**unsigned, "world_id": "conflict-world", "answer": "changed answer"},
+        KEY,
+        purpose=CANDIDATE_ATTESTATION_PURPOSE,
+    )
+    rankings_path = tmp_path / "rankings.jsonl"
+    rankings_path.write_text("", encoding="utf-8")
+
+    for label, rows, match in (
+        ("clone", [first, clone], "training content is duplicated"),
+        ("conflict", [first, conflict], "prompt has conflicting answers"),
+    ):
+        candidates_path = tmp_path / f"{label}-candidates.jsonl"
+        output_path = tmp_path / f"{label}-audits.jsonl"
+        candidates_path.write_text(
+            "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+        )
+        with pytest.raises(PromotionError, match=match):
+            audit_rankings(candidates_path, rankings_path, output_path, k=3)
+        assert not output_path.exists()
+
+
+def test_train_ready_report_rejects_duplicate_task_content_identity() -> None:
+    first, variant = _duplicate_task_content_identity_candidates()
+    candidates = [first, variant]
+    candidate_report = attach_attestation(
+        {
+            "schema_version": first["schema_version"],
+            "data_product": first["data_product"],
+            "data_stage": "candidate",
+            "release_profile_id": "p12-wiki-source-slice-1-v1",
+            "release_profile_sha256": release_profile_sha256(
+                "p12-wiki-source-slice-1-v1"
+            ),
+            "n_rows": len(candidates),
+            "candidate_row_set_sha256": promoted_row_set_sha256(candidates),
+            "target_promoted_worlds": 1,
+        },
+        KEY,
+        purpose="quality_report",
+    )
+
+    with pytest.raises(PromotionError, match="task content identity is duplicated"):
+        create_train_ready_report(candidate_report, candidates, [], KEY)
+
+
+def test_train_ready_report_rejects_resigned_task_training_content_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate, _ = _duplicate_task_content_identity_candidates()
+    candidate_report = attach_attestation(
+        {
+            "schema_version": candidate["schema_version"],
+            "data_product": candidate["data_product"],
+            "data_stage": "candidate",
+            "release_profile_id": "p12-wiki-source-slice-1-v1",
+            "release_profile_sha256": release_profile_sha256(
+                "p12-wiki-source-slice-1-v1"
+            ),
+            "n_rows": 1,
+            "candidate_row_set_sha256": promoted_row_set_sha256([candidate]),
+            "target_promoted_worlds": 1,
+        },
+        KEY,
+        purpose="quality_report",
+    )
+    unsigned = {key: value for key, value in candidate.items() if key != "attestation"}
+    unsigned.update(
+        {
+            "context": f"{candidate['context']}\nresigned mutation",
+            "data_stage": "train_ready",
+            "train_ready": True,
+            "promotion": {
+                "candidate_sha256": candidate_sha256(candidate),
+                "task_replay_sidecar": candidate["task_replay_sidecar"],
+                "task_candidate_content_commitment": (
+                    task_candidate_content_commitment(candidate)
+                ),
+            },
+        }
+    )
+    mutated = attach_attestation(unsigned, KEY, purpose="sft_row")
+    monkeypatch.setattr(promotion_module, "sft_row_errors", lambda *_a, **_k: [])
+
+    with pytest.raises(PromotionError, match="differs from candidate"):
+        create_train_ready_report(candidate_report, [candidate], [mutated], KEY)
+
+
+def _task_report_semantic_inputs() -> tuple[dict, dict, dict, dict]:
+    candidate, _ = _duplicate_task_content_identity_candidates()
+    candidate_digest = candidate_sha256(candidate)
+    source_relation_edges = [
+        {
+            "parent_record_id": "source-a",
+            "child_record_id": "source-b",
+            "relation_provenance": "authentic_source",
+        }
+    ]
+    source_relation_id = hashlib.sha256(
+        json.dumps(
+            source_relation_edges,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()[:20]
+    candidate_report = attach_attestation(
+        {
+            "schema_version": candidate["schema_version"],
+            "data_product": candidate["data_product"],
+            "data_stage": "candidate",
+            "release_profile_id": "p12-wiki-source-slice-1-v1",
+            "release_profile_sha256": release_profile_sha256(
+                "p12-wiki-source-slice-1-v1"
+            ),
+            "n_rows": 1,
+            "candidate_row_set_sha256": promoted_row_set_sha256([candidate]),
+            "target_promoted_worlds": 1,
+        },
+        KEY,
+        purpose="quality_report",
+    )
+    verification_values = {field: True for field in Verification.model_fields}
+    verification_values["candidate_mode"] = False
+    unsigned = {key: value for key, value in candidate.items() if key != "attestation"}
+    unsigned.update(
+        {
+            "data_stage": "train_ready",
+            "train_ready": True,
+            "split": "train",
+            "semantic_growth_group_id": "task-report-semantic-history",
+            "semantic_tokens": {
+                "internal": 16_000,
+                "event_bearing": 12_000,
+                "proof_bearing": 4_000,
+                "causal_supporting": 2_000,
+                "generic_background": 0,
+                "measurement_basis": "exact_replay_test",
+            },
+            "strict_support_event_count": 4,
+            "graph": {
+                "n_essential_events": 3,
+                "n_essential_artifacts": 2,
+                "proof_depth": 3,
+                "hop_count": 2,
+            },
+            "authentic_source_relation_edges": source_relation_edges,
+            "motif": "task-report-motif",
+            "base_task_id": "task-report-base-task",
+            "executable_proof_id": "task-report-executable-proof",
+            "answer_program_id": "task-report-answer-program",
+            "semantic_base_task_id": "task-report-semantic-base-task",
+            "real_source_verified": True,
+            "real_source_family_ids": ["task-report-source-family"],
+            "real_source_workflow_ids": ["task-report-source-workflow"],
+            "real_source_token_ratio": 0.75,
+            "source_relation_edges": source_relation_edges,
+            "source_relation_id": source_relation_id,
+            "authentic_source_relation_id": source_relation_id,
+            "hybrid_causal_edges": [],
+            "context_source_relation_count": 1,
+            "task_proof_receipt": {
+                "schema_version": "longworld.task-proof-receipt.test.v1",
+                "receipt_sha256": "b" * 64,
+            },
+            "verification": Verification(**verification_values).model_dump(),
+            "view_verification": {
+                "expected_answer": candidate["answer"],
+                "strict_replay_answer": candidate["answer"],
+                "essential_present": True,
+                "semantic_text_grounded": True,
+                "classification_ok": True,
+                "global_proof_green": True,
+                "production_eligible": False,
+                "content_gate_eligible": True,
+            },
+            "promotion": {
+                "candidate_sha256": candidate_digest,
+                "dense_audit_sha256": "a" * 64,
+                "task_replay_sidecar": candidate["task_replay_sidecar"],
+                "task_candidate_content_commitment": (
+                    task_candidate_content_commitment(candidate)
+                ),
+            },
+        }
+    )
+    commitment = promotion_module.task_semantic_commitment_sha256_from_row(unsigned)
+    receipt = attach_attestation(
+        {
+            "schema_version": RELEASE_SELECTION_SCHEMA,
+            "release_profile_id": "p12-wiki-source-slice-1-v1",
+            "release_profile_sha256": release_profile_sha256(
+                "p12-wiki-source-slice-1-v1"
+            ),
+            "candidate_row_set_sha256": promoted_row_set_sha256([candidate]),
+            "selected_candidate_sha256": [candidate_digest],
+            "split_by_world": {candidate["world_id"]: "train"},
+            "audit_sha256_by_candidate": {candidate_digest: "a" * 64},
+            "task_semantic_commitment_sha256_by_candidate": {
+                candidate_digest: commitment
+            },
+        },
+        KEY,
+        purpose=RELEASE_SELECTION_PURPOSE,
+    )
+    unsigned["promotion"].update(
+        {
+            "release_selection_sha256": serialized_row_sha256(receipt),
+            "task_semantic_commitment_sha256": commitment,
+        }
+    )
+    row = attach_attestation(unsigned, KEY, purpose="sft_row")
+    return candidate, candidate_report, row, receipt
+
+
+def test_task_train_ready_report_requires_release_selection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate, candidate_report, row, _receipt = _task_report_semantic_inputs()
+    monkeypatch.setattr(promotion_module, "sft_row_errors", lambda *_a, **_k: [])
+
+    with pytest.raises(PromotionError, match="requires a valid release selection"):
+        create_train_ready_report(candidate_report, [candidate], [row], KEY)
+
+
+def test_task_train_ready_report_rejects_resigned_semantic_metadata_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate, candidate_report, row, receipt = _task_report_semantic_inputs()
+    monkeypatch.setattr(promotion_module, "sft_row_errors", lambda *_a, **_k: [])
+
+    for field in (
+        "semantic_tokens",
+        "strict_support_event_count",
+        "graph",
+        "task_proof_receipt",
+        "verification",
+        "view_verification",
+    ):
+        unsigned = deepcopy(row)
+        unsigned.pop("attestation")
+        if field == "semantic_tokens":
+            unsigned[field]["proof_bearing"] += 1
+        elif field == "strict_support_event_count":
+            unsigned[field] += 1
+        elif field == "graph":
+            unsigned[field]["proof_depth"] += 1
+        elif field == "task_proof_receipt":
+            unsigned[field]["resigned_mutation"] = True
+        elif field == "verification":
+            unsigned[field]["semantic_sufficient"] = False
+        else:
+            unsigned[field]["classification_ok"] = False
+        mutated = attach_attestation(unsigned, KEY, purpose="sft_row")
+
+        with pytest.raises(PromotionError, match="differ from release selection"):
+            create_train_ready_report(
+                candidate_report,
+                [candidate],
+                [mutated],
+                KEY,
+                release_selection_receipt=receipt,
+            )
+
+
+@pytest.mark.parametrize(
+    "field",
+    (
+        "world_id",
+        "domain",
+        "length_bucket",
+        "motif",
+        "base_task_id",
+        "executable_proof_id",
+        "answer_program_id",
+        "semantic_base_task_id",
+        "real_source_verified",
+        "real_source_family_ids",
+        "real_source_workflow_ids",
+        "real_source_token_ratio",
+        "source_relation_edges",
+        "source_relation_id",
+        "authentic_source_relation_id",
+        "hybrid_causal_edges",
+        "context_source_relation_count",
+    ),
+)
+def test_task_train_ready_report_rejects_resigned_quality_metadata_mutation(
+    monkeypatch: pytest.MonkeyPatch, field: str
+) -> None:
+    candidate, candidate_report, row, receipt = _task_report_semantic_inputs()
+    monkeypatch.setattr(promotion_module, "sft_row_errors", lambda *_a, **_k: [])
+    unsigned = deepcopy(row)
+    unsigned.pop("attestation")
+    if field == "real_source_verified":
+        unsigned[field] = False
+    elif field in {"real_source_family_ids", "real_source_workflow_ids"}:
+        unsigned[field] = sorted([*unsigned[field], "resigned-mutation"])
+    elif field == "source_relation_edges":
+        unsigned[field] = [
+            *unsigned[field],
+            ["resigned-source", "resigned-target", "resigned-relation"],
+        ]
+        unsigned["source_relation_id"] = hashlib.sha256(
+            json.dumps(
+                unsigned[field],
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()[:20]
+        unsigned["context_source_relation_count"] = len(unsigned[field])
+    elif field == "hybrid_causal_edges":
+        unsigned[field] = [["resigned-source", "resigned-target", "resigned-relation"]]
+    elif field == "real_source_token_ratio":
+        unsigned[field] += 0.01
+    elif field == "context_source_relation_count":
+        unsigned[field] += 1
+    else:
+        unsigned[field] = f"{unsigned[field]}-resigned-mutation"
+    mutated = attach_attestation(unsigned, KEY, purpose="sft_row")
+
+    with pytest.raises(
+        PromotionError,
+        match=(
+            "semantic commitment is invalid|differ from release selection|"
+            "task release selection binding is invalid"
+        ),
+    ):
+        create_train_ready_report(
+            candidate_report,
+            [candidate],
+            [mutated],
+            KEY,
+            release_selection_receipt=receipt,
         )
 
 

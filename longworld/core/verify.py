@@ -58,6 +58,7 @@ class Verification(BaseModel):
     counterfactual_replay_sufficient: bool = False
     local_window_insufficient: bool = False
     contiguous_windows_insufficient: bool = True
+    artifact_aligned_windows_insufficient: bool = False
     closed_book_unsolved: bool = False
     distractor_invariance_gold: bool = False
     surface_match: bool = False

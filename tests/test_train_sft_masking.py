@@ -1,5 +1,10 @@
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
 
+from scripts import train_sft
 from scripts.train_sft import tokenize_assistant_only
 
 
@@ -63,3 +68,48 @@ def test_answer_larger_than_the_sequence_is_rejected() -> None:
     ]
     with pytest.raises(ValueError, match="assistant answer exceeds"):
         tokenize_assistant_only(tokenizer, messages, max_length=20)
+
+
+def test_diagnostic_train_cli_rejects_empty_post_filter_dataset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data = tmp_path / "release"
+    output = tmp_path / "sft"
+    monkeypatch.setattr(
+        train_sft,
+        "load_release_product",
+        lambda *_a, **_k: SimpleNamespace(
+            train_rows=[
+                {
+                    "view": "full",
+                    "query_timing": "first",
+                    "length_bucket": "16k",
+                }
+            ]
+        ),
+    )
+    monkeypatch.setattr(train_sft, "sft_row_errors", lambda _row: [])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "train_sft.py",
+            "--condition",
+            "B1",
+            "--data",
+            str(data),
+            "--out-dir",
+            str(output),
+            "--length-bucket",
+            "64k",
+            "--release-profile",
+            "p3-probe-12-v1",
+            "--diagnostic-only",
+            "--prepare-only",
+        ],
+    )
+
+    with pytest.raises(SystemExit, match="no rows remain after filtering"):
+        train_sft.main()
+
+    assert not output.exists()

@@ -227,9 +227,6 @@ def _condition_source_rows(
 
 
 def _source_content_digest(row: dict[str, Any]) -> str:
-    digest = str(row.get("content_hash") or "")
-    if digest:
-        return digest
     return hashlib.sha256(
         json.dumps(
             {"context": row.get("context"), "answer": str(row.get("answer"))},
@@ -253,11 +250,18 @@ def _select_condition_rows(
 ) -> tuple[list[dict[str, Any]], int]:
     eligible: list[dict[str, Any]] = []
     seen_content: set[str] = set()
+    answers_by_prompt: dict[str, str] = {}
     for row in rows:
         digest = _source_content_digest(row)
         if digest in seen_content:
-            continue
+            raise ValueError("training transform source has duplicate training content")
         seen_content.add(digest)
+        context = str(row.get("context") or "")
+        answer = str(row.get("answer") or "")
+        prompt_digest = hashlib.sha256(context.encode("utf-8")).hexdigest()
+        previous_answer = answers_by_prompt.setdefault(prompt_digest, answer)
+        if previous_answer != answer:
+            raise ValueError("training transform source has conflicting prompt answers")
         eligible.append(row)
 
     units: list[list[dict[str, Any]]] = []

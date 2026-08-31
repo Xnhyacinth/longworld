@@ -989,10 +989,19 @@ def test_export_drops_local_or_mixed_on_long_buckets(monkeypatch):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
     from export_llamafactory import COND_VIEWS, filter_rows
 
-    from longworld.core.attestation import ATTESTATION_ENV, attach_attestation
+    from longworld.core.attestation import (
+        ATTESTATION_ENV,
+        ATTESTATION_ENVIRONMENT_ENV,
+        ROLE_KEY_ENVS,
+        ROLE_KEY_ID_ENVS,
+        attach_attestation,
+    )
 
     key = b"longworld-test-attestation-key-32-bytes"
     monkeypatch.setenv(ATTESTATION_ENV, key.decode())
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "production")
+    monkeypatch.setenv(ROLE_KEY_ENVS["promotion"], key.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["promotion"], "probe-export-promotion-v1")
 
     rows = [
         {

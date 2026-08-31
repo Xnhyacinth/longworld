@@ -48,6 +48,7 @@ from longworld.core.pack import (
 from longworld.core.production_trust import (
     verify_embedded_production_approval_from_env,
 )
+from longworld.core.provenance import ProvenanceError
 from longworld.core.realworkflow import (
     EPISODE_REPLAY_BUNDLE_SCHEMA,
     load_episode_replay_bundle,
@@ -74,6 +75,10 @@ from longworld.core.sourcebundle import (
     load_source_workflow_bundle,
 )
 from longworld.core.sourceworkflow import SOURCE_WORKFLOW_ADAPTER_REVISIONS
+from longworld.core.taskreplaysidecar import (
+    TASK_REPLAY_ADAPTER_REGISTRY,
+    task_candidate_content_commitment,
+)
 from longworld.core.taxonomy import artifact_classification
 from longworld.core.tokenizer_assets import (
     TokenizerAssetError,
@@ -108,6 +113,7 @@ RELEASE_SELECTION_PURPOSE = "release_world_selection"
 RELEASE_GATE_SCHEMA = "longworld-release-gate-pass-v1"
 RELEASE_GATE_PURPOSE = "release_gate_pass"
 RELEASE_GATE_REVISION = "longworld-quality-gate-v6"
+TASK_SEMANTIC_COMMITMENT_SCHEMA = "longworld.task-semantic-commitment.v2"
 LEGACY_RELEASE_GATE_REVISION = "longworld-quality-gate-v5"
 _LEGACY_RELEASE_GATE_PROFILE_IDS = frozenset(
     {
@@ -245,7 +251,7 @@ def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def _canonical_sha256(value: dict[str, Any]) -> str:
+def _canonical_sha256(value: object) -> str:
     return hashlib.sha256(
         json.dumps(
             value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
@@ -398,14 +404,18 @@ def _candidate_has_verified_real_source(candidate: dict[str, Any]) -> bool:
         candidate.get("source_family_ids")
         and any(
             isinstance(candidate.get(field), dict)
-            for field in ("episode_replay_bundle", "source_workflow_bundle")
+            for field in (
+                "episode_replay_bundle",
+                "source_workflow_bundle",
+                "task_replay_sidecar",
+            )
         )
         and isinstance(classifications, list)
         and any(
             isinstance(item, dict)
             and item.get("source_origin")
             in {"real_public", "real_private_export", "real_derived"}
-            and item.get("workflow_kind") == "hybrid_causal"
+            and item.get("workflow_kind") in {"hybrid_causal", "real_source_derived"}
             for item in classifications
         )
     )
@@ -417,7 +427,11 @@ def _candidate_has_source_bound_proof(candidate: dict[str, Any]) -> bool:
         candidate.get("source_family_ids")
         and any(
             isinstance(candidate.get(field), dict)
-            for field in ("episode_replay_bundle", "source_workflow_bundle")
+            for field in (
+                "episode_replay_bundle",
+                "source_workflow_bundle",
+                "task_replay_sidecar",
+            )
         )
         and isinstance(classifications, list)
         and any(
@@ -575,7 +589,7 @@ def _cumulative_history_violations_by_world(
         def relation_ids(row: dict[str, Any]) -> set[str] | None:
             relations = row.get("authentic_source_relation_edges")
             if not isinstance(relations, list) or any(
-                not isinstance(relation, dict) for relation in relations
+                not _strict_source_relation_valid(relation) for relation in relations
             ):
                 return None
             return {_canonical_sha256(relation) for relation in relations}
@@ -647,10 +661,54 @@ def candidate_structural_preflight(
             raise PromotionError("candidate structural preflight input is duplicated")
         seen.add(digest)
 
+    task_candidate_digests: set[str] = set()
+    task_content_identities: set[tuple[str, str, str, str]] = set()
+    task_training_content_digests: set[str] = set()
+    task_answers_by_prompt: dict[str, str] = {}
+    for candidate in candidates:
+        binding = candidate.get("task_replay_sidecar")
+        if binding is None:
+            continue
+        try:
+            identity = _task_candidate_content_identity(candidate)
+        except PromotionError as error:
+            raise PromotionError(
+                "candidate structural preflight task replay sidecar is invalid"
+            ) from error
+        assert identity is not None
+        if identity in task_content_identities:
+            raise PromotionError(
+                "candidate structural preflight task content identity is duplicated"
+            )
+        task_content_identities.add(identity)
+        training_digest, prompt_digest, answer = _task_training_content_identity(
+            candidate
+        )
+        if training_digest in task_training_content_digests:
+            raise PromotionError(
+                "candidate structural preflight task training content is duplicated"
+            )
+        task_training_content_digests.add(training_digest)
+        previous_answer = task_answers_by_prompt.setdefault(prompt_digest, answer)
+        if previous_answer != answer:
+            raise PromotionError(
+                "candidate structural preflight task prompt has conflicting answers"
+            )
+        task_candidate_digests.add(candidate_sha256(candidate))
+
     missing_by_world = _missing_required_exact_length_buckets_by_world(
         candidates, profile
     )
-    cumulative_violations = _cumulative_history_violations_by_world(candidates, profile)
+    # Task-adapter growth is authoritative only after signed strict replay.
+    # It is checked again in ``select_release_worlds`` with auditor metrics.
+    cumulative_violations = _cumulative_history_violations_by_world(
+        [
+            candidate
+            for candidate in candidates
+            if candidate_sha256(candidate) not in task_candidate_digests
+        ],
+        profile,
+    )
     rejected_worlds = set(missing_by_world) | set(cumulative_violations)
     profile_digest = release_profile_sha256(release_profile_id)
     accepted = [
@@ -687,6 +745,116 @@ def candidate_structural_preflight(
     return accepted, rejects
 
 
+def _task_sidecar_matches_candidate(
+    candidate: dict[str, Any], binding: dict[str, Any]
+) -> bool:
+    key = (
+        str(binding.get("adapter_id") or ""),
+        str(binding.get("adapter_revision") or ""),
+        str(binding.get("sidecar_schema_version") or ""),
+    )
+    if key[0] == "cyber.kev_history.v1":
+        replay = candidate.get("domain_history_replay_manifest")
+        return bool(
+            candidate.get("domain") == "cyber"
+            and candidate.get("view") == "ordered_artifact_view"
+            and candidate.get("composition_method") == "causal_timeline"
+            and isinstance(replay, dict)
+            and replay.get("replay_revision") == key[1]
+            and candidate.get("strict_replay_revision") == key[1]
+        )
+    if key[0] == "finance.multi_filing.v1":
+        replay = candidate.get("finance_replay_contract")
+        return bool(
+            candidate.get("domain") == "finance"
+            and candidate.get("view") == "full"
+            and candidate.get("composition_method") == "same_case_dossier"
+            and isinstance(replay, dict)
+            and replay.get("adapter_id") == key[0]
+            and replay.get("revision") == key[1]
+            and candidate.get("strict_replay_revision") == key[1]
+        )
+    return False
+
+
+def _task_candidate_content_identity(
+    candidate: dict[str, Any],
+) -> tuple[str, str, str, str] | None:
+    binding = candidate.get("task_replay_sidecar")
+    if binding is None:
+        return None
+    if (
+        not isinstance(binding, dict)
+        or set(binding)
+        != {
+            "adapter_id",
+            "adapter_revision",
+            "sidecar_schema_version",
+            "sha256",
+        }
+        or (
+            str(binding.get("adapter_id") or ""),
+            str(binding.get("adapter_revision") or ""),
+            str(binding.get("sidecar_schema_version") or ""),
+        )
+        not in TASK_REPLAY_ADAPTER_REGISTRY
+        or _SHA256.fullmatch(str(binding.get("sha256") or "")) is None
+        or not _task_sidecar_matches_candidate(candidate, binding)
+    ):
+        raise PromotionError("task replay sidecar binding is invalid")
+    try:
+        commitment = task_candidate_content_commitment(candidate)
+    except ProvenanceError as error:
+        raise PromotionError("task candidate content identity is invalid") from error
+    return (
+        str(binding["sha256"]),
+        commitment["world_id"],
+        commitment["length_bucket"],
+        commitment["content_sha256"],
+    )
+
+
+def _task_training_content_identity(
+    candidate: dict[str, Any],
+) -> tuple[str, str, str]:
+    context = candidate.get("context")
+    if not isinstance(context, str) or not context:
+        raise PromotionError("task candidate training context is invalid")
+    answer = str(candidate.get("answer") or "")
+    if not answer:
+        raise PromotionError("task candidate training answer is invalid")
+    return (
+        _canonical_sha256({"context": context, "answer": answer}),
+        hashlib.sha256(context.encode("utf-8")).hexdigest(),
+        answer,
+    )
+
+
+def validate_task_candidate_content_uniqueness(
+    candidates: list[dict[str, Any]], *, label: str
+) -> None:
+    """Reject task-row metadata clones and conflicting exported prompts."""
+    source_identities: set[tuple[str, str, str, str]] = set()
+    training_digests: set[str] = set()
+    answers_by_prompt: dict[str, str] = {}
+    for candidate in candidates:
+        identity = _task_candidate_content_identity(candidate)
+        if identity is None:
+            continue
+        if identity in source_identities:
+            raise PromotionError(f"{label} task content identity is duplicated")
+        source_identities.add(identity)
+        training_digest, prompt_digest, answer = _task_training_content_identity(
+            candidate
+        )
+        if training_digest in training_digests:
+            raise PromotionError(f"{label} task training content is duplicated")
+        training_digests.add(training_digest)
+        previous_answer = answers_by_prompt.setdefault(prompt_digest, answer)
+        if previous_answer != answer:
+            raise PromotionError(f"{label} task prompt has conflicting answers")
+
+
 def _selection_audit_matches_candidate(
     audit: dict[str, Any], candidate: dict[str, Any], dense_top_k: int
 ) -> bool:
@@ -708,6 +876,8 @@ def _selection_audit_matches_candidate(
         and _SHA256.fullmatch(str(audit.get("verification_replay_sha256") or ""))
         is not None
         and _strict_growth_metrics_are_valid(audit.get("strict_growth_metrics"))
+        and _selection_task_proof_is_closed(audit, candidate)
+        and _selection_task_semantic_commitment_is_closed(audit, candidate)
         and (
             str(candidate.get("length_bucket") or "") not in EXACT_TOKEN_BAND_RANGES
             or (
@@ -741,6 +911,21 @@ def _selection_audit_matches_candidate(
     )
 
 
+def _selection_task_proof_is_closed(
+    audit: dict[str, Any], candidate: dict[str, Any]
+) -> bool:
+    if not isinstance(candidate.get("task_replay_sidecar"), dict):
+        return True
+    task_proof = audit.get("task_proof")
+    if not isinstance(task_proof, dict):
+        return False
+    try:
+        verification = Verification.model_validate(task_proof.get("verification"))
+    except ValueError:
+        return False
+    return verification.all_green()
+
+
 def _strict_growth_metrics_are_valid(value: Any) -> bool:
     if not isinstance(value, dict) or set(value) != {
         "semantic_growth_group_id",
@@ -765,12 +950,288 @@ def _strict_growth_metrics_are_valid(value: Any) -> bool:
         and isinstance(semantic, dict)
         and isinstance(graph, dict)
         and isinstance(relations, list)
-        and all(isinstance(item, dict) for item in relations)
+        and all(_strict_source_relation_valid(item) for item in relations)
         and all(
             isinstance(item, int) and not isinstance(item, bool) and item >= 0
             for item in integers
         )
         and semantic["event_bearing"] <= semantic["internal"]
+    )
+
+
+_TASK_SEMANTIC_TOKEN_FIELDS = frozenset(
+    {
+        "internal",
+        "event_bearing",
+        "proof_bearing",
+        "causal_supporting",
+        "generic_background",
+        "measurement_basis",
+    }
+)
+_TASK_SEMANTIC_GRAPH_FIELDS = frozenset(
+    {
+        "n_essential_events",
+        "n_essential_artifacts",
+        "proof_depth",
+        "hop_count",
+    }
+)
+_TASK_SEMANTIC_VIEW_FIELDS = (
+    "expected_answer",
+    "strict_replay_answer",
+    "essential_present",
+    "semantic_text_grounded",
+    "classification_ok",
+    "global_proof_green",
+)
+_TASK_QUALITY_METADATA_FIELDS = (
+    "world_id",
+    "domain",
+    "length_bucket",
+    "motif",
+    "base_task_id",
+    "executable_proof_id",
+    "answer_program_id",
+    "semantic_base_task_id",
+    "real_source_verified",
+    "real_source_family_ids",
+    "real_source_workflow_ids",
+    "real_source_token_ratio",
+    "source_relation_edges",
+    "source_relation_id",
+    "authentic_source_relation_id",
+    "hybrid_causal_edges",
+    "context_source_relation_count",
+)
+_TASK_QUALITY_OPTIONAL_ID_FIELDS = frozenset(
+    {
+        "motif",
+        "base_task_id",
+        "executable_proof_id",
+        "answer_program_id",
+        "semantic_base_task_id",
+    }
+)
+_TASK_QUALITY_REQUIRED_ID_FIELDS = frozenset(
+    {
+        "world_id",
+        "domain",
+        "length_bucket",
+    }
+)
+
+
+def _task_semantic_growth_commitment(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != {
+        "semantic_growth_group_id",
+        "semantic_tokens",
+        "strict_support_event_count",
+        "graph",
+        "authentic_source_relation_edges",
+    }:
+        raise PromotionError("task semantic growth commitment is invalid")
+    semantic = value.get("semantic_tokens")
+    graph = value.get("graph")
+    if (
+        not isinstance(semantic, dict)
+        or set(semantic) != _TASK_SEMANTIC_TOKEN_FIELDS
+        or not isinstance(graph, dict)
+        or set(graph) != _TASK_SEMANTIC_GRAPH_FIELDS
+        or any(
+            isinstance(semantic.get(field), bool)
+            or not isinstance(semantic.get(field), int)
+            or semantic[field] < 0
+            for field in _TASK_SEMANTIC_TOKEN_FIELDS - {"measurement_basis"}
+        )
+        or not isinstance(semantic.get("measurement_basis"), str)
+        or not semantic["measurement_basis"]
+        or any(
+            isinstance(graph.get(field), bool)
+            or not isinstance(graph.get(field), int)
+            or graph[field] < 0
+            for field in _TASK_SEMANTIC_GRAPH_FIELDS
+        )
+        or not _strict_growth_metrics_are_valid(value)
+    ):
+        raise PromotionError("task semantic growth commitment is invalid")
+    return {
+        "semantic_growth_group_id": value["semantic_growth_group_id"],
+        "semantic_tokens": dict(semantic),
+        "strict_support_event_count": value["strict_support_event_count"],
+        "graph": dict(graph),
+        "authentic_source_relation_edges": copy.deepcopy(
+            value["authentic_source_relation_edges"]
+        ),
+    }
+
+
+def _task_semantic_proof_commitment(
+    proof: Any, *, normalize_audit_verification: bool
+) -> dict[str, Any]:
+    if not isinstance(proof, dict):
+        raise PromotionError("task semantic proof commitment is invalid")
+    receipt = proof.get("task_proof_receipt")
+    raw_verification = proof.get("verification")
+    view = proof.get("view_verification")
+    allowed_view_fields = {
+        *_TASK_SEMANTIC_VIEW_FIELDS,
+        "production_eligible",
+        "content_gate_eligible",
+    }
+    if (
+        not isinstance(receipt, dict)
+        or not receipt
+        or not isinstance(raw_verification, dict)
+        or set(raw_verification) != set(Verification.model_fields)
+        or not isinstance(view, dict)
+        or not set(_TASK_SEMANTIC_VIEW_FIELDS) <= set(view)
+        or any(key not in allowed_view_fields for key in view)
+        or any(
+            not isinstance(view[field], str) or not view[field]
+            for field in _TASK_SEMANTIC_VIEW_FIELDS[:2]
+        )
+        or any(
+            not isinstance(view[field], bool)
+            for field in _TASK_SEMANTIC_VIEW_FIELDS[2:]
+        )
+    ):
+        raise PromotionError("task semantic proof commitment is invalid")
+    try:
+        verification = Verification.model_validate(raw_verification)
+    except ValueError as error:
+        raise PromotionError("task semantic proof commitment is invalid") from error
+    if normalize_audit_verification:
+        verification.production_mode = True
+        verification.candidate_mode = False
+        verification.embedding_topk_insufficient = True
+    return {
+        "task_proof_receipt": copy.deepcopy(receipt),
+        "verification": verification.model_dump(),
+        "view_verification": {
+            field: copy.deepcopy(view[field]) for field in _TASK_SEMANTIC_VIEW_FIELDS
+        },
+    }
+
+
+def _task_quality_metadata_commitment(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != set(_TASK_QUALITY_METADATA_FIELDS):
+        raise PromotionError("task quality metadata commitment is invalid")
+    if any(
+        item is not None and (not isinstance(item, str) or not item)
+        for item in (value.get(field) for field in _TASK_QUALITY_OPTIONAL_ID_FIELDS)
+    ) or any(
+        not isinstance(value.get(field), str) or not value[field]
+        for field in _TASK_QUALITY_REQUIRED_ID_FIELDS
+    ):
+        raise PromotionError("task quality metadata commitment is invalid")
+    families = value.get("real_source_family_ids")
+    workflows = value.get("real_source_workflow_ids")
+    source_relations = value.get("source_relation_edges")
+    hybrid_relations = value.get("hybrid_causal_edges")
+    ratio = value.get("real_source_token_ratio")
+    relation_count = value.get("context_source_relation_count")
+    if (
+        value.get("real_source_verified") is not True
+        or not isinstance(families, list)
+        or not families
+        or any(not isinstance(item, str) or not item for item in families)
+        or families != sorted(set(families))
+        or not isinstance(workflows, list)
+        or not workflows
+        or any(not isinstance(item, str) or not item for item in workflows)
+        or workflows != sorted(set(workflows))
+        or not isinstance(ratio, (int, float))
+        or isinstance(ratio, bool)
+        or not math.isfinite(float(ratio))
+        or not 0.0 <= float(ratio) <= 1.0
+        or not isinstance(source_relations, list)
+        or not source_relations
+        or any(not _strict_source_relation_valid(item) for item in source_relations)
+        or not isinstance(hybrid_relations, list)
+        or any(not _strict_source_relation_valid(item) for item in hybrid_relations)
+        or not isinstance(relation_count, int)
+        or isinstance(relation_count, bool)
+        or relation_count != len(source_relations)
+        or value.get("source_relation_id") != _canonical_sha256(source_relations)[:20]
+        or not isinstance(value.get("authentic_source_relation_id"), str)
+        or not value["authentic_source_relation_id"]
+    ):
+        raise PromotionError("task quality metadata commitment is invalid")
+    return {
+        field: (
+            float(value[field])
+            if field == "real_source_token_ratio"
+            else copy.deepcopy(value[field])
+        )
+        for field in _TASK_QUALITY_METADATA_FIELDS
+    }
+
+
+def task_semantic_commitment_sha256_from_audit(audit: dict[str, Any]) -> str:
+    """Commit to auditor-owned task semantics in their promoted representation."""
+    payload = {
+        "schema_version": TASK_SEMANTIC_COMMITMENT_SCHEMA,
+        "strict_growth_metrics": _task_semantic_growth_commitment(
+            audit.get("strict_growth_metrics")
+        ),
+        "proof": _task_semantic_proof_commitment(
+            audit.get("task_proof"), normalize_audit_verification=True
+        ),
+        "quality_metadata": _task_quality_metadata_commitment(
+            audit.get("task_quality_metadata")
+        ),
+    }
+    return _canonical_sha256(payload)
+
+
+def task_semantic_commitment_sha256_from_row(row: dict[str, Any]) -> str:
+    """Recompute the auditor-owned task semantic commitment from an actual row."""
+    growth = {
+        "semantic_growth_group_id": row.get("semantic_growth_group_id"),
+        "semantic_tokens": row.get("semantic_tokens"),
+        "strict_support_event_count": row.get("strict_support_event_count"),
+        "graph": row.get("graph"),
+        "authentic_source_relation_edges": row.get("authentic_source_relation_edges"),
+    }
+    proof = {
+        "task_proof_receipt": row.get("task_proof_receipt"),
+        "verification": row.get("verification"),
+        "view_verification": row.get("view_verification"),
+    }
+    quality_metadata = {
+        field: row.get(field) for field in _TASK_QUALITY_METADATA_FIELDS
+    }
+    payload = {
+        "schema_version": TASK_SEMANTIC_COMMITMENT_SCHEMA,
+        "strict_growth_metrics": _task_semantic_growth_commitment(growth),
+        "proof": _task_semantic_proof_commitment(
+            proof, normalize_audit_verification=False
+        ),
+        "quality_metadata": _task_quality_metadata_commitment(quality_metadata),
+    }
+    return _canonical_sha256(payload)
+
+
+def _selection_task_semantic_commitment_is_closed(
+    audit: dict[str, Any], candidate: dict[str, Any]
+) -> bool:
+    if not isinstance(candidate.get("task_replay_sidecar"), dict):
+        return True
+    try:
+        expected = task_semantic_commitment_sha256_from_audit(audit)
+    except PromotionError:
+        return False
+    return audit.get("task_semantic_commitment_sha256") == expected
+
+
+def _strict_source_relation_valid(value: Any) -> bool:
+    if isinstance(value, dict):
+        return bool(value)
+    return bool(
+        isinstance(value, (list, tuple))
+        and len(value) >= 2
+        and all(isinstance(item, str) and item for item in value[:2])
     )
 
 
@@ -915,6 +1376,9 @@ def select_release_worlds(
         raise PromotionError("release profile real-world quotas exceed split quotas")
     by_world: dict[str, list[tuple[str, dict[str, Any]]]] = {}
     candidate_digests: list[str] = []
+    task_content_identities: set[tuple[str, str, str, str]] = set()
+    task_training_content_digests: set[str] = set()
+    task_answers_by_prompt: dict[str, str] = {}
     for candidate in candidates:
         if not verify_attestation(
             candidate,
@@ -925,6 +1389,26 @@ def select_release_worlds(
         world_id = str(candidate.get("world_id") or "")
         if not world_id:
             raise PromotionError("world selection candidate has no world id")
+        task_content_identity = _task_candidate_content_identity(candidate)
+        if task_content_identity is not None:
+            if task_content_identity in task_content_identities:
+                raise PromotionError(
+                    "world selection task content identity is duplicated"
+                )
+            task_content_identities.add(task_content_identity)
+            training_digest, prompt_digest, answer = _task_training_content_identity(
+                candidate
+            )
+            if training_digest in task_training_content_digests:
+                raise PromotionError(
+                    "world selection task training content is duplicated"
+                )
+            task_training_content_digests.add(training_digest)
+            previous_answer = task_answers_by_prompt.setdefault(prompt_digest, answer)
+            if previous_answer != answer:
+                raise PromotionError(
+                    "world selection task prompt has conflicting answers"
+                )
         if str(candidate.get("length_bucket") or "") in EXACT_TOKEN_BAND_RANGES:
             expected_asset_digest = profile.tokenizer_asset_manifest_sha256
             if expected_asset_digest and (
@@ -1244,6 +1728,11 @@ def select_release_worlds(
         for _digest, candidate in by_world[world_id]
     ]
     selected_ids = sorted(candidate_sha256(candidate) for candidate in selected)
+    task_semantic_commitments = {
+        digest: str(audits_by_candidate[digest]["task_semantic_commitment_sha256"])
+        for digest in selected_ids
+        if isinstance(candidates_by_id[digest].get("task_replay_sidecar"), dict)
+    }
     receipt = attach_attestation(
         {
             "schema_version": RELEASE_SELECTION_SCHEMA,
@@ -1265,6 +1754,7 @@ def select_release_worlds(
                 digest: serialized_row_sha256(audit)
                 for digest, audit in sorted(audits_by_candidate.items())
             },
+            "task_semantic_commitment_sha256_by_candidate": (task_semantic_commitments),
             "n_candidate_worlds": len(by_world),
             "n_eligible_worlds": len(eligible_worlds),
             "n_selected_worlds": len(selected_worlds),
@@ -1336,6 +1826,29 @@ def create_train_ready_report(
             or candidate.get("data_stage") != "candidate"
         ):
             raise PromotionError("candidate product identity is inconsistent")
+    task_content_by_candidate_id: dict[str, tuple[str, str, str, str]] = {}
+    task_training_by_candidate_id: dict[str, tuple[str, str, str]] = {}
+    seen_task_content_identities: set[tuple[str, str, str, str]] = set()
+    seen_task_training_content_digests: set[str] = set()
+    task_answers_by_prompt: dict[str, str] = {}
+    for candidate in candidates:
+        identity = _task_candidate_content_identity(candidate)
+        if identity is None:
+            continue
+        if identity in seen_task_content_identities:
+            raise PromotionError("train-ready task content identity is duplicated")
+        seen_task_content_identities.add(identity)
+        task_training_identity = _task_training_content_identity(candidate)
+        training_digest, prompt_digest, answer = task_training_identity
+        if training_digest in seen_task_training_content_digests:
+            raise PromotionError("train-ready task training content is duplicated")
+        seen_task_training_content_digests.add(training_digest)
+        previous_answer = task_answers_by_prompt.setdefault(prompt_digest, answer)
+        if previous_answer != answer:
+            raise PromotionError("train-ready task prompt has conflicting answers")
+        digest = candidate_sha256(candidate)
+        task_content_by_candidate_id[digest] = identity
+        task_training_by_candidate_id[digest] = task_training_identity
     invalid = [
         row for row in rows if sft_row_errors(row, attestation_key=promotion_key)
     ]
@@ -1356,6 +1869,111 @@ def create_train_ready_report(
         promoted_candidate_ids
     ).issubset(candidate_ids):
         raise PromotionError("promoted rows do not belong to the candidate report")
+    promoted_task_training_digests: set[str] = set()
+    promoted_task_answers_by_prompt: dict[str, str] = {}
+    for row, promoted_candidate_id in zip(rows, promoted_candidate_ids, strict=True):
+        identity = task_content_by_candidate_id.get(promoted_candidate_id)
+        if identity is None:
+            continue
+        row_training_identity = _task_training_content_identity(row)
+        if (
+            row_training_identity
+            != task_training_by_candidate_id[promoted_candidate_id]
+        ):
+            raise PromotionError(
+                "promoted task training content differs from candidate"
+            )
+        training_digest, prompt_digest, answer = row_training_identity
+        if training_digest in promoted_task_training_digests:
+            raise PromotionError("promoted task training content is duplicated")
+        promoted_task_training_digests.add(training_digest)
+        previous_answer = promoted_task_answers_by_prompt.setdefault(
+            prompt_digest, answer
+        )
+        if previous_answer != answer:
+            raise PromotionError("promoted task prompt has conflicting answers")
+        promotion = row.get("promotion") or {}
+        if (
+            promotion.get("task_candidate_content_commitment")
+            != {
+                "world_id": identity[1],
+                "length_bucket": identity[2],
+                "content_sha256": identity[3],
+            }
+            or (promotion.get("task_replay_sidecar") or {}).get("sha256") != identity[0]
+        ):
+            raise PromotionError("promoted task content commitment is invalid")
+    task_selection_digest = ""
+    if task_content_by_candidate_id:
+        selection_key = selection_attestation_key or attestation_key
+        if (
+            release_selection_receipt is None
+            or selection_key is None
+            or not verify_attestation(
+                release_selection_receipt,
+                selection_key,
+                purpose=RELEASE_SELECTION_PURPOSE,
+            )
+        ):
+            raise PromotionError(
+                "task train-ready report requires a valid release selection"
+            )
+        selected_ids = release_selection_receipt.get("selected_candidate_sha256")
+        split_by_world = release_selection_receipt.get("split_by_world")
+        audit_sha256_by_candidate = release_selection_receipt.get(
+            "audit_sha256_by_candidate"
+        )
+        task_commitments = release_selection_receipt.get(
+            "task_semantic_commitment_sha256_by_candidate"
+        )
+        promoted_task_ids = {
+            candidate_id
+            for candidate_id in promoted_candidate_ids
+            if candidate_id in task_content_by_candidate_id
+        }
+        if (
+            release_selection_receipt.get("schema_version") != RELEASE_SELECTION_SCHEMA
+            or release_selection_receipt.get("release_profile_id") != release_profile_id
+            or release_selection_receipt.get("release_profile_sha256") != profile_digest
+            or release_selection_receipt.get("candidate_row_set_sha256")
+            != row_digest_set_sha256(candidate_digests)
+            or selected_ids != sorted(promoted_candidate_ids)
+            or not isinstance(split_by_world, dict)
+            or not isinstance(audit_sha256_by_candidate, dict)
+            or not isinstance(task_commitments, dict)
+            or set(task_commitments) != promoted_task_ids
+            or any(
+                split_by_world.get(str(row.get("world_id") or "")) != row.get("split")
+                for row in rows
+            )
+        ):
+            raise PromotionError("task release selection binding is invalid")
+        task_selection_digest = serialized_row_sha256(release_selection_receipt)
+        for row, promoted_candidate_id in zip(
+            rows, promoted_candidate_ids, strict=True
+        ):
+            if promoted_candidate_id not in promoted_task_ids:
+                continue
+            promotion = row.get("promotion") or {}
+            try:
+                actual_commitment = task_semantic_commitment_sha256_from_row(row)
+            except PromotionError as error:
+                raise PromotionError(
+                    "promoted task semantic commitment is invalid"
+                ) from error
+            expected_commitment = task_commitments[promoted_candidate_id]
+            if (
+                _SHA256.fullmatch(str(expected_commitment or "")) is None
+                or actual_commitment != expected_commitment
+                or promotion.get("task_semantic_commitment_sha256")
+                != expected_commitment
+                or audit_sha256_by_candidate.get(promoted_candidate_id)
+                != promotion.get("dense_audit_sha256")
+                or promotion.get("release_selection_sha256") != task_selection_digest
+            ):
+                raise PromotionError(
+                    "promoted task semantics differ from release selection"
+                )
     profile = release_profile(release_profile_id)
     missing_required_buckets = _missing_required_exact_length_buckets_by_world(
         rows, profile
@@ -1393,7 +2011,7 @@ def create_train_ready_report(
                 "train-ready row tokenizer assets do not match release profile"
             )
     domain_quotas = dict(profile.promoted_domain_world_quotas)
-    selection_digest = ""
+    selection_digest = task_selection_digest
     selected_worlds_by_domain: dict[str, list[str]] = {}
     expected_real_worlds_by_split: dict[str, list[str]] = {
         "train": [],
@@ -2035,8 +2653,7 @@ def _parallel_dossiers(
     return factual, counterfactual
 
 
-@lru_cache(maxsize=2)
-def _load_replay_tokenizer(model_id: str, revision: str):
+def _load_replay_tokenizer_uncached(model_id: str, revision: str):
     with sanitized_attestation_environment():
         from transformers import AutoTokenizer
 
@@ -2046,6 +2663,11 @@ def _load_replay_tokenizer(model_id: str, revision: str):
             trust_remote_code=False,
             local_files_only=True,
         )
+
+
+@lru_cache(maxsize=2)
+def _load_replay_tokenizer(model_id: str, revision: str):
+    return _load_replay_tokenizer_uncached(model_id, revision)
 
 
 @lru_cache(maxsize=2)

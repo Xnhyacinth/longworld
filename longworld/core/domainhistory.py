@@ -1010,6 +1010,7 @@ def build_kev_pipeline_candidate(
     tokenizer_asset_manifest_sha256: str,
     replay_manifest_binding: dict[str, Any],
     candidate_attestation_key: bytes,
+    task_replay_sidecar_binding: dict[str, Any] | None = None,
     document_shards: int = 4,
 ) -> dict[str, Any]:
     """Serialize an audited KEV history for ranking and adapter-based replay."""
@@ -1044,6 +1045,23 @@ def build_kev_pipeline_candidate(
         raise ProvenanceError("KEV pipeline replay manifest binding is invalid")
     if _SHA256.fullmatch(tokenizer_asset_manifest_sha256) is None:
         raise ProvenanceError("KEV pipeline tokenizer asset digest is invalid")
+    if task_replay_sidecar_binding is not None and (
+        set(task_replay_sidecar_binding)
+        != {
+            "adapter_id",
+            "adapter_revision",
+            "sidecar_schema_version",
+            "sha256",
+        }
+        or task_replay_sidecar_binding.get("adapter_id") != "cyber.kev_history.v1"
+        or task_replay_sidecar_binding.get("adapter_revision")
+        != KEV_HISTORY_REPLAY_REVISION
+        or task_replay_sidecar_binding.get("sidecar_schema_version")
+        != "longworld.task-replay-sidecar.v1"
+        or _SHA256.fullmatch(str(task_replay_sidecar_binding.get("sha256") or ""))
+        is None
+    ):
+        raise ProvenanceError("KEV task replay sidecar binding is invalid")
 
     documents = _pipeline_documents(str(history.get("context") or ""), document_shards)
     classifications: list[dict[str, Any]] = []
@@ -1168,6 +1186,10 @@ def build_kev_pipeline_candidate(
         "domain_history_replay_manifest": deepcopy(replay_manifest_binding),
         "promotion_blocker_code": "missing_domain_replay_adapter:cyber",
     }
+    if task_replay_sidecar_binding is not None:
+        candidate["task_replay_sidecar"] = deepcopy(task_replay_sidecar_binding)
+        candidate["generation_integration"] = "task_replay_sidecar_bound"
+        candidate["promotion_blocker_code"] = "signed_upstream_proof_gates_pending"
     audit = audit_kev_pipeline_candidate(candidate, token_counter=token_counter)
     if not audit or not all(audit.values()):
         failed = sorted(name for name, passed in audit.items() if not passed)

@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from longworld.core.attestation import (
+    ATTESTATION_V2_SCHEME,
     LOCAL_PROBE_TRUST_ISOLATION_FIELD,
     LOCAL_PROBE_TRUST_ISOLATION_VALUE,
     attestation_key_from_env,
@@ -16,6 +17,7 @@ from longworld.core.sourcebundle import (
     SOURCE_WORKFLOW_BUNDLE_SCHEMA,
 )
 from longworld.core.sourceworkflow import SOURCE_WORKFLOW_ADAPTER_REVISIONS
+from longworld.core.taskreplaysidecar import TASK_REPLAY_ADAPTER_REGISTRY
 
 _SFT_COMPOSITIONS = {
     "causal_timeline",
@@ -111,7 +113,11 @@ def replay_bundle_binding_valid(row: dict[str, Any]) -> bool:
     promotion = _mapping(row.get("promotion"))
     present = [
         field
-        for field in ("episode_replay_bundle", "source_workflow_bundle")
+        for field in (
+            "episode_replay_bundle",
+            "source_workflow_bundle",
+            "task_replay_sidecar",
+        )
         if isinstance(row.get(field), dict) or isinstance(promotion.get(field), dict)
     ]
     if len(present) != 1:
@@ -125,6 +131,21 @@ def replay_bundle_binding_valid(row: dict[str, Any]) -> bool:
         return set(top_level) == {"schema_version", "sha256", "composition"} and (
             top_level.get("schema_version") == EPISODE_REPLAY_BUNDLE_SCHEMA
             and top_level.get("composition") == "chronological_causal_union"
+            and _SHA256.fullmatch(str(top_level.get("sha256") or "")) is not None
+        )
+    if field == "task_replay_sidecar":
+        return set(top_level) == {
+            "adapter_id",
+            "adapter_revision",
+            "sidecar_schema_version",
+            "sha256",
+        } and (
+            (
+                str(top_level.get("adapter_id") or ""),
+                str(top_level.get("adapter_revision") or ""),
+                str(top_level.get("sidecar_schema_version") or ""),
+            )
+            in TASK_REPLAY_ADAPTER_REGISTRY
             and _SHA256.fullmatch(str(top_level.get("sha256") or "")) is not None
         )
     return set(top_level) == {
@@ -150,7 +171,18 @@ def sft_row_errors(
         if attestation_key is not None
         else attestation_key_from_env("sft_row")
     )
-    if not verify_attestation(row, key, purpose="sft_row"):
+    attestation = _mapping(row.get("attestation"))
+    role_attestation_valid = not (
+        set(attestation)
+        != {"scheme", "purpose", "role", "key_id", "environment", "digest"}
+        or attestation.get("purpose") != "sft_row"
+        or attestation.get("scheme") != ATTESTATION_V2_SCHEME
+        or attestation.get("role") != "promotion"
+        or attestation.get("environment") not in {"probe", "production"}
+    )
+    if not role_attestation_valid or not verify_attestation(
+        row, key, purpose="sft_row"
+    ):
         errors.append("invalid_or_missing_attestation")
     if row.get("training_objective") != "sft":
         errors.append("not_sft_objective")
@@ -163,13 +195,16 @@ def sft_row_errors(
         "trust_valid_for_production": False,
         "production_eligible": False,
     }
-    diagnostic_declared = row.get(LOCAL_PROBE_TRUST_ISOLATION_FIELD) is not None or any(
-        field in row for field in diagnostic_expected
+    diagnostic_declared = (
+        row.get(LOCAL_PROBE_TRUST_ISOLATION_FIELD) is not None
+        or any(field in row for field in diagnostic_expected)
+        or attestation.get("environment") == "probe"
     )
-    local_probe_diagnostic = row.get(
-        LOCAL_PROBE_TRUST_ISOLATION_FIELD
-    ) == LOCAL_PROBE_TRUST_ISOLATION_VALUE and all(
-        row.get(field) == value for field, value in diagnostic_expected.items()
+    local_probe_diagnostic = (
+        attestation.get("environment") == "probe"
+        and row.get(LOCAL_PROBE_TRUST_ISOLATION_FIELD)
+        in {None, LOCAL_PROBE_TRUST_ISOLATION_VALUE}
+        and all(row.get(field) == value for field, value in diagnostic_expected.items())
     )
     if diagnostic_declared and not local_probe_diagnostic:
         errors.append("invalid_local_probe_diagnostic_boundary")
@@ -206,7 +241,8 @@ def sft_row_errors(
         _SHA256.fullmatch(exact_asset_digest) is not None
         and promotion.get("tokenizer_asset_manifest_sha256") == exact_asset_digest
     )
-    if length_bucket == "128k" and (
+    task_exact_binding = isinstance(row.get("task_replay_sidecar"), dict)
+    if (length_bucket == "128k" or task_exact_binding) and (
         not exact_token_metadata_valid(row, require_asset_manifest=True)
         or promotion.get("tokenizer_asset_manifest_sha256") != exact_asset_digest
     ):

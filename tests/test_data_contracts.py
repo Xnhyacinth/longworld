@@ -188,6 +188,9 @@ def test_training_does_not_expose_the_producer_attestation_key() -> None:
     assert f"unset {ATTESTATION_ENV}" in launcher
     assert all(name in launcher for name in ROLE_KEY_ENVS.values())
     assert "validate_training_export.py" in launcher
+    assert "dataset_dir=$VALIDATED_SNAPSHOT" in launcher
+    assert "train_dataset=$VALIDATED_SNAPSHOT/B5w.datasets.yaml" in launcher
+    assert '--snapshot-root "$SNAPSHOT_ROOT"' in launcher
     assert '"B2"|"B4"|"B5_8k")' in launcher
     assert "unsupported for the signed long-context release" in launcher
     b5w_branch = launcher.index('if [[ "$COND" == "B5w" ]]; then')
@@ -212,6 +215,10 @@ def test_training_does_not_expose_the_producer_attestation_key() -> None:
         "validate_training_export.py"
         in (ROOT / "scripts" / "train_swift.sh").read_text()
     )
+    swift_launcher = (ROOT / "scripts" / "train_swift.sh").read_text()
+    assert '"--dataset" "$VALIDATED_SNAPSHOT/$COND.jsonl"' in swift_launcher
+    assert '"--load_from_cache_file" "false"' in swift_launcher
+    assert '--snapshot-root "$SNAPSHOT_ROOT"' in swift_launcher
 
     evaluator = (ROOT / "scripts" / "eval_causal.py").read_text()
     assert "trust_remote_code=True" not in evaluator
@@ -853,7 +860,12 @@ def test_each_view_has_truthful_bucket_and_dependency() -> None:
     assert dependency_class_for_view(join_spec, minimal, "full") == "program_join"
 
 
-def test_b5w_uses_weight_without_duplicate_rows(tmp_path: Path) -> None:
+def test_b5w_uses_weight_without_duplicate_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "production")
+    monkeypatch.setenv(ROLE_KEY_ENVS["promotion"], TEST_ATTESTATION_KEY.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["promotion"], "probe-export-promotion-v1")
     row = {
         "world_id": "w1",
         "query_id": "w1:q",
@@ -1007,8 +1019,11 @@ def test_query_first_release_conditions_never_fall_back_to_late_rows(
 
 
 def test_sharegpt_export_keeps_full_cf_dossier_twins_atomic_under_cap(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "production")
+    monkeypatch.setenv(ROLE_KEY_ENVS["promotion"], TEST_ATTESTATION_KEY.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["promotion"], "probe-export-promotion-v1")
     base = {
         "world_id": "w1",
         "query_id": "w1:q",
@@ -1140,6 +1155,63 @@ def test_sharegpt_export_skips_an_oversized_unit_and_fills_with_later_rows(
         "first",
         "filler",
     ]
+
+
+def test_sharegpt_export_rejects_duplicate_messages_with_distinct_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(export_llamafactory, "sft_row_errors", lambda _row: [])
+    base = {
+        "world_id": "w1",
+        "query_id": "q1",
+        "view": "full",
+        "query_type": "contradiction",
+        "query_timing": "first",
+        "length_bucket": "16k",
+        "context": "same exported prompt",
+        "answer": "same exported answer",
+        "difficulty": {"context_tokens": 16_000, "max_evidence_distance": 1},
+        "content_hash": "producer-hash-1",
+    }
+    clone = {
+        **base,
+        "world_id": "w2",
+        "query_id": "q2",
+        "content_hash": "producer-hash-2",
+    }
+
+    with pytest.raises(ValueError, match="duplicate training content"):
+        write_condition(
+            [base, clone],
+            tmp_path / "B1.json",
+            token_budget=None,
+            upsample=False,
+        )
+
+
+def test_sharegpt_export_rejects_conflicting_answers_for_one_prompt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(export_llamafactory, "sft_row_errors", lambda _row: [])
+    base = {
+        "world_id": "w1",
+        "query_id": "q1",
+        "view": "full",
+        "query_type": "contradiction",
+        "query_timing": "first",
+        "length_bucket": "16k",
+        "context": "same exported prompt",
+        "answer": "answer one",
+        "difficulty": {"context_tokens": 16_000, "max_evidence_distance": 1},
+    }
+
+    with pytest.raises(ValueError, match="conflicting answers"):
+        write_condition(
+            [base, {**base, "query_id": "q2", "answer": "answer two"}],
+            tmp_path / "B1.json",
+            token_budget=None,
+            upsample=False,
+        )
 
 
 def test_sharegpt_export_does_not_let_the_first_unit_exceed_budget(
@@ -1381,6 +1453,7 @@ def test_quality_gate_rejects_exact_duplicates_and_fake_long_growth() -> None:
     }
     duplicate = dict(base)
     duplicate["base_task_id"] = "other"
+    duplicate["question"] = "metadata-only variant"
     long_row = dict(base)
     long_row.update(length_bucket="128k", context="long")
     long_row["difficulty"] = {"context_tokens": 128000}
@@ -2914,6 +2987,112 @@ def test_release_metadata_rejects_changed_tokenizer_assets(monkeypatch) -> None:
         expected_model_id="Qwen/Qwen3.5-4B",
         expected_revision="a" * 40,
         expected_asset_manifest_sha256="b" * 64,
+    )
+
+
+def test_failed_polluted_tokenizer_load_does_not_poison_retry(monkeypatch) -> None:
+    expected_digest = "b" * 64
+    asset_state = {"digest": "c" * 64}
+    loaded_token_counts: list[int] = []
+
+    class FakeTokenizer:
+        def __init__(self, token_count: int) -> None:
+            self.token_count = token_count
+
+        def encode(self, _context: str, *, add_special_tokens: bool) -> list[int]:
+            assert add_special_tokens is False
+            return list(range(self.token_count))
+
+    class FakeAutoTokenizer:
+        @staticmethod
+        def from_pretrained(*_args, **_kwargs) -> FakeTokenizer:
+            token_count = 16_000 if asset_state["digest"] != expected_digest else 16_001
+            loaded_token_counts.append(token_count)
+            return FakeTokenizer(token_count)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "transformers",
+        SimpleNamespace(AutoTokenizer=FakeAutoTokenizer),
+    )
+    monkeypatch.setattr(
+        quality_gate,
+        "resolved_tokenizer_asset_manifest_sha256",
+        lambda _model, _revision: asset_state["digest"],
+    )
+    row = {
+        "length_bucket": "16k",
+        "context": "bound context",
+        "tokenizer_context_tokens": 16_001,
+        "tokenizer_model_id": "test/fresh-tokenizer",
+        "tokenizer_revision": "a" * 40,
+        "tokenizer_asset_manifest_sha256": expected_digest,
+    }
+
+    assert not quality_gate._has_exact_band_metadata(
+        row,
+        expected_model_id="test/fresh-tokenizer",
+        expected_revision="a" * 40,
+        expected_asset_manifest_sha256=expected_digest,
+    )
+    asset_state["digest"] = expected_digest
+    assert quality_gate._has_exact_band_metadata(
+        row,
+        expected_model_id="test/fresh-tokenizer",
+        expected_revision="a" * 40,
+        expected_asset_manifest_sha256=expected_digest,
+    )
+    assert loaded_token_counts == [16_000, 16_001]
+
+
+def test_postload_tokenizer_digest_failure_does_not_poison_retry(monkeypatch) -> None:
+    expected_digest = "b" * 64
+    digests = iter((expected_digest, "c" * 64))
+    loaded_token_counts = iter((16_000, 16_001))
+
+    class FakeTokenizer:
+        def __init__(self, token_count: int) -> None:
+            self.token_count = token_count
+
+        def encode(self, _context: str, *, add_special_tokens: bool) -> list[int]:
+            assert add_special_tokens is False
+            return list(range(self.token_count))
+
+    class FakeAutoTokenizer:
+        @staticmethod
+        def from_pretrained(*_args, **_kwargs) -> FakeTokenizer:
+            return FakeTokenizer(next(loaded_token_counts))
+
+    monkeypatch.setitem(
+        sys.modules,
+        "transformers",
+        SimpleNamespace(AutoTokenizer=FakeAutoTokenizer),
+    )
+    monkeypatch.setattr(
+        quality_gate,
+        "resolved_tokenizer_asset_manifest_sha256",
+        lambda _model, _revision: next(digests, expected_digest),
+    )
+    row = {
+        "length_bucket": "16k",
+        "context": "bound context",
+        "tokenizer_context_tokens": 16_001,
+        "tokenizer_model_id": "test/postload-fresh-tokenizer",
+        "tokenizer_revision": "a" * 40,
+        "tokenizer_asset_manifest_sha256": expected_digest,
+    }
+
+    assert not quality_gate._has_exact_band_metadata(
+        row,
+        expected_model_id="test/postload-fresh-tokenizer",
+        expected_revision="a" * 40,
+        expected_asset_manifest_sha256=expected_digest,
+    )
+    assert quality_gate._has_exact_band_metadata(
+        row,
+        expected_model_id="test/postload-fresh-tokenizer",
+        expected_revision="a" * 40,
+        expected_asset_manifest_sha256=expected_digest,
     )
 
 

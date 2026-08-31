@@ -1,0 +1,722 @@
+"""Executable upstream proof gates for source-bound task replay candidates."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import re
+from collections import Counter
+from collections.abc import Callable, Sequence
+from itertools import pairwise
+from typing import Any
+
+from longworld.core.attestation import sanitized_attestation_environment
+from longworld.core.domainhistory import (
+    audit_kev_pipeline_candidate,
+    replay_kev_pipeline_candidate,
+)
+from longworld.core.financehistory import (
+    audit_finance_pipeline_candidate,
+    replay_finance_pipeline_selection,
+)
+from longworld.core.pack import SEP
+from longworld.core.taskreplaysidecar import (
+    CYBER_KEV_TASK_REPLAY_ADAPTER,
+    FINANCE_TASK_REPLAY_ADAPTER,
+    TASK_REPLAY_ADAPTER_REGISTRY,
+    TaskReplayRegistryKey,
+)
+from longworld.core.verify import Verification
+
+TASK_PROOF_RECEIPT_SCHEMA = "longworld.task-proof-receipt.v2"
+TokenCounter = Callable[[str], int]
+_WINDOW_BANDS = {"4k": 4_096, "8k": 8_192, "16k": 16_384}
+_SHA256 = re.compile(r"[0-9a-f]{64}")
+_COMMIT_SHA = re.compile(r"[0-9a-f]{40}")
+_LEXEME = re.compile(r"[^\W_]+", re.UNICODE)
+
+
+class TaskProofError(ValueError):
+    """A task candidate lacks one or more independently replayed proof gates."""
+
+
+def _canonical_sha256(value: object) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+
+
+def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
+    binding = candidate.get("task_replay_sidecar")
+    if (
+        not isinstance(binding, dict)
+        or set(binding)
+        != {
+            "adapter_id",
+            "adapter_revision",
+            "sidecar_schema_version",
+            "sha256",
+        }
+        or _SHA256.fullmatch(str(binding.get("sha256") or "")) is None
+    ):
+        raise TaskProofError("candidate task replay sidecar binding is invalid")
+    key = (
+        str(binding.get("adapter_id") or ""),
+        str(binding.get("adapter_revision") or ""),
+        str(binding.get("sidecar_schema_version") or ""),
+    )
+    if key not in TASK_REPLAY_ADAPTER_REGISTRY:
+        raise TaskProofError("candidate task replay adapter is not registered")
+    expected_domain = "cyber" if key == CYBER_KEV_TASK_REPLAY_ADAPTER else "finance"
+    if candidate.get("domain") != expected_domain:
+        raise TaskProofError("candidate task replay adapter and domain do not match")
+    expected_view = (
+        "ordered_artifact_view" if key == CYBER_KEV_TASK_REPLAY_ADAPTER else "full"
+    )
+    expected_composition = (
+        "causal_timeline"
+        if key == CYBER_KEV_TASK_REPLAY_ADAPTER
+        else "same_case_dossier"
+    )
+    if (
+        candidate.get("data_stage") != "candidate"
+        or candidate.get("training_objective") != "sft"
+        or candidate.get("view") != expected_view
+        or candidate.get("composition_method") != expected_composition
+        or not str(candidate.get("question") or "").strip()
+        or not str(candidate.get("answer") or "").strip()
+        or not str(candidate.get("cf_answer") or "").strip()
+    ):
+        raise TaskProofError("candidate task lifecycle or view contract is invalid")
+    if candidate.get("strict_replay_revision") != key[1]:
+        raise TaskProofError("candidate task replay revision does not match sidecar")
+    if key == CYBER_KEV_TASK_REPLAY_ADAPTER:
+        replay_contract = candidate.get("domain_history_replay_manifest")
+        replay_identity_valid = bool(
+            isinstance(replay_contract, dict)
+            and replay_contract.get("replay_revision") == key[1]
+        )
+    else:
+        replay_contract = candidate.get("finance_replay_contract")
+        replay_identity_valid = bool(
+            isinstance(replay_contract, dict)
+            and replay_contract.get("adapter_id") == key[0]
+            and replay_contract.get("revision") == key[1]
+        )
+    if not replay_identity_valid:
+        raise TaskProofError("candidate adapter replay contract is inconsistent")
+    if (
+        not str(candidate.get("tokenizer_model_id") or "").strip()
+        or _COMMIT_SHA.fullmatch(str(candidate.get("tokenizer_revision") or "")) is None
+        or _SHA256.fullmatch(
+            str(candidate.get("tokenizer_asset_manifest_sha256") or "")
+        )
+        is None
+    ):
+        raise TaskProofError("candidate exact tokenizer identity is incomplete")
+    return key
+
+
+def _artifact_pool(
+    candidate: dict[str, Any],
+) -> tuple[list[str], list[str], list[dict[str, Any]]]:
+    document_context = candidate.get("document_context")
+    classifications = candidate.get("artifact_classification")
+    if (
+        not isinstance(document_context, str)
+        or not document_context.strip()
+        or not isinstance(classifications, list)
+        or not classifications
+    ):
+        raise TaskProofError("candidate document body or classification is missing")
+    documents = document_context.split(SEP)
+    if len(documents) != len(classifications):
+        raise TaskProofError("candidate document body and classification are unbound")
+    artifact_ids: list[str] = []
+    normalized: list[dict[str, Any]] = []
+    for classification, document in zip(classifications, documents, strict=True):
+        if not isinstance(classification, dict):
+            raise TaskProofError("candidate artifact classification is malformed")
+        artifact_id = str(classification.get("artifact_id") or "")
+        if (
+            not artifact_id
+            or artifact_id in artifact_ids
+            or not document.strip()
+            or not str(classification.get("workflow_id") or "")
+            or classification.get("source_origin")
+            not in {"real_public", "real_private_export", "real_derived"}
+            or classification.get("workflow_kind") != "real_source_derived"
+            or classification.get("evidence_role")
+            not in {
+                "causal_gold",
+                "causal_supporting",
+                "natural_background",
+                "structural_hard_negative",
+            }
+            or not str(classification.get("provenance_id") or "")
+        ):
+            raise TaskProofError("candidate artifact classification is invalid")
+        artifact_ids.append(artifact_id)
+        normalized.append(classification)
+    return artifact_ids, documents, normalized
+
+
+def _adapter_audit(
+    candidate: dict[str, Any],
+    adapter_key: TaskReplayRegistryKey,
+    token_counter: TokenCounter,
+) -> dict[str, bool]:
+    try:
+        if adapter_key == CYBER_KEV_TASK_REPLAY_ADAPTER:
+            audit = audit_kev_pipeline_candidate(candidate, token_counter=token_counter)
+        elif adapter_key == FINANCE_TASK_REPLAY_ADAPTER:
+            audit = audit_finance_pipeline_candidate(candidate)
+        else:  # pragma: no cover - the closed registry is checked first
+            raise TaskProofError("task replay adapter is unsupported")
+    except TaskProofError:
+        raise
+    except Exception as error:
+        raise TaskProofError("task adapter audit could not inspect the body") from error
+    failed = sorted(name for name, passed in audit.items() if passed is not True)
+    if failed:
+        raise TaskProofError("task adapter audit failed: " + ",".join(failed))
+    return audit
+
+
+def _replay(
+    candidate: dict[str, Any],
+    adapter_key: TaskReplayRegistryKey,
+    artifact_ids: Sequence[str],
+    *,
+    counterfactual: bool = False,
+) -> dict[str, Any]:
+    if adapter_key == CYBER_KEV_TASK_REPLAY_ADAPTER:
+        return replay_kev_pipeline_candidate(
+            candidate,
+            evidence_artifact_ids=artifact_ids,
+            counterfactual=counterfactual,
+        )
+    if adapter_key == FINANCE_TASK_REPLAY_ADAPTER:
+        return replay_finance_pipeline_selection(
+            candidate,
+            artifact_ids,
+            counterfactual=counterfactual,
+        )
+    raise TaskProofError("task replay adapter is unsupported")
+
+
+def _lexemes(text: str) -> list[str]:
+    return [value.casefold() for value in _LEXEME.findall(text)]
+
+
+def _bm25_ranking(question: str, documents: list[str]) -> list[tuple[int, float]]:
+    query = Counter(_lexemes(question))
+    terms = [Counter(_lexemes(document)) for document in documents]
+    lengths = [sum(values.values()) for values in terms]
+    if not query or not terms or any(length < 1 for length in lengths):
+        raise TaskProofError("BM25 tokenization produced an empty query or document")
+    document_count = len(documents)
+    average_length = sum(lengths) / document_count
+    document_frequency = {
+        term: sum(term in values for values in terms) for term in query
+    }
+    scores: list[tuple[int, float]] = []
+    for index, (values, length) in enumerate(zip(terms, lengths, strict=True)):
+        score = 0.0
+        for term, query_frequency in query.items():
+            frequency = values.get(term, 0)
+            if not frequency:
+                continue
+            frequency_in_documents = document_frequency[term]
+            inverse_frequency = math.log(
+                1
+                + (document_count - frequency_in_documents + 0.5)
+                / (frequency_in_documents + 0.5)
+            )
+            denominator = frequency + 1.2 * (1 - 0.75 + 0.75 * length / average_length)
+            score += (
+                query_frequency
+                * inverse_frequency
+                * (frequency * (1.2 + 1) / denominator)
+            )
+        scores.append((index, score))
+    return sorted(scores, key=lambda item: (-item[1], item[0]))
+
+
+def _tfidf_ranking(question: str, documents: list[str]) -> list[tuple[int, float]]:
+    query_counts = Counter(_lexemes(question))
+    document_counts = [Counter(_lexemes(document)) for document in documents]
+    if not query_counts or any(not values for values in document_counts):
+        raise TaskProofError("TF-IDF tokenization produced an empty query or document")
+    document_count = len(documents)
+    vocabulary = set(query_counts)
+    document_frequency = {
+        term: sum(term in values for values in document_counts) for term in vocabulary
+    }
+    inverse_frequency = {
+        term: math.log((1 + document_count) / (1 + document_frequency[term])) + 1
+        for term in vocabulary
+    }
+    query_vector = {
+        term: frequency * inverse_frequency[term]
+        for term, frequency in query_counts.items()
+    }
+    query_norm = math.sqrt(sum(value * value for value in query_vector.values()))
+    if not query_norm:
+        raise TaskProofError("TF-IDF query vector is empty")
+    scores: list[tuple[int, float]] = []
+    for index, counts in enumerate(document_counts):
+        vector = {
+            term: counts.get(term, 0) * inverse_frequency[term] for term in vocabulary
+        }
+        norm = math.sqrt(sum(value * value for value in vector.values()))
+        score = (
+            sum(query_vector[term] * vector[term] for term in vocabulary)
+            / (query_norm * norm)
+            if norm
+            else 0.0
+        )
+        scores.append((index, score))
+    return sorted(scores, key=lambda item: (-item[1], item[0]))
+
+
+def _retrieval_proof(
+    *,
+    name: str,
+    ranking: list[tuple[int, float]],
+    artifact_ids: list[str],
+    replay_answer: Callable[[Sequence[str]], str],
+    expected_answer: str,
+) -> dict[str, Any]:
+    if len(ranking) < 3:
+        raise TaskProofError(f"{name} requires at least three ranked artifacts")
+    selected = [artifact_ids[index] for index, _score in ranking[:3]]
+    prefix_answers = [
+        replay_answer(selected[:prefix]) for prefix in range(1, len(selected) + 1)
+    ]
+    if expected_answer in prefix_answers:
+        solved_at = prefix_answers.index(expected_answer) + 1
+        raise TaskProofError(f"{name} top-{solved_at} retrieves the gold answer")
+    return {
+        "top3": [
+            {"artifact_id": artifact_ids[index], "score": format(score, ".17g")}
+            for index, score in ranking[:3]
+        ],
+        "prefix_answer_sha256": [
+            hashlib.sha256(answer.encode()).hexdigest() for answer in prefix_answers
+        ],
+        "top1_insufficient": prefix_answers[0] != expected_answer,
+        "all_prefixes_insufficient": True,
+    }
+
+
+def _artifact_token_spans(
+    documents: list[str], token_counter: TokenCounter
+) -> tuple[list[dict[str, int]], int]:
+    prefix_tokens = [0]
+    for stop in range(1, len(documents) + 1):
+        prefix_tokens.append(token_counter(SEP.join(documents[:stop])))
+    if any(
+        not isinstance(value, int) or isinstance(value, bool) or value < 1
+        for value in prefix_tokens[1:]
+    ) or any(left >= right for left, right in pairwise(prefix_tokens)):
+        raise TaskProofError("exact token counter produced invalid artifact spans")
+    return (
+        [
+            {"start_token": prefix_tokens[index], "end_token": prefix_tokens[index + 1]}
+            for index in range(len(documents))
+        ],
+        prefix_tokens[-1],
+    )
+
+
+def _contiguous_window_proof(
+    *,
+    artifact_ids: list[str],
+    documents: list[str],
+    spans: list[dict[str, int]],
+    full_tokens: int,
+    token_counter: TokenCounter,
+    replay_answer: Callable[[Sequence[str]], str],
+    expected_answer: str,
+) -> tuple[dict[str, Any], bool]:
+    if len(documents) != len(artifact_ids):
+        raise TaskProofError("contiguous window documents are unbound")
+    token_cache: dict[tuple[int, int], int] = {}
+
+    def exact_window_tokens(start: int, stop: int) -> int:
+        key = (start, stop)
+        if key not in token_cache:
+            token_cache[key] = token_counter(SEP.join(documents[start:stop]))
+        value = token_cache[key]
+        if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+            raise TaskProofError("exact token counter produced an invalid window")
+        return value
+
+    output: dict[str, Any] = {}
+    has_strict_evidence = False
+    for label, limit in _WINDOW_BANDS.items():
+        if limit >= full_tokens:
+            output[label] = {
+                "window_tokens": limit,
+                "status": "full_control",
+                "strict_window_count": 0,
+                "enumeration_sha256": None,
+            }
+            continue
+        enumerated: list[dict[str, Any]] = []
+        for start in range(len(artifact_ids)):
+            for stop in range(start + 1, len(artifact_ids) + 1):
+                if start == 0 and stop == len(artifact_ids):
+                    continue
+                span_tokens = exact_window_tokens(start, stop)
+                if span_tokens > limit:
+                    continue
+                selected = artifact_ids[start:stop]
+                answer = replay_answer(selected)
+                enumerated.append(
+                    {
+                        "start": start,
+                        "stop": stop,
+                        "span_tokens": span_tokens,
+                        "artifact_ids": selected,
+                        "answer_sha256": hashlib.sha256(answer.encode()).hexdigest(),
+                    }
+                )
+                if answer == expected_answer:
+                    raise TaskProofError(
+                        f"contiguous window {label} retrieves the gold answer: "
+                        f"{start}:{stop}"
+                    )
+        if not enumerated:
+            raise TaskProofError(f"contiguous window {label} has no actual evidence")
+        has_strict_evidence = True
+        output[label] = {
+            "window_tokens": limit,
+            "status": "insufficient",
+            "strict_window_count": len(enumerated),
+            "max_artifact_count": max(len(item["artifact_ids"]) for item in enumerated),
+            "max_span_tokens": max(item["span_tokens"] for item in enumerated),
+            "enumeration_sha256": _canonical_sha256(enumerated),
+        }
+    return output, has_strict_evidence
+
+
+def _complexity_valid(candidate: dict[str, Any], essential_ids: list[str]) -> bool:
+    graph = candidate.get("graph")
+    return bool(
+        len(essential_ids) >= 2
+        and isinstance(candidate.get("event_count"), int)
+        and not isinstance(candidate.get("event_count"), bool)
+        and int(candidate["event_count"]) >= 4
+        and isinstance(candidate.get("strict_support_event_count"), int)
+        and not isinstance(candidate.get("strict_support_event_count"), bool)
+        and int(candidate["strict_support_event_count"]) >= 2
+        and isinstance(graph, dict)
+        and isinstance(graph.get("proof_depth"), int)
+        and not isinstance(graph.get("proof_depth"), bool)
+        and int(graph["proof_depth"]) >= 2
+        and isinstance(graph.get("hop_count"), int)
+        and not isinstance(graph.get("hop_count"), bool)
+        and int(graph["hop_count"]) >= 2
+    )
+
+
+def _proof_input_sha256(candidate: dict[str, Any]) -> str:
+    return _canonical_sha256(
+        {
+            key: value
+            for key, value in candidate.items()
+            if key
+            not in {
+                "attestation",
+                "verification",
+                "view_verification",
+                "task_proof_receipt",
+            }
+        }
+    )
+
+
+def compute_task_proof(
+    candidate: dict[str, Any], *, token_counter: TokenCounter
+) -> dict[str, Any]:
+    """Compute proof fields for later embedding in a separately signed candidate."""
+    if not callable(token_counter):
+        raise TaskProofError("an exact token counter is required")
+    before = _canonical_sha256(candidate)
+    with sanitized_attestation_environment():
+        adapter_key = _adapter_key(candidate)
+        artifact_ids, documents, classifications = _artifact_pool(candidate)
+        adapter_audit = _adapter_audit(candidate, adapter_key, token_counter)
+        context = candidate.get("context")
+        if not isinstance(context, str) or not context.strip():
+            raise TaskProofError("candidate serialized context is missing")
+        observed_context_tokens = token_counter(context)
+        if (
+            not isinstance(observed_context_tokens, int)
+            or isinstance(observed_context_tokens, bool)
+            or observed_context_tokens < 1
+            or candidate.get("tokenizer_context_tokens") != observed_context_tokens
+            or candidate.get("actual_context_tokens") != observed_context_tokens
+        ):
+            raise TaskProofError("candidate exact token count does not recompute")
+        spans, document_context_tokens = _artifact_token_spans(documents, token_counter)
+
+        essential = candidate.get("essential_artifact_ids")
+        if (
+            not isinstance(essential, list)
+            or not essential
+            or len(essential) != len(set(essential))
+            or any(not isinstance(value, str) for value in essential)
+            or not set(essential) <= set(artifact_ids)
+        ):
+            raise TaskProofError("candidate essential artifact set is invalid")
+        essential_ids = [str(value) for value in essential]
+        essential_classes = {str(item["artifact_id"]): item for item in classifications}
+        classification_valid = all(
+            essential_classes[value].get("evidence_role") == "causal_gold"
+            for value in essential_ids
+        )
+        if not classification_valid:
+            raise TaskProofError(
+                "candidate essential classification is not causal gold"
+            )
+
+        replay_cache: dict[tuple[bool, tuple[str, ...]], dict[str, Any]] = {}
+
+        def replay(
+            selected: Sequence[str], *, counterfactual: bool = False
+        ) -> dict[str, Any]:
+            cache_key = (counterfactual, tuple(selected))
+            if cache_key not in replay_cache:
+                replay_cache[cache_key] = _replay(
+                    candidate,
+                    adapter_key,
+                    selected,
+                    counterfactual=counterfactual,
+                )
+            return replay_cache[cache_key]
+
+        def answer(selected: Sequence[str]) -> str:
+            return str(replay(selected).get("answer") or "")
+
+        expected_answer = str(candidate.get("answer") or "")
+        expected_cf_answer = str(candidate.get("cf_answer") or "")
+        full = replay(artifact_ids)
+        minimal = replay(essential_ids)
+        full_cf = replay(artifact_ids, counterfactual=True)
+        minimal_cf = replay(essential_ids, counterfactual=True)
+        empty_answer = answer([])
+        remove_one = [
+            {
+                "removed_artifact_id": removed,
+                "answer": answer(
+                    [value for value in essential_ids if value != removed]
+                ),
+            }
+            for removed in essential_ids
+        ]
+        singles = [
+            {"artifact_id": artifact_id, "answer": answer([artifact_id])}
+            for artifact_id in essential_ids
+        ]
+
+        relation_ids = candidate.get("source_relation_ids")
+        replay_authentic_edges = full.get("authentic_source_relation_edges")
+        replay_derived_edges = full.get("verified_derived_order_relation_edges")
+        candidate_derived_edges = candidate.get("verified_derived_order_relation_edges")
+        if replay_derived_edges is None:
+            replay_derived_edges = full.get("verified_derived_relation_edges")
+            candidate_derived_edges = candidate.get("verified_derived_relation_edges")
+        source_relations_valid = bool(
+            isinstance(relation_ids, list)
+            and relation_ids
+            and relation_ids == full.get("source_relation_ids")
+            and candidate.get("source_record_ids") == full.get("source_record_ids")
+            and isinstance(replay_authentic_edges, list)
+            and replay_authentic_edges
+            and candidate.get("authentic_source_relation_edges")
+            == replay_authentic_edges
+            and isinstance(replay_derived_edges, list)
+            and replay_derived_edges
+            and candidate_derived_edges == replay_derived_edges
+        )
+        answer_surface_free = bool(
+            expected_answer
+            and expected_answer not in str(candidate.get("document_context") or "")
+            and expected_answer not in str(candidate.get("question") or "")
+        )
+        body_and_source_valid = bool(adapter_audit) and all(adapter_audit.values())
+        complexity_valid = _complexity_valid(candidate, essential_ids)
+        if not source_relations_valid:
+            raise TaskProofError("task source relation replay is incomplete")
+        if not answer_surface_free:
+            raise TaskProofError(
+                "task answer is exposed on the question or body surface"
+            )
+        if not complexity_valid:
+            raise TaskProofError("task proof complexity is insufficient")
+
+        windows, has_strict_window_evidence = _contiguous_window_proof(
+            artifact_ids=artifact_ids,
+            documents=documents,
+            spans=spans,
+            full_tokens=document_context_tokens,
+            token_counter=token_counter,
+            replay_answer=answer,
+            expected_answer=expected_answer,
+        )
+        if not has_strict_window_evidence:
+            raise TaskProofError("contiguous windows have no strict sub-full evidence")
+        bm25 = _retrieval_proof(
+            name="BM25",
+            ranking=_bm25_ranking(str(candidate.get("question") or ""), documents),
+            artifact_ids=artifact_ids,
+            replay_answer=answer,
+            expected_answer=expected_answer,
+        )
+        lexical = _retrieval_proof(
+            name="lexical TF-IDF",
+            ranking=_tfidf_ranking(str(candidate.get("question") or ""), documents),
+            artifact_ids=artifact_ids,
+            replay_answer=answer,
+            expected_answer=expected_answer,
+        )
+
+        checks = {
+            "full_replay_sufficient": full.get("answer") == expected_answer,
+            "minimal_replay_sufficient": minimal.get("answer") == expected_answer,
+            "full_counterfactual_sufficient": full_cf.get("answer")
+            == expected_cf_answer,
+            "minimal_counterfactual_sufficient": minimal_cf.get("answer")
+            == expected_cf_answer,
+            "counterfactual_changes_answer": expected_cf_answer != expected_answer,
+            "remove_one_fails": bool(remove_one)
+            and all(item["answer"] != expected_answer for item in remove_one),
+            "single_essential_insufficient": bool(singles)
+            and all(item["answer"] != expected_answer for item in singles),
+            "empty_selection_insufficient": empty_answer != expected_answer,
+            "artifact_aligned_windows_insufficient": has_strict_window_evidence
+            and all(
+                item["status"] in {"insufficient", "full_control"}
+                for item in windows.values()
+            ),
+            "bm25_top1_insufficient": bm25["top1_insufficient"] is True,
+            "bm25_top3_prefixes_insufficient": bm25["all_prefixes_insufficient"]
+            is True,
+            "lexical_tfidf_top3_prefixes_insufficient": lexical[
+                "all_prefixes_insufficient"
+            ]
+            is True,
+            "body_and_classification_valid": body_and_source_valid
+            and classification_valid,
+            "answer_surface_free": answer_surface_free,
+            "source_relations_replayed": source_relations_valid,
+            "minimum_complexity_met": complexity_valid,
+            "exact_token_count_recomputed": True,
+        }
+        failed = sorted(name for name, passed in checks.items() if passed is not True)
+        if failed:
+            raise TaskProofError("task proof gates failed: " + ",".join(failed))
+
+        verification = Verification(
+            production_mode=False,
+            candidate_mode=True,
+            full_sufficient=checks["full_replay_sufficient"],
+            minimal_sufficient=checks["minimal_replay_sufficient"],
+            semantic_sufficient=checks["body_and_classification_valid"]
+            and checks["source_relations_replayed"],
+            strict_executable_sufficient=checks["full_replay_sufficient"],
+            remove_one_fails=checks["remove_one_fails"],
+            counterfactual_changes_answer=checks["counterfactual_changes_answer"],
+            counterfactual_replay_sufficient=checks["full_counterfactual_sufficient"]
+            and checks["minimal_counterfactual_sufficient"],
+            local_window_insufficient=False,
+            contiguous_windows_insufficient=False,
+            artifact_aligned_windows_insufficient=checks[
+                "artifact_aligned_windows_insufficient"
+            ],
+            closed_book_unsolved=checks["empty_selection_insufficient"],
+            distractor_invariance_gold=checks["minimal_replay_sufficient"],
+            surface_match=checks["full_replay_sufficient"],
+            schema_ok=checks["body_and_classification_valid"],
+            no_shortcut=False,
+            min_complexity=checks["minimum_complexity_met"],
+            bm25_top1_insufficient=checks["bm25_top1_insufficient"],
+            bm25_topk_insufficient=checks["bm25_top3_prefixes_insufficient"],
+            lexical_tfidf_topk_insufficient=checks[
+                "lexical_tfidf_top3_prefixes_insufficient"
+            ],
+            embedding_topk_insufficient=False,
+            question_only_unsolved=checks["empty_selection_insufficient"]
+            and checks["answer_surface_free"],
+            essential_single_doc_insufficient=checks["single_essential_insufficient"],
+            essential_surface_gold_free=checks["answer_surface_free"],
+            essential_text_grounded=checks["body_and_classification_valid"],
+        )
+        artifact_bindings = [
+            {
+                "artifact_id": artifact_id,
+                "text_sha256": hashlib.sha256(document.encode()).hexdigest(),
+                **span,
+            }
+            for artifact_id, document, span in zip(
+                artifact_ids, documents, spans, strict=True
+            )
+        ]
+        receipt: dict[str, Any] = {
+            "schema_version": TASK_PROOF_RECEIPT_SCHEMA,
+            "proof_input_sha256": _proof_input_sha256(candidate),
+            "adapter_id": adapter_key[0],
+            "adapter_revision": adapter_key[1],
+            "sidecar_schema_version": adapter_key[2],
+            "task_replay_sidecar_sha256": candidate["task_replay_sidecar"]["sha256"],
+            "tokenizer": {
+                "model_id": candidate.get("tokenizer_model_id"),
+                "revision": candidate.get("tokenizer_revision"),
+                "asset_manifest_sha256": candidate.get(
+                    "tokenizer_asset_manifest_sha256"
+                ),
+                "serialized_context_tokens": observed_context_tokens,
+                "document_context_tokens": document_context_tokens,
+            },
+            "artifact_bindings": artifact_bindings,
+            "essential_artifact_ids": essential_ids,
+            "replay": {
+                "full_answer": expected_answer,
+                "minimal_answer": str(minimal.get("answer") or ""),
+                "counterfactual_answer": expected_cf_answer,
+                "empty_answer": empty_answer,
+                "remove_one": remove_one,
+                "single_essential": singles,
+            },
+            "window_scope": "artifact_aligned",
+            "artifact_aligned_windows": windows,
+            "retrieval": {"bm25": bm25, "lexical_tfidf": lexical},
+            "adapter_audit": adapter_audit,
+            "checks": checks,
+        }
+        receipt["receipt_sha256"] = _canonical_sha256(receipt)
+        result = {
+            "verification": verification.model_dump(),
+            "view_verification": {
+                "expected_answer": expected_answer,
+                "strict_replay_answer": expected_answer,
+                "essential_present": True,
+                "semantic_text_grounded": verification.essential_text_grounded,
+                "classification_ok": classification_valid,
+                "global_proof_green": False,
+                "production_eligible": False,
+            },
+            "task_proof_receipt": receipt,
+        }
+    if _canonical_sha256(candidate) != before:
+        raise TaskProofError("task proof computation mutated the candidate")
+    return result

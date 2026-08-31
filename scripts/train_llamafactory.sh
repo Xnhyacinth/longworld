@@ -30,6 +30,7 @@ CFG="$ROOT/configs/llamafactory/${COND}.yaml"
 LF_ROOT="${LLAMA_FACTORY_ROOT:-$ROOT/.vendor/LLaMA-Factory}"
 GPUS="${GPUS:-0}"
 HOLD="${HOLD_SH:-}"
+VALIDATED_SNAPSHOT=""
 if [[ "${SKIP_HOLD:-0}" != "1" && -z "$HOLD" && -x /workspace/wynckeliao/ops/gpu/hold.sh ]]; then
   HOLD="/workspace/wynckeliao/ops/gpu/hold.sh"
 fi
@@ -54,6 +55,13 @@ if [[ "$COND" =~ ^B(1|2|3|4|5|5w)$ ]]; then
   if [[ ! -x "$VERIFY_PY" ]]; then
     VERIFY_PY=python
   fi
+  SNAPSHOT_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/longworld-training.XXXXXX")"
+  chmod 700 "$SNAPSHOT_ROOT"
+  cleanup_training_snapshot() {
+    chmod -R u+w "$SNAPSHOT_ROOT" 2>/dev/null || true
+    rm -rf -- "$SNAPSHOT_ROOT"
+  }
+  trap cleanup_training_snapshot EXIT
   VERIFY_ARGS=(
     --manifest "$TRAINING_MANIFEST"
     --release-profile "$RELEASE_PROFILE"
@@ -73,7 +81,27 @@ if [[ "$COND" =~ ^B(1|2|3|4|5|5w)$ ]]; then
       --dataset-file "$COND.json"
     )
   fi
-  "$VERIFY_PY" "$ROOT/scripts/validate_training_export.py" "${VERIFY_ARGS[@]}"
+  VALIDATION_JSON="$(
+    "$VERIFY_PY" "$ROOT/scripts/validate_training_export.py" \
+      "${VERIFY_ARGS[@]}" --snapshot-root "$SNAPSHOT_ROOT"
+  )"
+  VALIDATED_SNAPSHOT="$(
+    "$VERIFY_PY" -c 'import json,sys
+value = json.load(sys.stdin).get("snapshot_dir")
+if not isinstance(value, str) or not value:
+    raise SystemExit("training validator did not return a snapshot")
+print(value)
+' <<<"$VALIDATION_JSON"
+  )"
+  case "$VALIDATED_SNAPSHOT" in
+    "$SNAPSHOT_ROOT"/*) ;;
+    *) echo "training validator returned an invalid snapshot path" >&2; exit 1 ;;
+  esac
+  if [[ ! -d "$VALIDATED_SNAPSHOT" || -L "$VALIDATED_SNAPSHOT" ]]; then
+    echo "validated training snapshot is missing or unsafe" >&2
+    exit 1
+  fi
+  printf '%s\n' "$VALIDATION_JSON"
 fi
 
 # Validation is complete; producer credentials must not reach model code.
@@ -152,6 +180,13 @@ print("fa3" if want == "fa3" and fa3_ok() else ("fa2" if fa2_ok() else "sdpa"))
 ATTN="${FLASH_ATTN_OVERRIDE:-$(detect_flash_attn)}"
 GBS="${GBS:-0}"
 EXTRA=("$@")
+if [[ -n "$VALIDATED_SNAPSHOT" ]]; then
+  if [[ "$COND" == "B5w" ]]; then
+    EXTRA+=("train_dataset=$VALIDATED_SNAPSHOT/B5w.datasets.yaml")
+  else
+    EXTRA+=("dataset_dir=$VALIDATED_SNAPSHOT")
+  fi
+fi
 USE_V1="${USE_V1:-0}"
 if [[ "$COND" == v1_* ]]; then
   USE_V1=1

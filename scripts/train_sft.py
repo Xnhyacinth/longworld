@@ -210,7 +210,17 @@ def main() -> None:
     except (TypeError, ValueError) as error:
         raise SystemExit(str(error)) from error
     rows = list(product.train_rows)
+    if rows and all(sft_row_errors(row) for row in rows):
+        raise SystemExit(
+            "no source row has a valid role-bound v2 SFT attestation; configure "
+            "the signed release trust environment or regenerate legacy rows"
+        )
     filtered = filter_rows(rows, args.condition, args.length_bucket)
+    if not filtered:
+        raise SystemExit(
+            "no rows remain after filtering for the requested condition and "
+            "length bucket"
+        )
     rng = random.Random(7)
     rng.shuffle(filtered)
 
