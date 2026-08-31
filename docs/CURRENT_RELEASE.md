@@ -72,13 +72,49 @@ and after a fresh load, but production still requires the resolved tokenizer
 asset snapshot itself to be mounted read-only or isolated from the audit
 process; local write access is not a production trust root.
 
-The final frozen repository regression is **1,409 passed / 1 expected xfail**;
-Ruff, focused MyPy, compileall, Bash syntax, and `git diff --check` also pass.
+The final post-fix repository regression is **1,496 passed / 1 expected
+xfail**; focused tests, Ruff, MyPy, compileall, Bash syntax, and
+`git diff --check` also pass.
 
 The evidence, exact hashes, baseline-scale comparison, and evaluation matrix are
 recorded in `reports/p12_baseline_promotion_scaleout_20260831.md`. This progress
 does not authorize a new HF training release; 48/210 remain blocked behind the
 12 complete source-bound world gate and independent production trust.
+
+## Godot raw-proof capacity and BEA source inventory
+
+The complete Godot allowlisted history scan retained **41 standalone audited
+CPT rows / 1,370,439 exact Qwen tokens**: 23×16K, 11×32K, 4×64K, 3×128K,
+and 0×256K. Targets were capacity ceilings, so no row was copied or padded.
+The independent report replayed all 40 source manifests, 39,499 commits in the
+contiguous approved-license suffix, raw commit/tree/blob path proofs, exact
+token counts, source-event/span/truncation gates, and the reconstructed
+training export. It found zero exact context/source-body duplicates and zero
+cross-band source-record/event overlap. The retained data contains 965 unique
+commits, 2,232 records, 41 windows, and 24 accepted base workflows.
+
+The first audit correctly rejected a manifest that counted one repository as
+one workflow instead of counting row `base_workflow_id` values. The producer
+was fixed and the release rebuilt from 40 authenticated extraction checkpoints;
+the final signed audit passes. See
+`reports/p12_godot_raw_replay_bea_20260831.md`.
+
+Godot is not yet added to the canonical 3,006-row mutually disjoint union. The
+current local-probe root cannot verify the historical pandas source-role
+signatures, and the old source key is unavailable. Cross-release subtraction
+therefore fails closed rather than re-signing historical provenance. The
+canonical inventory remains **3,006 rows / 286,634,406 tokens**; Godot is
+reported separately until a legitimate old verification root is restored or
+the references are independently re-imported.
+
+A live fixed-URL BEA GDP/GDI workbook fetch bound 74,180 raw bytes to 3,959
+cell-provenanced observations, 3,567 temporal relations, and 384 trajectories
+of depth 3–16. Of those relations, 2,935 are answer-changing revisions and 632
+are unchanged-value supersessions. This is source inventory only: it has no
+long rendering, sidecar replay, promotion, or training rows. The macro,
+visual-compatibility, and game-compatibility modules likewise remain disabled
+nonproduction prototypes. Production/train-ready rows remain zero; no HF
+upload is authorized.
 
 ## Longitudinal 64K/128K CPT candidate
 
