@@ -1,6 +1,6 @@
 # Current release status
 
-Last updated: 2026-08-30
+Last updated: 2026-08-31
 
 This file is the canonical publication-status summary. Historical receipts and
 `.hl/` logs remain useful for reproducibility, but they do not override this
@@ -20,7 +20,65 @@ outside the repository, and credentials must remain outside Git.
 
 The remote contains 19 release payload files plus the Hub-managed
 `.gitattributes`; the payload matches the local immutable P6 v4 staging package.
-There is currently no missing HF upload.
+No P6 payload is missing; no P12 production upload is authorized.
+
+## 2026-08-31 task replay and baseline checkpoint
+
+LongWorld model accuracy remains **unmeasured**: no checkpoint has yet been
+trained and evaluated under a fixed baseline protocol. The current local
+inventory is 3,006 content-audited CPT rows / 286,634,406 exact Qwen tokens and
+12 promotion-v2 SFT rows / 2 worlds / 454,846 tokens. Production/KMS-qualified
+rows remain zero.
+
+Cyber and Finance now emit closed, source-role-signed task replay sidecars,
+portable v2 replay registries, and signed per-world/per-band candidate content
+commitments. Fresh Cyber v7 and Finance v4 16/32/64K candidates were
+dense-ranked and produced 6/6 local-probe diagnostic auditor receipts. Those
+receipts recompute source/body/relation bindings, full/minimal/CF,
+remove-one/single/empty replay, artifact-aligned 4K/8K/16K checks, BM25/TF-IDF,
+dense top-3 insufficiency, and full-pool strict replay. Final review established
+that artifact-boundary enumeration is not an exhaustive tokenizer-offset
+sliding-window proof. The receipt now labels that scope explicitly and leaves
+the generic local/contiguous-window and no-shortcut fields false. Consequently
+all six candidates remain `train_ready=false`; task promotion is blocked before
+the later 12-world and independent production-trust gates. Candidate-declared
+proof fields are now forbidden rather than ignored. Training-message identity
+is recomputed from `context+answer` at preflight, audit, selection, promotion,
+report, quality-gate, and export boundaries; metadata-only clones and prompt
+conflicts fail closed. Strict support counts come from adapter replay, and
+candidate relabeling cannot create causal-supporting growth. The final scoped-v5
+audit digests are `edd1c9cb2c566dce45707da23342baa47c7b83f4ea96a9f09e493302d94fefbd`
+for Cyber and `899f846e374f7092c4b68484aecff7fc4be5ff00857cb0bdb96e99c692247b2a`
+for Finance; both record `global_proof_green=false`. Deno's pinned rerun
+retained only three 64K views at 65,496 tokens each; 16/32K were correctly
+rejected for `strict_support_overflow`.
+
+Task audit now signs a v2 semantic commitment covering replay/growth plus every
+stable field consumed by diversity and real-source quotas: motif, base task,
+answer program, executable proof, semantic task, source family/workflow/token
+ratio, and source relation identity. World selection binds each candidate to
+that commitment; task promotion requires the signed selection; the train-ready
+report recomputes the commitment from the actual row. Promotion-role re-signing
+therefore cannot manufacture semantic or source diversity.
+
+The signed LLaMA-Factory training path now consumes a post-validation, private
+content-addressed snapshot rather than mutable export paths. Snapshot
+materialization streams and rehashes every manifest-bound output, preserves
+relative paths, publishes only after all outputs pass, and rejects replaceable
+or foreign-owned temporary parents. Swift snapshot wiring is present, but Swift
+v2 intentionally remains fail-closed until it has its own executable
+deterministic transform validator. A signed tokenizer digest is checked before
+and after a fresh load, but production still requires the resolved tokenizer
+asset snapshot itself to be mounted read-only or isolated from the audit
+process; local write access is not a production trust root.
+
+The final frozen repository regression is **1,409 passed / 1 expected xfail**;
+Ruff, focused MyPy, compileall, Bash syntax, and `git diff --check` also pass.
+
+The evidence, exact hashes, baseline-scale comparison, and evaluation matrix are
+recorded in `reports/p12_baseline_promotion_scaleout_20260831.md`. This progress
+does not authorize a new HF training release; 48/210 remain blocked behind the
+12 complete source-bound world gate and independent production trust.
 
 ## Longitudinal 64K/128K CPT candidate
 
@@ -75,19 +133,21 @@ ten complete rows to signed-source-body overlap with earlier releases. The final
 records. The audit recursively replays two pinned prior releases and finds zero
 remaining source-body, event, or context overlap.
 
-Across the three mutually disjoint current longitudinal/multiband CPT releases,
-the local candidate inventory is now **2,625 rows and 255,283,343 exact context
-tokens**: 133×16K, 136×32K, 1,111×64K, 1,109×128K, and 136×256K. These are
-non-round natural capacity counts except for the earlier configured 1,000-row
-64K/128K quotas. They span eleven repositories in one Git-history source family.
+Across the five mutually disjoint current longitudinal/multiband CPT releases,
+the local candidate inventory is now **3,006 rows and 286,634,406 exact context
+tokens**: 300×16K, 253×32K, 1,111×64K, 1,109×128K, and 233×256K. The earlier
+1,000-row 64K/128K groups are configured quotas; the remaining counts are filtered
+source capacity. The newest Bitcoin/pandas 381-row increment alone has the explicit
+minimum-span and truncation-quality replay gates; older rows must not be described
+as having passed those two later gates.
 
 This does not yet establish broad semantic diversity. The new wave is 51.4%
 scikit-learn, 45.1% DuckDB, and 3.5% Flask; 84.9% of its rows span less than 30
 days, and only 1.1% span at least one year. It proves real chronological,
 multi-commit, non-copied CPT contexts, not answer-changing long-range dependence.
-All three releases remain `train_ready=false` and `production_eligible=false`.
-Godot, Bitcoin, and pandas are allowlisted future source capacity, not retained
-data.
+All five releases remain `train_ready=false` and `production_eligible=false`.
+Godot remains allowlisted future capacity; Bitcoin and pandas are retained in the
+newest 381-row audited increment.
 
 ## Earlier source-native long-document CPT candidate
 
@@ -168,14 +228,16 @@ ignored non-world candidates with zero training rows. See
 `reports/p12_executable_domains_strict_growth_20260830.md`; none of these
 diagnostics is qualified or uploadable training data.
 
-The first cumulative-domain materialization now adds one real CISA KEV catalog
+The first cumulative-domain materialization added one real CISA KEV catalog
 task at 16,201/32,125/64,125 exact tokens. The three strict prefixes contain
 82/159/314 unique records, 81/158/313 authentic catalog-membership relations,
 and 80/157/312 verified-derived chronological edges. All per-row replay, actual
 CF, remove-one, single-evidence, corruption, digest, exact-band, and cumulative
 growth checks pass. These are deliberately unsigned candidate histories with
 `real_source_verified=false`, `complete_world=false`, and `train_ready=false`;
-they add one executable task, not three worlds or training rows. Clinical and
+they add one executable task, not three worlds or training rows. This historical
+candidate-history snapshot is superseded by the source-signed v7 pipeline and
+its 3/3 task audits summarized above. Clinical and
 Regulation remain capacity-rejected at 5,167 and 748 source-body tokens. See
 `reports/p12_domain_history_wave1_20260830.md`.
 
@@ -532,20 +594,21 @@ chain. Trust-valid P12 publication therefore remains zero; 48/210 remain
 blocked.
 
 The finance cumulative-history adapter now materializes one additional
-candidate-only Amazon 2021--2024 annual-report task at 16,078 / 32,478 / 64,203
+candidate-only Amazon 2021--2024 annual-report task at 16,082 / 32,482 / 64,207
 exact Qwen tokens. The bands add 2/3/4 filings, 18/27/36 essential fact rows,
 and 19/29/39 answer-bearing source relations. Executed CF, per-essential remove-one,
 digest-consistent semantic corruption, exact-span replay, and cumulative growth
-all pass. The three rows remain outside the qualified union because common
-dense retrieval, signed promotion-v2 replay, and the 12-world release gate have
-not run.
+all pass. Shared dense ranking produces 3/3 signed local-probe diagnostic audits,
+including explicitly scoped artifact-aligned windows and auditor-recomputed
+growth metrics. These are not generic token-offset window proofs, so task
+promotion is blocked. The later 12-world release selection and independent
+production-trust gates also have not run.
 
 Replay data, source bytes, releases, and pinned model caches remain under
-`/workspace/wynckeliao`. The workspace permission controller repeatedly restores
-shared ACLs on the top-level credential directory, so runners correctly reject
-that path. A byte-identical active local-probe credential mirror is temporarily
-held under a 0700/0600, ACL-free `/root` path; it is execution authority only,
-not durable data or production trust. Reproduction still requires a locally
+`/workspace/wynckeliao`. The active role-separated local-probe trust root is now
+persisted outside Git at `/workspace/wynckeliao/.longworld-private/` with
+0700/0600 permissions and inherited ACLs removed; it is execution authority only,
+not production KMS trust. Reproduction still requires a locally
 resolvable model snapshot whose fresh manifest equals the signed digest. No new
 HF dataset upload is part of this cycle; code and release-status synchronization
 use GitHub only after final review.
@@ -557,8 +620,8 @@ use GitHub only after final review.
 | Current promotion-v2 local-probe union |               2 |              12 |              454,846 | Strict current-code rows; arXiv/ResearchLab only; 12-world target not evaluated |
 | Longitudinal Git-history CPT candidate |               0 |           2,000 |          192,731,120 | Eight repos; 71,294 non-reused commit events; local CPT candidate only          |
 | Historical pre-v2 union                |               5 |              35 |            1,347,609 | Regeneration inputs only; obsolete replay-growth schema                         |
-| CISA KEV candidate history             |               0 |               3 |              112,451 | One unsigned executable task × three bands; not promotion-v2                    |
-| Amazon finance candidate history       |               0 |               3 |              112,759 | Four issuer-owned annual filings; candidate-only, not promotion-v2              |
+| CISA KEV task-audited candidates       |               0 |               3 |              112,895 | One source-signed local-probe task × three bands; 3/3 audit, not selected       |
+| Amazon finance task-audited candidates |               0 |               3 |              112,771 | Four issuer-owned filings; 3/3 local-probe audit, not selected                  |
 | dprint incomplete candidate history    |               0 |               5 |              229,180 | 16K/64K only; rejected because the complete 32K band is absent                  |
 | P12 production/KMS release             |               0 |               0 |                    0 | Independent approval and the 12-world multidomain union remain blocked          |
 
