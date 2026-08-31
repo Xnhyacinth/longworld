@@ -14,11 +14,17 @@ from collections.abc import Callable, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import date
-from itertools import pairwise
+from itertools import combinations, pairwise
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from longworld.core.attestation import (
+    LOCAL_PROBE_TRUST_ISOLATION_FIELD,
+    attach_attestation,
+    verify_attestation,
+)
+from longworld.core.pack import SEP, wrap_prompt
 from longworld.core.provenance import (
     MAX_SOURCE_BYTES,
     ProvenanceError,
@@ -28,6 +34,7 @@ from longworld.core.provenance import (
 
 DOMAIN_CUMULATIVE_HISTORY_SCHEMA = "longworld.domain-cumulative-history.v1"
 KEV_HISTORY_REPLAY_REVISION = "longworld.kev-catalog-history-replay.v1"
+KEV_PIPELINE_REPLAY_MANIFEST_SCHEMA = "longworld.kev-history-replay-manifest.v1"
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _CVE_ID = re.compile(r"^CVE-(?:1999|2\d{3})-\d{4,}$")
@@ -715,3 +722,614 @@ def audit_cumulative_history(rows: Sequence[dict[str, Any]]) -> list[str]:
         ):
             errors.append(f"semantic_tokens_not_growing:{label}")
     return errors
+
+
+def _pipeline_document_records(document: str) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for line in document.splitlines():
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as error:
+            raise ProvenanceError("KEV pipeline document has invalid JSON") from error
+        if not isinstance(record, dict) or _canonical_json(record) != line:
+            raise ProvenanceError("KEV pipeline document record is not canonical")
+        records.append(record)
+    if not records:
+        raise ProvenanceError("KEV pipeline document is empty")
+    return records
+
+
+def _source_file_binding(name: str, sha256: str) -> dict[str, str]:
+    if Path(name).name != name or not name or _SHA256.fullmatch(sha256) is None:
+        raise ProvenanceError("KEV replay source file binding is invalid")
+    return {"name": name, "sha256": sha256}
+
+
+def build_kev_pipeline_replay_manifest(
+    *,
+    source_binding: dict[str, Any],
+    source_manifest_name: str,
+    source_response_name: str,
+    tokenizer_model_id: str,
+    tokenizer_revision: str,
+    tokenizer_asset_manifest_sha256: str,
+    source_attestation_key: bytes,
+) -> dict[str, Any]:
+    """Build a source-role sidecar for future registered Cyber replay."""
+    required_binding = {
+        "source_url",
+        "observed_at",
+        "retrieval_sha256",
+        "signed_manifest_sha256",
+    }
+    if set(source_binding) != required_binding:
+        raise ProvenanceError("KEV replay source binding is invalid")
+    source_url = str(source_binding.get("source_url") or "")
+    parsed_url = urlparse(source_url)
+    if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+        raise ProvenanceError("KEV replay source URL is invalid")
+    _parse_timestamp(str(source_binding.get("observed_at") or ""), "observed_at")
+    if (
+        not tokenizer_model_id
+        or _COMMIT_SHA.fullmatch(tokenizer_revision) is None
+        or _SHA256.fullmatch(tokenizer_asset_manifest_sha256) is None
+    ):
+        raise ProvenanceError("KEV replay tokenizer identity is invalid")
+    source_manifest = _source_file_binding(
+        source_manifest_name, str(source_binding["signed_manifest_sha256"])
+    )
+    source_response = _source_file_binding(
+        source_response_name, str(source_binding["retrieval_sha256"])
+    )
+    payload: dict[str, Any] = {
+        "schema_version": KEV_PIPELINE_REPLAY_MANIFEST_SCHEMA,
+        "data_stage": "source_replay_manifest",
+        "source_kind": "cisa_known_exploited_vulnerabilities_catalog",
+        "workflow_kind": "real_source_derived",
+        "strict_replay_revision": KEV_HISTORY_REPLAY_REVISION,
+        "source_binding": deepcopy(source_binding),
+        "source_manifest": source_manifest,
+        "source_response": source_response,
+        "tokenizer": {
+            "model_id": tokenizer_model_id,
+            "revision": tokenizer_revision,
+            "asset_manifest_sha256": tokenizer_asset_manifest_sha256,
+        },
+        "train_ready": False,
+        "production_eligible": False,
+    }
+    return attach_attestation(
+        payload, source_attestation_key, purpose="source_manifest"
+    )
+
+
+def verify_kev_pipeline_replay_manifest_bytes(
+    raw: bytes, source_attestation_key: bytes
+) -> dict[str, Any]:
+    """Verify the exact serialized source sidecar and its closed schema."""
+    try:
+        manifest = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ProvenanceError("KEV replay manifest is not valid UTF-8 JSON") from error
+    if not isinstance(manifest, dict):
+        raise ProvenanceError("KEV replay manifest must be an object")
+    if not verify_attestation(
+        manifest, source_attestation_key, purpose="source_manifest"
+    ):
+        raise ProvenanceError("KEV replay manifest attestation is invalid")
+    expected_fields = {
+        "schema_version",
+        "data_stage",
+        "source_kind",
+        "workflow_kind",
+        "strict_replay_revision",
+        "source_binding",
+        "source_manifest",
+        "source_response",
+        "tokenizer",
+        "train_ready",
+        "production_eligible",
+        "attestation",
+    }
+    if LOCAL_PROBE_TRUST_ISOLATION_FIELD in manifest:
+        expected_fields.add(LOCAL_PROBE_TRUST_ISOLATION_FIELD)
+    source_binding = manifest.get("source_binding")
+    source_manifest = manifest.get("source_manifest")
+    source_response = manifest.get("source_response")
+    tokenizer = manifest.get("tokenizer")
+    if (
+        set(manifest) != expected_fields
+        or manifest.get("schema_version") != KEV_PIPELINE_REPLAY_MANIFEST_SCHEMA
+        or manifest.get("data_stage") != "source_replay_manifest"
+        or manifest.get("source_kind") != "cisa_known_exploited_vulnerabilities_catalog"
+        or manifest.get("workflow_kind") != "real_source_derived"
+        or manifest.get("strict_replay_revision") != KEV_HISTORY_REPLAY_REVISION
+        or manifest.get("train_ready") is not False
+        or manifest.get("production_eligible") is not False
+        or not isinstance(source_binding, dict)
+        or set(source_binding)
+        != {
+            "source_url",
+            "observed_at",
+            "retrieval_sha256",
+            "signed_manifest_sha256",
+        }
+        or not isinstance(source_manifest, dict)
+        or set(source_manifest) != {"name", "sha256"}
+        or not isinstance(source_response, dict)
+        or set(source_response) != {"name", "sha256"}
+        or not isinstance(tokenizer, dict)
+        or set(tokenizer) != {"model_id", "revision", "asset_manifest_sha256"}
+        or not str(tokenizer.get("model_id") or "")
+        or _COMMIT_SHA.fullmatch(str(tokenizer.get("revision") or "")) is None
+        or _SHA256.fullmatch(str(tokenizer.get("asset_manifest_sha256") or "")) is None
+    ):
+        raise ProvenanceError("KEV replay manifest contract is invalid")
+    source_url = urlparse(str(source_binding.get("source_url") or ""))
+    if source_url.scheme not in {"http", "https"} or not source_url.netloc:
+        raise ProvenanceError("KEV replay manifest source URL is invalid")
+    _parse_timestamp(str(source_binding.get("observed_at") or ""), "observed_at")
+    _source_file_binding(
+        str(source_manifest.get("name") or ""),
+        str(source_manifest.get("sha256") or ""),
+    )
+    _source_file_binding(
+        str(source_response.get("name") or ""),
+        str(source_response.get("sha256") or ""),
+    )
+    if source_manifest.get("sha256") != source_binding.get(
+        "signed_manifest_sha256"
+    ) or source_response.get("sha256") != source_binding.get("retrieval_sha256"):
+        raise ProvenanceError("KEV replay manifest source digests disagree")
+    return manifest
+
+
+def kev_pipeline_replay_manifest_binding(
+    raw: bytes, source_attestation_key: bytes
+) -> dict[str, str]:
+    """Return the exact binding serialized into each candidate row."""
+    manifest = verify_kev_pipeline_replay_manifest_bytes(raw, source_attestation_key)
+    source_binding = manifest["source_binding"]
+    assert isinstance(source_binding, dict)
+    return {
+        "schema_version": KEV_PIPELINE_REPLAY_MANIFEST_SCHEMA,
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "source_manifest_sha256": str(source_binding["signed_manifest_sha256"]),
+        "source_response_sha256": str(source_binding["retrieval_sha256"]),
+        "replay_revision": KEV_HISTORY_REPLAY_REVISION,
+    }
+
+
+def _pipeline_record_id(record: dict[str, Any]) -> str:
+    if record.get("record_type") == "catalog_snapshot":
+        record_id = str(record.get("source_record_id") or "")
+    else:
+        payload = record.get("source_payload")
+        record_id = (
+            f"cisa-kev:{payload.get('cveID')}" if isinstance(payload, dict) else ""
+        )
+    if not record_id:
+        raise ProvenanceError("KEV pipeline source record identity is invalid")
+    return record_id
+
+
+def _pipeline_documents(context: str, count: int) -> list[str]:
+    lines = context.splitlines()
+    if count < 4 or count > len(lines):
+        raise ProvenanceError("KEV pipeline document shard count is invalid")
+    base, remainder = divmod(len(lines), count)
+    documents: list[str] = []
+    cursor = 0
+    for index in range(count):
+        width = base + (index < remainder)
+        documents.append("\n".join(lines[cursor : cursor + width]))
+        cursor += width
+    return documents
+
+
+def replay_kev_pipeline_candidate(
+    candidate: dict[str, Any],
+    *,
+    counterfactual: bool = False,
+    evidence_artifact_ids: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    """Replay one standard serialized KEV candidate from its document bodies."""
+    try:
+        document_context = candidate.get("document_context")
+        classifications = candidate.get("artifact_classification")
+        if (
+            not isinstance(document_context, str)
+            or not isinstance(classifications, list)
+            or not classifications
+        ):
+            raise ProvenanceError("KEV pipeline artifact pool is missing")
+        documents = document_context.split(SEP)
+        if len(documents) != len(classifications):
+            raise ProvenanceError("KEV pipeline artifact pool is unbound")
+        available_artifact_ids = [
+            str(item.get("artifact_id") or "")
+            for item in classifications
+            if isinstance(item, dict)
+        ]
+        if (
+            len(available_artifact_ids) != len(classifications)
+            or "" in available_artifact_ids
+            or len(available_artifact_ids) != len(set(available_artifact_ids))
+        ):
+            raise ProvenanceError("KEV pipeline artifact identities are invalid")
+        selected_artifact_ids: set[str] | None = None
+        if evidence_artifact_ids is not None:
+            selected_values = list(evidence_artifact_ids)
+            if (
+                isinstance(evidence_artifact_ids, (str, bytes))
+                or any(
+                    not isinstance(value, str) or not value for value in selected_values
+                )
+                or len(selected_values) != len(set(selected_values))
+                or not set(selected_values) <= set(available_artifact_ids)
+            ):
+                raise ProvenanceError("KEV pipeline evidence selection is invalid")
+            selected_artifact_ids = set(selected_values)
+        context_records: list[dict[str, Any]] = []
+        evidence_ids: list[str] = []
+        for document, classification in zip(documents, classifications, strict=True):
+            if not isinstance(classification, dict):
+                raise ProvenanceError("KEV pipeline classification is malformed")
+            artifact_id = str(classification.get("artifact_id") or "")
+            records = _pipeline_document_records(document)
+            context_records.extend(records)
+            if selected_artifact_ids is None or artifact_id in selected_artifact_ids:
+                evidence_ids.extend(_pipeline_record_id(record) for record in records)
+        task = {
+            "context": "\n".join(_canonical_json(record) for record in context_records),
+            "counterfactual_twin": deepcopy(candidate.get("counterfactual_twin")),
+        }
+        return replay_kev_catalog_history(
+            task,
+            counterfactual=counterfactual,
+            evidence_ids=evidence_ids if selected_artifact_ids is not None else None,
+        )
+    except (KeyError, TypeError, ValueError, ProvenanceError):
+        return {
+            "answer": "unknown",
+            "source_record_ids": [],
+            "source_relation_ids": [],
+            "authentic_source_relation_edges": [],
+            "verified_derived_order_relation_edges": [],
+            "event_count": 0,
+            "strict_support_event_count": 0,
+            "proof_depth": 0,
+            "hop_count": 0,
+        }
+
+
+def build_kev_pipeline_candidate(
+    history: dict[str, Any],
+    *,
+    token_counter: Callable[[str], int],
+    tokenizer_asset_manifest_sha256: str,
+    replay_manifest_binding: dict[str, Any],
+    candidate_attestation_key: bytes,
+    document_shards: int = 4,
+) -> dict[str, Any]:
+    """Serialize an audited KEV history for ranking and adapter-based replay."""
+    history_audit = audit_kev_catalog_history_candidate(history)
+    if not history_audit or not all(history_audit.values()):
+        raise ProvenanceError("KEV pipeline input failed history audit")
+    required_replay_binding = {
+        "schema_version",
+        "sha256",
+        "source_manifest_sha256",
+        "source_response_sha256",
+        "replay_revision",
+    }
+    if (
+        set(replay_manifest_binding) != required_replay_binding
+        or replay_manifest_binding.get("schema_version")
+        != KEV_PIPELINE_REPLAY_MANIFEST_SCHEMA
+        or replay_manifest_binding.get("replay_revision") != KEV_HISTORY_REPLAY_REVISION
+        or any(
+            _SHA256.fullmatch(str(replay_manifest_binding.get(field) or "")) is None
+            for field in (
+                "sha256",
+                "source_manifest_sha256",
+                "source_response_sha256",
+            )
+        )
+        or replay_manifest_binding.get("source_manifest_sha256")
+        != (history.get("source_binding") or {}).get("signed_manifest_sha256")
+        or replay_manifest_binding.get("source_response_sha256")
+        != (history.get("source_binding") or {}).get("retrieval_sha256")
+    ):
+        raise ProvenanceError("KEV pipeline replay manifest binding is invalid")
+    if _SHA256.fullmatch(tokenizer_asset_manifest_sha256) is None:
+        raise ProvenanceError("KEV pipeline tokenizer asset digest is invalid")
+
+    documents = _pipeline_documents(str(history.get("context") or ""), document_shards)
+    classifications: list[dict[str, Any]] = []
+    source_ids_by_artifact: dict[str, list[str]] = {}
+    for index, document in enumerate(documents):
+        text_sha256 = _sha256_text(document)
+        artifact_id = (
+            f"{history['world_id']}.kev_history_{history['length_bucket']}_"
+            f"{index:02d}_{text_sha256[:12]}"
+        )
+        record_ids = [
+            _pipeline_record_id(record)
+            for record in _pipeline_document_records(document)
+        ]
+        source_ids_by_artifact[artifact_id] = record_ids
+        classifications.append(
+            {
+                "artifact_id": artifact_id,
+                "workflow_id": history["world_id"],
+                "workflow_kind": "real_source_derived",
+                "evidence_role": "causal_gold",
+                "source_origin": "real_derived",
+                "provenance_id": f"sha256:{text_sha256}",
+            }
+        )
+    artifact_ids = [item["artifact_id"] for item in classifications]
+    document_context = SEP.join(documents)
+    question = str(history["question"])
+    context = wrap_prompt(question, document_context, "first")
+    context_tokens = token_counter(context)
+    query_id = (
+        f"{history['world_id']}.kev_catalog_chronology_audit:first:spread:"
+        f"{history['length_bucket']}"
+    )
+    candidate: dict[str, Any] = {
+        "schema_version": "p3.0",
+        "data_product": "worldlong_cyber_kev_candidate_v1",
+        "data_stage": "candidate",
+        "train_ready": False,
+        "production_eligible": False,
+        "promotion_eligible": False,
+        "complete_world": False,
+        "promoted": False,
+        "generation_integration": "ranker_ready_promotion_adapter_pending",
+        "world_id": history["world_id"],
+        "seed": 0,
+        "domain": "cyber",
+        "workflow_kind": history["workflow_kind"],
+        "query_id": query_id,
+        "query_type": history["query_type"],
+        "query_timing": "first",
+        "position_bucket": "spread",
+        "length_bucket": history["length_bucket"],
+        "question": question,
+        "answer": history["answer"],
+        "cf_answer": history["cf_answer"],
+        "view": "ordered_artifact_view",
+        "context": context,
+        "document_context": document_context,
+        "essential_artifact_ids": artifact_ids,
+        "counterfactual_twin": deepcopy(history["counterfactual_twin"]),
+        "pipeline_capabilities": {
+            "dense_ranking": True,
+            "cyber_strict_replay": True,
+            "generic_strict_replay": False,
+            "generic_promotion": False,
+        },
+        "artifact_classification": classifications,
+        "source_record_ids_by_artifact": source_ids_by_artifact,
+        "workflow_ids": [history["world_id"]],
+        "training_objective": "sft",
+        "composition_method": "causal_timeline",
+        "motif": "chronology+annual_aggregation+remediation_window",
+        "base_task_id": _sha256_text(
+            f"{history['world_id']}|{history['answer_program_id']}"
+        )[:20],
+        "semantic_base_task_id": _sha256_text(f"cyber|{history['answer_program_id']}")[
+            :20
+        ],
+        "dossier_id": _sha256_text(
+            _canonical_json(
+                {
+                    "world_id": history["world_id"],
+                    "query_type": history["query_type"],
+                    "artifact_ids": artifact_ids,
+                }
+            )
+        )[:20],
+        "answer_program_id": history["answer_program_id"],
+        "semantic_growth_group_id": history["semantic_growth_group_id"],
+        "source_binding": deepcopy(history["source_binding"]),
+        "source_family_ids": ["cisa_known_exploited_vulnerabilities_catalog"],
+        "source_record_ids": list(history["source_record_ids"]),
+        "source_relation_ids": list(history["source_relation_ids"]),
+        "authentic_source_relation_edges": deepcopy(
+            history["authentic_source_relation_edges"]
+        ),
+        "verified_derived_order_relation_edges": deepcopy(
+            history["verified_derived_order_relation_edges"]
+        ),
+        "event_count": history["event_count"],
+        "strict_support_event_count": history["strict_support_event_count"],
+        "graph": deepcopy(history["graph"]),
+        "tokenizer_model_id": history["tokenizer_model_id"],
+        "tokenizer_revision": history["tokenizer_revision"],
+        "tokenizer_asset_manifest_sha256": tokenizer_asset_manifest_sha256,
+        "tokenizer_context_tokens": context_tokens,
+        "actual_context_tokens": context_tokens,
+        "band_lower_tokens": history["band_lower_tokens"],
+        "band_upper_tokens": history["band_upper_tokens"],
+        "semantic_tokens": {
+            "internal": context_tokens,
+            "event_bearing": context_tokens,
+            "proof_bearing": context_tokens,
+            "causal_supporting": 0,
+            "generic_background": 0,
+        },
+        "real_source_verified": False,
+        "source_verified_at_materialization": True,
+        "real_source_token_ratio": 1.0,
+        "strict_replay_revision": history["strict_replay_revision"],
+        "domain_history_replay_manifest": deepcopy(replay_manifest_binding),
+        "promotion_blocker_code": "missing_domain_replay_adapter:cyber",
+    }
+    audit = audit_kev_pipeline_candidate(candidate, token_counter=token_counter)
+    if not audit or not all(audit.values()):
+        failed = sorted(name for name, passed in audit.items() if not passed)
+        raise ProvenanceError(
+            f"KEV pipeline candidate failed executable audit: {','.join(failed)}"
+        )
+    return attach_attestation(
+        candidate, candidate_attestation_key, purpose="candidate_row"
+    )
+
+
+def audit_kev_pipeline_candidate(
+    candidate: dict[str, Any], *, token_counter: Callable[[str], int]
+) -> dict[str, bool]:
+    """Audit standard serialization without claiming shared promotion support."""
+    replay = replay_kev_pipeline_candidate(candidate)
+    cf_replay = replay_kev_pipeline_candidate(candidate, counterfactual=True)
+    classifications = candidate.get("artifact_classification")
+    classifications = classifications if isinstance(classifications, list) else []
+    artifact_ids = [
+        str(item.get("artifact_id") or "")
+        for item in classifications
+        if isinstance(item, dict)
+    ]
+    removals = [
+        replay_kev_pipeline_candidate(
+            candidate,
+            evidence_artifact_ids=[value for value in artifact_ids if value != removed],
+        )["answer"]
+        for removed in artifact_ids
+    ]
+    singles = [
+        replay_kev_pipeline_candidate(candidate, evidence_artifact_ids=[artifact_id])[
+            "answer"
+        ]
+        for artifact_id in artifact_ids
+    ]
+    top_three = [
+        replay_kev_pipeline_candidate(candidate, evidence_artifact_ids=list(selected))[
+            "answer"
+        ]
+        for selected in combinations(artifact_ids, 3)
+    ]
+    context = candidate.get("document_context")
+    documents = context.split(SEP) if isinstance(context, str) else []
+    source_ids_by_artifact = candidate.get("source_record_ids_by_artifact")
+    source_ids_by_artifact = (
+        source_ids_by_artifact if isinstance(source_ids_by_artifact, dict) else {}
+    )
+    artifact_bindings_valid = len(documents) == len(classifications) and bool(documents)
+    reconstructed_source_ids: list[str] = []
+    if artifact_bindings_valid:
+        try:
+            for document, classification in zip(
+                documents, classifications, strict=True
+            ):
+                if not isinstance(classification, dict):
+                    raise ProvenanceError("classification is malformed")
+                artifact_id = str(classification.get("artifact_id") or "")
+                text_sha256 = _sha256_text(document)
+                document_record_ids = [
+                    _pipeline_record_id(record)
+                    for record in _pipeline_document_records(document)
+                ]
+                reconstructed_source_ids.extend(document_record_ids)
+                artifact_bindings_valid = artifact_bindings_valid and bool(
+                    artifact_id
+                    and classification.get("provenance_id") == f"sha256:{text_sha256}"
+                    and classification.get("source_origin") == "real_derived"
+                    and classification.get("workflow_kind") == "real_source_derived"
+                    and source_ids_by_artifact.get(artifact_id) == document_record_ids
+                )
+        except (TypeError, ValueError, ProvenanceError):
+            artifact_bindings_valid = False
+    corrupted = deepcopy(candidate)
+    corrupted_documents = list(documents)
+    corruption_fails = False
+    if corrupted_documents:
+        lines = corrupted_documents[-1].splitlines()
+        last = json.loads(lines[-1])
+        payload = last.get("source_payload")
+        if isinstance(payload, dict):
+            payload["requiredAction"] = f"CORRUPTED {payload['requiredAction']}"
+            lines[-1] = _canonical_json(last)
+            corrupted_documents[-1] = "\n".join(lines)
+            corrupted["document_context"] = SEP.join(corrupted_documents)
+            corruption_fails = replay_kev_pipeline_candidate(corrupted)[
+                "answer"
+            ] != candidate.get("answer")
+    replay_binding = candidate.get("domain_history_replay_manifest")
+    replay_binding_valid = isinstance(replay_binding, dict) and set(replay_binding) == {
+        "schema_version",
+        "sha256",
+        "source_manifest_sha256",
+        "source_response_sha256",
+        "replay_revision",
+    }
+    if replay_binding_valid and isinstance(replay_binding, dict):
+        replay_binding_valid = bool(
+            replay_binding.get("schema_version") == KEV_PIPELINE_REPLAY_MANIFEST_SCHEMA
+            and replay_binding.get("replay_revision") == KEV_HISTORY_REPLAY_REVISION
+            and all(
+                _SHA256.fullmatch(str(replay_binding.get(field) or ""))
+                for field in (
+                    "sha256",
+                    "source_manifest_sha256",
+                    "source_response_sha256",
+                )
+            )
+        )
+    declared_tokens = candidate.get("tokenizer_context_tokens")
+    recomputed_tokens = token_counter(str(candidate.get("context") or ""))
+    lower = candidate.get("band_lower_tokens")
+    upper = candidate.get("band_upper_tokens")
+    return {
+        "strict_replay_sufficient": replay["answer"] == candidate.get("answer"),
+        "counterfactual_replay_sufficient": cf_replay["answer"]
+        == candidate.get("cf_answer"),
+        "counterfactual_changes_answer": cf_replay["answer"] != replay["answer"],
+        "remove_one_artifact_fails": bool(removals)
+        and all(answer != candidate.get("answer") for answer in removals),
+        "essential_single_artifact_insufficient": bool(singles)
+        and all(answer != candidate.get("answer") for answer in singles),
+        "every_top_three_insufficient": bool(top_three)
+        and all(answer != candidate.get("answer") for answer in top_three),
+        "semantic_corruption_fails": corruption_fails,
+        "artifact_text_bindings_valid": artifact_bindings_valid,
+        "source_records_reconstructed": reconstructed_source_ids
+        == candidate.get("source_record_ids")
+        == replay["source_record_ids"],
+        "source_relations_reconstructed": candidate.get("source_relation_ids")
+        == replay["source_relation_ids"],
+        "replay_manifest_binding_valid": replay_binding_valid,
+        "exact_token_count_recomputed": isinstance(declared_tokens, int)
+        and not isinstance(declared_tokens, bool)
+        and declared_tokens == recomputed_tokens,
+        "exact_token_band_recomputed": isinstance(lower, int)
+        and isinstance(upper, int)
+        and lower <= recomputed_tokens <= upper,
+        "ranker_contract_shape_valid": bool(
+            candidate.get("data_stage") == "candidate"
+            and candidate.get("training_objective") == "sft"
+            and candidate.get("view") == "ordered_artifact_view"
+            and candidate.get("composition_method") == "causal_timeline"
+            and candidate.get("essential_artifact_ids") == artifact_ids
+            and len(artifact_ids) == len(set(artifact_ids)) >= 4
+            and candidate.get("pipeline_capabilities")
+            == {
+                "dense_ranking": True,
+                "cyber_strict_replay": True,
+                "generic_strict_replay": False,
+                "generic_promotion": False,
+            }
+        ),
+        "non_promoted_boundary": all(
+            candidate.get(field) is False
+            for field in (
+                "train_ready",
+                "production_eligible",
+                "promotion_eligible",
+                "complete_world",
+                "promoted",
+            )
+        ),
+    }

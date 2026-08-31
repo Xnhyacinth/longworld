@@ -25,7 +25,11 @@ from longworld.core.domainhistory import (
     HistoryBand,
     audit_cumulative_history,
     audit_kev_catalog_history_candidate,
+    audit_kev_pipeline_candidate,
     build_kev_catalog_history_candidates,
+    build_kev_pipeline_candidate,
+    build_kev_pipeline_replay_manifest,
+    kev_pipeline_replay_manifest_binding,
     verify_bound_json_retrieval,
 )
 from longworld.core.provenance import ProvenanceError, _read_regular_file
@@ -245,6 +249,95 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     cumulative_errors = audit_cumulative_history(rows)
     accepted = sum(1 for audit in row_audits if audit and all(audit.values()))
     asset_digest = resolved_tokenizer_asset_manifest_sha256(model_id, revision)
+    pipeline_config = config.get("pipeline_candidate_export")
+    if pipeline_config is None:
+        pipeline_config = {"enabled": False}
+    if not isinstance(pipeline_config, dict) or not isinstance(
+        pipeline_config.get("enabled"), bool
+    ):
+        raise ProvenanceError("pipeline candidate export config is invalid")
+    pipeline_rows: list[dict[str, Any]] = []
+    pipeline_audits: list[dict[str, bool]] = []
+    pipeline_bytes = b""
+    replay_manifest_bytes = b""
+    pipeline_output: dict[str, Any] | None = None
+    if pipeline_config["enabled"]:
+        document_shards = pipeline_config.get("document_shards")
+        if (
+            isinstance(document_shards, bool)
+            or not isinstance(document_shards, int)
+            or document_shards != 4
+        ):
+            raise ProvenanceError("pipeline export requires exactly four shards")
+        candidate_key = attestation_key_from_env("candidate_row")
+        if candidate_key is None:
+            raise ProvenanceError(
+                "pipeline candidate export requires candidate attestation key"
+            )
+        replay_manifest = build_kev_pipeline_replay_manifest(
+            source_binding=source_binding,
+            source_manifest_name=manifest_path.name,
+            source_response_name=catalog_path.name,
+            tokenizer_model_id=model_id,
+            tokenizer_revision=revision,
+            tokenizer_asset_manifest_sha256=asset_digest,
+            source_attestation_key=key,
+        )
+        replay_manifest_bytes = _canonical_bytes(replay_manifest) + b"\n"
+        replay_binding = kev_pipeline_replay_manifest_binding(
+            replay_manifest_bytes, key
+        )
+        pipeline_rows = [
+            build_kev_pipeline_candidate(
+                row,
+                token_counter=token_counter,
+                tokenizer_asset_manifest_sha256=asset_digest,
+                replay_manifest_binding=replay_binding,
+                candidate_attestation_key=candidate_key,
+                document_shards=document_shards,
+            )
+            for row in rows
+        ]
+        pipeline_audits = [
+            audit_kev_pipeline_candidate(row, token_counter=token_counter)
+            for row in pipeline_rows
+        ]
+        pipeline_accepted = sum(
+            1 for audit in pipeline_audits if audit and all(audit.values())
+        )
+        if pipeline_accepted != len(pipeline_rows):
+            raise ProvenanceError("KEV pipeline candidate export audit failed")
+        pipeline_bytes = (
+            b"\n".join(_canonical_bytes(row) for row in pipeline_rows) + b"\n"
+        )
+        pipeline_output = {
+            "status": "ranker_ready_promotion_adapter_pending",
+            "promotion_adapter_available": False,
+            "promotion_blocker_code": "missing_domain_replay_adapter:cyber",
+            "attempts": len(pipeline_rows),
+            "accepted_candidates": pipeline_accepted,
+            "retention": pipeline_accepted / max(1, len(pipeline_rows)),
+            "candidate_sha256": hashlib.sha256(pipeline_bytes).hexdigest(),
+            "replay_manifest_sha256": hashlib.sha256(replay_manifest_bytes).hexdigest(),
+            "source_attestation_verified": True,
+            "candidate_attestation_present": True,
+            "strict_replay_verified": True,
+            "rows": [
+                {
+                    "length_bucket": row["length_bucket"],
+                    "tokenizer_context_tokens": row["tokenizer_context_tokens"],
+                    "artifact_count": len(row["artifact_classification"]),
+                    "source_record_count": len(row["source_record_ids"]),
+                    "source_relation_count": len(row["source_relation_ids"]),
+                    "audit": audit,
+                }
+                for row, audit in zip(pipeline_rows, pipeline_audits, strict=True)
+            ],
+            "train_ready": False,
+            "production_eligible": False,
+            "complete_world": False,
+            "promoted": False,
+        }
     manifest_output: dict[str, Any] = {
         "schema_version": "longworld.domain-history-candidate-manifest.v1",
         "data_stage": "candidate_history_audit",
@@ -298,6 +391,8 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         "generation_integration": "disabled",
         "signed": False,
     }
+    if pipeline_output is not None:
+        manifest_output["pipeline_export"] = pipeline_output
     if accepted != len(rows) or cumulative_errors:
         raise ProvenanceError("domain-history executable audit failed")
     rejects_bytes = b"".join(
@@ -307,6 +402,9 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     )
     _atomic_write(output_dir / "candidates.jsonl", candidate_bytes)
     _atomic_write(output_dir / "capacity_rejects.jsonl", rejects_bytes)
+    if pipeline_output is not None:
+        _atomic_write(output_dir / "pipeline_candidates.jsonl", pipeline_bytes)
+        _atomic_write(output_dir / "KEV_REPLAY_MANIFEST.json", replay_manifest_bytes)
     _atomic_write(
         output_dir / "MANIFEST.json", _canonical_bytes(manifest_output) + b"\n"
     )
