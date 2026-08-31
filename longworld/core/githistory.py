@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import subprocess
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
+from itertools import pairwise
+from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
 from longworld.core.publicscan import sanitize_public_text
@@ -17,6 +19,7 @@ from longworld.core.realworkflow import WorkflowRecord
 
 _REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 _GIT_SHA = re.compile(r"[0-9a-f]{40}\Z")
+_GIT_PATH = re.compile(r"(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\Z")
 _RECORD_SEPARATOR = "\x00LONGWORLD_RECORD\x00"
 _FIELD_SEPARATOR = "\x00"
 _PATCH_PREFIX = "LONGWORLD_PATCH\x00"
@@ -24,6 +27,8 @@ _MAX_COMMITS = 100_000
 _MAX_TOKENIZER_CHARS = 128_000
 TOKEN_COUNT_CACHE_REVISION = "sha256-text+tokenizer-asset-v1"
 TRUNCATION_QUALITY_REVISION = "git-observed-prefix-truncation-v1"
+LICENSE_BINDING_POLICY_SCHEMA = "longworld.repo-license-binding-policy.v1"
+LICENSE_BINDING_RECEIPT_SCHEMA = "longworld.git-license-binding-receipt.v2"
 
 
 class OffsetTokenizer(Protocol):
@@ -50,6 +55,7 @@ class GitHistoryExtraction:
     head_revision: str
     reject_reasons: dict[str, int]
     truncated_commits: tuple[GitCommitTruncation, ...] = ()
+    commit_revisions: tuple[str, ...] = ()
 
 
 class DeterministicTokenCountCache:
@@ -167,7 +173,228 @@ def _git_output(checkout: Path, *args: str) -> str:
     return completed.stdout.strip()
 
 
-def _history_segments(checkout: Path, max_commits: int, skip_commits: int) -> list[str]:
+def _canonical_bytes(value: object) -> bytes:
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode()
+
+
+def _normalized_license_policy(policy: object) -> dict[str, Any]:
+    if not isinstance(policy, dict) or set(policy) != {
+        "schema_version",
+        "approved_path",
+        "approved_blobs",
+    }:
+        raise ValueError("Git license binding policy is invalid")
+    path = policy.get("approved_path")
+    parsed_path = PurePosixPath(path) if isinstance(path, str) else None
+    if (
+        policy.get("schema_version") != LICENSE_BINDING_POLICY_SCHEMA
+        or parsed_path is None
+        or parsed_path.is_absolute()
+        or not parsed_path.parts
+        or any(part in {"", ".", ".."} for part in parsed_path.parts)
+        or _GIT_PATH.fullmatch(path) is None
+    ):
+        raise ValueError("Git license binding policy is invalid")
+    raw_blobs = policy.get("approved_blobs")
+    if not isinstance(raw_blobs, list) or not raw_blobs:
+        raise ValueError("Git license binding policy has no approved blobs")
+    approved_blobs: list[dict[str, str | int]] = []
+    seen_git_blobs: set[str] = set()
+    for item in raw_blobs:
+        if not isinstance(item, dict) or set(item) != {
+            "git_blob_sha",
+            "sha256",
+            "size",
+        }:
+            raise ValueError("Git license binding policy blob is invalid")
+        git_blob_sha = item.get("git_blob_sha")
+        sha256 = item.get("sha256")
+        size = item.get("size")
+        if (
+            not isinstance(git_blob_sha, str)
+            or _GIT_SHA.fullmatch(git_blob_sha) is None
+            or git_blob_sha in seen_git_blobs
+            or not isinstance(sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", sha256) is None
+            or isinstance(size, bool)
+            or not isinstance(size, int)
+            or size <= 0
+        ):
+            raise ValueError("Git license binding policy blob is invalid")
+        seen_git_blobs.add(git_blob_sha)
+        approved_blobs.append(
+            {"git_blob_sha": git_blob_sha, "sha256": sha256, "size": size}
+        )
+    return {
+        "schema_version": LICENSE_BINDING_POLICY_SCHEMA,
+        "approved_path": str(parsed_path),
+        "approved_blobs": approved_blobs,
+    }
+
+
+def _batch_object_contents(checkout: Path, object_ids: list[str]) -> dict[str, bytes]:
+    completed = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-c",
+            "core.fsmonitor=false",
+            "-C",
+            str(checkout),
+            "cat-file",
+            "--batch",
+        ],
+        input=("\n".join(object_ids) + "\n").encode(),
+        check=True,
+        capture_output=True,
+        env={
+            "PATH": "/usr/bin:/bin",
+            "LANG": "C.UTF-8",
+            "LC_ALL": "C.UTF-8",
+            "GIT_PAGER": "cat",
+            "GIT_TERMINAL_PROMPT": "0",
+        },
+    )
+    payload = completed.stdout
+    cursor = 0
+    contents: dict[str, bytes] = {}
+    for expected_id in object_ids:
+        header_end = payload.find(b"\n", cursor)
+        if header_end < 0:
+            raise ValueError("Git license blob batch is truncated")
+        fields = payload[cursor:header_end].decode("ascii").split()
+        if len(fields) != 3 or fields[0] != expected_id or fields[1] != "blob":
+            raise ValueError("Git license blob batch is invalid")
+        try:
+            size = int(fields[2])
+        except ValueError as error:
+            raise ValueError("Git license blob batch is invalid") from error
+        content_start = header_end + 1
+        content_end = content_start + size
+        if (
+            content_end >= len(payload)
+            or payload[content_end : content_end + 1] != b"\n"
+        ):
+            raise ValueError("Git license blob batch is truncated")
+        contents[expected_id] = payload[content_start:content_end]
+        cursor = content_end + 1
+    if cursor != len(payload):
+        raise ValueError("Git license blob batch has trailing data")
+    return contents
+
+
+def bind_git_license_history(
+    checkout: Path,
+    commit_revisions: tuple[str, ...],
+    policy: object,
+) -> dict[str, Any]:
+    """Bind every selected commit to an independently approved license blob."""
+    normalized_policy = _normalized_license_policy(policy)
+    if not commit_revisions or any(
+        _GIT_SHA.fullmatch(revision) is None for revision in commit_revisions
+    ):
+        raise ValueError("Git license binding commit history is invalid")
+    path = str(normalized_policy["approved_path"])
+    completed = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-c",
+            "core.fsmonitor=false",
+            "-C",
+            str(checkout),
+            "cat-file",
+            "--batch-check=%(objectname) %(objecttype) %(objectsize)",
+        ],
+        input="".join(f"{revision}:{path}\n" for revision in commit_revisions),
+        check=True,
+        capture_output=True,
+        text=True,
+        env={
+            "PATH": "/usr/bin:/bin",
+            "LANG": "C.UTF-8",
+            "LC_ALL": "C.UTF-8",
+            "GIT_PAGER": "cat",
+            "GIT_TERMINAL_PROMPT": "0",
+        },
+    )
+    lines = completed.stdout.splitlines()
+    if len(lines) != len(commit_revisions):
+        raise ValueError("Git license binding batch is incomplete")
+    commit_bindings: list[dict[str, str]] = []
+    blob_sizes: dict[str, int] = {}
+    for revision, line in zip(commit_revisions, lines, strict=True):
+        fields = line.split()
+        if len(fields) != 3 or fields[1] != "blob":
+            raise ValueError(
+                f"Git license path is missing at selected commit: {revision}"
+            )
+        git_blob_sha, _, raw_size = fields
+        if _GIT_SHA.fullmatch(git_blob_sha) is None:
+            raise ValueError("Git license binding returned an invalid blob identity")
+        try:
+            size = int(raw_size)
+        except ValueError as error:
+            raise ValueError(
+                "Git license binding returned an invalid blob size"
+            ) from error
+        if size <= 0:
+            raise ValueError("Git license binding returned an empty license")
+        prior_size = blob_sizes.setdefault(git_blob_sha, size)
+        if prior_size != size:
+            raise ValueError("Git license blob size is inconsistent")
+        commit_bindings.append({"revision": revision, "git_blob_sha": git_blob_sha})
+    object_ids = sorted(blob_sizes)
+    contents = _batch_object_contents(checkout, object_ids)
+    observed_blobs = [
+        {
+            "git_blob_sha": object_id,
+            "sha256": hashlib.sha256(contents[object_id]).hexdigest(),
+            "size": len(contents[object_id]),
+        }
+        for object_id in object_ids
+    ]
+    approved = {
+        (
+            str(item["git_blob_sha"]),
+            str(item["sha256"]),
+            int(item["size"]),
+        )
+        for item in normalized_policy["approved_blobs"]
+    }
+    if any(
+        (item["git_blob_sha"], item["sha256"], item["size"]) not in approved
+        for item in observed_blobs
+    ):
+        raise ValueError("Git license history contains a blob not approved by policy")
+    transition_count = sum(
+        left["git_blob_sha"] != right["git_blob_sha"]
+        for left, right in pairwise(commit_bindings)
+    )
+    return {
+        "schema_version": LICENSE_BINDING_RECEIPT_SCHEMA,
+        "policy": normalized_policy,
+        "policy_sha256": hashlib.sha256(
+            _canonical_bytes(normalized_policy)
+        ).hexdigest(),
+        "selected_commit_count": len(commit_bindings),
+        "selected_first_revision": commit_bindings[0]["revision"],
+        "selected_last_revision": commit_bindings[-1]["revision"],
+        "commit_bindings": commit_bindings,
+        "commit_bindings_sha256": hashlib.sha256(
+            _canonical_bytes(commit_bindings)
+        ).hexdigest(),
+        "observed_license_blobs": observed_blobs,
+        "transition_count": transition_count,
+    }
+
+
+def _history_segments(
+    checkout: Path,
+    max_commits: int,
+    skip_commits: int,
+    root_revision: str,
+) -> list[str]:
     pretty = "%x00LONGWORLD_RECORD%x00%H%x00%P%x00%cI%x00%B%x00LONGWORLD_PATCH%x00"
     completed = subprocess.run(
         [
@@ -188,7 +415,7 @@ def _history_segments(checkout: Path, max_commits: int, skip_commits: int) -> li
             "--no-color",
             "--no-renames",
             f"--format={pretty}",
-            "HEAD",
+            root_revision,
         ],
         check=True,
         capture_output=True,
@@ -287,6 +514,7 @@ def extract_first_parent_history(
     tokenizer: OffsetTokenizer,
     max_commits: int,
     skip_commits: int = 0,
+    root_revision: str | None = None,
     max_record_tokens: int = 768,
     max_chunks_per_commit: int = 0,
 ) -> GitHistoryExtraction:
@@ -303,14 +531,17 @@ def extract_first_parent_history(
         raise ValueError("Git history commit chunk cap is invalid")
     if not checkout.is_dir():
         raise ValueError("Git history checkout is unavailable")
-    head_revision = _git_output(checkout, "rev-parse", "HEAD")
-    if _GIT_SHA.fullmatch(head_revision) is None:
+    selected_root = root_revision or _git_output(checkout, "rev-parse", "HEAD")
+    if _GIT_SHA.fullmatch(selected_root) is None:
         raise ValueError("Git history checkout has no full HEAD revision")
+    if _git_output(checkout, "cat-file", "-t", selected_root) != "commit":
+        raise ValueError("Git history root revision is not a commit")
 
-    segments = _history_segments(checkout, max_commits, skip_commits)
+    segments = _history_segments(checkout, max_commits, skip_commits, selected_root)
     records: list[WorkflowRecord] = []
     rejects: Counter[str] = Counter()
     truncated_commits: list[GitCommitTruncation] = []
+    commit_revisions: list[str] = []
     previous_sha = ""
     previous_record_id = ""
     for segment in segments:
@@ -328,6 +559,7 @@ def extract_first_parent_history(
             _GIT_SHA.fullmatch(parent) is None for parent in raw_parents.split()
         ):
             raise ValueError("Git history stream has an invalid object identity")
+        commit_revisions.append(sha)
         try:
             timestamp = datetime.fromisoformat(occurred_at.replace("Z", "+00:00"))
         except ValueError as error:
@@ -396,10 +628,13 @@ def extract_first_parent_history(
                 )
             )
             previous_record_id = record_id
+    if not commit_revisions:
+        raise ValueError("Git history selected slice is empty")
     return GitHistoryExtraction(
         records=tuple(records),
         commit_count=len(segments),
-        head_revision=head_revision,
+        head_revision=commit_revisions[-1],
         reject_reasons=dict(rejects),
         truncated_commits=tuple(truncated_commits),
+        commit_revisions=tuple(commit_revisions),
     )

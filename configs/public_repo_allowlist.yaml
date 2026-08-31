@@ -103,6 +103,34 @@ repositories:
   godotengine/godot:
     visibility: public
     license: MIT
+    license_binding:
+      schema_version: longworld.repo-license-binding-policy.v1
+      approved_path: LICENSE.txt
+      approved_blobs:
+        - git_blob_sha: 0b5b0c341ff1e629e4cc4d5db12b94fd2e284428
+          sha256: 0d884f0505ba7d5e137affb326a04ea486c90a77377f19dc9231038617365052
+          size: 1188
+        - git_blob_sha: 0e3ba08d6b2e8cf435241829c96f10b74e4356fe
+          sha256: b0435e3b3e4e55238f05f4b306f30524a1b2e20147810d436eaa554fa6855c80
+          size: 1149
+        - git_blob_sha: 11b3b89c8e48edc5bb9e2c48513999ed5c580fba
+          sha256: 49147dff9d1a4ca7b2a83ffb83982984b4ce9ddeb66b015c00b0b121f3ffaf51
+          size: 1145
+        - git_blob_sha: 44418d6f51d450fb1b6c3beb26117720bc873ddd
+          sha256: 966313e8129db5d0b3b081d1a50ae107da9a3da2d8faa05899e3042a33192525
+          size: 1146
+        - git_blob_sha: 52bd041102ab4d87a59afc241febc30d23372451
+          sha256: 3aa8ff954579b34f90924e5a91903403c1be94aeb6076b58e36ce6bc128942bb
+          size: 1146
+        - git_blob_sha: bcce1a3a33b37dfd5ff41199568a8c0c2960abbb
+          sha256: 2d44847566666edecc6d180ac6cb8d0c64b1dfc8fbd82d4798a9d3112d7991c0
+          size: 1145
+        - git_blob_sha: bee83fb8b891a71af5966def74a23ce7b27f19e4
+          sha256: b42748ea02ebddfb9ee09fd5f153596ba96100c36e7541e1d2206b82ac0112a7
+          size: 1146
+        - git_blob_sha: c7ad3ddaa37bab35d33e22d94e578114e1cbd5bd
+          sha256: 173214b73b662b575996e4ccbab99ce820f1a74f025a03819a231ef4835229ac
+          size: 1145
     authorization:
       record_id: PUBLIC-GITHUB-TERMS-2026-08
       scope: read-only workflow export

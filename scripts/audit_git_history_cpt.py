@@ -7,18 +7,23 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import tempfile
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from longworld.core.attestation import (
+    ATTESTATION_ENVIRONMENT_ENV,
     attach_attestation,
     attestation_key_from_env,
     canonical_attested_payload,
@@ -26,18 +31,30 @@ from longworld.core.attestation import (
     verify_attestation,
 )
 from longworld.core.githistory import (
+    LICENSE_BINDING_POLICY_SCHEMA,
+    LICENSE_BINDING_RECEIPT_SCHEMA,
     TOKEN_COUNT_CACHE_REVISION,
     DeterministicTokenCountCache,
     git_truncation_quality,
 )
 from longworld.core.provenance import _read_regular_file
+from longworld.core.realworkflow import (
+    PUBLIC_POLICY_SHA256_ENV,
+    _validate_public_export_governance,
+    approved_public_policy_digests,
+)
 from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
 from longworld.core.tokenizer_assets import resolved_tokenizer_asset_manifest_sha256
 from scripts.export_cpt import _reject_reason, iter_jsonl
+from scripts.export_github_workflow import CANONICAL_ALLOWLIST
 from scripts.merge_git_history_cpt_releases import _load_release
 
 MAX_MANIFEST_BYTES = 64_000_000
 AUDIT_SCHEMA = "longworld.git-history-cpt-audit.v1"
+SOURCE_SCHEMA = "longworld.git-history-source-manifest.v1"
+_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+_GIT_SHA = re.compile(r"[0-9a-f]{40}\Z")
+_GIT_PATH = re.compile(r"(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\Z")
 
 
 @dataclass(frozen=True)
@@ -66,6 +83,308 @@ def _read_object(path: Path) -> tuple[dict[str, Any], bytes]:
     if not isinstance(value, dict):
         raise TypeError(f"JSON manifest is not an object: {path}")
     return value, raw
+
+
+def _canonical_bytes(value: object) -> bytes:
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode()
+
+
+def _canonical_license_policy(source: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    raw = CANONICAL_ALLOWLIST.read_bytes()
+    current_digest = hashlib.sha256(raw).hexdigest()
+    try:
+        approved = approved_public_policy_digests()
+    except ValueError as error:
+        raise ValueError("current canonical allowlist pin is invalid") from error
+    environment = os.environ.get(ATTESTATION_ENVIRONMENT_ENV, "").strip().lower()
+    if approved and current_digest not in approved:
+        raise ValueError("current canonical allowlist is not independently approved")
+    if environment in {"probe", "production"} and not approved:
+        raise ValueError(f"{PUBLIC_POLICY_SHA256_ENV} is required in release mode")
+    allowlist = yaml.safe_load(raw)
+    repository = str(source.get("repository_url") or "").removeprefix(
+        "https://github.com/"
+    )
+    repositories = (
+        allowlist.get("repositories") if isinstance(allowlist, dict) else None
+    )
+    policy = repositories.get(repository) if isinstance(repositories, dict) else None
+    license_binding = (
+        policy.get("license_binding") if isinstance(policy, dict) else None
+    )
+    if (
+        not isinstance(allowlist, dict)
+        or allowlist.get("schema_version") != "longworld.repo-allowlist.v1"
+        or not isinstance(policy, dict)
+        or policy.get("visibility") != "public"
+        or policy.get("license") != source.get("license")
+        or "commit" not in set(policy.get("allowed_record_kinds") or [])
+        or not isinstance(license_binding, dict)
+    ):
+        raise ValueError("source license is not pinned by canonical allowlist")
+    authorization = policy.get("authorization")
+    if not isinstance(authorization, dict):
+        raise TypeError("source authorization is not pinned by canonical allowlist")
+    normalized_authorization = dict(authorization)
+    reviewed_at = normalized_authorization.get("reviewed_at")
+    if isinstance(reviewed_at, datetime):
+        if reviewed_at.tzinfo is None:
+            raise ValueError("canonical authorization timestamp lacks timezone")
+        normalized_authorization["reviewed_at"] = reviewed_at.isoformat().replace(
+            "+00:00", "Z"
+        )
+    if source.get("authorization") != normalized_authorization:
+        raise ValueError("source authorization is not pinned by canonical allowlist")
+    repository_policy = {
+        "repository": repository,
+        "visibility": policy.get("visibility"),
+        "license": policy.get("license"),
+        "authorization": normalized_authorization,
+        "allowed_record_kinds": policy.get("allowed_record_kinds"),
+        "license_binding": license_binding,
+    }
+    return license_binding, hashlib.sha256(
+        _canonical_bytes(repository_policy)
+    ).hexdigest()
+
+
+def _validate_source_manifest_schema(source: dict[str, Any]) -> None:
+    if source.get("schema_version") != SOURCE_SCHEMA:
+        raise ValueError("unsupported Git history source manifest schema")
+
+
+def _validate_license_binding_receipt(
+    source: dict[str, Any],
+    *,
+    canonical_policy: dict[str, Any] | None = None,
+    canonical_repository_policy_sha256: str | None = None,
+) -> str:
+    """Replay v2 license history bindings or identify an explicit legacy source."""
+    environment = os.environ.get(ATTESTATION_ENVIRONMENT_ENV, "").strip().lower()
+    remote = source.get("remote_identity")
+    parser = source.get("parser")
+    if not isinstance(remote, dict) or not isinstance(parser, dict):
+        raise TypeError("source license identity is invalid")
+    binding = source.get("license_binding")
+    if binding is None:
+        if environment == "production":
+            raise ValueError("production audit requires license-binding v2")
+        if parser.get("revision") == "v5":
+            raise ValueError("Git parser v5 requires a license-binding v2 receipt")
+        if parser.get("revision") not in {"v1", "v2", "v3", "v4"}:
+            raise ValueError("Git legacy parser revision is unsupported")
+        if remote.get("license_file_classifier_spdx_id") == "NOASSERTION":
+            raise ValueError("legacy Git license binding cannot accept NOASSERTION")
+        return "legacy-remote-head-v1"
+    if parser.get("revision") != "v5":
+        raise ValueError("license-binding v2 requires Git parser v5")
+    if canonical_policy is None and canonical_repository_policy_sha256 is None:
+        canonical_policy, canonical_repository_policy_sha256 = (
+            _canonical_license_policy(source)
+        )
+    elif canonical_policy is None or canonical_repository_policy_sha256 is None:
+        raise ValueError("canonical allowlist policy binding is incomplete")
+    expected_binding_fields = {
+        "schema_version",
+        "policy",
+        "policy_sha256",
+        "selected_commit_count",
+        "selected_first_revision",
+        "selected_last_revision",
+        "commit_bindings",
+        "commit_bindings_sha256",
+        "observed_license_blobs",
+        "transition_count",
+    }
+    if not isinstance(binding, dict) or set(binding) != expected_binding_fields:
+        raise ValueError("Git license-binding v2 receipt shape is invalid")
+    if binding.get("schema_version") != LICENSE_BINDING_RECEIPT_SCHEMA:
+        raise ValueError("Git license-binding receipt revision is invalid")
+    policy = binding.get("policy")
+    if not isinstance(policy, dict) or set(policy) != {
+        "schema_version",
+        "approved_path",
+        "approved_blobs",
+    }:
+        raise ValueError("Git license-binding policy shape is invalid")
+    policy_digest = hashlib.sha256(_canonical_bytes(policy)).hexdigest()
+    public_policy = source.get("public_policy")
+    try:
+        approved_public_policies = approved_public_policy_digests()
+    except ValueError as error:
+        raise ValueError("public policy approval pin is invalid") from error
+    if (
+        policy.get("schema_version") != LICENSE_BINDING_POLICY_SCHEMA
+        or policy != canonical_policy
+        or binding.get("policy_sha256") != policy_digest
+        or not isinstance(public_policy, dict)
+        or not isinstance(public_policy.get("sha256"), str)
+        or _SHA256.fullmatch(public_policy["sha256"]) is None
+        or public_policy.get("repository_policy_sha256")
+        != canonical_repository_policy_sha256
+        or public_policy.get("license_binding_policy_sha256") != policy_digest
+    ):
+        raise ValueError("Git license policy binding is not in canonical allowlist")
+    if approved_public_policies and public_policy["sha256"] not in (
+        approved_public_policies
+    ):
+        raise ValueError("Git source policy is not independently approved")
+    if environment in {"probe", "production"} and not approved_public_policies:
+        raise ValueError(f"{PUBLIC_POLICY_SHA256_ENV} is required in release mode")
+    approved_path = policy.get("approved_path")
+    raw_approved = policy.get("approved_blobs")
+    if (
+        not isinstance(approved_path, str)
+        or _GIT_PATH.fullmatch(approved_path) is None
+        or not isinstance(raw_approved, list)
+        or not raw_approved
+    ):
+        raise ValueError("Git license-binding policy content is invalid")
+
+    def validated_blobs(raw: object, *, label: str) -> dict[str, tuple[str, int]]:
+        if not isinstance(raw, list) or not raw:
+            raise ValueError(f"Git {label} license blobs are invalid")
+        result: dict[str, tuple[str, int]] = {}
+        for item in raw:
+            if not isinstance(item, dict) or set(item) != {
+                "git_blob_sha",
+                "sha256",
+                "size",
+            }:
+                raise ValueError(f"Git {label} license blob is invalid")
+            git_blob_sha = item.get("git_blob_sha")
+            sha256 = item.get("sha256")
+            size = item.get("size")
+            if (
+                not isinstance(git_blob_sha, str)
+                or _GIT_SHA.fullmatch(git_blob_sha) is None
+                or git_blob_sha in result
+                or not isinstance(sha256, str)
+                or _SHA256.fullmatch(sha256) is None
+                or isinstance(size, bool)
+                or not isinstance(size, int)
+                or size <= 0
+            ):
+                raise ValueError(f"Git {label} license blob is invalid")
+            result[git_blob_sha] = (sha256, size)
+        return result
+
+    approved = validated_blobs(raw_approved, label="approved")
+    observed = validated_blobs(binding.get("observed_license_blobs"), label="observed")
+    if any(
+        approved.get(git_blob_sha) != identity
+        for git_blob_sha, identity in observed.items()
+    ):
+        raise ValueError("Git observed license blob is not approved")
+    commit_bindings = binding.get("commit_bindings")
+    selected_count = binding.get("selected_commit_count")
+    if (
+        not isinstance(commit_bindings, list)
+        or not commit_bindings
+        or isinstance(selected_count, bool)
+        or not isinstance(selected_count, int)
+        or selected_count != len(commit_bindings)
+        or selected_count != source.get("observed_commit_count")
+    ):
+        raise ValueError("Git license commit binding count is invalid")
+    if (
+        binding.get("commit_bindings_sha256")
+        != hashlib.sha256(_canonical_bytes(commit_bindings)).hexdigest()
+    ):
+        raise ValueError("Git license commit binding digest is invalid")
+    revisions: list[str] = []
+    blob_sequence: list[str] = []
+    for item in commit_bindings:
+        if not isinstance(item, dict) or set(item) != {
+            "revision",
+            "git_blob_sha",
+        }:
+            raise ValueError("Git license commit binding is invalid")
+        revision = item.get("revision")
+        git_blob_sha = item.get("git_blob_sha")
+        if (
+            not isinstance(revision, str)
+            or _GIT_SHA.fullmatch(revision) is None
+            or revision in revisions
+            or not isinstance(git_blob_sha, str)
+            or git_blob_sha not in observed
+        ):
+            raise ValueError("Git license commit binding is invalid")
+        revisions.append(revision)
+        blob_sequence.append(git_blob_sha)
+    if (
+        binding.get("selected_first_revision") != revisions[0]
+        or binding.get("selected_last_revision") != revisions[-1]
+        or source.get("revision") != revisions[-1]
+        or set(observed) != set(blob_sequence)
+        or binding.get("transition_count")
+        != sum(left != right for left, right in pairwise(blob_sequence))
+    ):
+        raise ValueError("Git license history binding is inconsistent")
+    record_events = {
+        str(item.get("source_event_id") or "")
+        for item in source.get("record_index") or []
+        if isinstance(item, dict)
+    }
+    if not record_events.issubset(revisions):
+        raise ValueError("Git source records escape license-bound history")
+    expected_remote_fields = {
+        "repository_response_sha256",
+        "commit_response_sha256",
+        "license_response_sha256",
+        "head_revision",
+        "repository_url",
+        "license",
+        "repository_license_spdx_id",
+        "license_file_classifier_spdx_id",
+        "license_file_revision",
+        "license_file_path",
+        "license_file_git_blob_sha",
+        "license_file_size",
+        "license_file_sha256",
+        "license_file_html_url",
+        "license_file_download_url",
+    }
+    last_blob = blob_sequence[-1]
+    last_sha256, last_size = observed[last_blob]
+    repository_url = source.get("repository_url")
+    source_license = source.get("license")
+    if (
+        set(remote) != expected_remote_fields
+        or any(
+            not isinstance(remote.get(field), str)
+            or _SHA256.fullmatch(str(remote.get(field))) is None
+            for field in (
+                "repository_response_sha256",
+                "commit_response_sha256",
+                "license_response_sha256",
+            )
+        )
+        or remote.get("head_revision") != revisions[-1]
+        or remote.get("license_file_revision") != revisions[-1]
+        or remote.get("repository_url") != repository_url
+        or remote.get("license") != source_license
+        or remote.get("repository_license_spdx_id") != source_license
+        or remote.get("license_file_classifier_spdx_id")
+        not in {source_license, "NOASSERTION"}
+        or remote.get("license_file_path") != approved_path
+        or remote.get("license_file_git_blob_sha") != last_blob
+        or remote.get("license_file_sha256") != last_sha256
+        or remote.get("license_file_size") != last_size
+        or remote.get("license_file_html_url")
+        != f"{repository_url}/blob/{revisions[-1]}/{approved_path}"
+        or remote.get("license_file_download_url")
+        != (
+            str(repository_url).replace(
+                "https://github.com/", "https://raw.githubusercontent.com/"
+            )
+            + f"/{revisions[-1]}/{approved_path}"
+        )
+    ):
+        raise ValueError("Git remote license tip is not bound to selected history")
+    return "git-license-binding-v2"
 
 
 def _source_path(release_dir: Path, value: object) -> Path:
@@ -489,11 +808,13 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
     source_records: dict[str, SourceRecordBinding] = {}
     base_workflows: set[str] = set()
     verified_source_manifests = 0
+    license_binding_revisions: Counter[str] = Counter()
     for summary in release.get("source_manifests") or []:
         if not isinstance(summary, dict):
             raise TypeError("source manifest summary is invalid")
         path = _source_path(release_dir, summary.get("path"))
         source, raw = _read_object(path)
+        _validate_source_manifest_schema(source)
         if hashlib.sha256(raw).hexdigest() != summary.get("manifest_file_sha256"):
             raise ValueError("source manifest file hash mismatch")
         payload = json.dumps(
@@ -505,6 +826,7 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
             raise ValueError("source manifest payload hash mismatch")
         if not verify_attestation(source, source_key, purpose="source_manifest"):
             raise ValueError("source manifest attestation failed")
+        _validate_public_export_governance(source)
         provenance_id = (
             "sha256:" + hashlib.sha256(canonical_attested_payload(source)).hexdigest()
         )
@@ -518,17 +840,18 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
             or remote.get("license") != source.get("license")
         ):
             raise ValueError("source remote identity is unbound")
+        license_binding_revisions[_validate_license_binding_receipt(source)] += 1
         parser = source.get("parser")
         if longitudinal and (
             not isinstance(parser, dict)
-            or parser.get("revision") not in {"v3", "v4"}
+            or parser.get("revision") not in {"v3", "v4", "v5"}
             or parser.get("max_chunks_per_commit")
             != release.get("max_chunks_per_commit")
             or parser.get("oversized_commit_policy")
             != "real_prefix_chunks_with_audited_omission"
         ):
             raise ValueError("longitudinal source parser contract is invalid")
-        if isinstance(parser, dict) and parser.get("revision") == "v4":
+        if isinstance(parser, dict) and parser.get("revision") in {"v4", "v5"}:
             _validate_source_truncation_contract(
                 source, maximum_truncated_commit_ratio_ppm
             )
@@ -826,6 +1149,13 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
         "exact_duplicate_contexts": 0,
         "exact_duplicate_source_record_texts": 0,
         "verified_source_manifests": verified_source_manifests,
+        "license_binding_revisions": dict(sorted(license_binding_revisions.items())),
+        "license_binding_v2_source_manifests": license_binding_revisions[
+            "git-license-binding-v2"
+        ],
+        "legacy_license_binding_source_manifests": license_binding_revisions[
+            "legacy-remote-head-v1"
+        ],
         "cpt_contract_replayed": True,
         "exact_token_counts_recomputed": True,
         "training_export_reconstructed": True,

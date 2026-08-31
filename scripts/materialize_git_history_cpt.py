@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -23,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from longworld.core.attestation import (
+    ATTESTATION_ENVIRONMENT_ENV,
     attach_attestation,
     attestation_key_from_env,
     canonical_attested_payload,
@@ -36,15 +38,23 @@ from longworld.core.cptwindow import (
     pack_disjoint_workflow_windows,
 )
 from longworld.core.githistory import (
+    LICENSE_BINDING_POLICY_SCHEMA,
     TOKEN_COUNT_CACHE_REVISION,
     DeterministicTokenCountCache,
     GitHistoryExtraction,
+    bind_git_license_history,
     extract_first_parent_history,
     git_truncation_quality,
 )
 from longworld.core.provenance import SourceLineage
 from longworld.core.publicscan import PUBLIC_SCANNER, PUBLIC_SCANNER_REVISION
-from longworld.core.realworkflow import RealWorkflow, WorkflowRecord
+from longworld.core.realworkflow import (
+    PUBLIC_POLICY_SHA256_ENV,
+    RealWorkflow,
+    WorkflowRecord,
+    _validate_public_export_governance,
+    approved_public_policy_digests,
+)
 from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
 from longworld.core.taxonomy import SourceOrigin
 from longworld.core.tokenizer_assets import resolved_tokenizer_asset_manifest_sha256
@@ -61,6 +71,7 @@ SOURCE_SCHEMA = "longworld.git-history-source-manifest.v1"
 RELEASE_SCHEMA = "longworld.git-history-cpt-release.v1"
 MAX_CONFIG_BYTES = 256_000
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+_GIT_OBJECT_ID = re.compile(r"[0-9a-f]{40,64}\Z")
 MAX_SOURCE_SLICES = 1_000
 
 
@@ -142,7 +153,40 @@ def _load_allowlist() -> tuple[dict[str, Any], str]:
     repositories = payload.get("repositories")
     if not isinstance(repositories, dict):
         raise TypeError("canonical repository allowlist has no repositories")
-    return repositories, hashlib.sha256(raw).hexdigest()
+    digest = hashlib.sha256(raw).hexdigest()
+    try:
+        approved = approved_public_policy_digests()
+    except ValueError as error:
+        raise ValueError("canonical repository allowlist pin is invalid") from error
+    environment = os.environ.get(ATTESTATION_ENVIRONMENT_ENV, "").strip().lower()
+    if approved and digest not in approved:
+        raise ValueError("canonical repository allowlist is not independently pinned")
+    if environment in {"probe", "production"} and not approved:
+        raise ValueError(f"{PUBLIC_POLICY_SHA256_ENV} is required in release mode")
+    return repositories, digest
+
+
+def _repository_policy_sha256(repository: str, policy: dict[str, Any]) -> str:
+    authorization = policy.get("authorization")
+    if not isinstance(authorization, dict):
+        raise TypeError("repository authorization is missing")
+    normalized_authorization = dict(authorization)
+    reviewed_at = normalized_authorization.get("reviewed_at")
+    if isinstance(reviewed_at, datetime):
+        if reviewed_at.tzinfo is None:
+            raise ValueError("repository authorization timestamp lacks timezone")
+        normalized_authorization["reviewed_at"] = reviewed_at.isoformat().replace(
+            "+00:00", "Z"
+        )
+    receipt = {
+        "repository": repository,
+        "visibility": policy.get("visibility"),
+        "license": policy.get("license"),
+        "authorization": normalized_authorization,
+        "allowed_record_kinds": policy.get("allowed_record_kinds"),
+        "license_binding": policy.get("license_binding"),
+    }
+    return hashlib.sha256(_canonical_bytes(receipt)).hexdigest()
 
 
 def _git(checkout: Path, *args: str) -> str:
@@ -191,8 +235,10 @@ def validate_remote_identity(
     head_revision: str,
     license_id: str,
     fetch_json=_gh_fetch,
+    *,
+    license_binding_policy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Bind a local object ID to a currently public, license-matched GitHub repo."""
+    """Bind a local object ID and exact license bytes to a public GitHub repo."""
     repo = fetch_json(f"repos/{repository}")
     commit = fetch_json(f"repos/{repository}/commits/{head_revision}")
     license_payload = fetch_json(f"repos/{repository}/license?ref={head_revision}")
@@ -211,14 +257,78 @@ def validate_remote_identity(
         or commit.get("html_url") != f"{expected_url}/commit/{head_revision}"
     ):
         raise ValueError("Git history HEAD is not present in the public repository")
-    remote_license = (
+    repository_license = repo.get("license")
+    if (
+        not isinstance(repository_license, dict)
+        or repository_license.get("spdx_id") != license_id
+    ):
+        raise ValueError("Git history repository license does not match allowlist")
+    license_classifier = (
         license_payload.get("license") if isinstance(license_payload, dict) else None
     )
     if (
-        not isinstance(remote_license, dict)
-        or remote_license.get("spdx_id") != license_id
+        not isinstance(license_payload, dict)
+        or not isinstance(license_classifier, dict)
+        or license_classifier.get("spdx_id") not in {license_id, "NOASSERTION"}
     ):
-        raise ValueError("Git history repository license does not match allowlist")
+        raise ValueError(
+            "Git history revision license classifier conflicts with allowlist"
+        )
+    license_path = license_payload.get("path")
+    license_blob_sha = license_payload.get("sha")
+    license_size = license_payload.get("size")
+    license_content = license_payload.get("content")
+    license_html_url = license_payload.get("html_url")
+    license_download_url = license_payload.get("download_url")
+    if (
+        not isinstance(license_path, str)
+        or not license_path
+        or not isinstance(license_blob_sha, str)
+        or _GIT_OBJECT_ID.fullmatch(license_blob_sha) is None
+        or isinstance(license_size, bool)
+        or not isinstance(license_size, int)
+        or license_size <= 0
+        or license_payload.get("encoding") != "base64"
+        or not isinstance(license_content, str)
+        or not isinstance(license_html_url, str)
+        or license_html_url != f"{expected_url}/blob/{head_revision}/{license_path}"
+        or not isinstance(license_download_url, str)
+        or license_download_url
+        != (
+            "https://raw.githubusercontent.com/"
+            f"{repository}/{head_revision}/{license_path}"
+        )
+    ):
+        raise ValueError("Git history revision license file identity is invalid")
+    try:
+        license_bytes = base64.b64decode(
+            "".join(license_content.split()), validate=True
+        )
+    except (ValueError, base64.binascii.Error) as error:
+        raise ValueError("Git history revision license content is invalid") from error
+    if len(license_bytes) != license_size:
+        raise ValueError("Git history revision license size does not match content")
+    if (
+        license_classifier["spdx_id"] == "NOASSERTION"
+        and license_binding_policy is None
+    ):
+        raise ValueError("Git history NOASSERTION license is not independently pinned")
+    if license_binding_policy is not None:
+        raw_approved = license_binding_policy.get("approved_blobs")
+        if (
+            license_binding_policy.get("schema_version")
+            != LICENSE_BINDING_POLICY_SCHEMA
+            or license_binding_policy.get("approved_path") != license_path
+            or not isinstance(raw_approved, list)
+            or not any(
+                isinstance(item, dict)
+                and item.get("git_blob_sha") == license_blob_sha
+                and item.get("sha256") == hashlib.sha256(license_bytes).hexdigest()
+                and item.get("size") == license_size
+                for item in raw_approved
+            )
+        ):
+            raise ValueError("Git history revision license is not independently pinned")
     return {
         "repository_response_sha256": hashlib.sha256(
             _canonical_bytes(repo)
@@ -230,6 +340,15 @@ def validate_remote_identity(
         "head_revision": head_revision,
         "repository_url": expected_url,
         "license": license_id,
+        "repository_license_spdx_id": str(repository_license["spdx_id"]),
+        "license_file_classifier_spdx_id": str(license_classifier["spdx_id"]),
+        "license_file_revision": head_revision,
+        "license_file_path": license_path,
+        "license_file_git_blob_sha": license_blob_sha,
+        "license_file_size": license_size,
+        "license_file_sha256": hashlib.sha256(license_bytes).hexdigest(),
+        "license_file_html_url": license_html_url,
+        "license_file_download_url": license_download_url,
     }
 
 
@@ -264,6 +383,8 @@ def _source_manifest(
     source_client: dict[str, str],
     history_client: dict[str, str],
     remote_identity: dict[str, Any],
+    license_binding: dict[str, Any],
+    root_revision: str,
     max_commits: int,
     skip_commits: int,
     max_record_tokens: int,
@@ -339,6 +460,14 @@ def _source_manifest(
                 "commit_was_truncated": was_truncated,
             }
         )
+    public_policy = {
+        "record_id": str(authorization.get("record_id") or ""),
+        "sha256": policy_sha256,
+        "repository_policy_sha256": _repository_policy_sha256(repository, policy),
+        "license_binding_policy_sha256": str(
+            license_binding.get("policy_sha256") or ""
+        ),
+    }
     unsigned = {
         "schema_version": SOURCE_SCHEMA,
         "source_origin": "real_public",
@@ -347,10 +476,7 @@ def _source_manifest(
         "license": str(policy.get("license") or ""),
         "exported_at": exported_at,
         "authorization": authorization,
-        "public_policy": {
-            "record_id": str(authorization.get("record_id") or ""),
-            "sha256": policy_sha256,
-        },
+        "public_policy": public_policy,
         "source_client": source_client,
         "history_client": history_client,
         "remote_identity": remote_identity,
@@ -362,9 +488,10 @@ def _source_manifest(
         },
         "parser": {
             "name": "git_first_parent_patch",
-            "revision": "v4",
+            "revision": "v5",
             "first_parent": True,
             "source_text_deduplication": "global_sha256_fail_closed",
+            "root_revision": root_revision,
             "max_commits": max_commits,
             "skip_commits": skip_commits,
             "max_record_tokens": max_record_tokens,
@@ -378,7 +505,9 @@ def _source_manifest(
         "truncation_quality": truncation_quality,
         "truncated_commit_index": truncated_commit_index,
         "record_index": record_index,
+        "license_binding": license_binding,
     }
+    _validate_public_export_governance(unsigned)
     return attach_attestation(unsigned, key, purpose="source_manifest")
 
 
@@ -520,6 +649,7 @@ def _deduplicate_extraction(
         head_revision=extraction.head_revision,
         reject_reasons=dict(rejects),
         truncated_commits=extraction.truncated_commits,
+        commit_revisions=extraction.commit_revisions,
     )
 
 
@@ -617,7 +747,19 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             if checkout_key not in validated_checkouts:
                 _validate_checkout(checkout, repository)
                 validated_checkouts.add(checkout_key)
-            return int(_git(checkout, "rev-list", "--first-parent", "--count", "HEAD"))
+            root_revision = _git(checkout, "rev-parse", "HEAD")
+            if _GIT_OBJECT_ID.fullmatch(root_revision) is None:
+                raise ValueError("Git history source root revision is invalid")
+            source["root_revision"] = root_revision
+            return int(
+                _git(
+                    checkout,
+                    "rev-list",
+                    "--first-parent",
+                    "--count",
+                    root_revision,
+                )
+            )
 
         raw_sources = _source_slices(
             raw_sources,
@@ -641,17 +783,35 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         if checkout_key not in validated_checkouts:
             _validate_checkout(checkout, repository)
             validated_checkouts.add(checkout_key)
+        root_revision = str(source.get("root_revision") or "")
+        if not root_revision:
+            root_revision = _git(checkout, "rev-parse", "HEAD")
+        if _GIT_OBJECT_ID.fullmatch(root_revision) is None:
+            raise ValueError("Git history source root revision is invalid")
         extraction = extract_first_parent_history(
             checkout,
             repository=repository,
             tokenizer=tokenizer,
             max_commits=int(source.get("max_commits") or 0),
             skip_commits=int(source.get("skip_commits") or 0),
+            root_revision=root_revision,
             max_record_tokens=max_record_tokens,
             max_chunks_per_commit=max_chunks_per_commit,
         )
         extraction = _deduplicate_extraction(extraction, seen_source_text_sha256)
         license_id = str(policy.get("license") or "")
+        raw_license_binding_policy = policy.get("license_binding")
+        if raw_license_binding_policy is None:
+            raise ValueError(
+                "repository has no license-binding v2 policy for materialization"
+            )
+        if not isinstance(raw_license_binding_policy, dict):
+            raise TypeError("repository license-binding v2 policy is invalid")
+        license_binding = bind_git_license_history(
+            checkout,
+            extraction.commit_revisions,
+            raw_license_binding_policy,
+        )
         remote_key = (repository, extraction.head_revision, license_id)
         remote_identity = remote_identities.get(remote_key)
         if remote_identity is None:
@@ -659,8 +819,26 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 repository,
                 extraction.head_revision,
                 license_id,
+                license_binding_policy=raw_license_binding_policy,
             )
             remote_identities[remote_key] = remote_identity
+        last_blob = str(license_binding["commit_bindings"][-1]["git_blob_sha"])
+        observed = next(
+            item
+            for item in license_binding["observed_license_blobs"]
+            if item["git_blob_sha"] == last_blob
+        )
+        if (
+            remote_identity.get("license_file_revision") != extraction.head_revision
+            or remote_identity.get("license_file_path")
+            != license_binding["policy"]["approved_path"]
+            or remote_identity.get("license_file_git_blob_sha") != last_blob
+            or remote_identity.get("license_file_sha256") != observed["sha256"]
+            or remote_identity.get("license_file_size") != observed["size"]
+        ):
+            raise ValueError(
+                "Git history remote license tip does not match local history"
+            )
         source_manifest = _source_manifest(
             repository=repository,
             policy=policy,
@@ -670,6 +848,8 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             source_client=source_client,
             history_client=history_client,
             remote_identity=remote_identity,
+            license_binding=license_binding,
+            root_revision=root_revision,
             max_commits=int(source.get("max_commits") or 0),
             skip_commits=int(source.get("skip_commits") or 0),
             max_record_tokens=max_record_tokens,
@@ -702,7 +882,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             url=f"https://github.com/{repository}",
             license=str(policy.get("license") or ""),
             retrieved_at=exported_at,
-            parser="git_first_parent_patch@4",
+            parser="git_first_parent_patch@5",
             sha256=source_digest,
             revision=extraction.head_revision,
             source_path=str(manifest_path),
