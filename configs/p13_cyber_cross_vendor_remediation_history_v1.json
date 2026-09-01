@@ -1,0 +1,26 @@
+{
+  "schema_version": "longworld.cyber-cross-cve-materialization.v1",
+  "world_id": "cyber_cross_vendor_remediation_2018_2025_v1",
+  "signed_manifest": "data/source_inventory/p13_cyber_cross_vendor_remediation_v1/cyber_workflow_manifest.signed.v1.json",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "bands": [
+    {
+      "name": "16k",
+      "lower_tokens": 16000,
+      "upper_tokens": 16384
+    },
+    {
+      "name": "32k",
+      "lower_tokens": 32000,
+      "upper_tokens": 32768
+    },
+    {
+      "name": "64k",
+      "lower_tokens": 64000,
+      "upper_tokens": 65536
+    }
+  ]
+}

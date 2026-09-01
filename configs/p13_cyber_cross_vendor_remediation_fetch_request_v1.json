@@ -1,0 +1,35 @@
+{
+  "schema_version": "longworld.cyber-fetch-request.v1",
+  "user_agent": "LongWorld/0.2 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "p13-public-cyber-cross-vendor-remediation-v1",
+    "scope": "bounded read-only export of public NVD CVE and CISA KEV records for a cross-vendor remediation workflow",
+    "basis": "project-owner authorization for public-source research diagnostics",
+    "reviewed_at": "2026-09-01T00:00:00Z",
+    "allowed_actions": [
+      "fetch_cisa_kev",
+      "fetch_nvd_cve"
+    ]
+  },
+  "cve_ids": [
+    "CVE-2018-13379",
+    "CVE-2019-11510",
+    "CVE-2019-19781",
+    "CVE-2020-1472",
+    "CVE-2020-5902",
+    "CVE-2021-26855",
+    "CVE-2021-34527",
+    "CVE-2021-41773",
+    "CVE-2021-44228",
+    "CVE-2022-26134",
+    "CVE-2023-34362",
+    "CVE-2023-46805",
+    "CVE-2024-1709",
+    "CVE-2024-21887",
+    "CVE-2024-3400",
+    "CVE-2024-47575",
+    "CVE-2025-53770"
+  ],
+  "requests_per_second": 0.1,
+  "max_retries": 2
+}

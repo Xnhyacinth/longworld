@@ -35,6 +35,8 @@ from longworld.core.provenance import (
 DOMAIN_CUMULATIVE_HISTORY_SCHEMA = "longworld.domain-cumulative-history.v1"
 KEV_HISTORY_REPLAY_REVISION = "longworld.kev-catalog-history-replay.v1"
 KEV_PIPELINE_REPLAY_MANIFEST_SCHEMA = "longworld.kev-history-replay-manifest.v1"
+CROSS_CVE_HISTORY_SCHEMA = "longworld.cyber-cross-cve-history.v1"
+CROSS_CVE_HISTORY_REPLAY_REVISION = "longworld.cyber-cross-cve-replay.v1"
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _CVE_ID = re.compile(r"^CVE-(?:1999|2\d{3})-\d{4,}$")
@@ -52,6 +54,11 @@ _ENTRY_FIELDS = {
     "notes",
     "cwes",
 }
+_CROSS_CVE_QUESTION = (
+    "Across the NVD-to-CISA KEV joins, reconstruct every selected CVE "
+    "remediation record, verify date-then-CVE chronology, and return ransomware "
+    "use, status, remediation-window extrema, and vendor/year checkpoints."
+)
 
 
 @dataclass(frozen=True)
@@ -327,6 +334,626 @@ def _answer(header: dict[str, Any], entries: Sequence[dict[str, Any]]) -> str:
             "year_end_checkpoints": checkpoints,
         }
     )
+
+
+def _cross_cve_line_id(record: dict[str, Any]) -> str:
+    if record.get("record_type") == "cyber_source_record":
+        return str(record.get("record_id") or "")
+    if record.get("record_type") == "cyber_source_relation":
+        return str(record.get("relation_id") or "")
+    return ""
+
+
+def _parse_cross_cve_context(context: object) -> list[dict[str, Any]]:
+    if not isinstance(context, str) or not context:
+        raise ProvenanceError("cross-CVE context is empty")
+    records: list[dict[str, Any]] = []
+    identities: set[str] = set()
+    for line in context.splitlines():
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as error:
+            raise ProvenanceError("cross-CVE context has invalid JSON") from error
+        identity = _cross_cve_line_id(record) if isinstance(record, dict) else ""
+        if (
+            not isinstance(record, dict)
+            or _canonical_json(record) != line
+            or not identity
+            or identity in identities
+        ):
+            raise ProvenanceError("cross-CVE context record is invalid")
+        identities.add(identity)
+        records.append(record)
+    return records
+
+
+def _cross_cve_joined_records(
+    records: Sequence[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    source_records: dict[str, dict[str, Any]] = {}
+    relations: dict[str, dict[str, Any]] = {}
+    for record in records:
+        if record.get("record_type") == "cyber_source_record":
+            record_id = str(record.get("record_id") or "")
+            cve_id = str(record.get("cve_id") or "")
+            kind = str(record.get("kind") or "")
+            text = record.get("text")
+            parsed_url = urlparse(str(record.get("source_url") or ""))
+            if (
+                kind not in {"nvd_cve", "cisa_kev_entry"}
+                or _CVE_ID.fullmatch(cve_id) is None
+                or record_id
+                != (f"nvd:{cve_id}" if kind == "nvd_cve" else f"cisa-kev:{cve_id}")
+                or parsed_url.scheme not in {"http", "https"}
+                or not parsed_url.netloc
+                or _SHA256.fullmatch(str(record.get("source_sha256") or "")) is None
+                or not isinstance(text, str)
+                or record.get("text_sha256") != _sha256_text(text)
+            ):
+                raise ProvenanceError("cross-CVE source record is invalid")
+            try:
+                payload = json.loads(text)
+            except json.JSONDecodeError as error:
+                raise ProvenanceError("cross-CVE source text is invalid") from error
+            identity_field = "id" if kind == "nvd_cve" else "cveID"
+            if not isinstance(payload, dict) or payload.get(identity_field) != cve_id:
+                raise ProvenanceError("cross-CVE source identity is invalid")
+            source_records[record_id] = {**record, "payload": payload}
+        elif record.get("record_type") == "cyber_source_relation":
+            relation_id = str(record.get("relation_id") or "")
+            if record.get("kind") != "listed_in_kev" or not relation_id.startswith(
+                "cyber:listed-in-kev:CVE-"
+            ):
+                raise ProvenanceError("cross-CVE source relation is invalid")
+            relations[relation_id] = record
+        else:
+            raise ProvenanceError("cross-CVE record type is invalid")
+
+    joined: list[dict[str, Any]] = []
+    for relation_id, relation in relations.items():
+        cve_id = relation_id.removeprefix("cyber:listed-in-kev:")
+        nvd = source_records.get(f"nvd:{cve_id}")
+        kev = source_records.get(f"cisa-kev:{cve_id}")
+        if (
+            nvd is None
+            or kev is None
+            or relation.get("source_record_id") != kev["record_id"]
+            or relation.get("target_record_id") != nvd["record_id"]
+        ):
+            continue
+        nvd_payload = nvd["payload"]
+        kev_payload = kev["payload"]
+        required = (
+            "dateAdded",
+            "dueDate",
+            "knownRansomwareCampaignUse",
+            "product",
+            "requiredAction",
+            "vendorProject",
+        )
+        if not isinstance(nvd_payload.get("vulnStatus"), str) or not all(
+            isinstance(kev_payload.get(field), str) for field in required
+        ):
+            raise ProvenanceError("cross-CVE answer facts are incomplete")
+        date_added = date.fromisoformat(kev_payload["dateAdded"])
+        due_date = date.fromisoformat(kev_payload["dueDate"])
+        joined.append(
+            {
+                "cve_id": cve_id,
+                "vulnerability_status": nvd_payload["vulnStatus"],
+                "date_added": date_added.isoformat(),
+                "due_date": due_date.isoformat(),
+                "remediation_window_days": (due_date - date_added).days,
+                "known_ransomware_use": kev_payload["knownRansomwareCampaignUse"],
+                "vendor": kev_payload["vendorProject"],
+                "product": kev_payload["product"],
+                "required_action": kev_payload["requiredAction"],
+            }
+        )
+    if len(joined) < 2:
+        raise ProvenanceError("cross-CVE replay requires at least two complete joins")
+    return sorted(joined, key=lambda item: (item["date_added"], item["cve_id"]))
+
+
+def _cross_cve_answer(joined: Sequence[dict[str, Any]]) -> str:
+    vendor_counts: dict[str, int] = {}
+    year_counts: dict[str, int] = {}
+    for item in joined:
+        vendor_counts[item["vendor"]] = vendor_counts.get(item["vendor"], 0) + 1
+        year = item["date_added"][:4]
+        year_counts[year] = year_counts.get(year, 0) + 1
+    maximum = max(
+        joined,
+        key=lambda item: (
+            item["remediation_window_days"],
+            item["date_added"],
+            item["cve_id"],
+        ),
+    )
+    return _canonical_json(
+        {
+            "selected_cve_count": len(joined),
+            "date_then_cve_order_valid": all(
+                (left["date_added"], left["cve_id"])
+                <= (right["date_added"], right["cve_id"])
+                for left, right in pairwise(joined)
+            ),
+            "known_ransomware_count": sum(
+                item["known_ransomware_use"] == "Known" for item in joined
+            ),
+            "maximum_remediation_window": {
+                "cve_id": maximum["cve_id"],
+                "days": maximum["remediation_window_days"],
+            },
+            "vendor_counts": [
+                {"vendor": vendor, "count": count}
+                for vendor, count in sorted(vendor_counts.items())
+            ],
+            "year_counts": [
+                {"year": year, "count": count}
+                for year, count in sorted(year_counts.items())
+            ],
+            "joined_records": list(joined),
+        }
+    )
+
+
+def replay_cross_cve_remediation_history(
+    task: dict[str, Any],
+    *,
+    counterfactual: bool = False,
+    evidence_ids: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    """Replay a cross-CVE NVD/KEV aggregation from complete source-role records."""
+    try:
+        records = _parse_cross_cve_context(task.get("context"))
+        if evidence_ids is not None:
+            selected = list(evidence_ids)
+            if (
+                isinstance(evidence_ids, (str, bytes))
+                or any(not isinstance(value, str) or not value for value in selected)
+                or len(selected) != len(set(selected))
+            ):
+                raise ProvenanceError("cross-CVE evidence selection is invalid")
+            available = {_cross_cve_line_id(record) for record in records}
+            if not set(selected) <= available:
+                raise ProvenanceError("cross-CVE evidence selection is invalid")
+            selected_ids = set(selected)
+            records = [
+                record
+                for record in records
+                if _cross_cve_line_id(record) in selected_ids
+            ]
+        if counterfactual:
+            twin = task.get("counterfactual_twin")
+            if not isinstance(twin, dict):
+                raise ProvenanceError("cross-CVE counterfactual is missing")
+            matches = [
+                record
+                for record in records
+                if record.get("record_type") == "cyber_source_record"
+                and record.get("record_id") == twin.get("record_id")
+            ]
+            if (
+                len(matches) != 1
+                or twin.get("source_origin") != "synthetic_counterfactual"
+                or twin.get("provenance_operation") != "replace_due_date"
+                or not isinstance(twin.get("parent_value"), str)
+                or not isinstance(twin.get("value"), str)
+                or twin["parent_value"] == twin["value"]
+            ):
+                raise ProvenanceError("cross-CVE counterfactual is invalid")
+            record = matches[0]
+            payload = json.loads(str(record["text"]))
+            if payload.get("dueDate") != twin["parent_value"]:
+                raise ProvenanceError("cross-CVE counterfactual parent is invalid")
+            date.fromisoformat(twin["value"])
+            payload["dueDate"] = twin["value"]
+            record["text"] = _canonical_json(payload)
+            record["text_sha256"] = _sha256_text(record["text"])
+        joined = _cross_cve_joined_records(records)
+        source_record_ids = sorted(
+            record["record_id"]
+            for record in records
+            if record.get("record_type") == "cyber_source_record"
+        )
+        relation_ids = sorted(
+            record["relation_id"]
+            for record in records
+            if record.get("record_type") == "cyber_source_relation"
+        )
+        authentic_edges = [
+            [
+                f"cisa-kev:{item['cve_id']}",
+                f"nvd:{item['cve_id']}",
+                f"cyber:listed-in-kev:{item['cve_id']}",
+            ]
+            for item in joined
+        ]
+        derived_edges = [
+            [
+                f"nvd:{left['cve_id']}",
+                f"nvd:{right['cve_id']}",
+                (f"verified-derived-order:nvd:{left['cve_id']}:nvd:{right['cve_id']}"),
+            ]
+            for left, right in pairwise(joined)
+        ]
+        return {
+            "answer": _cross_cve_answer(joined),
+            "source_record_ids": source_record_ids,
+            "source_relation_ids": relation_ids,
+            "authentic_source_relation_edges": authentic_edges,
+            "verified_derived_order_relation_edges": derived_edges,
+            "event_count": len(source_record_ids) + len(relation_ids),
+            "strict_support_event_count": len(source_record_ids) + len(relation_ids),
+            "proof_depth": len(joined),
+            "hop_count": len(joined),
+        }
+    except (KeyError, TypeError, ValueError, ProvenanceError):
+        return {
+            "answer": "unknown",
+            "source_record_ids": [],
+            "source_relation_ids": [],
+            "authentic_source_relation_edges": [],
+            "verified_derived_order_relation_edges": [],
+            "event_count": 0,
+            "strict_support_event_count": 0,
+            "proof_depth": 0,
+            "hop_count": 0,
+        }
+
+
+def _cross_cve_source_units(
+    manifest: dict[str, Any],
+) -> list[tuple[str, str, list[str]]]:
+    raw_records = manifest.get("records")
+    raw_relations = manifest.get("relations")
+    if not isinstance(raw_records, list) or not isinstance(raw_relations, list):
+        raise ProvenanceError("cross-CVE source manifest is incomplete")
+    records = {
+        str(record.get("record_id") or ""): record
+        for record in raw_records
+        if isinstance(record, dict)
+    }
+    relations = {
+        str(relation.get("relation_id") or ""): relation
+        for relation in raw_relations
+        if isinstance(relation, dict)
+    }
+    if len(records) != len(raw_records) or len(relations) != len(raw_relations):
+        raise ProvenanceError("cross-CVE source manifest repeats identities")
+    units: list[tuple[str, str, list[str]]] = []
+    joined_record_ids: set[str] = set()
+    for relation_id, relation in relations.items():
+        if not relation_id.startswith("cyber:listed-in-kev:"):
+            raise ProvenanceError("cross-CVE source relation is invalid")
+        cve_id = relation_id.removeprefix("cyber:listed-in-kev:")
+        nvd = records.get(f"nvd:{cve_id}")
+        kev = records.get(f"cisa-kev:{cve_id}")
+        if nvd is None or kev is None:
+            raise ProvenanceError("cross-CVE source join is incomplete")
+        joined_record_ids.update((nvd["record_id"], kev["record_id"]))
+        documents: list[str] = []
+        for record in (nvd, kev):
+            documents.append(
+                _canonical_json(
+                    {
+                        "record_type": "cyber_source_record",
+                        "record_id": record["record_id"],
+                        "kind": record["kind"],
+                        "cve_id": record["cve_id"],
+                        "source_url": record["source_url"],
+                        "source_sha256": record["source_sha256"],
+                        "text_sha256": record["text_sha256"],
+                        "text": record["text"],
+                    }
+                )
+            )
+        documents.append(
+            _canonical_json(
+                {
+                    "record_type": "cyber_source_relation",
+                    "relation_id": relation_id,
+                    "kind": relation["kind"],
+                    "source_record_id": relation["source_record_id"],
+                    "target_record_id": relation["target_record_id"],
+                }
+            )
+        )
+        try:
+            date_added = str(json.loads(str(kev["text"]))["dateAdded"])
+            date.fromisoformat(date_added)
+        except (KeyError, TypeError, json.JSONDecodeError, ValueError) as error:
+            raise ProvenanceError("cross-CVE source date is invalid") from error
+        units.append((date_added, cve_id, documents))
+    if joined_record_ids != set(records):
+        raise ProvenanceError("cross-CVE source join coverage is incomplete")
+    if len(units) < 2 or len(units) > 20:
+        raise ProvenanceError("cross-CVE adapter requires 2 to 20 complete joins")
+    return sorted(units, key=lambda item: (item[0], item[1]))
+
+
+def _cross_cve_subset_documents(
+    units: Sequence[tuple[str, str, list[str]]], mask: int
+) -> list[str]:
+    return [
+        document
+        for index, (_date_added, _cve_id, documents) in enumerate(units)
+        if mask & (1 << index)
+        for document in documents
+    ]
+
+
+def _select_cross_cve_band_mask(
+    units: Sequence[tuple[str, str, list[str]]],
+    *,
+    required_mask: int,
+    band: HistoryBand,
+    token_counter: Callable[[str], int],
+) -> tuple[int, list[str], int]:
+    unit_weights = [token_counter(SEP.join(unit[2])) for unit in units]
+    for mask in range(1, 1 << len(units)):
+        if mask & required_mask != required_mask or mask.bit_count() < max(
+            2, required_mask.bit_count() + 1
+        ):
+            continue
+        approximate = (
+            sum(
+                weight
+                for index, weight in enumerate(unit_weights)
+                if mask & (1 << index)
+            )
+            + max(0, mask.bit_count() - 1) * token_counter(SEP)
+            + token_counter(_CROSS_CVE_QUESTION)
+            + 256
+        )
+        if not band.lower_tokens - 4_096 <= approximate <= band.upper_tokens + 4_096:
+            continue
+        documents = _cross_cve_subset_documents(units, mask)
+        tokens = token_counter(
+            wrap_prompt(_CROSS_CVE_QUESTION, SEP.join(documents), "first")
+        )
+        if band.lower_tokens <= tokens <= band.upper_tokens:
+            return mask, documents, tokens
+    raise ProvenanceError(f"verified cross-CVE source cannot fill {band.name}")
+
+
+def build_cross_cve_remediation_history_candidates(
+    manifest: dict[str, Any],
+    *,
+    world_id: str,
+    source_binding: dict[str, Any],
+    bands: Sequence[HistoryBand],
+    token_counter: Callable[[str], int],
+    tokenizer_model_id: str,
+    tokenizer_revision: str,
+) -> list[dict[str, Any]]:
+    """Build nested exact-band cross-source CVE histories without padding."""
+    if (
+        not world_id
+        or not tokenizer_model_id
+        or _COMMIT_SHA.fullmatch(tokenizer_revision) is None
+        or [band.name for band in bands] != list(_EXPECTED_BANDS[: len(bands)])
+    ):
+        raise ProvenanceError("cross-CVE materialization identity is invalid")
+    required_binding = {
+        "source_manifest_sha256",
+        "fetch_inventory_sha256",
+        "authorization_record_id",
+        "observed_at",
+    }
+    if set(source_binding) != required_binding or any(
+        _SHA256.fullmatch(str(source_binding.get(field) or "")) is None
+        for field in ("source_manifest_sha256", "fetch_inventory_sha256")
+    ):
+        raise ProvenanceError("cross-CVE source binding is invalid")
+    if not str(source_binding.get("authorization_record_id") or ""):
+        raise ProvenanceError("cross-CVE authorization binding is invalid")
+    _parse_timestamp(str(source_binding.get("observed_at") or ""), "observed_at")
+
+    units = _cross_cve_source_units(manifest)
+    rows: list[dict[str, Any]] = []
+    selected_mask = 0
+    previous_cves: set[str] = set()
+    for band in bands:
+        selected_mask, documents, context_tokens = _select_cross_cve_band_mask(
+            units,
+            required_mask=selected_mask,
+            band=band,
+            token_counter=token_counter,
+        )
+        context = "\n".join(documents)
+        provisional = {
+            "context": context,
+            "counterfactual_twin": {},
+        }
+        replay = replay_cross_cve_remediation_history(provisional)
+        if replay["answer"] == "unknown":
+            raise ProvenanceError("cross-CVE selected source does not replay")
+        joined = json.loads(replay["answer"])["joined_records"]
+        target = joined[-1]
+        replacement = (
+            "2099-12-31" if target["due_date"] != "2099-12-31" else "2098-12-31"
+        )
+        twin = {
+            "record_id": f"cisa-kev:{target['cve_id']}",
+            "source_origin": "synthetic_counterfactual",
+            "provenance_operation": "replace_due_date",
+            "parent_value": target["due_date"],
+            "value": replacement,
+        }
+        task = {"context": context, "counterfactual_twin": twin}
+        replay = replay_cross_cve_remediation_history(task)
+        selected_cves = {item["cve_id"] for item in joined}
+        if not previous_cves < selected_cves:
+            raise ProvenanceError("cross-CVE semantic state did not grow")
+        previous_cves = selected_cves
+        row: dict[str, Any] = {
+            "schema_version": CROSS_CVE_HISTORY_SCHEMA,
+            "data_stage": "candidate_history",
+            "train_ready": False,
+            "production_eligible": False,
+            "promotion_eligible": False,
+            "complete_world": False,
+            "promoted": False,
+            "generation_integration": "disabled",
+            "world_id": world_id,
+            "domain": "cyber",
+            "workflow_kind": "real_source_derived",
+            "query_type": "cross_cve_remediation_reconstruction",
+            "answer_program_id": "cyber.cross_cve_remediation_reconstruction.v1",
+            "answer_program_operations": [
+                "JOIN_NVD_CISA_BY_CVE",
+                "ORDER_DATE_THEN_CVE",
+                "GROUP_VENDOR_AND_YEAR",
+                "COUNT_KNOWN_RANSOMWARE",
+                "SELECT_MAX_REMEDIATION_WINDOW",
+            ],
+            "semantic_growth_group_id": f"{world_id}|cross-cve-remediation",
+            "length_bucket": band.name,
+            "question": _CROSS_CVE_QUESTION,
+            "context": context,
+            "context_sha256": _sha256_text(context),
+            "answer": replay["answer"],
+            "cf_answer": replay_cross_cve_remediation_history(
+                task, counterfactual=True
+            )["answer"],
+            "counterfactual_twin": twin,
+            "source_binding": deepcopy(source_binding),
+            "source_record_ids": replay["source_record_ids"],
+            "source_relation_ids": replay["source_relation_ids"],
+            "essential_evidence_ids": [
+                *replay["source_record_ids"],
+                *replay["source_relation_ids"],
+            ],
+            "event_count": replay["event_count"],
+            "strict_support_event_count": replay["strict_support_event_count"],
+            "graph": {
+                "proof_depth": replay["proof_depth"],
+                "hop_count": replay["hop_count"],
+            },
+            "authentic_source_relation_edges": replay[
+                "authentic_source_relation_edges"
+            ],
+            "verified_derived_order_relation_edges": replay[
+                "verified_derived_order_relation_edges"
+            ],
+            "tokenizer_model_id": tokenizer_model_id,
+            "tokenizer_revision": tokenizer_revision,
+            "tokenizer_context_tokens": context_tokens,
+            "actual_context_tokens": context_tokens,
+            "band_lower_tokens": band.lower_tokens,
+            "band_upper_tokens": band.upper_tokens,
+            "semantic_tokens": {
+                "internal": context_tokens,
+                "event_bearing": context_tokens,
+                "proof_bearing": context_tokens,
+                "causal_supporting": 0,
+                "generic_background": 0,
+            },
+            "real_source_verified": False,
+            "source_verified_at_materialization": True,
+            "real_source_token_ratio": 1.0,
+            "strict_replay_revision": CROSS_CVE_HISTORY_REPLAY_REVISION,
+        }
+        audit = audit_cross_cve_remediation_history_candidate(
+            row, token_counter=token_counter
+        )
+        if not audit or not all(audit.values()):
+            failed = sorted(name for name, passed in audit.items() if not passed)
+            raise ProvenanceError(
+                "cross-CVE history candidate failed: " + ",".join(failed)
+            )
+        rows.append(row)
+    return rows
+
+
+def audit_cross_cve_remediation_history_candidate(
+    task: dict[str, Any], *, token_counter: Callable[[str], int]
+) -> dict[str, bool]:
+    """Recompute answer, CF, evidence necessity, corruption and exact length."""
+    replay = replay_cross_cve_remediation_history(task)
+    cf_replay = replay_cross_cve_remediation_history(task, counterfactual=True)
+    essentials = task.get("essential_evidence_ids")
+    essentials = essentials if isinstance(essentials, list) else []
+    removals = [
+        replay_cross_cve_remediation_history(
+            task,
+            evidence_ids=[value for value in essentials if value != removed],
+        )["answer"]
+        for removed in essentials
+    ]
+    singles = [
+        replay_cross_cve_remediation_history(task, evidence_ids=[value])["answer"]
+        for value in essentials
+    ]
+    corrupted = deepcopy(task)
+    lines = str(corrupted.get("context") or "").splitlines()
+    corruption_fails = False
+    source_index = next(
+        (
+            index
+            for index, line in enumerate(lines)
+            if json.loads(line).get("record_type") == "cyber_source_record"
+        ),
+        None,
+    )
+    if source_index is not None:
+        record = json.loads(lines[source_index])
+        record["text"] += " CORRUPTED"
+        lines[source_index] = _canonical_json(record)
+        corrupted["context"] = "\n".join(lines)
+        corruption_fails = (
+            replay_cross_cve_remediation_history(corrupted)["answer"] == "unknown"
+        )
+    document_context = SEP.join(str(task.get("context") or "").splitlines())
+    recomputed_tokens = token_counter(
+        wrap_prompt(str(task.get("question") or ""), document_context, "first")
+    )
+    declared_tokens = task.get("tokenizer_context_tokens")
+    lower = task.get("band_lower_tokens")
+    upper = task.get("band_upper_tokens")
+    return {
+        "strict_replay_sufficient": replay["answer"] == task.get("answer"),
+        "counterfactual_replay_sufficient": cf_replay["answer"]
+        == task.get("cf_answer"),
+        "counterfactual_changes_answer": cf_replay["answer"] != replay["answer"],
+        "remove_one_fails": bool(removals)
+        and all(answer != task.get("answer") for answer in removals),
+        "essential_single_doc_insufficient": bool(singles)
+        and all(answer != task.get("answer") for answer in singles),
+        "semantic_corruption_fails": corruption_fails,
+        "answer_surface_free": str(task.get("answer") or "") not in document_context,
+        "source_records_replayed": task.get("source_record_ids")
+        == replay["source_record_ids"],
+        "source_relations_replayed": task.get("source_relation_ids")
+        == replay["source_relation_ids"],
+        "graph_replayed": task.get("event_count") == replay["event_count"]
+        and task.get("strict_support_event_count")
+        == replay["strict_support_event_count"]
+        and (task.get("graph") or {}).get("proof_depth") == replay["proof_depth"]
+        and (task.get("graph") or {}).get("hop_count") == replay["hop_count"]
+        and task.get("authentic_source_relation_edges")
+        == replay["authentic_source_relation_edges"]
+        and task.get("verified_derived_order_relation_edges")
+        == replay["verified_derived_order_relation_edges"],
+        "exact_token_count_recomputed": isinstance(declared_tokens, int)
+        and not isinstance(declared_tokens, bool)
+        and declared_tokens == recomputed_tokens,
+        "exact_token_band_recomputed": isinstance(lower, int)
+        and isinstance(upper, int)
+        and lower <= recomputed_tokens <= upper,
+        "non_promoted_boundary": all(
+            task.get(field) is False
+            for field in (
+                "train_ready",
+                "production_eligible",
+                "promotion_eligible",
+                "complete_world",
+                "promoted",
+            )
+        ),
+    }
 
 
 def replay_kev_catalog_history(
