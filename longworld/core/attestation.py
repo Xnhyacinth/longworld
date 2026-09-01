@@ -37,6 +37,7 @@ PURPOSE_ROLES = {
     "source_manifest": "source",
     "artifact_semantics": "source",
     "git_workflow": "source",
+    "git_remote_identity_receipt": "source",
     "episode_replay_bundle": "source",
     "source_workflow_bundle": "source",
     "source_workflow_component": "source",
@@ -48,7 +49,9 @@ PURPOSE_ROLES = {
     "release_gate_pass": "auditor",
     "sft_row": "promotion",
     "cpt_row": "promotion",
+    "git_packing_plan": "promotion",
     "quality_report": "report",
+    "git_reference_index": "report",
     "training_export_manifest": "report",
     "release_inventory": "report",
 }
