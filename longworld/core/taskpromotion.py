@@ -25,6 +25,10 @@ from longworld.core.financehistory import (
     audit_finance_pipeline_candidate,
     replay_finance_pipeline_selection,
 )
+from longworld.core.macrovintage import (
+    audit_macro_vintage_pipeline_candidate,
+    replay_macro_vintage_pipeline_selection,
+)
 from longworld.core.pack import SEP
 from longworld.core.promotion import (
     _APPROVED_EXACT_TOKENIZERS,
@@ -55,6 +59,7 @@ from longworld.core.taskproof import TaskProofError, compute_task_proof
 from longworld.core.taskreplaysidecar import (
     CYBER_KEV_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
+    MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     TASK_REPLAY_SIDECAR_PURPOSE,
     LoadedTaskReplaySidecar,
     task_candidate_content_commitment,
@@ -231,6 +236,29 @@ def _validate_sidecar_payload(
             or replay_contract.get("revision") != expected["replay_revision"]
         ):
             raise PromotionError("candidate Finance replay contract is inconsistent")
+    elif sidecar.registry_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
+        if candidate.get("domain") != "macro_economics":
+            raise PromotionError("task replay adapter does not match candidate domain")
+        source = candidate.get("source_binding")
+        if not isinstance(source, dict):
+            raise PromotionError("candidate Macro source binding is missing")
+        fetch_receipt = payload.get("fetch_receipt")
+        if (
+            not isinstance(fetch_receipt, dict)
+            or _canonical_sha256(fetch_receipt)
+            != source.get("fetch_receipt_sha256")
+        ):
+            raise PromotionError("candidate Macro source receipt is inconsistent")
+        expected = {
+            "workflow_manifest_sha256": source.get("workflow_manifest_sha256"),
+            "raw_source_sha256": source.get("raw_source_sha256"),
+            "fetch_inventory_sha256": source.get("fetch_inventory_sha256"),
+            "fetch_receipt": fetch_receipt,
+            "source_families": source.get("source_families"),
+            "authorization_record_id": source.get("authorization_record_id"),
+            "replay_revision": candidate.get("strict_replay_revision"),
+            **tokenizer_binding,
+        }
     else:
         raise PromotionError("task replay adapter is not registered for promotion")
     if (
@@ -301,6 +329,8 @@ def _adapter_audit(
                 )
             elif sidecar.registry_key == FINANCE_TASK_REPLAY_ADAPTER:
                 audit = audit_finance_pipeline_candidate(candidate)
+            elif sidecar.registry_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
+                audit = audit_macro_vintage_pipeline_candidate(candidate)
             else:
                 raise PromotionError(
                     "task replay adapter is not registered for promotion"
@@ -331,6 +361,12 @@ def _replay_selection(
             )
         if sidecar.registry_key == FINANCE_TASK_REPLAY_ADAPTER:
             return replay_finance_pipeline_selection(
+                candidate,
+                artifact_ids,
+                counterfactual=counterfactual,
+            )
+        if sidecar.registry_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
+            return replay_macro_vintage_pipeline_selection(
                 candidate,
                 artifact_ids,
                 counterfactual=counterfactual,
@@ -478,12 +514,17 @@ def _task_selection_metrics(
         if not isinstance(candidate_source_records, Mapping):
             raise PromotionError("Cyber replay artifact source mapping is missing")
         source_records_by_artifact = candidate_source_records
-    else:
+    elif sidecar.registry_key in {
+        FINANCE_TASK_REPLAY_ADAPTER,
+        MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
+    }:
         if "source_record_ids_by_artifact" in candidate:
             raise PromotionError(
-                "Finance candidate source mapping is not authoritative"
+                "task candidate source mapping is not authoritative"
             )
         source_records_by_artifact = {}
+    else:  # pragma: no cover - sidecar loading rejects this first
+        raise PromotionError("task replay adapter is not registered for promotion")
     replay_relation_artifact_ids = {
         artifact_id
         for artifact_id in artifact_index
@@ -528,11 +569,14 @@ def _task_selection_metrics(
         raise PromotionError("task replay semantic token counts are invalid")
     essential_source_units = {child for _parent, child in authentic_pairs}
     replayed_strict_support = replay.get("strict_support_event_count")
-    group_suffix = (
-        "kev-catalog-history"
-        if sidecar.registry_key == CYBER_KEV_TASK_REPLAY_ADAPTER
-        else "multi-filing-finance"
-    )
+    if sidecar.registry_key == CYBER_KEV_TASK_REPLAY_ADAPTER:
+        group_suffix = "kev-catalog-history"
+    elif sidecar.registry_key == FINANCE_TASK_REPLAY_ADAPTER:
+        group_suffix = "multi-filing-finance"
+    elif sidecar.registry_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
+        group_suffix = "macro-vintage-history"
+    else:  # pragma: no cover - sidecar loading rejects this first
+        raise PromotionError("task replay adapter is not registered for promotion")
     candidate_graph = candidate.get("graph")
     replay_proof_depth = replay.get("proof_depth")
     replay_hop_count = replay.get("hop_count")
@@ -792,8 +836,17 @@ def _source_metadata(candidate: dict[str, Any]) -> dict[str, Any]:
     relations = [*authentic, *derived]
     relation_id = _canonical_sha256(relations)[:20] if relations else ""
     authentic_relation_id = _canonical_sha256(authentic)[:20] if authentic else ""
+    real_source_verified = True
+    if candidate.get("domain") == "macro_economics":
+        real_source_verified = bool(
+            candidate.get("real_source_verified") is True
+            and candidate.get("source_attestation_verified") is True
+            and isinstance(candidate.get("task_replay_sidecar"), dict)
+        )
+        if not real_source_verified:
+            raise PromotionError("Macro source receipt is not source-attested")
     return {
-        "real_source_verified": True,
+        "real_source_verified": real_source_verified,
         "real_source_family_ids": source_families,
         "real_source_workflow_ids": workflow_ids,
         "workflow_ids": workflow_ids,
@@ -1033,7 +1086,9 @@ def promote_task_candidate(
         "strict_replay_revision": STRICT_REPLAY_REVISION,
         "strict_replay_answer": expected_answer,
         "tokenizer_asset_manifest_sha256": candidate["tokenizer_asset_manifest_sha256"],
-        "real_source_verified": True,
+        "real_source_verified": _source_metadata(candidate)[
+            "real_source_verified"
+        ],
         "task_replay_sidecar": _sidecar_binding(sidecar),
         "task_candidate_content_commitment": task_candidate_content_commitment(
             candidate

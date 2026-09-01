@@ -38,6 +38,11 @@ FINANCE_TASK_REPLAY_ADAPTER = (
     "longworld.financial-history-replay.v1",
     TASK_REPLAY_SIDECAR_SCHEMA,
 )
+MACRO_VINTAGE_TASK_REPLAY_ADAPTER = (
+    "macro.gdp_vintage_reconstruction.v1",
+    "longworld.macro-vintage-replay.v1",
+    TASK_REPLAY_SIDECAR_SCHEMA,
+)
 
 TaskReplayRegistryKey = tuple[str, str, str]
 _SHA256_LENGTH = 64
@@ -123,8 +128,8 @@ class LoadedTaskReplaySidecar:
 
 
 def _contract(key: TaskReplayRegistryKey) -> TaskReplayAdapterContract:
-    payload_fields = (
-        frozenset(
+    if key == CYBER_KEV_TASK_REPLAY_ADAPTER:
+        payload_fields = frozenset(
             {
                 "source_manifest_sha256",
                 "source_response_sha256",
@@ -136,8 +141,8 @@ def _contract(key: TaskReplayRegistryKey) -> TaskReplayAdapterContract:
                 "candidate_content_commitments",
             }
         )
-        if key == CYBER_KEV_TASK_REPLAY_ADAPTER
-        else frozenset(
+    elif key == FINANCE_TASK_REPLAY_ADAPTER:
+        payload_fields = frozenset(
             {
                 "signed_manifest_sha256",
                 "source_family",
@@ -149,7 +154,24 @@ def _contract(key: TaskReplayRegistryKey) -> TaskReplayAdapterContract:
                 "candidate_content_commitments",
             }
         )
-    )
+    elif key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
+        payload_fields = frozenset(
+            {
+                "workflow_manifest_sha256",
+                "raw_source_sha256",
+                "fetch_inventory_sha256",
+                "fetch_receipt",
+                "source_families",
+                "authorization_record_id",
+                "replay_revision",
+                "tokenizer_model_id",
+                "tokenizer_revision",
+                "tokenizer_asset_manifest_sha256",
+                "candidate_content_commitments",
+            }
+        )
+    else:
+        raise ProvenanceError("task replay adapter contract is not registered")
     return TaskReplayAdapterContract(*key, replay_payload_fields=payload_fields)
 
 
@@ -161,6 +183,7 @@ TASK_REPLAY_ADAPTER_REGISTRY: Mapping[
         for key in (
             CYBER_KEV_TASK_REPLAY_ADAPTER,
             FINANCE_TASK_REPLAY_ADAPTER,
+            MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
         )
     }
 )
@@ -179,6 +202,9 @@ def _verify_replay_payload(
         "source_response_sha256",
         "replay_manifest_sha256",
         "signed_manifest_sha256",
+        "workflow_manifest_sha256",
+        "raw_source_sha256",
+        "fetch_inventory_sha256",
     }
     if any(
         field in replay_payload and not _is_sha256(replay_payload[field])
@@ -212,11 +238,44 @@ def _verify_replay_payload(
     ):
         raise ProvenanceError("task replay sidecar content commitments are invalid")
     tokenizer_revision = replay_payload.get("tokenizer_revision")
+    source_families = replay_payload.get("source_families")
+    fetch_receipt = replay_payload.get("fetch_receipt")
+    retrieval = (
+        fetch_receipt.get("retrieval")
+        if isinstance(fetch_receipt, dict)
+        else None
+    )
     if (
         not isinstance(tokenizer_revision, str)
         or len(tokenizer_revision) != 40
         or any(character not in "0123456789abcdef" for character in tokenizer_revision)
         or replay_payload.get("replay_revision") != contract.adapter_revision
+        or (
+            contract.registry_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER
+            and (
+                not isinstance(source_families, list)
+                or not source_families
+                or any(
+                    not isinstance(value, str) or not value.strip()
+                    for value in source_families
+                )
+                or source_families != sorted(set(source_families))
+                or not isinstance(fetch_receipt, dict)
+                or set(fetch_receipt)
+                != {"started_at", "completed_at", "retrieval"}
+                or not str(fetch_receipt.get("started_at") or "")
+                or not str(fetch_receipt.get("completed_at") or "")
+                or not isinstance(retrieval, dict)
+                or retrieval.get("status") != 200
+                or retrieval.get("sha256")
+                != replay_payload.get("raw_source_sha256")
+                or not str(retrieval.get("requested_url") or "")
+                or not str(retrieval.get("final_url") or "")
+                or not isinstance(retrieval.get("raw_bytes"), int)
+                or isinstance(retrieval.get("raw_bytes"), bool)
+                or int(retrieval["raw_bytes"]) < 1
+            )
+        )
         or any(
             not isinstance(replay_payload.get(field), str)
             or not str(replay_payload[field]).strip()
@@ -225,6 +284,11 @@ def _verify_replay_payload(
                 *(
                     ("source_family", "authorization_record_id")
                     if contract.registry_key == FINANCE_TASK_REPLAY_ADAPTER
+                    else ()
+                ),
+                *(
+                    ("authorization_record_id",)
+                    if contract.registry_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER
                     else ()
                 ),
             )

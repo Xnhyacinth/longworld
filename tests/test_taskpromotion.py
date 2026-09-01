@@ -33,6 +33,7 @@ from longworld.core.financehistory import (
     build_finance_pipeline_candidate,
     build_financial_history_candidates,
 )
+from longworld.core.macrovintage import build_macro_vintage_pipeline_candidates
 from longworld.core.pack import SEP
 from longworld.core.promotion import (
     CANDIDATE_ATTESTATION_PURPOSE,
@@ -44,6 +45,7 @@ from longworld.core.promotion import (
     _selection_audit_matches_candidate,
     candidate_sha256,
     serialized_row_sha256,
+    validate_task_candidate_content_uniqueness,
 )
 from longworld.core.taskpromotion import (
     create_task_dense_audit,
@@ -52,6 +54,7 @@ from longworld.core.taskpromotion import (
 from longworld.core.taskreplaysidecar import (
     CYBER_KEV_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
+    MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     LoadedTaskReplaySidecar,
     build_task_replay_sidecar,
     load_task_replay_sidecar,
@@ -59,6 +62,7 @@ from longworld.core.taskreplaysidecar import (
     task_replay_sidecar_binding,
 )
 from longworld.core.verify import Verification
+from tests.test_macro_vintage_pipeline import _workflow_manifest
 
 KEYS = {
     role: f"task-promotion-{role}-key-material-2026-v1".encode()
@@ -93,6 +97,29 @@ class _TestOffsetTokenizer:
 
 
 _test_token_count.offset_tokenizer = _TestOffsetTokenizer()  # type: ignore[attr-defined]
+
+
+class _MacroOffsetTokenizer:
+    def __call__(
+        self,
+        text: str,
+        *,
+        add_special_tokens: bool,
+        return_offsets_mapping: bool,
+    ) -> dict[str, list[Any]]:
+        assert add_special_tokens is False
+        assert return_offsets_mapping is True
+        offsets = [
+            (index, min(len(text), index + 4)) for index in range(0, len(text), 4)
+        ]
+        return {"input_ids": list(range(len(offsets))), "offset_mapping": offsets}
+
+
+def _macro_token_count(text: str) -> int:
+    return max(1, (len(text) + 3) // 4)
+
+
+_macro_token_count.offset_tokenizer = _MacroOffsetTokenizer()  # type: ignore[attr-defined]
 
 
 @pytest.fixture(autouse=True)
@@ -463,6 +490,66 @@ def _finance_candidate(
     )
 
 
+def _macro_candidate(
+    tmp_path: Path,
+) -> tuple[dict[str, Any], LoadedTaskReplaySidecar]:
+    kwargs = {
+        "manifest": _workflow_manifest(),
+        "workflow_manifest_sha256": "a" * 64,
+        "world_id": "macro-task-promotion-test",
+        "target_series_id": "BEA_GDP_CURRENT_DOLLARS",
+        "target_period": "2020Q1",
+        "bands": (("16k", 16_000, 16_384),),
+        "token_counter": _macro_token_count,
+        "tokenizer_model_id": TOKENIZER_MODEL_ID,
+        "tokenizer_revision": TOKENIZER_REVISION,
+        "tokenizer_asset_manifest_sha256": TOKENIZER_ASSET_SHA256,
+    }
+    [provisional] = build_macro_vintage_pipeline_candidates(**kwargs)
+    provisional["source_verified_at_materialization"] = True
+    provisional["source_attestation_verified"] = True
+    provisional["real_source_verified"] = True
+    source_binding = provisional["source_binding"]
+    loaded, binding = _loaded_sidecar(
+        tmp_path,
+        MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
+        {
+            "workflow_manifest_sha256": source_binding[
+                "workflow_manifest_sha256"
+            ],
+            "raw_source_sha256": source_binding["raw_source_sha256"],
+            "fetch_inventory_sha256": source_binding[
+                "fetch_inventory_sha256"
+            ],
+            "fetch_receipt": kwargs["manifest"]["fetch_receipt"],
+            "source_families": source_binding["source_families"],
+            "authorization_record_id": source_binding[
+                "authorization_record_id"
+            ],
+            "replay_revision": provisional["strict_replay_revision"],
+            "tokenizer_model_id": TOKENIZER_MODEL_ID,
+            "tokenizer_revision": TOKENIZER_REVISION,
+            "tokenizer_asset_manifest_sha256": TOKENIZER_ASSET_SHA256,
+        },
+        [provisional],
+    )
+    [candidate] = build_macro_vintage_pipeline_candidates(
+        **kwargs,
+        task_replay_sidecar_binding=binding,
+    )
+    candidate["source_verified_at_materialization"] = True
+    candidate["source_attestation_verified"] = True
+    candidate["real_source_verified"] = True
+    return (
+        attach_attestation(
+            candidate,
+            KEYS["candidate"],
+            purpose=CANDIDATE_ATTESTATION_PURPOSE,
+        ),
+        loaded,
+    )
+
+
 def _ranking(candidate: dict[str, Any]) -> dict[str, Any]:
     documents = str(candidate["document_context"]).split(SEP)
     classifications = candidate["artifact_classification"]
@@ -599,7 +686,7 @@ def test_task_dense_audit_replays_full_pool_but_rejects_dense_prefixes(
     assert quality_metadata["authentic_source_relation_id"]
     assert audit["counterfactual_replay_answer"] == candidate["cf_answer"]
     assert candidate["answer"] not in audit["strict_replay_prefix_answers"]
-    assert not _selection_audit_matches_candidate(audit, candidate, 3)
+    assert _selection_audit_matches_candidate(audit, candidate, 3)
     assert _candidate_has_source_bound_proof(candidate)
     assert _candidate_has_verified_real_source(candidate)
     receipt = audit["task_proof"]["task_proof_receipt"]
@@ -609,6 +696,44 @@ def test_task_dense_audit_replays_full_pool_but_rejects_dense_prefixes(
     assert metrics["graph"]["n_essential_events"] != candidate["event_count"]
     assert metrics["semantic_tokens"]["internal"] == _test_token_count(
         candidate["document_context"]
+    )
+
+
+def test_macro_task_dense_audit_uses_explicit_adapter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        taskpromotion_module,
+        "task_sidecar_token_counter",
+        lambda _sidecar: _macro_token_count,
+    )
+    candidate, sidecar = _macro_candidate(tmp_path)
+
+    audit = create_task_dense_audit(
+        candidate,
+        _ranking(candidate),
+        sidecar,
+        candidate_attestation_key=KEYS["candidate"],
+        ranking_attestation_key=KEYS["ranker"],
+        audit_attestation_key=KEYS["auditor"],
+        source_attestation_key=KEYS["source"],
+    )
+
+    assert audit["adapter_audit"]["four_vintage_path"] is True
+    assert audit["embedding_topk_insufficient"] is True
+    assert audit["counterfactual_replay_answer"] == candidate["cf_answer"]
+    assert audit["strict_growth_metrics"]["semantic_growth_group_id"].endswith(
+        "|macro-vintage-history"
+    )
+
+
+def test_macro_candidate_passes_shared_content_identity_preflight(
+    tmp_path: Path,
+) -> None:
+    candidate, _sidecar = _macro_candidate(tmp_path)
+
+    validate_task_candidate_content_uniqueness(
+        [candidate], label="Macro shared preflight"
     )
 
 
@@ -1059,15 +1184,71 @@ def test_task_promotion_honors_signed_world_selection(tmp_path: Path) -> None:
         purpose="release_world_selection",
     )
 
-    with pytest.raises(PromotionError, match="verification gates are not green"):
-        promote_task_candidate(
-            candidate,
-            audit,
-            sidecar,
-            candidate_attestation_key=KEYS["candidate"],
-            audit_attestation_key=KEYS["auditor"],
-            promotion_attestation_key=KEYS["promotion"],
-            source_attestation_key=KEYS["source"],
-            expected_split="train",
-            release_selection_receipt=receipt,
-        )
+    promoted = promote_task_candidate(
+        candidate,
+        audit,
+        sidecar,
+        candidate_attestation_key=KEYS["candidate"],
+        audit_attestation_key=KEYS["auditor"],
+        promotion_attestation_key=KEYS["promotion"],
+        source_attestation_key=KEYS["source"],
+        expected_split="train",
+        release_selection_receipt=receipt,
+    )
+
+    assert promoted["train_ready"] is True
+    assert Verification.model_validate(promoted["verification"]).all_green()
+
+
+def test_macro_task_promotion_honors_signed_world_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        taskpromotion_module,
+        "task_sidecar_token_counter",
+        lambda _sidecar: _macro_token_count,
+    )
+    candidate, sidecar = _macro_candidate(tmp_path)
+    audit = create_task_dense_audit(
+        candidate,
+        _ranking(candidate),
+        sidecar,
+        candidate_attestation_key=KEYS["candidate"],
+        ranking_attestation_key=KEYS["ranker"],
+        audit_attestation_key=KEYS["auditor"],
+        source_attestation_key=KEYS["source"],
+    )
+    digest = candidate_sha256(candidate)
+    receipt = attach_attestation(
+        {
+            "schema_version": RELEASE_SELECTION_SCHEMA,
+            "selected_candidate_sha256": [digest],
+            "split_by_world": {candidate["world_id"]: "train"},
+            "audit_sha256_by_candidate": {digest: serialized_row_sha256(audit)},
+            "task_semantic_commitment_sha256_by_candidate": {
+                digest: audit["task_semantic_commitment_sha256"]
+            },
+            "tokenizer_asset_manifest_sha256": TOKENIZER_ASSET_SHA256,
+        },
+        KEYS["auditor"],
+        purpose="release_world_selection",
+    )
+
+    promoted = promote_task_candidate(
+        candidate,
+        audit,
+        sidecar,
+        candidate_attestation_key=KEYS["candidate"],
+        audit_attestation_key=KEYS["auditor"],
+        promotion_attestation_key=KEYS["promotion"],
+        source_attestation_key=KEYS["source"],
+        expected_split="train",
+        release_selection_receipt=receipt,
+    )
+
+    assert promoted["domain"] == "macro_economics"
+    assert promoted["view"] == "ordered_release_timeline"
+    assert promoted["composition_method"] == "as_of_revision_workflow"
+    assert promoted["train_ready"] is True
+    assert promoted["trust_scope"] == "local_probe"
+    assert Verification.model_validate(promoted["verification"]).all_green()

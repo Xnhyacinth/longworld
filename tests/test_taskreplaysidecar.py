@@ -17,6 +17,7 @@ from longworld.core.record_contract import replay_bundle_binding_valid
 from longworld.core.taskreplaysidecar import (
     CYBER_KEV_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
+    MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     TASK_REPLAY_ADAPTER_REGISTRY,
     TASK_REPLAY_SIDECAR_SCHEMA,
     build_task_replay_sidecar,
@@ -43,8 +44,8 @@ def _signed_sidecar(
 ) -> dict:
     adapter_id, adapter_revision, sidecar_schema_version = adapter
     assert sidecar_schema_version == TASK_REPLAY_SIDECAR_SCHEMA
-    replay_payload = (
-        {
+    if adapter == CYBER_KEV_TASK_REPLAY_ADAPTER:
+        replay_payload = {
             "source_manifest_sha256": "a" * 64,
             "source_response_sha256": "b" * 64,
             "replay_manifest_sha256": "c" * 64,
@@ -60,8 +61,8 @@ def _signed_sidecar(
                 }
             ],
         }
-        if adapter == CYBER_KEV_TASK_REPLAY_ADAPTER
-        else {
+    elif adapter == FINANCE_TASK_REPLAY_ADAPTER:
+        replay_payload = {
             "signed_manifest_sha256": "a" * 64,
             "source_family": "issuer_owned_sec_filing",
             "authorization_record_id": "amazon-ir-public-v1",
@@ -77,7 +78,37 @@ def _signed_sidecar(
                 }
             ],
         }
-    )
+    else:
+        assert adapter == MACRO_VINTAGE_TASK_REPLAY_ADAPTER
+        replay_payload = {
+            "workflow_manifest_sha256": "a" * 64,
+            "raw_source_sha256": "b" * 64,
+            "fetch_inventory_sha256": "c" * 64,
+            "fetch_receipt": {
+                "started_at": "2026-01-01T00:00:00Z",
+                "completed_at": "2026-01-01T00:00:01Z",
+                "retrieval": {
+                    "requested_url": "https://apps.bea.gov/source.xlsx",
+                    "final_url": "https://apps.bea.gov/source.xlsx",
+                    "status": 200,
+                    "raw_bytes": 1_024,
+                    "sha256": "b" * 64,
+                },
+            },
+            "source_families": ["bea_nipa_fixed_xlsx"],
+            "authorization_record_id": "bea-public-download-v1",
+            "replay_revision": adapter_revision,
+            "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+            "tokenizer_revision": "d" * 40,
+            "tokenizer_asset_manifest_sha256": "e" * 64,
+            "candidate_content_commitments": [
+                {
+                    "world_id": "test-world",
+                    "length_bucket": "16k",
+                    "content_sha256": "f" * 64,
+                }
+            ],
+        }
     return build_task_replay_sidecar(
         adapter_id=adapter_id,
         adapter_revision=adapter_revision,
@@ -119,7 +150,11 @@ def _write_sidecar(
 
 @pytest.mark.parametrize(
     "adapter",
-    (CYBER_KEV_TASK_REPLAY_ADAPTER, FINANCE_TASK_REPLAY_ADAPTER),
+    (
+        CYBER_KEV_TASK_REPLAY_ADAPTER,
+        FINANCE_TASK_REPLAY_ADAPTER,
+        MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
+    ),
 )
 def test_loads_exact_source_attested_registered_sidecar(
     tmp_path: Path, adapter: tuple[str, str, str]
@@ -158,11 +193,19 @@ def test_builder_requires_source_role_identity(
 def test_adapter_payload_schemas_are_closed_and_distinct() -> None:
     cyber = _signed_sidecar(CYBER_KEV_TASK_REPLAY_ADAPTER)
     finance = _signed_sidecar(FINANCE_TASK_REPLAY_ADAPTER)
-    assert set(cyber["replay_payload"]) != set(finance["replay_payload"])
+    macro = _signed_sidecar(MACRO_VINTAGE_TASK_REPLAY_ADAPTER)
+    assert len(
+        {
+            frozenset(cyber["replay_payload"]),
+            frozenset(finance["replay_payload"]),
+            frozenset(macro["replay_payload"]),
+        }
+    ) == 3
 
     for adapter, wrong_payload in (
         (CYBER_KEV_TASK_REPLAY_ADAPTER, finance["replay_payload"]),
         (FINANCE_TASK_REPLAY_ADAPTER, cyber["replay_payload"]),
+        (MACRO_VINTAGE_TASK_REPLAY_ADAPTER, finance["replay_payload"]),
     ):
         with pytest.raises(ProvenanceError, match="payload"):
             build_task_replay_sidecar(
@@ -214,6 +257,7 @@ def test_registry_is_closed_over_adapter_revision_and_schema(tmp_path: Path) -> 
     assert set(TASK_REPLAY_ADAPTER_REGISTRY) == {
         CYBER_KEV_TASK_REPLAY_ADAPTER,
         FINANCE_TASK_REPLAY_ADAPTER,
+        MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     }
     binding, _ = _write_sidecar(tmp_path, adapter=FINANCE_TASK_REPLAY_ADAPTER)
     binding["adapter_revision"] = "longworld.financial-history-replay.v999"

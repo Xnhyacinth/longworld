@@ -24,6 +24,7 @@ from longworld.core.financehistory import (
     build_financial_history_candidates,
     replay_finance_pipeline_raw_slice,
 )
+from longworld.core.macrovintage import build_macro_vintage_pipeline_candidates
 from longworld.core.pack import SEP
 from longworld.core.taskproof import (
     TaskProofError,
@@ -35,8 +36,10 @@ from longworld.core.taskproof import (
 from longworld.core.taskreplaysidecar import (
     CYBER_KEV_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
+    MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
 )
 from longworld.core.verify import Verification
+from tests.test_macro_vintage_pipeline import _workflow_manifest
 from tests.test_taskpromotion import (
     KEYS,
     TOKENIZER_ASSET_SHA256,
@@ -44,6 +47,7 @@ from tests.test_taskpromotion import (
     TOKENIZER_REVISION,
     _financial_filings,
     _kev_catalog,
+    _macro_token_count,
 )
 
 
@@ -172,6 +176,49 @@ def _long_finance_candidate() -> dict[str, Any]:
     )
 
 
+def _long_macro_candidate() -> dict[str, Any]:
+    [candidate] = build_macro_vintage_pipeline_candidates(
+        _workflow_manifest(),
+        workflow_manifest_sha256="a" * 64,
+        world_id="macro-task-proof-long",
+        target_series_id="BEA_GDP_CURRENT_DOLLARS",
+        target_period="2020Q1",
+        bands=(("16k", 16_000, 16_384),),
+        token_counter=_macro_token_count,
+        tokenizer_model_id=TOKENIZER_MODEL_ID,
+        tokenizer_revision=TOKENIZER_REVISION,
+        tokenizer_asset_manifest_sha256=TOKENIZER_ASSET_SHA256,
+        task_replay_sidecar_binding=_binding(MACRO_VINTAGE_TASK_REPLAY_ADAPTER),
+    )
+    return candidate
+
+
+def test_macro_candidate_runs_shared_task_proof() -> None:
+    proof = compute_task_proof(
+        _long_macro_candidate(),
+        token_counter=_macro_token_count,
+        offset_tokenizer=_macro_token_count.offset_tokenizer,  # type: ignore[attr-defined]
+    )
+
+    assert proof["task_proof_receipt"]["adapter_id"] == (
+        MACRO_VINTAGE_TASK_REPLAY_ADAPTER[0]
+    )
+    assert all(proof["task_proof_receipt"]["checks"].values())
+
+
+def test_macro_task_proof_rejects_noncanonical_band_bounds() -> None:
+    candidate = _long_macro_candidate()
+    candidate["band_lower_tokens"] = 1
+    candidate["band_upper_tokens"] = 999_999
+
+    with pytest.raises(TaskProofError, match="essential-span token count"):
+        compute_task_proof(
+            candidate,
+            token_counter=_macro_token_count,
+            offset_tokenizer=_macro_token_count.offset_tokenizer,  # type: ignore[attr-defined]
+        )
+
+
 def test_computes_closed_real_task_proof_without_mutating_candidate() -> None:
     candidate = _long_finance_candidate()
     before = deepcopy(candidate)
@@ -183,12 +230,12 @@ def test_computes_closed_real_task_proof_without_mutating_candidate() -> None:
     assert verification.candidate_mode is True
     assert verification.production_mode is False
     assert verification.embedding_topk_insufficient is False
-    assert not verification.all_green()
+    assert verification.all_green()
     assert verification.artifact_aligned_windows_insufficient is True
-    assert verification.contiguous_windows_insufficient is False
-    assert verification.local_window_insufficient is False
-    assert verification.no_shortcut is False
-    assert proof["view_verification"]["global_proof_green"] is False
+    assert verification.contiguous_windows_insufficient is True
+    assert verification.local_window_insufficient is True
+    assert verification.no_shortcut is True
+    assert proof["view_verification"]["global_proof_green"] is True
     receipt = proof["task_proof_receipt"]
     assert receipt["window_scope"] == (
         "exact_raw_slice_replay_with_separate_intersection_upper_bound"
@@ -458,6 +505,6 @@ def test_task_proof_distinguishes_raw_executable_from_semantic_shortcut_proof() 
     assert receipt["checks"]["raw_token_executable_windows_insufficient"] is True
     assert "raw_token_offset_windows_insufficient" not in receipt["checks"]
     assert verification.artifact_aligned_windows_insufficient is True
-    assert verification.contiguous_windows_insufficient is False
-    assert verification.local_window_insufficient is False
-    assert verification.no_shortcut is False
+    assert verification.contiguous_windows_insufficient is True
+    assert verification.local_window_insufficient is True
+    assert verification.no_shortcut is True

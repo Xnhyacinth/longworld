@@ -24,11 +24,13 @@ _SFT_COMPOSITIONS = {
     "provenance_graph",
     "same_case_dossier",
     "counterfactual_twin",
+    "as_of_revision_workflow",
 }
 _COMPOSITION_BY_VIEW = {
     "full": "same_case_dossier",
     "minimal": "same_case_dossier",
     "ordered_artifact_view": "causal_timeline",
+    "ordered_release_timeline": "as_of_revision_workflow",
     "cf": "counterfactual_twin",
 }
 _WORKFLOW_KINDS = {

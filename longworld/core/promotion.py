@@ -76,6 +76,7 @@ from longworld.core.sourcebundle import (
 )
 from longworld.core.sourceworkflow import SOURCE_WORKFLOW_ADAPTER_REVISIONS
 from longworld.core.taskreplaysidecar import (
+    MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     TASK_REPLAY_ADAPTER_REGISTRY,
     task_candidate_content_commitment,
 )
@@ -772,6 +773,15 @@ def _task_sidecar_matches_candidate(
             and isinstance(replay, dict)
             and replay.get("adapter_id") == key[0]
             and replay.get("revision") == key[1]
+            and candidate.get("strict_replay_revision") == key[1]
+        )
+    if key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
+        return bool(
+            candidate.get("domain") == "macro_economics"
+            and candidate.get("view") == "ordered_release_timeline"
+            and candidate.get("composition_method") == "as_of_revision_workflow"
+            and candidate.get("schema_version")
+            == "longworld.macro-vintage-pipeline-candidate.v1"
             and candidate.get("strict_replay_revision") == key[1]
         )
     return False

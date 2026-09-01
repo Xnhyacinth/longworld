@@ -23,10 +23,18 @@ from longworld.core.financehistory import (
     replay_finance_pipeline_raw_slice,
     replay_finance_pipeline_selection,
 )
+from longworld.core.macrovintage import (
+    MACRO_VINTAGE_PIPELINE_CANDIDATE_SCHEMA,
+    audit_macro_vintage_pipeline_candidate,
+    replay_macro_vintage_pipeline_raw_slice,
+    replay_macro_vintage_pipeline_selection,
+)
 from longworld.core.pack import SEP
+from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
 from longworld.core.taskreplaysidecar import (
     CYBER_KEV_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
+    MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     TASK_REPLAY_ADAPTER_REGISTRY,
     TaskReplayRegistryKey,
 )
@@ -76,17 +84,22 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
     )
     if key not in TASK_REPLAY_ADAPTER_REGISTRY:
         raise TaskProofError("candidate task replay adapter is not registered")
-    expected_domain = "cyber" if key == CYBER_KEV_TASK_REPLAY_ADAPTER else "finance"
+    if key == CYBER_KEV_TASK_REPLAY_ADAPTER:
+        expected_domain = "cyber"
+        expected_view = "ordered_artifact_view"
+        expected_composition = "causal_timeline"
+    elif key == FINANCE_TASK_REPLAY_ADAPTER:
+        expected_domain = "finance"
+        expected_view = "full"
+        expected_composition = "same_case_dossier"
+    elif key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
+        expected_domain = "macro_economics"
+        expected_view = "ordered_release_timeline"
+        expected_composition = "as_of_revision_workflow"
+    else:  # pragma: no cover - the closed registry is checked first
+        raise TaskProofError("candidate task replay adapter is unsupported")
     if candidate.get("domain") != expected_domain:
         raise TaskProofError("candidate task replay adapter and domain do not match")
-    expected_view = (
-        "ordered_artifact_view" if key == CYBER_KEV_TASK_REPLAY_ADAPTER else "full"
-    )
-    expected_composition = (
-        "causal_timeline"
-        if key == CYBER_KEV_TASK_REPLAY_ADAPTER
-        else "same_case_dossier"
-    )
     if (
         candidate.get("data_stage") != "candidate"
         or candidate.get("training_objective") != "sft"
@@ -105,12 +118,17 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
             isinstance(replay_contract, dict)
             and replay_contract.get("replay_revision") == key[1]
         )
-    else:
+    elif key == FINANCE_TASK_REPLAY_ADAPTER:
         replay_contract = candidate.get("finance_replay_contract")
         replay_identity_valid = bool(
             isinstance(replay_contract, dict)
             and replay_contract.get("adapter_id") == key[0]
             and replay_contract.get("revision") == key[1]
+        )
+    else:
+        replay_identity_valid = (
+            candidate.get("schema_version")
+            == MACRO_VINTAGE_PIPELINE_CANDIDATE_SCHEMA
         )
     if not replay_identity_valid:
         raise TaskProofError("candidate adapter replay contract is inconsistent")
@@ -180,6 +198,8 @@ def _adapter_audit(
             audit = audit_kev_pipeline_candidate(candidate, token_counter=token_counter)
         elif adapter_key == FINANCE_TASK_REPLAY_ADAPTER:
             audit = audit_finance_pipeline_candidate(candidate)
+        elif adapter_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
+            audit = audit_macro_vintage_pipeline_candidate(candidate)
         else:  # pragma: no cover - the closed registry is checked first
             raise TaskProofError("task replay adapter is unsupported")
     except TaskProofError:
@@ -211,6 +231,12 @@ def _replay(
             artifact_ids,
             counterfactual=counterfactual,
         )
+    if adapter_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
+        return replay_macro_vintage_pipeline_selection(
+            candidate,
+            artifact_ids,
+            counterfactual=counterfactual,
+        )
     raise TaskProofError("task replay adapter is unsupported")
 
 
@@ -231,6 +257,13 @@ def _replay_raw_slice(
         )
     if adapter_key == FINANCE_TASK_REPLAY_ADAPTER:
         return replay_finance_pipeline_raw_slice(
+            candidate,
+            raw_document_context,
+            left_framed=left_framed,
+            right_framed=right_framed,
+        )
+    if adapter_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
+        return replay_macro_vintage_pipeline_raw_slice(
             candidate,
             raw_document_context,
             left_framed=left_framed,
@@ -769,6 +802,14 @@ def compute_task_proof(
         ):
             raise TaskProofError("candidate exact token count does not recompute")
         spans, document_context_tokens = _artifact_token_spans(documents, token_counter)
+        if (
+            adapter_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER
+            and candidate.get("tokenizer_document_context_tokens")
+            != document_context_tokens
+        ):
+            raise TaskProofError(
+                "candidate exact document-context token count does not recompute"
+            )
 
         essential = candidate.get("essential_artifact_ids")
         if (
@@ -780,6 +821,39 @@ def compute_task_proof(
         ):
             raise TaskProofError("candidate essential artifact set is invalid")
         essential_ids = [str(value) for value in essential]
+        if adapter_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
+            essential_positions = [
+                artifact_ids.index(value) for value in essential_ids
+            ]
+            essential_span_tokens = token_counter(
+                SEP.join(
+                    documents[
+                        min(essential_positions) : max(essential_positions) + 1
+                    ]
+                )
+            )
+            band_lower_tokens = candidate.get("band_lower_tokens")
+            band_upper_tokens = candidate.get("band_upper_tokens")
+            expected_band = EXACT_TOKEN_BAND_RANGES.get(
+                str(candidate.get("length_bucket") or "")
+            )
+            if (
+                not isinstance(band_lower_tokens, int)
+                or isinstance(band_lower_tokens, bool)
+                or expected_band is None
+                or (band_lower_tokens, band_upper_tokens) != expected_band
+                or candidate.get("minimum_essential_span_tokens")
+                != max(
+                    8_193,
+                    16_385 if band_lower_tokens > 16_384 else 0,
+                    band_lower_tokens // 2 + 1,
+                )
+                or candidate.get("tokenizer_essential_span_tokens")
+                != essential_span_tokens
+            ):
+                raise TaskProofError(
+                    "candidate exact essential-span token count does not recompute"
+                )
         essential_classes = {str(item["artifact_id"]): item for item in classifications}
         classification_valid = all(
             essential_classes[value].get("evidence_role") == "causal_gold"
@@ -953,6 +1027,19 @@ def compute_task_proof(
             "minimum_complexity_met": complexity_valid,
             "exact_token_count_recomputed": True,
         }
+        checks["no_shortcut"] = all(
+            checks[field]
+            for field in (
+                "artifact_aligned_windows_insufficient",
+                "raw_token_executable_windows_insufficient",
+                "bm25_top1_insufficient",
+                "bm25_top3_prefixes_insufficient",
+                "lexical_tfidf_top3_prefixes_insufficient",
+                "single_essential_insufficient",
+                "empty_selection_insufficient",
+                "answer_surface_free",
+            )
+        )
         failed = sorted(name for name, passed in checks.items() if passed is not True)
         if failed:
             raise TaskProofError("task proof gates failed: " + ",".join(failed))
@@ -969,8 +1056,12 @@ def compute_task_proof(
             counterfactual_changes_answer=checks["counterfactual_changes_answer"],
             counterfactual_replay_sufficient=checks["full_counterfactual_sufficient"]
             and checks["minimal_counterfactual_sufficient"],
-            local_window_insufficient=False,
-            contiguous_windows_insufficient=False,
+            local_window_insufficient=checks[
+                "raw_token_executable_windows_insufficient"
+            ],
+            contiguous_windows_insufficient=checks[
+                "artifact_aligned_windows_insufficient"
+            ],
             artifact_aligned_windows_insufficient=checks[
                 "artifact_aligned_windows_insufficient"
             ],
@@ -978,7 +1069,7 @@ def compute_task_proof(
             distractor_invariance_gold=checks["minimal_replay_sufficient"],
             surface_match=checks["full_replay_sufficient"],
             schema_ok=checks["body_and_classification_valid"],
-            no_shortcut=False,
+            no_shortcut=checks["no_shortcut"],
             min_complexity=checks["minimum_complexity_met"],
             bm25_top1_insufficient=checks["bm25_top1_insufficient"],
             bm25_topk_insufficient=checks["bm25_top3_prefixes_insufficient"],
@@ -1046,7 +1137,7 @@ def compute_task_proof(
                 "essential_present": True,
                 "semantic_text_grounded": verification.essential_text_grounded,
                 "classification_ok": classification_valid,
-                "global_proof_green": False,
+                "global_proof_green": verification.all_green(),
                 "production_eligible": False,
             },
             "task_proof_receipt": receipt,
