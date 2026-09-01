@@ -11,7 +11,17 @@ from types import SimpleNamespace
 
 import pytest
 
-from longworld.core.attestation import ATTESTATION_ENV, verify_attestation
+from longworld.core.attestation import (
+    ATTESTATION_ENVIRONMENT_ENV,
+    ROLE_KEY_ENVS,
+    ROLE_KEY_ID_ENVS,
+    verify_attestation,
+)
+from longworld.core.gitcache import (
+    read_remote_identity_receipt,
+    sign_remote_identity_receipt,
+    verify_remote_identity_receipt,
+)
 from longworld.core.githistory import (
     GitCommitTruncation,
     GitHistoryExtraction,
@@ -30,7 +40,10 @@ from materialize_git_history_cpt import (
     _deduplicate_extraction,
     _load_allowlist,
     _load_slice_checkpoint,
+    _remote_identity_receipt_path,
+    _remote_identity_request,
     _requests,
+    _resolve_remote_identity_receipt,
     _slice_checkpoint_identity,
     _source_manifest,
     _source_slices,
@@ -40,6 +53,37 @@ from materialize_git_history_cpt import (
 )
 
 from longworld.core.cptwindow import CPTBand
+
+
+def _activate_source_role(monkeypatch: pytest.MonkeyPatch) -> bytes:
+    key = b"git-history-source-role-test-key-0001"
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(ROLE_KEY_ENVS["source"], key.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["source"], "probe-git-history-source-v1")
+    return key
+
+
+def _receipt_remote_identity(head: str = "a" * 40) -> dict[str, object]:
+    repository_url = "https://github.com/example/repo"
+    return {
+        "repository_response_sha256": "d" * 64,
+        "commit_response_sha256": "e" * 64,
+        "license_response_sha256": "f" * 64,
+        "head_revision": head,
+        "repository_url": repository_url,
+        "license": "MIT",
+        "repository_license_spdx_id": "MIT",
+        "license_file_classifier_spdx_id": "NOASSERTION",
+        "license_file_revision": head,
+        "license_file_path": "LICENSE.txt",
+        "license_file_git_blob_sha": "1" * 40,
+        "license_file_size": 12,
+        "license_file_sha256": "2" * 64,
+        "license_file_html_url": f"{repository_url}/blob/{head}/LICENSE.txt",
+        "license_file_download_url": (
+            f"https://raw.githubusercontent.com/example/repo/{head}/LICENSE.txt"
+        ),
+    }
 
 
 class _CharacterTokenizer:
@@ -601,11 +645,163 @@ def test_git_history_remote_identity_binds_revision_license_bytes_when_classifie
         )
 
 
+def test_remote_identity_receipt_cache_hit_is_request_bound_and_skips_live_fetch(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    key = _activate_source_role(monkeypatch)
+    request = _remote_identity_request(
+        repository="example/repo",
+        head_revision="a" * 40,
+        license_id="MIT",
+        license_binding_policy_sha256="b" * 64,
+        source_client={"path": "/usr/bin/gh", "sha256": "c" * 64},
+    )
+    cache_path = _remote_identity_receipt_path(tmp_path, request)
+    receipt = sign_remote_identity_receipt(
+        request_identity=request,
+        remote_identity=_receipt_remote_identity(),
+        checked_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        key=key,
+    )
+    cache_path.parent.mkdir(parents=True)
+    cache_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+    def unexpected_live_fetch() -> dict[str, object]:
+        raise AssertionError("a verified cache hit must not access the network")
+
+    resolved = _resolve_remote_identity_receipt(
+        path=cache_path,
+        request_identity=request,
+        exported_at="2026-09-01T12:00:00Z",
+        source_key=key,
+        live_validate=unexpected_live_fetch,
+    )
+
+    assert resolved["cache_hit"] is True
+    assert resolved["exported_at"] == "2026-09-01T12:00:00Z"
+    assert resolved["binding"]["request_identity"] == request
+    assert resolved["binding"]["remote_identity"] == _receipt_remote_identity()
+    assert resolved["receipt"] == receipt
+
+
+@pytest.mark.parametrize("cached_state", ["expired", "invalid"])
+def test_remote_identity_receipt_cache_refreshes_invalid_or_expired_artifact(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    cached_state: str,
+) -> None:
+    key = _activate_source_role(monkeypatch)
+    request = _remote_identity_request(
+        repository="example/repo",
+        head_revision="a" * 40,
+        license_id="MIT",
+        license_binding_policy_sha256="b" * 64,
+        source_client={"path": "/usr/bin/gh", "sha256": "c" * 64},
+    )
+    cache_path = _remote_identity_receipt_path(tmp_path, request)
+    stale = sign_remote_identity_receipt(
+        request_identity=request,
+        remote_identity=_receipt_remote_identity(),
+        checked_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
+        key=key,
+    )
+    if cached_state == "invalid":
+        stale["remote_identity"]["license_file_size"] = 13
+    cache_path.parent.mkdir(parents=True)
+    cache_path.write_text(json.dumps(stale), encoding="utf-8")
+    live_calls = 0
+
+    def live_fetch() -> dict[str, object]:
+        nonlocal live_calls
+        live_calls += 1
+        return _receipt_remote_identity()
+
+    resolved = _resolve_remote_identity_receipt(
+        path=cache_path,
+        request_identity=request,
+        exported_at="2026-09-01T12:00:00Z",
+        source_key=key,
+        live_validate=live_fetch,
+        refresh_checked_at=datetime(2026, 9, 1, 12, tzinfo=timezone.utc),
+    )
+
+    assert live_calls == 1
+    assert resolved["cache_hit"] is False
+    assert resolved["exported_at"] == "2026-09-01T12:00:00Z"
+    assert resolved["binding"] == read_remote_identity_receipt(
+        cache_path,
+        expected_request_identity=request,
+        exported_at=resolved["exported_at"],
+        key=key,
+    )
+    assert json.loads(cache_path.read_text(encoding="utf-8")) == resolved["receipt"]
+
+
+def test_remote_identity_receipt_path_changes_with_materialization_identity(
+    tmp_path: Path,
+) -> None:
+    request = _remote_identity_request(
+        repository="example/repo",
+        head_revision="a" * 40,
+        license_id="MIT",
+        license_binding_policy_sha256="b" * 64,
+        source_client={"path": "/usr/bin/gh", "sha256": "c" * 64},
+    )
+    changed = {
+        **request,
+        "source_client": {"path": "/usr/bin/gh", "sha256": "9" * 64},
+    }
+
+    first = _remote_identity_receipt_path(tmp_path, request)
+    second = _remote_identity_receipt_path(tmp_path, changed)
+
+    assert first != second
+    assert first.parent == second.parent
+    assert first.name.endswith(".json")
+    assert len(first.stem) == 64
+
+
+def test_remote_identity_receipt_does_not_fall_back_when_refresh_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    key = _activate_source_role(monkeypatch)
+    request = _remote_identity_request(
+        repository="example/repo",
+        head_revision="a" * 40,
+        license_id="MIT",
+        license_binding_policy_sha256="b" * 64,
+        source_client={"path": "/usr/bin/gh", "sha256": "c" * 64},
+    )
+    cache_path = _remote_identity_receipt_path(tmp_path, request)
+    stale = sign_remote_identity_receipt(
+        request_identity=request,
+        remote_identity=_receipt_remote_identity(),
+        checked_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
+        key=key,
+    )
+    cache_path.parent.mkdir(parents=True)
+    cache_path.write_text(json.dumps(stale), encoding="utf-8")
+    original = cache_path.read_bytes()
+
+    def failed_live_fetch() -> dict[str, object]:
+        raise OSError("network unavailable")
+
+    with pytest.raises(OSError, match="network unavailable"):
+        _resolve_remote_identity_receipt(
+            path=cache_path,
+            request_identity=request,
+            exported_at="2026-09-01T12:00:00Z",
+            source_key=key,
+            live_validate=failed_live_fetch,
+        )
+
+    assert cache_path.read_bytes() == original
+
+
 def test_git_history_source_manifest_normalizes_yaml_timestamp(
     monkeypatch,
 ) -> None:
-    key = b"git-history-source-manifest-test-key"
-    monkeypatch.setenv(ATTESTATION_ENV, key.decode())
+    key = _activate_source_role(monkeypatch)
     monkeypatch.setattr(
         "materialize_git_history_cpt.validate_git_object_proof_public_export_governance",
         lambda _payload: None,
@@ -636,6 +832,20 @@ def test_git_history_source_manifest_normalizes_yaml_timestamp(
         ),
     )
 
+    source_client = {"path": "/usr/bin/gh", "sha256": "b" * 64}
+    remote_identity_request = _remote_identity_request(
+        repository="example/repo",
+        head_revision="a" * 40,
+        license_id="MIT",
+        license_binding_policy_sha256="3" * 64,
+        source_client=source_client,
+    )
+    remote_identity_receipt = sign_remote_identity_receipt(
+        request_identity=remote_identity_request,
+        remote_identity=_receipt_remote_identity(),
+        checked_at=datetime(2026, 1, 2, tzinfo=timezone.utc),
+        key=key,
+    )
     manifest = _source_manifest(
         repository="example/repo",
         policy={
@@ -650,31 +860,9 @@ def test_git_history_source_manifest_normalizes_yaml_timestamp(
         policy_sha256=hashlib.sha256(b"policy").hexdigest(),
         extraction=extraction,
         exported_at="2026-01-02T00:00:00Z",
-        source_client={"path": "/usr/bin/gh", "sha256": "b" * 64},
+        source_client=source_client,
         history_client={"path": "/usr/bin/git", "sha256": "c" * 64},
-        remote_identity={
-            "repository_response_sha256": "d" * 64,
-            "commit_response_sha256": "e" * 64,
-            "license_response_sha256": "f" * 64,
-            "head_revision": "a" * 40,
-            "repository_url": "https://github.com/example/repo",
-            "license": "MIT",
-            "repository_license_spdx_id": "MIT",
-            "license_file_classifier_spdx_id": "NOASSERTION",
-            "license_file_revision": "a" * 40,
-            "license_file_path": "LICENSE.txt",
-            "license_file_git_blob_sha": "1" * 40,
-            "license_file_size": 12,
-            "license_file_sha256": "2" * 64,
-            "license_file_html_url": (
-                "https://github.com/example/repo/blob/" + "a" * 40 + "/LICENSE.txt"
-            ),
-            "license_file_download_url": (
-                "https://raw.githubusercontent.com/example/repo/"
-                + "a" * 40
-                + "/LICENSE.txt"
-            ),
-        },
+        remote_identity_receipt=remote_identity_receipt,
         license_binding={
             "schema_version": "longworld.git-license-binding-receipt.v3",
             "policy": {
@@ -731,6 +919,19 @@ def test_git_history_source_manifest_normalizes_yaml_timestamp(
     assert manifest["record_index"][0]["commit_chunk_count_total"] == 1
     assert manifest["remote_identity"]["repository_license_spdx_id"] == "MIT"
     assert manifest["remote_identity"]["license_file_sha256"] == "2" * 64
+    assert manifest["remote_identity_request"] == remote_identity_request
+    assert manifest["remote_identity_receipt"] == remote_identity_receipt
+    assert (
+        manifest["remote_identity_receipt_sha256"]
+        == (
+            verify_remote_identity_receipt(
+                remote_identity_receipt,
+                expected_request_identity=remote_identity_request,
+                exported_at="2026-01-02T00:00:00Z",
+                key=key,
+            )["receipt_sha256"]
+        )
+    )
     assert manifest["license_binding"]["schema_version"].endswith(".v3")
     assert manifest["parser"]["revision"] == "v6"
     assert manifest["parser"]["root_revision"] == "a" * 40
@@ -746,7 +947,21 @@ def test_git_history_source_manifest_rejects_oversized_signed_payload(
         "materialize_git_history_cpt.validate_git_object_proof_public_export_governance",
         lambda _payload: None,
     )
-    monkeypatch.setenv(ATTESTATION_ENV, "git-history-source-manifest-test-key")
+    key = _activate_source_role(monkeypatch)
+    source_client = {"path": "/usr/bin/gh", "sha256": "c" * 64}
+    request = _remote_identity_request(
+        repository="example/repo",
+        head_revision="b" * 40,
+        license_id="MIT",
+        license_binding_policy_sha256="e" * 64,
+        source_client=source_client,
+    )
+    receipt = sign_remote_identity_receipt(
+        request_identity=request,
+        remote_identity=_receipt_remote_identity("b" * 40),
+        checked_at=datetime(2026, 1, 2, tzinfo=timezone.utc),
+        key=key,
+    )
     with pytest.raises(ValueError, match="audit size limit"):
         _source_manifest(
             repository="example/repo",
@@ -769,10 +984,13 @@ def test_git_history_source_manifest_rejects_oversized_signed_payload(
                 records=(),
             ),
             exported_at="2026-01-02T00:00:00Z",
-            source_client={"path": "/usr/bin/gh", "sha256": "c" * 64},
+            source_client=source_client,
             history_client={"path": "/usr/bin/git", "sha256": "d" * 64},
-            remote_identity={},
-            license_binding={"object_path_proof": {"public_metadata_review": {}}},
+            remote_identity_receipt=receipt,
+            license_binding={
+                "policy_sha256": "e" * 64,
+                "object_path_proof": {"public_metadata_review": {}},
+            },
             root_revision="b" * 40,
             max_commits=1,
             skip_commits=0,

@@ -30,6 +30,7 @@ from longworld.core.attestation import (
     sanitized_attestation_environment,
     verify_attestation,
 )
+from longworld.core.gitcache import verify_remote_identity_receipt
 from longworld.core.githistory import (
     LICENSE_BINDING_POLICY_SCHEMA,
     LICENSE_BINDING_RECEIPT_SCHEMA,
@@ -158,6 +159,86 @@ def _canonical_license_policy(source: dict[str, Any]) -> tuple[dict[str, Any], s
 def _validate_source_manifest_schema(source: dict[str, Any]) -> None:
     if source.get("schema_version") != SOURCE_SCHEMA:
         raise ValueError("unsupported Git history source manifest schema")
+
+
+def _validate_remote_identity_receipt(
+    source: dict[str, Any], source_key: bytes
+) -> bool:
+    """Replay a manifest-bound source receipt without consulting GitHub or cache."""
+    parser = source.get("parser")
+    if not isinstance(parser, dict):
+        raise TypeError("source parser is invalid")
+    receipt_fields = {
+        "remote_identity_receipt",
+        "remote_identity_receipt_sha256",
+        "remote_identity_request",
+    }
+    present_receipt_fields = receipt_fields.intersection(source)
+    if not present_receipt_fields:
+        parser_revision = parser.get("revision")
+        if parser_revision == "v6":
+            raise ValueError("Git v6 remote identity receipt fields are missing")
+        if parser_revision not in {"v1", "v2", "v3", "v4", "v5"}:
+            raise ValueError("Git remote identity parser revision is unsupported")
+        return False
+    if present_receipt_fields != receipt_fields or "remote_identity" not in source:
+        raise ValueError("Git remote identity receipt fields are incomplete")
+
+    repository_url = source.get("repository_url")
+    if not isinstance(repository_url, str) or not repository_url.startswith(
+        "https://github.com/"
+    ):
+        raise ValueError("Git remote identity repository is invalid")
+    repository = repository_url.removeprefix("https://github.com/")
+    binding = source.get("license_binding")
+    source_client = source.get("source_client")
+    exported_at = source.get("exported_at")
+    if (
+        not isinstance(binding, dict)
+        or not isinstance(source_client, dict)
+        or not isinstance(exported_at, str)
+    ):
+        raise TypeError("Git remote identity receipt inputs are invalid")
+    head_revision = source.get("revision")
+    license_id = source.get("license")
+    expected_request = {
+        "repository": repository,
+        "head_revision": head_revision,
+        "license": license_id,
+        "license_binding_policy_sha256": binding.get("policy_sha256"),
+        "source_client": source_client,
+        "request_operations": [
+            {
+                "method": "GET",
+                "hostname": "github.com",
+                "endpoint": f"repos/{repository}",
+            },
+            {
+                "method": "GET",
+                "hostname": "github.com",
+                "endpoint": f"repos/{repository}/commits/{head_revision}",
+            },
+            {
+                "method": "GET",
+                "hostname": "github.com",
+                "endpoint": f"repos/{repository}/license?ref={head_revision}",
+            },
+        ],
+    }
+    verified = verify_remote_identity_receipt(
+        source.get("remote_identity_receipt"),
+        expected_request_identity=expected_request,
+        exported_at=exported_at,
+        key=source_key,
+    )
+    if (
+        source.get("remote_identity_receipt_sha256")
+        != verified["receipt_sha256"]
+        or source.get("remote_identity_request") != verified["request_identity"]
+        or source.get("remote_identity") != verified["remote_identity"]
+    ):
+        raise ValueError("Git remote identity receipt manifest binding is invalid")
+    return True
 
 
 def _validate_source_export_governance(source: dict[str, Any]) -> None:
@@ -991,6 +1072,7 @@ def audit_release(release_dir: Path) -> dict[str, Any]:
             raise ValueError("source manifest payload hash mismatch")
         if not verify_attestation(source, source_key, purpose="source_manifest"):
             raise ValueError("source manifest attestation failed")
+        _validate_remote_identity_receipt(source, source_key)
         _validate_source_export_governance(source)
         provenance_id = (
             "sha256:" + hashlib.sha256(canonical_attested_payload(source)).hexdigest()

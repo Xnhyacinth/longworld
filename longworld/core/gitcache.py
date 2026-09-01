@@ -361,6 +361,24 @@ def verify_remote_identity_receipt(
     }
 
 
+def load_remote_identity_receipt(
+    path: Path,
+    *,
+    expected_request_identity: Mapping[str, Any],
+    exported_at: str,
+    key: bytes | None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Return a safely loaded signed receipt and its normalized verification."""
+    receipt = _strict_json_object(path, max_bytes=MAX_REMOTE_IDENTITY_RECEIPT_BYTES)
+    binding = verify_remote_identity_receipt(
+        receipt,
+        expected_request_identity=expected_request_identity,
+        exported_at=exported_at,
+        key=key,
+    )
+    return receipt, binding
+
+
 def read_remote_identity_receipt(
     path: Path,
     *,
@@ -369,12 +387,13 @@ def read_remote_identity_receipt(
     key: bytes | None,
 ) -> dict[str, Any]:
     """Securely read and verify a source-role remote identity receipt."""
-    return verify_remote_identity_receipt(
-        _strict_json_object(path, max_bytes=MAX_REMOTE_IDENTITY_RECEIPT_BYTES),
+    _receipt, binding = load_remote_identity_receipt(
+        path,
         expected_request_identity=expected_request_identity,
         exported_at=exported_at,
         key=key,
     )
+    return binding
 
 
 def _validated_packing_identity(value: object) -> dict[str, Any]:

@@ -17,6 +17,7 @@ import tempfile
 from collections import Counter
 from collections.abc import Callable
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,12 @@ from longworld.core.cptwindow import (
     CPTBand,
     CPTWindowRequest,
     pack_disjoint_workflow_windows,
+)
+from longworld.core.gitcache import (
+    GitCacheError,
+    load_remote_identity_receipt,
+    sign_remote_identity_receipt,
+    verify_remote_identity_receipt,
 )
 from longworld.core.githistory import (
     LICENSE_BINDING_POLICY_SCHEMA,
@@ -364,6 +371,100 @@ def validate_remote_identity(
     }
 
 
+def _remote_identity_request(
+    *,
+    repository: str,
+    head_revision: str,
+    license_id: str,
+    license_binding_policy_sha256: str,
+    source_client: dict[str, str],
+) -> dict[str, Any]:
+    """Describe every live request and input that determines remote identity."""
+    return {
+        "repository": repository,
+        "head_revision": head_revision,
+        "license": license_id,
+        "license_binding_policy_sha256": license_binding_policy_sha256,
+        "source_client": dict(source_client),
+        "request_operations": [
+            {
+                "method": "GET",
+                "hostname": "github.com",
+                "endpoint": f"repos/{repository}",
+            },
+            {
+                "method": "GET",
+                "hostname": "github.com",
+                "endpoint": f"repos/{repository}/commits/{head_revision}",
+            },
+            {
+                "method": "GET",
+                "hostname": "github.com",
+                "endpoint": f"repos/{repository}/license?ref={head_revision}",
+            },
+        ],
+    }
+
+
+def _remote_identity_receipt_path(
+    output_dir: Path, request_identity: dict[str, Any]
+) -> Path:
+    request_sha256 = hashlib.sha256(_canonical_bytes(request_identity)).hexdigest()
+    return output_dir / "checkpoints" / "remote-identities" / f"{request_sha256}.json"
+
+
+def _resolve_remote_identity_receipt(
+    *,
+    path: Path,
+    request_identity: dict[str, Any],
+    exported_at: str,
+    source_key: bytes,
+    live_validate: Callable[[], dict[str, Any]],
+    refresh_checked_at: datetime | None = None,
+) -> dict[str, Any]:
+    """Use only a fresh verified receipt, otherwise refresh it from the remote."""
+    if path.exists():
+        try:
+            receipt, binding = load_remote_identity_receipt(
+                path,
+                expected_request_identity=request_identity,
+                exported_at=exported_at,
+                key=source_key,
+            )
+        except GitCacheError:
+            pass
+        else:
+            return {
+                "receipt": receipt,
+                "binding": binding,
+                "exported_at": exported_at,
+                "cache_hit": True,
+            }
+
+    remote_identity = live_validate()
+    checked_at = refresh_checked_at or datetime.now(timezone.utc)
+    receipt = sign_remote_identity_receipt(
+        request_identity=request_identity,
+        remote_identity=remote_identity,
+        checked_at=checked_at,
+        key=source_key,
+    )
+    refreshed_exported_at = str(receipt["checked_at"])
+    binding = verify_remote_identity_receipt(
+        receipt,
+        expected_request_identity=request_identity,
+        exported_at=refreshed_exported_at,
+        key=source_key,
+    )
+    _atomic_write(path, _canonical_bytes(receipt) + b"\n")
+    return {
+        "receipt": receipt,
+        "binding": binding,
+        "exported_at": refreshed_exported_at,
+        "cache_hit": False,
+    }
+
+
 def _validate_checkout(checkout: Path, repository: str) -> None:
     expected = f"https://github.com/{repository}"
     remote = _git(checkout, "remote", "get-url", "origin").removesuffix(".git")
@@ -394,7 +495,7 @@ def _source_manifest(
     exported_at: str,
     source_client: dict[str, str],
     history_client: dict[str, str],
-    remote_identity: dict[str, Any],
+    remote_identity_receipt: dict[str, Any],
     license_binding: dict[str, Any],
     root_revision: str,
     max_commits: int,
@@ -409,6 +510,19 @@ def _source_manifest(
     key = attestation_key_from_env("source_manifest")
     if key is None:
         raise ValueError("source role key is required")
+    expected_remote_request = _remote_identity_request(
+        repository=repository,
+        head_revision=extraction.head_revision,
+        license_id=str(policy.get("license") or ""),
+        license_binding_policy_sha256=str(license_binding.get("policy_sha256") or ""),
+        source_client=source_client,
+    )
+    remote_identity_binding = verify_remote_identity_receipt(
+        remote_identity_receipt,
+        expected_request_identity=expected_remote_request,
+        exported_at=exported_at,
+        key=key,
+    )
     authorization = policy.get("authorization")
     if not isinstance(authorization, dict):
         raise TypeError("repository authorization is missing")
@@ -500,7 +614,10 @@ def _source_manifest(
         "git_object_proof_privacy_review": license_binding["object_path_proof"][
             "public_metadata_review"
         ],
-        "remote_identity": remote_identity,
+        "remote_identity_receipt": remote_identity_receipt,
+        "remote_identity_receipt_sha256": remote_identity_binding["receipt_sha256"],
+        "remote_identity_request": remote_identity_binding["request_identity"],
+        "remote_identity": remote_identity_binding["remote_identity"],
         "privacy_review": {
             "emails": "redacted_training_text_public_git_metadata_retained",
             "secrets": "fail_closed",
@@ -1083,7 +1200,6 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     source_key = attestation_key_from_env("source_manifest")
     if source_key is None:
         raise ValueError("source role key is required")
-    exported_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     source_manifests: list[dict[str, Any]] = []
     accepted_by_band: dict[str, list[bytes]] = {name: [] for name in bands}
     accepted_tokens: Counter[str] = Counter()
@@ -1094,7 +1210,6 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     used_base_workflow_ids: set[str] = set()
     seen_source_text_sha256: set[str] = set()
     validated_checkouts: set[tuple[str, Path]] = set()
-    remote_identities: dict[tuple[str, str, str], dict[str, Any]] = {}
 
     raw_sources = config.get("sources")
     if not isinstance(raw_sources, list) or not raw_sources:
@@ -1254,16 +1369,32 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
                     path=absence_key[2],
                 )
                 coverage_absence_proofs[absence_key] = history_coverage_absence_proof
-        remote_key = (repository, extraction.head_revision, license_id)
-        remote_identity = remote_identities.get(remote_key)
-        if remote_identity is None:
-            remote_identity = validate_remote_identity(
+        remote_identity_request = _remote_identity_request(
+            repository=repository,
+            head_revision=extraction.head_revision,
+            license_id=license_id,
+            license_binding_policy_sha256=str(license_binding["policy_sha256"]),
+            source_client=source_client,
+        )
+        requested_exported_at = (
+            datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        )
+        resolved_remote_identity = _resolve_remote_identity_receipt(
+            path=_remote_identity_receipt_path(output_dir, remote_identity_request),
+            request_identity=remote_identity_request,
+            exported_at=requested_exported_at,
+            source_key=source_key,
+            live_validate=partial(
+                validate_remote_identity,
                 repository,
                 extraction.head_revision,
                 license_id,
                 license_binding_policy=raw_license_binding_policy,
-            )
-            remote_identities[remote_key] = remote_identity
+            ),
+        )
+        exported_at = str(resolved_remote_identity["exported_at"])
+        remote_identity_receipt = resolved_remote_identity["receipt"]
+        remote_identity = resolved_remote_identity["binding"]["remote_identity"]
         last_blob = str(license_binding["commit_bindings"][-1]["git_blob_sha"])
         observed = next(
             item
@@ -1289,7 +1420,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             exported_at=exported_at,
             source_client=source_client,
             history_client=history_client,
-            remote_identity=remote_identity,
+            remote_identity_receipt=remote_identity_receipt,
             license_binding=license_binding,
             root_revision=root_revision,
             max_commits=int(source.get("max_commits") or 0),

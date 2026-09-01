@@ -4,12 +4,18 @@ import base64
 import hashlib
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 import yaml
 
+from longworld.core.attestation import (
+    ATTESTATION_ENVIRONMENT_ENV,
+    ROLE_KEY_ENVS,
+    ROLE_KEY_ID_ENVS,
+)
+from longworld.core.gitcache import sign_remote_identity_receipt
 from longworld.core.githistory import git_object_path_proof_history_anchor
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
@@ -24,6 +30,7 @@ from audit_git_history_cpt import (
     _validate_complete_scan_contract,
     _validate_history_coverage,
     _validate_license_binding_receipt,
+    _validate_remote_identity_receipt,
     _validate_retained_count_contract,
     _validate_source_export_governance,
     _validate_source_manifest_schema,
@@ -32,6 +39,14 @@ from audit_git_history_cpt import (
     _validate_source_truncation_contract,
     _validate_source_window_binding,
 )
+
+
+def _activate_source_role(monkeypatch: pytest.MonkeyPatch) -> bytes:
+    key = b"git-history-auditor-source-role-key-0001"
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(ROLE_KEY_ENVS["source"], key.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["source"], "probe-git-auditor-source-v1")
+    return key
 
 
 def _license_bound_source() -> dict[str, object]:
@@ -201,6 +216,140 @@ def _validate_bound_fixture(source: dict[str, object]) -> str:
             "repository_policy_sha256"
         ],
     )
+
+
+def _receipt_bound_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[dict[str, object], bytes]:
+    key = _activate_source_role(monkeypatch)
+    source = _license_bound_source()
+    source_client = {"path": "/usr/bin/gh", "sha256": "7" * 64}
+    repository = "example/repo"
+    head_revision = str(source["revision"])
+    request = {
+        "repository": repository,
+        "head_revision": head_revision,
+        "license": "MIT",
+        "license_binding_policy_sha256": source["license_binding"][
+            "policy_sha256"
+        ],
+        "source_client": source_client,
+        "request_operations": [
+            {
+                "method": "GET",
+                "hostname": "github.com",
+                "endpoint": f"repos/{repository}",
+            },
+            {
+                "method": "GET",
+                "hostname": "github.com",
+                "endpoint": f"repos/{repository}/commits/{head_revision}",
+            },
+            {
+                "method": "GET",
+                "hostname": "github.com",
+                "endpoint": f"repos/{repository}/license?ref={head_revision}",
+            },
+        ],
+    }
+    exported_at = "2026-09-01T12:00:00Z"
+    receipt = sign_remote_identity_receipt(
+        request_identity=request,
+        remote_identity=source["remote_identity"],
+        checked_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        key=key,
+    )
+    source.update(
+        {
+            "exported_at": exported_at,
+            "source_client": source_client,
+            "remote_identity_receipt": receipt,
+            "remote_identity_receipt_sha256": hashlib.sha256(
+                json.dumps(
+                    receipt,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode()
+            ).hexdigest(),
+            "remote_identity_request": request,
+        }
+    )
+    return source, key
+
+
+def test_remote_identity_receipt_audit_reconstructs_and_replays_manifest_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, key = _receipt_bound_source(monkeypatch)
+
+    assert _validate_remote_identity_receipt(source, key) is True
+
+
+@pytest.mark.parametrize(
+    "field",
+    (
+        "remote_identity_receipt",
+        "remote_identity_receipt_sha256",
+        "remote_identity_request",
+        "remote_identity",
+    ),
+)
+def test_v6_remote_identity_receipt_audit_requires_all_four_manifest_fields(
+    monkeypatch: pytest.MonkeyPatch, field: str
+) -> None:
+    source, key = _receipt_bound_source(monkeypatch)
+    source.pop(field)
+
+    with pytest.raises(ValueError, match="remote identity receipt fields"):
+        _validate_remote_identity_receipt(source, key)
+
+
+@pytest.mark.parametrize("tamper", ("receipt", "digest", "request", "remote", "time"))
+def test_remote_identity_receipt_audit_rejects_every_cross_binding_tamper(
+    monkeypatch: pytest.MonkeyPatch, tamper: str
+) -> None:
+    source, key = _receipt_bound_source(monkeypatch)
+    if tamper == "receipt":
+        source["remote_identity_receipt"]["remote_identity"][
+            "license_file_size"
+        ] += 1
+    elif tamper == "digest":
+        source["remote_identity_receipt_sha256"] = "0" * 64
+    elif tamper == "request":
+        source["remote_identity_request"]["source_client"]["sha256"] = "0" * 64
+    elif tamper == "remote":
+        source["remote_identity"]["license_file_size"] += 1
+    else:
+        source["exported_at"] = "2026-09-03T00:00:01Z"
+
+    with pytest.raises(ValueError):
+        _validate_remote_identity_receipt(source, key)
+
+
+def test_remote_identity_receipt_audit_preserves_only_complete_legacy_absence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, key = _receipt_bound_source(monkeypatch)
+    for field in (
+        "remote_identity_receipt",
+        "remote_identity_receipt_sha256",
+        "remote_identity_request",
+    ):
+        source.pop(field)
+
+    with pytest.raises(ValueError, match="remote identity receipt fields"):
+        _validate_remote_identity_receipt(source, key)
+
+    source["parser"]["revision"] = "v5"
+    assert _validate_remote_identity_receipt(source, key) is False
+    source["parser"]["revision"] = "v7"
+    with pytest.raises(ValueError, match="parser revision"):
+        _validate_remote_identity_receipt(source, key)
+    source["parser"]["revision"] = "v5"
+    source["remote_identity_receipt_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="remote identity receipt fields"):
+        _validate_remote_identity_receipt(source, key)
 
 
 def test_history_coverage_audit_replays_counts_root_and_license_path() -> None:
