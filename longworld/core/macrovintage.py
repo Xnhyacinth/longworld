@@ -52,6 +52,7 @@ _COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 MACRO_VINTAGE_PIPELINE_CANDIDATE_SCHEMA = (
     "longworld.macro-vintage-pipeline-candidate.v1"
 )
+MACRO_VINTAGE_PACKING_PLAN_SCHEMA = "longworld.macro-vintage-packing-plan.v1"
 
 
 def _parse_date(value: str, label: str) -> date:
@@ -406,7 +407,7 @@ def _validate_pipeline_manifest(
     return observations, relations, trajectories
 
 
-def _pipeline_path(
+def _pipeline_target_history(
     observations: Mapping[str, dict[str, Any]],
     relations: Mapping[str, dict[str, Any]],
     trajectories: Sequence[dict[str, Any]],
@@ -437,9 +438,89 @@ def _pipeline_path(
         selected_relations = [relations[value] for value in relation_ids]
     except KeyError as error:
         raise ProvenanceError("macro vintage target trajectory is unbound") from error
+    return selected_observations, selected_relations
+
+
+def _pipeline_path(
+    observations: Mapping[str, dict[str, Any]],
+    relations: Mapping[str, dict[str, Any]],
+    trajectories: Sequence[dict[str, Any]],
+    *,
+    series_id: str,
+    period: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    selected_observations, selected_relations = _pipeline_target_history(
+        observations,
+        relations,
+        trajectories,
+        series_id=series_id,
+        period=period,
+    )
     if selected_relations[-1]["kind"] != "revises_observation":
         raise ProvenanceError("macro vintage final transition must change the answer")
     return selected_observations, selected_relations
+
+
+def _pipeline_band_paths(
+    observations: Mapping[str, dict[str, Any]],
+    relations: Mapping[str, dict[str, Any]],
+    trajectories: Sequence[dict[str, Any]],
+    *,
+    series_id: str,
+    period: str,
+    band_count: int,
+) -> list[tuple[list[dict[str, Any]], list[dict[str, Any]]]]:
+    if band_count == 1:
+        return [
+            _pipeline_path(
+                observations,
+                relations,
+                trajectories,
+                series_id=series_id,
+                period=period,
+            )
+        ]
+    full_observations, full_relations = _pipeline_target_history(
+        observations,
+        relations,
+        trajectories,
+        series_id=series_id,
+        period=period,
+    )
+    eligible_lengths = []
+    for length in range(4, len(full_observations) + 1):
+        prefix_relations = full_relations[: length - 1]
+        if (
+            prefix_relations[-1]["kind"] == "revises_observation"
+            and {value["kind"] for value in prefix_relations}
+            == {
+                "revises_observation",
+                "supersedes_without_observed_value_change",
+            }
+        ):
+            eligible_lengths.append(length)
+    if len(eligible_lengths) < band_count:
+        raise ProvenanceError(
+            "macro vintage target has too few executable prefixes for bands"
+        )
+    indexes = [
+        index * (len(eligible_lengths) - 1) // (band_count - 1)
+        for index in range(band_count)
+    ]
+    selected_lengths = [eligible_lengths[index] for index in indexes]
+    if any(
+        current <= prior for prior, current in pairwise(selected_lengths)
+    ):
+        raise ProvenanceError(
+            "macro vintage target prefixes do not grow across bands"
+        )
+    return [
+        (
+            full_observations[:length],
+            full_relations[: length - 1],
+        )
+        for length in selected_lengths
+    ]
 
 
 def _pipeline_answer(
@@ -488,6 +569,27 @@ def _pipeline_answer(
             ),
             "revision_steps": steps,
         }
+    )
+
+
+def _pipeline_question(task: Mapping[str, Any]) -> str:
+    expected_fields = {
+        "series_id",
+        "period",
+        "start_vintage_date",
+        "decision_date",
+    }
+    if set(task) != expected_fields or any(
+        not isinstance(task.get(field), str) or not task[field]
+        for field in expected_fields
+    ):
+        raise ProvenanceError("macro vintage task identity is invalid")
+    return (
+        f"For BEA series {task['series_id']}, period {task['period']}, reconstruct "
+        f"the complete revision path from {task['start_vintage_date']} through "
+        f"the decision date {task['decision_date']}. Report every changed or "
+        "unchanged transition, the initial and current values, and the cumulative "
+        "revision delta."
     )
 
 
@@ -791,6 +893,99 @@ def replay_macro_vintage_pipeline_raw_slice(
         return replay_macro_vintage_pipeline_selection(candidate, [])
 
 
+def _verified_packing_plan_bands(
+    verified_packing_plan: Mapping[str, Any] | None,
+    *,
+    workflow_manifest_sha256: str,
+    world_id: str,
+    target_series_id: str,
+    target_period: str,
+    bands: Sequence[tuple[str, int, int]],
+    tokenizer_model_id: str,
+    tokenizer_revision: str,
+    tokenizer_asset_manifest_sha256: str,
+) -> list[Mapping[str, Any]] | None:
+    if verified_packing_plan is None:
+        return None
+    if not isinstance(verified_packing_plan, Mapping):
+        raise ProvenanceError("macro vintage packing plan identity is invalid")
+    expected_fields = {
+        "schema_version",
+        "workflow_manifest_sha256",
+        "world_id",
+        "target_series_id",
+        "target_period",
+        "tokenizer_model_id",
+        "tokenizer_revision",
+        "tokenizer_asset_manifest_sha256",
+        "bands",
+    }
+    plan_bands = verified_packing_plan.get("bands")
+    if (
+        set(verified_packing_plan) != expected_fields
+        or verified_packing_plan.get("schema_version")
+        != MACRO_VINTAGE_PACKING_PLAN_SCHEMA
+        or verified_packing_plan.get("workflow_manifest_sha256")
+        != workflow_manifest_sha256
+        or verified_packing_plan.get("world_id") != world_id
+        or verified_packing_plan.get("target_series_id") != target_series_id
+        or verified_packing_plan.get("target_period") != target_period
+        or verified_packing_plan.get("tokenizer_model_id") != tokenizer_model_id
+        or verified_packing_plan.get("tokenizer_revision") != tokenizer_revision
+        or verified_packing_plan.get("tokenizer_asset_manifest_sha256")
+        != tokenizer_asset_manifest_sha256
+        or not isinstance(plan_bands, list)
+        or len(plan_bands) != len(bands)
+    ):
+        raise ProvenanceError("macro vintage packing plan identity is invalid")
+    expected_band_fields = {
+        "length_bucket",
+        "band_lower_tokens",
+        "band_upper_tokens",
+        "trajectory_prefix_lengths",
+        "artifact_ids",
+        "document_context_sha256",
+        "context_tokens",
+    }
+    output: list[Mapping[str, Any]] = []
+    for raw, (band_name, lower, upper) in zip(plan_bands, bands, strict=True):
+        if not isinstance(raw, Mapping):
+            raise ProvenanceError("macro vintage packing plan band is invalid")
+        prefix_lengths = raw.get("trajectory_prefix_lengths")
+        artifact_ids = raw.get("artifact_ids")
+        context_tokens = raw.get("context_tokens")
+        if (
+            set(raw) != expected_band_fields
+            or raw.get("length_bucket") != band_name
+            or raw.get("band_lower_tokens") != lower
+            or raw.get("band_upper_tokens") != upper
+            or not isinstance(prefix_lengths, Mapping)
+            or not prefix_lengths
+            or any(
+                not isinstance(key, str)
+                or not key
+                or isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 1
+                for key, value in prefix_lengths.items()
+            )
+            or not isinstance(artifact_ids, list)
+            or not artifact_ids
+            or any(not isinstance(value, str) or not value for value in artifact_ids)
+            or len(artifact_ids) != len(set(artifact_ids))
+            or _SHA256.fullmatch(
+                str(raw.get("document_context_sha256") or "")
+            )
+            is None
+            or isinstance(context_tokens, bool)
+            or not isinstance(context_tokens, int)
+            or context_tokens < 1
+        ):
+            raise ProvenanceError("macro vintage packing plan band is invalid")
+        output.append(raw)
+    return output
+
+
 def build_macro_vintage_pipeline_candidates(
     manifest: Mapping[str, Any],
     *,
@@ -804,6 +999,7 @@ def build_macro_vintage_pipeline_candidates(
     tokenizer_revision: str,
     tokenizer_asset_manifest_sha256: str,
     task_replay_sidecar_binding: dict[str, Any] | None = None,
+    verified_packing_plan: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Build nested exact-band macro tasks from distinct chronological records."""
     observations, relations, trajectories = _validate_pipeline_manifest(
@@ -840,12 +1036,24 @@ def build_macro_vintage_pipeline_candidates(
         is None
     ):
         raise ProvenanceError("macro vintage task replay sidecar binding is invalid")
-    path_observations, path_relations = _pipeline_path(
+    verified_plan_bands = _verified_packing_plan_bands(
+        verified_packing_plan,
+        workflow_manifest_sha256=workflow_manifest_sha256,
+        world_id=world_id,
+        target_series_id=target_series_id,
+        target_period=target_period,
+        bands=bands,
+        tokenizer_model_id=tokenizer_model_id,
+        tokenizer_revision=tokenizer_revision,
+        tokenizer_asset_manifest_sha256=tokenizer_asset_manifest_sha256,
+    )
+    band_paths = _pipeline_band_paths(
         observations,
         relations,
         trajectories,
         series_id=target_series_id,
         period=target_period,
+        band_count=len(bands),
     )
     observation_artifacts = [
         _pipeline_artifact("macro_vintage_observation", value)
@@ -901,17 +1109,6 @@ def build_macro_vintage_pipeline_candidates(
                 )
             )
         trajectory_prefix_ids[trajectory_id] = prefixes
-    essential_ids = [
-        *(str(value["observation_id"]) for value in path_observations),
-        *(str(value["relation_id"]) for value in path_relations),
-    ]
-    essential_set = set(essential_ids)
-    current = path_observations[-1]
-    prior = path_observations[-2]
-    replacement = _decimal(str(current["value"])) + Decimal(1)
-    if replacement == _decimal(str(prior["value"])):
-        replacement += Decimal(1)
-    replacement_value = _decimal_text(replacement)
     source_binding = {
         "workflow_manifest_sha256": workflow_manifest_sha256,
         "raw_source_sha256": str(manifest["raw_source_sha256"]),
@@ -923,20 +1120,6 @@ def build_macro_vintage_pipeline_candidates(
         "authorization_record_id": str(manifest["authorization"]["record_id"]),
         "parser_revision": MACRO_VINTAGE_PARSER_REVISION,
     }
-    question = (
-        f"For BEA series {target_series_id}, period {target_period}, reconstruct "
-        f"the complete revision path from {path_observations[0]['vintage_date']} "
-        f"through the decision date {current['vintage_date']}. Report every "
-        "changed or unchanged transition, the initial and current values, and "
-        "the cumulative revision delta."
-    )
-    task_metadata = {
-        "series_id": target_series_id,
-        "period": target_period,
-        "start_vintage_date": str(path_observations[0]["vintage_date"]),
-        "decision_date": str(current["vintage_date"]),
-    }
-
     document_by_id = {
         str(value["artifact_id"]): _pipeline_json(value) for value in all_artifacts
     }
@@ -953,13 +1136,6 @@ def build_macro_vintage_pipeline_candidates(
     artifact_indexes = {
         str(value["artifact_id"]): index for index, value in enumerate(all_artifacts)
     }
-    essential_indexes = sorted(artifact_indexes[value] for value in essential_ids)
-    span_artifact_ids = {
-        str(value["artifact_id"])
-        for value in all_artifacts[
-            essential_indexes[0] : essential_indexes[-1] + 1
-        ]
-    }
 
     def assemble(
         selected: Sequence[dict[str, Any]],
@@ -972,6 +1148,12 @@ def build_macro_vintage_pipeline_candidates(
         minimum_essential_span_tokens: int,
         band_name: str,
         prefix_lengths: Mapping[str, int],
+        essential_ids: Sequence[str],
+        essential_set: set[str],
+        current: Mapping[str, Any],
+        replacement_value: str,
+        question: str,
+        task_metadata: Mapping[str, str],
     ) -> dict[str, Any]:
         classifications = [
             {
@@ -1035,7 +1217,7 @@ def build_macro_vintage_pipeline_candidates(
                 "source_origin": "synthetic_counterfactual",
                 "provenance_operation": "replace_exact_fact",
             },
-            "macro_task": deepcopy(task_metadata),
+            "macro_task": dict(task_metadata),
             "answer_program_id": "macro.as_of_revision_path.v2",
             "strict_replay_revision": MACRO_VINTAGE_REPLAY_REVISION,
             "workflow_ids": [world_id],
@@ -1109,7 +1291,9 @@ def build_macro_vintage_pipeline_candidates(
             len(selected_ids) - 1
         ) * separator_token_cost
 
-    def estimated_essential_span_tokens(selected_ids: set[str]) -> int:
+    def estimated_essential_span_tokens(
+        selected_ids: set[str], span_artifact_ids: set[str]
+    ) -> int:
         inside = selected_ids & span_artifact_ids
         if not inside:
             return 0
@@ -1118,7 +1302,10 @@ def build_macro_vintage_pipeline_candidates(
         ) * separator_token_cost
 
     def packing_states(
-        retained_prefixes: Mapping[str, int], lower: int, upper: int
+        retained_prefixes: Mapping[str, int],
+        lower: int,
+        upper: int,
+        span_artifact_ids: set[str],
     ) -> list[tuple[int, int, tuple[tuple[str, int], ...]]]:
         """Bounded deterministic DP over complete trajectory prefixes."""
         background_ids = sorted(
@@ -1131,7 +1318,7 @@ def build_macro_vintage_pipeline_candidates(
             (
                 estimated_tokens(base_ids),
                 min(2, len(retained_prefixes) - 1),
-                estimated_essential_span_tokens(base_ids),
+                estimated_essential_span_tokens(base_ids, span_artifact_ids),
             ): tuple(sorted(retained_prefixes.items()))
         }
         max_estimate = upper + 1_024
@@ -1252,11 +1439,12 @@ def build_macro_vintage_pipeline_candidates(
         )[:512]
 
     output: list[dict[str, Any]] = []
-    retained_prefixes = {
-        target_trajectory_id: len(trajectory_prefix_ids[target_trajectory_id]) - 1
-    }
+    retained_prefixes: dict[str, int] = {}
     used_band_names: set[str] = set()
-    for band_name, lower, upper in bands:
+    for band_index, (
+        (band_name, lower, upper),
+        (path_observations, path_relations),
+    ) in enumerate(zip(bands, band_paths, strict=True)):
         if (
             not band_name
             or band_name in used_band_names
@@ -1265,6 +1453,34 @@ def build_macro_vintage_pipeline_candidates(
         ):
             raise ProvenanceError("macro vintage pipeline band is invalid")
         used_band_names.add(band_name)
+        retained_prefixes[target_trajectory_id] = len(path_observations)
+        essential_ids = [
+            *(str(value["observation_id"]) for value in path_observations),
+            *(str(value["relation_id"]) for value in path_relations),
+        ]
+        essential_set = set(essential_ids)
+        current = path_observations[-1]
+        prior = path_observations[-2]
+        replacement = _decimal(str(current["value"])) + Decimal(1)
+        if replacement == _decimal(str(prior["value"])):
+            replacement += Decimal(1)
+        replacement_value = _decimal_text(replacement)
+        task_metadata = {
+            "series_id": target_series_id,
+            "period": target_period,
+            "start_vintage_date": str(path_observations[0]["vintage_date"]),
+            "decision_date": str(current["vintage_date"]),
+        }
+        question = _pipeline_question(task_metadata)
+        essential_indexes = sorted(
+            artifact_indexes[value] for value in essential_ids
+        )
+        span_artifact_ids = {
+            str(value["artifact_id"])
+            for value in all_artifacts[
+                essential_indexes[0] : essential_indexes[-1] + 1
+            ]
+        }
         candidate: dict[str, Any] | None = None
         selected_prefixes: dict[str, int] | None = None
         minimum_essential_span_tokens = max(
@@ -1272,11 +1488,44 @@ def build_macro_vintage_pipeline_candidates(
             16_385 if lower > 16_384 else 0,
             lower // 2 + 1,
         )
-        for _estimated_cost, _estimated_span, selection in packing_states(
-            retained_prefixes, lower, upper
-        ):
+        plan_band = (
+            None
+            if verified_plan_bands is None
+            else verified_plan_bands[band_index]
+        )
+        if plan_band is None:
+            finalists = packing_states(
+                retained_prefixes, lower, upper, span_artifact_ids
+            )
+        else:
+            prefix_lengths = plan_band["trajectory_prefix_lengths"]
+            assert isinstance(prefix_lengths, Mapping)
+            selected_prefix_map = {
+                str(key): int(value) for key, value in prefix_lengths.items()
+            }
+            if (
+                selected_prefix_map.get(target_trajectory_id)
+                != len(path_observations)
+                or len(selected_prefix_map) < 3
+                or any(
+                    selected_prefix_map.get(trajectory_id, 0) < length
+                    for trajectory_id, length in retained_prefixes.items()
+                )
+            ):
+                raise ProvenanceError(
+                    "macro vintage packing plan semantic prefix is invalid"
+                )
+            finalists = [(0, 0, tuple(sorted(selected_prefix_map.items())))]
+        for _estimated_cost, _estimated_span, selection in finalists:
             selected_prefix_map = dict(selection)
-            selected_ids = selected_ids_for_prefixes(selected_prefix_map)
+            try:
+                selected_ids = selected_ids_for_prefixes(selected_prefix_map)
+            except ProvenanceError as error:
+                if plan_band is None:
+                    raise
+                raise ProvenanceError(
+                    "macro vintage packing plan prefix is invalid"
+                ) from error
             selected = [
                 value
                 for value in all_artifacts
@@ -1286,8 +1535,21 @@ def build_macro_vintage_pipeline_candidates(
                 document_by_id[str(value["artifact_id"])] for value in selected
             ]
             document_context = SEP.join(documents)
+            if plan_band is not None and (
+                plan_band["artifact_ids"]
+                != [str(value["artifact_id"]) for value in selected]
+                or plan_band["document_context_sha256"]
+                != _pipeline_sha256(document_context)
+            ):
+                raise ProvenanceError(
+                    "macro vintage packing plan document binding is invalid"
+                )
             document_context_tokens = token_counter(document_context)
             if document_context_tokens < lower:
+                if plan_band is not None:
+                    raise ProvenanceError(
+                        "macro vintage packing plan document length is invalid"
+                    )
                 continue
             essential_positions = [
                 index
@@ -1302,10 +1564,22 @@ def build_macro_vintage_pipeline_candidates(
                 )
             )
             if essential_span_tokens < minimum_essential_span_tokens:
+                if plan_band is not None:
+                    raise ProvenanceError(
+                        "macro vintage packing plan evidence span is invalid"
+                    )
                 continue
             context = wrap_prompt(question, document_context, "first")
             context_tokens = token_counter(context)
+            if plan_band is not None and plan_band["context_tokens"] != context_tokens:
+                raise ProvenanceError(
+                    "macro vintage packing plan context binding is invalid"
+                )
             if context_tokens > upper:
+                if plan_band is not None:
+                    raise ProvenanceError(
+                        "macro vintage packing plan context length is invalid"
+                    )
                 continue
             candidate = assemble(
                 selected,
@@ -1318,6 +1592,12 @@ def build_macro_vintage_pipeline_candidates(
                 minimum_essential_span_tokens,
                 band_name,
                 selected_prefix_map,
+                essential_ids,
+                essential_set,
+                current,
+                replacement_value,
+                question,
+                task_metadata,
             )
             selected_prefixes = selected_prefix_map
             break
@@ -1343,6 +1623,24 @@ def build_macro_vintage_pipeline_candidates(
                 "macro vintage pipeline candidate audit failed: " + ",".join(failed)
             )
         output.append(candidate)
+    if len(output) > 1:
+        growth = [
+            (
+                len(value["essential_artifact_ids"]),
+                int(value["strict_support_event_count"]),
+                int(value["graph"]["proof_depth"]),
+                len(value["authentic_source_relation_edges"]),
+                len(value["source_relation_ids"]),
+            )
+            for value in output
+        ]
+        if any(
+            any(current <= prior for prior, current in zip(left, right, strict=True))
+            for left, right in pairwise(growth)
+        ):
+            raise ProvenanceError(
+                "macro vintage semantic support does not grow across bands"
+            )
     return output
 
 
@@ -1374,6 +1672,22 @@ def audit_macro_vintage_pipeline_candidate(candidate: dict[str, Any]) -> dict[st
         essential_span_tokens = candidate.get("tokenizer_essential_span_tokens")
         minimum_essential_span_tokens = candidate.get(
             "minimum_essential_span_tokens"
+        )
+        macro_task = candidate.get("macro_task")
+        expected_question = (
+            _pipeline_question(macro_task)
+            if isinstance(macro_task, Mapping)
+            else ""
+        )
+        question = candidate.get("question")
+        document_context = candidate.get("document_context")
+        serialized_prompt_valid = bool(
+            isinstance(question, str)
+            and question == expected_question
+            and isinstance(document_context, str)
+            and candidate.get("query_timing") == "first"
+            and candidate.get("context")
+            == wrap_prompt(question, document_context, "first")
         )
         prefix_valid = bool(
             isinstance(prefix_lengths, Mapping)
@@ -1483,6 +1797,7 @@ def audit_macro_vintage_pipeline_candidate(candidate: dict[str, Any]) -> dict[st
             "chronological_unique_documents": ordered == sorted(ordered)
             and len(artifact_ids) == len(set(artifact_ids)),
             "trajectory_prefix_packing_valid": prefix_valid,
+            "serialized_prompt_valid": serialized_prompt_valid,
             "semantic_evidence_spread_valid": bool(
                 isinstance(essential_span_tokens, int)
                 and not isinstance(essential_span_tokens, bool)

@@ -219,6 +219,18 @@ def test_macro_task_proof_rejects_noncanonical_band_bounds() -> None:
         )
 
 
+def test_macro_task_proof_rejects_serialized_context_corruption() -> None:
+    candidate = _long_macro_candidate()
+    candidate["context"] = "X" * len(candidate["context"])
+
+    with pytest.raises(TaskProofError, match="adapter audit"):
+        compute_task_proof(
+            candidate,
+            token_counter=_macro_token_count,
+            offset_tokenizer=_macro_token_count.offset_tokenizer,  # type: ignore[attr-defined]
+        )
+
+
 def test_computes_closed_real_task_proof_without_mutating_candidate() -> None:
     candidate = _long_finance_candidate()
     before = deepcopy(candidate)

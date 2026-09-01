@@ -6,8 +6,11 @@ from datetime import date, timedelta
 from itertools import pairwise
 from pathlib import Path
 
+import pytest
+
 import longworld.core.macrovintage as macro_vintage_module
 from longworld.core.macrovintage import (
+    MACRO_VINTAGE_PACKING_PLAN_SCHEMA,
     audit_macro_vintage_pipeline_candidate,
     build_macro_vintage_pipeline_candidates,
     replay_macro_vintage_pipeline_raw_slice,
@@ -19,6 +22,7 @@ from longworld.core.macrovintageworkflow import (
     MAX_MACRO_VINTAGE_WORKFLOW_MANIFEST_BYTES,
 )
 from longworld.core.pack import SEP, wrap_prompt
+from longworld.core.provenance import ProvenanceError
 from scripts.materialize_macro_vintage_histories import _read_json
 
 
@@ -76,16 +80,32 @@ def _observation(
     }
 
 
-def _workflow_manifest() -> dict[str, object]:
+def _workflow_manifest(
+    *, target_vintage_count: int = 4, trajectory_count: int = 22
+) -> dict[str, object]:
     observations: list[dict[str, object]] = []
     relations: list[dict[str, object]] = []
     trajectories: list[dict[str, object]] = []
     start = date(2020, 1, 1)
     row = 10
-    for trajectory_index in range(22):
+    for trajectory_index in range(trajectory_count):
         series_id = "BEA_GDP_CURRENT_DOLLARS"
         period = f"{2020 + trajectory_index // 4}Q{trajectory_index % 4 + 1}"
-        values = ["100", "101", "101", str(103 + trajectory_index)]
+        if trajectory_index == 0 and target_vintage_count == 10:
+            values = [
+                "100",
+                "101",
+                "101",
+                "103",
+                "103",
+                "105",
+                "106",
+                "106",
+                "108",
+                "109",
+            ]
+        else:
+            values = ["100", "101", "101", str(103 + trajectory_index)]
         selected: list[dict[str, object]] = []
         for vintage_index, value in enumerate(values):
             vintage = (start + timedelta(days=30 * vintage_index + trajectory_index)).isoformat()
@@ -153,12 +173,30 @@ def _workflow_manifest() -> dict[str, object]:
                 "sha256": "b" * 64,
             },
         },
+        "generated_at": "2026-01-01T00:00:02Z",
         "parser": MACRO_VINTAGE_PARSER_REVISION,
         "authorization": {"record_id": "bea-public-probe-1"},
         "observations": observations,
         "relations": relations,
         "trajectories": trajectories,
     }
+
+
+@pytest.mark.parametrize(
+    "raw, message",
+    [
+        ('{"world_id":"first","world_id":"second"}', "duplicate JSON key"),
+        ('{"value":NaN}', "non-finite JSON value"),
+    ],
+)
+def test_macro_materializer_json_reader_rejects_ambiguous_values(
+    tmp_path: Path, raw: str, message: str
+) -> None:
+    path = tmp_path / "ambiguous.json"
+    path.write_text(raw, encoding="utf-8")
+
+    with pytest.raises(ProvenanceError, match=message):
+        _read_json(path, 1_024)
 
 
 def test_builds_real_ordered_16k_path_and_replays_changed_and_unchanged_edges() -> None:
@@ -213,6 +251,29 @@ def test_builds_real_ordered_16k_path_and_replays_changed_and_unchanged_edges() 
     )
     assert candidate["answer"] != candidate["cf_answer"]
     assert all(audit_macro_vintage_pipeline_candidate(candidate).values())
+
+
+@pytest.mark.parametrize("field", ["question", "context"])
+def test_macro_audit_rejects_serialized_prompt_corruption(field: str) -> None:
+    [candidate] = build_macro_vintage_pipeline_candidates(
+        _workflow_manifest(),
+        workflow_manifest_sha256="a" * 64,
+        world_id="bea-macro-vintage-prompt-corruption-test",
+        target_series_id="BEA_GDP_CURRENT_DOLLARS",
+        target_period="2020Q1",
+        bands=(("16k", 16_000, 16_384),),
+        token_counter=_token_count,
+        tokenizer_model_id="Qwen/Qwen3.5-4B",
+        tokenizer_revision="c" * 40,
+        tokenizer_asset_manifest_sha256="d" * 64,
+    )
+    corrupted = dict(candidate)
+    corrupted[field] = "X" * len(str(candidate[field]))
+
+    audit = audit_macro_vintage_pipeline_candidate(corrupted)
+
+    assert audit["serialized_prompt_valid"] is False
+    assert not all(audit.values())
 
     records = [json.loads(value) for value in candidate["document_context"].split(SEP)]
     selected_ids = {value["artifact_id"] for value in records}
@@ -461,6 +522,174 @@ def test_prefix_packing_preserves_the_reference_selection_and_bytes() -> None:
     assert candidate["trajectory_prefix_lengths"][
         "bea:trajectory:bea_gdp_current_dollars:2023Q3"
     ] == 4
+
+
+def test_multiband_target_revision_path_grows_strict_semantic_support() -> None:
+    candidates = build_macro_vintage_pipeline_candidates(
+        _workflow_manifest(target_vintage_count=10, trajectory_count=50),
+        workflow_manifest_sha256="a" * 64,
+        world_id="bea-macro-vintage-semantic-growth-test",
+        target_series_id="BEA_GDP_CURRENT_DOLLARS",
+        target_period="2020Q1",
+        bands=(
+            ("16k", 16_000, 16_384),
+            ("32k", 32_000, 32_768),
+            ("64k", 64_000, 65_536),
+        ),
+        token_counter=_token_count,
+        tokenizer_model_id="Qwen/Qwen3.5-4B",
+        tokenizer_revision="c" * 40,
+        tokenizer_asset_manifest_sha256="d" * 64,
+    )
+
+    target_trajectory_id = (
+        "bea:trajectory:bea_gdp_current_dollars:2020Q1"
+    )
+    assert [
+        value["trajectory_prefix_lengths"][target_trajectory_id]
+        for value in candidates
+    ] == [4, 7, 10]
+    assert [len(value["essential_artifact_ids"]) for value in candidates] == [
+        7,
+        13,
+        19,
+    ]
+    assert [value["strict_support_event_count"] for value in candidates] == [
+        4,
+        7,
+        10,
+    ]
+    assert [value["graph"]["proof_depth"] for value in candidates] == [4, 7, 10]
+    assert [
+        len(value["authentic_source_relation_edges"]) for value in candidates
+    ] == [4, 7, 10]
+    assert [len(value["source_relation_ids"]) for value in candidates] == [
+        7,
+        13,
+        19,
+    ]
+    document_ids = [
+        {item["artifact_id"] for item in value["artifact_classification"]}
+        for value in candidates
+    ]
+    assert document_ids[0] < document_ids[1] < document_ids[2]
+    for candidate in candidates:
+        steps = json.loads(candidate["answer"])["revision_steps"]
+        assert {value["relation_kind"] for value in steps} == {
+            "revises_observation",
+            "supersedes_without_observed_value_change",
+        }
+        assert steps[-1]["relation_kind"] == "revises_observation"
+        assert candidate["length_fill_method"] == (
+            "distinct_chronological_source_records"
+        )
+        assert all(audit_macro_vintage_pipeline_candidate(candidate).values())
+
+
+def test_verified_packing_plan_skips_dp_and_rebuilds_identical_candidate(
+    monkeypatch,
+) -> None:
+    kwargs = {
+        "manifest": _workflow_manifest(),
+        "workflow_manifest_sha256": "a" * 64,
+        "world_id": "bea-macro-vintage-packing-plan-test",
+        "target_series_id": "BEA_GDP_CURRENT_DOLLARS",
+        "target_period": "2020Q1",
+        "bands": (("16k", 16_000, 16_384),),
+        "token_counter": _token_count,
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "c" * 40,
+        "tokenizer_asset_manifest_sha256": "d" * 64,
+    }
+    reference = build_macro_vintage_pipeline_candidates(**kwargs)
+    candidate = reference[0]
+    packing_plan = {
+        "schema_version": MACRO_VINTAGE_PACKING_PLAN_SCHEMA,
+        "workflow_manifest_sha256": "a" * 64,
+        "world_id": "bea-macro-vintage-packing-plan-test",
+        "target_series_id": "BEA_GDP_CURRENT_DOLLARS",
+        "target_period": "2020Q1",
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "c" * 40,
+        "tokenizer_asset_manifest_sha256": "d" * 64,
+        "bands": [
+            {
+                "length_bucket": "16k",
+                "band_lower_tokens": 16_000,
+                "band_upper_tokens": 16_384,
+                "trajectory_prefix_lengths": candidate[
+                    "trajectory_prefix_lengths"
+                ],
+                "artifact_ids": [
+                    value["artifact_id"]
+                    for value in candidate["artifact_classification"]
+                ],
+                "document_context_sha256": hashlib.sha256(
+                    candidate["document_context"].encode()
+                ).hexdigest(),
+                "context_tokens": candidate["tokenizer_context_tokens"],
+            }
+        ],
+    }
+
+    def unexpected_dp(*_args, **_kwargs):
+        raise AssertionError("packing DP must not run for a verified plan")
+
+    monkeypatch.setattr(macro_vintage_module, "bisect_right", unexpected_dp)
+    rebuilt = build_macro_vintage_pipeline_candidates(
+        **kwargs,
+        verified_packing_plan=packing_plan,
+    )
+
+    assert rebuilt == reference
+
+
+def test_verified_packing_plan_drift_fails_closed() -> None:
+    kwargs = {
+        "manifest": _workflow_manifest(),
+        "workflow_manifest_sha256": "a" * 64,
+        "world_id": "bea-macro-vintage-packing-plan-drift-test",
+        "target_series_id": "BEA_GDP_CURRENT_DOLLARS",
+        "target_period": "2020Q1",
+        "bands": (("16k", 16_000, 16_384),),
+        "token_counter": _token_count,
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "c" * 40,
+        "tokenizer_asset_manifest_sha256": "d" * 64,
+    }
+    [candidate] = build_macro_vintage_pipeline_candidates(**kwargs)
+    packing_plan = {
+        "schema_version": MACRO_VINTAGE_PACKING_PLAN_SCHEMA,
+        "workflow_manifest_sha256": "a" * 64,
+        "world_id": "bea-macro-vintage-packing-plan-drift-test",
+        "target_series_id": "BEA_GDP_CURRENT_DOLLARS",
+        "target_period": "2020Q1",
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "c" * 40,
+        "tokenizer_asset_manifest_sha256": "d" * 64,
+        "bands": [
+            {
+                "length_bucket": "16k",
+                "band_lower_tokens": 16_000,
+                "band_upper_tokens": 16_384,
+                "trajectory_prefix_lengths": candidate[
+                    "trajectory_prefix_lengths"
+                ],
+                "artifact_ids": [
+                    value["artifact_id"]
+                    for value in candidate["artifact_classification"]
+                ],
+                "document_context_sha256": "0" * 64,
+                "context_tokens": candidate["tokenizer_context_tokens"],
+            }
+        ],
+    }
+
+    with pytest.raises(ProvenanceError, match="packing plan"):
+        build_macro_vintage_pipeline_candidates(
+            **kwargs,
+            verified_packing_plan=packing_plan,
+        )
 
 
 def test_exact_token_prefilter_does_not_replay_an_over_upper_finalist(

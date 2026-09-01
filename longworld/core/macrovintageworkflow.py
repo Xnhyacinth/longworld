@@ -13,15 +13,23 @@ import posixpath
 import re
 import zipfile
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from itertools import pairwise
 from pathlib import Path, PurePosixPath
 from typing import Any
 from xml.etree import ElementTree
 
+from longworld.core.attestation import (
+    ATTESTATION_V2_SCHEME,
+    LOCAL_PROBE_TRUST_ISOLATION_FIELD,
+    LOCAL_PROBE_TRUST_ISOLATION_VALUE,
+    attach_attestation,
+    verify_attestation,
+)
 from longworld.core.provenance import (
     MAX_MANIFEST_BYTES,
     ProvenanceError,
@@ -55,6 +63,15 @@ MAX_CELLS = 200_000
 MAX_EXPANDED_CELL_CHARS = 8_000_000
 MAX_OBSERVATIONS = 100_000
 MAX_MACRO_VINTAGE_WORKFLOW_MANIFEST_BYTES = 16_000_000
+MAX_MACRO_CACHE_BYTES = 32_000_000
+MACRO_REMOTE_SOURCE_RECEIPT_SCHEMA = "longworld.macro-remote-source-receipt.v1"
+MACRO_REMOTE_SOURCE_RECEIPT_PURPOSE = "macro_remote_source_receipt"
+MACRO_REMOTE_SOURCE_RECEIPT_VALIDITY_SECONDS = 86_400
+MACRO_PACKING_PLAN_SCHEMA = "longworld.macro-packing-cache.v1"
+MACRO_PACKING_PLAN_PURPOSE = "macro_packing_plan"
+MACRO_VERIFIED_PACKING_PLAN_SCHEMA = "longworld.macro-vintage-packing-plan.v1"
+MACRO_REFERENCE_INDEX_SCHEMA = "longworld.macro-reference-index.v1"
+MACRO_REFERENCE_INDEX_PURPOSE = "macro_reference_index"
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _QUARTER = re.compile(r"^(?:19|20)\d{2}Q[1-4]$")
@@ -105,6 +122,595 @@ _INVENTORY_FIELDS = {
     "fetch_receipt",
     "n_retrievals",
 }
+
+
+def _canonical_json_bytes(value: object) -> bytes:
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode()
+
+
+def _closed_signed_cache(
+    value: object, *, unsigned_fields: set[str], purpose: str, role: str, key: bytes | None
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ProvenanceError("macro cache artifact must be an object")
+    expected = {*unsigned_fields, "attestation"}
+    fields = set(value)
+    if not (
+        fields == expected
+        or (
+            fields == expected | {LOCAL_PROBE_TRUST_ISOLATION_FIELD}
+            and value.get(LOCAL_PROBE_TRUST_ISOLATION_FIELD)
+            == LOCAL_PROBE_TRUST_ISOLATION_VALUE
+        )
+    ):
+        raise ProvenanceError("macro cache artifact has unexpected fields")
+    attestation = value.get("attestation")
+    if (
+        not isinstance(attestation, dict)
+        or set(attestation)
+        != {"scheme", "purpose", "role", "key_id", "environment", "digest"}
+        or attestation.get("scheme") != ATTESTATION_V2_SCHEME
+        or attestation.get("purpose") != purpose
+        or attestation.get("role") != role
+        or not verify_attestation(value, key, purpose=purpose)
+    ):
+        raise ProvenanceError(f"macro cache lacks a valid {role}-role signature")
+    return value
+
+
+def _read_macro_cache(path: Path) -> tuple[dict[str, Any], bytes]:
+    def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in value:
+                raise ProvenanceError("macro cache JSON contains a duplicate key")
+            value[key] = item
+        return value
+
+    def reject_nonfinite(value: str) -> None:
+        raise ProvenanceError(f"macro cache JSON contains non-finite value {value}")
+
+    try:
+        raw = _read_regular_file(path, MAX_MACRO_CACHE_BYTES)
+        value = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=reject_duplicate_keys,
+            parse_constant=reject_nonfinite,
+        )
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ProvenanceError(f"cannot read macro cache {path.name}") from error
+    if not isinstance(value, dict):
+        raise ProvenanceError("macro cache artifact must be an object")
+    return value, raw
+
+
+def _macro_remote_source_identity(
+    source_binding: Mapping[str, Any], fetch_receipt: Mapping[str, Any]
+) -> dict[str, Any]:
+    binding_fields = {
+        "workflow_manifest_sha256",
+        "raw_source_sha256",
+        "fetch_inventory_sha256",
+        "fetch_receipt_sha256",
+        "source_families",
+        "authorization_record_id",
+        "parser_revision",
+    }
+    retrieval = fetch_receipt.get("retrieval")
+    if (
+        set(source_binding) != binding_fields
+        or any(
+            _SHA256.fullmatch(str(source_binding.get(field) or "")) is None
+            for field in (
+                "workflow_manifest_sha256",
+                "raw_source_sha256",
+                "fetch_inventory_sha256",
+                "fetch_receipt_sha256",
+            )
+        )
+        or source_binding.get("source_families")
+        != ["bea_gdp_gdi_vintage_workbook"]
+        or source_binding.get("parser_revision") != MACRO_VINTAGE_PARSER_REVISION
+        or not str(source_binding.get("authorization_record_id") or "")
+        or set(fetch_receipt) != {"started_at", "completed_at", "retrieval"}
+        or not isinstance(retrieval, Mapping)
+        or retrieval.get("requested_url") != BEA_GDP_GDI_VINTAGE_XLSX_URL
+        or retrieval.get("final_url") != BEA_GDP_GDI_VINTAGE_XLSX_URL
+        or retrieval.get("status") != 200
+        or retrieval.get("sha256") != source_binding.get("raw_source_sha256")
+        or isinstance(retrieval.get("raw_bytes"), bool)
+        or not isinstance(retrieval.get("raw_bytes"), int)
+        or retrieval["raw_bytes"] < 1
+        or hashlib.sha256(_canonical_json_bytes(fetch_receipt)).hexdigest()
+        != source_binding.get("fetch_receipt_sha256")
+    ):
+        raise ProvenanceError("macro remote source identity is invalid")
+    started_at = str(fetch_receipt.get("started_at") or "")
+    completed_at = str(fetch_receipt.get("completed_at") or "")
+    started = _parse_timestamp(started_at, "macro cache started_at")
+    completed = _parse_timestamp(completed_at, "macro cache completed_at")
+    if not started < completed <= started + timedelta(
+        seconds=MACRO_REMOTE_SOURCE_RECEIPT_VALIDITY_SECONDS
+    ):
+        raise ProvenanceError("macro remote source receipt interval is invalid")
+    return {
+        "workflow_manifest_sha256": source_binding["workflow_manifest_sha256"],
+        "raw_source_sha256": source_binding["raw_source_sha256"],
+        "fetch_inventory_sha256": source_binding["fetch_inventory_sha256"],
+        "fetch_receipt_sha256": source_binding["fetch_receipt_sha256"],
+        "authorization_record_id": source_binding["authorization_record_id"],
+        "source_family": "bea_gdp_gdi_vintage_workbook",
+        "request_method": "GET",
+        "requested_url": BEA_GDP_GDI_VINTAGE_XLSX_URL,
+        "final_url": BEA_GDP_GDI_VINTAGE_XLSX_URL,
+        "response_status": 200,
+        "response_sha256": source_binding["raw_source_sha256"],
+        "response_bytes": retrieval["raw_bytes"],
+        "checked_at": started_at,
+        "exported_at": completed_at,
+    }
+
+
+def sign_macro_remote_source_receipt(
+    *,
+    source_binding: Mapping[str, Any],
+    fetch_receipt: Mapping[str, Any],
+    exported_at: str,
+    key: bytes,
+) -> dict[str, Any]:
+    """Sign the exact BEA request/response identity, never a quality decision."""
+    identity = _macro_remote_source_identity(source_binding, fetch_receipt)
+    checked = _parse_timestamp(identity["checked_at"], "macro cache checked_at")
+    fetched = _parse_timestamp(identity["exported_at"], "macro cache fetched_at")
+    exported = _parse_timestamp(exported_at, "macro cache exported_at")
+    expires = checked + timedelta(
+        seconds=MACRO_REMOTE_SOURCE_RECEIPT_VALIDITY_SECONDS
+    )
+    if not checked < fetched <= exported <= expires:
+        raise ProvenanceError("macro remote source receipt is stale for this export")
+    signed = attach_attestation(
+        {
+            "schema_version": MACRO_REMOTE_SOURCE_RECEIPT_SCHEMA,
+            "source_identity": identity,
+            "exported_at": exported_at,
+            "expires_at": expires.isoformat().replace("+00:00", "Z"),
+        },
+        key,
+        purpose=MACRO_REMOTE_SOURCE_RECEIPT_PURPOSE,
+    )
+    _closed_signed_cache(
+        signed,
+        unsigned_fields={
+            "schema_version",
+            "source_identity",
+            "exported_at",
+            "expires_at",
+        },
+        purpose=MACRO_REMOTE_SOURCE_RECEIPT_PURPOSE,
+        role="source",
+        key=key,
+    )
+    return signed
+
+
+def verify_macro_remote_source_receipt(
+    receipt: object,
+    *,
+    expected_source_binding: Mapping[str, Any],
+    expected_fetch_receipt: Mapping[str, Any],
+    key: bytes | None,
+) -> dict[str, Any]:
+    """Verify a source-role BEA receipt against the current workflow inputs."""
+    value = _closed_signed_cache(
+        receipt,
+        unsigned_fields={
+            "schema_version",
+            "source_identity",
+            "exported_at",
+            "expires_at",
+        },
+        purpose=MACRO_REMOTE_SOURCE_RECEIPT_PURPOSE,
+        role="source",
+        key=key,
+    )
+    if value.get("schema_version") != MACRO_REMOTE_SOURCE_RECEIPT_SCHEMA:
+        raise ProvenanceError("macro remote source receipt schema is unsupported")
+    expected = _macro_remote_source_identity(
+        expected_source_binding, expected_fetch_receipt
+    )
+    checked = _parse_timestamp(expected["checked_at"], "macro cache checked_at")
+    fetched = _parse_timestamp(expected["exported_at"], "macro cache fetched_at")
+    exported_at = str(value.get("exported_at") or "")
+    exported = _parse_timestamp(exported_at, "macro cache exported_at")
+    expires = checked + timedelta(
+        seconds=MACRO_REMOTE_SOURCE_RECEIPT_VALIDITY_SECONDS
+    )
+    expires_at = expires.isoformat().replace("+00:00", "Z")
+    if (
+        value.get("source_identity") != expected
+        or value.get("expires_at") != expires_at
+        or not checked < fetched <= exported <= expires
+    ):
+        raise ProvenanceError("macro remote source receipt identity does not match")
+    return {
+        "receipt_sha256": hashlib.sha256(_canonical_json_bytes(value)).hexdigest(),
+        "source_identity": expected,
+        "exported_at": exported_at,
+        "expires_at": expires_at,
+    }
+
+
+def read_macro_remote_source_receipt(
+    path: Path,
+    *,
+    expected_source_binding: Mapping[str, Any],
+    expected_fetch_receipt: Mapping[str, Any],
+    key: bytes | None,
+) -> dict[str, Any]:
+    """Safely read a Macro source receipt and bind its exact serialized bytes."""
+    value, raw = _read_macro_cache(path)
+    verified = verify_macro_remote_source_receipt(
+        value,
+        expected_source_binding=expected_source_binding,
+        expected_fetch_receipt=expected_fetch_receipt,
+        key=key,
+    )
+    verified["receipt_sha256"] = hashlib.sha256(raw).hexdigest()
+    return verified
+
+
+def _macro_cache_rows(rows: object) -> list[Mapping[str, Any]]:
+    if not isinstance(rows, list) or not rows or any(
+        not isinstance(row, Mapping) for row in rows
+    ):
+        raise ProvenanceError("macro cache candidates are invalid")
+    normalized = list(rows)
+    world_ids = {str(row.get("world_id") or "") for row in normalized}
+    buckets = [str(row.get("length_bucket") or "") for row in normalized]
+    source_bindings = [row.get("source_binding") for row in normalized]
+    tokenizer_pins = {
+        (
+            str(row.get("tokenizer_model_id") or ""),
+            str(row.get("tokenizer_revision") or ""),
+            str(row.get("tokenizer_asset_manifest_sha256") or ""),
+        )
+        for row in normalized
+    }
+    if (
+        len(world_ids) != 1
+        or "" in world_ids
+        or any(not bucket for bucket in buckets)
+        or len(buckets) != len(set(buckets))
+        or not isinstance(source_bindings[0], Mapping)
+        or any(binding != source_bindings[0] for binding in source_bindings[1:])
+        or len(tokenizer_pins) != 1
+    ):
+        raise ProvenanceError("macro cache candidate identity is inconsistent")
+    return normalized
+
+
+def build_macro_verified_packing_plan(
+    rows: object, *, bands: Sequence[tuple[str, int, int]] | None = None
+) -> dict[str, Any]:
+    normalized = _macro_cache_rows(rows)
+    first = normalized[0]
+    source_binding = first["source_binding"]
+    assert isinstance(source_binding, Mapping)
+    macro_task = first.get("macro_task")
+    if (
+        not isinstance(macro_task, Mapping)
+        or not str(macro_task.get("series_id") or "")
+        or not str(macro_task.get("period") or "")
+    ):
+        raise ProvenanceError("macro packing task identity is invalid")
+    if bands is None:
+        bands = []
+        for row in normalized:
+            lower = row.get("band_lower_tokens")
+            upper = row.get("band_upper_tokens")
+            if (
+                isinstance(lower, bool)
+                or not isinstance(lower, int)
+                or isinstance(upper, bool)
+                or not isinstance(upper, int)
+            ):
+                raise ProvenanceError("macro packing band bounds are invalid")
+            bands.append((str(row.get("length_bucket") or ""), lower, upper))
+    if len(bands) != len(normalized):
+        raise ProvenanceError("macro packing bands do not match candidates")
+    plan_bands: list[dict[str, Any]] = []
+    for row, (band_name, lower, upper) in zip(normalized, bands, strict=True):
+        classifications = row.get("artifact_classification")
+        prefixes = row.get("trajectory_prefix_lengths")
+        context = row.get("document_context")
+        context_tokens = row.get("tokenizer_context_tokens")
+        if (
+            row.get("length_bucket") != band_name
+            or lower < 1
+            or upper < lower
+            or not isinstance(classifications, list)
+            or not classifications
+            or any(not isinstance(item, Mapping) for item in classifications)
+            or not isinstance(prefixes, Mapping)
+            or not prefixes
+            or any(
+                not isinstance(key, str)
+                or not key
+                or isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 1
+                for key, value in prefixes.items()
+            )
+            or not isinstance(context, str)
+            or not context
+            or isinstance(context_tokens, bool)
+            or not isinstance(context_tokens, int)
+            or context_tokens < 1
+        ):
+            raise ProvenanceError("macro packing window is invalid")
+        artifact_ids = [str(item.get("artifact_id") or "") for item in classifications]
+        if "" in artifact_ids or len(artifact_ids) != len(set(artifact_ids)):
+            raise ProvenanceError("macro packing artifact sequence is invalid")
+        plan_bands.append(
+            {
+                "length_bucket": band_name,
+                "band_lower_tokens": lower,
+                "band_upper_tokens": upper,
+                "trajectory_prefix_lengths": dict(sorted(prefixes.items())),
+                "artifact_ids": artifact_ids,
+                "document_context_sha256": hashlib.sha256(context.encode()).hexdigest(),
+                "context_tokens": context_tokens,
+            }
+        )
+    return {
+        "schema_version": MACRO_VERIFIED_PACKING_PLAN_SCHEMA,
+        "workflow_manifest_sha256": source_binding["workflow_manifest_sha256"],
+        "world_id": str(first["world_id"]),
+        "target_series_id": macro_task["series_id"],
+        "target_period": macro_task["period"],
+        "tokenizer_model_id": first["tokenizer_model_id"],
+        "tokenizer_revision": first["tokenizer_revision"],
+        "tokenizer_asset_manifest_sha256": first[
+            "tokenizer_asset_manifest_sha256"
+        ],
+        "bands": plan_bands,
+    }
+
+
+def sign_macro_packing_plan(
+    rows: list[dict[str, Any]],
+    *,
+    bands: Sequence[tuple[str, int, int]] | None = None,
+    remote_source_receipt_sha256: str,
+    key: bytes,
+) -> dict[str, Any]:
+    """Sign deterministic Macro prefix selections, never candidate gate results."""
+    if _SHA256.fullmatch(remote_source_receipt_sha256) is None:
+        raise ProvenanceError("macro packing receipt binding is invalid")
+    plan = build_macro_verified_packing_plan(rows, bands=bands)
+    signed = attach_attestation(
+        {
+            "schema_version": MACRO_PACKING_PLAN_SCHEMA,
+            "remote_source_receipt_sha256": remote_source_receipt_sha256,
+            "packing_plan": plan,
+        },
+        key,
+        purpose=MACRO_PACKING_PLAN_PURPOSE,
+    )
+    verify_macro_packing_plan(
+        signed,
+        expected_rows=rows,
+        expected_bands=bands,
+        expected_remote_source_receipt_sha256=remote_source_receipt_sha256,
+        key=key,
+    )
+    return signed
+
+
+def verify_macro_packing_plan(
+    plan: object,
+    *,
+    expected_rows: list[dict[str, Any]] | None,
+    expected_remote_source_receipt_sha256: str,
+    key: bytes | None,
+    expected_bands: Sequence[tuple[str, int, int]] | None = None,
+) -> dict[str, Any]:
+    """Return only a rederived Macro selection plan after promotion-role verification."""
+    value = _closed_signed_cache(
+        plan,
+        unsigned_fields={
+            "schema_version",
+            "remote_source_receipt_sha256",
+            "packing_plan",
+        },
+        purpose=MACRO_PACKING_PLAN_PURPOSE,
+        role="promotion",
+        key=key,
+    )
+    if (
+        value.get("schema_version") != MACRO_PACKING_PLAN_SCHEMA
+        or value.get("remote_source_receipt_sha256")
+        != expected_remote_source_receipt_sha256
+        or not isinstance(value.get("packing_plan"), dict)
+    ):
+        raise ProvenanceError("macro packing plan identity does not match")
+    if expected_rows is not None and value[
+        "packing_plan"
+    ] != build_macro_verified_packing_plan(expected_rows, bands=expected_bands):
+        raise ProvenanceError("macro packing plan identity does not match")
+    return dict(value["packing_plan"])
+
+
+def read_macro_packing_plan(
+    path: Path,
+    *,
+    expected_rows: list[dict[str, Any]] | None,
+    expected_remote_source_receipt_sha256: str,
+    key: bytes | None,
+    expected_bands: Sequence[tuple[str, int, int]] | None = None,
+) -> dict[str, Any]:
+    """Safely read and rederive a promotion-role Macro packing plan."""
+    value, raw = _read_macro_cache(path)
+    verified = verify_macro_packing_plan(
+        value,
+        expected_rows=expected_rows,
+        expected_bands=expected_bands,
+        expected_remote_source_receipt_sha256=(
+            expected_remote_source_receipt_sha256
+        ),
+        key=key,
+    )
+    return {
+        "packing_plan": verified,
+        "packing_plan_sha256": hashlib.sha256(raw).hexdigest(),
+    }
+
+
+def _macro_reference_payload(
+    rows: object, *, packing_plan_sha256: str, remote_source_receipt_sha256: str
+) -> dict[str, Any]:
+    normalized = _macro_cache_rows(rows)
+    if (
+        _SHA256.fullmatch(packing_plan_sha256) is None
+        or _SHA256.fullmatch(remote_source_receipt_sha256) is None
+    ):
+        raise ProvenanceError("macro reference cache binding is invalid")
+    references: list[dict[str, Any]] = []
+    for row in normalized:
+        context = row.get("document_context")
+        classifications = row.get("artifact_classification")
+        essential_ids = row.get("essential_artifact_ids")
+        record_ids = row.get("source_record_ids")
+        relation_ids = row.get("source_relation_ids")
+        if (
+            not isinstance(context, str)
+            or not context
+            or not isinstance(classifications, list)
+            or not classifications
+            or any(not isinstance(value, Mapping) for value in classifications)
+            or not isinstance(essential_ids, list)
+            or not essential_ids
+            or not isinstance(record_ids, list)
+            or not record_ids
+            or not isinstance(relation_ids, list)
+            or not relation_ids
+            or any(not isinstance(value, str) or not value for value in essential_ids)
+            or any(not isinstance(value, str) or not value for value in record_ids)
+            or any(not isinstance(value, str) or not value for value in relation_ids)
+        ):
+            raise ProvenanceError("macro reference candidate is invalid")
+        artifact_ids = [str(value.get("artifact_id") or "") for value in classifications]
+        if "" in artifact_ids or len(artifact_ids) != len(set(artifact_ids)):
+            raise ProvenanceError("macro reference artifact identity is invalid")
+        references.append(
+            {
+                "world_id": row.get("world_id"),
+                "query_id": row.get("query_id"),
+                "length_bucket": row.get("length_bucket"),
+                "document_context_sha256": hashlib.sha256(
+                    context.encode()
+                ).hexdigest(),
+                "artifact_ids": artifact_ids,
+                "essential_artifact_ids": essential_ids,
+                "source_record_ids": list(record_ids),
+                "source_relation_ids": list(relation_ids),
+            }
+        )
+    return {
+        "packing_plan_sha256": packing_plan_sha256,
+        "remote_source_receipt_sha256": remote_source_receipt_sha256,
+        "references": references,
+    }
+
+
+def sign_macro_reference_index(
+    rows: list[dict[str, Any]],
+    *,
+    packing_plan_sha256: str,
+    remote_source_receipt_sha256: str,
+    key: bytes,
+) -> dict[str, Any]:
+    """Sign a complete Macro candidate identity index after local replay audit."""
+    payload = _macro_reference_payload(
+        rows,
+        packing_plan_sha256=packing_plan_sha256,
+        remote_source_receipt_sha256=remote_source_receipt_sha256,
+    )
+    signed = attach_attestation(
+        {
+            "schema_version": MACRO_REFERENCE_INDEX_SCHEMA,
+            **payload,
+        },
+        key,
+        purpose=MACRO_REFERENCE_INDEX_PURPOSE,
+    )
+    verify_macro_reference_index(
+        signed,
+        expected_rows=rows,
+        expected_packing_plan_sha256=packing_plan_sha256,
+        expected_remote_source_receipt_sha256=remote_source_receipt_sha256,
+        key=key,
+    )
+    return signed
+
+
+def verify_macro_reference_index(
+    index: object,
+    *,
+    expected_rows: list[dict[str, Any]],
+    expected_packing_plan_sha256: str,
+    expected_remote_source_receipt_sha256: str,
+    key: bytes | None,
+) -> dict[str, Any]:
+    """Verify a report-role index against independently reconstructed candidates."""
+    value = _closed_signed_cache(
+        index,
+        unsigned_fields={
+            "schema_version",
+            "packing_plan_sha256",
+            "remote_source_receipt_sha256",
+            "references",
+        },
+        purpose=MACRO_REFERENCE_INDEX_PURPOSE,
+        role="report",
+        key=key,
+    )
+    expected = _macro_reference_payload(
+        expected_rows,
+        packing_plan_sha256=expected_packing_plan_sha256,
+        remote_source_receipt_sha256=expected_remote_source_receipt_sha256,
+    )
+    if (
+        value.get("schema_version") != MACRO_REFERENCE_INDEX_SCHEMA
+        or any(value.get(field) != expected[field] for field in expected)
+    ):
+        raise ProvenanceError("macro reference index identity does not match")
+    return expected
+
+
+def read_macro_reference_index(
+    path: Path,
+    *,
+    expected_rows: list[dict[str, Any]],
+    expected_packing_plan_sha256: str,
+    expected_remote_source_receipt_sha256: str,
+    key: bytes | None,
+) -> dict[str, Any]:
+    """Safely read and rederive a report-role Macro reference index."""
+    value, raw = _read_macro_cache(path)
+    verified = verify_macro_reference_index(
+        value,
+        expected_rows=expected_rows,
+        expected_packing_plan_sha256=expected_packing_plan_sha256,
+        expected_remote_source_receipt_sha256=(
+            expected_remote_source_receipt_sha256
+        ),
+        key=key,
+    )
+    verified["reference_index_sha256"] = hashlib.sha256(raw).hexdigest()
+    return verified
 
 
 @dataclass(frozen=True)

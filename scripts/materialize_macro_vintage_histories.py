@@ -16,6 +16,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from longworld.core.attestation import (
+    ATTESTATION_ENVIRONMENT_ENV,
+    LOCAL_PROBE_COMBINED_ROLES_ENV,
+    LOCAL_PROBE_TRUST_ISOLATION_VALUE,
     attestation_key_from_env,
     sanitized_attestation_environment,
 )
@@ -24,9 +27,18 @@ from longworld.core.macrovintage import (
     build_macro_vintage_pipeline_candidates,
 )
 from longworld.core.macrovintageworkflow import (
+    MACRO_PACKING_PLAN_PURPOSE,
+    MACRO_REFERENCE_INDEX_PURPOSE,
+    MACRO_REMOTE_SOURCE_RECEIPT_PURPOSE,
+    MACRO_VINTAGE_PARSER_REVISION,
     MAX_MACRO_VINTAGE_WORKFLOW_MANIFEST_BYTES,
     MAX_XLSX_BYTES,
     audit_macro_vintage_workflow_manifest,
+    read_macro_packing_plan,
+    read_macro_remote_source_receipt,
+    sign_macro_packing_plan,
+    sign_macro_reference_index,
+    sign_macro_remote_source_receipt,
 )
 from longworld.core.provenance import (
     ProvenanceError,
@@ -41,6 +53,31 @@ from longworld.core.taskreplaysidecar import (
 from longworld.core.tokenizer_assets import resolved_tokenizer_asset_manifest_sha256
 
 MAX_CONFIG_BYTES = 256_000
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ProvenanceError(f"duplicate JSON key: {key}")
+        value[key] = item
+    return value
+
+
+def _reject_nonfinite_json(value: str) -> None:
+    raise ProvenanceError(f"non-finite JSON value: {value}")
+
+
+def _require_combined_local_probe() -> None:
+    if (
+        os.environ.get(ATTESTATION_ENVIRONMENT_ENV, "").strip().lower()
+        != "probe"
+        or os.environ.get(LOCAL_PROBE_COMBINED_ROLES_ENV, "").strip()
+        != LOCAL_PROBE_TRUST_ISOLATION_VALUE
+    ):
+        raise ProvenanceError(
+            "Macro combined-role cache path is local-probe diagnostic only"
+        )
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -138,7 +175,11 @@ def _build_source_sidecar(
 def _read_json(path: Path, max_bytes: int) -> tuple[dict[str, Any], bytes]:
     try:
         raw = _read_regular_file(path, max_bytes)
-        value = json.loads(raw.decode("utf-8"))
+        value = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=_unique_json_object,
+            parse_constant=_reject_nonfinite_json,
+        )
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ProvenanceError(f"cannot load JSON object {path.name}") from error
     if not isinstance(value, dict):
@@ -165,8 +206,111 @@ def _load_tokenizer(model_id: str, revision: str) -> Any:
         )
 
 
+def _pipeline_source_binding(
+    workflow: dict[str, Any], workflow_manifest_sha256: str
+) -> dict[str, Any]:
+    fetch_receipt = workflow.get("fetch_receipt")
+    authorization = workflow.get("authorization")
+    if not isinstance(fetch_receipt, dict) or not isinstance(authorization, dict):
+        raise ProvenanceError("Macro workflow source identity is invalid")
+    return {
+        "workflow_manifest_sha256": workflow_manifest_sha256,
+        "raw_source_sha256": str(workflow.get("raw_source_sha256") or ""),
+        "fetch_inventory_sha256": str(
+            workflow.get("fetch_inventory_sha256") or ""
+        ),
+        "fetch_receipt_sha256": hashlib.sha256(
+            json.dumps(
+                fetch_receipt,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest(),
+        "source_families": ["bea_gdp_gdi_vintage_workbook"],
+        "authorization_record_id": str(authorization.get("record_id") or ""),
+        "parser_revision": MACRO_VINTAGE_PARSER_REVISION,
+    }
+
+
+def _load_cached_packing_plan(
+    *,
+    output_dir: Path,
+    source_binding: dict[str, Any],
+    fetch_receipt: dict[str, Any],
+) -> dict[str, Any] | None:
+    packing_path = output_dir / "MACRO_PACKING_PLAN.json"
+    if not packing_path.exists():
+        return None
+    source_key = attestation_key_from_env(MACRO_REMOTE_SOURCE_RECEIPT_PURPOSE)
+    promotion_key = attestation_key_from_env(MACRO_PACKING_PLAN_PURPOSE)
+    if source_key is None or promotion_key is None:
+        raise ProvenanceError("Macro packing cache requires source and promotion keys")
+    receipt = read_macro_remote_source_receipt(
+        output_dir / "MACRO_REMOTE_SOURCE_RECEIPT.json",
+        expected_source_binding=source_binding,
+        expected_fetch_receipt=fetch_receipt,
+        key=source_key,
+    )
+    return read_macro_packing_plan(
+        packing_path,
+        expected_rows=None,
+        expected_remote_source_receipt_sha256=receipt["receipt_sha256"],
+        key=promotion_key,
+    )["packing_plan"]
+
+
+def materialize_macro_execution_caches(
+    rows: list[dict[str, Any]], *, workflow: dict[str, Any], output_dir: Path
+) -> dict[str, str]:
+    """Write role-separated acceleration metadata without any final gate result."""
+    _require_combined_local_probe()
+    if not rows or not isinstance(rows[0].get("source_binding"), dict):
+        raise ProvenanceError("Macro cache materialization requires candidate rows")
+    source_key = attestation_key_from_env(MACRO_REMOTE_SOURCE_RECEIPT_PURPOSE)
+    promotion_key = attestation_key_from_env(MACRO_PACKING_PLAN_PURPOSE)
+    report_key = attestation_key_from_env(MACRO_REFERENCE_INDEX_PURPOSE)
+    if source_key is None or promotion_key is None or report_key is None:
+        raise ProvenanceError("Macro cache materialization requires three role keys")
+
+    source_receipt = sign_macro_remote_source_receipt(
+        source_binding=rows[0]["source_binding"],
+        fetch_receipt=workflow.get("fetch_receipt") or {},
+        exported_at=str(workflow.get("generated_at") or ""),
+        key=source_key,
+    )
+    source_receipt_bytes = _canonical_bytes(source_receipt)
+    source_receipt_sha256 = hashlib.sha256(source_receipt_bytes).hexdigest()
+    packing_plan = sign_macro_packing_plan(
+        rows,
+        remote_source_receipt_sha256=source_receipt_sha256,
+        key=promotion_key,
+    )
+    packing_plan_bytes = _canonical_bytes(packing_plan)
+    packing_plan_sha256 = hashlib.sha256(packing_plan_bytes).hexdigest()
+    reference_index = sign_macro_reference_index(
+        rows,
+        packing_plan_sha256=packing_plan_sha256,
+        remote_source_receipt_sha256=source_receipt_sha256,
+        key=report_key,
+    )
+    reference_index_bytes = _canonical_bytes(reference_index)
+
+    _atomic_write(
+        output_dir / "MACRO_REMOTE_SOURCE_RECEIPT.json", source_receipt_bytes
+    )
+    _atomic_write(output_dir / "MACRO_PACKING_PLAN.json", packing_plan_bytes)
+    _atomic_write(output_dir / "MACRO_REFERENCE_INDEX.json", reference_index_bytes)
+    return {
+        "remote_source_receipt_sha256": source_receipt_sha256,
+        "packing_plan_sha256": packing_plan_sha256,
+        "reference_index_sha256": hashlib.sha256(reference_index_bytes).hexdigest(),
+    }
+
+
 def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     """Reaudit exact workbook bytes and write deterministic macro candidates."""
+    _require_combined_local_probe()
     config, _config_raw = _read_json(config_path, MAX_CONFIG_BYTES)
     if config.get("schema_version") != "longworld.macro-vintage-materialization.v1":
         raise ProvenanceError("unsupported macro-vintage materialization config")
@@ -221,7 +365,13 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         tokenizer_model_id=model_id,
         tokenizer_revision=revision,
         tokenizer_asset_manifest_sha256=tokenizer_asset_sha256,
+        verified_packing_plan=_load_cached_packing_plan(
+            output_dir=output_dir,
+            source_binding=_pipeline_source_binding(workflow, workflow_sha256),
+            fetch_receipt=dict(workflow.get("fetch_receipt") or {}),
+        ),
     )
+    packing_cache_hit = (output_dir / "MACRO_PACKING_PLAN.json").exists()
     for row in rows:
         row["source_verified_at_materialization"] = True
         row["source_attestation_verified"] = True
@@ -245,6 +395,9 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     audits = [audit_macro_vintage_pipeline_candidate(row) for row in rows]
     if not all(audit and all(audit.values()) for audit in audits):
         raise ProvenanceError("macro-vintage candidate audit failed")
+    cache_bindings = materialize_macro_execution_caches(
+        rows, workflow=workflow, output_dir=output_dir
+    )
     candidate_bytes = b"".join(_canonical_bytes(row) for row in rows)
     report: dict[str, Any] = {
         "schema_version": "longworld.macro-vintage-candidate-manifest.v1",
@@ -261,6 +414,9 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         "source_inventory_reaudited": True,
         "source_attestation_verified": True,
         "source_replay_sidecar_attested": True,
+        "cache_bindings": cache_bindings,
+        "packing_cache_hit": packing_cache_hit,
+        "cache_restored_final_gate": False,
         "task_replay_sidecar": sidecar_binding,
         "exact_token_counts_recomputed": True,
         "tokenizer_model_id": model_id,

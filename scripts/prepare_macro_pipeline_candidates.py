@@ -16,10 +16,25 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from longworld.core.attestation import attach_attestation, attestation_key_from_env
+from longworld.core.attestation import (
+    ATTESTATION_ENVIRONMENT_ENV,
+    LOCAL_PROBE_COMBINED_ROLES_ENV,
+    LOCAL_PROBE_TRUST_ISOLATION_VALUE,
+    attach_attestation,
+    attestation_key_from_env,
+)
 from longworld.core.macrovintage import (
     MACRO_VINTAGE_PIPELINE_CANDIDATE_SCHEMA,
     audit_macro_vintage_pipeline_candidate,
+)
+from longworld.core.macrovintageworkflow import (
+    MACRO_PACKING_PLAN_PURPOSE,
+    MACRO_REFERENCE_INDEX_PURPOSE,
+    MACRO_REMOTE_SOURCE_RECEIPT_PURPOSE,
+    MAX_MACRO_CACHE_BYTES,
+    read_macro_packing_plan,
+    read_macro_reference_index,
+    read_macro_remote_source_receipt,
 )
 from longworld.core.promotion import CANDIDATE_ATTESTATION_PURPOSE, candidate_sha256
 from longworld.core.provenance import ProvenanceError, _read_regular_file
@@ -31,6 +46,8 @@ from longworld.core.taskreplaysidecar import (
     task_replay_sidecar_binding,
 )
 from longworld.core.tokenizer_assets import resolved_tokenizer_asset_manifest_sha256
+
+MAX_MACRO_CANDIDATE_BYTES = 128_000_000
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -59,20 +76,40 @@ def _atomic_write(path: Path, content: bytes) -> None:
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
-    if path.is_symlink() or not path.is_file():
-        raise ValueError("Macro candidate input is missing or not a regular file")
+    def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in value:
+                raise ValueError("Macro candidate JSON contains a duplicate key")
+            value[key] = item
+        return value
+
+    def reject_nonfinite(value: str) -> None:
+        raise ValueError(f"Macro candidate JSON contains non-finite value {value}")
+
+    try:
+        lines = _read_regular_file(path, MAX_MACRO_CANDIDATE_BYTES).decode(
+            "utf-8"
+        ).splitlines()
+    except (OSError, ProvenanceError, UnicodeDecodeError) as error:
+        raise ValueError(
+            "Macro candidate input is missing or not a regular UTF-8 file"
+        ) from error
     rows: list[dict[str, Any]] = []
-    with path.open(encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, start=1):
-            if not line.strip():
-                continue
-            try:
-                value = json.loads(line)
-            except json.JSONDecodeError as error:
-                raise ValueError(f"{path}:{line_number}: invalid JSON") from error
-            if not isinstance(value, dict):
-                raise TypeError(f"{path}:{line_number}: expected an object")
-            rows.append(value)
+    for line_number, line in enumerate(lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            value = json.loads(
+                line,
+                object_pairs_hook=reject_duplicate_keys,
+                parse_constant=reject_nonfinite,
+            )
+        except json.JSONDecodeError as error:
+            raise ValueError(f"{path}:{line_number}: invalid JSON") from error
+        if not isinstance(value, dict):
+            raise TypeError(f"{path}:{line_number}: expected an object")
+        rows.append(value)
     if not rows:
         raise ValueError("Macro candidate input is empty")
     return rows
@@ -80,12 +117,26 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 def prepare(input_path: Path, output_dir: Path) -> dict[str, Any]:
     """Verify one source sidecar, bind candidates, and sign candidate rows."""
+    if (
+        os.environ.get(ATTESTATION_ENVIRONMENT_ENV, "").strip().lower()
+        != "probe"
+        or os.environ.get(LOCAL_PROBE_COMBINED_ROLES_ENV, "").strip()
+        != LOCAL_PROBE_TRUST_ISOLATION_VALUE
+    ):
+        raise ValueError(
+            "Macro combined-role prepare path is local-probe diagnostic only"
+        )
     candidate_key = attestation_key_from_env(CANDIDATE_ATTESTATION_PURPOSE)
     source_key = attestation_key_from_env("task_replay_sidecar")
+    packing_key = attestation_key_from_env(MACRO_PACKING_PLAN_PURPOSE)
+    reference_key = attestation_key_from_env(MACRO_REFERENCE_INDEX_PURPOSE)
+    receipt_key = attestation_key_from_env(MACRO_REMOTE_SOURCE_RECEIPT_PURPOSE)
     if candidate_key is None:
         raise ValueError("candidate-row attestation key is required")
     if source_key is None:
         raise ValueError("source task-replay attestation key is required")
+    if packing_key is None or reference_key is None or receipt_key is None:
+        raise ValueError("Macro cache role keys are required")
     input_rows = _read_jsonl(input_path)
     if any(
         row.get("schema_version") != MACRO_VINTAGE_PIPELINE_CANDIDATE_SCHEMA
@@ -158,6 +209,17 @@ def prepare(input_path: Path, output_dir: Path) -> dict[str, Any]:
     ):
         raise ProvenanceError("Macro task replay sidecar identity is inconsistent")
 
+    receipt_path = input_path.parent / "MACRO_REMOTE_SOURCE_RECEIPT.json"
+    try:
+        receipt_binding = read_macro_remote_source_receipt(
+            receipt_path,
+            expected_source_binding=source_binding,
+            expected_fetch_receipt=fetch_receipt,
+            key=receipt_key,
+        )
+    except (OSError, ProvenanceError) as error:
+        raise ProvenanceError("cannot verify Macro remote source receipt") from error
+
     unsigned = []
     for input_row in input_rows:
         row = deepcopy(input_row)
@@ -171,6 +233,27 @@ def prepare(input_path: Path, output_dir: Path) -> dict[str, Any]:
             "missing_candidate_dense_ranking_and_audit"
         )
         unsigned.append(row)
+    packing_path = input_path.parent / "MACRO_PACKING_PLAN.json"
+    try:
+        packing_binding = read_macro_packing_plan(
+            packing_path,
+            expected_rows=unsigned,
+            expected_remote_source_receipt_sha256=receipt_binding["receipt_sha256"],
+            key=packing_key,
+        )
+    except (OSError, ProvenanceError) as error:
+        raise ProvenanceError("cannot verify Macro packing plan") from error
+    reference_path = input_path.parent / "MACRO_REFERENCE_INDEX.json"
+    try:
+        reference_binding = read_macro_reference_index(
+            reference_path,
+            expected_rows=unsigned,
+            expected_packing_plan_sha256=packing_binding["packing_plan_sha256"],
+            expected_remote_source_receipt_sha256=receipt_binding["receipt_sha256"],
+            key=reference_key,
+        )
+    except (OSError, ProvenanceError) as error:
+        raise ProvenanceError("cannot verify Macro reference index") from error
     commitments = sorted(
         (task_candidate_content_commitment(row) for row in unsigned),
         key=lambda item: (item["world_id"], item["length_bucket"]),
@@ -217,12 +300,36 @@ def prepare(input_path: Path, output_dir: Path) -> dict[str, Any]:
         "macro_strict_replay_green": True,
         "dense_ranking_ready": True,
         "task_promotion_adapter_available": True,
+        "cache_bindings": {
+            "remote_source_receipt_sha256": receipt_binding["receipt_sha256"],
+            "packing_plan_sha256": packing_binding["packing_plan_sha256"],
+            "reference_index_sha256": reference_binding[
+                "reference_index_sha256"
+            ],
+        },
+        "cache_restored_final_gate": False,
+        "candidate_audit_recomputed_after_cache_load": True,
         "train_ready": False,
         "promoted": False,
     }
     _atomic_write(output_dir / "candidates.jsonl", candidate_bytes)
     _atomic_write(output_dir / "TASK_REPLAY_SIDECAR.json", sidecar_bytes)
     _atomic_write(output_dir / "REPLAY_PATH_REGISTRY.json", registry_bytes)
+    verified_cache_files = (
+        (receipt_path, receipt_binding["receipt_sha256"]),
+        (packing_path, packing_binding["packing_plan_sha256"]),
+        (reference_path, reference_binding["reference_index_sha256"]),
+    )
+    for cache_path, expected_sha256 in verified_cache_files:
+        try:
+            cache_bytes = _read_regular_file(cache_path, MAX_MACRO_CACHE_BYTES)
+        except OSError as error:
+            raise ProvenanceError(f"cannot copy Macro cache {cache_path.name}") from error
+        if hashlib.sha256(cache_bytes).hexdigest() != expected_sha256:
+            raise ProvenanceError(
+                f"Macro cache changed after verification: {cache_path.name}"
+            )
+        _atomic_write(output_dir / cache_path.name, cache_bytes)
     _atomic_write(output_dir / "MANIFEST.json", _canonical_bytes(report) + b"\n")
     return report
 

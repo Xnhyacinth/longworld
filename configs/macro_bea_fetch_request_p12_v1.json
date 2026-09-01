@@ -1,0 +1,15 @@
+{
+  "schema_version": "longworld.macro-vintage-fetch-request.v1",
+  "user_agent": "LongWorld/0.2 macro-probe@example.org",
+  "authorization": {
+    "record_id": "local-bea-probe-20260831",
+    "scope": "single official BEA GDP/GDI vintage workbook local probe",
+    "basis": "public-source research authorization; local diagnostic only",
+    "reviewed_at": "2026-08-31T15:00:00Z",
+    "allowed_actions": [
+      "fetch_bea_gdp_gdi_vintage_xlsx"
+    ]
+  },
+  "url": "https://apps.bea.gov/national/xls/gdp-gdi-vintage-history.xlsx",
+  "max_retries": 2
+}
