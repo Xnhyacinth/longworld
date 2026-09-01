@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
-import tempfile
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +18,9 @@ from longworld.core.attestation import (
     verify_attestation,
 )
 from longworld.core.production_trust import (
+    require_independent_package_approval,
     verify_embedded_production_approval_from_env,
+    verify_embedded_production_package_approval_from_env,
 )
 from longworld.core.promotion import (
     RELEASE_GATE_PURPOSE,
@@ -37,6 +40,7 @@ from longworld.core.training_manifest import (
 )
 
 RELEASE_INVENTORY_SCHEMA = "longworld-private-dataset-release-v1"
+PRODUCTION_RELEASE_PREFLIGHT_SCHEMA = "longworld-production-release-preflight-v1"
 RELEASE_INVENTORY_NAME = "release_inventory.json"
 PRODUCTION_PACKAGE_READY_PROFILE_IDS: frozenset[str] = frozenset()
 COMMITTED_NAME = "COMMITTED"
@@ -63,23 +67,28 @@ TRAINING_OUTPUT_ALLOWLIST = frozenset(
 )
 
 
-def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
-    descriptor, temporary_name = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+def _write_json_exclusive(path: Path, payload: dict[str, Any]) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
+    descriptor = os.open(path, flags, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False, sort_keys=True)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def release_commit_marker_bytes(inventory_path: Path) -> bytes:
+    """Return the immutable marker bytes bound by package approval."""
+    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    marker = {
+        "schema_version": RELEASE_INVENTORY_SCHEMA,
+        "inventory_sha256": file_sha256(inventory_path),
+    }
+    if isinstance(inventory, dict) and inventory.get("trust_mode") == "production":
+        marker["production_eligible"] = True
+    return (json.dumps(marker, sort_keys=True, separators=(",", ":")) + "\n").encode(
+        "utf-8"
     )
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False, sort_keys=True)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary_name, path)
-    except BaseException:
-        try:
-            os.unlink(temporary_name)
-        except FileNotFoundError:
-            pass
-        raise
 
 
 def _relative(root: Path, path: Path, *, field: str) -> str:
@@ -92,11 +101,149 @@ def _relative(root: Path, path: Path, *, field: str) -> str:
     return relative.as_posix()
 
 
+def _expected_directories(paths: set[str]) -> set[str]:
+    directories: set[str] = set()
+    for value in paths:
+        parent = Path(value).parent
+        while parent != Path("."):
+            directories.add(parent.as_posix())
+            parent = parent.parent
+    return directories
+
+
+def _package_member_paths(root: Path) -> tuple[set[str], set[str]]:
+    files: set[str] = set()
+    directories: set[str] = set()
+    for path in root.rglob("*"):
+        status = path.stat(follow_symlinks=False)
+        relative = path.relative_to(root).as_posix()
+        if stat.S_ISREG(status.st_mode):
+            if status.st_nlink != 1:
+                raise ValueError(f"package member has multiple hard links: {relative}")
+            files.add(relative)
+        elif stat.S_ISDIR(status.st_mode):
+            directories.add(relative)
+        else:
+            raise ValueError(f"non-regular package member: {relative}")
+    return files, directories
+
+
 def _regular_file(path: Path, *, field: str) -> None:
     if path.is_symlink():
         raise ValueError(f"{field} contains a symlink path")
-    if not path.is_file():
+    try:
+        status = path.stat(follow_symlinks=False)
+    except FileNotFoundError as error:
+        raise ValueError(f"{field} is missing or not a regular file") from error
+    if not stat.S_ISREG(status.st_mode):
         raise ValueError(f"{field} is missing or not a regular file")
+    if status.st_nlink != 1:
+        raise ValueError(f"{field} has multiple hard links")
+
+
+def _release_member_snapshot(root: Path) -> dict[str, tuple[Any, ...]]:
+    """Bind child identities and bytes across one public eligibility check."""
+    if root.is_symlink():
+        raise ValueError("release package root cannot be a symlink")
+    root_status = root.stat(follow_symlinks=False)
+    if not stat.S_ISDIR(root_status.st_mode):
+        raise ValueError("release package root is missing or not a directory")
+    snapshot: dict[str, tuple[Any, ...]] = {
+        ".": (
+            root_status.st_dev,
+            root_status.st_ino,
+            root_status.st_mode,
+            root_status.st_nlink,
+            root_status.st_size,
+            root_status.st_mtime_ns,
+            root_status.st_ctime_ns,
+            "",
+        )
+    }
+    member_paths = sorted(root.rglob("*"))
+    member_names = tuple(path.relative_to(root).as_posix() for path in member_paths)
+    for path in member_paths:
+        before = path.stat(follow_symlinks=False)
+        if not (stat.S_ISDIR(before.st_mode) or stat.S_ISREG(before.st_mode)):
+            raise ValueError(
+                f"non-regular package member: {path.relative_to(root).as_posix()}"
+            )
+        if stat.S_ISREG(before.st_mode) and before.st_nlink != 1:
+            raise ValueError(
+                f"package member has multiple hard links: "
+                f"{path.relative_to(root).as_posix()}"
+            )
+        digest = ""
+        if stat.S_ISREG(before.st_mode):
+            hasher = hashlib.sha256()
+            with path.open("rb") as handle:
+                while chunk := handle.read(1024 * 1024):
+                    hasher.update(chunk)
+            digest = hasher.hexdigest()
+            after = path.stat(follow_symlinks=False)
+            if (
+                before.st_dev,
+                before.st_ino,
+                before.st_mode,
+                before.st_nlink,
+                before.st_size,
+                before.st_mtime_ns,
+                before.st_ctime_ns,
+            ) != (
+                after.st_dev,
+                after.st_ino,
+                after.st_mode,
+                after.st_nlink,
+                after.st_size,
+                after.st_mtime_ns,
+                after.st_ctime_ns,
+            ):
+                raise ValueError("release package members changed during validation")
+            before = after
+        snapshot[path.relative_to(root).as_posix()] = (
+            before.st_dev,
+            before.st_ino,
+            before.st_mode,
+            before.st_nlink,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+            digest,
+        )
+    final_paths = sorted(root.rglob("*"))
+    final_names = tuple(path.relative_to(root).as_posix() for path in final_paths)
+    if final_names != member_names:
+        raise ValueError("release package members changed during validation")
+    for path in final_paths:
+        try:
+            final = path.stat(follow_symlinks=False)
+        except FileNotFoundError as error:
+            raise ValueError(
+                "release package members changed during validation"
+            ) from error
+        expected = snapshot[path.relative_to(root).as_posix()]
+        if (
+            final.st_dev,
+            final.st_ino,
+            final.st_mode,
+            final.st_nlink,
+            final.st_size,
+            final.st_mtime_ns,
+            final.st_ctime_ns,
+        ) != expected[:7]:
+            raise ValueError("release package members changed during validation")
+    final_root = root.stat(follow_symlinks=False)
+    if (
+        final_root.st_dev,
+        final_root.st_ino,
+        final_root.st_mode,
+        final_root.st_nlink,
+        final_root.st_size,
+        final_root.st_mtime_ns,
+        final_root.st_ctime_ns,
+    ) != snapshot["."][:7]:
+        raise ValueError("release package members changed during validation")
+    return snapshot
 
 
 def _entry(root: Path, path: Path, *, role: str) -> dict[str, Any]:
@@ -258,7 +405,7 @@ def _bound_files(
     training_attestation_key: bytes | None,
     gate_attestation_key: bytes | None,
     trust_mode: str,
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
     manifest = validate_training_manifest(
         manifest_path,
         expected_release_profile_id=release_profile_id,
@@ -273,7 +420,7 @@ def _bound_files(
     )
     source_digests = manifest["source_file_sha256"]
     gate_path = source_dir / "release_gate_pass.json"
-    _load_gate_receipt(
+    gate_receipt = _load_gate_receipt(
         gate_path,
         release_profile_id=release_profile_id,
         source_digests=source_digests,
@@ -300,7 +447,7 @@ def _bound_files(
     paths = [entry["path"] for entry in entries]
     if len(paths) != len(set(paths)):
         raise ValueError("release inventory contains duplicate paths")
-    return manifest, sorted(entries, key=lambda entry: entry["path"])
+    return manifest, sorted(entries, key=lambda entry: entry["path"]), gate_receipt
 
 
 def _inventory_payload(
@@ -317,7 +464,7 @@ def _inventory_payload(
         "release_profile_sha256": release_profile_sha256(release_profile_id),
         "transform_revision": transform_revision,
         "trust_mode": trust_mode,
-        "production_eligible": trust_mode == "production",
+        "production_eligible": False,
         "release_gate_pass": next(
             entry for entry in entries if entry["role"] == "release_gate_pass"
         ),
@@ -372,11 +519,11 @@ def create_release_inventory(
         raise ValueError(f"unsupported release trust mode: {trust_mode}")
     if (
         trust_mode == "production"
-        and issuable_release_profile(release_profile_id).environment != "production"
+        and release_profile(release_profile_id).environment != "production"
     ):
         raise ValueError("production inventory requires a production release profile")
     root = release_root.absolute()
-    manifest, entries = _bound_files(
+    manifest, entries, _gate_receipt = _bound_files(
         root,
         manifest_path=manifest_path.absolute(),
         release_profile_id=release_profile_id,
@@ -385,23 +532,19 @@ def create_release_inventory(
         gate_attestation_key=gate_attestation_key,
         trust_mode=trust_mode,
     )
-    if (
-        trust_mode == "production"
-        and release_profile_id not in PRODUCTION_PACKAGE_READY_PROFILE_IDS
-    ):
-        raise ValueError(
-            "production packaging contract is not ready for source sidecars and "
-            "runtime dependency locks"
-        )
+    if trust_mode == "production":
+        production_package_ready_profile(release_profile_id)
     expected_files = {entry["path"] for entry in entries}
-    actual_files = {
-        path.relative_to(root).as_posix()
-        for path in root.rglob("*")
-        if path.is_file() or path.is_symlink()
-    }
+    actual_files, actual_directories = _package_member_paths(root)
     if actual_files != expected_files:
         raise ValueError(
             f"unexpected release package files: {sorted(actual_files - expected_files)}"
+        )
+    expected_directories = _expected_directories(expected_files)
+    if actual_directories != expected_directories:
+        raise ValueError(
+            "unexpected release package directories: "
+            f"{sorted(actual_directories - expected_directories)}"
         )
     payload = _inventory_payload(
         release_profile_id=release_profile_id,
@@ -415,11 +558,11 @@ def create_release_inventory(
         trust_mode=trust_mode,
         attestation_key=inventory_attestation_key,
     )
-    _write_json_atomic(root / RELEASE_INVENTORY_NAME, inventory)
+    _write_json_exclusive(root / RELEASE_INVENTORY_NAME, inventory)
     return inventory
 
 
-def validate_release_inventory(
+def _validate_release_inventory_contents(
     release_root: Path,
     *,
     expected_release_profile_id: str,
@@ -427,9 +570,9 @@ def validate_release_inventory(
     training_attestation_key: bytes | None,
     gate_attestation_key: bytes | None,
     inventory_attestation_key: bytes | None,
-    expected_trust_mode: str = "local_engineering",
-) -> dict[str, Any]:
-    """Validate a committed package, including the absence of unlisted files."""
+    expected_trust_mode: str,
+    committed: bool,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     if expected_trust_mode not in RELEASE_TRUST_MODES:
         raise ValueError(f"unsupported release trust mode: {expected_trust_mode}")
     if (
@@ -438,13 +581,20 @@ def validate_release_inventory(
     ):
         raise ValueError("production inventory requires a production release profile")
     root = release_root.absolute()
+    if root.is_symlink():
+        raise ValueError("release package root cannot be a symlink")
     inventory_path = root / RELEASE_INVENTORY_NAME
     marker_path = root / COMMITTED_NAME
     _regular_file(inventory_path, field="release inventory")
-    _regular_file(marker_path, field="commit marker")
+    if committed:
+        _regular_file(marker_path, field="commit marker")
+    elif marker_path.exists() or marker_path.is_symlink():
+        raise ValueError("staged release package is already committed")
     try:
         inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
-        marker = json.loads(marker_path.read_text(encoding="utf-8"))
+        marker = (
+            json.loads(marker_path.read_text(encoding="utf-8")) if committed else None
+        )
     except json.JSONDecodeError as error:
         raise ValueError("release inventory or commit marker is malformed") from error
     if (
@@ -455,23 +605,19 @@ def validate_release_inventory(
         != release_profile_sha256(expected_release_profile_id)
         or inventory.get("transform_revision") != expected_transform_revision
         or inventory.get("trust_mode") != expected_trust_mode
-        or inventory.get("production_eligible")
-        is not (expected_trust_mode == "production")
+        or inventory.get("production_eligible") is not False
         or not verify_attestation(
             inventory,
             inventory_attestation_key,
             purpose=RELEASE_INVENTORY_PURPOSE,
         )
-        or not isinstance(marker, dict)
-        or marker.get("schema_version") != RELEASE_INVENTORY_SCHEMA
-        or marker.get("inventory_sha256") != file_sha256(inventory_path)
     ):
         raise ValueError("release inventory identity or commit marker is invalid")
     manifest_binding = inventory.get("training_manifest")
     if not isinstance(manifest_binding, dict):
         raise TypeError("release inventory training manifest binding is missing")
     manifest_path = root / str(manifest_binding.get("path") or "")
-    manifest, expected_entries = _bound_files(
+    manifest, expected_entries, gate_receipt = _bound_files(
         root,
         manifest_path=manifest_path,
         release_profile_id=expected_release_profile_id,
@@ -494,18 +640,167 @@ def validate_release_inventory(
     )
     if inventory != expected_inventory:
         raise ValueError("release inventory file bindings changed")
+    if committed:
+        expected_marker = json.loads(release_commit_marker_bytes(inventory_path))
+        if not isinstance(marker, dict):
+            raise ValueError("release inventory identity or commit marker is invalid")
+        if expected_trust_mode == "production":
+            if set(marker) != {*expected_marker, "production_approval"} or any(
+                marker.get(field) != value for field, value in expected_marker.items()
+            ):
+                raise ValueError(
+                    "release inventory identity or commit marker is invalid"
+                )
+            package_approval = verify_embedded_production_package_approval_from_env(
+                marker.get("production_approval"),
+                release_profile_id=expected_release_profile_id,
+                release_profile_sha256=release_profile_sha256(
+                    expected_release_profile_id
+                ),
+                release_inventory_sha256=file_sha256(inventory_path),
+                committed_sha256=hashlib.sha256(
+                    release_commit_marker_bytes(inventory_path)
+                ).hexdigest(),
+                training_manifest_sha256=file_sha256(manifest_path),
+            )
+            require_independent_package_approval(
+                gate_receipt.get("production_approval"), package_approval
+            )
+        elif marker != expected_marker:
+            raise ValueError("release inventory identity or commit marker is invalid")
     expected_files = {
         *(entry["path"] for entry in expected_entries),
         RELEASE_INVENTORY_NAME,
-        COMMITTED_NAME,
     }
-    actual_files = {
-        path.relative_to(root).as_posix()
-        for path in root.rglob("*")
-        if path.is_file() or path.is_symlink()
-    }
+    if committed:
+        expected_files.add(COMMITTED_NAME)
+    actual_files, actual_directories = _package_member_paths(root)
     if actual_files != expected_files:
         raise ValueError(
             f"unexpected release package files: {sorted(actual_files - expected_files)}"
         )
+    expected_directories = _expected_directories(expected_files)
+    if actual_directories != expected_directories:
+        raise ValueError(
+            "unexpected release package directories: "
+            f"{sorted(actual_directories - expected_directories)}"
+        )
+    return inventory, gate_receipt
+
+
+def production_package_ready_profile(release_profile_id: str) -> None:
+    """Require a currently issuable profile with a completed package contract."""
+    profile = issuable_release_profile(release_profile_id)
+    if profile.environment != "production":
+        raise ValueError("production inventory requires a production release profile")
+    if release_profile_id not in PRODUCTION_PACKAGE_READY_PROFILE_IDS:
+        raise ValueError(
+            "production packaging contract is not ready for source sidecars and "
+            "runtime dependency locks"
+        )
+
+
+def validate_staged_release_inventory(
+    release_root: Path,
+    *,
+    expected_release_profile_id: str,
+    expected_transform_revision: str,
+    training_attestation_key: bytes | None,
+    gate_attestation_key: bytes | None,
+    inventory_attestation_key: bytes | None,
+    expected_trust_mode: str = "production",
+) -> dict[str, Any]:
+    """Validate an uncommitted package before independent approval."""
+    inventory, _gate_receipt = _validate_release_inventory_contents(
+        release_root,
+        expected_release_profile_id=expected_release_profile_id,
+        expected_transform_revision=expected_transform_revision,
+        training_attestation_key=training_attestation_key,
+        gate_attestation_key=gate_attestation_key,
+        inventory_attestation_key=inventory_attestation_key,
+        expected_trust_mode=expected_trust_mode,
+        committed=False,
+    )
     return inventory
+
+
+def validate_staged_release_inventory_with_gate(
+    release_root: Path,
+    *,
+    expected_release_profile_id: str,
+    expected_transform_revision: str,
+    training_attestation_key: bytes | None,
+    gate_attestation_key: bytes | None,
+    inventory_attestation_key: bytes | None,
+    expected_trust_mode: str = "production",
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Validate a staged package and return its already-verified gate snapshot."""
+    return _validate_release_inventory_contents(
+        release_root,
+        expected_release_profile_id=expected_release_profile_id,
+        expected_transform_revision=expected_transform_revision,
+        training_attestation_key=training_attestation_key,
+        gate_attestation_key=gate_attestation_key,
+        inventory_attestation_key=inventory_attestation_key,
+        expected_trust_mode=expected_trust_mode,
+        committed=False,
+    )
+
+
+def validate_release_inventory(
+    release_root: Path,
+    *,
+    expected_release_profile_id: str,
+    expected_transform_revision: str,
+    training_attestation_key: bytes | None,
+    gate_attestation_key: bytes | None,
+    inventory_attestation_key: bytes | None,
+    expected_trust_mode: str = "local_engineering",
+) -> dict[str, Any]:
+    """Validate a committed package, including the absence of unlisted files."""
+    inventory, _gate_receipt = _validate_release_inventory_contents(
+        release_root,
+        expected_release_profile_id=expected_release_profile_id,
+        expected_transform_revision=expected_transform_revision,
+        training_attestation_key=training_attestation_key,
+        gate_attestation_key=gate_attestation_key,
+        inventory_attestation_key=inventory_attestation_key,
+        expected_trust_mode=expected_trust_mode,
+        committed=True,
+    )
+    return inventory
+
+
+def validate_production_release_preflight(
+    release_root: Path,
+    *,
+    expected_release_profile_id: str,
+    expected_transform_revision: str,
+    training_attestation_key: bytes | None,
+    gate_attestation_key: bytes | None,
+    inventory_attestation_key: bytes | None,
+) -> dict[str, Any]:
+    """Return effective eligibility only after the committed package verifies."""
+    production_package_ready_profile(expected_release_profile_id)
+    root = release_root.absolute()
+    initial_members = _release_member_snapshot(root)
+    inventory = validate_release_inventory(
+        root,
+        expected_release_profile_id=expected_release_profile_id,
+        expected_transform_revision=expected_transform_revision,
+        training_attestation_key=training_attestation_key,
+        gate_attestation_key=gate_attestation_key,
+        inventory_attestation_key=inventory_attestation_key,
+        expected_trust_mode="production",
+    )
+    preflight = {
+        "schema_version": PRODUCTION_RELEASE_PREFLIGHT_SCHEMA,
+        "release_profile_id": expected_release_profile_id,
+        "release_inventory_sha256": file_sha256(root / RELEASE_INVENTORY_NAME),
+        "commit_marker_sha256": file_sha256(root / COMMITTED_NAME),
+        "production_eligible": True,
+        "inventory": inventory,
+    }
+    if _release_member_snapshot(root) != initial_members:
+        raise ValueError("release package members changed during validation")
+    return preflight

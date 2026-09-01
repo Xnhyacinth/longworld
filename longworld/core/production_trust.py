@@ -62,6 +62,7 @@ _VERIFIED_RECEIPT_KEYS = {
     "verified",
     "scheme",
     "approval_key_id",
+    "public_key_sha256",
     "approval_envelope_sha256",
     "trust_roots_sha256",
     "approval_statement_sha256",
@@ -105,6 +106,7 @@ def is_verified_production_approval_receipt(value: object) -> bool:
             _valid_sha256(value.get(field))
             for field in (
                 "approval_envelope_sha256",
+                "public_key_sha256",
                 "trust_roots_sha256",
                 "approval_statement_sha256",
             )
@@ -112,6 +114,32 @@ def is_verified_production_approval_receipt(value: object) -> bool:
         and isinstance(value.get("statement"), dict)
         and isinstance(value.get("signature"), dict)
     )
+
+
+def require_independent_package_approval(
+    release_approval: object, package_approval: object
+) -> None:
+    """Require package finalization to use a separate KMS key and authority."""
+    if not is_verified_production_approval_receipt(
+        release_approval
+    ) or not is_verified_production_approval_receipt(package_approval):
+        raise ValueError("production approval receipts are invalid")
+    assert isinstance(release_approval, dict)
+    assert isinstance(package_approval, dict)
+    release_statement = release_approval["statement"]
+    package_statement = package_approval["statement"]
+    assert isinstance(release_statement, dict)
+    assert isinstance(package_statement, dict)
+    if (
+        package_approval["approval_key_id"] == release_approval["approval_key_id"]
+        or package_approval["public_key_sha256"]
+        == release_approval["public_key_sha256"]
+        or package_statement.get("approval_authority")
+        == release_statement.get("approval_authority")
+    ):
+        raise ValueError(
+            "package approval requires an independent KMS identity and authority"
+        )
 
 
 def _read_pinned_json(path_value: str, digest: str, *, label: str) -> tuple[dict, str]:
@@ -137,18 +165,51 @@ def _read_pinned_json(path_value: str, digest: str, *, label: str) -> tuple[dict
 
 def _load_trust_key(
     trust_roots: dict, key_id: str, approval_authority: str
-) -> ec.EllipticCurvePublicKey:
+) -> tuple[ec.EllipticCurvePublicKey, str]:
     if trust_roots.get("schema_version") != TRUST_ROOTS_SCHEMA:
         raise ValueError("production trust roots schema is invalid")
     keys = trust_roots.get("keys")
     if not isinstance(keys, list) or not keys:
         raise ValueError("production trust roots contain no keys")
-    matching = [
-        item for item in keys if isinstance(item, dict) and item.get("key_id") == key_id
-    ]
+    validated: list[tuple[dict[str, Any], ec.EllipticCurvePublicKey, str]] = []
+    key_ids: set[str] = set()
+    public_key_digests: set[str] = set()
+    for item in keys:
+        if not isinstance(item, dict):
+            raise TypeError("production trust root key must be an object")
+        root_key_id = str(item.get("key_id") or "")
+        if not root_key_id or root_key_id in key_ids:
+            raise ValueError("approval key id is not uniquely pinned")
+        key_ids.add(root_key_id)
+        try:
+            public_key = serialization.load_pem_public_key(
+                str(item.get("public_key_pem") or "").encode("utf-8")
+            )
+        except (TypeError, ValueError) as error:
+            raise ValueError("approval public key is invalid") from error
+        if not isinstance(public_key, ec.EllipticCurvePublicKey) or not isinstance(
+            public_key.curve, ec.SECP256R1
+        ):
+            raise TypeError("approval public key must be ECDSA P-256")
+        public_der = public_key.public_bytes(
+            serialization.Encoding.DER,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        public_key_digest = _sha256(public_der)
+        if not _valid_sha256(
+            item.get("public_key_sha256")
+        ) or public_key_digest != item.get("public_key_sha256"):
+            raise ValueError("approval public key digest does not match")
+        if public_key_digest in public_key_digests:
+            raise ValueError(
+                "production trust roots contain duplicate public key material"
+            )
+        public_key_digests.add(public_key_digest)
+        validated.append((item, public_key, public_key_digest))
+    matching = [item for item in validated if item[0].get("key_id") == key_id]
     if len(matching) != 1:
         raise ValueError("approval key id is not uniquely pinned")
-    root = matching[0]
+    root, public_key, public_key_digest = matching[0]
     authorities = root.get("approval_authorities")
     if (
         root.get("scheme") != APPROVAL_SCHEME
@@ -158,25 +219,7 @@ def _load_trust_key(
         or approval_authority not in authorities
     ):
         raise ValueError("approval key is not a production KMS identity")
-    try:
-        public_key = serialization.load_pem_public_key(
-            str(root.get("public_key_pem") or "").encode("utf-8")
-        )
-    except (TypeError, ValueError) as error:
-        raise ValueError("approval public key is invalid") from error
-    if not isinstance(public_key, ec.EllipticCurvePublicKey) or not isinstance(
-        public_key.curve, ec.SECP256R1
-    ):
-        raise TypeError("approval public key must be ECDSA P-256")
-    public_der = public_key.public_bytes(
-        serialization.Encoding.DER,
-        serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-    if not _valid_sha256(root.get("public_key_sha256")) or _sha256(
-        public_der
-    ) != root.get("public_key_sha256"):
-        raise ValueError("approval public key digest does not match")
-    return public_key
+    return public_key, public_key_digest
 
 
 def _validate_statement(
@@ -239,7 +282,7 @@ def _verify_approval_envelope(
         raise ValueError("production approval signature metadata is invalid")
     key_id = str(signature.get("key_id") or "")
     authority = str(statement.get("approval_authority") or "")
-    public_key = _load_trust_key(roots, key_id, authority)
+    public_key, public_key_digest = _load_trust_key(roots, key_id, authority)
     _validate_statement(
         statement,
         release_profile_id=release_profile_id,
@@ -268,6 +311,7 @@ def _verify_approval_envelope(
         "verified": True,
         "scheme": APPROVAL_SCHEME,
         "approval_key_id": key_id,
+        "public_key_sha256": public_key_digest,
         "approval_envelope_sha256": envelope_sha256,
         "trust_roots_sha256": roots_digest,
         "approval_statement_sha256": _sha256(statement_bytes),
@@ -337,7 +381,7 @@ def _verify_package_approval_envelope(
         raise ValueError("production package approval signature metadata is invalid")
     key_id = str(signature.get("key_id") or "")
     authority = str(statement.get("approval_authority") or "")
-    public_key = _load_trust_key(roots, key_id, authority)
+    public_key, public_key_digest = _load_trust_key(roots, key_id, authority)
     _validate_package_statement(
         statement,
         release_profile_id=release_profile_id,
@@ -367,6 +411,7 @@ def _verify_package_approval_envelope(
         "verified": True,
         "scheme": APPROVAL_SCHEME,
         "approval_key_id": key_id,
+        "public_key_sha256": public_key_digest,
         "approval_envelope_sha256": envelope_sha256,
         "trust_roots_sha256": roots_digest,
         "approval_statement_sha256": _sha256(statement_bytes),
@@ -437,6 +482,44 @@ def verify_production_package_approval_from_env(
         committed_sha256=committed_sha256,
         training_manifest_sha256=training_manifest_sha256,
     )
+
+
+def verify_embedded_production_package_approval_from_env(
+    receipt: object,
+    *,
+    release_profile_id: str,
+    release_profile_sha256: str,
+    release_inventory_sha256: str,
+    committed_sha256: str,
+    training_manifest_sha256: str,
+) -> dict[str, Any]:
+    """Reverify a committed package approval against current protected roots."""
+    if not is_verified_production_approval_receipt(receipt):
+        raise ValueError("embedded production package approval receipt is invalid")
+    assert isinstance(receipt, dict)
+    roots, roots_digest = _read_pinned_json(
+        os.environ.get(TRUST_ROOTS_PATH_ENV, ""),
+        os.environ.get(TRUST_ROOTS_DIGEST_ENV, ""),
+        label="trust roots",
+    )
+    if receipt.get("trust_roots_sha256") != roots_digest:
+        raise ValueError("embedded package approval trust roots changed")
+    statement = receipt["statement"]
+    assert isinstance(statement, dict)
+    approval = {"statement": statement, "signature": receipt["signature"]}
+    verified = _verify_package_approval_envelope(
+        approval,
+        roots=roots,
+        roots_digest=roots_digest,
+        release_profile_id=release_profile_id,
+        release_profile_sha256=release_profile_sha256,
+        release_inventory_sha256=release_inventory_sha256,
+        committed_sha256=committed_sha256,
+        training_manifest_sha256=training_manifest_sha256,
+    )
+    if verified != receipt:
+        raise ValueError("embedded production package approval metadata mismatch")
+    return verified
 
 
 def verify_embedded_production_approval_from_env(

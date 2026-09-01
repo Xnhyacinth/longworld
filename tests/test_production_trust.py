@@ -18,6 +18,7 @@ from longworld.core.production_trust import (
     TRUST_ROOTS_PATH_ENV,
     canonical_approval_statement,
     is_verified_production_approval_receipt,
+    require_independent_package_approval,
     verify_embedded_production_approval_from_env,
     verify_production_approval_from_env,
     verify_production_package_approval_from_env,
@@ -114,6 +115,7 @@ def test_external_kms_approval_binds_exact_release_bytes(
     assert receipt["verified"] is True
     assert receipt["approval_key_id"].startswith("aws-kms://")
     assert len(receipt["approval_envelope_sha256"]) == 64
+    assert len(receipt["public_key_sha256"]) == 64
     assert is_verified_production_approval_receipt(receipt)
     assert not is_verified_production_approval_receipt(
         {**receipt, "approval_key_id": "local-self-signed"}
@@ -305,3 +307,66 @@ def test_external_kms_package_approval_binds_inventory_and_commit_bytes(
             committed_sha256=statement["committed_sha256"],
             training_manifest_sha256=statement["training_manifest_sha256"],
         )
+
+
+def test_trust_roots_reject_public_key_aliases_globally(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    statement = _write_approval_fixture(tmp_path, monkeypatch)
+    roots_path = tmp_path / "trust-roots.json"
+    roots = json.loads(roots_path.read_text())
+    aliased = {
+        **roots["keys"][0],
+        "key_id": (
+            "aws-kms://arn:aws:kms:us-east-1:123456789012:"
+            "key/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        ),
+        "approval_authorities": ["dataset-publication-governance"],
+    }
+    roots["keys"].append(aliased)
+    roots_path.write_text(json.dumps(roots, sort_keys=True))
+    monkeypatch.setenv(
+        TRUST_ROOTS_DIGEST_ENV, hashlib.sha256(roots_path.read_bytes()).hexdigest()
+    )
+
+    with pytest.raises(ValueError, match="duplicate public key material"):
+        verify_production_approval_from_env(
+            release_profile_id=statement["release_profile_id"],
+            release_profile_sha256=statement["release_profile_sha256"],
+            source_file_sha256={
+                "quality_report.json": statement["quality_report_sha256"],
+                "train.jsonl": statement["train_sha256"],
+                "eval.jsonl": statement["eval_sha256"],
+            },
+            release_selection_sha256=statement["release_selection_sha256"],
+        )
+
+
+def test_package_approval_requires_distinct_public_key_digest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    statement = _write_approval_fixture(tmp_path, monkeypatch)
+    release_receipt = verify_production_approval_from_env(
+        release_profile_id=statement["release_profile_id"],
+        release_profile_sha256=statement["release_profile_sha256"],
+        source_file_sha256={
+            "quality_report.json": statement["quality_report_sha256"],
+            "train.jsonl": statement["train_sha256"],
+            "eval.jsonl": statement["eval_sha256"],
+        },
+        release_selection_sha256=statement["release_selection_sha256"],
+    )
+    aliased_package_receipt = {
+        **release_receipt,
+        "approval_key_id": (
+            "aws-kms://arn:aws:kms:us-east-1:123456789012:"
+            "key/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        ),
+        "statement": {
+            **release_receipt["statement"],
+            "approval_authority": "dataset-publication-governance",
+        },
+    }
+
+    with pytest.raises(ValueError, match="independent KMS identity and authority"):
+        require_independent_package_approval(release_receipt, aliased_package_receipt)
