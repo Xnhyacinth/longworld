@@ -81,6 +81,37 @@ recorded in `reports/p12_baseline_promotion_scaleout_20260831.md`. This progress
 does not authorize a new HF training release; 48/210 remain blocked behind the
 12 complete source-bound world gate and independent production trust.
 
+## 2026-09-01 eligibility closure and Macro scale-out
+
+The two eligibility flags are now treated as outputs of different closed
+contracts rather than mutable release metadata. A row can become `train_ready`
+only through source-bound selection, strict replay, signed promotion, report,
+quality gate, and deterministic export. A release can become
+`production_eligible` only after a current production profile, nonempty ready
+unseen splits, independent KMS approval, an immutable inventory, and an
+atomically finalized `COMMITTED` package all verify.
+
+Four official-BEA Macro revision worlds now contribute 12 strict-audited
+16/32/64K candidates. Their contexts are restricted to the target economic
+series; all four 64K artifact sets are pairwise disjoint. Construction,
+verified packing-cache replay, and independent audit reject cross-series
+prefixes using the serialized observation bodies. All 12 adapter audits pass,
+including CF/remove-one, raw-token windows, dense top-3 insufficiency, and
+full-pool strict replay. They remain candidates because Macro still needs the
+standard full/CF/ordered training projections and a unified 12-world release
+selection.
+
+Production packaging also now recomputes the canonical SFT row contract instead
+of trusting top-level eligibility mirrors. Production unseen evaluation rejects
+nonissuable profiles, blocked requested axes, and empty train/eval outputs. Its
+input row set and original train/eval row sets are now bound to the auditor-
+signed release gate, and any production failure removes partial split outputs.
+The full status, immutable hashes, and exact closure sequence are recorded in
+`reports/p13_eligibility_scaleout_20260901.md`. The complete code regression
+passes **1,563 tests / 1 expected xfail**; six subsequently added attack/failure
+regressions pass in the current 18-test Macro and 189-test production-focused
+suites.
+
 ## Godot raw-proof capacity and BEA source inventory
 
 The complete Godot allowlisted history scan retained **41 standalone audited

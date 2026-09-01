@@ -1,5 +1,13 @@
 # Frozen generation snapshots
 
+## P13 eligibility and Macro scale-out (2026-09-01)
+
+See `p13_eligibility_scaleout_20260901.md` for the current distinction between
+row-level train readiness, release-level train readiness, and production
+eligibility. It records four official-BEA 16/32/64K Macro candidate worlds,
+their strict-audit hashes, the production packer/unseen fail-closed fixes, and
+the six-domain 12-world closure path. These candidates are not an HF release.
+
 ## P6 source-dependent private probe (2026-08-25)
 
 See `p6_source_dependent_probe_v1.md`. The 12-world local-engineering release
