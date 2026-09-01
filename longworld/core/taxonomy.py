@@ -15,6 +15,7 @@ class SourceOrigin(str, Enum):
     REAL_PUBLIC = "real_public"
     REAL_PRIVATE_EXPORT = "real_private_export"
     REAL_DERIVED = "real_derived"
+    SYNTHETIC_COUNTERFACTUAL = "synthetic_counterfactual"
 
 
 class WorkflowKind(str, Enum):

@@ -59,6 +59,7 @@ from longworld.core.pack import (
     pack_view,
     prompt_document_prefix,
     prompt_query_boundary,
+    real_source_marginal_token_metrics,
     wrap_prompt,
 )
 from longworld.core.promotion import (
@@ -957,7 +958,12 @@ def source_workflow_artifacts_for_query(
         if len(source_workflow_ids) != 1:
             raise ValueError("SEC financial proof must bind one source workflow")
         source_workflow_id = next(iter(source_workflow_ids))
-        sec_event_types = {"sec_filing", "sec_source_section", "sec_financial_answer"}
+        sec_event_types = {
+            "sec_filing",
+            "sec_source_section",
+            "sec_prior_annual_filing_relation",
+            "sec_financial_answer",
+        }
         selected = [
             artifact
             for artifact in selected
@@ -2221,10 +2227,26 @@ def emit_records(
                                 slot_failed = True
                                 break
                         dumped["requested_max_tokens"] = packed.requested_max_tokens
-                        src_tok = _real_source_tokens(classified_artifacts)
-                        dumped["real_source_token_ratio"] = round(
-                            src_tok / max(1, metrics.context_tokens), 4
-                        )
+                        if classified_artifacts:
+                            _, source_metric_tokens, source_ratio = (
+                                real_source_marginal_token_metrics(
+                                    classified_artifacts,
+                                    question=spec.question,
+                                    timing=timing,
+                                    token_counter=(
+                                        exact_metric_counter or estimate_tokens
+                                    ),
+                                    include_prompt=exact_metric_counter is not None,
+                                )
+                            )
+                        else:
+                            source_metric_tokens = metrics.context_tokens
+                            source_ratio = 0.0
+                        if source_metric_tokens != metrics.context_tokens:
+                            raise ValueError(
+                                "real source metric does not bind the rendered context"
+                            )
+                        dumped["real_source_token_ratio"] = round(source_ratio, 4)
                         dumped["cross_workstream"] = spec.motif in {
                             "cross_workstream",
                             "cross_stream_release_gate",

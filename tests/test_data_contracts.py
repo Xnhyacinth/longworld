@@ -25,7 +25,10 @@ from longworld.core.attestation import (
 from longworld.core.pack import (
     compute_view_metrics,
     dependency_class_for_view,
+    join_artifacts,
     pack_view,
+    real_source_marginal_token_metrics,
+    wrap_prompt,
 )
 from longworld.core.promotion import STRICT_REPLAY_REVISION, promoted_row_set_sha256
 from longworld.core.provenance import ProvenanceError
@@ -272,6 +275,77 @@ def test_real_source_tokens_use_provenance_classification_not_doc_type() -> None
 
     assert _real_source_tokens([repo_body, synthetic_source_pack]) > 0
     assert _real_source_tokens([synthetic_source_pack]) == 0
+
+
+def test_real_source_marginal_tokens_use_one_rendered_prompt_and_tokenizer() -> None:
+    repo_body = _artifact("w.repo", "real pull request body " * 20)
+    classify_artifact(
+        repo_body,
+        source_origin=SourceOrigin.REAL_PUBLIC,
+        workflow_kind=WorkflowKind.HYBRID_CAUSAL,
+        evidence_role=EvidenceRole.CAUSAL_GOLD,
+        workflow_id="w",
+        provenance_id="github:psf/requests#1",
+    )
+    synthetic = _artifact("w.synthetic", "synthetic state transition " * 20)
+    classify_artifact(
+        synthetic,
+        source_origin=SourceOrigin.SYNTHETIC_WORLD,
+        workflow_kind=WorkflowKind.SYNTHETIC_EXECUTABLE,
+        evidence_role=EvidenceRole.CAUSAL_SUPPORTING,
+        workflow_id="w",
+        provenance_id="synthetic-sha256:test",
+    )
+
+    source_tokens, total_tokens, ratio = real_source_marginal_token_metrics(
+        [repo_body, synthetic],
+        question="Which transition is eligible?",
+        timing="first",
+        token_counter=len,
+    )
+    prompt = wrap_prompt(
+        "Which transition is eligible?",
+        join_artifacts([repo_body, synthetic]),
+        "first",
+    )
+    without_source = wrap_prompt(
+        "Which transition is eligible?", synthetic.text, "first"
+    )
+
+    assert total_tokens == len(prompt)
+    assert source_tokens == len(prompt) - len(without_source)
+    assert ratio == source_tokens / total_tokens
+    assert 0.0 < ratio < 1.0
+
+
+def test_real_source_marginal_tokens_fail_closed_on_nonmonotonic_counter() -> None:
+    repo_body = _artifact("w.repo", "real source")
+    classify_artifact(
+        repo_body,
+        source_origin=SourceOrigin.REAL_PUBLIC,
+        workflow_kind=WorkflowKind.HYBRID_CAUSAL,
+        evidence_role=EvidenceRole.CAUSAL_GOLD,
+        workflow_id="w",
+        provenance_id="github:psf/requests#1",
+    )
+
+    with pytest.raises(ValueError, match="real source marginal token count"):
+        real_source_marginal_token_metrics(
+            [repo_body],
+            question="Question?",
+            timing="first",
+            token_counter=lambda text: 1 if repo_body.text in text else 2,
+        )
+
+
+def test_real_source_marginal_tokens_allow_empty_context_without_prompt() -> None:
+    assert real_source_marginal_token_metrics(
+        [],
+        question="Question?",
+        timing="first",
+        token_counter=len,
+        include_prompt=False,
+    ) == (0, 0, 0.0)
 
 
 def test_real_ci_corridor_uses_only_the_bound_source_interval() -> None:

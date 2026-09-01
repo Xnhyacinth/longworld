@@ -15,6 +15,7 @@ from longworld.core.semantic import (
     is_boilerplate,
     pulse_doc_ratio,
 )
+from longworld.core.taxonomy import SourceOrigin, artifact_classification
 from longworld.domains.company.queries import QuerySpec
 
 SEP = "\n\n===== DOCUMENT =====\n\n"
@@ -28,6 +29,45 @@ def estimate_tokens(text: str) -> int:
 
 def join_artifacts(arts: list[Artifact]) -> str:
     return SEP.join(a.text for a in arts)
+
+
+def real_source_marginal_token_metrics(
+    artifacts: list[Artifact],
+    *,
+    question: str,
+    timing: str,
+    token_counter: Callable[[str], int],
+    include_prompt: bool = True,
+) -> tuple[int, int, float]:
+    """Measure real-source share as its marginal in one rendered prompt."""
+    real_origins = {
+        SourceOrigin.REAL_PUBLIC,
+        SourceOrigin.REAL_PRIVATE_EXPORT,
+        SourceOrigin.REAL_DERIVED,
+    }
+    full_context = join_artifacts(artifacts)
+    without_real_context = join_artifacts(
+        [
+            artifact
+            for artifact in artifacts
+            if artifact_classification(artifact).source_origin not in real_origins
+        ]
+    )
+    full_text = (
+        wrap_prompt(question, full_context, timing) if include_prompt else full_context
+    )
+    without_real_text = (
+        wrap_prompt(question, without_real_context, timing)
+        if include_prompt
+        else without_real_context
+    )
+    total_tokens = token_counter(full_text)
+    source_tokens = total_tokens - token_counter(without_real_text)
+    if total_tokens == 0 and source_tokens == 0:
+        return 0, 0, 0.0
+    if total_tokens <= 0 or not 0 <= source_tokens <= total_tokens:
+        raise ValueError("real source marginal token count is outside the prompt")
+    return source_tokens, total_tokens, source_tokens / total_tokens
 
 
 def length_label(tokens: int) -> str:

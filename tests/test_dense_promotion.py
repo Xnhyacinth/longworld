@@ -51,6 +51,7 @@ from longworld.core.promotion import (
     _candidate_n_workstreams,
     _independent_verification_replay,
     _materialize_synthetic_replay,
+    _missing_required_view_coverage_by_world,
     _n_workstreams,
     _replayed_quality_metrics,
     _resolved_local_tokenizer_revision,
@@ -81,8 +82,15 @@ from longworld.core.semantic import (
     sentence_near_dup_ratio,
 )
 from longworld.core.sourcebundle import LoadedSourceWorkflowBundle
+from longworld.core.taskproof import TASK_PROOF_RECEIPT_SCHEMA
 from longworld.core.taskreplaysidecar import task_candidate_content_commitment
-from longworld.core.taxonomy import artifact_classification
+from longworld.core.taxonomy import (
+    EvidenceRole,
+    SourceOrigin,
+    WorkflowKind,
+    artifact_classification,
+    classify_artifact,
+)
 from longworld.core.verify import Verification
 from longworld.core.views import render_cf_view
 
@@ -1628,6 +1636,78 @@ def test_replayed_exact_metrics_use_tokenizer_for_position_and_distance() -> Non
     assert replayed["evidence_distance"] == exact_metrics.max_evidence_distance
 
 
+def test_replayed_real_source_ratio_uses_prompt_marginal_not_artifact_sum() -> None:
+    candidate, artifacts = _candidate()
+    materialized = materialize(
+        candidate["seed"],
+        n_parallel=0,
+        n_pulses=0,
+        domain=candidate["domain"],
+        n_workstreams=0,
+    )
+    world = materialized.worlds["focal"]
+    spec = next(
+        query
+        for query in materialized.queries
+        if candidate["query_id"].startswith(f"{query.query_id}:")
+    )
+    for artifact in artifacts:
+        classify_artifact(
+            artifact,
+            source_origin=SourceOrigin.REAL_PUBLIC,
+            workflow_kind=WorkflowKind.HYBRID_CAUSAL,
+            evidence_role=EvidenceRole.CAUSAL_GOLD,
+            workflow_id=world.world_id,
+            provenance_id=f"test:{artifact.artifact_id}",
+        )
+
+    def boundary_heavy_token_counter(text: str) -> int:
+        return 60_100 + len(text) if text else 0
+
+    document_context = join_artifacts(artifacts)
+    prompt = wrap_prompt(spec.question, document_context, "first")
+    metrics = compute_view_metrics(
+        artifacts,
+        set(spec.essential_artifact_ids),
+        query_timing="first",
+        context=prompt,
+        token_counter=boundary_heavy_token_counter,
+        token_prefix=prompt_document_prefix(spec.question, "first"),
+        query_boundary_tokens=prompt_query_boundary(
+            spec.question,
+            document_context,
+            "first",
+            boundary_heavy_token_counter,
+        ),
+    )
+    candidate["length_bucket"] = "64k"
+    candidate["position_bucket"] = metrics.position_bucket
+    total_tokens = boundary_heavy_token_counter(prompt)
+
+    replayed = _replayed_quality_metrics(
+        candidate,
+        world,
+        spec,
+        artifacts,
+        {
+            "exact_token_replay": {
+                "tokenizer_context_tokens": total_tokens,
+                "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+                "tokenizer_revision": "a" * 40,
+            }
+        },
+        token_counter=boundary_heavy_token_counter,
+    )
+
+    empty_prompt_tokens = boundary_heavy_token_counter(
+        wrap_prompt(spec.question, "", "first")
+    )
+    assert replayed["real_source_token_ratio"] == round(
+        (total_tokens - empty_prompt_tokens) / total_tokens, 4
+    )
+    assert 0.0 < replayed["real_source_token_ratio"] < 1.0
+
+
 def test_promotion_rejects_a_resigned_incorrect_audited_dup_ratio() -> None:
     candidate, artifacts = _candidate()
     audit = create_dense_audit(candidate, _ranking(candidate, artifacts), KEY, k=3)
@@ -1911,6 +1991,262 @@ def _selection_audit(
     if asset_digest:
         payload["tokenizer_asset_manifest_sha256"] = asset_digest
     return attach_attestation(payload, KEY, purpose=DENSE_AUDIT_PURPOSE)
+
+
+def _p13_six_domain_selection_inputs() -> tuple[list[dict], list[dict]]:
+    template, _ = _candidate()
+    profile = release_profile("p13-authentic-six-domain-probe-12-v1")
+    tokens_by_band = {"16k": 16_000, "32k": 32_000, "64k": 64_000}
+    domains = tuple(dict(profile.promoted_domain_world_quotas))
+    candidates = []
+    audits = []
+    for domain in domains:
+        for world_index in range(2):
+            world_id = f"p13-{domain}-{world_index}"
+            for level, band in enumerate(("16k", "32k", "64k"), start=1):
+                relations = [
+                    {
+                        "parent_record_id": f"{world_id}-revision-{index}",
+                        "child_record_id": f"{world_id}-revision-{index + 1}",
+                        "relation_provenance": "authentic_source",
+                    }
+                    for index in range(level)
+                ]
+                for view in ("full", "cf", "ordered_artifact_view"):
+                    candidate = {
+                        **deepcopy(
+                            {
+                                key: value
+                                for key, value in template.items()
+                                if key != "attestation"
+                            }
+                        ),
+                        "world_id": world_id,
+                        "query_id": f"{world_id}-{band}-{view}",
+                        "dossier_id": f"{world_id}-{band}",
+                        "domain": domain,
+                        "view": view,
+                        "query_timing": "first",
+                        "length_bucket": band,
+                        "tokenizer_context_tokens": tokens_by_band[band],
+                        "tokenizer_model_id": profile.tokenizer_model_id,
+                        "tokenizer_revision": profile.tokenizer_revision,
+                        "tokenizer_asset_manifest_sha256": (
+                            profile.tokenizer_asset_manifest_sha256
+                        ),
+                        "semantic_growth_group_id": f"{world_id}-history",
+                        "semantic_tokens": {
+                            "event_bearing": 8_000 * level,
+                            "internal": 10_000 * level,
+                            "generic_background": 0,
+                        },
+                        "strict_support_event_count": 3 * level,
+                        "source_relation_edges": relations,
+                        "authentic_source_relation_edges": relations,
+                        "graph": {
+                            **dict(template.get("graph") or {}),
+                            "n_essential_events": 2 * level,
+                            "proof_depth": level + 1,
+                        },
+                    }
+                    _mark_candidate_as_real(candidate)
+                    candidate["source_family_ids"] = [f"source/{domain}/{world_index}"]
+                    candidate["source_relation_edges"] = relations
+                    candidate["authentic_source_relation_edges"] = relations
+                    candidate = attach_attestation(
+                        candidate, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
+                    )
+                    candidates.append(candidate)
+                    audits.append(_selection_audit(candidate))
+    return candidates, audits
+
+
+def test_required_view_coverage_uses_row_contract_late_timing_vocabulary() -> None:
+    profile = replace(
+        release_profile("p13-authentic-six-domain-probe-12-v1"),
+        required_exact_length_buckets=("16k",),
+        required_view_timings=(("ordered_artifact_view", "late"),),
+    )
+    row = {
+        "world_id": "late-timing-world",
+        "length_bucket": "16k",
+        "tokenizer_context_tokens": 16_000,
+        "tokenizer_model_id": profile.tokenizer_model_id,
+        "tokenizer_revision": profile.tokenizer_revision,
+        "tokenizer_asset_manifest_sha256": profile.tokenizer_asset_manifest_sha256,
+        "view": "ordered_artifact_view",
+        "query_timing": "late",
+    }
+
+    assert _missing_required_view_coverage_by_world([row], profile) == {}
+    with pytest.raises(PromotionError, match="required view coverage is invalid"):
+        _missing_required_view_coverage_by_world(
+            [row], replace(profile, required_view_timings=(("full", "later"),))
+        )
+
+
+def test_p13_selection_requires_every_view_in_every_exact_bucket() -> None:
+    candidates, audits = _p13_six_domain_selection_inputs()
+    removed = next(
+        candidate
+        for candidate in candidates
+        if candidate["world_id"] == "p13-finance-0"
+        and candidate["length_bucket"] == "32k"
+        and candidate["view"] == "cf"
+    )
+    removed_digest = candidate_sha256(removed)
+
+    with pytest.raises(PromotionError, match="required view coverage"):
+        select_release_worlds(
+            [candidate for candidate in candidates if candidate is not removed],
+            [audit for audit in audits if audit["candidate_sha256"] != removed_digest],
+            "p13-authentic-six-domain-probe-12-v1",
+            candidate_attestation_key=KEY,
+            audit_attestation_key=KEY,
+        )
+
+
+def test_p13_selection_requires_every_selected_row_to_be_source_bound() -> None:
+    candidates, audits = _p13_six_domain_selection_inputs()
+    index = next(
+        index
+        for index, candidate in enumerate(candidates)
+        if candidate["world_id"] == "p13-cyber-0"
+        and candidate["length_bucket"] == "16k"
+        and candidate["view"] == "ordered_artifact_view"
+    )
+    payload = {
+        key: value for key, value in candidates[index].items() if key != "attestation"
+    }
+    payload.pop("episode_replay_bundle")
+    payload["source_family_ids"] = []
+    payload["artifact_classification"] = [
+        {
+            **item,
+            "workflow_kind": "synthetic_executable",
+            "source_origin": "synthetic_world",
+        }
+        for item in payload["artifact_classification"]
+    ]
+    candidates[index] = attach_attestation(
+        payload, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
+    )
+    audits[index] = _selection_audit(candidates[index])
+
+    with pytest.raises(PromotionError, match="all rows to be source-bound"):
+        select_release_worlds(
+            candidates,
+            audits,
+            "p13-authentic-six-domain-probe-12-v1",
+            candidate_attestation_key=KEY,
+            audit_attestation_key=KEY,
+        )
+
+
+def test_p13_selection_signs_domain_stratified_world_maps() -> None:
+    candidates, audits = _p13_six_domain_selection_inputs()
+
+    selected, receipt = select_release_worlds(
+        candidates,
+        audits,
+        "p13-authentic-six-domain-probe-12-v1",
+        candidate_attestation_key=KEY,
+        audit_attestation_key=KEY,
+    )
+
+    assert len({row["world_id"] for row in selected}) == 12
+    assert receipt["worlds_by_domain"] == receipt["selected_worlds_by_domain"]
+    assert {
+        domain: len(world_ids)
+        for domain, world_ids in receipt["worlds_by_domain"].items()
+    } == dict(
+        release_profile(
+            "p13-authentic-six-domain-probe-12-v1"
+        ).promoted_domain_world_quotas
+    )
+    split_worlds = receipt["split_worlds_by_domain"]
+    assert sum(map(len, split_worlds["eval"].values())) == 2
+    assert (
+        len([domain for domain, world_ids in split_worlds["eval"].items() if world_ids])
+        == 2
+    )
+    assert all(len(world_ids) >= 1 for world_ids in split_worlds["train"].values())
+    assert {
+        world_id: split
+        for split, domain_worlds in split_worlds.items()
+        for world_ids in domain_worlds.values()
+        for world_id in world_ids
+    } == receipt["split_by_world"]
+
+
+def test_p13_train_ready_report_rechecks_and_signs_domain_view_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidates, audits = _p13_six_domain_selection_inputs()
+    selected, receipt = select_release_worlds(
+        candidates,
+        audits,
+        "p13-authentic-six-domain-probe-12-v1",
+        candidate_attestation_key=KEY,
+        audit_attestation_key=KEY,
+    )
+    selection_digest = serialized_row_sha256(receipt)
+    rows = [
+        {
+            **candidate,
+            "data_stage": "train_ready",
+            "split": receipt["split_by_world"][candidate["world_id"]],
+            "promotion": {
+                "candidate_sha256": candidate_sha256(candidate),
+                "dense_audit_sha256": receipt["audit_sha256_by_candidate"][
+                    candidate_sha256(candidate)
+                ],
+                "release_selection_sha256": selection_digest,
+                "tokenizer_asset_manifest_sha256": candidate[
+                    "tokenizer_asset_manifest_sha256"
+                ],
+            },
+        }
+        for candidate in selected
+    ]
+    candidate_report = attach_attestation(
+        {
+            "schema_version": candidates[0]["schema_version"],
+            "data_product": candidates[0]["data_product"],
+            "data_stage": "candidate",
+            "release_profile_id": "p13-authentic-six-domain-probe-12-v1",
+            "release_profile_sha256": release_profile_sha256(
+                "p13-authentic-six-domain-probe-12-v1"
+            ),
+            "n_worlds": 12,
+            "n_rows": len(candidates),
+            "target_promoted_worlds": 12,
+            "candidate_row_set_sha256": promoted_row_set_sha256(candidates),
+            "retention": 1.0,
+            "n_clones": 0,
+        },
+        KEY,
+        purpose="quality_report",
+    )
+    monkeypatch.setattr(promotion_module, "sft_row_errors", lambda *_a, **_k: [])
+
+    report = create_train_ready_report(
+        candidate_report,
+        candidates,
+        rows,
+        KEY,
+        release_selection_receipt=receipt,
+    )
+
+    assert report["worlds_by_domain"] == {
+        domain: 2
+        for domain in dict(
+            release_profile(
+                "p13-authentic-six-domain-probe-12-v1"
+            ).promoted_domain_world_quotas
+        )
+    }
+    assert report["split_worlds_by_domain"] == receipt["split_worlds_by_domain"]
 
 
 def _p12_sec_exact_bucket_selection_inputs(
@@ -4818,7 +5154,7 @@ def _task_report_semantic_inputs() -> tuple[dict, dict, dict, dict]:
             "hybrid_causal_edges": [],
             "context_source_relation_count": 1,
             "task_proof_receipt": {
-                "schema_version": "longworld.task-proof-receipt.test.v1",
+                "schema_version": TASK_PROOF_RECEIPT_SCHEMA,
                 "receipt_sha256": "b" * 64,
             },
             "verification": Verification(**verification_values).model_dump(),

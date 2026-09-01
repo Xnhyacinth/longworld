@@ -3,6 +3,10 @@ from __future__ import annotations
 import hashlib
 import inspect
 import json
+import os
+import subprocess
+import sys
+import sysconfig
 from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
@@ -10,6 +14,7 @@ from typing import Any
 
 import pytest
 
+import scripts.project_task_candidate_views as task_view_cli
 import scripts.promote_candidates as promotion_cli
 from longworld.core import financehistory
 from longworld.core import taskpromotion as taskpromotion_module
@@ -19,6 +24,7 @@ from longworld.core.attestation import (
     ROLE_KEY_ENVS,
     ROLE_KEY_ID_ENVS,
     attach_attestation,
+    verify_attestation,
 )
 from longworld.core.domainhistory import (
     KEV_PIPELINE_REPLAY_MANIFEST_SCHEMA,
@@ -34,7 +40,7 @@ from longworld.core.financehistory import (
     build_financial_history_candidates,
 )
 from longworld.core.macrovintage import build_macro_vintage_pipeline_candidates
-from longworld.core.pack import SEP
+from longworld.core.pack import SEP, wrap_prompt
 from longworld.core.promotion import (
     CANDIDATE_ATTESTATION_PURPOSE,
     DENSE_RANKING_PURPOSE,
@@ -44,17 +50,26 @@ from longworld.core.promotion import (
     _candidate_has_verified_real_source,
     _selection_audit_matches_candidate,
     candidate_sha256,
+    candidate_structural_preflight,
+    select_release_worlds,
     serialized_row_sha256,
+    task_semantic_commitment_sha256_from_audit,
     validate_task_candidate_content_uniqueness,
 )
+from longworld.core.provenance import ProvenanceError
 from longworld.core.taskpromotion import (
+    build_task_candidate_view_projections,
     create_task_dense_audit,
     promote_task_candidate,
 )
+from longworld.core.taskproof import TaskProofError, audit_task_view_projection
 from longworld.core.taskreplaysidecar import (
     CYBER_KEV_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
+    TASK_REPLAY_SIDECAR_PURPOSE,
+    TASK_REPLAY_SIDECAR_SCHEMA_V2,
+    TASK_REPLAY_SIDECAR_SCHEMA_V3,
     LoadedTaskReplaySidecar,
     build_task_replay_sidecar,
     load_task_replay_sidecar,
@@ -73,6 +88,41 @@ TOKENIZER_MODEL_ID = "Qwen/Qwen3.5-4B"
 TOKENIZER_REVISION = "c" * 40
 TOKENIZER_ASSET_SHA256 = "d" * 64
 _TASK_SIDECAR_TOKEN_COUNTER = taskpromotion_module.task_sidecar_token_counter
+
+
+def test_task_view_projection_cli_bootstraps_repo_without_editable_install(
+    tmp_path: Path,
+) -> None:
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = os.pathsep.join(
+        dict.fromkeys(
+            (
+                sysconfig.get_path("purelib"),
+                sysconfig.get_path("platlib"),
+            )
+        )
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-S",
+            str(
+                Path(__file__).resolve().parents[1]
+                / "scripts"
+                / "project_task_candidate_views.py"
+            ),
+            "--help",
+        ],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "usage:" in result.stdout
 
 
 def _test_token_count(text: str) -> int:
@@ -514,18 +564,12 @@ def _macro_candidate(
         tmp_path,
         MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
         {
-            "workflow_manifest_sha256": source_binding[
-                "workflow_manifest_sha256"
-            ],
+            "workflow_manifest_sha256": source_binding["workflow_manifest_sha256"],
             "raw_source_sha256": source_binding["raw_source_sha256"],
-            "fetch_inventory_sha256": source_binding[
-                "fetch_inventory_sha256"
-            ],
+            "fetch_inventory_sha256": source_binding["fetch_inventory_sha256"],
             "fetch_receipt": kwargs["manifest"]["fetch_receipt"],
             "source_families": source_binding["source_families"],
-            "authorization_record_id": source_binding[
-                "authorization_record_id"
-            ],
+            "authorization_record_id": source_binding["authorization_record_id"],
             "replay_revision": provisional["strict_replay_revision"],
             "tokenizer_model_id": TOKENIZER_MODEL_ID,
             "tokenizer_revision": TOKENIZER_REVISION,
@@ -678,7 +722,15 @@ def test_task_dense_audit_replays_full_pool_but_rejects_dense_prefixes(
     assert quality_metadata["world_id"] == candidate["world_id"]
     assert quality_metadata["domain"] == candidate["domain"]
     assert quality_metadata["length_bucket"] == candidate["length_bucket"]
-    assert quality_metadata["motif"] == candidate.get("motif")
+    assert (
+        quality_metadata["motif"]
+        == {
+            "cyber": "chronology+annual_aggregation+remediation_window",
+            "finance": (
+                "multi_filing_trajectory+certification+cross_statement_reconciliation"
+            ),
+        }[candidate["domain"]]
+    )
     assert quality_metadata["answer_program_id"] == candidate.get("answer_program_id")
     assert quality_metadata["real_source_verified"] is True
     assert quality_metadata["real_source_family_ids"]
@@ -1198,6 +1250,868 @@ def test_task_promotion_honors_signed_world_selection(tmp_path: Path) -> None:
 
     assert promoted["train_ready"] is True
     assert Verification.model_validate(promoted["verification"]).all_green()
+
+
+def _candidate_task_views(
+    candidate: dict[str, Any],
+    sidecar: LoadedTaskReplaySidecar,
+    *,
+    token_counter: Any = _test_token_count,
+) -> list[dict[str, Any]]:
+    return build_task_candidate_view_projections(
+        candidate,
+        adapter_key=sidecar.registry_key,
+        token_counter=token_counter,
+        candidate_attestation_key=KEYS["candidate"],
+    )
+
+
+def _resign_v3_projection(
+    output_dir: Path,
+    sidecar: LoadedTaskReplaySidecar,
+    original: dict[str, Any],
+    forged: dict[str, Any],
+) -> tuple[dict[str, Any], LoadedTaskReplaySidecar]:
+    old_commitment = task_candidate_content_commitment(
+        original, sidecar_schema_version=TASK_REPLAY_SIDECAR_SCHEMA_V3
+    )
+    new_commitment = task_candidate_content_commitment(
+        forged, sidecar_schema_version=TASK_REPLAY_SIDECAR_SCHEMA_V3
+    )
+    payload = deepcopy(sidecar.replay_payload)
+    payload["candidate_content_commitments"] = [
+        new_commitment if item == old_commitment else item
+        for item in payload["candidate_content_commitments"]
+    ]
+    payload["candidate_content_commitments"].sort(
+        key=lambda item: (item["world_id"], item["length_bucket"], item["view"])
+    )
+    for receipt in payload["projection_derivation_receipts"]:
+        if receipt["projection_content_commitment"] == old_commitment:
+            receipt["projection_content_commitment"] = new_commitment
+            receipt["projection_receipt"] = deepcopy(forged["task_view_projection"])
+            receipt["projection_receipt_sha256"] = hashlib.sha256(
+                json.dumps(
+                    forged["task_view_projection"],
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode()
+            ).hexdigest()
+    payload["projection_derivation_receipts"].sort(
+        key=lambda item: (
+            item["projection_content_commitment"]["world_id"],
+            item["projection_content_commitment"]["length_bucket"],
+            item["projection_content_commitment"]["view"],
+        )
+    )
+    signed_sidecar = build_task_replay_sidecar(
+        adapter_id=sidecar.adapter_id,
+        adapter_revision=sidecar.adapter_revision,
+        replay_payload=payload,
+        source_attestation_key=KEYS["source"],
+        sidecar_schema_version=TASK_REPLAY_SIDECAR_SCHEMA_V3,
+    )
+    raw = _canonical_bytes(signed_sidecar)
+    path = output_dir / "FORGED_SOURCE_MEASUREMENT_SIDECAR_V3.json"
+    path.write_bytes(raw)
+    binding = task_replay_sidecar_binding(raw, source_attestation_key=KEYS["source"])
+    rebound = deepcopy(forged)
+    rebound.pop("attestation", None)
+    rebound["task_replay_sidecar"] = binding
+    rebound = attach_attestation(
+        rebound, KEYS["candidate"], purpose=CANDIDATE_ATTESTATION_PURPOSE
+    )
+    return rebound, load_task_replay_sidecar(
+        output_dir,
+        path.name,
+        binding,
+        source_attestation_key=KEYS["source"],
+    )
+
+
+def _assert_standard_training_views(
+    candidate: dict[str, Any], views: list[dict[str, Any]]
+) -> None:
+
+    by_view = {row["view"]: row for row in views}
+    assert set(by_view) == {"full", "cf", "ordered_artifact_view"}
+    assert by_view["full"]["dossier_id"] == by_view["cf"]["dossier_id"]
+    assert by_view["full"]["document_context"] != by_view["cf"]["document_context"]
+    full_ids = [
+        value["artifact_id"] for value in by_view["full"]["artifact_classification"]
+    ]
+    cf_ids = [
+        value["artifact_id"] for value in by_view["cf"]["artifact_classification"]
+    ]
+    ordered_ids = [
+        value["artifact_id"]
+        for value in by_view["ordered_artifact_view"]["artifact_classification"]
+    ]
+    assert full_ids == cf_ids
+    assert full_ids != ordered_ids
+    assert (
+        by_view["full"]["document_context"]
+        != by_view["ordered_artifact_view"]["document_context"]
+    )
+    assert len({row["context"] for row in views}) == 3
+    assert by_view["full"]["answer"] == candidate["answer"]
+    assert by_view["cf"]["answer"] == candidate["cf_answer"]
+    assert by_view["cf"]["cf_answer"] == candidate["answer"]
+    changed = [
+        item
+        for item in by_view["cf"]["artifact_classification"]
+        if item["source_origin"] == "synthetic_counterfactual"
+    ]
+    assert len(changed) == 1
+    assert changed[0]["counterfactual_parent_source_origin"] in {
+        "real_public",
+        "real_private_export",
+        "real_derived",
+    }
+    assert changed[0]["counterfactual_parent_provenance_id"]
+    assert changed[0]["counterfactual_parent_text_sha256"]
+    assert changed[0]["counterfactual_parent_source_binding_sha256"]
+    assert _candidate_has_source_bound_proof(by_view["cf"])
+    only_changed = deepcopy(by_view["cf"])
+    only_changed["artifact_classification"] = changed
+    assert not _candidate_has_source_bound_proof(only_changed)
+    assert all(row["train_ready"] is False for row in views)
+    assert all(row["production_eligible"] is False for row in views)
+    assert all(
+        row["promotion_blocker_code"] == "task_view_source_commitment_pending"
+        for row in views
+    )
+    assert len({candidate_sha256(row) for row in views}) == 3
+    assert (
+        len({task_candidate_content_commitment(row)["content_sha256"] for row in views})
+        == 3
+    )
+    assert all(
+        verify_attestation(
+            row, KEYS["candidate"], purpose=CANDIDATE_ATTESTATION_PURPOSE
+        )
+        for row in views
+    )
+    assert (
+        by_view["cf"]["task_view_projection"]["materialized_replay_answer_sha256"]
+        == hashlib.sha256(candidate["cf_answer"].encode()).hexdigest()
+    )
+    chronology = by_view["ordered_artifact_view"]["task_view_projection"]["chronology"]
+    assert chronology == sorted(chronology, key=lambda item: item["order_key"])
+    forged_order = deepcopy(by_view["ordered_artifact_view"])
+    forged_order["task_view_projection"]["chronology"] = [
+        {"artifact_id": item["artifact_id"], "order_key": f"{index:08d}"}
+        for index, item in enumerate(chronology)
+    ]
+    with pytest.raises(TaskProofError, match="projection_chronology_valid"):
+        audit_task_view_projection(forged_order)
+
+    reshuffled = deepcopy(by_view["ordered_artifact_view"])
+    reshuffled_documents = list(reversed(reshuffled["document_context"].split(SEP)))
+    reshuffled["document_context"] = SEP.join(reshuffled_documents)
+    reshuffled["artifact_classification"] = list(
+        reversed(reshuffled["artifact_classification"])
+    )
+    reshuffled["task_view_projection"]["document_context_sha256"] = hashlib.sha256(
+        reshuffled["document_context"].encode()
+    ).hexdigest()
+    reshuffled["task_view_projection"]["artifact_bindings"] = [
+        {
+            "artifact_id": classification["artifact_id"],
+            "text_sha256": hashlib.sha256(document.encode()).hexdigest(),
+        }
+        for classification, document in zip(
+            reshuffled["artifact_classification"],
+            reshuffled_documents,
+            strict=True,
+        )
+    ]
+    reshuffled["task_view_projection"]["chronology"] = [
+        {"artifact_id": item["artifact_id"], "order_key": f"{index:08d}"}
+        for index, item in enumerate(reshuffled["artifact_classification"])
+    ]
+    with pytest.raises(TaskProofError, match="projection_chronology_valid"):
+        audit_task_view_projection(reshuffled)
+
+    forged_parent = deepcopy(by_view["cf"])
+    forged_parent["artifact_classification"] = deepcopy(
+        by_view["cf"]["artifact_classification"]
+    )
+    forged_changed = next(
+        item
+        for item in forged_parent["artifact_classification"]
+        if item["source_origin"] == "synthetic_counterfactual"
+    )
+    forged_changed["counterfactual_parent_provenance_id"] = "sha256:" + "0" * 64
+    with pytest.raises(TaskProofError, match="counterfactual_parent_binding_valid"):
+        audit_task_view_projection(forged_parent)
+
+
+@pytest.mark.parametrize("factory", (_finance_candidate, _cyber_candidate))
+def test_task_promotion_materializes_standard_training_views(
+    tmp_path: Path,
+    factory: Any,
+) -> None:
+    candidate, sidecar = factory(tmp_path)
+
+    _assert_standard_training_views(
+        candidate, _candidate_task_views(candidate, sidecar)
+    )
+
+
+def test_task_view_difficulty_uses_replayed_view_graph(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate, sidecar = _finance_candidate(tmp_path)
+    parent_depth = candidate["graph"]["proof_depth"]
+    view_depth = 2 if parent_depth >= 3 else 3
+    original_replay = taskpromotion_module._task_view_replay
+
+    def replay_with_distinct_view_depth(
+        candidate_row: dict[str, Any],
+        adapter_key: tuple[str, str, str],
+        artifact_ids: Any,
+        *,
+        counterfactual: bool = False,
+    ) -> dict[str, Any]:
+        replay = original_replay(
+            candidate_row,
+            adapter_key,
+            artifact_ids,
+            counterfactual=counterfactual,
+        )
+        if candidate_row.get("view") == "ordered_artifact_view" and not counterfactual:
+            replay = deepcopy(replay)
+            replay["proof_depth"] = view_depth
+        return replay
+
+    monkeypatch.setattr(
+        taskpromotion_module, "_task_view_replay", replay_with_distinct_view_depth
+    )
+
+    ordered = next(
+        row
+        for row in _candidate_task_views(candidate, sidecar)
+        if row["view"] == "ordered_artifact_view"
+    )
+    expected_dependency_class = (
+        "deep_dependency"
+        if view_depth >= 3
+        else "long_range_retrieval"
+        if ordered["difficulty"]["max_evidence_distance"] >= 8_000
+        else "local_or_mixed"
+    )
+
+    assert ordered["graph"]["proof_depth"] == view_depth
+    assert ordered["difficulty"]["proof_depth"] == view_depth
+    assert ordered["dependency_class"] == expected_dependency_class
+
+
+def test_macro_task_promotion_materializes_standard_training_views(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        taskpromotion_module,
+        "task_sidecar_token_counter",
+        lambda _sidecar: _macro_token_count,
+    )
+    candidate, sidecar = _macro_candidate(tmp_path)
+
+    _assert_standard_training_views(
+        candidate,
+        _candidate_task_views(candidate, sidecar, token_counter=_macro_token_count),
+    )
+
+
+def test_task_view_projection_cli_is_deterministic_and_stays_candidate_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate, sidecar = _finance_candidate(tmp_path)
+    input_path = tmp_path / "candidates.jsonl"
+    input_path.write_bytes(_canonical_bytes(candidate))
+    output_dir = tmp_path / "projected"
+    monkeypatch.setattr(
+        task_view_cli,
+        "task_sidecar_token_counter",
+        lambda _sidecar: _test_token_count,
+    )
+
+    first = task_view_cli.project(
+        input_path, tmp_path / sidecar.relative_path, output_dir
+    )
+    first_bytes = {
+        path.name: path.read_bytes() for path in sorted(output_dir.iterdir())
+    }
+    second = task_view_cli.project(
+        input_path, tmp_path / sidecar.relative_path, output_dir
+    )
+
+    assert first == second
+    assert first["projection_candidate_count"] == 3
+    assert first["train_ready"] is False
+    assert first["requires_source_sidecar_rebuild"] is False
+    assert first["dense_audit_complete"] is False
+    assert first_bytes == {
+        path.name: path.read_bytes() for path in sorted(output_dir.iterdir())
+    }
+    commitment_input = json.loads(
+        (output_dir / "SOURCE_COMMITMENT_INPUT.json").read_text()
+    )
+    assert commitment_input["sidecar_schema_version"] == (
+        "longworld.task-replay-sidecar.v3"
+    )
+    assert commitment_input["required_commitment_identity"] == [
+        "world_id",
+        "length_bucket",
+        "view",
+    ]
+
+    projected = [
+        json.loads(line)
+        for line in (output_dir / "candidates.jsonl").read_text().splitlines()
+    ]
+    v3_raw = (output_dir / "TASK_REPLAY_SIDECAR_V3.json").read_bytes()
+    v3_binding = task_replay_sidecar_binding(
+        v3_raw, source_attestation_key=KEYS["source"]
+    )
+    v3_sidecar = load_task_replay_sidecar(
+        output_dir,
+        "TASK_REPLAY_SIDECAR_V3.json",
+        v3_binding,
+        source_attestation_key=KEYS["source"],
+    )
+    legacy_sidecar = deepcopy(v3_sidecar.signed_sidecar)
+    legacy_sidecar.pop("attestation")
+    legacy_payload = legacy_sidecar["replay_payload"]
+    legacy_payload["projection_derivation_revision"] = (
+        "longworld.task-view-derivation.v3"
+    )
+    for receipt in legacy_payload["projection_derivation_receipts"]:
+        receipt["projection_receipt"]["derivation_revision"] = (
+            "longworld.task-view-derivation.v3"
+        )
+        receipt["projection_receipt_sha256"] = hashlib.sha256(
+            _canonical_bytes(receipt["projection_receipt"]).rstrip(b"\n")
+        ).hexdigest()
+    legacy_sidecar = attach_attestation(
+        legacy_sidecar,
+        KEYS["source"],
+        purpose=TASK_REPLAY_SIDECAR_PURPOSE,
+    )
+    with pytest.raises(ProvenanceError, match="parent candidate binding"):
+        task_replay_sidecar_binding(
+            _canonical_bytes(legacy_sidecar),
+            source_attestation_key=KEYS["source"],
+        )
+    ordered = next(row for row in projected if row["view"] == "ordered_artifact_view")
+    reordered = deepcopy(ordered)
+    reordered.pop("attestation")
+    reordered_documents = list(reversed(reordered["document_context"].split(SEP)))
+    reordered["document_context"] = SEP.join(reordered_documents)
+    reordered["artifact_classification"] = list(
+        reversed(reordered["artifact_classification"])
+    )
+    reordered["context"] = wrap_prompt(
+        reordered["question"], reordered["document_context"], "first"
+    )
+    projection = reordered["task_view_projection"]
+    projection["document_context_sha256"] = hashlib.sha256(
+        reordered["document_context"].encode()
+    ).hexdigest()
+    projection["artifact_bindings"] = [
+        {
+            "artifact_id": classification["artifact_id"],
+            "text_sha256": hashlib.sha256(document.encode()).hexdigest(),
+        }
+        for classification, document in zip(
+            reordered["artifact_classification"], reordered_documents, strict=True
+        )
+    ]
+    projection["parent_artifact_bindings"] = list(
+        reversed(projection["parent_artifact_bindings"])
+    )
+    replay_candidate = deepcopy(reordered)
+    replay_candidate["context"] = "\n".join(
+        [projection["adapter_context_header"], *reordered_documents]
+    )
+    artifact_ids = [
+        classification["artifact_id"]
+        for classification in reordered["artifact_classification"]
+    ]
+    replay = taskpromotion_module._task_view_replay(
+        replay_candidate, FINANCE_TASK_REPLAY_ADAPTER, artifact_ids
+    )
+    for field in (
+        "source_record_ids",
+        "source_relation_ids",
+        "authentic_source_relation_edges",
+        "verified_derived_relation_edges",
+        "event_count",
+        "strict_support_event_count",
+    ):
+        reordered[field] = deepcopy(replay[field])
+    reordered["graph"] = {
+        **reordered["graph"],
+        "proof_depth": replay["proof_depth"],
+        "hop_count": replay["hop_count"],
+    }
+    reordered, reordered_sidecar = _resign_v3_projection(
+        output_dir, v3_sidecar, ordered, reordered
+    )
+    with pytest.raises(PromotionError, match="adapter audit"):
+        create_task_dense_audit(
+            reordered,
+            _ranking(reordered),
+            reordered_sidecar,
+            candidate_attestation_key=KEYS["candidate"],
+            ranking_attestation_key=KEYS["ranker"],
+            audit_attestation_key=KEYS["auditor"],
+            source_attestation_key=KEYS["source"],
+        )
+    audits = [
+        create_task_dense_audit(
+            row,
+            _ranking(row),
+            v3_sidecar,
+            candidate_attestation_key=KEYS["candidate"],
+            ranking_attestation_key=KEYS["ranker"],
+            audit_attestation_key=KEYS["auditor"],
+            source_attestation_key=KEYS["source"],
+        )
+        for row in projected
+    ]
+    assert len(audits) == 3
+    assert all(audit["full_pool_strict_replay_sufficient"] is True for audit in audits)
+    cf_audit = next(
+        audit
+        for audit in audits
+        if next(
+            row
+            for row in projected
+            if candidate_sha256(row) == audit["candidate_sha256"]
+        )["view"]
+        == "cf"
+    )
+    assert 0.0 < cf_audit["task_quality_metadata"]["real_source_token_ratio"] < 1.0
+    cf = next(row for row in projected if row["view"] == "cf")
+    forged_measurement = deepcopy(cf)
+    forged_measurement.pop("attestation")
+    measurement = forged_measurement["task_view_projection"][
+        "source_token_measurement_receipt"
+    ]
+    changed = next(
+        item
+        for item in measurement["parent_artifact_token_contributions"]
+        if item["retained_as_real"] is False
+    )
+    retained = next(
+        item
+        for item in measurement["parent_artifact_token_contributions"]
+        if item["retained_as_real"] is True
+    )
+    assert changed["token_contribution"] > 1
+    shifted_tokens = changed["token_contribution"] // 2
+    changed["token_contribution"] -= shifted_tokens
+    retained["token_contribution"] += shifted_tokens
+    measurement["retained_parent_document_tokens"] += shifted_tokens
+    measurement["real_source_token_ratio"] = min(
+        measurement["parent_real_source_token_ratio"],
+        measurement["parent_real_source_token_ratio"]
+        * measurement["retained_parent_document_tokens"]
+        / measurement["parent_document_context_tokens"],
+    )
+    forged_measurement["real_source_token_ratio"] = measurement[
+        "real_source_token_ratio"
+    ]
+    forged_measurement, forged_measurement_sidecar = _resign_v3_projection(
+        output_dir, v3_sidecar, cf, forged_measurement
+    )
+    with pytest.raises(
+        PromotionError, match="source-token measurement receipt is invalid"
+    ):
+        create_task_dense_audit(
+            forged_measurement,
+            _ranking(forged_measurement),
+            forged_measurement_sidecar,
+            candidate_attestation_key=KEYS["candidate"],
+            ranking_attestation_key=KEYS["ranker"],
+            audit_attestation_key=KEYS["auditor"],
+            source_attestation_key=KEYS["source"],
+        )
+    forged_parent = deepcopy(v3_sidecar.parent_candidates[0])
+    forged_parent["answer_program_id"] = "renamed.before.source.signing"
+    with pytest.raises(PromotionError, match="parent candidate is not verified"):
+        create_task_dense_audit(
+            projected[0],
+            _ranking(projected[0]),
+            replace(v3_sidecar, parent_candidates=(forged_parent,)),
+            candidate_attestation_key=KEYS["candidate"],
+            ranking_attestation_key=KEYS["ranker"],
+            audit_attestation_key=KEYS["auditor"],
+            source_attestation_key=KEYS["source"],
+        )
+    _accepted, _rejects = candidate_structural_preflight(
+        projected,
+        "p3-probe-12-v1",
+        candidate_attestation_key=KEYS["candidate"],
+    )
+    legacy_derivation = deepcopy(
+        next(row for row in projected if row["view"] == "full")
+    )
+    legacy_derivation.pop("attestation")
+    legacy_derivation["task_view_projection"]["derivation_revision"] = (
+        "longworld.task-view-derivation.v3"
+    )
+    legacy_derivation = attach_attestation(
+        legacy_derivation,
+        KEYS["candidate"],
+        purpose=CANDIDATE_ATTESTATION_PURPOSE,
+    )
+    with pytest.raises(
+        PromotionError, match="structural preflight task replay sidecar is invalid"
+    ):
+        candidate_structural_preflight(
+            [legacy_derivation],
+            "p13-authentic-six-domain-probe-12-v1",
+            candidate_attestation_key=KEYS["candidate"],
+        )
+    rankings_path = tmp_path / "rankings.jsonl"
+    rankings_path.write_bytes(
+        b"".join(_canonical_bytes(_ranking(row)) for row in projected)
+    )
+    audit_manifest = task_view_cli.audit_projections(output_dir, rankings_path)
+    audit_bytes = (output_dir / "audits.jsonl").read_bytes()
+    assert audit_manifest["dense_audit_complete"] is True
+    assert audit_manifest["audited_projection_count"] == 3
+    assert task_view_cli.audit_projections(output_dir, rankings_path) == audit_manifest
+    assert (output_dir / "audits.jsonl").read_bytes() == audit_bytes
+    full = next(row for row in projected if row["view"] == "full")
+    full_audit = next(
+        audit for audit in audits if audit["candidate_sha256"] == candidate_sha256(full)
+    )
+    legacy_receipt_audit = deepcopy(full_audit)
+    legacy_receipt_audit["task_proof"]["task_proof_receipt"]["schema_version"] = (
+        "longworld.task-proof-receipt.v4"
+    )
+    with pytest.raises(PromotionError, match="task proof receipt schema"):
+        task_semantic_commitment_sha256_from_audit(legacy_receipt_audit)
+    full_digest = candidate_sha256(full)
+    selection = attach_attestation(
+        {
+            "schema_version": RELEASE_SELECTION_SCHEMA,
+            "selected_candidate_sha256": [full_digest],
+            "split_by_world": {full["world_id"]: "train"},
+            "audit_sha256_by_candidate": {
+                full_digest: serialized_row_sha256(full_audit)
+            },
+            "task_semantic_commitment_sha256_by_candidate": {
+                full_digest: full_audit["task_semantic_commitment_sha256"]
+            },
+            "tokenizer_asset_manifest_sha256": TOKENIZER_ASSET_SHA256,
+        },
+        KEYS["auditor"],
+        purpose="release_world_selection",
+    )
+    promoted = promote_task_candidate(
+        full,
+        full_audit,
+        v3_sidecar,
+        candidate_attestation_key=KEYS["candidate"],
+        audit_attestation_key=KEYS["auditor"],
+        promotion_attestation_key=KEYS["promotion"],
+        source_attestation_key=KEYS["source"],
+        expected_split="train",
+        release_selection_receipt=selection,
+    )
+    assert promoted["promotion"]["candidate_sha256"] == full_digest
+    assert promoted["promotion"]["task_candidate_content_commitment"]["view"] == (
+        "full"
+    )
+    renamed = deepcopy(full)
+    renamed.pop("attestation")
+    for field in (
+        "motif",
+        "answer_program_id",
+        "executable_proof_id",
+        "semantic_base_task_id",
+    ):
+        renamed[field] = "same-semantics-new-name"
+    renamed = attach_attestation(
+        renamed, KEYS["candidate"], purpose=CANDIDATE_ATTESTATION_PURPOSE
+    )
+    forged_payload = deepcopy(v3_sidecar.replay_payload)
+    old_commitment = task_candidate_content_commitment(
+        full, sidecar_schema_version=TASK_REPLAY_SIDECAR_SCHEMA_V3
+    )
+    renamed_commitment = task_candidate_content_commitment(
+        renamed, sidecar_schema_version=TASK_REPLAY_SIDECAR_SCHEMA_V3
+    )
+    forged_payload["candidate_content_commitments"] = [
+        renamed_commitment if item == old_commitment else item
+        for item in forged_payload["candidate_content_commitments"]
+    ]
+    for receipt in forged_payload["projection_derivation_receipts"]:
+        if receipt["projection_content_commitment"] == old_commitment:
+            receipt["projection_content_commitment"] = renamed_commitment
+    forged_sidecar_row = build_task_replay_sidecar(
+        adapter_id=v3_sidecar.adapter_id,
+        adapter_revision=v3_sidecar.adapter_revision,
+        replay_payload=forged_payload,
+        source_attestation_key=KEYS["source"],
+        sidecar_schema_version=TASK_REPLAY_SIDECAR_SCHEMA_V3,
+    )
+    forged_sidecar_path = output_dir / "FORGED_TASK_REPLAY_SIDECAR_V3.json"
+    forged_sidecar_path.write_bytes(_canonical_bytes(forged_sidecar_row))
+    forged_binding = task_replay_sidecar_binding(
+        forged_sidecar_path.read_bytes(), source_attestation_key=KEYS["source"]
+    )
+    renamed = deepcopy(renamed)
+    renamed.pop("attestation")
+    renamed["task_replay_sidecar"] = forged_binding
+    renamed = attach_attestation(
+        renamed, KEYS["candidate"], purpose=CANDIDATE_ATTESTATION_PURPOSE
+    )
+    forged_loaded = load_task_replay_sidecar(
+        output_dir,
+        forged_sidecar_path.name,
+        forged_binding,
+        source_attestation_key=KEYS["source"],
+    )
+    with pytest.raises(PromotionError, match="semantic identifiers are not canonical"):
+        create_task_dense_audit(
+            renamed,
+            _ranking(renamed),
+            forged_loaded,
+            candidate_attestation_key=KEYS["candidate"],
+            ranking_attestation_key=KEYS["ranker"],
+            audit_attestation_key=KEYS["auditor"],
+            source_attestation_key=KEYS["source"],
+        )
+    substituted = deepcopy(next(row for row in projected if row["view"] == "full"))
+    substituted.pop("attestation")
+    substituted["view"] = "cf"
+    substituted["composition_method"] = "counterfactual_twin"
+    substituted = attach_attestation(
+        substituted,
+        KEYS["candidate"],
+        purpose=CANDIDATE_ATTESTATION_PURPOSE,
+    )
+    with pytest.raises(PromotionError, match="does not bind candidate content"):
+        taskpromotion_module._validate_candidate_identity(
+            substituted,
+            v3_sidecar,
+            candidate_attestation_key=KEYS["candidate"],
+            source_attestation_key=KEYS["source"],
+        )
+    with pytest.raises(
+        PromotionError, match="structural preflight task replay sidecar is invalid"
+    ):
+        candidate_structural_preflight(
+            [substituted],
+            "p3-probe-12-v1",
+            candidate_attestation_key=KEYS["candidate"],
+        )
+
+    downgraded = deepcopy(next(row for row in projected if row["view"] == "full"))
+    downgraded.pop("attestation")
+    downgraded["task_replay_sidecar"]["sidecar_schema_version"] = (
+        sidecar.sidecar_schema_version
+    )
+    downgraded = attach_attestation(
+        downgraded,
+        KEYS["candidate"],
+        purpose=CANDIDATE_ATTESTATION_PURPOSE,
+    )
+    with pytest.raises(
+        PromotionError, match="structural preflight task replay sidecar is invalid"
+    ):
+        candidate_structural_preflight(
+            [downgraded],
+            "p3-probe-12-v1",
+            candidate_attestation_key=KEYS["candidate"],
+        )
+
+    v1_payload = {
+        **{
+            key: value
+            for key, value in sidecar.replay_payload.items()
+            if key != "candidate_content_commitments"
+        },
+        "candidate_content_commitments": [
+            task_candidate_content_commitment(
+                row, sidecar_schema_version=TASK_REPLAY_SIDECAR_SCHEMA_V2
+            )
+            for row in projected
+        ],
+    }
+    v1_payload["candidate_content_commitments"].sort(
+        key=lambda item: (item["world_id"], item["length_bucket"], item["view"])
+    )
+    with pytest.raises(ProvenanceError, match="content commitments"):
+        build_task_replay_sidecar(
+            adapter_id=sidecar.adapter_id,
+            adapter_revision=sidecar.adapter_revision,
+            replay_payload=v1_payload,
+            source_attestation_key=KEYS["source"],
+        )
+
+
+@pytest.mark.parametrize(
+    ("factory", "token_counter"),
+    (
+        (_finance_candidate, _test_token_count),
+        (_cyber_candidate, _test_token_count),
+        (_macro_candidate, _macro_token_count),
+    ),
+)
+def test_all_domain_standard_views_pass_independent_dense_audit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    factory: Any,
+    token_counter: Any,
+) -> None:
+    monkeypatch.setattr(
+        taskpromotion_module, "task_sidecar_token_counter", lambda _: token_counter
+    )
+    monkeypatch.setattr(
+        task_view_cli, "task_sidecar_token_counter", lambda _: token_counter
+    )
+    candidate, sidecar = factory(tmp_path)
+    input_path = tmp_path / "candidates.jsonl"
+    input_path.write_bytes(_canonical_bytes(candidate))
+    output_dir = tmp_path / "projected"
+    task_view_cli.project(input_path, tmp_path / sidecar.relative_path, output_dir)
+    projected = [
+        json.loads(line)
+        for line in (output_dir / "candidates.jsonl").read_text().splitlines()
+    ]
+    rankings_path = tmp_path / "rankings.jsonl"
+    rankings_path.write_bytes(
+        b"".join(_canonical_bytes(_ranking(row)) for row in projected)
+    )
+
+    manifest = task_view_cli.audit_projections(output_dir, rankings_path)
+
+    assert manifest["audited_projection_count"] == 3
+    assert manifest["dense_audit_complete"] is True
+    audits = [
+        json.loads(line)
+        for line in (output_dir / "audits.jsonl").read_text().splitlines()
+    ]
+    assert {audit["candidate_sha256"] for audit in audits} == {
+        candidate_sha256(row) for row in projected
+    }
+    audit_by_digest = {audit["candidate_sha256"]: audit for audit in audits}
+    parent_ratio = candidate["real_source_token_ratio"]
+    for row in projected:
+        receipt = row["task_view_projection"]["source_token_measurement_receipt"]
+        assert receipt["schema_version"] == (
+            "longworld.source-token-measurement-receipt.v1"
+        )
+        assert receipt["measurement_basis"] == (
+            "parent_source_ratio_x_retained_parent_token_share"
+        )
+        assert receipt["parent_real_source_token_ratio"] == parent_ratio
+        assert (
+            sum(
+                item["token_contribution"]
+                for item in receipt["parent_artifact_token_contributions"]
+            )
+            == receipt["parent_document_context_tokens"]
+        )
+        assert row["real_source_token_ratio"] == receipt["real_source_token_ratio"]
+        assert (
+            audit_by_digest[candidate_sha256(row)]["task_quality_metadata"][
+                "real_source_token_ratio"
+            ]
+            == row["real_source_token_ratio"]
+            <= parent_ratio
+        )
+    assert (
+        next(row for row in projected if row["view"] == "cf")["real_source_token_ratio"]
+        < parent_ratio
+    )
+
+
+def test_v2_standard_views_are_historical_and_cannot_enter_p13_or_promotion(
+    tmp_path: Path,
+) -> None:
+    parent, parent_sidecar = _finance_candidate(tmp_path)
+    projections = _candidate_task_views(parent, parent_sidecar)
+    commitments = sorted(
+        (
+            task_candidate_content_commitment(
+                row, sidecar_schema_version=TASK_REPLAY_SIDECAR_SCHEMA_V2
+            )
+            for row in projections
+        ),
+        key=lambda item: (item["world_id"], item["length_bucket"], item["view"]),
+    )
+    replay_payload = {
+        **{
+            key: value
+            for key, value in parent_sidecar.replay_payload.items()
+            if key != "candidate_content_commitments"
+        },
+        "candidate_content_commitments": commitments,
+    }
+    signed_sidecar = build_task_replay_sidecar(
+        adapter_id=parent_sidecar.adapter_id,
+        adapter_revision=parent_sidecar.adapter_revision,
+        replay_payload=replay_payload,
+        source_attestation_key=KEYS["source"],
+        sidecar_schema_version=TASK_REPLAY_SIDECAR_SCHEMA_V2,
+    )
+    raw = _canonical_bytes(signed_sidecar)
+    path = tmp_path / "TASK_REPLAY_SIDECAR_V2.json"
+    path.write_bytes(raw)
+    binding = task_replay_sidecar_binding(raw, source_attestation_key=KEYS["source"])
+    loaded = load_task_replay_sidecar(
+        tmp_path,
+        path.name,
+        binding,
+        source_attestation_key=KEYS["source"],
+    )
+    rebound = []
+    for projection in projections:
+        projection = deepcopy(projection)
+        projection.pop("attestation")
+        projection["task_replay_sidecar"] = binding
+        rebound.append(
+            attach_attestation(
+                projection,
+                KEYS["candidate"],
+                purpose=CANDIDATE_ATTESTATION_PURPOSE,
+            )
+        )
+
+    with pytest.raises(
+        PromotionError, match="structural preflight task replay sidecar is invalid"
+    ):
+        candidate_structural_preflight(
+            rebound,
+            "p3-probe-12-v1",
+            candidate_attestation_key=KEYS["candidate"],
+        )
+    with pytest.raises(PromotionError, match="task replay sidecar binding is invalid"):
+        select_release_worlds(
+            rebound,
+            [],
+            "p3-probe-12-v1",
+            candidate_attestation_key=KEYS["candidate"],
+            audit_attestation_key=KEYS["auditor"],
+        )
+    with pytest.raises(PromotionError, match="production promotion requires v3"):
+        promote_task_candidate(
+            rebound[0],
+            {},
+            loaded,
+            candidate_attestation_key=KEYS["candidate"],
+            audit_attestation_key=KEYS["auditor"],
+            promotion_attestation_key=KEYS["promotion"],
+            source_attestation_key=KEYS["source"],
+        )
 
 
 def test_macro_task_promotion_honors_signed_world_selection(

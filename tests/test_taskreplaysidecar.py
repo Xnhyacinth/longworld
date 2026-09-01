@@ -16,8 +16,14 @@ from longworld.core.provenance import ProvenanceError
 from longworld.core.record_contract import replay_bundle_binding_valid
 from longworld.core.taskreplaysidecar import (
     CYBER_KEV_TASK_REPLAY_ADAPTER,
+    CYBER_KEV_TASK_REPLAY_ADAPTER_V2,
+    CYBER_KEV_TASK_REPLAY_ADAPTER_V3,
     FINANCE_TASK_REPLAY_ADAPTER,
+    FINANCE_TASK_REPLAY_ADAPTER_V2,
+    FINANCE_TASK_REPLAY_ADAPTER_V3,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
+    MACRO_VINTAGE_TASK_REPLAY_ADAPTER_V2,
+    MACRO_VINTAGE_TASK_REPLAY_ADAPTER_V3,
     TASK_REPLAY_ADAPTER_REGISTRY,
     TASK_REPLAY_SIDECAR_SCHEMA,
     build_task_replay_sidecar,
@@ -194,13 +200,16 @@ def test_adapter_payload_schemas_are_closed_and_distinct() -> None:
     cyber = _signed_sidecar(CYBER_KEV_TASK_REPLAY_ADAPTER)
     finance = _signed_sidecar(FINANCE_TASK_REPLAY_ADAPTER)
     macro = _signed_sidecar(MACRO_VINTAGE_TASK_REPLAY_ADAPTER)
-    assert len(
-        {
-            frozenset(cyber["replay_payload"]),
-            frozenset(finance["replay_payload"]),
-            frozenset(macro["replay_payload"]),
-        }
-    ) == 3
+    assert (
+        len(
+            {
+                frozenset(cyber["replay_payload"]),
+                frozenset(finance["replay_payload"]),
+                frozenset(macro["replay_payload"]),
+            }
+        )
+        == 3
+    )
 
     for adapter, wrong_payload in (
         (CYBER_KEV_TASK_REPLAY_ADAPTER, finance["replay_payload"]),
@@ -256,8 +265,14 @@ def test_candidate_content_commitment_binds_body_answer_and_relations() -> None:
 def test_registry_is_closed_over_adapter_revision_and_schema(tmp_path: Path) -> None:
     assert set(TASK_REPLAY_ADAPTER_REGISTRY) == {
         CYBER_KEV_TASK_REPLAY_ADAPTER,
+        CYBER_KEV_TASK_REPLAY_ADAPTER_V2,
+        CYBER_KEV_TASK_REPLAY_ADAPTER_V3,
         FINANCE_TASK_REPLAY_ADAPTER,
+        FINANCE_TASK_REPLAY_ADAPTER_V2,
+        FINANCE_TASK_REPLAY_ADAPTER_V3,
         MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
+        MACRO_VINTAGE_TASK_REPLAY_ADAPTER_V2,
+        MACRO_VINTAGE_TASK_REPLAY_ADAPTER_V3,
     }
     binding, _ = _write_sidecar(tmp_path, adapter=FINANCE_TASK_REPLAY_ADAPTER)
     binding["adapter_revision"] = "longworld.financial-history-replay.v999"

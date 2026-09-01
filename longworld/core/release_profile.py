@@ -51,6 +51,10 @@ class ReleaseProfile:
     tokenizer_revision: str
     tokenizer_asset_manifest_sha256: str | None
     dense_top_k: int
+    required_view_timings: tuple[tuple[str, str], ...]
+    min_train_worlds_by_domain: tuple[tuple[str, int], ...]
+    min_eval_domains: int
+    require_all_rows_source_bound: bool
 
 
 def _profile(
@@ -79,6 +83,11 @@ def _profile(
     bind_tokenizer_assets: bool = False,
     training_length_buckets: tuple[str, ...] = ("16k", "32k", "64k"),
     required_exact_length_buckets: tuple[str, ...] = (),
+    split_strategy: str = "world_atomic_hash_v1",
+    required_view_timings: tuple[tuple[str, str], ...] = (),
+    min_train_worlds_by_domain: tuple[tuple[str, int], ...] = (),
+    min_eval_domains: int = 0,
+    require_all_rows_source_bound: bool = False,
 ) -> ReleaseProfile:
     return ReleaseProfile(
         profile_id=profile_id,
@@ -89,7 +98,7 @@ def _profile(
         min_eval_worlds=min_eval_worlds,
         min_real_train_worlds=min_real_train_worlds,
         min_real_eval_worlds=min_real_eval_worlds,
-        split_strategy="world_atomic_hash_v1",
+        split_strategy=split_strategy,
         training_conditions=("B1", "B3", "B5", "B5w"),
         training_length_buckets=training_length_buckets,
         required_exact_length_buckets=required_exact_length_buckets,
@@ -127,6 +136,10 @@ def _profile(
             else None
         ),
         dense_top_k=3,
+        required_view_timings=required_view_timings,
+        min_train_worlds_by_domain=min_train_worlds_by_domain,
+        min_eval_domains=min_eval_domains,
+        require_all_rows_source_bound=require_all_rows_source_bound,
     )
 
 
@@ -315,6 +328,76 @@ RELEASE_PROFILES = {
         min_unique_semantic_base_tasks=8,
         bind_tokenizer_assets=True,
         required_exact_length_buckets=("16k", "32k", "64k"),
+    ),
+    "p13-authentic-six-domain-probe-12-v1": _profile(
+        profile_id="p13-authentic-six-domain-probe-12-v1",
+        environment="probe",
+        expected_promoted_worlds=12,
+        min_source_families=6,
+        min_real_base_tasks=12,
+        min_real_source_relations=12,
+        min_real_64k_rows=36,
+        min_train_worlds=10,
+        min_eval_worlds=2,
+        min_real_train_worlds=10,
+        min_real_eval_worlds=2,
+        predecessor_profile_id=None,
+        min_domains=6,
+        promoted_domain_world_quotas=(
+            ("company", 2),
+            ("researchlab", 2),
+            ("codeforge", 2),
+            ("finance", 2),
+            ("cyber", 2),
+            ("macro_economics", 2),
+        ),
+        min_exact_64k_rows_by_domain=(
+            ("company", 6),
+            ("researchlab", 6),
+            ("codeforge", 6),
+            ("finance", 6),
+            ("cyber", 6),
+            ("macro_economics", 6),
+        ),
+        min_unique_real_source_workflows=12,
+        min_real_exact_64k_rows_by_domain=(
+            ("company", 6),
+            ("researchlab", 6),
+            ("codeforge", 6),
+            ("finance", 6),
+            ("cyber", 6),
+            ("macro_economics", 6),
+        ),
+        min_real_exact_64k_worlds_by_domain=(
+            ("company", 2),
+            ("researchlab", 2),
+            ("codeforge", 2),
+            ("finance", 2),
+            ("cyber", 2),
+            ("macro_economics", 2),
+        ),
+        min_motifs=12,
+        min_unique_executable_proofs=12,
+        min_unique_answer_programs=12,
+        min_unique_semantic_base_tasks=12,
+        bind_tokenizer_assets=True,
+        required_exact_length_buckets=("16k", "32k", "64k"),
+        split_strategy="world_atomic_domain_stratified_hash_v1",
+        required_view_timings=(
+            ("full", "first"),
+            ("cf", "first"),
+            ("ordered_artifact_view", "first"),
+        ),
+        min_train_worlds_by_domain=(
+            ("company", 1),
+            ("researchlab", 1),
+            ("codeforge", 1),
+            ("finance", 1),
+            ("cyber", 1),
+            ("macro_economics", 1),
+        ),
+        min_eval_domains=2,
+        require_all_rows_source_bound=True,
     ),
     "p7-sec-source-slice-1-v1": _profile(
         profile_id="p7-sec-source-slice-1-v1",
@@ -603,6 +686,7 @@ RELATION_PROVENANCE_SPLIT_PROFILE_IDS = frozenset(
         "p10-source-rich-production-210-v1",
         "p12-current-source-probe-12-v1",
         "p12-current-source-probe-12-v2",
+        "p13-authentic-six-domain-probe-12-v1",
     }
 )
 SUBSTANTIAL_REAL_PROOF_GROWTH_PROFILE_IDS = RELATION_PROVENANCE_SPLIT_PROFILE_IDS
@@ -612,6 +696,7 @@ CURRENT_RELEASE_GATE_ONLY_PROFILE_IDS = frozenset(
         "p10-source-rich-production-210-v1",
         "p12-current-source-probe-12-v1",
         "p12-current-source-probe-12-v2",
+        "p13-authentic-six-domain-probe-12-v1",
     }
 )
 
@@ -655,6 +740,14 @@ def release_profile_sha256(profile_id: str) -> str:
         profile.pop("min_unique_answer_programs")
     if profile["min_unique_semantic_base_tasks"] == 0:
         profile.pop("min_unique_semantic_base_tasks")
+    if not profile["required_view_timings"]:
+        profile.pop("required_view_timings")
+    if not profile["min_train_worlds_by_domain"]:
+        profile.pop("min_train_worlds_by_domain")
+    if profile["min_eval_domains"] == 0:
+        profile.pop("min_eval_domains")
+    if profile["require_all_rows_source_bound"] is False:
+        profile.pop("require_all_rows_source_bound")
     payload = json.dumps(
         profile,
         sort_keys=True,

@@ -20,11 +20,14 @@ from longworld.core.attestation import (
     PURPOSE_ROLES,
     attach_attestation,
     attestation_key_from_env,
+    canonical_attested_payload,
     verify_attestation,
 )
 from longworld.core.provenance import ProvenanceError
 
 TASK_REPLAY_SIDECAR_SCHEMA = "longworld.task-replay-sidecar.v1"
+TASK_REPLAY_SIDECAR_SCHEMA_V2 = "longworld.task-replay-sidecar.v2"
+TASK_REPLAY_SIDECAR_SCHEMA_V3 = "longworld.task-replay-sidecar.v3"
 TASK_REPLAY_SIDECAR_PURPOSE = "task_replay_sidecar"
 MAX_TASK_REPLAY_SIDECAR_BYTES = 16_000_000
 
@@ -42,6 +45,36 @@ MACRO_VINTAGE_TASK_REPLAY_ADAPTER = (
     "macro.gdp_vintage_reconstruction.v1",
     "longworld.macro-vintage-replay.v1",
     TASK_REPLAY_SIDECAR_SCHEMA,
+)
+CYBER_KEV_TASK_REPLAY_ADAPTER_V2 = (
+    CYBER_KEV_TASK_REPLAY_ADAPTER[0],
+    CYBER_KEV_TASK_REPLAY_ADAPTER[1],
+    TASK_REPLAY_SIDECAR_SCHEMA_V2,
+)
+FINANCE_TASK_REPLAY_ADAPTER_V2 = (
+    FINANCE_TASK_REPLAY_ADAPTER[0],
+    FINANCE_TASK_REPLAY_ADAPTER[1],
+    TASK_REPLAY_SIDECAR_SCHEMA_V2,
+)
+MACRO_VINTAGE_TASK_REPLAY_ADAPTER_V2 = (
+    MACRO_VINTAGE_TASK_REPLAY_ADAPTER[0],
+    MACRO_VINTAGE_TASK_REPLAY_ADAPTER[1],
+    TASK_REPLAY_SIDECAR_SCHEMA_V2,
+)
+CYBER_KEV_TASK_REPLAY_ADAPTER_V3 = (
+    CYBER_KEV_TASK_REPLAY_ADAPTER[0],
+    CYBER_KEV_TASK_REPLAY_ADAPTER[1],
+    TASK_REPLAY_SIDECAR_SCHEMA_V3,
+)
+FINANCE_TASK_REPLAY_ADAPTER_V3 = (
+    FINANCE_TASK_REPLAY_ADAPTER[0],
+    FINANCE_TASK_REPLAY_ADAPTER[1],
+    TASK_REPLAY_SIDECAR_SCHEMA_V3,
+)
+MACRO_VINTAGE_TASK_REPLAY_ADAPTER_V3 = (
+    MACRO_VINTAGE_TASK_REPLAY_ADAPTER[0],
+    MACRO_VINTAGE_TASK_REPLAY_ADAPTER[1],
+    TASK_REPLAY_SIDECAR_SCHEMA_V3,
 )
 
 TaskReplayRegistryKey = tuple[str, str, str]
@@ -71,6 +104,12 @@ _ATTESTATION_FIELDS = {
     "digest",
 }
 _CONTENT_COMMITMENT_FIELDS = {"world_id", "length_bucket", "content_sha256"}
+_CONTENT_COMMITMENT_FIELDS_V2 = {
+    "world_id",
+    "length_bucket",
+    "view",
+    "content_sha256",
+}
 _CONTENT_COMMITMENT_EXCLUDED_FIELDS = {
     "attestation",
     "complete_world",
@@ -87,6 +126,18 @@ _CONTENT_COMMITMENT_EXCLUDED_FIELDS = {
     "verification",
     "view_verification",
     LOCAL_PROBE_TRUST_ISOLATION_FIELD,
+}
+TASK_VIEW_DERIVATION_REVISION = "longworld.task-view-derivation.v4"
+SOURCE_TOKEN_MEASUREMENT_RECEIPT_SCHEMA = (
+    "longworld.source-token-measurement-receipt.v1"
+)
+SOURCE_TOKEN_MEASUREMENT_BASIS = "parent_source_ratio_x_retained_parent_token_share"
+_V3_DERIVATION_FIELDS = {
+    "parent_candidate_sha256",
+    "parent_content_commitment",
+    "projection_content_commitment",
+    "projection_receipt",
+    "projection_receipt_sha256",
 }
 
 
@@ -117,6 +168,7 @@ class LoadedTaskReplaySidecar:
     raw_bytes: bytes
     signed_sidecar: dict[str, Any]
     replay_payload: dict[str, Any]
+    parent_candidates: tuple[dict[str, Any], ...] = ()
 
     @property
     def registry_key(self) -> TaskReplayRegistryKey:
@@ -128,7 +180,14 @@ class LoadedTaskReplaySidecar:
 
 
 def _contract(key: TaskReplayRegistryKey) -> TaskReplayAdapterContract:
-    if key == CYBER_KEV_TASK_REPLAY_ADAPTER:
+    family = key[:2]
+    if key[2] not in {
+        TASK_REPLAY_SIDECAR_SCHEMA,
+        TASK_REPLAY_SIDECAR_SCHEMA_V2,
+        TASK_REPLAY_SIDECAR_SCHEMA_V3,
+    }:
+        raise ProvenanceError("task replay adapter contract is not registered")
+    if family == CYBER_KEV_TASK_REPLAY_ADAPTER[:2]:
         payload_fields = frozenset(
             {
                 "source_manifest_sha256",
@@ -141,7 +200,7 @@ def _contract(key: TaskReplayRegistryKey) -> TaskReplayAdapterContract:
                 "candidate_content_commitments",
             }
         )
-    elif key == FINANCE_TASK_REPLAY_ADAPTER:
+    elif family == FINANCE_TASK_REPLAY_ADAPTER[:2]:
         payload_fields = frozenset(
             {
                 "signed_manifest_sha256",
@@ -154,7 +213,7 @@ def _contract(key: TaskReplayRegistryKey) -> TaskReplayAdapterContract:
                 "candidate_content_commitments",
             }
         )
-    elif key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
+    elif family == MACRO_VINTAGE_TASK_REPLAY_ADAPTER[:2]:
         payload_fields = frozenset(
             {
                 "workflow_manifest_sha256",
@@ -172,6 +231,19 @@ def _contract(key: TaskReplayRegistryKey) -> TaskReplayAdapterContract:
         )
     else:
         raise ProvenanceError("task replay adapter contract is not registered")
+    if key[2] == TASK_REPLAY_SIDECAR_SCHEMA_V3:
+        payload_fields = payload_fields | frozenset(
+            {
+                "parent_sidecar_raw_utf8",
+                "parent_sidecar_sha256",
+                "parent_candidates_raw_utf8",
+                "parent_candidates_sha256",
+                "parent_candidate_digests",
+                "parent_candidate_content_commitments",
+                "projection_derivation_revision",
+                "projection_derivation_receipts",
+            }
+        )
     return TaskReplayAdapterContract(*key, replay_payload_fields=payload_fields)
 
 
@@ -184,6 +256,12 @@ TASK_REPLAY_ADAPTER_REGISTRY: Mapping[
             CYBER_KEV_TASK_REPLAY_ADAPTER,
             FINANCE_TASK_REPLAY_ADAPTER,
             MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
+            CYBER_KEV_TASK_REPLAY_ADAPTER_V2,
+            FINANCE_TASK_REPLAY_ADAPTER_V2,
+            MACRO_VINTAGE_TASK_REPLAY_ADAPTER_V2,
+            CYBER_KEV_TASK_REPLAY_ADAPTER_V3,
+            FINANCE_TASK_REPLAY_ADAPTER_V3,
+            MACRO_VINTAGE_TASK_REPLAY_ADAPTER_V3,
         )
     }
 )
@@ -212,38 +290,55 @@ def _verify_replay_payload(
     ):
         raise ProvenanceError("task replay sidecar payload digest is invalid")
     commitments = replay_payload.get("candidate_content_commitments")
+    commitment_fields = (
+        _CONTENT_COMMITMENT_FIELDS_V2
+        if contract.sidecar_schema_version
+        in {TASK_REPLAY_SIDECAR_SCHEMA_V2, TASK_REPLAY_SIDECAR_SCHEMA_V3}
+        else _CONTENT_COMMITMENT_FIELDS
+    )
+    identity_fields = (
+        ("world_id", "length_bucket", "view")
+        if contract.sidecar_schema_version
+        in {TASK_REPLAY_SIDECAR_SCHEMA_V2, TASK_REPLAY_SIDECAR_SCHEMA_V3}
+        else ("world_id", "length_bucket")
+    )
     if (
         not isinstance(commitments, list)
         or not commitments
         or any(
             not isinstance(item, dict)
-            or set(item) != _CONTENT_COMMITMENT_FIELDS
+            or set(item) != commitment_fields
             or not str(item.get("world_id") or "").strip()
             or not str(item.get("length_bucket") or "").strip()
+            or (
+                contract.sidecar_schema_version
+                in {TASK_REPLAY_SIDECAR_SCHEMA_V2, TASK_REPLAY_SIDECAR_SCHEMA_V3}
+                and not str(item.get("view") or "").strip()
+            )
             or not _is_sha256(item.get("content_sha256"))
             for item in commitments
         )
         or commitments
         != sorted(
             commitments,
-            key=lambda item: (str(item["world_id"]), str(item["length_bucket"])),
+            key=lambda item: tuple(str(item[field]) for field in identity_fields),
         )
         or len(
             {
-                (str(item["world_id"]), str(item["length_bucket"]))
+                tuple(str(item[field]) for field in identity_fields)
                 for item in commitments
             }
         )
         != len(commitments)
     ):
         raise ProvenanceError("task replay sidecar content commitments are invalid")
+    if contract.sidecar_schema_version == TASK_REPLAY_SIDECAR_SCHEMA_V3:
+        _verify_v3_derivation_payload(replay_payload, contract)
     tokenizer_revision = replay_payload.get("tokenizer_revision")
     source_families = replay_payload.get("source_families")
     fetch_receipt = replay_payload.get("fetch_receipt")
     retrieval = (
-        fetch_receipt.get("retrieval")
-        if isinstance(fetch_receipt, dict)
-        else None
+        fetch_receipt.get("retrieval") if isinstance(fetch_receipt, dict) else None
     )
     if (
         not isinstance(tokenizer_revision, str)
@@ -251,7 +346,7 @@ def _verify_replay_payload(
         or any(character not in "0123456789abcdef" for character in tokenizer_revision)
         or replay_payload.get("replay_revision") != contract.adapter_revision
         or (
-            contract.registry_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER
+            contract.adapter_id == MACRO_VINTAGE_TASK_REPLAY_ADAPTER[0]
             and (
                 not isinstance(source_families, list)
                 or not source_families
@@ -261,14 +356,12 @@ def _verify_replay_payload(
                 )
                 or source_families != sorted(set(source_families))
                 or not isinstance(fetch_receipt, dict)
-                or set(fetch_receipt)
-                != {"started_at", "completed_at", "retrieval"}
+                or set(fetch_receipt) != {"started_at", "completed_at", "retrieval"}
                 or not str(fetch_receipt.get("started_at") or "")
                 or not str(fetch_receipt.get("completed_at") or "")
                 or not isinstance(retrieval, dict)
                 or retrieval.get("status") != 200
-                or retrieval.get("sha256")
-                != replay_payload.get("raw_source_sha256")
+                or retrieval.get("sha256") != replay_payload.get("raw_source_sha256")
                 or not str(retrieval.get("requested_url") or "")
                 or not str(retrieval.get("final_url") or "")
                 or not isinstance(retrieval.get("raw_bytes"), int)
@@ -283,12 +376,12 @@ def _verify_replay_payload(
                 "tokenizer_model_id",
                 *(
                     ("source_family", "authorization_record_id")
-                    if contract.registry_key == FINANCE_TASK_REPLAY_ADAPTER
+                    if contract.adapter_id == FINANCE_TASK_REPLAY_ADAPTER[0]
                     else ()
                 ),
                 *(
                     ("authorization_record_id",)
-                    if contract.registry_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER
+                    if contract.adapter_id == MACRO_VINTAGE_TASK_REPLAY_ADAPTER[0]
                     else ()
                 ),
             )
@@ -298,7 +391,138 @@ def _verify_replay_payload(
     return replay_payload
 
 
-def task_candidate_content_commitment(candidate: Mapping[str, Any]) -> dict[str, str]:
+def _parse_parent_candidates(raw_utf8: str) -> tuple[dict[str, Any], ...]:
+    rows: list[dict[str, Any]] = []
+    try:
+        lines = raw_utf8.splitlines()
+        for line in lines:
+            if not line.strip():
+                continue
+            value = json.loads(line)
+            if not isinstance(value, dict):
+                raise TypeError
+            rows.append(value)
+    except (json.JSONDecodeError, TypeError) as error:
+        raise ProvenanceError("task replay parent candidates are invalid") from error
+    if not rows:
+        raise ProvenanceError("task replay parent candidates are empty")
+    return tuple(rows)
+
+
+def _verify_v3_derivation_payload(
+    replay_payload: dict[str, Any], contract: TaskReplayAdapterContract
+) -> tuple[dict[str, Any], ...]:
+    parent_sidecar_raw = replay_payload.get("parent_sidecar_raw_utf8")
+    parent_candidates_raw = replay_payload.get("parent_candidates_raw_utf8")
+    if not isinstance(parent_sidecar_raw, str) or not isinstance(
+        parent_candidates_raw, str
+    ):
+        raise ProvenanceError("task replay parent exact bytes are invalid")
+    parent_sidecar_bytes = parent_sidecar_raw.encode("utf-8")
+    parent_candidate_bytes = parent_candidates_raw.encode("utf-8")
+    if (
+        replay_payload.get("parent_sidecar_sha256")
+        != hashlib.sha256(parent_sidecar_bytes).hexdigest()
+        or replay_payload.get("parent_candidates_sha256")
+        != hashlib.sha256(parent_candidate_bytes).hexdigest()
+    ):
+        raise ProvenanceError("task replay parent exact-byte digest mismatch")
+    parent_sidecar = _json_object(parent_sidecar_bytes)
+    if (
+        parent_sidecar.get("schema_version") != TASK_REPLAY_SIDECAR_SCHEMA
+        or parent_sidecar.get("adapter_id") != contract.adapter_id
+        or parent_sidecar.get("adapter_revision") != contract.adapter_revision
+    ):
+        raise ProvenanceError("task replay parent sidecar identity is invalid")
+    parents = _parse_parent_candidates(parent_candidates_raw)
+    observed_digests = sorted(
+        hashlib.sha256(canonical_attested_payload(row)).hexdigest() for row in parents
+    )
+    parent_commitment_by_digest = {
+        hashlib.sha256(canonical_attested_payload(row)).hexdigest(): (
+            task_candidate_content_commitment(row)
+        )
+        for row in parents
+    }
+    observed_commitments = sorted(
+        parent_commitment_by_digest.values(),
+        key=lambda item: (item["world_id"], item["length_bucket"]),
+    )
+    if (
+        replay_payload.get("parent_candidate_digests") != observed_digests
+        or replay_payload.get("parent_candidate_content_commitments")
+        != observed_commitments
+        or not isinstance(
+            (parent_sidecar.get("replay_payload") or {}).get(
+                "candidate_content_commitments"
+            ),
+            list,
+        )
+        or any(
+            commitment
+            not in parent_sidecar["replay_payload"]["candidate_content_commitments"]
+            for commitment in observed_commitments
+        )
+        or replay_payload.get("projection_derivation_revision")
+        != TASK_VIEW_DERIVATION_REVISION
+    ):
+        raise ProvenanceError("task replay parent candidate binding is invalid")
+    receipts = replay_payload.get("projection_derivation_receipts")
+    commitments = replay_payload.get("candidate_content_commitments")
+    if not isinstance(receipts, list) or len(receipts) != len(commitments):
+        raise ProvenanceError("task replay projection derivation receipts are invalid")
+    parent_by_digest = parent_commitment_by_digest
+    projection_commitments: list[dict[str, str]] = []
+    identities: list[tuple[str, str, str]] = []
+    for receipt in receipts:
+        if not isinstance(receipt, dict) or set(receipt) != _V3_DERIVATION_FIELDS:
+            raise ProvenanceError(
+                "task replay projection derivation receipts are invalid"
+            )
+        parent_digest = str(receipt.get("parent_candidate_sha256") or "")
+        projection_receipt = receipt.get("projection_receipt")
+        projection_commitment = receipt.get("projection_content_commitment")
+        if (
+            parent_digest not in parent_by_digest
+            or receipt.get("parent_content_commitment")
+            != parent_by_digest[parent_digest]
+            or not isinstance(projection_receipt, dict)
+            or receipt.get("projection_receipt_sha256")
+            != hashlib.sha256(
+                json.dumps(
+                    projection_receipt,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode()
+            ).hexdigest()
+            or not isinstance(projection_commitment, dict)
+            or projection_receipt.get("parent_candidate_sha256") != parent_digest
+            or projection_receipt.get("derivation_revision")
+            != TASK_VIEW_DERIVATION_REVISION
+            or projection_receipt.get("view") != projection_commitment.get("view")
+        ):
+            raise ProvenanceError(
+                "task replay projection derivation receipt binding is invalid"
+            )
+        projection_commitments.append(projection_commitment)
+        identities.append(
+            (
+                str(projection_commitment.get("world_id") or ""),
+                str(projection_commitment.get("length_bucket") or ""),
+                str(projection_commitment.get("view") or ""),
+            )
+        )
+    if identities != sorted(identities) or projection_commitments != commitments:
+        raise ProvenanceError("task replay projection derivation coverage is invalid")
+    return parents
+
+
+def task_candidate_content_commitment(
+    candidate: Mapping[str, Any],
+    *,
+    sidecar_schema_version: str = TASK_REPLAY_SIDECAR_SCHEMA,
+) -> dict[str, str]:
     """Commit to all source-sensitive candidate fields before trust metadata."""
     world_id = str(candidate.get("world_id") or "").strip()
     length_bucket = str(candidate.get("length_bucket") or "").strip()
@@ -309,7 +533,7 @@ def task_candidate_content_commitment(candidate: Mapping[str, Any]) -> dict[str,
         for key, value in candidate.items()
         if key not in _CONTENT_COMMITMENT_EXCLUDED_FIELDS
     }
-    return {
+    commitment = {
         "world_id": world_id,
         "length_bucket": length_bucket,
         "content_sha256": hashlib.sha256(
@@ -321,6 +545,17 @@ def task_candidate_content_commitment(candidate: Mapping[str, Any]) -> dict[str,
             ).encode()
         ).hexdigest(),
     }
+    if sidecar_schema_version in {
+        TASK_REPLAY_SIDECAR_SCHEMA_V2,
+        TASK_REPLAY_SIDECAR_SCHEMA_V3,
+    }:
+        view = str(candidate.get("view") or "").strip()
+        if not view:
+            raise ProvenanceError("task candidate view identity is incomplete")
+        commitment["view"] = view
+    elif sidecar_schema_version != TASK_REPLAY_SIDECAR_SCHEMA:
+        raise ProvenanceError("task replay sidecar schema is not registered")
+    return commitment
 
 
 def build_task_replay_sidecar(
@@ -329,13 +564,24 @@ def build_task_replay_sidecar(
     adapter_revision: str,
     replay_payload: Mapping[str, Any],
     source_attestation_key: bytes,
+    sidecar_schema_version: str = TASK_REPLAY_SIDECAR_SCHEMA,
 ) -> dict[str, Any]:
     """Build one source-role-attested sidecar for a registered static adapter."""
-    key = (adapter_id, adapter_revision, TASK_REPLAY_SIDECAR_SCHEMA)
+    key = (adapter_id, adapter_revision, sidecar_schema_version)
     contract = TASK_REPLAY_ADAPTER_REGISTRY.get(key)
     if contract is None:
         raise ProvenanceError("task replay adapter contract is not registered")
     validated_payload = _verify_replay_payload(dict(replay_payload), contract)
+    if sidecar_schema_version == TASK_REPLAY_SIDECAR_SCHEMA_V3:
+        parent_raw = str(validated_payload["parent_sidecar_raw_utf8"]).encode()
+        parent_binding = task_replay_sidecar_binding(
+            parent_raw, source_attestation_key=source_attestation_key
+        )
+        if (
+            parent_binding["sidecar_schema_version"] != TASK_REPLAY_SIDECAR_SCHEMA
+            or parent_binding["sha256"] != validated_payload["parent_sidecar_sha256"]
+        ):
+            raise ProvenanceError("task replay parent sidecar is not verified v1")
     payload = {
         "schema_version": contract.sidecar_schema_version,
         "data_stage": "source_replay_sidecar",
@@ -573,6 +819,18 @@ def load_task_replay_sidecar(
     )
     _verify_source_attestation(payload, key)
     replay_payload = _verify_sidecar_contract(payload, contract)
+    parent_candidates: tuple[dict[str, Any], ...] = ()
+    if contract.sidecar_schema_version == TASK_REPLAY_SIDECAR_SCHEMA_V3:
+        parent_raw = str(replay_payload["parent_sidecar_raw_utf8"]).encode()
+        parent_binding = task_replay_sidecar_binding(
+            parent_raw, source_attestation_key=key
+        )
+        if (
+            parent_binding["sidecar_schema_version"] != TASK_REPLAY_SIDECAR_SCHEMA
+            or parent_binding["sha256"] != replay_payload["parent_sidecar_sha256"]
+        ):
+            raise ProvenanceError("task replay parent sidecar is not verified v1")
+        parent_candidates = _verify_v3_derivation_payload(replay_payload, contract)
     return LoadedTaskReplaySidecar(
         adapter_id=contract.adapter_id,
         adapter_revision=contract.adapter_revision,
@@ -582,4 +840,5 @@ def load_task_replay_sidecar(
         raw_bytes=raw,
         signed_sidecar=payload,
         replay_payload=replay_payload,
+        parent_candidates=parent_candidates,
     )

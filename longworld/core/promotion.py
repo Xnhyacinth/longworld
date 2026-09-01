@@ -43,6 +43,7 @@ from longworld.core.pack import (
     join_artifacts,
     prompt_document_prefix,
     prompt_query_boundary,
+    real_source_marginal_token_metrics,
     wrap_prompt,
 )
 from longworld.core.production_trust import (
@@ -75,9 +76,13 @@ from longworld.core.sourcebundle import (
     load_source_workflow_bundle,
 )
 from longworld.core.sourceworkflow import SOURCE_WORKFLOW_ADAPTER_REVISIONS
+from longworld.core.taskproof import TASK_PROOF_RECEIPT_SCHEMA
 from longworld.core.taskreplaysidecar import (
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     TASK_REPLAY_ADAPTER_REGISTRY,
+    TASK_REPLAY_SIDECAR_SCHEMA_V2,
+    TASK_REPLAY_SIDECAR_SCHEMA_V3,
+    TASK_VIEW_DERIVATION_REVISION,
     task_candidate_content_commitment,
 )
 from longworld.core.taxonomy import artifact_classification
@@ -419,6 +424,7 @@ def _candidate_has_verified_real_source(candidate: dict[str, Any]) -> bool:
             and item.get("workflow_kind") in {"hybrid_causal", "real_source_derived"}
             for item in classifications
         )
+        and _counterfactual_parent_source_binding_valid(candidate)
     )
 
 
@@ -443,6 +449,58 @@ def _candidate_has_source_bound_proof(candidate: dict[str, Any]) -> bool:
             and item.get("evidence_role") in {"causal_gold", "causal_supporting"}
             for item in classifications
         )
+        and _counterfactual_parent_source_binding_valid(candidate)
+    )
+
+
+def _counterfactual_parent_source_binding_valid(candidate: dict[str, Any]) -> bool:
+    classifications = candidate.get("artifact_classification")
+    if not isinstance(classifications, list):
+        return False
+    synthetic = [
+        item
+        for item in classifications
+        if isinstance(item, dict)
+        and item.get("source_origin") == "synthetic_counterfactual"
+    ]
+    if not synthetic:
+        return True
+    projection = candidate.get("task_view_projection")
+    if (
+        candidate.get("view") != "cf"
+        or len(synthetic) != 1
+        or not isinstance(projection, dict)
+        or projection.get("view") != "cf"
+        or not isinstance(projection.get("parent_task_replay_sidecar"), dict)
+        or _SHA256.fullmatch(
+            str(projection["parent_task_replay_sidecar"].get("sha256") or "")
+        )
+        is None
+        or _SHA256.fullmatch(str(projection.get("parent_source_binding_sha256") or ""))
+        is None
+    ):
+        return False
+    parent_by_id = {
+        str(item.get("artifact_id") or ""): item
+        for item in projection.get("parent_artifact_bindings") or []
+        if isinstance(item, dict)
+    }
+    changed = synthetic[0]
+    parent = parent_by_id.get(str(changed.get("artifact_id") or ""))
+    return bool(
+        isinstance(parent, dict)
+        and parent.get("source_origin")
+        in {"real_public", "real_private_export", "real_derived"}
+        and changed.get("counterfactual_parent_source_origin")
+        == parent.get("source_origin")
+        and changed.get("counterfactual_parent_provenance_id")
+        == parent.get("provenance_id")
+        and changed.get("counterfactual_parent_text_sha256")
+        == parent.get("text_sha256")
+        and changed.get("counterfactual_parent_source_binding_sha256")
+        == projection.get("parent_source_binding_sha256")
+        and changed.get("counterfactual_parent_sidecar_sha256")
+        == projection["parent_task_replay_sidecar"].get("sha256")
     )
 
 
@@ -510,6 +568,79 @@ def _missing_required_exact_length_buckets_by_world(
         )
         for world_id in sorted(worlds)
         if not set(required).issubset(observed.get(world_id, set()))
+    }
+
+
+def _missing_required_view_coverage_by_world(
+    rows: list[dict[str, Any]], profile: Any
+) -> dict[str, tuple[str, ...]]:
+    required_views = tuple(profile.required_view_timings)
+    required_buckets = tuple(profile.required_exact_length_buckets)
+    if not required_views:
+        return {}
+    if (
+        not required_buckets
+        or len(set(required_views)) != len(required_views)
+        or any(
+            view not in _COMPOSITION_BY_VIEW or timing not in {"first", "late"}
+            for view, timing in required_views
+        )
+    ):
+        raise PromotionError("release profile required view coverage is invalid")
+    required = {
+        (bucket, view, timing)
+        for bucket in required_buckets
+        for view, timing in required_views
+    }
+    observed: defaultdict[str, set[tuple[str, str, str]]] = defaultdict(set)
+    worlds: set[str] = set()
+    for row in rows:
+        world_id = str(row.get("world_id") or "")
+        if not world_id:
+            continue
+        worlds.add(world_id)
+        bucket = str(row.get("length_bucket") or "")
+        tokens = row.get("tokenizer_context_tokens")
+        key = (
+            bucket,
+            str(row.get("view") or ""),
+            str(row.get("query_timing") or ""),
+        )
+        if (
+            key not in required
+            or not isinstance(tokens, int)
+            or isinstance(tokens, bool)
+            or exact_token_band_reject_reason(bucket, tokens) is not None
+            or row.get("tokenizer_model_id") != profile.tokenizer_model_id
+            or row.get("tokenizer_revision") != profile.tokenizer_revision
+            or (
+                profile.tokenizer_asset_manifest_sha256
+                and row.get("tokenizer_asset_manifest_sha256")
+                != profile.tokenizer_asset_manifest_sha256
+            )
+        ):
+            continue
+        observed[world_id].add(key)
+    return {
+        world_id: tuple(
+            f"{bucket}:{view}/{timing}"
+            for bucket, view, timing in sorted(required - observed[world_id])
+        )
+        for world_id in sorted(worlds)
+        if not required.issubset(observed[world_id])
+    }
+
+
+def _worlds_with_unbound_rows(rows: list[dict[str, Any]]) -> dict[str, tuple[str, ...]]:
+    unbound: defaultdict[str, list[str]] = defaultdict(list)
+    for row in rows:
+        if _candidate_has_source_bound_proof(row):
+            continue
+        world_id = str(row.get("world_id") or "")
+        unbound[world_id].append(str(row.get("query_id") or "?"))
+    return {
+        world_id: tuple(sorted(query_ids))
+        for world_id, query_ids in sorted(unbound.items())
     }
 
 
@@ -663,7 +794,7 @@ def candidate_structural_preflight(
         seen.add(digest)
 
     task_candidate_digests: set[str] = set()
-    task_content_identities: set[tuple[str, str, str, str]] = set()
+    task_content_identities: set[tuple[str, ...]] = set()
     task_training_content_digests: set[str] = set()
     task_answers_by_prompt: dict[str, str] = {}
     for candidate in candidates:
@@ -754,6 +885,28 @@ def _task_sidecar_matches_candidate(
         str(binding.get("adapter_revision") or ""),
         str(binding.get("sidecar_schema_version") or ""),
     )
+    if key[2] == TASK_REPLAY_SIDECAR_SCHEMA_V3:
+        projection = candidate.get("task_view_projection")
+        view = str(candidate.get("view") or "")
+        expected_domains = {
+            "cyber.kev_history.v1": "cyber",
+            "finance.multi_filing.v1": "finance",
+            "macro.gdp_vintage_reconstruction.v1": "macro_economics",
+        }
+        return bool(
+            key[0] in expected_domains
+            and candidate.get("domain") == expected_domains[key[0]]
+            and view in {"full", "cf", "ordered_artifact_view"}
+            and candidate.get("composition_method") == _COMPOSITION_BY_VIEW[view]
+            and candidate.get("strict_replay_revision") == key[1]
+            and isinstance(projection, dict)
+            and projection.get("schema_version") == "longworld.task-view-projection.v1"
+            and projection.get("derivation_revision") == TASK_VIEW_DERIVATION_REVISION
+            and projection.get("view") == view
+            and projection.get("dossier_id") == candidate.get("dossier_id")
+        )
+    if candidate.get("task_view_projection") is not None:
+        return False
     if key[0] == "cyber.kev_history.v1":
         replay = candidate.get("domain_history_replay_manifest")
         return bool(
@@ -789,7 +942,7 @@ def _task_sidecar_matches_candidate(
 
 def _task_candidate_content_identity(
     candidate: dict[str, Any],
-) -> tuple[str, str, str, str] | None:
+) -> tuple[str, ...] | None:
     binding = candidate.get("task_replay_sidecar")
     if binding is None:
         return None
@@ -813,9 +966,23 @@ def _task_candidate_content_identity(
     ):
         raise PromotionError("task replay sidecar binding is invalid")
     try:
-        commitment = task_candidate_content_commitment(candidate)
+        sidecar_schema_version = str(binding["sidecar_schema_version"])
+        commitment = task_candidate_content_commitment(
+            candidate, sidecar_schema_version=sidecar_schema_version
+        )
     except ProvenanceError as error:
         raise PromotionError("task candidate content identity is invalid") from error
+    if sidecar_schema_version in {
+        TASK_REPLAY_SIDECAR_SCHEMA_V2,
+        TASK_REPLAY_SIDECAR_SCHEMA_V3,
+    }:
+        return (
+            str(binding["sha256"]),
+            commitment["world_id"],
+            commitment["length_bucket"],
+            commitment["view"],
+            commitment["content_sha256"],
+        )
     return (
         str(binding["sha256"]),
         commitment["world_id"],
@@ -844,7 +1011,7 @@ def validate_task_candidate_content_uniqueness(
     candidates: list[dict[str, Any]], *, label: str
 ) -> None:
     """Reject task-row metadata clones and conflicting exported prompts."""
-    source_identities: set[tuple[str, str, str, str]] = set()
+    source_identities: set[tuple[str, ...]] = set()
     training_digests: set[str] = set()
     answers_by_prompt: dict[str, str] = {}
     for candidate in candidates:
@@ -1091,8 +1258,11 @@ def _task_semantic_proof_commitment(
     }
     if (
         not isinstance(receipt, dict)
-        or not receipt
-        or not isinstance(raw_verification, dict)
+        or receipt.get("schema_version") != TASK_PROOF_RECEIPT_SCHEMA
+    ):
+        raise PromotionError("task proof receipt schema is not current")
+    if (
+        not isinstance(raw_verification, dict)
         or set(raw_verification) != set(Verification.model_fields)
         or not isinstance(view, dict)
         or not set(_TASK_SEMANTIC_VIEW_FIELDS) <= set(view)
@@ -1377,7 +1547,10 @@ def select_release_worlds(
         profile.expected_promoted_worlds
     ):
         raise PromotionError("release profile split quotas do not cover its target")
-    if profile.split_strategy != "world_atomic_hash_v1":
+    if profile.split_strategy not in {
+        "world_atomic_hash_v1",
+        "world_atomic_domain_stratified_hash_v1",
+    }:
         raise PromotionError("release profile split strategy is unsupported")
     if (
         profile.min_real_train_worlds > profile.min_train_worlds
@@ -1386,7 +1559,7 @@ def select_release_worlds(
         raise PromotionError("release profile real-world quotas exceed split quotas")
     by_world: dict[str, list[tuple[str, dict[str, Any]]]] = {}
     candidate_digests: list[str] = []
-    task_content_identities: set[tuple[str, str, str, str]] = set()
+    task_content_identities: set[tuple[str, ...]] = set()
     task_training_content_digests: set[str] = set()
     task_answers_by_prompt: dict[str, str] = {}
     for candidate in candidates:
@@ -1484,11 +1657,35 @@ def select_release_worlds(
         ],
         profile,
     )
+    missing_required_views = _missing_required_view_coverage_by_world(
+        [
+            candidate
+            for world_id in fully_audited_worlds
+            if world_id not in missing_required_buckets
+            for _digest, candidate in by_world[world_id]
+        ],
+        profile,
+    )
+    unbound_rows_by_world = (
+        _worlds_with_unbound_rows(
+            [
+                candidate
+                for world_id in fully_audited_worlds
+                if world_id not in missing_required_buckets
+                and world_id not in missing_required_views
+                for _digest, candidate in by_world[world_id]
+            ]
+        )
+        if profile.require_all_rows_source_bound
+        else {}
+    )
     strict_growth_violations = _cumulative_history_violations_by_world(
         [
             _candidate_with_strict_growth(candidate, audits_by_candidate[digest])
             for world_id in fully_audited_worlds
             if world_id not in missing_required_buckets
+            and world_id not in missing_required_views
+            and world_id not in unbound_rows_by_world
             for digest, candidate in by_world[world_id]
         ],
         profile,
@@ -1502,6 +1699,8 @@ def select_release_worlds(
         world_id
         for world_id in fully_audited_worlds
         if world_id not in missing_required_buckets
+        and world_id not in missing_required_views
+        and world_id not in unbound_rows_by_world
     ]
     target = profile.expected_promoted_worlds
     if len(eligible_worlds) < target:
@@ -1521,6 +1720,23 @@ def select_release_worlds(
             raise PromotionError(
                 "insufficient fully audited worlds with required exact length buckets: "
                 + details
+            )
+        if missing_required_views:
+            details = ",".join(
+                f"{world_id}={'+'.join(missing)}"
+                for world_id, missing in missing_required_views.items()
+            )
+            raise PromotionError(
+                "insufficient fully audited worlds with required view coverage: "
+                + details
+            )
+        if unbound_rows_by_world:
+            details = ",".join(
+                f"{world_id}={len(query_ids)}"
+                for world_id, query_ids in unbound_rows_by_world.items()
+            )
+            raise PromotionError(
+                "release profile requires all rows to be source-bound: " + details
             )
         raise PromotionError(
             f"insufficient fully audited worlds: {len(eligible_worlds)}<{target}"
@@ -1706,32 +1922,106 @@ def select_release_worlds(
     selected_real_worlds = {
         world_id for world_id in selected_worlds if world_id in real_eligible_worlds
     }
-    real_eval_worlds = set(
-        sorted(
-            selected_real_worlds,
-            key=lambda world_id: _sha256_text(f"{profile_digest}|real-eval|{world_id}"),
-        )[: profile.min_real_eval_worlds]
-    )
-    protected_real_train_worlds = set(
-        sorted(
-            selected_real_worlds - real_eval_worlds,
-            key=lambda world_id: _sha256_text(
-                f"{profile_digest}|real-train|{world_id}"
-            ),
-        )[: profile.min_real_train_worlds]
-    )
-    eval_worlds = real_eval_worlds | set(
-        sorted(
-            set(selected_worlds) - real_eval_worlds - protected_real_train_worlds,
-            key=lambda world_id: _sha256_text(f"{profile_digest}|eval|{world_id}"),
-        )[: profile.min_eval_worlds - len(real_eval_worlds)]
-    )
+    if profile.split_strategy == "world_atomic_domain_stratified_hash_v1":
+        train_minima = dict(profile.min_train_worlds_by_domain)
+        if (
+            not profile.require_all_rows_source_bound
+            or profile.min_real_train_worlds != profile.min_train_worlds
+            or profile.min_real_eval_worlds != profile.min_eval_worlds
+            or set(train_minima) != set(domain_quotas)
+            or len(train_minima) != len(profile.min_train_worlds_by_domain)
+            or any(
+                minimum < 1 or minimum >= domain_quotas[domain]
+                for domain, minimum in train_minima.items()
+            )
+            or profile.min_eval_domains < 1
+            or profile.min_eval_domains > profile.min_eval_worlds
+        ):
+            raise PromotionError("release profile domain split quotas are invalid")
+        eval_domains = sorted(
+            domain_quotas,
+            key=lambda domain: _sha256_text(f"{profile_digest}|eval-domain|{domain}"),
+        )[: profile.min_eval_domains]
+        eval_worlds = {
+            min(
+                selected_worlds_by_domain[domain],
+                key=lambda world_id: _sha256_text(f"{profile_digest}|eval|{world_id}"),
+            )
+            for domain in eval_domains
+        }
+        remaining_eval_slots = profile.min_eval_worlds - len(eval_worlds)
+        if remaining_eval_slots:
+            eval_counts = Counter(
+                domains_by_world[world_id] for world_id in eval_worlds
+            )
+            remaining = [
+                world_id
+                for world_id in sorted(
+                    set(selected_worlds) - eval_worlds,
+                    key=lambda item: _sha256_text(f"{profile_digest}|eval|{item}"),
+                )
+                if domain_quotas[domains_by_world[world_id]]
+                - eval_counts[domains_by_world[world_id]]
+                > train_minima[domains_by_world[world_id]]
+            ]
+            eval_worlds.update(remaining[:remaining_eval_slots])
+    else:
+        real_eval_worlds = set(
+            sorted(
+                selected_real_worlds,
+                key=lambda world_id: _sha256_text(
+                    f"{profile_digest}|real-eval|{world_id}"
+                ),
+            )[: profile.min_real_eval_worlds]
+        )
+        protected_real_train_worlds = set(
+            sorted(
+                selected_real_worlds - real_eval_worlds,
+                key=lambda world_id: _sha256_text(
+                    f"{profile_digest}|real-train|{world_id}"
+                ),
+            )[: profile.min_real_train_worlds]
+        )
+        eval_worlds = real_eval_worlds | set(
+            sorted(
+                set(selected_worlds) - real_eval_worlds - protected_real_train_worlds,
+                key=lambda world_id: _sha256_text(f"{profile_digest}|eval|{world_id}"),
+            )[: profile.min_eval_worlds - len(real_eval_worlds)]
+        )
     if len(eval_worlds) != profile.min_eval_worlds:
         raise PromotionError("release profile eval split cannot satisfy real quotas")
     split_by_world = {
         world_id: "eval" if world_id in eval_worlds else "train"
         for world_id in selected_worlds
     }
+    if profile.min_train_worlds_by_domain and (
+        any(
+            sum(
+                split_by_world[world_id] == "train"
+                for world_id in selected_worlds_by_domain.get(domain, [])
+            )
+            < minimum
+            for domain, minimum in profile.min_train_worlds_by_domain
+        )
+        or len({domains_by_world[world_id] for world_id in eval_worlds})
+        < profile.min_eval_domains
+    ):
+        raise PromotionError("release profile domain split cannot satisfy quotas")
+    split_worlds_by_domain = (
+        {
+            split: {
+                domain: sorted(
+                    world_id
+                    for world_id in world_ids
+                    if split_by_world[world_id] == split
+                )
+                for domain, world_ids in selected_worlds_by_domain.items()
+            }
+            for split in ("train", "eval")
+        }
+        if domain_quotas
+        else {}
+    )
     selected = [
         candidate
         for world_id in selected_worlds
@@ -1771,6 +2061,8 @@ def select_release_worlds(
             "split_strategy": profile.split_strategy,
             "promoted_domain_world_quotas": domain_quotas,
             "selected_worlds_by_domain": selected_worlds_by_domain,
+            "worlds_by_domain": selected_worlds_by_domain,
+            "split_worlds_by_domain": split_worlds_by_domain,
             "selected_candidate_sha256": selected_ids,
             "split_by_world": split_by_world,
             "n_real_eligible_worlds": len(real_eligible_worlds),
@@ -1836,9 +2128,9 @@ def create_train_ready_report(
             or candidate.get("data_stage") != "candidate"
         ):
             raise PromotionError("candidate product identity is inconsistent")
-    task_content_by_candidate_id: dict[str, tuple[str, str, str, str]] = {}
+    task_content_by_candidate_id: dict[str, tuple[str, ...]] = {}
     task_training_by_candidate_id: dict[str, tuple[str, str, str]] = {}
-    seen_task_content_identities: set[tuple[str, str, str, str]] = set()
+    seen_task_content_identities: set[tuple[str, ...]] = set()
     seen_task_training_content_digests: set[str] = set()
     task_answers_by_prompt: dict[str, str] = {}
     for candidate in candidates:
@@ -1903,13 +2195,16 @@ def create_train_ready_report(
         if previous_answer != answer:
             raise PromotionError("promoted task prompt has conflicting answers")
         promotion = row.get("promotion") or {}
+        expected_content_commitment = {
+            "world_id": identity[1],
+            "length_bucket": identity[2],
+            "content_sha256": identity[-1],
+        }
+        if len(identity) == 5:
+            expected_content_commitment["view"] = identity[3]
         if (
             promotion.get("task_candidate_content_commitment")
-            != {
-                "world_id": identity[1],
-                "length_bucket": identity[2],
-                "content_sha256": identity[3],
-            }
+            != expected_content_commitment
             or (promotion.get("task_replay_sidecar") or {}).get("sha256") != identity[0]
         ):
             raise PromotionError("promoted task content commitment is invalid")
@@ -1996,6 +2291,25 @@ def create_train_ready_report(
         raise PromotionError(
             "promoted rows are missing required exact length buckets: " + details
         )
+    missing_required_views = _missing_required_view_coverage_by_world(rows, profile)
+    if missing_required_views:
+        details = ",".join(
+            f"{world_id}={'+'.join(missing)}"
+            for world_id, missing in missing_required_views.items()
+        )
+        raise PromotionError(
+            "promoted rows are missing required view coverage: " + details
+        )
+    if profile.require_all_rows_source_bound:
+        unbound_rows_by_world = _worlds_with_unbound_rows(rows)
+        if unbound_rows_by_world:
+            details = ",".join(
+                f"{world_id}={len(query_ids)}"
+                for world_id, query_ids in unbound_rows_by_world.items()
+            )
+            raise PromotionError(
+                "release profile requires all rows to be source-bound: " + details
+            )
     strict_growth_violations = _cumulative_history_violations_by_world(rows, profile)
     if strict_growth_violations:
         details = ";".join(
@@ -2023,6 +2337,7 @@ def create_train_ready_report(
     domain_quotas = dict(profile.promoted_domain_world_quotas)
     selection_digest = task_selection_digest
     selected_worlds_by_domain: dict[str, list[str]] = {}
+    split_worlds_by_domain: dict[str, dict[str, list[str]]] = {}
     expected_real_worlds_by_split: dict[str, list[str]] = {
         "train": [],
         "eval": [],
@@ -2127,6 +2442,39 @@ def create_train_ready_report(
                 "selected_worlds_by_domain"
             ) != selected_worlds_by_domain:
                 raise PromotionError("release domain world quota is invalid")
+            split_worlds_by_domain = {
+                split: {
+                    domain: sorted(
+                        world_id
+                        for world_id in world_ids
+                        if split_by_world.get(world_id) == split
+                    )
+                    for domain, world_ids in selected_worlds_by_domain.items()
+                }
+                for split in ("train", "eval")
+            }
+            if profile.min_train_worlds_by_domain and (
+                release_selection_receipt.get("worlds_by_domain")
+                != selected_worlds_by_domain
+                or release_selection_receipt.get("split_worlds_by_domain")
+                != split_worlds_by_domain
+            ):
+                raise PromotionError("release signed domain split map is invalid")
+            if profile.min_train_worlds_by_domain and (
+                any(
+                    len(split_worlds_by_domain["train"].get(domain, [])) < minimum
+                    for domain, minimum in profile.min_train_worlds_by_domain
+                )
+                or len(
+                    {
+                        domain
+                        for domain, world_ids in split_worlds_by_domain["eval"].items()
+                        if world_ids
+                    }
+                )
+                < profile.min_eval_domains
+            ):
+                raise PromotionError("release domain split quota is invalid")
         selected_real_worlds = {
             str(candidate.get("world_id") or "")
             for candidate in selected_candidates
@@ -2238,6 +2586,7 @@ def create_train_ready_report(
         }
         if domain_quotas
         else {},
+        "split_worlds_by_domain": split_worlds_by_domain,
         "candidate_generation_retention": float(candidate_report.get("retention") or 0),
         "promotion_retention": len(rows) / max(1, len(candidates)),
         "retention": len(rows) / max(1, len(candidates)),
@@ -3260,8 +3609,6 @@ def _replayed_quality_metrics(
         "proof_bearing": 0,
         "causal_supporting": 0,
     }
-    real_source_tokens = 0
-    real_origins = {"real_public", "real_private_export", "real_derived"}
     bound_workflow_ids = {world.world_id} | {
         str(event.params["workflow_id"])
         for event in world.events
@@ -3284,8 +3631,18 @@ def _replayed_quality_metrics(
             semantic_tokens["proof_bearing"] += tokens
         elif set(spec.sufficient_event_ids).intersection(artifact.reveals_events):
             semantic_tokens["causal_supporting"] += tokens
-        if classification.source_origin.value in real_origins:
-            real_source_tokens += tokens
+
+    try:
+        _, source_metric_tokens, source_ratio = real_source_marginal_token_metrics(
+            artifacts,
+            question=spec.question,
+            timing=str(candidate["query_timing"]),
+            token_counter=token_counter or estimate_tokens,
+        )
+    except ValueError as exc:
+        raise PromotionError(str(exc)) from exc
+    if source_metric_tokens != metrics.context_tokens:
+        raise PromotionError("real source metric does not bind the rendered context")
 
     replayed_graph = graph_stats(world, spec)
     difficulty = dict(candidate.get("difficulty") or {})
@@ -3354,9 +3711,7 @@ def _replayed_quality_metrics(
         "near_dup_sentence_ratio": round(sentence_near_dup_ratio(artifacts), 4),
         "semantic_tokens": semantic_tokens,
         "context_source_relation_count": context_source_relation_count,
-        "real_source_token_ratio": round(
-            real_source_tokens / max(1, metrics.context_tokens), 4
-        ),
+        "real_source_token_ratio": round(source_ratio, 4),
     }
     if isinstance(exact_token_replay, dict):
         replayed.update(exact_token_replay)

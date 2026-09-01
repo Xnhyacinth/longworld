@@ -49,6 +49,7 @@ _SOURCE_ORIGINS = {
     "real_public",
     "real_private_export",
     "real_derived",
+    "synthetic_counterfactual",
 }
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _COMMIT_SHA = re.compile(r"[0-9a-f]{40}")

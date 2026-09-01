@@ -127,6 +127,55 @@ def test_p12_current_v2_adds_per_world_bands_without_rewriting_v1() -> None:
     assert current_contract == historical_contract
 
 
+def test_p13_authentic_six_domain_profile_is_an_immutable_probe_root() -> None:
+    profile = release_profile("p13-authentic-six-domain-probe-12-v1")
+
+    assert profile.environment == "probe"
+    assert profile.predecessor_profile_id is None
+    assert profile.expected_promoted_worlds == 12
+    assert (profile.min_train_worlds, profile.min_eval_worlds) == (10, 2)
+    assert (profile.min_real_train_worlds, profile.min_real_eval_worlds) == (10, 2)
+    assert profile.split_strategy == "world_atomic_domain_stratified_hash_v1"
+    assert profile.min_domains == 6
+    assert dict(profile.promoted_domain_world_quotas) == {
+        "company": 2,
+        "researchlab": 2,
+        "codeforge": 2,
+        "finance": 2,
+        "cyber": 2,
+        "macro_economics": 2,
+    }
+    assert dict(profile.min_train_worlds_by_domain) == {
+        domain: 1 for domain, _quota in profile.promoted_domain_world_quotas
+    }
+    assert profile.min_eval_domains == 2
+    assert profile.require_all_rows_source_bound is True
+    assert profile.required_exact_length_buckets == ("16k", "32k", "64k")
+    assert profile.required_view_timings == (
+        ("full", "first"),
+        ("cf", "first"),
+        ("ordered_artifact_view", "first"),
+    )
+    assert profile.min_real_64k_rows == 36
+    assert dict(profile.min_real_exact_64k_rows_by_domain) == {
+        domain: 6 for domain, _quota in profile.promoted_domain_world_quotas
+    }
+    assert dict(profile.min_exact_64k_rows_by_domain) == {
+        domain: 6 for domain, _quota in profile.promoted_domain_world_quotas
+    }
+    assert dict(profile.min_real_exact_64k_worlds_by_domain) == {
+        domain: 2 for domain, _quota in profile.promoted_domain_world_quotas
+    }
+    assert profile.min_unique_real_source_workflows == 12
+    assert profile.min_unique_executable_proofs == 12
+    assert profile.min_unique_answer_programs == 12
+    assert profile.min_unique_semantic_base_tasks == 12
+    assert profile.min_motifs == 12
+    assert release_profile_sha256(profile.profile_id) == (
+        "7fc9734fdd5dd7b3420eb7235e542fe1b82b8bf5dfc146862eb889a21d6de877"
+    )
+
+
 def test_current_production_profiles_require_source_rich_predecessors() -> None:
     production_48 = release_profile("p10-source-rich-production-48-v1")
     production_210 = release_profile("p10-source-rich-production-210-v1")

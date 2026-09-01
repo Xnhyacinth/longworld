@@ -9,6 +9,7 @@ import re
 from bisect import bisect_left, bisect_right
 from collections import Counter
 from collections.abc import Callable, Sequence
+from copy import deepcopy
 from itertools import pairwise
 from typing import Any
 
@@ -35,12 +36,17 @@ from longworld.core.taskreplaysidecar import (
     CYBER_KEV_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
+    SOURCE_TOKEN_MEASUREMENT_BASIS,
+    SOURCE_TOKEN_MEASUREMENT_RECEIPT_SCHEMA,
     TASK_REPLAY_ADAPTER_REGISTRY,
+    TASK_REPLAY_SIDECAR_SCHEMA_V2,
+    TASK_REPLAY_SIDECAR_SCHEMA_V3,
+    TASK_VIEW_DERIVATION_REVISION,
     TaskReplayRegistryKey,
 )
 from longworld.core.verify import Verification
 
-TASK_PROOF_RECEIPT_SCHEMA = "longworld.task-proof-receipt.v4"
+TASK_PROOF_RECEIPT_SCHEMA = "longworld.task-proof-receipt.v5"
 TokenCounter = Callable[[str], int]
 _WINDOW_BANDS = {"4k": 4_096, "8k": 8_192, "16k": 16_384}
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -84,15 +90,20 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
     )
     if key not in TASK_REPLAY_ADAPTER_REGISTRY:
         raise TaskProofError("candidate task replay adapter is not registered")
-    if key == CYBER_KEV_TASK_REPLAY_ADAPTER:
+    family = key[:2]
+    standard_projection = key[2] in {
+        TASK_REPLAY_SIDECAR_SCHEMA_V2,
+        TASK_REPLAY_SIDECAR_SCHEMA_V3,
+    }
+    if family == CYBER_KEV_TASK_REPLAY_ADAPTER[:2]:
         expected_domain = "cyber"
         expected_view = "ordered_artifact_view"
         expected_composition = "causal_timeline"
-    elif key == FINANCE_TASK_REPLAY_ADAPTER:
+    elif family == FINANCE_TASK_REPLAY_ADAPTER[:2]:
         expected_domain = "finance"
         expected_view = "full"
         expected_composition = "same_case_dossier"
-    elif key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
+    elif family == MACRO_VINTAGE_TASK_REPLAY_ADAPTER[:2]:
         expected_domain = "macro_economics"
         expected_view = "ordered_release_timeline"
         expected_composition = "as_of_revision_workflow"
@@ -100,11 +111,25 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
         raise TaskProofError("candidate task replay adapter is unsupported")
     if candidate.get("domain") != expected_domain:
         raise TaskProofError("candidate task replay adapter and domain do not match")
+    view = str(candidate.get("view") or "")
+    if standard_projection:
+        expected_compositions = {
+            "full": "same_case_dossier",
+            "cf": "counterfactual_twin",
+            "ordered_artifact_view": "causal_timeline",
+        }
+        view_valid = candidate.get("composition_method") == expected_compositions.get(
+            view
+        )
+    else:
+        view_valid = (
+            view == expected_view
+            and candidate.get("composition_method") == expected_composition
+        )
     if (
         candidate.get("data_stage") != "candidate"
         or candidate.get("training_objective") != "sft"
-        or candidate.get("view") != expected_view
-        or candidate.get("composition_method") != expected_composition
+        or not view_valid
         or not str(candidate.get("question") or "").strip()
         or not str(candidate.get("answer") or "").strip()
         or not str(candidate.get("cf_answer") or "").strip()
@@ -112,13 +137,13 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
         raise TaskProofError("candidate task lifecycle or view contract is invalid")
     if candidate.get("strict_replay_revision") != key[1]:
         raise TaskProofError("candidate task replay revision does not match sidecar")
-    if key == CYBER_KEV_TASK_REPLAY_ADAPTER:
+    if family == CYBER_KEV_TASK_REPLAY_ADAPTER[:2]:
         replay_contract = candidate.get("domain_history_replay_manifest")
         replay_identity_valid = bool(
             isinstance(replay_contract, dict)
             and replay_contract.get("replay_revision") == key[1]
         )
-    elif key == FINANCE_TASK_REPLAY_ADAPTER:
+    elif family == FINANCE_TASK_REPLAY_ADAPTER[:2]:
         replay_contract = candidate.get("finance_replay_contract")
         replay_identity_valid = bool(
             isinstance(replay_contract, dict)
@@ -127,8 +152,7 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
         )
     else:
         replay_identity_valid = (
-            candidate.get("schema_version")
-            == MACRO_VINTAGE_PIPELINE_CANDIDATE_SCHEMA
+            candidate.get("schema_version") == MACRO_VINTAGE_PIPELINE_CANDIDATE_SCHEMA
         )
     if not replay_identity_valid:
         raise TaskProofError("candidate adapter replay contract is inconsistent")
@@ -142,6 +166,398 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
     ):
         raise TaskProofError("candidate exact tokenizer identity is incomplete")
     return key
+
+
+def audit_task_view_projection(candidate: dict[str, Any]) -> dict[str, bool]:
+    """Validate projected bytes, parent provenance, and source chronology."""
+    projection = candidate.get("task_view_projection")
+    classifications = candidate.get("artifact_classification")
+    document_context = candidate.get("document_context")
+    if (
+        not isinstance(projection, dict)
+        or projection.get("schema_version") != "longworld.task-view-projection.v1"
+        or projection.get("derivation_revision") != TASK_VIEW_DERIVATION_REVISION
+        or projection.get("view") != candidate.get("view")
+        or projection.get("dossier_id") != candidate.get("dossier_id")
+        or not isinstance(classifications, list)
+        or not isinstance(document_context, str)
+    ):
+        raise TaskProofError("task view projection contract is invalid")
+    documents = document_context.split(SEP)
+    bindings = projection.get("artifact_bindings")
+    if len(documents) != len(classifications) or not isinstance(bindings, list):
+        raise TaskProofError("task view projection artifact bindings are invalid")
+    expected_bindings = [
+        {
+            "artifact_id": str(classification.get("artifact_id") or ""),
+            "text_sha256": hashlib.sha256(document.encode()).hexdigest(),
+        }
+        for classification, document in zip(classifications, documents, strict=True)
+        if isinstance(classification, dict)
+    ]
+    chronology = projection.get("chronology")
+    chronology_valid = chronology == []
+    if candidate.get("view") == "ordered_artifact_view":
+        try:
+            expected_chronology = _projection_chronology(
+                candidate, classifications, documents
+            )
+        except (KeyError, TypeError, ValueError, TaskProofError):
+            expected_chronology = None
+        chronology_valid = bool(
+            isinstance(chronology, list)
+            and len(chronology) == len(classifications)
+            and chronology == expected_chronology
+            and [
+                str(classification.get("artifact_id") or "")
+                for classification in classifications
+                if isinstance(classification, dict)
+            ]
+            == [item["artifact_id"] for item in chronology]
+        )
+    parent_binding_valid = _counterfactual_parent_binding_valid(
+        candidate, classifications, documents, projection
+    )
+    source_token_measurement_valid = _source_token_measurement_valid(
+        candidate, projection
+    )
+    checks = {
+        "projection_document_digest_valid": projection.get("document_context_sha256")
+        == hashlib.sha256(document_context.encode()).hexdigest(),
+        "projection_artifact_bindings_valid": bindings == expected_bindings,
+        "projection_chronology_valid": chronology_valid,
+        "counterfactual_parent_binding_valid": parent_binding_valid,
+        "source_token_measurement_valid": source_token_measurement_valid,
+        "projection_candidate_only": all(
+            candidate.get(field) is False
+            for field in ("train_ready", "production_eligible", "promoted")
+        ),
+    }
+    failed = sorted(name for name, value in checks.items() if value is not True)
+    if failed:
+        raise TaskProofError("task view projection failed: " + ",".join(failed))
+    return checks
+
+
+def _source_token_measurement_valid(
+    candidate: dict[str, Any], projection: dict[str, Any]
+) -> bool:
+    measurement = projection.get("source_token_measurement_receipt")
+    contributions = (
+        measurement.get("parent_artifact_token_contributions")
+        if isinstance(measurement, dict)
+        else None
+    )
+    parent_bindings = projection.get("parent_artifact_bindings")
+    if (
+        not isinstance(measurement, dict)
+        or measurement.get("schema_version") != SOURCE_TOKEN_MEASUREMENT_RECEIPT_SCHEMA
+        or measurement.get("measurement_basis") != SOURCE_TOKEN_MEASUREMENT_BASIS
+        or measurement.get("tokenizer_model_id") != candidate.get("tokenizer_model_id")
+        or measurement.get("tokenizer_revision") != candidate.get("tokenizer_revision")
+        or measurement.get("tokenizer_asset_manifest_sha256")
+        != candidate.get("tokenizer_asset_manifest_sha256")
+        or not isinstance(contributions, list)
+        or not contributions
+        or not isinstance(parent_bindings, list)
+    ):
+        return False
+    parent_by_id = {
+        str(item.get("artifact_id") or ""): item
+        for item in parent_bindings
+        if isinstance(item, dict)
+    }
+    contribution_ids = [
+        str(item.get("artifact_id") or "")
+        for item in contributions
+        if isinstance(item, dict)
+    ]
+    if (
+        len(contribution_ids) != len(contributions)
+        or len(set(contribution_ids)) != len(contribution_ids)
+        or set(contribution_ids) != set(parent_by_id)
+        or any(
+            not isinstance(item, dict)
+            or item.get("parent_text_sha256")
+            != parent_by_id.get(str(item.get("artifact_id") or ""), {}).get(
+                "text_sha256"
+            )
+            or isinstance(item.get("token_contribution"), bool)
+            or not isinstance(item.get("token_contribution"), int)
+            or item["token_contribution"] < 0
+            or not isinstance(item.get("retained_as_real"), bool)
+            for item in contributions
+        )
+    ):
+        return False
+    parent_tokens = measurement.get("parent_document_context_tokens")
+    projected_tokens = measurement.get("projected_document_context_tokens")
+    retained_tokens = measurement.get("retained_parent_document_tokens")
+    parent_ratio = measurement.get("parent_real_source_token_ratio")
+    measured_ratio = measurement.get("real_source_token_ratio")
+    expected_parent_tokens = sum(item["token_contribution"] for item in contributions)
+    expected_retained_tokens = sum(
+        item["token_contribution"] for item in contributions if item["retained_as_real"]
+    )
+    if (
+        isinstance(parent_tokens, bool)
+        or not isinstance(parent_tokens, int)
+        or parent_tokens < 1
+        or isinstance(projected_tokens, bool)
+        or not isinstance(projected_tokens, int)
+        or projected_tokens < 1
+        or isinstance(retained_tokens, bool)
+        or not isinstance(retained_tokens, int)
+        or retained_tokens < 0
+        or expected_parent_tokens != parent_tokens
+        or expected_retained_tokens != retained_tokens
+        or isinstance(parent_ratio, bool)
+        or not isinstance(parent_ratio, (int, float))
+        or isinstance(measured_ratio, bool)
+        or not isinstance(measured_ratio, (int, float))
+        or not 0.0 < float(parent_ratio) <= 1.0
+        or candidate.get("real_source_token_ratio") != measured_ratio
+    ):
+        return False
+    expected_ratio = float(parent_ratio)
+    if retained_tokens != parent_tokens:
+        expected_ratio *= retained_tokens / parent_tokens
+    expected_ratio = min(float(parent_ratio), expected_ratio)
+    return bool(
+        measured_ratio == expected_ratio
+        and (
+            retained_tokens < parent_tokens
+            if candidate.get("view") == "cf"
+            else retained_tokens == parent_tokens
+        )
+    )
+
+
+def _projection_chronology(
+    candidate: dict[str, Any],
+    classifications: list[Any],
+    documents: list[str],
+) -> list[dict[str, str]]:
+    domain = str(candidate.get("domain") or "")
+    parsed: list[tuple[dict[str, Any], str, dict[str, Any] | list[dict[str, Any]]]] = []
+    for classification, document in zip(classifications, documents, strict=True):
+        if not isinstance(classification, dict):
+            raise TaskProofError("task chronology classification is malformed")
+        if domain == "cyber":
+            records = [json.loads(line) for line in document.splitlines()]
+            parsed.append((classification, document, records))
+        else:
+            record = json.loads(document)
+            if not isinstance(record, dict):
+                raise TaskProofError("task chronology record is malformed")
+            parsed.append((classification, document, record))
+    filings: dict[str, str] = {}
+    if domain == "finance":
+        filings = {
+            str(record.get("source_record_id") or ""): str(
+                record.get("filing_date") or ""
+            )
+            for _classification, _document, record in parsed
+            if isinstance(record, dict) and record.get("record_type") == "filing"
+        }
+    chronology: list[dict[str, str]] = []
+    for classification, _document, value in parsed:
+        artifact_id = str(classification.get("artifact_id") or "")
+        if domain == "finance" and isinstance(value, dict):
+            record_type = str(value.get("record_type") or "")
+            if record_type == "financial_source_row":
+                occurred_at, kind = str(value.get("report_date") or ""), "0"
+            elif record_type == "filing":
+                occurred_at, kind = str(value.get("filing_date") or ""), "1"
+            elif record_type == "filing_relation":
+                occurred_at, kind = (
+                    filings.get(str(value.get("source_record_id") or ""), ""),
+                    "2",
+                )
+            else:
+                raise TaskProofError("Finance chronology record type is unsupported")
+            order_key = f"{occurred_at}|{kind}|{artifact_id}"
+        elif domain == "macro_economics" and isinstance(value, dict):
+            payload = value.get("source_payload")
+            if not isinstance(payload, dict):
+                raise TaskProofError("Macro chronology payload is malformed")
+            if value.get("record_type") == "macro_vintage_observation":
+                occurred_at, kind = str(payload.get("vintage_date") or ""), "0"
+            elif value.get("record_type") == "macro_vintage_relation":
+                occurred_at, kind = str(payload.get("source_vintage_date") or ""), "1"
+            else:
+                raise TaskProofError("Macro chronology record type is unsupported")
+            order_key = f"{occurred_at}|{kind}|{artifact_id}"
+        elif domain == "cyber" and isinstance(value, list):
+            dates = [
+                str((record.get("source_payload") or {}).get("dateAdded") or "")
+                for record in value
+                if isinstance(record, dict)
+                and isinstance(record.get("source_payload"), dict)
+            ]
+            if dates != sorted(dates):
+                raise TaskProofError("Cyber chronology shard is not ordered")
+            start = dates[0] if dates else "0000-00-00"
+            end = dates[-1] if dates else start
+            order_key = f"{start}|{end}|{artifact_id}"
+        else:
+            raise TaskProofError("task chronology domain is unsupported")
+        if not artifact_id or not order_key.split("|", 1)[0]:
+            raise TaskProofError("task chronology identity is incomplete")
+        chronology.append({"artifact_id": artifact_id, "order_key": order_key})
+    return sorted(chronology, key=lambda item: item["order_key"])
+
+
+def _counterfactual_parent_binding_valid(
+    candidate: dict[str, Any],
+    classifications: list[Any],
+    documents: list[str],
+    projection: dict[str, Any],
+) -> bool:
+    synthetic = [
+        item
+        for item in classifications
+        if isinstance(item, dict)
+        and item.get("source_origin") == "synthetic_counterfactual"
+    ]
+    if candidate.get("view") == "cf":
+        if len(synthetic) != 1:
+            return False
+    elif synthetic:
+        return False
+    parent_bindings = projection.get("parent_artifact_bindings")
+    parent_sidecar = projection.get("parent_task_replay_sidecar")
+    if (
+        not isinstance(parent_bindings, list)
+        or len(parent_bindings) != len(classifications)
+        or not isinstance(parent_sidecar, dict)
+        or projection.get("parent_source_binding_sha256")
+        != _canonical_sha256(candidate.get("source_binding"))
+    ):
+        return False
+    parent_by_id = {
+        str(item.get("artifact_id") or ""): item
+        for item in parent_bindings
+        if isinstance(item, dict)
+    }
+    if len(parent_by_id) != len(parent_bindings):
+        return False
+    for classification, document in zip(classifications, documents, strict=True):
+        if not isinstance(classification, dict):
+            return False
+        parent = parent_by_id.get(str(classification.get("artifact_id") or ""))
+        if not isinstance(parent, dict) or parent.get("source_origin") not in {
+            "real_public",
+            "real_private_export",
+            "real_derived",
+        }:
+            return False
+        current_sha = hashlib.sha256(document.encode()).hexdigest()
+        if classification.get("source_origin") == "synthetic_counterfactual":
+            if (
+                classification.get("counterfactual_parent_source_origin")
+                != parent.get("source_origin")
+                or classification.get("counterfactual_parent_provenance_id")
+                != parent.get("provenance_id")
+                or classification.get("counterfactual_parent_text_sha256")
+                != parent.get("text_sha256")
+                or classification.get("counterfactual_parent_source_binding_sha256")
+                != projection.get("parent_source_binding_sha256")
+                or classification.get("counterfactual_parent_sidecar_sha256")
+                != parent_sidecar.get("sha256")
+                or classification.get("provenance_id")
+                != "counterfactual-projection-sha256:" + current_sha
+                or current_sha == parent.get("text_sha256")
+            ):
+                return False
+        elif (
+            classification.get("source_origin") != parent.get("source_origin")
+            or classification.get("provenance_id") != parent.get("provenance_id")
+            or current_sha != parent.get("text_sha256")
+        ):
+            return False
+    return True
+
+
+def canonicalize_kev_projection_candidate(
+    candidate: dict[str, Any],
+) -> dict[str, Any]:
+    """Restore source chronology for KEV execution without changing view bytes."""
+    if candidate.get("view") == "ordered_artifact_view":
+        return candidate
+    document_context = candidate.get("document_context")
+    classifications = candidate.get("artifact_classification")
+    if not isinstance(document_context, str) or not isinstance(classifications, list):
+        return candidate
+    documents = document_context.split(SEP)
+    if len(documents) != len(classifications):
+        return candidate
+
+    def order_key(item: tuple[dict[str, Any], str]) -> tuple[str, str]:
+        classification, document = item
+        keys: list[str] = []
+        for line in document.splitlines():
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                return ("9", str(classification.get("artifact_id") or ""))
+            if record.get("record_type") == "catalog_snapshot":
+                keys.append("0")
+            else:
+                payload = record.get("source_payload")
+                if not isinstance(payload, dict):
+                    return ("9", str(classification.get("artifact_id") or ""))
+                keys.append(
+                    "1|"
+                    + str(payload.get("dateAdded") or "")
+                    + "|"
+                    + str(payload.get("cveID") or "")
+                )
+        return (min(keys, default="9"), str(classification.get("artifact_id") or ""))
+
+    paired = [
+        (classification, document)
+        for classification, document in zip(classifications, documents, strict=True)
+        if isinstance(classification, dict)
+    ]
+    if len(paired) != len(documents):
+        return candidate
+    ordered = sorted(paired, key=order_key)
+    replay_candidate = dict(candidate)
+    replay_candidate["artifact_classification"] = [item[0] for item in ordered]
+    replay_candidate["document_context"] = SEP.join(item[1] for item in ordered)
+    return replay_candidate
+
+
+def normalize_projection_candidate_for_adapter(
+    candidate: dict[str, Any],
+) -> dict[str, Any]:
+    """Present adapter-native provenance while retaining projection metadata."""
+    if candidate.get("domain") != "macro_economics":
+        return candidate
+    classifications = candidate.get("artifact_classification")
+    document_context = candidate.get("document_context")
+    if not isinstance(classifications, list) or not isinstance(document_context, str):
+        return candidate
+    documents = document_context.split(SEP)
+    if len(documents) != len(classifications):
+        return candidate
+    normalized = deepcopy(classifications)
+    changed = False
+    for classification, document in zip(normalized, documents, strict=True):
+        if (
+            isinstance(classification, dict)
+            and classification.get("source_origin") == "synthetic_counterfactual"
+        ):
+            classification["provenance_id"] = (
+                "sha256:" + hashlib.sha256(document.encode()).hexdigest()
+            )
+            changed = True
+    if not changed:
+        return candidate
+    output = dict(candidate)
+    output["artifact_classification"] = normalized
+    return output
 
 
 def _artifact_pool(
@@ -171,8 +587,14 @@ def _artifact_pool(
             or not document.strip()
             or not str(classification.get("workflow_id") or "")
             or classification.get("source_origin")
-            not in {"real_public", "real_private_export", "real_derived"}
-            or classification.get("workflow_kind") != "real_source_derived"
+            not in {
+                "real_public",
+                "real_private_export",
+                "real_derived",
+                "synthetic_counterfactual",
+            }
+            or classification.get("workflow_kind")
+            not in {"real_source_derived", "hybrid_causal"}
             or classification.get("evidence_role")
             not in {
                 "causal_gold",
@@ -194,7 +616,12 @@ def _adapter_audit(
     token_counter: TokenCounter,
 ) -> dict[str, bool]:
     try:
-        if adapter_key == CYBER_KEV_TASK_REPLAY_ADAPTER:
+        if adapter_key[2] in {
+            TASK_REPLAY_SIDECAR_SCHEMA_V2,
+            TASK_REPLAY_SIDECAR_SCHEMA_V3,
+        }:
+            audit = audit_task_view_projection(candidate)
+        elif adapter_key == CYBER_KEV_TASK_REPLAY_ADAPTER:
             audit = audit_kev_pipeline_candidate(candidate, token_counter=token_counter)
         elif adapter_key == FINANCE_TASK_REPLAY_ADAPTER:
             audit = audit_finance_pipeline_candidate(candidate)
@@ -219,21 +646,37 @@ def _replay(
     *,
     counterfactual: bool = False,
 ) -> dict[str, Any]:
-    if adapter_key == CYBER_KEV_TASK_REPLAY_ADAPTER:
+    if adapter_key[:2] == CYBER_KEV_TASK_REPLAY_ADAPTER[:2]:
         return replay_kev_pipeline_candidate(
-            candidate,
+            canonicalize_kev_projection_candidate(candidate),
             evidence_artifact_ids=artifact_ids,
             counterfactual=counterfactual,
         )
-    if adapter_key == FINANCE_TASK_REPLAY_ADAPTER:
+    if adapter_key[:2] == FINANCE_TASK_REPLAY_ADAPTER[:2]:
+        if adapter_key[2] in {
+            TASK_REPLAY_SIDECAR_SCHEMA_V2,
+            TASK_REPLAY_SIDECAR_SCHEMA_V3,
+        }:
+            projection = candidate.get("task_view_projection")
+            header = (
+                projection.get("adapter_context_header")
+                if isinstance(projection, dict)
+                else None
+            )
+            if not isinstance(header, str) or not header:
+                return {"answer": "unknown"}
+            candidate = dict(candidate)
+            candidate["context"] = "\n".join(
+                [header, *str(candidate.get("document_context") or "").split(SEP)]
+            )
         return replay_finance_pipeline_selection(
             candidate,
             artifact_ids,
             counterfactual=counterfactual,
         )
-    if adapter_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
+    if adapter_key[:2] == MACRO_VINTAGE_TASK_REPLAY_ADAPTER[:2]:
         return replay_macro_vintage_pipeline_selection(
-            candidate,
+            normalize_projection_candidate_for_adapter(candidate),
             artifact_ids,
             counterfactual=counterfactual,
         )
@@ -248,21 +691,37 @@ def _replay_raw_slice(
     left_framed: bool,
     right_framed: bool,
 ) -> dict[str, Any]:
-    if adapter_key == CYBER_KEV_TASK_REPLAY_ADAPTER:
+    if adapter_key[:2] == CYBER_KEV_TASK_REPLAY_ADAPTER[:2]:
         return replay_kev_pipeline_raw_slice(
             candidate,
             raw_document_context,
             left_framed=left_framed,
             right_framed=right_framed,
         )
-    if adapter_key == FINANCE_TASK_REPLAY_ADAPTER:
+    if adapter_key[:2] == FINANCE_TASK_REPLAY_ADAPTER[:2]:
+        if adapter_key[2] in {
+            TASK_REPLAY_SIDECAR_SCHEMA_V2,
+            TASK_REPLAY_SIDECAR_SCHEMA_V3,
+        }:
+            projection = candidate.get("task_view_projection")
+            header = (
+                projection.get("adapter_context_header")
+                if isinstance(projection, dict)
+                else None
+            )
+            if not isinstance(header, str) or not header:
+                return {"answer": "unknown"}
+            candidate = dict(candidate)
+            candidate["context"] = "\n".join(
+                [header, *str(candidate.get("document_context") or "").split(SEP)]
+            )
         return replay_finance_pipeline_raw_slice(
             candidate,
             raw_document_context,
             left_framed=left_framed,
             right_framed=right_framed,
         )
-    if adapter_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
+    if adapter_key[:2] == MACRO_VINTAGE_TASK_REPLAY_ADAPTER[:2]:
         return replay_macro_vintage_pipeline_raw_slice(
             candidate,
             raw_document_context,
@@ -803,7 +1262,7 @@ def compute_task_proof(
             raise TaskProofError("candidate exact token count does not recompute")
         spans, document_context_tokens = _artifact_token_spans(documents, token_counter)
         if (
-            adapter_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER
+            adapter_key[:2] == MACRO_VINTAGE_TASK_REPLAY_ADAPTER[:2]
             and candidate.get("tokenizer_document_context_tokens")
             != document_context_tokens
         ):
@@ -821,15 +1280,11 @@ def compute_task_proof(
         ):
             raise TaskProofError("candidate essential artifact set is invalid")
         essential_ids = [str(value) for value in essential]
-        if adapter_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
-            essential_positions = [
-                artifact_ids.index(value) for value in essential_ids
-            ]
+        if adapter_key[:2] == MACRO_VINTAGE_TASK_REPLAY_ADAPTER[:2]:
+            essential_positions = [artifact_ids.index(value) for value in essential_ids]
             essential_span_tokens = token_counter(
                 SEP.join(
-                    documents[
-                        min(essential_positions) : max(essential_positions) + 1
-                    ]
+                    documents[min(essential_positions) : max(essential_positions) + 1]
                 )
             )
             band_lower_tokens = candidate.get("band_lower_tokens")
