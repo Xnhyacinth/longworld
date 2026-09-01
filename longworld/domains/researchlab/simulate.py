@@ -202,6 +202,69 @@ def _semantic_arxiv_body(
     return body, f"derived-sha256:{provenance}", excluded_paths, source_file_spans
 
 
+def _semantic_arxiv_section_body(
+    record: Any,
+    *,
+    basename: str,
+    section_names: frozenset[str],
+) -> tuple[str, str, list[str], list[dict[str, Any]]]:
+    """Derive a deterministic view from complete top-level LaTeX sections."""
+    payload = json.loads(record.text)
+    raw_sources = payload.get("latex_sources") if isinstance(payload, dict) else None
+    matches = [
+        source
+        for source in raw_sources or []
+        if str(source.get("path") or "").rsplit("/", 1)[-1] == basename
+    ]
+    if len(matches) != 1 or not section_names:
+        raise ValueError("arXiv section view source is not unique")
+    path = str(matches[0]["path"])
+    text = str(matches[0]["text"])
+    headings = list(re.finditer(r"(?m)^\\section\*?\{(?P<name>[^}]*)\}", text))
+    sections: dict[str, str] = {}
+    for index, heading in enumerate(headings):
+        name = " ".join(heading.group("name").split())
+        end = headings[index + 1].start() if index + 1 < len(headings) else len(text)
+        if name in sections:
+            raise ValueError("arXiv top-level section name is duplicated")
+        sections[name] = text[heading.start() : end]
+    if not section_names.issubset(sections):
+        raise ValueError("arXiv requested top-level section is missing")
+    selected_text = "\n\n".join(
+        sections[name] for name in sections if name in section_names
+    )
+    revision_id = record.attribute("revision_id")
+    header = (
+        f"% arXiv manuscript revision {revision_id}\n"
+        f"% arXiv submitted_at {record.occurred_at}\n"
+    )
+    body = header + selected_text
+    span = {
+        "path": path,
+        "basename": basename,
+        "char_start": len(header),
+        "char_end": len(body),
+        "text_sha256": hashlib.sha256(selected_text.encode()).hexdigest(),
+    }
+    excluded_paths = sorted(
+        str(source["path"])
+        for source in raw_sources
+        if str(source.get("path") or "") != path
+    )
+    digest_payload = {
+        "operation": "arxiv_semantic_latex_body_v2",
+        "parent_provenance_id": record.provenance_id,
+        "excluded_paths": excluded_paths,
+        "source_file_spans": [span],
+        "source_view_basenames": [basename],
+        "text_sha256": hashlib.sha256(body.encode()).hexdigest(),
+    }
+    provenance = hashlib.sha256(
+        json.dumps(digest_payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return body, f"derived-sha256:{provenance}", excluded_paths, [span]
+
+
 def _canonical_digest(payload: dict[str, Any]) -> str:
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
@@ -1222,11 +1285,10 @@ def _wikipedia_source_workflow_events(
 
 
 _ARXIV_16K_VIEWS: dict[str, frozenset[str] | None] = {
-    "v1": frozenset({"example.tex", "illustrations_sup.tex", "main.tex"}),
+    "v1": frozenset({"example.tex", "main.tex"}),
     "v2": frozenset(
         {
             "acknowledgements.tex",
-            "discussion.tex",
             "experiments_details.tex",
             "main.tex",
         }
@@ -1521,12 +1583,23 @@ def _multiband_arxiv_revision_event(
     tier: str,
     included_basenames: frozenset[str] | None,
     view_channel: str = "",
+    section_basename: str = "",
+    section_names: frozenset[str] = frozenset(),
 ) -> tuple[Event, str, str, dict[str, str]]:
-    body, provenance_id, excluded_paths, source_file_spans = _semantic_arxiv_body(
-        record,
-        included_basenames=included_basenames,
-        bind_file_spans=True,
-    )
+    if section_names:
+        body, provenance_id, excluded_paths, source_file_spans = (
+            _semantic_arxiv_section_body(
+                record,
+                basename=section_basename,
+                section_names=section_names,
+            )
+        )
+    else:
+        body, provenance_id, excluded_paths, source_file_spans = _semantic_arxiv_body(
+            record,
+            included_basenames=included_basenames,
+            bind_file_spans=True,
+        )
     channel_suffix = f"_{view_channel}" if view_channel else ""
     event_id = (
         f"{prefix}.arxiv_revision_{tier}_{workflow_index}_{record_index}"
@@ -1620,6 +1693,45 @@ def _multiband_arxiv_revision_event(
         visibility=[event_id],
     )
     return event, body, revision_fact_id, source_fact_ids
+
+
+def _multiband_arxiv_context_event(
+    *,
+    workflow: Any,
+    record: Any,
+    prefix: str,
+    workflow_index: int,
+    record_index: int,
+    tier: str,
+    parent_channel: str,
+    included_basenames: frozenset[str],
+) -> Event:
+    event, _body, _revision_fact_id, _source_fact_ids = _multiband_arxiv_revision_event(
+        workflow=workflow,
+        record=record,
+        prefix=prefix,
+        workflow_index=workflow_index,
+        record_index=record_index,
+        tier=tier,
+        included_basenames=included_basenames,
+        view_channel=f"context_{parent_channel}",
+    )
+    event.type = "arxiv_revision_context"
+    basename = next(iter(included_basenames))
+    [source_span] = event.params["source_file_spans"]
+    source_text = event.params["text"][
+        int(source_span["char_start"]) : int(source_span["char_end"])
+    ]
+    substantive = next(
+        (line.strip() for line in source_text.splitlines() if line.strip()),
+        source_text[:80],
+    )
+    event.params["source_context_basename"] = basename
+    event.params["ground_values"] = [
+        event.params["occurred_at"][:10],
+        substantive[:160],
+    ]
+    return event
 
 
 def _multiband_arxiv_relation_event(
@@ -1728,6 +1840,296 @@ def _multiband_arxiv_relation_event(
     )
 
 
+def _paper_substantive_revision_records(
+    workflow: Any,
+) -> tuple[list[Any], int, str, frozenset[str], frozenset[str]] | None:
+    """Recognize a long adjacent arXiv history with one reliable semantic delta."""
+    records = sorted(
+        workflow.records,
+        key=lambda record: int(str(record.attribute("revision_id"))[1:]),
+    )
+    if len(records) < 7 or any(
+        record.source_family != "arxiv_record" for record in records
+    ):
+        return None
+    revision_ids = [str(record.attribute("revision_id")) for record in records]
+    if revision_ids != [f"v{index}" for index in range(1, len(records) + 1)]:
+        return None
+    delta_indices = [
+        index
+        for index, record in enumerate(records)
+        if sum(fact.field == "revision_added_text" for fact in record.facts) == 1
+    ]
+    if len(delta_indices) != 1:
+        return None
+    delta_index = delta_indices[0]
+    if delta_index < 1 or delta_index + 2 >= len(records):
+        return None
+    expected_relations = {
+        (records[index].record_id, records[index - 1].record_id)
+        for index in range(1, len(records))
+    }
+    if {
+        (relation.source_record_id, relation.target_record_id)
+        for relation in workflow.relations
+        if relation.kind == "revision_of" and len(relation.evidence) == 1
+    } != expected_relations:
+        return None
+    source = records[delta_index]
+    target = records[delta_index - 1]
+    [delta_fact] = [
+        fact for fact in source.facts if fact.field == "revision_added_text"
+    ]
+    source_payload = json.loads(source.text)
+    target_payload = json.loads(target.text)
+    source_files = {
+        str(item["path"]).rsplit("/", 1)[-1]: str(item["text"])
+        for item in source_payload["latex_sources"]
+    }
+    target_files = {
+        str(item["path"]).rsplit("/", 1)[-1]: str(item["text"])
+        for item in target_payload["latex_sources"]
+    }
+    delta_basenames = [
+        basename for basename, text in source_files.items() if delta_fact.value in text
+    ]
+    if len(delta_basenames) != 1 or delta_basenames[0] not in target_files:
+        return None
+    basename = delta_basenames[0]
+
+    def sections(text: str) -> dict[str, str]:
+        headings = list(re.finditer(r"(?m)^\\section\*?\{(?P<name>[^}]*)\}", text))
+        return {
+            " ".join(heading.group("name").split()): text[
+                heading.start() : (
+                    headings[index + 1].start()
+                    if index + 1 < len(headings)
+                    else len(text)
+                )
+            ]
+            for index, heading in enumerate(headings)
+        }
+
+    source_sections = sections(source_files[basename])
+    target_sections = sections(target_files[basename])
+    delta_sections = [
+        name for name, text in source_sections.items() if delta_fact.value in text
+    ]
+    shared = set(source_sections) & set(target_sections)
+    if len(delta_sections) != 1 or delta_sections[0] not in shared:
+        return None
+    delta_section = delta_sections[0]
+    largest_other = max(
+        (name for name in shared if name != delta_section),
+        key=lambda name: min(len(source_sections[name]), len(target_sections[name])),
+        default="",
+    )
+    if not largest_other:
+        return None
+    conclusion = next((name for name in shared if name.casefold() == "conclusion"), "")
+    introduction = next(
+        (name for name in shared if name.casefold() == "introduction"), ""
+    )
+    compact = frozenset({delta_section, largest_other, conclusion, introduction} - {""})
+    expanded = frozenset(
+        name
+        for name in source_sections
+        if name in shared and name.casefold() != "introduction"
+    )
+    if not introduction or not {delta_section, largest_other}.issubset(expanded):
+        return None
+    return records, delta_index, basename, compact, expanded
+
+
+def _paper_substantive_revision_events(
+    workflow: Any,
+    prefix: str,
+    workflow_index: int,
+    recognized: tuple[list[Any], int, str, frozenset[str], frozenset[str]],
+) -> list[Event]:
+    records, delta_index, delta_basename, compact_sections, expanded_sections = (
+        recognized
+    )
+    relations = {
+        (relation.source_record_id, relation.target_record_id): (index, relation)
+        for index, relation in enumerate(workflow.relations)
+    }
+    record_indices = {
+        record.record_id: index for index, record in enumerate(workflow.records)
+    }
+    delta_fact = next(
+        fact
+        for fact in records[delta_index].facts
+        if fact.field == "revision_added_text"
+    )
+    events: list[Event] = []
+    proof_records = set(records[delta_index - 1 : delta_index + 3])
+
+    for record in records:
+        if record in proof_records:
+            continue
+        _body, _provenance, _excluded, spans = _semantic_arxiv_body(
+            record, bind_file_spans=True
+        )
+        for index, span in enumerate(spans):
+            context = _multiband_arxiv_context_event(
+                workflow=workflow,
+                record=record,
+                prefix=prefix,
+                workflow_index=workflow_index,
+                record_index=record_indices[record.record_id],
+                tier="64k",
+                parent_channel=f"history_{index}",
+                included_basenames=frozenset({str(span["basename"])}),
+            )
+            context.time = date.fromisoformat(record.occurred_at[:10])
+            context.params["source_view_tier"] = "history"
+            events.append(context)
+
+    tier_specs = {
+        "16k": (2, compact_sections),
+        "32k": (3, expanded_sections),
+        "64k": (4, None),
+    }
+    workflow_key = hashlib.sha256(workflow.workflow_id.encode()).hexdigest()[:12]
+    for tier, (record_count, section_names) in tier_specs.items():
+        selected_records = records[delta_index - 1 : delta_index - 1 + record_count]
+        record_events: list[Event] = []
+        bodies: dict[str, str] = {}
+        revision_facts: dict[str, str] = {}
+        source_facts: dict[str, dict[str, str]] = {}
+        for offset, record in enumerate(selected_records):
+            use_sections = (
+                section_names
+                if offset < 2 and section_names is not None
+                else frozenset()
+            )
+            if tier == "32k" and offset == 1:
+                use_sections |= compact_sections - expanded_sections
+            included = None
+            if offset >= 2:
+                payload = json.loads(record.text)
+                included = frozenset(
+                    {
+                        max(
+                            payload["latex_sources"],
+                            key=lambda item: len(str(item["text"])),
+                        )["path"].rsplit("/", 1)[-1]
+                    }
+                )
+            event, body, revision_fact, facts = _multiband_arxiv_revision_event(
+                workflow=workflow,
+                record=record,
+                prefix=prefix,
+                workflow_index=workflow_index,
+                record_index=record_indices[record.record_id],
+                tier=tier,
+                included_basenames=included,
+                view_channel=f"substantive_{offset}",
+                section_basename=delta_basename if use_sections else "",
+                section_names=use_sections,
+            )
+            events.append(event)
+            record_events.append(event)
+            bodies[record.record_id] = body
+            revision_facts[record.record_id] = revision_fact
+            source_facts[record.record_id] = facts
+
+        relation_events: list[Event] = []
+        for relation_offset in range(1, len(selected_records)):
+            source_record = selected_records[relation_offset]
+            target_record = selected_records[relation_offset - 1]
+            relation_index, relation = relations[
+                (source_record.record_id, target_record.record_id)
+            ]
+            relation_event = _multiband_arxiv_relation_event(
+                workflow=workflow,
+                records={
+                    str(record.attribute("revision_id")): record for record in records
+                },
+                relation=relation,
+                relation_index=relation_index,
+                workflow_index=workflow_index,
+                tier=tier,
+                source_event=record_events[relation_offset],
+                target_event=record_events[relation_offset - 1],
+                source_body=bodies[source_record.record_id],
+                source_revision_fact_id=revision_facts[source_record.record_id],
+                target_revision_fact_id=revision_facts[target_record.record_id],
+                source_fact_ids=source_facts[source_record.record_id],
+                prior_relation_id=(relation_events[-1].id if relation_events else ""),
+            )
+            events.append(relation_event)
+            relation_events.append(relation_event)
+
+        source_event = record_events[1]
+        target_event = record_events[0]
+        fact_start = bodies[records[delta_index].record_id].index(delta_fact.value)
+        decision_id = (
+            f"{prefix}.arxiv_revision_decision_{tier}_{workflow_index}_substantive"
+        )
+        terminal_event = record_events[-1] if len(record_events) > 2 else None
+        proof_events = [event.id for event in record_events]
+        proof_events.extend(event.id for event in relation_events)
+        proof_events.append(decision_id)
+        events.append(
+            Event(
+                id=decision_id,
+                type="arxiv_revision_decision",
+                time=max(event.time for event in record_events) + timedelta(days=1),
+                params={
+                    "workflow_id": workflow.workflow_id,
+                    "work_id": records[delta_index].attribute("work_id"),
+                    "control_tier": tier,
+                    "substantive_revision_tier": True,
+                    "decision_mode": "relation_delta",
+                    "answer_key": f"real_revision_added_text:{workflow_key}:{tier}",
+                    "candidate_key": f"real_revision_delta_candidate:{workflow_key}:{tier}",
+                    "source_record_id": records[delta_index].record_id,
+                    "target_record_id": records[delta_index - 1].record_id,
+                    "source_revision_id": records[delta_index].attribute("revision_id"),
+                    "target_revision_id": records[delta_index - 1].attribute(
+                        "revision_id"
+                    ),
+                    "source_record_event_id": source_event.id,
+                    "target_record_event_id": target_event.id,
+                    "terminal_record_id": terminal_event.params["record_id"]
+                    if terminal_event
+                    else "",
+                    "terminal_record_event_id": terminal_event.id
+                    if terminal_event
+                    else "",
+                    "terminal_revision_id": terminal_event.params["revision_id"]
+                    if terminal_event
+                    else "",
+                    "relation_event_id": relation_events[0].id,
+                    "required_relation_ids": [
+                        event.params["relation_id"] for event in relation_events
+                    ],
+                    "fact_id": delta_fact.fact_id,
+                    "grounded_fact_id": source_facts[records[delta_index].record_id][
+                        delta_fact.fact_id
+                    ],
+                    "fact_char_start": fact_start,
+                    "fact_char_end": fact_start + len(delta_fact.value),
+                    "fact_value_offset": 0,
+                    "fact_value_length": len(delta_fact.value),
+                    "proof_event_ids": proof_events,
+                },
+                visibility=[decision_id],
+                causal_inputs=[event.id for event in record_events]
+                + [relation_events[-1].id],
+                required_inputs=[event.id for event in record_events]
+                + [relation_events[-1].id],
+                relation_kinds={
+                    **{event.id: "reads_source" for event in record_events},
+                    relation_events[-1].id: "applies_revision_chain",
+                },
+            )
+        )
+    return events
+
+
 def _paper_multiband_events(
     workflow: Any, prefix: str, workflow_index: int, records: dict[str, Any]
 ) -> list[Event]:
@@ -1769,6 +2171,23 @@ def _paper_multiband_events(
             body_by_tier[tier][revision_id] = body
             revision_fact_by_tier[tier][revision_id] = revision_fact
             source_facts_by_tier[tier][revision_id] = source_facts
+            context_basename = {
+                "v1": "illustrations_sup.tex",
+                "v2": "discussion.tex",
+            }.get(revision_id)
+            if tier == "16k" and context_basename is not None:
+                events.append(
+                    _multiband_arxiv_context_event(
+                        workflow=workflow,
+                        record=record,
+                        prefix=prefix,
+                        workflow_index=workflow_index,
+                        record_index=record_indices[record.record_id],
+                        tier=tier,
+                        parent_channel=f"source_{context_basename.removesuffix('.tex')}",
+                        included_basenames=frozenset({context_basename}),
+                    )
+                )
 
     relations = {
         (relation.source_record_id, relation.target_record_id): (index, relation)
@@ -1971,6 +2390,10 @@ def _paper_benchmark_trace_events(
     }
     events: list[Event] = []
     workflow_key = hashlib.sha256(workflow.workflow_id.encode()).hexdigest()[:12]
+    context_records_created: set[str] = set()
+    evidence_events: dict[tuple[str, str], Event] = {}
+    evidence_event_basenames: dict[tuple[str, str], frozenset[str]] = {}
+    relation_events_by_pair: dict[tuple[str, str], Event] = {}
     for tier in ("16k", "32k", "64k"):
         tier_views = _ARXIV_BENCHMARK_TRACE_VIEWS[tier]
         view_events: list[tuple[Event, bool, bool, bool]] = []
@@ -1986,31 +2409,92 @@ def _paper_benchmark_trace_events(
             require_training,
         ) in tier_views:
             record = records[revision_id]
-            event, body, revision_fact_id, _source_facts = (
-                _multiband_arxiv_revision_event(
-                    workflow=workflow,
-                    record=record,
-                    prefix=prefix,
-                    workflow_index=workflow_index,
-                    record_index=record_indices[record.record_id],
-                    tier=tier,
+            _configured_body, _configured_provenance, _configured_excluded, spans = (
+                _semantic_arxiv_body(
+                    record,
                     included_basenames=included_basenames,
-                    view_channel=channel,
+                    bind_file_spans=True,
                 )
             )
-            _add_benchmark_grounded_facts(
-                event,
-                require_abstract=require_abstract,
-                require_detail=require_detail,
-                require_training=require_training,
+            available_basenames = frozenset(str(span["basename"]) for span in spans)
+            preferred_evidence = {
+                *({"introduction.tex", "ms.tex"} if require_abstract else set()),
+                *(
+                    {
+                        "parameter_attention.tex",
+                        "results.tex",
+                        "sqrt_d_trick.tex",
+                        "visualizations.tex",
+                    }
+                    if require_detail
+                    else set()
+                ),
+                *({"training.tex"} if require_training else set()),
+            }
+            evidence_key = (revision_id, channel)
+            evidence_basenames = evidence_event_basenames.get(
+                evidence_key,
+                frozenset(available_basenames & preferred_evidence),
             )
-            events.append(event)
+            event = evidence_events.get(evidence_key)
+            if event is None:
+                event, body, revision_fact_id, _source_facts = (
+                    _multiband_arxiv_revision_event(
+                        workflow=workflow,
+                        record=record,
+                        prefix=prefix,
+                        workflow_index=workflow_index,
+                        record_index=record_indices[record.record_id],
+                        tier=tier,
+                        included_basenames=evidence_basenames,
+                        view_channel=channel,
+                    )
+                )
+                _add_benchmark_grounded_facts(
+                    event,
+                    require_abstract=require_abstract,
+                    require_detail=require_detail,
+                    require_training=require_training,
+                )
+                events.append(event)
+                evidence_events[evidence_key] = event
+                evidence_event_basenames[evidence_key] = evidence_basenames
+            else:
+                body = str(event.params["text"])
+                revision_fact_id = f"{event.id}:revision_id"
             view_events.append(
                 (event, require_abstract, require_detail, require_training)
             )
             revision_events.setdefault(revision_id, []).append(event)
             event_bodies[event.id] = body
             revision_fact_ids[event.id] = revision_fact_id
+        for revision_id in dict.fromkeys(item[0] for item in tier_views):
+            record = records[revision_id]
+            if record.record_id in context_records_created:
+                continue
+            _full_body, _full_provenance, _full_excluded, full_spans = (
+                _semantic_arxiv_body(record, bind_file_spans=True)
+            )
+            all_basenames = {str(span["basename"]) for span in full_spans}
+            proof_basenames = {
+                str(basename)
+                for event in revision_events[revision_id]
+                for basename in event.params["source_view_basenames"]
+            }
+            for index, basename in enumerate(sorted(all_basenames - proof_basenames)):
+                events.append(
+                    _multiband_arxiv_context_event(
+                        workflow=workflow,
+                        record=record,
+                        prefix=prefix,
+                        workflow_index=workflow_index,
+                        record_index=record_indices[record.record_id],
+                        tier=tier,
+                        parent_channel=f"source_{index}",
+                        included_basenames=frozenset({basename}),
+                    )
+                )
+            context_records_created.add(record.record_id)
 
         relation_events: list[Event] = []
         relation_pairs = {
@@ -2027,22 +2511,28 @@ def _paper_benchmark_trace_events(
             ]
             source_event = revision_events[source_revision][0]
             target_event = revision_events[target_revision][0]
-            relation_event = _multiband_arxiv_relation_event(
-                workflow=workflow,
-                records=records,
-                relation=relation,
-                relation_index=relation_index,
-                workflow_index=workflow_index,
-                tier=tier,
-                source_event=source_event,
-                target_event=target_event,
-                source_body=event_bodies[source_event.id],
-                source_revision_fact_id=revision_fact_ids[source_event.id],
-                target_revision_fact_id=revision_fact_ids[target_event.id],
-                source_fact_ids={},
-                prior_relation_id=(relation_events[-1].id if relation_events else ""),
-            )
-            events.append(relation_event)
+            relation_key = (source_revision, target_revision)
+            relation_event = relation_events_by_pair.get(relation_key)
+            if relation_event is None:
+                relation_event = _multiband_arxiv_relation_event(
+                    workflow=workflow,
+                    records=records,
+                    relation=relation,
+                    relation_index=relation_index,
+                    workflow_index=workflow_index,
+                    tier=tier,
+                    source_event=source_event,
+                    target_event=target_event,
+                    source_body=event_bodies[source_event.id],
+                    source_revision_fact_id=revision_fact_ids[source_event.id],
+                    target_revision_fact_id=revision_fact_ids[target_event.id],
+                    source_fact_ids={},
+                    prior_relation_id=(
+                        relation_events[-1].id if relation_events else ""
+                    ),
+                )
+                events.append(relation_event)
+                relation_events_by_pair[relation_key] = relation_event
             relation_events.append(relation_event)
 
         decision_id = f"{prefix}.arxiv_benchmark_trace_decision_{tier}_{workflow_index}"
@@ -2134,6 +2624,14 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
             events.extend(
                 _paper_multiband_events(
                     workflow, prefix, workflow_index, multiband_records
+                )
+            )
+            continue
+        substantive_records = _paper_substantive_revision_records(workflow)
+        if substantive_records is not None:
+            events.extend(
+                _paper_substantive_revision_events(
+                    workflow, prefix, workflow_index, substantive_records
                 )
             )
             continue
@@ -2379,6 +2877,7 @@ def canonical_researchlab_source_event_envelope(
         return None
     if event_type not in {
         "arxiv_revision",
+        "arxiv_revision_context",
         "arxiv_revision_relation",
         "wiki_source_relation",
         "wiki_source_section",
@@ -2553,7 +3052,11 @@ def canonical_researchlab_source_visible_text(
         return None
     if not isinstance(event_type, str) or not isinstance(params, dict):
         return None
-    if event_type in {"arxiv_revision", "wiki_source_section"}:
+    if event_type in {
+        "arxiv_revision",
+        "arxiv_revision_context",
+        "wiki_source_section",
+    }:
         text = params.get("text")
         return text if isinstance(text, str) and text else None
     if event_type == "arxiv_revision_relation":
@@ -2573,6 +3076,11 @@ def canonical_researchlab_source_visible_text(
                     "source_revision": params["source_revision_id"],
                     "target_revision": params["target_revision_id"],
                     "evidence": params["evidence_quote"],
+                    **(
+                        {"control_tier": params["source_view_tier"]}
+                        if params.get("source_view_tier")
+                        else {}
+                    ),
                 },
                 ensure_ascii=False,
                 indent=2,

@@ -675,16 +675,52 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                 separators=(",", ":"),
             ).encode()
         ).hexdigest()
+        terminal_revision = str(decision.params.get("terminal_revision_id") or "")
+        terminal_suffix = (
+            f" | {terminal_revision} YYYY-MM-DD" if terminal_revision else ""
+        )
         if funding:
             answer_schema = (
-                "YYYY-MM-DD | <first_funder> | <agency_acronym> | NSF <grant_id> "
-                "| v3 YYYY-MM-DD"
+                "YYYY-MM-DD | <first_funder> | <agency_acronym> | NSF <grant_id>"
+                f"{terminal_suffix}"
             )
             parse_op = "PARSE_FUNDING_DISCLOSURE"
         else:
-            answer_schema = "YYYY-MM-DD | <added_sentence> | v3 YYYY-MM-DD"
+            answer_schema = f"YYYY-MM-DD | <added_sentence>{terminal_suffix}"
             parse_op = "SELECT_UNIQUE_SEMANTIC_DELTA"
-        if tier == "16k":
+        if decision.params.get("substantive_revision_tier") is True:
+            relation_count = len(decision.params.get("required_relation_ids") or [])
+            question = (
+                f"Trace the signed arXiv revision chain for {decision.params['work_id']} "
+                f"from {decision.params['target_revision_id']} through "
+                f"{decision.params['source_revision_id']}. Verify that the selected "
+                "semantic sentence is absent from the earlier source view and first "
+                "appears in the later view."
+                + (
+                    f" Follow the authentic chain through {terminal_revision} and "
+                    "report its submission date."
+                    if terminal_revision
+                    else ""
+                )
+                + f" Reply exactly as {answer_schema}."
+            )
+            program_ops = [
+                {"op": "READ_SOURCE_SPAN"},
+                {"op": "READ_PRIOR_SUBMISSION_DATE"},
+                {"op": "VERIFY_ABSENT_FROM_PRIOR_REVISION"},
+                *({"op": "FOLLOW_REVISION_OF"} for _ in range(relation_count)),
+                {"op": parse_op},
+                *([{"op": "READ_TERMINAL_REVISION_DATE"}] if terminal_revision else []),
+                {"op": "APPLY_REVISION_CHAIN_RESOLUTION"},
+            ]
+            gold_expression = (
+                f"READ_DATE({decision.params['target_revision_id']}) AND "
+                f"READ_SOURCE_SPAN({decision.params['source_revision_id']}) AND "
+                f"ABSENT_FROM({decision.params['target_revision_id']}) THEN "
+                f"{parse_op} AND FOLLOW_REVISION_CHAIN({relation_count})"
+            )
+            proof_depth = relation_count + 1
+        elif tier == "16k":
             question = (
                 "Compare the bounded, source-attested LaTeX views for the first "
                 f"two public revisions of {decision.params['work_id']}. Verify "

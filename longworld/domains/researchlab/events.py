@@ -1145,7 +1145,7 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
     t = ev.type
     if t in {"report_v1", "license_clause"}:
         return True, None
-    if t == "arxiv_revision":
+    if t in {"arxiv_revision", "arxiv_revision_context"}:
         try:
             source = _source_binding(ev)
         except (GroundedSpanError, TypeError):
@@ -1366,12 +1366,14 @@ def apply_event(state: WorldState, ev: Event) -> None:
     day = ev.time
     if t == "license_clause":
         state.set("pending_license", p["spdx"], eid, day)
-    elif t == "arxiv_revision":
+    elif t in {"arxiv_revision", "arxiv_revision_context"}:
         try:
             source = _source_binding(ev)
         except (GroundedSpanError, TypeError):
             return
         if not _arxiv_source_binding_valid(ev, source):
+            return
+        if t == "arxiv_revision_context":
             return
         headers = _arxiv_headers(source)
         if headers is None:
@@ -1560,7 +1562,8 @@ def apply_event(state: WorldState, ev: Event) -> None:
                 terminal_date = str(terminal.get("occurred_at") or "")[:10]
                 if not terminal_date:
                     return
-                value += f" | v3 {terminal_date}"
+                terminal_revision = str(p.get("terminal_revision_id") or "v3")
+                value += f" | {terminal_revision} {terminal_date}"
             answer_key = str(p.get("answer_key") or "real_revision_added_text")
             state.set(answer_key, value, eid, day)
             state.set("real_revision_added_text", value, eid, day)

@@ -127,7 +127,7 @@ def _ground(ev: Event) -> list[str]:
         return ["case-ratified"]
     if t == "status_pulse":
         return [str(p["ticket"])]
-    if t == "arxiv_revision":
+    if t in {"arxiv_revision", "arxiv_revision_context"}:
         return [str(value) for value in p.get("ground_values") or []]
     if t == "arxiv_revision_relation":
         return [str(p["relation_kind"]), str(p["target_revision_id"])]
@@ -147,7 +147,7 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
     date_s = ev.time.isoformat()
     paper, model, bench = project["paper"], project["model"], project["benchmark"]
     canonical_source_text = canonical_researchlab_source_visible_text(ev)
-    if t == "arxiv_revision":
+    if t in {"arxiv_revision", "arxiv_revision_context"}:
         if canonical_source_text is None:
             raise ValueError("arXiv revision visible text is invalid")
         return "json", canonical_source_text
@@ -176,6 +176,10 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
         return "json", json.dumps(
             {
                 "kind": "arxiv_revision_decision",
+                "control_tier": ev.params.get("control_tier", "legacy"),
+                "required_revision_relations": len(
+                    ev.params.get("required_relation_ids") or []
+                ),
                 "rule": rule,
                 "answer_disclosure": "omitted",
             },
@@ -187,6 +191,13 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
         return "json", json.dumps(
             {
                 "kind": "arxiv_benchmark_trace_decision",
+                "control_tier": ev.params["control_tier"],
+                "required_source_channels": len(
+                    ev.params.get("record_requirements") or []
+                ),
+                "required_revision_relations": len(
+                    ev.params.get("required_relation_ids") or []
+                ),
                 "rule": (
                     "report the benchmark observations in verified revision order; "
                     "include detailed-result spans only when the control tier "
@@ -542,11 +553,12 @@ def render_lab(sim: SimulatedWorld) -> list[Artifact]:
         )
         if ev.type in {
             "arxiv_revision",
+            "arxiv_revision_context",
             "arxiv_revision_relation",
             "arxiv_revision_decision",
             "arxiv_benchmark_trace_decision",
         }:
-            is_record = ev.type == "arxiv_revision"
+            is_record = ev.type in {"arxiv_revision", "arxiv_revision_context"}
             source_origin = (
                 SourceOrigin(str(ev.params["source_origin"]))
                 if is_record
@@ -595,7 +607,11 @@ def render_lab(sim: SimulatedWorld) -> list[Artifact]:
                     if is_real_record
                     else WorkflowKind.HYBRID_CAUSAL
                 ),
-                evidence_role=EvidenceRole.CAUSAL_SUPPORTING,
+                evidence_role=(
+                    EvidenceRole.NATURAL_BACKGROUND
+                    if ev.type == "arxiv_revision_context"
+                    else EvidenceRole.CAUSAL_SUPPORTING
+                ),
                 workflow_id=sim.spec["world_id"],
                 provenance_id=provenance_id,
             )

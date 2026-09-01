@@ -513,8 +513,24 @@ def test_real_arxiv_multiband_queries_grow_source_history_and_proof() -> None:
     v1_16k_files = set(revision_events[("16k", "v1")].params["source_view_basenames"])
     v2_16k_files = set(revision_events[("16k", "v2")].params["source_view_basenames"])
     assert "main.tex" in v1_16k_files & v2_16k_files
+    assert "illustrations_sup.tex" not in v1_16k_files
     assert "acknowledgements.tex" not in v1_16k_files
     assert "acknowledgements.tex" in v2_16k_files
+    assert "experiments_details.tex" in v2_16k_files
+    assert "discussion.tex" not in v2_16k_files
+    context_by_revision = {
+        event.params["revision_id"]: event
+        for event in world.events
+        if event.type == "arxiv_revision_context"
+        and event.params.get("source_view_tier") == "16k"
+    }
+    assert context_by_revision["v1"].params["source_view_basenames"] == [
+        "illustrations_sup.tex"
+    ]
+    assert context_by_revision["v2"].params["source_view_basenames"] == [
+        "discussion.tex"
+    ]
+    assert all(event.required_inputs == [] for event in context_by_revision.values())
     decision_16k = events_by_id[specs[0].essential_event_ids[-1]]
     assert decision_16k.params["required_new_include"] == "parts/acknowledgements"
     assert [
