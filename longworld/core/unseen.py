@@ -16,8 +16,15 @@ from longworld.core.attestation import attach_attestation, verify_attestation
 from longworld.core.production_trust import (
     verify_embedded_production_approval_from_env,
 )
-from longworld.core.promotion import RELEASE_GATE_REVISION
-from longworld.core.release_profile import release_profile, release_profile_sha256
+from longworld.core.promotion import (
+    RELEASE_GATE_REVISION,
+    promoted_row_set_sha256,
+    promoted_split_row_set_sha256,
+)
+from longworld.core.release_profile import (
+    issuable_release_profile,
+    release_profile_sha256,
+)
 
 UNSEEN_AXES = (
     "world_entity",
@@ -132,7 +139,7 @@ def _has_production_attestation(
 def _validated_release_binding(
     release_manifest: object,
     *,
-    n_rows: int,
+    rows: list[dict[str, Any]],
     source_file_sha256: object,
     attestation_key: bytes | None,
 ) -> dict[str, Any]:
@@ -144,12 +151,13 @@ def _validated_release_binding(
     ):
         raise ValueError("production unseen release attestation is invalid")
     release_sources = release_manifest.get("source_file_sha256")
+    release_split_rows = release_manifest.get("promoted_split_row_set_sha256")
     if (
         release_manifest.get("schema_version") != _RELEASE_GATE_SCHEMA
         or release_manifest.get("gate_revision") != RELEASE_GATE_REVISION
         or release_manifest.get("ok") is not True
         or release_manifest.get("errors") != []
-        or release_manifest.get("n_rows") != n_rows
+        or release_manifest.get("n_rows") != len(rows)
         or _SHA256.fullmatch(str(release_manifest.get("release_profile_sha256") or ""))
         is None
         or not str(release_manifest.get("release_profile_id") or "")
@@ -161,10 +169,17 @@ def _validated_release_binding(
         )
         or release_manifest.get("quality_report_sha256")
         != release_sources.get("quality_report.json")
+        or release_manifest.get("promoted_row_set_sha256")
+        != promoted_row_set_sha256(rows)
+        or release_split_rows
+        != {
+            split: promoted_split_row_set_sha256(rows, split)
+            for split in ("train", "eval")
+        }
     ):
         raise ValueError("production unseen release manifest is invalid")
     release_profile_id = str(release_manifest["release_profile_id"])
-    profile = release_profile(release_profile_id)
+    profile = issuable_release_profile(release_profile_id)
     if profile.environment != "production" or release_manifest.get(
         "release_profile_sha256"
     ) != release_profile_sha256(release_profile_id):
@@ -191,6 +206,8 @@ def _validated_release_binding(
         "release_profile_id": release_manifest["release_profile_id"],
         "release_profile_sha256": release_manifest["release_profile_sha256"],
         "source_file_sha256": dict(sorted(release_sources.items())),
+        "promoted_row_set_sha256": release_manifest["promoted_row_set_sha256"],
+        "promoted_split_row_set_sha256": dict(sorted(release_split_rows.items())),
     }
 
 
@@ -217,8 +234,35 @@ def _validate_split_outputs(payload: dict[str, Any], manifest_path: Path) -> Non
                 raw = output.read_bytes()
             except OSError as error:
                 raise ValueError("unseen split output is missing") from error
+            if not raw.strip():
+                raise ValueError("unseen split output is empty")
             if _sha256_bytes(raw) != details.get(f"{prefix}_sha256"):
                 raise ValueError("unseen split output digest is invalid")
+
+
+def _load_axis_rows(manifest_path: Path, axis: str) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for split in ("train", "eval"):
+        path = manifest_path.parent / axis / f"{split}.jsonl"
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+            values = [json.loads(line) for line in lines if line.strip()]
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError("unseen split output rows are invalid") from error
+        if any(not isinstance(value, dict) for value in values):
+            raise ValueError("unseen split output rows are invalid")
+        rows.extend(values)
+    return rows
+
+
+def _unready_axes(axes: dict[str, dict[str, Any]]) -> list[str]:
+    return sorted(
+        axis
+        for axis, details in axes.items()
+        if details.get("status") != "ready"
+        or int(details.get("n_train_rows") or 0) <= 0
+        or int(details.get("n_eval_rows") or 0) <= 0
+    )
 
 
 def _dossier_group_errors(rows: list[dict[str, Any]], axis: str) -> list[str]:
@@ -341,7 +385,7 @@ def _world_entity_coverage(rows: list[dict[str, Any]]) -> str:
     return "world_atomic_only"
 
 
-def build_unseen_splits(
+def _build_unseen_splits(
     rows: list[dict[str, Any]],
     output_dir: Path,
     *,
@@ -387,6 +431,8 @@ def build_unseen_splits(
 
     release_binding: dict[str, Any] | None = None
     if trust_mode == "production":
+        if manifest_attestation_key is None:
+            raise ValueError("production unseen manifest attestation key is missing")
         for index, row in enumerate(rows):
             if not _has_production_attestation(
                 row,
@@ -399,7 +445,7 @@ def build_unseen_splits(
                 )
         release_binding = _validated_release_binding(
             release_manifest,
-            n_rows=len(rows),
+            rows=rows,
             source_file_sha256=source_file_sha256,
             attestation_key=release_attestation_key,
         )
@@ -505,6 +551,14 @@ def build_unseen_splits(
         if axis == "world_entity":
             manifest[axis]["coverage"] = _world_entity_coverage(rows)
 
+    if trust_mode == "production":
+        unready_axes = _unready_axes(manifest)
+        if unready_axes:
+            _invalidate_split_outputs(output_dir, selected_axes)
+            raise ValueError(
+                "production unseen axes are not ready: " + ",".join(unready_axes)
+            )
+
     manifest_payload = {
         "schema_version": UNSEEN_SPLIT_SCHEMA,
         "trust_mode": trust_mode,
@@ -523,8 +577,7 @@ def build_unseen_splits(
         "axes": manifest,
     }
     if trust_mode == "production":
-        if manifest_attestation_key is None:
-            raise ValueError("production unseen manifest attestation key is missing")
+        assert manifest_attestation_key is not None
         manifest_payload = attach_attestation(
             manifest_payload,
             manifest_attestation_key,
@@ -542,6 +595,44 @@ def build_unseen_splits(
         (json.dumps(manifest_payload, indent=2, sort_keys=True) + "\n").encode(),
     )
     return manifest
+
+
+def build_unseen_splits(
+    rows: list[dict[str, Any]],
+    output_dir: Path,
+    *,
+    axes: Iterable[str] = UNSEEN_AXES,
+    eval_ratio: float = 0.2,
+    split_seed: int = 0,
+    trust_mode: str = "local_engineering",
+    source_file_sha256: dict[str, str] | None = None,
+    release_manifest: dict[str, Any] | None = None,
+    promotion_attestation_key: bytes | None = None,
+    release_attestation_key: bytes | None = None,
+    manifest_attestation_key: bytes | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Build splits and leave no production outputs after any failed attempt."""
+    selected_axes = tuple(axes)
+    try:
+        return _build_unseen_splits(
+            rows,
+            output_dir,
+            axes=selected_axes,
+            eval_ratio=eval_ratio,
+            split_seed=split_seed,
+            trust_mode=trust_mode,
+            source_file_sha256=source_file_sha256,
+            release_manifest=release_manifest,
+            promotion_attestation_key=promotion_attestation_key,
+            release_attestation_key=release_attestation_key,
+            manifest_attestation_key=manifest_attestation_key,
+        )
+    except BaseException:
+        if trust_mode == "production":
+            _invalidate_split_outputs(
+                output_dir, (axis for axis in selected_axes if axis in UNSEEN_AXES)
+            )
+        raise
 
 
 def load_unseen_split_manifest(
@@ -580,14 +671,35 @@ def load_unseen_split_manifest(
             )
         ):
             raise ValueError("production unseen manifest attestation is invalid")
+        axes = payload.get("axes")
+        if not isinstance(axes, dict):
+            raise ValueError("unseen split manifest axes are invalid")
+        ready_axes = sorted(
+            axis
+            for axis, details in axes.items()
+            if isinstance(details, dict) and details.get("status") == "ready"
+        )
+        if not ready_axes:
+            raise ValueError("production unseen axes are not ready")
+        _validate_split_outputs(payload, manifest_path)
+        release_rows = _load_axis_rows(manifest_path, ready_axes[0])
+        if len(release_rows) != payload["n_input_rows"]:
+            raise ValueError("production unseen input row count is invalid")
         expected_release = _validated_release_binding(
             release_manifest,
-            n_rows=payload["n_input_rows"],
+            rows=release_rows,
             source_file_sha256=payload.get("input_source_file_sha256"),
             attestation_key=release_attestation_key,
         )
         if payload.get("release_manifest") != expected_release:
             raise ValueError("production unseen release manifest binding is invalid")
+        expected_row_set = expected_release["promoted_row_set_sha256"]
+        if any(
+            promoted_row_set_sha256(_load_axis_rows(manifest_path, axis))
+            != expected_row_set
+            for axis in ready_axes[1:]
+        ):
+            raise ValueError("production unseen axis row-set binding is invalid")
     elif (
         payload.get("production_eligible") is not False
         or payload.get("row_attestations_verified") is not False
@@ -600,5 +712,14 @@ def load_unseen_split_manifest(
     ):
         raise ValueError("local engineering manifest overstates production trust")
 
-    _validate_split_outputs(payload, manifest_path)
+    if trust_mode != "production":
+        _validate_split_outputs(payload, manifest_path)
+    if trust_mode == "production":
+        axes = payload["axes"]
+        assert isinstance(axes, dict)
+        unready_axes = _unready_axes(axes)
+        if unready_axes:
+            raise ValueError(
+                "production unseen axes are not ready: " + ",".join(unready_axes)
+            )
     return payload

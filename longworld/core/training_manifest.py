@@ -388,15 +388,15 @@ def validate_deterministic_training_transform(
             raise ValueError(
                 "training transform source is not promoted train-ready data"
             )
-        if require_production_trust and any(
-            row.get(field) != expected
-            for field, expected in {
-                "trust_scope": "production",
-                "diagnostic_only": False,
-                "content_gate_eligible": True,
-                "trust_valid_for_production": True,
-                "production_eligible": True,
-            }.items()
+        row_errors = sft_row_errors(row)
+        if row_errors:
+            raise ValueError(
+                "training transform source row contract failed: " + ",".join(row_errors)
+            )
+        attestation = row.get("attestation")
+        if require_production_trust and (
+            not isinstance(attestation, dict)
+            or attestation.get("environment") != "production"
         ):
             raise ValueError(
                 "training transform source lacks explicit production trust"

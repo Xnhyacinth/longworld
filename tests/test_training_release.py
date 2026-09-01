@@ -9,11 +9,18 @@ import pytest
 
 from longworld.core.attestation import (
     ATTESTATION_ENV,
+    ATTESTATION_ENVIRONMENT_ENV,
     LOCAL_PROBE_COMBINED_ROLES_ENV,
     LOCAL_PROBE_TRUST_ISOLATION_VALUE,
+    ROLE_KEY_ENVS,
+    ROLE_KEY_ID_ENVS,
+    attach_attestation,
     attestation_key_from_env,
 )
-from longworld.core.record_contract import exact_token_metadata_valid
+from longworld.core.record_contract import (
+    STRICT_REPLAY_REVISION,
+    exact_token_metadata_valid,
+)
 from longworld.core.release_profile import release_profile, release_profile_sha256
 from longworld.core.training_manifest import (
     LLAMAFACTORY_SHAREGPT_SYSTEM_V4,
@@ -72,6 +79,11 @@ def test_loaded_release_metrics_feed_the_gate_receipt_world_count(
                 "data_stage": "train_ready",
                 "release_profile_id": "p3-probe-12-v1",
                 "release_profile_sha256": release_profile_sha256("p3-probe-12-v1"),
+                "promoted_row_set_sha256": "a" * 64,
+                "promoted_split_row_set_sha256": {
+                    "train": "b" * 64,
+                    "eval": "c" * 64,
+                },
             }
         )
     )
@@ -101,6 +113,11 @@ def test_loaded_release_metrics_feed_the_gate_receipt_world_count(
     assert receipt["ok"] is True
     assert receipt["errors"] == []
     assert receipt["source_file_sha256"] == product.source_file_sha256
+    assert receipt["promoted_row_set_sha256"] == "a" * 64
+    assert receipt["promoted_split_row_set_sha256"] == {
+        "train": "b" * 64,
+        "eval": "c" * 64,
+    }
     assert receipt["tokenizer_model_id"] == "Qwen/Qwen3.5-4B"
     assert len(receipt["tokenizer_revision"]) == 40
     assert receipt["tokenizer_asset_manifest_sha256"] is None
@@ -408,7 +425,11 @@ def test_training_export_rows_are_exact_deterministic_promoted_projections(
 ) -> None:
     from longworld.core import training_manifest
 
-    monkeypatch.setattr(training_manifest, "sft_row_errors", lambda _row: [])
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "production")
+    monkeypatch.setenv(ROLE_KEY_ENVS["promotion"], KEY.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["promotion"], "kms-promotion-v1")
+    monkeypatch.setenv(ROLE_KEY_ENVS["report"], KEY.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["report"], "kms-report-v1")
     monkeypatch.setattr(
         training_manifest,
         "release_profile",
@@ -449,8 +470,53 @@ def test_training_export_rows_are_exact_deterministic_promoted_projections(
         "workflow_kinds": ["hybrid_causal"],
         "workflow_ids": ["workflow-1"],
         "evidence_roles": ["essential"],
-        "composition_method": "source_bound_workflow",
-        "training_objective": "long_context_sft",
+        "composition_method": "same_case_dossier",
+        "training_objective": "sft",
+        "verification": {
+            "production_mode": True,
+            "semantic_sufficient": True,
+            "strict_executable_sufficient": True,
+            "embedding_topk_insufficient": True,
+        },
+        "view_verification": {
+            "production_eligible": True,
+            "essential_present": True,
+            "semantic_text_grounded": True,
+            "classification_ok": True,
+            "global_proof_green": True,
+            "expected_answer": "v2.1.0",
+            "strict_replay_answer": "v2.1.0",
+        },
+        "promotion": {
+            "schema_version": "train-ready-promotion-v2",
+            "candidate_sha256": "a" * 64,
+            "dense_audit_sha256": "b" * 64,
+            "dense_ranking_sha256": "c" * 64,
+            "dense_model_provider": "huggingface",
+            "dense_model_id": "sentence-transformers/all-MiniLM-L6-v2",
+            "dense_model_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+            "dense_model_backend": "sentence-transformers-6.0.0",
+            "dense_score_metric": "dot_product",
+            "dense_chunking": {
+                "strategy": "tokenizer_token_windows",
+                "max_tokens": 192,
+                "overlap_tokens": 32,
+                "aggregation": "max_similarity",
+            },
+            "dense_top_k": 3,
+            "strict_replay_revision": STRICT_REPLAY_REVISION,
+            "strict_replay_answer": "v2.1.0",
+        },
+        "artifact_classification": [
+            {
+                "artifact_id": "artifact-1",
+                "workflow_id": "workflow-1",
+                "workflow_kind": "hybrid_causal",
+                "evidence_role": "causal_gold",
+                "source_origin": "real_public",
+                "provenance_id": "source-sha256:" + "d" * 64,
+            }
+        ],
     }
     (source / "quality_report.json").write_text("{}\n")
     second = {
@@ -458,10 +524,11 @@ def test_training_export_rows_are_exact_deterministic_promoted_projections(
         "query_id": "query-2",
         "dossier_id": "dossier-2",
         "context": "a second source-bound release history",
-        "answer": "v2.2.0",
         "base_task_id": "task-2",
         "executable_proof_id": "proof-2",
     }
+    promoted = attach_attestation(promoted, KEY, purpose="sft_row")
+    second = attach_attestation(second, KEY, purpose="sft_row")
     _write_jsonl(source / "train.jsonl", [promoted, second])
     (source / "eval.jsonl").write_text("")
     transformed = {
@@ -488,8 +555,8 @@ def test_training_export_rows_are_exact_deterministic_promoted_projections(
         "workflow_kinds": ["hybrid_causal"],
         "workflow_ids": ["workflow-1"],
         "evidence_roles": ["essential"],
-        "composition_method": "source_bound_workflow",
-        "training_objective": "long_context_sft",
+        "composition_method": "same_case_dossier",
+        "training_objective": "sft",
     }
     transformed_second = json.loads(json.dumps(transformed))
     transformed_second.update(
@@ -506,66 +573,78 @@ def test_training_export_rows_are_exact_deterministic_promoted_projections(
     expected_rows = [transformed, transformed_second]
     shard.write_text(json.dumps(expected_rows) + "\n")
     manifest_path = output / "training_export_manifest.json"
-    manifest = create_training_manifest(
-        manifest_path,
-        release_root=root,
-        source_data_dir=source,
-        release_profile_id="p3-probe-12-v1",
-        transform_revision="longworld-llamafactory-sharegpt-v4",
-        output_paths=[shard],
-        source_file_sha256=_source_digests(source),
-        attestation_key=attestation_key_from_env("training_export_manifest"),
-    )
+
+    def build_manifest() -> dict:
+        return create_training_manifest(
+            manifest_path,
+            release_root=root,
+            source_data_dir=source,
+            release_profile_id="p3-probe-12-v1",
+            transform_revision=LLAMAFACTORY_SHAREGPT_TRANSFORM_V4,
+            output_paths=[shard],
+            source_file_sha256=_source_digests(source),
+            attestation_key=attestation_key_from_env("training_export_manifest"),
+        )
+
+    manifest = build_manifest()
 
     assert validate_deterministic_training_transform(manifest_path, manifest) == 2
 
-    with pytest.raises(ValueError, match="production trust"):
-        validate_deterministic_training_transform(
-            manifest_path,
-            manifest,
-            require_production_trust=True,
-        )
-
-    production_trust = {
-        "trust_scope": "production",
-        "diagnostic_only": False,
-        "content_gate_eligible": True,
-        "trust_valid_for_production": True,
-        "production_eligible": True,
-    }
-    promoted.update(production_trust)
-    second.update(production_trust)
-    _write_jsonl(source / "train.jsonl", [promoted, second])
-    manifest = create_training_manifest(
-        manifest_path,
-        release_root=root,
-        source_data_dir=source,
-        release_profile_id="p3-probe-12-v1",
-        transform_revision="longworld-llamafactory-sharegpt-v4",
-        output_paths=[shard],
-        source_file_sha256=_source_digests(source),
-        attestation_key=attestation_key_from_env("training_export_manifest"),
-    )
+    assert not {
+        "trust_scope",
+        "diagnostic_only",
+        "content_gate_eligible",
+        "trust_valid_for_production",
+        "production_eligible",
+    }.intersection(promoted)
     assert (
         validate_deterministic_training_transform(
-            manifest_path,
-            manifest,
-            require_production_trust=True,
+            manifest_path, manifest, require_production_trust=True
         )
         == 2
     )
 
-    shard.write_text(json.dumps([transformed]) + "\n")
-    manifest = create_training_manifest(
-        manifest_path,
-        release_root=root,
-        source_data_dir=source,
-        release_profile_id="p3-probe-12-v1",
-        transform_revision="longworld-llamafactory-sharegpt-v4",
-        output_paths=[shard],
-        source_file_sha256=_source_digests(source),
-        attestation_key=attestation_key_from_env("training_export_manifest"),
+    invalid = {
+        **{key: value for key, value in promoted.items() if key != "attestation"},
+        "view_verification": {
+            **promoted["view_verification"],
+            "production_eligible": False,
+        },
+    }
+    invalid = attach_attestation(invalid, KEY, purpose="sft_row")
+    _write_jsonl(source / "train.jsonl", [invalid, second])
+    manifest = build_manifest()
+    with pytest.raises(ValueError, match="view_not_production_eligible"):
+        validate_deterministic_training_transform(
+            manifest_path, manifest, require_production_trust=True
+        )
+
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["promotion"], "probe-promotion-v1")
+    probe = {
+        **{key: value for key, value in promoted.items() if key != "attestation"},
+        "trust_scope": "local_probe",
+        "diagnostic_only": True,
+        "content_gate_eligible": True,
+        "trust_valid_for_production": False,
+        "production_eligible": False,
+        "view_verification": {
+            **promoted["view_verification"],
+            "content_gate_eligible": True,
+            "production_eligible": False,
+        },
+    }
+    _write_jsonl(
+        source / "train.jsonl", [attach_attestation(probe, KEY, purpose="sft_row")]
     )
+    manifest = build_manifest()
+    with pytest.raises(ValueError, match="production trust"):
+        validate_deterministic_training_transform(
+            manifest_path, manifest, require_production_trust=True
+        )
+
+    shard.write_text(json.dumps([]) + "\n")
+    manifest = build_manifest()
     with pytest.raises(ValueError, match="deterministic transform"):
         validate_deterministic_training_transform(manifest_path, manifest)
 

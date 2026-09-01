@@ -120,6 +120,10 @@ def _create_release_gate_receipt(
         "predecessor_profile_id": profile.predecessor_profile_id,
         "quality_report_sha256": product.source_file_sha256["quality_report.json"],
         "source_file_sha256": dict(sorted(product.source_file_sha256.items())),
+        "promoted_row_set_sha256": product.report.get("promoted_row_set_sha256"),
+        "promoted_split_row_set_sha256": product.report.get(
+            "promoted_split_row_set_sha256"
+        ),
         "metrics_sha256": metrics_sha256,
         "n_worlds": product.metrics.get("n_worlds_observed"),
         "n_rows": product.metrics.get("n_rows"),

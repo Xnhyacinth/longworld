@@ -9,6 +9,7 @@ import pytest
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
+import longworld.core.release_profile as release_profile_module
 from longworld.core.attestation import (
     ATTESTATION_ENVIRONMENT_ENV,
     ROLE_KEY_ENVS,
@@ -23,7 +24,11 @@ from longworld.core.production_trust import (
     canonical_approval_statement,
     verify_production_approval_from_env,
 )
-from longworld.core.promotion import RELEASE_GATE_REVISION
+from longworld.core.promotion import (
+    RELEASE_GATE_REVISION,
+    promoted_row_set_sha256,
+    promoted_split_row_set_sha256,
+)
 from longworld.core.release_profile import release_profile_sha256
 from longworld.core.unseen import (
     build_unseen_splits,
@@ -41,8 +46,16 @@ def _sha256(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def _production_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+def _production_environment(
+    monkeypatch: pytest.MonkeyPatch, *, allow_profile: bool = True
+) -> None:
     monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "production")
+    if allow_profile:
+        monkeypatch.setattr(
+            release_profile_module,
+            "ISSUABLE_PRODUCTION_PROFILE_IDS",
+            frozenset({PRODUCTION_PROFILE}),
+        )
     for role, key in (
         ("promotion", PROMOTION_KEY),
         ("auditor", AUDITOR_KEY),
@@ -148,6 +161,11 @@ def _production_release(
             "quality_report_sha256": source_file_sha256["quality_report.json"],
             "source_file_sha256": source_file_sha256,
             "n_rows": len(rows),
+            "promoted_row_set_sha256": promoted_row_set_sha256(rows),
+            "promoted_split_row_set_sha256": {
+                split: promoted_split_row_set_sha256(rows, split)
+                for split in ("train", "eval")
+            },
             "production_approval": production_approval,
             "ok": True,
             "errors": [],
@@ -176,6 +194,33 @@ def _row(index: int, *, source_family: str = "family-a") -> dict:
         "context": f"context {index}",
         "answer": f"answer {index}",
     }
+
+
+def _approved_production_case(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    allow_profile: bool = True,
+    shared_entities: bool = False,
+) -> tuple[list[dict], dict[str, str], dict]:
+    _production_environment(monkeypatch, allow_profile=allow_profile)
+    rows = [_row(index) for index in range(8)]
+    if shared_entities:
+        for row in rows:
+            world_number = int(row["world_id"].rsplit("-", 1)[1])
+            row["workflow_ids"] = [f"shared-entity-{world_number // 2}"]
+    rows = [attach_attestation(row, PROMOTION_KEY, purpose="sft_row") for row in rows]
+    source_hashes = {
+        "quality_report.json": _sha256(b"quality"),
+        "train.jsonl": _sha256(b"train"),
+        "eval.jsonl": _sha256(b"eval"),
+    }
+    approval = _production_approval(tmp_path, monkeypatch, source_hashes)
+    return (
+        rows,
+        source_hashes,
+        _production_release(rows, source_hashes, production_approval=approval),
+    )
 
 
 @pytest.mark.parametrize(
@@ -451,6 +496,126 @@ def test_production_unseen_binds_release_rows_and_signed_outputs(
         )
 
 
+def test_production_unseen_rejects_same_count_rows_from_another_release(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rows, source_hashes, release = _approved_production_case(tmp_path, monkeypatch)
+    alternate_rows = []
+    for index, row in enumerate(rows):
+        unsigned = {key: value for key, value in row.items() if key != "attestation"}
+        unsigned["answer"] = f"alternate-release-answer-{index}"
+        alternate_rows.append(
+            attach_attestation(unsigned, PROMOTION_KEY, purpose="sft_row")
+        )
+
+    with pytest.raises(ValueError, match="release manifest is invalid"):
+        build_unseen_splits(
+            alternate_rows,
+            tmp_path / "unseen",
+            axes=["topology_operator"],
+            trust_mode="production",
+            source_file_sha256={
+                "train.jsonl": source_hashes["train.jsonl"],
+                "eval.jsonl": source_hashes["eval.jsonl"],
+            },
+            release_manifest=release,
+            promotion_attestation_key=PROMOTION_KEY,
+            release_attestation_key=AUDITOR_KEY,
+            manifest_attestation_key=REPORT_KEY,
+        )
+
+
+def test_load_production_unseen_rejects_blocked_axis_marked_eligible(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rows, source_hashes, release = _approved_production_case(
+        tmp_path, monkeypatch, shared_entities=True
+    )
+    build_unseen_splits(
+        rows,
+        tmp_path,
+        axes=["world_entity"],
+        trust_mode="production",
+        source_file_sha256={
+            "train.jsonl": source_hashes["train.jsonl"],
+            "eval.jsonl": source_hashes["eval.jsonl"],
+        },
+        release_manifest=release,
+        promotion_attestation_key=PROMOTION_KEY,
+        release_attestation_key=AUDITOR_KEY,
+        manifest_attestation_key=REPORT_KEY,
+    )
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest.pop("attestation")
+    manifest["axes"] = {
+        "world_entity": {
+            "status": "blocked",
+            "reason": "world_atomic_only",
+            "coverage": "world_atomic_only",
+            "n_rows": len(rows),
+        }
+    }
+    manifest = attach_attestation(
+        manifest, REPORT_KEY, purpose="training_export_manifest"
+    )
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    (tmp_path / "world_entity" / "train.jsonl").unlink()
+    (tmp_path / "world_entity" / "eval.jsonl").unlink()
+
+    with pytest.raises(ValueError, match="production unseen axes are not ready"):
+        load_unseen_split_manifest(
+            manifest_path,
+            trust_mode="production",
+            release_manifest=release,
+            release_attestation_key=AUDITOR_KEY,
+            manifest_attestation_key=REPORT_KEY,
+        )
+
+
+def test_load_production_unseen_rejects_empty_ready_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rows, source_hashes, release = _approved_production_case(
+        tmp_path, monkeypatch, shared_entities=True
+    )
+    build_unseen_splits(
+        rows,
+        tmp_path,
+        axes=["world_entity"],
+        trust_mode="production",
+        source_file_sha256={
+            "train.jsonl": source_hashes["train.jsonl"],
+            "eval.jsonl": source_hashes["eval.jsonl"],
+        },
+        release_manifest=release,
+        promotion_attestation_key=PROMOTION_KEY,
+        release_attestation_key=AUDITOR_KEY,
+        manifest_attestation_key=REPORT_KEY,
+    )
+
+    output = tmp_path / "world_entity" / "train.jsonl"
+    output.write_bytes(b"")
+    manifest_path = tmp_path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest.pop("attestation")
+    manifest["axes"]["world_entity"]["train_sha256"] = _sha256(b"")
+    manifest = attach_attestation(
+        manifest, REPORT_KEY, purpose="training_export_manifest"
+    )
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="unseen split output is empty"):
+        load_unseen_split_manifest(
+            manifest_path,
+            trust_mode="production",
+            release_manifest=release,
+            release_attestation_key=AUDITOR_KEY,
+            manifest_attestation_key=REPORT_KEY,
+        )
+
+
 def test_production_unseen_rejects_tampered_row_attestation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -585,42 +750,162 @@ def test_production_unseen_rejects_unknown_release_profile(
         )
 
 
-def test_production_world_entity_blocks_world_atomic_only_coverage(
+def test_production_unseen_rejects_nonissuable_release_profile(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _production_environment(monkeypatch)
-    rows = [
-        attach_attestation(_row(index), PROMOTION_KEY, purpose="sft_row")
-        for index in range(8)
-    ]
-    source_hashes = {
-        "quality_report.json": _sha256(b"quality"),
-        "train.jsonl": _sha256(b"train"),
-        "eval.jsonl": _sha256(b"eval"),
-    }
-    approval = _production_approval(tmp_path, monkeypatch, source_hashes)
-    release = _production_release(rows, source_hashes, production_approval=approval)
-
-    manifest = build_unseen_splits(
-        rows,
-        tmp_path,
-        axes=["world_entity"],
-        trust_mode="production",
-        source_file_sha256={
-            "train.jsonl": source_hashes["train.jsonl"],
-            "eval.jsonl": source_hashes["eval.jsonl"],
-        },
-        release_manifest=release,
-        promotion_attestation_key=PROMOTION_KEY,
-        release_attestation_key=AUDITOR_KEY,
-        manifest_attestation_key=REPORT_KEY,
+    rows, source_hashes, release = _approved_production_case(
+        tmp_path, monkeypatch, allow_profile=False
     )
 
-    assert manifest["world_entity"] == {
-        "status": "blocked",
-        "reason": "world_atomic_only",
-        "coverage": "world_atomic_only",
-        "n_rows": len(rows),
-    }
+    with pytest.raises(ValueError, match="superseded production release profile"):
+        build_unseen_splits(
+            rows,
+            tmp_path,
+            axes=["topology_operator"],
+            trust_mode="production",
+            source_file_sha256={
+                "train.jsonl": source_hashes["train.jsonl"],
+                "eval.jsonl": source_hashes["eval.jsonl"],
+            },
+            release_manifest=release,
+            promotion_attestation_key=PROMOTION_KEY,
+            release_attestation_key=AUDITOR_KEY,
+            manifest_attestation_key=REPORT_KEY,
+        )
+
+
+def test_production_unseen_rejects_when_any_requested_axis_is_blocked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rows, source_hashes, release = _approved_production_case(tmp_path, monkeypatch)
+    output_dir = tmp_path / "unseen"
+
+    with pytest.raises(ValueError, match="production unseen axes are not ready"):
+        build_unseen_splits(
+            rows,
+            output_dir,
+            axes=["topology_operator", "source_document_family"],
+            trust_mode="production",
+            source_file_sha256={
+                "train.jsonl": source_hashes["train.jsonl"],
+                "eval.jsonl": source_hashes["eval.jsonl"],
+            },
+            release_manifest=release,
+            promotion_attestation_key=PROMOTION_KEY,
+            release_attestation_key=AUDITOR_KEY,
+            manifest_attestation_key=REPORT_KEY,
+        )
+
+    assert not (output_dir / "manifest.json").exists()
+    for axis in ("topology_operator", "source_document_family"):
+        assert not (output_dir / axis / "train.jsonl").exists()
+        assert not (output_dir / axis / "eval.jsonl").exists()
+
+
+@pytest.mark.parametrize(
+    ("manifest_key", "message"),
+    [
+        (None, "manifest attestation key is missing"),
+        (b"wrong-report-key-material-for-cleanup-test", "identity is incomplete"),
+    ],
+)
+def test_production_unseen_cleans_outputs_when_report_signing_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    manifest_key: bytes | None,
+    message: str,
+) -> None:
+    rows, source_hashes, release = _approved_production_case(
+        tmp_path, monkeypatch, shared_entities=True
+    )
+    output_dir = tmp_path / "unseen"
+
+    with pytest.raises(ValueError, match=message):
+        build_unseen_splits(
+            rows,
+            output_dir,
+            axes=["world_entity"],
+            trust_mode="production",
+            source_file_sha256={
+                "train.jsonl": source_hashes["train.jsonl"],
+                "eval.jsonl": source_hashes["eval.jsonl"],
+            },
+            release_manifest=release,
+            promotion_attestation_key=PROMOTION_KEY,
+            release_attestation_key=AUDITOR_KEY,
+            manifest_attestation_key=manifest_key,
+        )
+
+    assert not (output_dir / "manifest.json").exists()
+    assert not (output_dir / "world_entity" / "train.jsonl").exists()
+    assert not (output_dir / "world_entity" / "eval.jsonl").exists()
+
+
+def test_production_unseen_cleans_first_axis_when_later_axis_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rows, source_hashes, release = _approved_production_case(tmp_path, monkeypatch)
+    unsigned = [
+        {
+            **{key: value for key, value in row.items() if key != "attestation"},
+            "source_family_ids": [f"family-{index // 2}"],
+        }
+        for index, row in enumerate(rows)
+    ]
+    unsigned[2]["dossier_id"] = "dossier-0"
+    rows = [
+        attach_attestation(row, PROMOTION_KEY, purpose="sft_row") for row in unsigned
+    ]
+    release = _production_release(
+        rows,
+        source_hashes,
+        production_approval=release["production_approval"],
+    )
+    output_dir = tmp_path / "unseen"
+
+    with pytest.raises(ValueError, match="dossier spans unseen groups"):
+        build_unseen_splits(
+            rows,
+            output_dir,
+            axes=["source_document_family", "world_entity"],
+            trust_mode="production",
+            source_file_sha256={
+                "train.jsonl": source_hashes["train.jsonl"],
+                "eval.jsonl": source_hashes["eval.jsonl"],
+            },
+            release_manifest=release,
+            promotion_attestation_key=PROMOTION_KEY,
+            release_attestation_key=AUDITOR_KEY,
+            manifest_attestation_key=REPORT_KEY,
+        )
+
+    assert not (output_dir / "manifest.json").exists()
+    for axis in ("source_document_family", "world_entity"):
+        assert not (output_dir / axis / "train.jsonl").exists()
+        assert not (output_dir / axis / "eval.jsonl").exists()
+
+
+def test_production_world_entity_rejects_world_atomic_only_coverage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rows, source_hashes, release = _approved_production_case(tmp_path, monkeypatch)
+
+    with pytest.raises(ValueError, match="production unseen axes are not ready"):
+        build_unseen_splits(
+            rows,
+            tmp_path,
+            axes=["world_entity"],
+            trust_mode="production",
+            source_file_sha256={
+                "train.jsonl": source_hashes["train.jsonl"],
+                "eval.jsonl": source_hashes["eval.jsonl"],
+            },
+            release_manifest=release,
+            promotion_attestation_key=PROMOTION_KEY,
+            release_attestation_key=AUDITOR_KEY,
+            manifest_attestation_key=REPORT_KEY,
+        )
+
+    assert not (tmp_path / "manifest.json").exists()
     assert not (tmp_path / "world_entity" / "train.jsonl").exists()
     assert not (tmp_path / "world_entity" / "eval.jsonl").exists()
