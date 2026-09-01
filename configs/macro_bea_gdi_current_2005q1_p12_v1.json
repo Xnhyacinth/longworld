@@ -1,0 +1,17 @@
+{
+  "schema_version": "longworld.macro-vintage-materialization.v1",
+  "workflow_manifest": "data/source_cache/macro/bea_gdp_gdi_vintage_20260831/workflow_manifest.json",
+  "raw_source": "data/source_cache/macro/bea_gdp_gdi_vintage_20260831/bea-gdp-gdi-vintage-history.xlsx",
+  "world_id": "bea-gdi-current-dollars-2005q1-revision-history-v1",
+  "target_series_id": "BEA_GDI_CURRENT_DOLLARS",
+  "target_period": "2005Q1",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "bands": [
+    {"name": "16k", "lower_tokens": 16000, "upper_tokens": 16384},
+    {"name": "32k", "lower_tokens": 32000, "upper_tokens": 32768},
+    {"name": "64k", "lower_tokens": 64000, "upper_tokens": 65536}
+  ]
+}

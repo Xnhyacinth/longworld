@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from copy import deepcopy
 from datetime import date, timedelta
 from itertools import pairwise
 from pathlib import Path
@@ -20,6 +21,7 @@ from longworld.core.macrovintageworkflow import (
     MACRO_VINTAGE_PARSER_REVISION,
     MACRO_VINTAGE_WORKFLOW_MANIFEST_SCHEMA,
     MAX_MACRO_VINTAGE_WORKFLOW_MANIFEST_BYTES,
+    build_macro_verified_packing_plan,
 )
 from longworld.core.pack import SEP, wrap_prompt
 from longworld.core.provenance import ProvenanceError
@@ -81,15 +83,18 @@ def _observation(
 
 
 def _workflow_manifest(
-    *, target_vintage_count: int = 4, trajectory_count: int = 22
+    *,
+    target_vintage_count: int = 4,
+    trajectory_count: int = 22,
+    series_id: str = "BEA_GDP_CURRENT_DOLLARS",
+    row_start: int = 10,
 ) -> dict[str, object]:
     observations: list[dict[str, object]] = []
     relations: list[dict[str, object]] = []
     trajectories: list[dict[str, object]] = []
     start = date(2020, 1, 1)
-    row = 10
+    row = row_start
     for trajectory_index in range(trajectory_count):
-        series_id = "BEA_GDP_CURRENT_DOLLARS"
         period = f"{2020 + trajectory_index // 4}Q{trajectory_index % 4 + 1}"
         if trajectory_index == 0 and target_vintage_count == 10:
             values = [
@@ -180,6 +185,82 @@ def _workflow_manifest(
         "relations": relations,
         "trajectories": trajectories,
     }
+
+
+def test_background_packing_stays_within_the_target_series() -> None:
+    manifest = _workflow_manifest(trajectory_count=22)
+    unrelated = _workflow_manifest(
+        trajectory_count=22,
+        series_id="ZZZ_UNRELATED_SERIES",
+        row_start=10_000,
+    )
+    for field in ("observations", "relations", "trajectories"):
+        manifest[field].extend(unrelated[field])
+
+    [candidate] = build_macro_vintage_pipeline_candidates(
+        manifest,
+        workflow_manifest_sha256="a" * 64,
+        world_id="bea-macro-vintage-same-series-background-test",
+        target_series_id="BEA_GDP_CURRENT_DOLLARS",
+        target_period="2020Q1",
+        bands=(("16k", 16_000, 16_384),),
+        token_counter=_token_count,
+        tokenizer_model_id="Qwen/Qwen3.5-4B",
+        tokenizer_revision="c" * 40,
+        tokenizer_asset_manifest_sha256="d" * 64,
+    )
+
+    assert all(
+        ":bea_gdp_current_dollars:" in trajectory_id
+        for trajectory_id in candidate["background_trajectory_ids"]
+    )
+
+
+def test_audit_rejects_cross_series_serialized_background_observation() -> None:
+    [candidate] = build_macro_vintage_pipeline_candidates(
+        _workflow_manifest(),
+        workflow_manifest_sha256="a" * 64,
+        world_id="bea-macro-vintage-cross-series-audit-test",
+        target_series_id="BEA_GDP_CURRENT_DOLLARS",
+        target_period="2020Q1",
+        bands=(("16k", 16_000, 16_384),),
+        token_counter=_token_count,
+        tokenizer_model_id="Qwen/Qwen3.5-4B",
+        tokenizer_revision="c" * 40,
+        tokenizer_asset_manifest_sha256="d" * 64,
+    )
+    corrupted = deepcopy(candidate)
+    background_ids = {
+        artifact_id
+        for trajectory_id in corrupted["background_trajectory_ids"]
+        for artifact_id in corrupted["trajectory_prefix_artifact_ids"][trajectory_id]
+    }
+    records = [
+        json.loads(value) for value in corrupted["document_context"].split(SEP)
+    ]
+    index = next(
+        position
+        for position, record in enumerate(records)
+        if record["record_type"] == "macro_vintage_observation"
+        and record["artifact_id"] in background_ids
+    )
+    records[index]["source_payload"]["series_id"] = "ZZZ_UNRELATED_SERIES"
+    documents = [
+        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        for value in records
+    ]
+    corrupted["document_context"] = SEP.join(documents)
+    corrupted["context"] = wrap_prompt(
+        corrupted["question"], corrupted["document_context"], "first"
+    )
+    corrupted["artifact_classification"][index]["provenance_id"] = (
+        "sha256:" + hashlib.sha256(documents[index].encode()).hexdigest()
+    )
+
+    audit = audit_macro_vintage_pipeline_candidate(corrupted)
+
+    assert audit["trajectory_prefix_packing_valid"] is False
+    assert not all(audit.values())
 
 
 @pytest.mark.parametrize(
@@ -686,6 +767,52 @@ def test_verified_packing_plan_drift_fails_closed() -> None:
     }
 
     with pytest.raises(ProvenanceError, match="packing plan"):
+        build_macro_vintage_pipeline_candidates(
+            **kwargs,
+            verified_packing_plan=packing_plan,
+        )
+
+
+def test_verified_packing_plan_rejects_cross_series_prefix() -> None:
+    manifest = _workflow_manifest(trajectory_count=22)
+    unrelated = _workflow_manifest(
+        trajectory_count=22,
+        series_id="ZZZ_UNRELATED_SERIES",
+        row_start=10_000,
+    )
+    for field in ("observations", "relations", "trajectories"):
+        manifest[field].extend(unrelated[field])
+    kwargs = {
+        "manifest": manifest,
+        "workflow_manifest_sha256": "a" * 64,
+        "world_id": "bea-macro-vintage-cross-series-cache-test",
+        "target_series_id": "BEA_GDP_CURRENT_DOLLARS",
+        "target_period": "2020Q1",
+        "bands": (("16k", 16_000, 16_384),),
+        "token_counter": _token_count,
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "c" * 40,
+        "tokenizer_asset_manifest_sha256": "d" * 64,
+    }
+    [candidate] = build_macro_vintage_pipeline_candidates(**kwargs)
+    packing_plan = build_macro_verified_packing_plan(
+        [candidate], bands=kwargs["bands"]
+    )
+    prefixes = packing_plan["bands"][0]["trajectory_prefix_lengths"]
+    replaced = next(
+        value
+        for value in candidate["background_trajectory_ids"]
+        if value in prefixes
+    )
+    length = prefixes.pop(replaced)
+    unrelated_trajectory_id = next(
+        value["trajectory_id"]
+        for value in unrelated["trajectories"]
+        if value["period"] == "2020Q2"
+    )
+    prefixes[unrelated_trajectory_id] = length
+
+    with pytest.raises(ProvenanceError, match="semantic prefix"):
         build_macro_vintage_pipeline_candidates(
             **kwargs,
             verified_packing_plan=packing_plan,

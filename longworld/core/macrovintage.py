@@ -1079,15 +1079,18 @@ def build_macro_vintage_pipeline_candidates(
         raise ProvenanceError("macro vintage target trajectory is not unique")
     target_trajectory_id = str(target_trajectories[0].get("trajectory_id") or "")
     trajectory_prefix_ids: dict[str, list[tuple[str, ...]]] = {}
+    trajectory_series_ids: dict[str, str] = {}
     claimed_artifact_ids: set[str] = set()
     for trajectory in sorted(
         trajectories, key=lambda value: str(value.get("trajectory_id") or "")
     ):
         trajectory_id = str(trajectory.get("trajectory_id") or "")
+        trajectory_series_id = str(trajectory.get("series_id") or "")
         observation_ids = trajectory.get("observation_ids")
         relation_ids = trajectory.get("relation_ids")
         if (
             not trajectory_id
+            or not trajectory_series_id
             or trajectory_id in trajectory_prefix_ids
             or not isinstance(observation_ids, list)
             or len(observation_ids) < 2
@@ -1109,6 +1112,7 @@ def build_macro_vintage_pipeline_candidates(
                 )
             )
         trajectory_prefix_ids[trajectory_id] = prefixes
+        trajectory_series_ids[trajectory_id] = trajectory_series_id
     source_binding = {
         "workflow_manifest_sha256": workflow_manifest_sha256,
         "raw_source_sha256": str(manifest["raw_source_sha256"]),
@@ -1309,7 +1313,10 @@ def build_macro_vintage_pipeline_candidates(
     ) -> list[tuple[int, int, tuple[tuple[str, int], ...]]]:
         """Bounded deterministic DP over complete trajectory prefixes."""
         background_ids = sorted(
-            value for value in trajectory_prefix_ids if value != target_trajectory_id
+            value
+            for value in trajectory_prefix_ids
+            if value != target_trajectory_id
+            and trajectory_series_ids[value] == target_series_id
         )
         base_ids = selected_ids_for_prefixes(retained_prefixes)
         states: dict[
@@ -1511,6 +1518,10 @@ def build_macro_vintage_pipeline_candidates(
                     selected_prefix_map.get(trajectory_id, 0) < length
                     for trajectory_id, length in retained_prefixes.items()
                 )
+                or any(
+                    trajectory_series_ids.get(trajectory_id) != target_series_id
+                    for trajectory_id in selected_prefix_map
+                )
             ):
                 raise ProvenanceError(
                     "macro vintage packing plan semantic prefix is invalid"
@@ -1674,6 +1685,11 @@ def audit_macro_vintage_pipeline_candidate(candidate: dict[str, Any]) -> dict[st
             "minimum_essential_span_tokens"
         )
         macro_task = candidate.get("macro_task")
+        task_series_id = (
+            str(macro_task.get("series_id") or "")
+            if isinstance(macro_task, Mapping)
+            else ""
+        )
         expected_question = (
             _pipeline_question(macro_task)
             if isinstance(macro_task, Mapping)
@@ -1750,20 +1766,21 @@ def audit_macro_vintage_pipeline_candidate(candidate: dict[str, Any]) -> dict[st
                     )
                     for value in selected_relations.values()
                 }
+                selected_series_ids = {
+                    str(value["series_id"]) for value in selected_observations
+                }
                 if (
                     len(selected_observations) != length
                     or len(selected_relations) != length - 1
                     or relation_pairs != set(expected_pairs)
                     or len(
                         {
-                            (
-                                str(value["series_id"]),
-                                str(value["period"]),
-                            )
+                            (str(value["series_id"]), str(value["period"]))
                             for value in selected_observations
                         }
-                    )
-                    != 1
+                    ) != 1
+                    or selected_series_ids
+                    != {task_series_id}
                 ):
                     prefix_valid = False
                     break
