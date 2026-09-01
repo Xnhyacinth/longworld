@@ -676,6 +676,18 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
             ).encode()
         ).hexdigest()
         terminal_revision = str(decision.params.get("terminal_revision_id") or "")
+        if not terminal_revision:
+            terminal_event_id = str(
+                decision.params.get("terminal_record_event_id") or ""
+            )
+            terminal_record_id = str(decision.params.get("terminal_record_id") or "")
+            terminal_event = events_by_id.get(terminal_event_id)
+            if (
+                terminal_event is not None
+                and terminal_record_id
+                and terminal_event.params.get("record_id") == terminal_record_id
+            ):
+                terminal_revision = str(terminal_event.params.get("revision_id") or "")
         terminal_suffix = (
             f" | {terminal_revision} YYYY-MM-DD" if terminal_revision else ""
         )

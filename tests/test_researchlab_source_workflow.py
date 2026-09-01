@@ -501,6 +501,7 @@ def test_real_arxiv_multiband_queries_grow_source_history_and_proof() -> None:
     assert len({spec.base_task_group for spec in specs}) == 1
     assert len({spec.semantic_growth_group for spec in specs}) == 1
     assert [spec.proof_depth for spec in specs] == [2, 3, 4]
+    assert all("| v3 YYYY-MM-DD" in spec.question for spec in specs)
     events_by_id = {event.id: event for event in world.events}
     revision_events = {
         (
@@ -543,6 +544,16 @@ def test_real_arxiv_multiband_queries_grow_source_history_and_proof() -> None:
     assert [len(spec.sufficient_event_ids) for spec in specs] == [4, 5, 6]
 
     artifacts = materialized.artifacts["focal"]
+    legacy_control_artifacts = [
+        artifact
+        for artifact in artifacts
+        if (artifact.slots or {}).get("event_type")
+        in {"arxiv_revision_relation", "arxiv_revision_decision"}
+    ]
+    assert legacy_control_artifacts
+    assert all(
+        '"control_tier"' not in artifact.text for artifact in legacy_control_artifacts
+    )
     source_chars = []
     for spec in specs:
         essential = [

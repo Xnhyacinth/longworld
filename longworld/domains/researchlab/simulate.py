@@ -2059,6 +2059,7 @@ def _paper_substantive_revision_events(
                 source_fact_ids=source_facts[source_record.record_id],
                 prior_relation_id=(relation_events[-1].id if relation_events else ""),
             )
+            relation_event.params["render_control_tier"] = True
             events.append(relation_event)
             relation_events.append(relation_event)
 
@@ -3078,7 +3079,7 @@ def canonical_researchlab_source_visible_text(
                     "evidence": params["evidence_quote"],
                     **(
                         {"control_tier": params["source_view_tier"]}
-                        if params.get("source_view_tier")
+                        if params.get("render_control_tier") is True
                         else {}
                     ),
                 },

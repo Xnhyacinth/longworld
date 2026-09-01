@@ -173,16 +173,22 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
                 "accept the exact semantic delta only after both revision bodies "
                 "and their verified revision_of relation replay"
             )
+        payload = {
+            "kind": "arxiv_revision_decision",
+            "rule": rule,
+            "answer_disclosure": "omitted",
+        }
+        if ev.params.get("substantive_revision_tier") is True:
+            payload.update(
+                {
+                    "control_tier": ev.params["control_tier"],
+                    "required_revision_relations": len(
+                        ev.params.get("required_relation_ids") or []
+                    ),
+                }
+            )
         return "json", json.dumps(
-            {
-                "kind": "arxiv_revision_decision",
-                "control_tier": ev.params.get("control_tier", "legacy"),
-                "required_revision_relations": len(
-                    ev.params.get("required_relation_ids") or []
-                ),
-                "rule": rule,
-                "answer_disclosure": "omitted",
-            },
+            payload,
             ensure_ascii=False,
             indent=2,
             sort_keys=True,
