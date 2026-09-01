@@ -2106,6 +2106,67 @@ def test_p13_selection_requires_every_view_in_every_exact_bucket() -> None:
         )
 
 
+def test_p13_selection_rejects_duplicate_band_view_timing_cell() -> None:
+    candidates, audits = _p13_six_domain_selection_inputs()
+    original = next(
+        candidate
+        for candidate in candidates
+        if candidate["world_id"] == "p13-finance-0"
+        and candidate["length_bucket"] == "16k"
+        and candidate["view"] == "full"
+    )
+    duplicate = {
+        key: deepcopy(value) for key, value in original.items() if key != "attestation"
+    }
+    duplicate["query_id"] += "-duplicate-cell"
+    duplicate["question"] += " Verify the independently rendered duplicate."
+    duplicate["context"] += "\nIndependent duplicate rendering."
+    duplicate = attach_attestation(
+        duplicate, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
+    )
+    candidates.append(duplicate)
+    audits.append(_selection_audit(duplicate))
+
+    with pytest.raises(PromotionError, match="immutable world lineage"):
+        select_release_worlds(
+            candidates,
+            audits,
+            "p13-authentic-six-domain-probe-12-v1",
+            candidate_attestation_key=KEY,
+            audit_attestation_key=KEY,
+        )
+
+
+def test_p13_selection_rejects_cross_source_world_cell_substitution() -> None:
+    candidates, audits = _p13_six_domain_selection_inputs()
+    index = next(
+        index
+        for index, candidate in enumerate(candidates)
+        if candidate["world_id"] == "p13-cyber-0"
+        and candidate["length_bucket"] == "64k"
+        and candidate["view"] == "cf"
+    )
+    substituted = {
+        key: deepcopy(value)
+        for key, value in candidates[index].items()
+        if key != "attestation"
+    }
+    substituted["episode_replay_bundle"]["sha256"] = "b" * 64
+    candidates[index] = attach_attestation(
+        substituted, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
+    )
+    audits[index] = _selection_audit(candidates[index])
+
+    with pytest.raises(PromotionError, match="immutable world lineage"):
+        select_release_worlds(
+            candidates,
+            audits,
+            "p13-authentic-six-domain-probe-12-v1",
+            candidate_attestation_key=KEY,
+            audit_attestation_key=KEY,
+        )
+
+
 def test_p13_selection_requires_every_selected_row_to_be_source_bound() -> None:
     candidates, audits = _p13_six_domain_selection_inputs()
     index = next(

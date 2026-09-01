@@ -129,9 +129,9 @@ _CONTENT_COMMITMENT_EXCLUDED_FIELDS = {
 }
 TASK_VIEW_DERIVATION_REVISION = "longworld.task-view-derivation.v4"
 SOURCE_TOKEN_MEASUREMENT_RECEIPT_SCHEMA = (
-    "longworld.source-token-measurement-receipt.v1"
+    "longworld.source-token-measurement-receipt.v2"
 )
-SOURCE_TOKEN_MEASUREMENT_BASIS = "parent_source_ratio_x_retained_parent_token_share"
+SOURCE_TOKEN_MEASUREMENT_BASIS = "final_prompt_real_source_marginal"
 _V3_DERIVATION_FIELDS = {
     "parent_candidate_sha256",
     "parent_content_commitment",

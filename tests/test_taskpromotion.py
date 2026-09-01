@@ -751,6 +751,53 @@ def test_task_dense_audit_replays_full_pool_but_rejects_dense_prefixes(
     )
 
 
+def test_executable_proof_identity_ignores_instance_labels_but_binds_topology(
+    tmp_path: Path,
+) -> None:
+    candidate, sidecar = _finance_candidate(tmp_path)
+    identifiers = taskpromotion_module._canonical_task_identifiers(
+        candidate, sidecar.registry_key
+    )
+
+    renamed = deepcopy(candidate)
+    renamed["essential_artifact_ids"] = [
+        f"renamed-essential-{index}"
+        for index, _value in enumerate(candidate["essential_artifact_ids"])
+    ]
+    node_names: dict[str, str] = {}
+    for field in (
+        "authentic_source_relation_edges",
+        "verified_derived_relation_edges",
+    ):
+        renamed_relations: list[list[str]] = []
+        for relation in candidate[field]:
+            renamed_relation = deepcopy(relation)
+            for index in (0, 1):
+                value = str(relation[index])
+                node_names.setdefault(value, f"renamed-node-{len(node_names)}")
+                renamed_relation[index] = node_names[value]
+            renamed_relations.append(renamed_relation)
+        renamed[field] = renamed_relations
+
+    changed_topology = deepcopy(candidate)
+    changed_topology["authentic_source_relation_edges"][0][2] = (
+        "independently_changed_relation"
+    )
+
+    assert (
+        taskpromotion_module._canonical_task_identifiers(renamed, sidecar.registry_key)[
+            "executable_proof_id"
+        ]
+        == identifiers["executable_proof_id"]
+    )
+    assert (
+        taskpromotion_module._canonical_task_identifiers(
+            changed_topology, sidecar.registry_key
+        )["executable_proof_id"]
+        != identifiers["executable_proof_id"]
+    )
+
+
 def test_macro_task_dense_audit_uses_explicit_adapter(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1715,15 +1762,6 @@ def test_task_view_projection_cli_is_deterministic_and_stays_candidate_only(
     changed["token_contribution"] -= shifted_tokens
     retained["token_contribution"] += shifted_tokens
     measurement["retained_parent_document_tokens"] += shifted_tokens
-    measurement["real_source_token_ratio"] = min(
-        measurement["parent_real_source_token_ratio"],
-        measurement["parent_real_source_token_ratio"]
-        * measurement["retained_parent_document_tokens"]
-        / measurement["parent_document_context_tokens"],
-    )
-    forged_measurement["real_source_token_ratio"] = measurement[
-        "real_source_token_ratio"
-    ]
     forged_measurement, forged_measurement_sidecar = _resign_v3_projection(
         output_dir, v3_sidecar, cf, forged_measurement
     )
@@ -2007,11 +2045,9 @@ def test_all_domain_standard_views_pass_independent_dense_audit(
     for row in projected:
         receipt = row["task_view_projection"]["source_token_measurement_receipt"]
         assert receipt["schema_version"] == (
-            "longworld.source-token-measurement-receipt.v1"
+            "longworld.source-token-measurement-receipt.v2"
         )
-        assert receipt["measurement_basis"] == (
-            "parent_source_ratio_x_retained_parent_token_share"
-        )
+        assert receipt["measurement_basis"] == ("final_prompt_real_source_marginal")
         assert receipt["parent_real_source_token_ratio"] == parent_ratio
         assert (
             sum(
@@ -2020,18 +2056,36 @@ def test_all_domain_standard_views_pass_independent_dense_audit(
             )
             == receipt["parent_document_context_tokens"]
         )
+        documents = row["document_context"].split(SEP)
+        without_real_context = SEP.join(
+            document
+            for classification, document in zip(
+                row["artifact_classification"], documents, strict=True
+            )
+            if classification["source_origin"]
+            not in {"real_public", "real_private_export", "real_derived"}
+        )
+        final_prompt_tokens = token_counter(row["context"])
+        without_real_prompt_tokens = token_counter(
+            wrap_prompt(row["question"], without_real_context, row["query_timing"])
+        )
+        expected_source_tokens = final_prompt_tokens - without_real_prompt_tokens
+        assert receipt["final_prompt_tokens"] == final_prompt_tokens
+        assert receipt["without_real_prompt_tokens"] == without_real_prompt_tokens
+        assert receipt["real_source_marginal_tokens"] == expected_source_tokens
+        assert receipt["real_source_token_ratio"] == (
+            expected_source_tokens / final_prompt_tokens
+        )
         assert row["real_source_token_ratio"] == receipt["real_source_token_ratio"]
         assert (
             audit_by_digest[candidate_sha256(row)]["task_quality_metadata"][
                 "real_source_token_ratio"
             ]
             == row["real_source_token_ratio"]
-            <= parent_ratio
         )
-    assert (
-        next(row for row in projected if row["view"] == "cf")["real_source_token_ratio"]
-        < parent_ratio
-    )
+        assert 0.0 < row["real_source_token_ratio"] <= 1.0
+    ratio_by_view = {row["view"]: row["real_source_token_ratio"] for row in projected}
+    assert ratio_by_view["cf"] < ratio_by_view["full"]
 
 
 def test_v2_standard_views_are_historical_and_cannot_enter_p13_or_promotion(

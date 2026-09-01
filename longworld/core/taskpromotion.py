@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from datetime import date
@@ -430,6 +431,21 @@ def _validate_v3_projection_derivation(
         if isinstance(measurement, dict)
         else None
     )
+    final_prompt_tokens = (
+        measurement.get("final_prompt_tokens")
+        if isinstance(measurement, dict)
+        else None
+    )
+    without_real_prompt_tokens = (
+        measurement.get("without_real_prompt_tokens")
+        if isinstance(measurement, dict)
+        else None
+    )
+    source_tokens = (
+        measurement.get("real_source_marginal_tokens")
+        if isinstance(measurement, dict)
+        else None
+    )
     measurement_valid = bool(
         isinstance(measurement, dict)
         and measurement.get("schema_version") == SOURCE_TOKEN_MEASUREMENT_RECEIPT_SCHEMA
@@ -440,13 +456,24 @@ def _validate_v3_projection_derivation(
         and not isinstance(parent_ratio, bool)
         and isinstance(measured_ratio, (int, float))
         and not isinstance(measured_ratio, bool)
-        and 0.0 <= float(measured_ratio) <= float(parent_ratio) <= 1.0
+        and 0.0 < float(measured_ratio) <= 1.0
+        and 0.0 < float(parent_ratio) <= 1.0
         and isinstance(parent_tokens, int)
         and not isinstance(parent_tokens, bool)
         and parent_tokens > 0
         and isinstance(retained_tokens, int)
         and not isinstance(retained_tokens, bool)
         and 0 <= retained_tokens <= parent_tokens
+        and isinstance(final_prompt_tokens, int)
+        and not isinstance(final_prompt_tokens, bool)
+        and final_prompt_tokens == candidate.get("tokenizer_context_tokens")
+        and isinstance(without_real_prompt_tokens, int)
+        and not isinstance(without_real_prompt_tokens, bool)
+        and 0 <= without_real_prompt_tokens < final_prompt_tokens
+        and isinstance(source_tokens, int)
+        and not isinstance(source_tokens, bool)
+        and source_tokens == final_prompt_tokens - without_real_prompt_tokens
+        and measured_ratio == source_tokens / final_prompt_tokens
         and isinstance(contributions, list)
         and contributions
         and all(
@@ -1388,6 +1415,69 @@ _STANDARD_VIEW_COMPOSITIONS = {
 _REAL_SOURCE_ORIGINS = frozenset({"real_public", "real_private_export", "real_derived"})
 
 
+def _normalized_relation_topology(candidate: Mapping[str, Any]) -> dict[str, Any]:
+    edges: list[tuple[str, str, str, str]] = []
+    relation_fields = (
+        ("authentic", candidate.get("authentic_source_relation_edges")),
+        (
+            "derived",
+            candidate.get("verified_derived_order_relation_edges")
+            or candidate.get("verified_derived_relation_edges"),
+        ),
+    )
+    for provenance, relations in relation_fields:
+        if not isinstance(relations, list):
+            continue
+        for relation in relations:
+            if isinstance(relation, list) and len(relation) >= 2:
+                parent, child = str(relation[0]), str(relation[1])
+                operator = (
+                    str(relation[2]).split(":", 1)[0] if len(relation) > 2 else ""
+                )
+            elif isinstance(relation, dict):
+                parent = str(
+                    relation.get("parent_record_id")
+                    or relation.get("source_record_id")
+                    or ""
+                )
+                child = str(
+                    relation.get("child_record_id")
+                    or relation.get("target_record_id")
+                    or ""
+                )
+                operator = str(
+                    relation.get("relation_provenance")
+                    or relation.get("relation_type")
+                    or relation.get("operator")
+                    or relation.get("type")
+                    or ""
+                )
+            else:
+                continue
+            if parent and child:
+                edges.append((parent, child, provenance, operator))
+    indegree: Counter[str] = Counter(child for _parent, child, _kind, _op in edges)
+    outdegree: Counter[str] = Counter(parent for parent, _child, _kind, _op in edges)
+    nodes = set(indegree) | set(outdegree)
+    return {
+        "edge_count": len(edges),
+        "node_degree_multiset": sorted(
+            (indegree[node], outdegree[node]) for node in nodes
+        ),
+        "typed_edge_degree_multiset": sorted(
+            (
+                provenance,
+                operator,
+                indegree[parent],
+                outdegree[parent],
+                indegree[child],
+                outdegree[child],
+            )
+            for parent, child, provenance, operator in edges
+        ),
+    }
+
+
 def _canonical_task_identifiers(
     candidate: Mapping[str, Any], adapter_key: tuple[str, str, str]
 ) -> dict[str, str]:
@@ -1429,18 +1519,18 @@ def _canonical_task_identifiers(
             ).get("provenance_operation"),
         }
     )[:20]
-    relations = candidate.get("authentic_source_relation_edges")
-    relation_digests = sorted(
-        _canonical_sha256(value) for value in relations or [] if isinstance(value, list)
-    )
+    graph = candidate.get("graph") if isinstance(candidate.get("graph"), dict) else {}
     executable_proof_id = _canonical_sha256(
         {
             "adapter_id": family[0],
             "answer_program_id": answer_program_id,
-            "essential_artifact_ids": sorted(
-                str(value) for value in candidate.get("essential_artifact_ids") or []
+            "program_ops": program_ops,
+            "essential_artifact_count": len(
+                candidate.get("essential_artifact_ids") or []
             ),
-            "authentic_relation_digests": relation_digests,
+            "relation_topology": _normalized_relation_topology(candidate),
+            "proof_depth": graph.get("proof_depth"),
+            "hop_count": graph.get("hop_count"),
             "counterfactual_operation": (
                 candidate.get("counterfactual_twin") or {}
             ).get("provenance_operation"),
@@ -1596,10 +1686,24 @@ def _source_token_measurement_receipt(
     )
     if parent_tokens < 1 or not retained_range_valid:
         raise PromotionError("task parent source-token measurement is invalid")
-    measured_ratio = float(parent_ratio)
-    if retained_tokens != parent_tokens:
-        measured_ratio *= retained_tokens / parent_tokens
-    measured_ratio = min(float(parent_ratio), measured_ratio)
+    projected_context = str(projected.get("document_context") or "")
+    question = str(projected.get("question") or "")
+    timing = str(projected.get("query_timing") or "")
+    rendered_prompt = wrap_prompt(question, projected_context, timing)
+    if rendered_prompt != projected.get("context"):
+        raise PromotionError("task projected prompt is not canonically rendered")
+    without_real_context = SEP.join(
+        document
+        for classification, document in projected_artifacts
+        if classification.get("source_origin") not in _REAL_SOURCE_ORIGINS
+    )
+    without_real_prompt = wrap_prompt(question, without_real_context, timing)
+    final_prompt_tokens = token_counter(rendered_prompt)
+    without_real_prompt_tokens = token_counter(without_real_prompt)
+    source_tokens = final_prompt_tokens - without_real_prompt_tokens
+    if final_prompt_tokens < 1 or not 0 < source_tokens <= final_prompt_tokens:
+        raise PromotionError("task final prompt source-token marginal is invalid")
+    measured_ratio = source_tokens / final_prompt_tokens
     return {
         "schema_version": SOURCE_TOKEN_MEASUREMENT_RECEIPT_SCHEMA,
         "measurement_basis": SOURCE_TOKEN_MEASUREMENT_BASIS,
@@ -1610,11 +1714,12 @@ def _source_token_measurement_receipt(
         ),
         "parent_real_source_token_ratio": parent_ratio,
         "parent_document_context_tokens": parent_tokens,
-        "projected_document_context_tokens": token_counter(
-            str(projected.get("document_context") or "")
-        ),
+        "projected_document_context_tokens": token_counter(projected_context),
         "retained_parent_document_tokens": retained_tokens,
         "parent_artifact_token_contributions": contributions,
+        "final_prompt_tokens": final_prompt_tokens,
+        "without_real_prompt_tokens": without_real_prompt_tokens,
+        "real_source_marginal_tokens": source_tokens,
         "real_source_token_ratio": measured_ratio,
     }
 

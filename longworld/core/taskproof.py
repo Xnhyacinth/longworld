@@ -295,6 +295,9 @@ def _source_token_measurement_valid(
     retained_tokens = measurement.get("retained_parent_document_tokens")
     parent_ratio = measurement.get("parent_real_source_token_ratio")
     measured_ratio = measurement.get("real_source_token_ratio")
+    final_prompt_tokens = measurement.get("final_prompt_tokens")
+    without_real_prompt_tokens = measurement.get("without_real_prompt_tokens")
+    source_tokens = measurement.get("real_source_marginal_tokens")
     expected_parent_tokens = sum(item["token_contribution"] for item in contributions)
     expected_retained_tokens = sum(
         item["token_contribution"] for item in contributions if item["retained_as_real"]
@@ -316,13 +319,20 @@ def _source_token_measurement_valid(
         or isinstance(measured_ratio, bool)
         or not isinstance(measured_ratio, (int, float))
         or not 0.0 < float(parent_ratio) <= 1.0
+        or isinstance(final_prompt_tokens, bool)
+        or not isinstance(final_prompt_tokens, int)
+        or final_prompt_tokens < 1
+        or final_prompt_tokens != candidate.get("tokenizer_context_tokens")
+        or isinstance(without_real_prompt_tokens, bool)
+        or not isinstance(without_real_prompt_tokens, int)
+        or not 0 <= without_real_prompt_tokens < final_prompt_tokens
+        or isinstance(source_tokens, bool)
+        or not isinstance(source_tokens, int)
+        or source_tokens != final_prompt_tokens - without_real_prompt_tokens
         or candidate.get("real_source_token_ratio") != measured_ratio
     ):
         return False
-    expected_ratio = float(parent_ratio)
-    if retained_tokens != parent_tokens:
-        expected_ratio *= retained_tokens / parent_tokens
-    expected_ratio = min(float(parent_ratio), expected_ratio)
+    expected_ratio = source_tokens / final_prompt_tokens
     return bool(
         measured_ratio == expected_ratio
         and (

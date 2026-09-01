@@ -631,6 +631,78 @@ def _missing_required_view_coverage_by_world(
     }
 
 
+def _immutable_world_lineage_violations_by_world(
+    rows: list[dict[str, Any]], profile: Any
+) -> dict[str, tuple[str, ...]]:
+    """Reject mixed-source or duplicate cells in fixed multi-view profiles."""
+    required_views = tuple(profile.required_view_timings)
+    required_buckets = tuple(profile.required_exact_length_buckets)
+    if not required_views:
+        return {}
+    required_cells = {
+        (bucket, view, timing)
+        for bucket in required_buckets
+        for view, timing in required_views
+    }
+    by_world: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        world_id = str(row.get("world_id") or "")
+        if world_id:
+            by_world[world_id].append(row)
+
+    def source_lineage(row: dict[str, Any]) -> str:
+        for field in (
+            "source_binding",
+            "source_workflow_bundle",
+            "episode_replay_bundle",
+        ):
+            value = row.get(field)
+            if isinstance(value, dict):
+                return _canonical_sha256({"binding_type": field, "binding": value})
+        return ""
+
+    violations: dict[str, tuple[str, ...]] = {}
+    for world_id, world_rows in sorted(by_world.items()):
+        reasons: list[str] = []
+        cell_counts = Counter(
+            (
+                str(row.get("length_bucket") or ""),
+                str(row.get("view") or ""),
+                str(row.get("query_timing") or ""),
+            )
+            for row in world_rows
+        )
+        duplicated = sorted(
+            cell
+            for cell, count in cell_counts.items()
+            if cell in required_cells and count != 1
+        )
+        if duplicated:
+            reasons.append(
+                "duplicate_cells="
+                + "+".join(
+                    f"{bucket}:{view}/{timing}" for bucket, view, timing in duplicated
+                )
+            )
+        for field in ("base_task_id", "semantic_base_task_id"):
+            values = {str(row.get(field) or "") for row in world_rows if row.get(field)}
+            if len(values) > 1:
+                reasons.append(f"mixed_{field}")
+        for field in ("source_family_ids", "workflow_ids"):
+            values = {
+                _canonical_sha256(sorted(str(value) for value in row.get(field) or []))
+                for row in world_rows
+            }
+            if len(values) > 1:
+                reasons.append(f"mixed_{field}")
+        source_lineages = {source_lineage(row) for row in world_rows}
+        if "" in source_lineages or len(source_lineages) > 1:
+            reasons.append("mixed_source_binding")
+        if reasons:
+            violations[world_id] = tuple(reasons)
+    return violations
+
+
 def _worlds_with_unbound_rows(rows: list[dict[str, Any]]) -> dict[str, tuple[str, ...]]:
     unbound: defaultdict[str, list[str]] = defaultdict(list)
     for row in rows:
@@ -1666,6 +1738,16 @@ def select_release_worlds(
         ],
         profile,
     )
+    lineage_violations = _immutable_world_lineage_violations_by_world(
+        [
+            candidate
+            for world_id in fully_audited_worlds
+            if world_id not in missing_required_buckets
+            and world_id not in missing_required_views
+            for _digest, candidate in by_world[world_id]
+        ],
+        profile,
+    )
     unbound_rows_by_world = (
         _worlds_with_unbound_rows(
             [
@@ -1685,6 +1767,7 @@ def select_release_worlds(
             for world_id in fully_audited_worlds
             if world_id not in missing_required_buckets
             and world_id not in missing_required_views
+            and world_id not in lineage_violations
             and world_id not in unbound_rows_by_world
             for digest, candidate in by_world[world_id]
         ],
@@ -1700,6 +1783,7 @@ def select_release_worlds(
         for world_id in fully_audited_worlds
         if world_id not in missing_required_buckets
         and world_id not in missing_required_views
+        and world_id not in lineage_violations
         and world_id not in unbound_rows_by_world
     ]
     target = profile.expected_promoted_worlds
@@ -1737,6 +1821,14 @@ def select_release_worlds(
             )
             raise PromotionError(
                 "release profile requires all rows to be source-bound: " + details
+            )
+        if lineage_violations:
+            details = ",".join(
+                f"{world_id}={'+'.join(reasons)}"
+                for world_id, reasons in lineage_violations.items()
+            )
+            raise PromotionError(
+                "insufficient worlds with immutable world lineage: " + details
             )
         raise PromotionError(
             f"insufficient fully audited worlds: {len(eligible_worlds)}<{target}"
@@ -2299,6 +2391,15 @@ def create_train_ready_report(
         )
         raise PromotionError(
             "promoted rows are missing required view coverage: " + details
+        )
+    lineage_violations = _immutable_world_lineage_violations_by_world(rows, profile)
+    if lineage_violations:
+        details = ",".join(
+            f"{world_id}={'+'.join(reasons)}"
+            for world_id, reasons in lineage_violations.items()
+        )
+        raise PromotionError(
+            "promoted rows violate immutable world lineage: " + details
         )
     if profile.require_all_rows_source_bound:
         unbound_rows_by_world = _worlds_with_unbound_rows(rows)
