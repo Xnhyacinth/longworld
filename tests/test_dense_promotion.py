@@ -49,6 +49,7 @@ from longworld.core.promotion import (
     _candidate_has_verified_real_source,
     _candidate_include_program_joins,
     _candidate_n_workstreams,
+    _immutable_world_lineage_violations_by_world,
     _independent_verification_replay,
     _materialize_synthetic_replay,
     _missing_required_view_coverage_by_world,
@@ -2165,6 +2166,23 @@ def test_p13_selection_rejects_cross_source_world_cell_substitution() -> None:
             candidate_attestation_key=KEY,
             audit_attestation_key=KEY,
         )
+
+
+def test_p13_lineage_allows_semantic_program_growth_within_one_base_task() -> None:
+    candidates, _audits = _p13_six_domain_selection_inputs()
+    rows = [
+        deepcopy(candidate)
+        for candidate in candidates
+        if candidate["world_id"] == "p13-codeforge-0"
+    ]
+    rows[-1]["semantic_base_task_id"] = "deeper-band-program"
+
+    assert (
+        _immutable_world_lineage_violations_by_world(
+            rows, release_profile("p13-authentic-six-domain-probe-12-v1")
+        )
+        == {}
+    )
 
 
 def test_p13_selection_requires_every_selected_row_to_be_source_bound() -> None:

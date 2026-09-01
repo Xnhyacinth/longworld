@@ -684,7 +684,7 @@ def _immutable_world_lineage_violations_by_world(
                     f"{bucket}:{view}/{timing}" for bucket, view, timing in duplicated
                 )
             )
-        for field in ("base_task_id", "semantic_base_task_id"):
+        for field in ("base_task_id",):
             values = {str(row.get(field) or "") for row in world_rows if row.get(field)}
             if len(values) > 1:
                 reasons.append(f"mixed_{field}")
