@@ -60,7 +60,9 @@ candidates，共 519,335 tokens；旧 reconstruction 不再借这些叙事 secti
 - immutable profile digest：
   `7fc9734fdd5dd7b3420eb7235e542fe1b82b8bf5dfc146862eb889a21d6de877`
 - 最低完整规模：12 worlds、108 rows、每档 36 rows、每域 6 条 64K rows。
-- 当前没有 selection receipt、promotion manifest、quality-gate receipt 或 B1/B3/B5/B5w export。
+- 已用当前 7 个 world 和授权 local-probe trust root 实际运行统一 selection；它按设计
+  fail-closed 为 `insufficient fully audited worlds: 7<12`，未写 selection receipt。
+  因此仍没有 promotion manifest、quality-gate receipt 或 B1/B3/B5/B5w export。
 - production trust 的 prepare/独立 ECDSA approval/finalize/COMMITTED 代码路径已实现，但
   production profile allowlist 和 package-ready allowlist 都为空。
 - production-48、四套 unseen eval、private HF 上传继续阻塞；不能手工修改 eligibility 字段。

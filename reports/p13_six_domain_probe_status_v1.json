@@ -124,6 +124,8 @@
     {"domain": "cyber", "world": "cross-vendor remediation", "history_rows": 3, "history_tokens": 112860, "source_records": 34, "source_relations": 17, "source_tokens": 163050, "source_manifest_sha256": "e5ef9568958862f7af469ad8acf90f62cc8fa60a453b9633f4625440394ab2e9", "blocker": "source-state-answer/CF/remove-one pass; standard three-view sidecar, raw-window, dense and promotion remain"}
   ],
   "release_state": {
+    "selection_attempted": true,
+    "selection_blocker": "insufficient fully audited worlds: 7<12",
     "selection_run": false,
     "promotion_run": false,
     "quality_gate_run": false,
