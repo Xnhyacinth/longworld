@@ -1,0 +1,138 @@
+{
+  "schema_version": "p13-six-domain-probe-status-v1",
+  "created_at": "2026-09-01",
+  "release_profile": {
+    "profile_id": "p13-authentic-six-domain-probe-12-v1",
+    "sha256": "7fc9734fdd5dd7b3420eb7235e542fe1b82b8bf5dfc146862eb889a21d6de877",
+    "required_worlds": 12,
+    "required_rows": 108,
+    "required_rows_per_band": 36,
+    "required_64k_rows_per_domain": 6,
+    "required_views": ["full", "cf", "ordered_artifact_view"],
+    "required_bands": ["16k", "32k", "64k"]
+  },
+  "canonical_physical_inventory": {
+    "worlds": 7,
+    "rows": 63,
+    "actual_context_tokens": 2371273,
+    "quota_countable_worlds": 5,
+    "quota_required_worlds": 12,
+    "unique_motifs": 5,
+    "required_unique_motifs": 12,
+    "unique_executable_proofs": 16,
+    "required_unique_executable_proofs": 12,
+    "unique_answer_programs": 5,
+    "required_unique_answer_programs": 12,
+    "unique_semantic_base_tasks": 5,
+    "required_unique_semantic_base_tasks": 12,
+    "quota_by_domain": {
+      "company": 0,
+      "researchlab": 0,
+      "codeforge": 1,
+      "finance": 1,
+      "cyber": 1,
+      "macro_economics": 2
+    }
+  },
+  "canonical_worlds": [
+    {
+      "domain": "finance",
+      "world_id": "finance_amazon_issuer_ir_2021_2024_v1",
+      "rows": 9,
+      "actual_context_tokens": 339841,
+      "candidate_path": "data/releases/p13-task-views-finance-amazon-source-token-v2-rerun1/candidates.jsonl",
+      "candidate_sha256": "431723776c424333b07b057047c81057330a9451c6a1bb0dbe0e0390a2964661",
+      "ranking_sha256": "ccf6f4c051144c1274a7de0da3b6936198ce5324a230b8ea445fdb3c160257e6",
+      "audit_sha256": "014c176c73f55fa4f52873231ee92ff45d0a5d44a3a6c3608128fff2c567c084",
+      "source_token_receipt_schema": "longworld.source-token-measurement-receipt.v2"
+    },
+    {
+      "domain": "cyber",
+      "world_id": "cyber_cisa_kev_catalog_20260829_v1",
+      "rows": 9,
+      "actual_context_tokens": 338685,
+      "candidate_path": "data/releases/p13-task-views-cyber-kev-source-token-v2-rerun1/candidates.jsonl",
+      "candidate_sha256": "347ae9bb09637ea2d157de829401501129d96250d89826528e2bce5a48217203",
+      "ranking_sha256": "d5aa41f3622e800dc2b08eef00beb3bda79dfd2cb407c9b3ca53a65c709dad34",
+      "audit_sha256": "95438b8dfe8b413de9d76a933cced6247f1685ae324860409b120d0ee4d79b1f",
+      "source_token_receipt_schema": "longworld.source-token-measurement-receipt.v2"
+    },
+    {
+      "domain": "macro_economics",
+      "world_id": "bea-real-gdp-percent-change-2005q4-revision-history-v1",
+      "rows": 9,
+      "actual_context_tokens": 336966,
+      "candidate_path": "data/releases/p13-task-views-macro-bea-real-gdp-source-token-v2-v1/candidates.jsonl",
+      "candidate_sha256": "6c81e0a8b963248ef982cab99498ef834c05c6ead75df413e228b493cc310620",
+      "ranking_sha256": "744d5f99e8a08e46cf49c494e73e2b5508cee731d3ea5d86053bc1df1aed8a99",
+      "audit_sha256": "711d477e674f9e778628cd4a24b46a8b8b35c619d885d3831e64a302395b18a4",
+      "source_token_receipt_schema": "longworld.source-token-measurement-receipt.v2"
+    },
+    {
+      "domain": "macro_economics",
+      "world_id": "bea-gdi-current-dollars-2005q1-revision-history-v1",
+      "rows": 9,
+      "actual_context_tokens": 337050,
+      "candidate_path": "data/releases/p13-task-views-macro-bea-gdi-current-2005q1-source-token-v2-v1/candidates.jsonl",
+      "candidate_sha256": "5ad8e1d5eb164d497830c660547b47eaafc939fd99a6e930628c7aab6715b941",
+      "ranking_sha256": "4de88d7d20a5736af456730bc78d0aff4cfd8b4627c251544a883268c9cd75c5",
+      "audit_sha256": "760a1b5473a505c2bfef62221435b246fad4191435eff2d079bda717512e4018",
+      "source_token_receipt_schema": "longworld.source-token-measurement-receipt.v2"
+    },
+    {
+      "domain": "macro_economics",
+      "world_id": "bea-gdp-current-dollars-2003q1-revision-history-v1",
+      "rows": 9,
+      "actual_context_tokens": 336939,
+      "candidate_path": "data/releases/p13-task-views-macro-bea-gdp-current-2003q1-source-token-v2-v1/candidates.jsonl",
+      "candidate_sha256": "d4a19105b8ad6ac3d82174235f4e00fe116468440974f58a4283bf6d7368acac",
+      "ranking_sha256": "d14bff11ca3a255cd69bda26f79d648702cd0c56847201ee9d4783ccd006e5cf",
+      "audit_sha256": "6d585703ff4bdb9033da4151ffa82a888cb96fb05022d4eeaaa8b88701980a6e",
+      "source_token_receipt_schema": "longworld.source-token-measurement-receipt.v2"
+    },
+    {
+      "domain": "macro_economics",
+      "world_id": "bea-real-gdi-percent-change-2004q1-revision-history-v1",
+      "rows": 9,
+      "actual_context_tokens": 338304,
+      "candidate_path": "data/releases/p13-task-views-macro-bea-real-gdi-2004q1-source-token-v2-v1/candidates.jsonl",
+      "candidate_sha256": "ae4f8b9c331d4c8cc4a4dc5857b59d343da0210a0b75bb07597bf8a84c2dacca",
+      "ranking_sha256": "fa82c841bc825043290f40268167edcb6195c7069a9c83f30587dafdcd23c734",
+      "audit_sha256": "99943c0a124ba6044666494c8c675cda778d668476d6c065dd49e99b3aeecf67",
+      "source_token_receipt_schema": "longworld.source-token-measurement-receipt.v2"
+    },
+    {
+      "domain": "codeforge",
+      "world_id": "code000126-umberkit-83:focal",
+      "rows": 9,
+      "actual_context_tokens": 343488,
+      "candidate_path": "data/releases/p13-codeforge-dprint-first-three-view-workspace-v2-candidate/train.jsonl",
+      "candidate_sha256": "432596bd067d55a051b3ee105cfa905b9ac79578f02b71df56f2b15fda16131d",
+      "ranking_sha256": "26e90822ef4579b8383819cbfbc0f8094af11f0c3f91ab70f90993a73fde2362",
+      "audit_sha256": "214060a4fde12998afe06aaf6da9fbb90ec9741809f4524ec4b8dc03d07d1260",
+      "accepted_sha256": "b8494dc0233ddf98c98cec481d1de9662e212085a3661ece1aa6d95af4fa247c"
+    }
+  ],
+  "incomplete_worlds": [
+    {"domain": "company", "world": "Microsoft FY2022-FY2025", "covered_cells": 6, "required_cells": 9, "blocker": "64k natural reconstruction is 55102 tokens"},
+    {"domain": "company", "world": "Microsoft cashflow-tax-market-risk diagnostic", "candidate_rows": 8, "actual_context_tokens": 519335, "candidate_sha256": "3f06308a6cbda8dc7f12c548bb7ede301719cab03e0b6bd88f2c43bb360a758a", "blocker": "independent 64k answer program is not the 16k/32k reconstruction semantic growth group"},
+    {"domain": "researchlab", "world": "Attention revisions", "covered_cells": 6, "required_cells": 9, "blocker": "64k natural history is 48929 tokens and lacks review-response history"},
+    {"domain": "researchlab", "world": "AEVB v1-v11", "covered_cells": 6, "required_cells": 9, "candidate_rows": 6, "actual_context_tokens": 291525, "candidate_sha256": "867c1589b29751c30da9eb5cd149e6822055060b3e918366c9030ae6e1a1a8c4", "blocker": "16k is 14980 tokens; 32k/64k near-duplicate ratios are 0.4022/0.5149"},
+    {"domain": "researchlab", "world": "MLRC revision workflow", "covered_cells": 9, "required_cells": 9, "candidate_rows": 9, "actual_context_tokens": 342606, "candidate_sha256": "6761103d41b39ec599e7bf5966a51bf787a92f838d385dbba58a59ab8b227c80", "blocker": "32k/64k CF near-duplicate ratios are 0.3473/0.3170, above 0.25"},
+    {"domain": "codeforge", "world": "Pulumi", "covered_cells": 3, "required_cells": 9, "blocker": "16k and 32k strict_support_overflow"},
+    {"domain": "codeforge", "world": "Oxc", "covered_cells": 5, "required_cells": 9, "candidate_rows": 5, "actual_context_tokens": 225722, "blocker": "16k ordered distance shortfall; 32k has answerable 16k subwindow"},
+    {"domain": "cyber", "world": "cross-vendor remediation", "history_rows": 3, "history_tokens": 112860, "source_records": 34, "source_relations": 17, "source_tokens": 163050, "source_manifest_sha256": "e5ef9568958862f7af469ad8acf90f62cc8fa60a453b9633f4625440394ab2e9", "blocker": "source-state-answer/CF/remove-one pass; standard three-view sidecar, raw-window, dense and promotion remain"}
+  ],
+  "release_state": {
+    "selection_run": false,
+    "promotion_run": false,
+    "quality_gate_run": false,
+    "exports_run": false,
+    "train_ready": false,
+    "production_eligible": false,
+    "production_48_enabled": false,
+    "private_hf_upload_allowed": false,
+    "issuable_production_profile_ids": [],
+    "production_package_ready_profile_ids": []
+  }
+}
