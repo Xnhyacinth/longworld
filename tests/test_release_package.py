@@ -6,6 +6,8 @@ import hashlib
 import json
 import os
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -1106,6 +1108,86 @@ def test_production_finalize_commits_only_after_external_kms_approval(
     )
 
 
+def test_production_finalize_preflight_failure_never_exposes_commit_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import build_release_package as package_builder
+
+    destination, request_path, _prepared = _prepare_production_stage(
+        tmp_path, monkeypatch
+    )
+    _package_approval_from_request(request_path, tmp_path, monkeypatch)
+    marker_observations: list[bool] = []
+
+    def fail_preflight(*_args: object, **_kwargs: object) -> dict:
+        marker_observations.append((destination / "COMMITTED").exists())
+        raise ValueError("injected final preflight failure")
+
+    monkeypatch.setattr(
+        package_builder,
+        "_validate_prospective_production_release_preflight",
+        fail_preflight,
+    )
+
+    with pytest.raises(ValueError, match="injected final preflight failure"):
+        finalize_release_package(
+            staged_package=destination,
+            release_profile_id=PRODUCTION_PROFILE,
+            transform_revision=TRANSFORM,
+            training_attestation_key=REPORT_KEY,
+            gate_attestation_key=AUDITOR_KEY,
+            inventory_attestation_key=REPORT_KEY,
+        )
+
+    assert marker_observations == [False]
+    assert not (destination / "COMMITTED").exists()
+
+
+def test_production_finalize_marker_only_watcher_cannot_run_before_preflight(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import build_release_package as package_builder
+
+    destination, request_path, _prepared = _prepare_production_stage(
+        tmp_path, monkeypatch
+    )
+    _package_approval_from_request(request_path, tmp_path, monkeypatch)
+    original_preflight = (
+        package_builder._validate_prospective_production_release_preflight
+    )
+    preflight_started = threading.Event()
+    allow_preflight = threading.Event()
+
+    def blocked_preflight(*args: object, **kwargs: object) -> dict:
+        preflight_started.set()
+        if not allow_preflight.wait(timeout=5):
+            raise TimeoutError("test did not release final preflight")
+        return original_preflight(*args, **kwargs)
+
+    monkeypatch.setattr(
+        package_builder,
+        "_validate_prospective_production_release_preflight",
+        blocked_preflight,
+    )
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(
+            finalize_release_package,
+            staged_package=destination,
+            release_profile_id=PRODUCTION_PROFILE,
+            transform_revision=TRANSFORM,
+            training_attestation_key=REPORT_KEY,
+            gate_attestation_key=AUDITOR_KEY,
+            inventory_attestation_key=REPORT_KEY,
+        )
+        assert preflight_started.wait(timeout=5)
+        assert not (destination / "COMMITTED").exists()
+        allow_preflight.set()
+        preflight = future.result(timeout=5)
+
+    assert preflight["production_eligible"] is True
+    assert (destination / "COMMITTED").is_file()
+
+
 def test_production_finalize_rechecks_package_readiness_after_revocation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1490,18 +1572,36 @@ def test_production_entrypoints_reject_child_file_identity_swap(
     target = destination / "04_promoted" / "train.jsonl"
     replacement = tmp_path / f"replacement-{entrypoint}.jsonl"
     replacement.write_bytes(target.read_bytes())
-    original_file_sha256 = release_inventory.file_sha256
     swapped = False
 
-    def swap_after_validation(path: Path) -> str:
-        nonlocal swapped
-        digest = original_file_sha256(path)
-        if Path(path).name == "COMMITTED" and not swapped:
-            os.replace(replacement, target)
-            swapped = True
-        return digest
+    if entrypoint == "finalize":
+        original_snapshot = release_inventory._release_member_snapshot
+        snapshot_count = 0
 
-    monkeypatch.setattr(release_inventory, "file_sha256", swap_after_validation)
+        def swap_after_initial_snapshot(root: Path) -> dict:
+            nonlocal snapshot_count, swapped
+            snapshot = original_snapshot(root)
+            snapshot_count += 1
+            if snapshot_count == 1:
+                os.replace(replacement, target)
+                swapped = True
+            return snapshot
+
+        monkeypatch.setattr(
+            release_inventory, "_release_member_snapshot", swap_after_initial_snapshot
+        )
+    else:
+        original_file_sha256 = release_inventory.file_sha256
+
+        def swap_after_validation(path: Path) -> str:
+            nonlocal swapped
+            digest = original_file_sha256(path)
+            if Path(path).name == "COMMITTED" and not swapped:
+                os.replace(replacement, target)
+                swapped = True
+            return digest
+
+        monkeypatch.setattr(release_inventory, "file_sha256", swap_after_validation)
 
     with pytest.raises(ValueError, match="release package members changed"):
         if entrypoint == "finalize":
@@ -1524,6 +1624,8 @@ def test_production_entrypoints_reject_child_file_identity_swap(
             )
 
     assert swapped
+    if entrypoint == "finalize":
+        assert not (destination / "COMMITTED").exists()
 
 
 @pytest.mark.parametrize("mutation", ("replace_early_member", "add_member"))

@@ -562,6 +562,40 @@ def create_release_inventory(
     return inventory
 
 
+def _validate_production_commit_marker(
+    marker: object,
+    *,
+    inventory_path: Path,
+    manifest_path: Path,
+    gate_receipt: dict[str, Any],
+    release_profile_id: str,
+) -> None:
+    expected_marker = json.loads(release_commit_marker_bytes(inventory_path))
+    if (
+        not isinstance(marker, dict)
+        or set(marker)
+        != {
+            *expected_marker,
+            "production_approval",
+        }
+        or any(marker.get(field) != value for field, value in expected_marker.items())
+    ):
+        raise ValueError("release inventory identity or commit marker is invalid")
+    package_approval = verify_embedded_production_package_approval_from_env(
+        marker.get("production_approval"),
+        release_profile_id=release_profile_id,
+        release_profile_sha256=release_profile_sha256(release_profile_id),
+        release_inventory_sha256=file_sha256(inventory_path),
+        committed_sha256=hashlib.sha256(
+            release_commit_marker_bytes(inventory_path)
+        ).hexdigest(),
+        training_manifest_sha256=file_sha256(manifest_path),
+    )
+    require_independent_package_approval(
+        gate_receipt.get("production_approval"), package_approval
+    )
+
+
 def _validate_release_inventory_contents(
     release_root: Path,
     *,
@@ -645,26 +679,12 @@ def _validate_release_inventory_contents(
         if not isinstance(marker, dict):
             raise ValueError("release inventory identity or commit marker is invalid")
         if expected_trust_mode == "production":
-            if set(marker) != {*expected_marker, "production_approval"} or any(
-                marker.get(field) != value for field, value in expected_marker.items()
-            ):
-                raise ValueError(
-                    "release inventory identity or commit marker is invalid"
-                )
-            package_approval = verify_embedded_production_package_approval_from_env(
-                marker.get("production_approval"),
+            _validate_production_commit_marker(
+                marker,
+                inventory_path=inventory_path,
+                manifest_path=manifest_path,
+                gate_receipt=gate_receipt,
                 release_profile_id=expected_release_profile_id,
-                release_profile_sha256=release_profile_sha256(
-                    expected_release_profile_id
-                ),
-                release_inventory_sha256=file_sha256(inventory_path),
-                committed_sha256=hashlib.sha256(
-                    release_commit_marker_bytes(inventory_path)
-                ).hexdigest(),
-                training_manifest_sha256=file_sha256(manifest_path),
-            )
-            require_independent_package_approval(
-                gate_receipt.get("production_approval"), package_approval
             )
         elif marker != expected_marker:
             raise ValueError("release inventory identity or commit marker is invalid")
@@ -769,6 +789,57 @@ def validate_release_inventory(
         committed=True,
     )
     return inventory
+
+
+def _validate_prospective_production_release_preflight(
+    release_root: Path,
+    *,
+    expected_release_profile_id: str,
+    expected_transform_revision: str,
+    training_attestation_key: bytes | None,
+    gate_attestation_key: bytes | None,
+    inventory_attestation_key: bytes | None,
+    prospective_commit_marker: bytes,
+) -> dict[str, Any]:
+    """Validate the exact marker bytes before their final atomic publication."""
+    production_package_ready_profile(expected_release_profile_id)
+    root = release_root.absolute()
+    initial_members = _release_member_snapshot(root)
+    inventory, gate_receipt = _validate_release_inventory_contents(
+        root,
+        expected_release_profile_id=expected_release_profile_id,
+        expected_transform_revision=expected_transform_revision,
+        training_attestation_key=training_attestation_key,
+        gate_attestation_key=gate_attestation_key,
+        inventory_attestation_key=inventory_attestation_key,
+        expected_trust_mode="production",
+        committed=False,
+    )
+    try:
+        marker = json.loads(prospective_commit_marker)
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
+        raise ValueError("release inventory or commit marker is malformed") from error
+    manifest_binding = inventory.get("training_manifest")
+    if not isinstance(manifest_binding, dict):
+        raise TypeError("release inventory training manifest binding is missing")
+    _validate_production_commit_marker(
+        marker,
+        inventory_path=root / RELEASE_INVENTORY_NAME,
+        manifest_path=root / str(manifest_binding.get("path") or ""),
+        gate_receipt=gate_receipt,
+        release_profile_id=expected_release_profile_id,
+    )
+    preflight = {
+        "schema_version": PRODUCTION_RELEASE_PREFLIGHT_SCHEMA,
+        "release_profile_id": expected_release_profile_id,
+        "release_inventory_sha256": file_sha256(root / RELEASE_INVENTORY_NAME),
+        "commit_marker_sha256": hashlib.sha256(prospective_commit_marker).hexdigest(),
+        "production_eligible": True,
+        "inventory": inventory,
+    }
+    if _release_member_snapshot(root) != initial_members:
+        raise ValueError("release package members changed during validation")
+    return preflight
 
 
 def validate_production_release_preflight(

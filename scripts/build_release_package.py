@@ -31,6 +31,7 @@ from longworld.core.release_inventory import (
     RELEASE_INVENTORY_PURPOSE,
     RELEASE_TRUST_MODES,
     TRAINING_OUTPUT_ALLOWLIST,
+    _validate_prospective_production_release_preflight,
     create_release_inventory,
     production_package_ready_profile,
     release_commit_marker_bytes,
@@ -128,6 +129,19 @@ def _write_commit_marker(stage_root: Path, marker_bytes: bytes) -> None:
         handle.write(marker_bytes)
         handle.flush()
         os.fsync(handle.fileno())
+
+
+def _prepare_commit_marker(stage_root: Path, marker_bytes: bytes) -> Path:
+    descriptor, marker_name = tempfile.mkstemp(
+        prefix=f".{stage_root.name}.COMMITTED.",
+        suffix=".tmp",
+        dir=stage_root.parent,
+    )
+    with os.fdopen(descriptor, "wb") as handle:
+        handle.write(marker_bytes)
+        handle.flush()
+        os.fsync(handle.fileno())
+    return Path(marker_name)
 
 
 def _scan_release_payloads(stage_root: Path) -> None:
@@ -507,19 +521,22 @@ def finalize_release_package(
     committed_bytes = (
         json.dumps(marker, sort_keys=True, separators=(",", ":")) + "\n"
     ).encode("utf-8")
+    prepared_marker = _prepare_commit_marker(stage_root, committed_bytes)
     _require_directory_identity(stage_root, stage_identity, label="staged package root")
-    _write_commit_marker(stage_root, committed_bytes)
-    _require_directory_identity(stage_root, stage_identity, label="staged package root")
-    _fsync_directory(stage_root)
-    _fsync_directory(stage_root.parent)
-    return validate_production_release_preflight(
+    preflight = _validate_prospective_production_release_preflight(
         stage_root,
         expected_release_profile_id=release_profile_id,
         expected_transform_revision=transform_revision,
         training_attestation_key=training_attestation_key,
         gate_attestation_key=gate_attestation_key,
         inventory_attestation_key=inventory_attestation_key,
+        prospective_commit_marker=committed_bytes,
     )
+    _require_directory_identity(stage_root, stage_identity, label="staged package root")
+    _fsync_directory(stage_root)
+    _fsync_directory(stage_root.parent)
+    _publish_path_no_replace(prepared_marker, stage_root / COMMITTED_NAME)
+    return preflight
 
 
 def main() -> None:
