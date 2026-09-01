@@ -1,0 +1,31 @@
+{
+  "schema_version": "longworld-local-probe-run-request-v1",
+  "probe_id": "p13-company-microsoft-four-annual-exact-v10",
+  "data_product": "worldlong_p13_company_microsoft_four_annual_exact_v10",
+  "candidate_profile_id": "p12-sec-source-slice-1-v1",
+  "target_union_profile_id": "p13-authentic-six-domain-probe-12-v1",
+  "config": "configs/p13_company_microsoft_four_annual_exact_v10.yaml",
+  "source_bundle": {
+    "path": "data/source_inventory/p13_company_microsoft_four_annual_v4/source_workflow_bundle.p13.four-annual.v4.signed.json",
+    "adapter_revision": "sourceworkflow@2",
+    "sha256": "85838a916595b6d29ef184e054b0ebf617929b197b80d2ea8db8383fd2cccc6d",
+    "binding_digest": "085dc84b58f36c30b7b5f42bb26d9e32b43a06588d98a5975e4e97c16aec5b89"
+  },
+  "source_programs": [
+    "sec_financial_reconstruction",
+    "sec_financial_cashflow_tax_market_risk"
+  ],
+  "exact_tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb"
+  },
+  "declared_exact_buckets": ["16k", "32k", "64k"],
+  "required_views": ["full", "cf", "ordered_artifact_view"],
+  "required_timing": "first",
+  "composition_method": "causal_timeline",
+  "padding_allowed": false,
+  "random_document_concatenation_allowed": false,
+  "trust_scope": "local_probe",
+  "production_eligible": false
+}

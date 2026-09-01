@@ -12,7 +12,8 @@ from html import unescape
 from itertools import pairwise
 
 from longworld.core.filingworkflow import (
-    ISSUER_GCS_MERGED_COMPONENT_REVISION,
+    ISSUER_GCS_MERGED_COMPONENT_REVISION_V2,
+    ISSUER_GCS_MERGED_COMPONENT_REVISIONS,
     SEC_REQUIRED_COMPONENT_TYPES,
     SecFilingComponent,
     parse_issuer_gcs_merged_components,
@@ -66,12 +67,19 @@ _CERT_DATE = re.compile(
     r"Date&#58;\s*([A-Z][a-z]+(?:(?:&#160;)|(?:&nbsp;)|\s)+\d{1,2},\s*\d{4})"
 )
 _GCS_CERT_DATE = re.compile(r">([A-Z][a-z]+\s+\d{1,2},\s*\d{4})</(?:font|span)>")
+_GCS_LEGACY_CERT_DATE = re.compile(r">([A-Z][a-z]+\s+\d{1,2},\s*\d{4})\s*</p>")
+_GCS_LEGACY_EXHIBIT_FILENAME = re.compile(
+    r"msft-ex(?:311|312|321|322)_\d+\.htm", re.IGNORECASE
+)
 _CERT_PERIOD = re.compile(
     r"(?:fiscal\s+)?year ended\s+"
     r"([A-Z][a-z]+(?:(?:&#160;)|(?:&nbsp;)|\s)+\d{1,2},\s*\d{4})",
     re.IGNORECASE,
 )
 _CERT_FORM = re.compile(r"Form\s+10-K", re.IGNORECASE)
+_GCS_LEGACY_CERT_FORM = re.compile(
+    r"Form(?:(?:&#160;)|(?:&nbsp;)|\s)+10-K", re.IGNORECASE
+)
 _CERT_906 = re.compile(r"Section(?:(?:&#160;)|(?:&nbsp;)|\s)+906", re.IGNORECASE)
 _OFFICER_TITLES = ("Chief Executive Officer", "Chief Financial Officer")
 _CENTRAL_INDEX_KEY = re.compile(
@@ -87,6 +95,11 @@ _GCS_CIK = re.compile(
 _GCS_PRIMARY_SCHEMA = re.compile(
     r'\bxlink:href="#([A-Za-z0-9][A-Za-z0-9._-]{0,249})\.xsd"'
 )
+_GCS_LEGACY_PRIMARY_TITLE = re.compile(
+    r"<title>[ \t\r\n]*(msft-10k_\d{8}\.htm)[ \t\r\n]*</title>",
+    re.IGNORECASE,
+)
+_GCS_LEGACY_PRIMARY_FILENAME = re.compile(r"msft-10k_\d{8}\.htm", re.IGNORECASE)
 _HEADINGS = (
     (
         "item8_operations",
@@ -235,6 +248,27 @@ _AMAZON_GROUND = (
 )
 _MICROSOFT_HEADINGS = (
     (
+        "item1_business",
+        "10-K",
+        'id="item_1_business"',
+        'id="item_1a_risk_factors"',
+        None,
+    ),
+    (
+        "item1a_risk_factors",
+        "10-K",
+        'id="item_1a_risk_factors"',
+        'id="item_1b_unresolved_staff_comments"',
+        None,
+    ),
+    (
+        "item7_mda",
+        "10-K",
+        'id="item_7_managements_discussion_analysis_f"',
+        'id="item_7a_quantitative_qualitative_disclos"',
+        None,
+    ),
+    (
         "item8_operations",
         "10-K",
         'id="income_statements"',
@@ -296,6 +330,9 @@ _MICROSOFT_HEADINGS = (
     ),
 )
 _MICROSOFT_GROUND = (
+    ("item1_business", 'id="item_1_business"'),
+    ("item1a_risk_factors", 'id="item_1a_risk_factors"'),
+    ("item7_mda", 'id="item_7_managements_discussion_analysis_f"'),
     ("item8_operations", 'id="income_statements"'),
     ("item8_balance_sheet", 'id="balance_sheets"'),
     ("item8_cash_flow", 'id="cash_flows_statements"'),
@@ -312,6 +349,27 @@ _MICROSOFT_GROUND = (
     ("ex_32_1", "EX-32.1"),
     ("ex_32_2", "EX-32.2"),
 )
+_MICROSOFT_LEGACY_ID_REPLACEMENTS = {
+    'id="item_1_business"': 'id="ITEM_1_BUSINESS"',
+    'id="item_1a_risk_factors"': 'id="ITEM_1A_RISK_FACTORS"',
+    'id="item_1b_unresolved_staff_comments"': (
+        'id="ITEM_1B_UNRESOLVED_STAFF_COMMENTS"'
+    ),
+    'id="item_2_properties"': 'id="ITEM_2_PROPERTIES"',
+    'id="item_3_legal_proceedings"': 'id="ITEM_3_LEGAL_PROCEEDINGS"',
+    'id="item_4_mine_safety_disclosures"': 'id="ITEM_4_MINE_SAFETY_DISCLOSURES"',
+    'id="item_7_managements_discussion_analysis_f"': (
+        'id="ITEM_7_MANAGEMENTS_DISCUSSION_ANALYSIS_F"'
+    ),
+    'id="item_7a_quantitative_qualitative_disclos"': (
+        'id="ITEM_7A_QUANTITATIVE_QUALITATIVE_DISCLOS"'
+    ),
+    'id="income_statements"': 'id="INCOME_STATEMENTS"',
+    'id="comprehensive_income_statements"': ('id="COMPREHENSIVE_INCOME_STATEMENTS"'),
+    'id="balance_sheets"': 'id="BALANCE_SHEETS"',
+    'id="cash_flows_statements"': 'id="CASH_FLOWS_STATEMENTS"',
+    'id="stockholders_equity_statements"': ('id="STOCKHOLDERS_EQUITY_STATEMENTS"'),
+}
 _ISSUER_SPECS = {
     "0000320193": IssuerFinancialSpec(
         headings=_HEADINGS,
@@ -369,6 +427,36 @@ _ISSUER_SPECS = {
         service_member="us-gaap:ServiceOtherMember",
     ),
 }
+
+
+def _microsoft_legacy_spec(spec: IssuerFinancialSpec) -> IssuerFinancialSpec:
+    def legacy(value: str | None) -> str | None:
+        return _MICROSOFT_LEGACY_ID_REPLACEMENTS.get(value, value)
+
+    return replace(
+        spec,
+        n_category=9,
+        headings=tuple(
+            (
+                section_id,
+                component_type,
+                str(legacy(start_heading)),
+                legacy(end_heading),
+                max_chars,
+            )
+            for (
+                section_id,
+                component_type,
+                start_heading,
+                end_heading,
+                max_chars,
+            ) in spec.headings
+        ),
+        section_ground=tuple(
+            (section_id, str(legacy(ground)))
+            for section_id, ground in spec.section_ground
+        ),
+    )
 
 
 @dataclass(frozen=True)
@@ -461,7 +549,7 @@ class SecFinancialProgram:
 
 
 def _source_components(
-    source_text: str, parent_source_sha256: str
+    source_text: str, parent_source_sha256: str, *, parser_revision: str = ""
 ) -> tuple[SecFilingComponent, ...]:
     if "microsoft.gcs-web.com/sec-filings/sec-filing/" not in source_text:
         return parse_sec_filing_components(source_text, parent_source_sha256)
@@ -472,17 +560,27 @@ def _source_components(
     primary_stems = set(_GCS_PRIMARY_SCHEMA.findall(source_text))
     if len(accessions) != 1 or len(ciks) != 1 or len(primary_stems) != 1:
         raise ProvenanceError("issuer GCS filing identity is missing or ambiguous")
+    if parser_revision not in ISSUER_GCS_MERGED_COMPONENT_REVISIONS:
+        raise ProvenanceError("issuer GCS parser revision is missing or unsupported")
+    primary_document = f"{next(iter(primary_stems))}.htm"
+    if parser_revision == ISSUER_GCS_MERGED_COMPONENT_REVISION_V2:
+        legacy_primary_documents = set(_GCS_LEGACY_PRIMARY_TITLE.findall(source_text))
+        if len(legacy_primary_documents) > 1:
+            raise ProvenanceError("issuer GCS primary filename is ambiguous")
+        if legacy_primary_documents:
+            primary_document = next(iter(legacy_primary_documents))
     return parse_issuer_gcs_merged_components(
         source_text,
         expected_accession=next(iter(accessions)),
         expected_cik=next(iter(ciks)),
         expected_form="10-K",
-        expected_primary_document=f"{next(iter(primary_stems))}.htm",
+        expected_primary_document=primary_document,
+        parser_revision=parser_revision,
     )
 
 
 def _validate_source_component(source_text: str, component: SecFilingComponent) -> None:
-    if component.parser_revision == ISSUER_GCS_MERGED_COMPONENT_REVISION:
+    if component.parser_revision in ISSUER_GCS_MERGED_COMPONENT_REVISIONS:
         validate_issuer_gcs_merged_component(source_text, component)
     else:
         validate_sec_filing_component(source_text, component)
@@ -749,12 +847,16 @@ def _validate_sec_xbrl_fact(
         raise ProvenanceError("SEC iXBRL fact provenance mismatch")
 
 
-def validate_sec_xbrl_fact(source_text: str, fact: SecXbrlFact) -> None:
+def validate_sec_xbrl_fact(
+    source_text: str, fact: SecXbrlFact, *, parser_revision: str = ""
+) -> None:
     """Replay a fact's exact span, value, component lineage, and provenance."""
     components = {
         item.component_type: item
         for item in _source_components(
-            source_text, hashlib.sha256(source_text.encode()).hexdigest()
+            source_text,
+            hashlib.sha256(source_text.encode()).hexdigest(),
+            parser_revision=parser_revision,
         )
     }
     component = components.get(fact.component_type)
@@ -902,12 +1004,16 @@ def _validate_sec_filing_section(
         raise ProvenanceError("SEC filing section provenance mismatch")
 
 
-def validate_sec_filing_section(source_text: str, section: SecFilingSection) -> None:
+def validate_sec_filing_section(
+    source_text: str, section: SecFilingSection, *, parser_revision: str = ""
+) -> None:
     """Replay a non-copying section view against its exact SEC component."""
     components = {
         item.component_type: item
         for item in _source_components(
-            source_text, hashlib.sha256(source_text.encode()).hexdigest()
+            source_text,
+            hashlib.sha256(source_text.encode()).hexdigest(),
+            parser_revision=parser_revision,
         )
     }
     component = components.get(section.component_type)
@@ -923,9 +1029,10 @@ def derive_sec_filing_subsection(
     section_id: str,
     char_start: int,
     char_end: int,
+    parser_revision: str = "",
 ) -> SecFilingSection:
     """Derive one hash-bound, non-copying interval inside a validated section."""
-    validate_sec_filing_section(source_text, section)
+    validate_sec_filing_section(source_text, section, parser_revision=parser_revision)
     if (
         not section_id
         or char_start < section.char_start
@@ -961,7 +1068,7 @@ def derive_sec_filing_subsection(
             }
         ),
     )
-    validate_sec_filing_section(source_text, item)
+    validate_sec_filing_section(source_text, item, parser_revision=parser_revision)
     return item
 
 
@@ -969,6 +1076,8 @@ def split_sec_filing_section_by_facts(
     source_text: str,
     section: SecFilingSection,
     facts: tuple[SecXbrlFact, ...],
+    *,
+    parser_revision: str = "",
 ) -> tuple[SecFilingSection, ...]:
     """Partition a section into exhaustive, non-copying, fact-centered views."""
     if not facts:
@@ -976,7 +1085,9 @@ def split_sec_filing_section_by_facts(
     components = {
         item.component_type: item
         for item in _source_components(
-            source_text, hashlib.sha256(source_text.encode()).hexdigest()
+            source_text,
+            hashlib.sha256(source_text.encode()).hexdigest(),
+            parser_revision=parser_revision,
         )
     }
     component = components.get(section.component_type)
@@ -1007,6 +1118,7 @@ def split_sec_filing_section_by_facts(
             section_id=f"{section.section_id}__{fact.fact_id}",
             char_start=start,
             char_end=end,
+            parser_revision=parser_revision,
         )
         slices.append(item)
     return tuple(slices)
@@ -1038,7 +1150,7 @@ def parse_sec_certification_facts(
     facts: list[SecCertificationFact] = []
     name_pattern = (
         _GCS_906_CERT_NAME
-        if component.parser_revision == ISSUER_GCS_MERGED_COMPONENT_REVISION
+        if component.parser_revision in ISSUER_GCS_MERGED_COMPONENT_REVISIONS
         and component.component_type.startswith("EX-32.")
         else _CERT_NAME
     )
@@ -1070,14 +1182,30 @@ def parse_sec_certification_facts(
         title_start = component.char_start + segment_start + title_offset
         title_end = title_start + len(officer_title)
 
-        form_match = _required_cert_match(_CERT_FORM, report_segment, "covered form")
+        legacy_gcs = (
+            component.parser_revision == ISSUER_GCS_MERGED_COMPONENT_REVISION_V2
+            and _GCS_LEGACY_EXHIBIT_FILENAME.fullmatch(component.filename) is not None
+        )
+        form_pattern = _GCS_LEGACY_CERT_FORM if legacy_gcs else _CERT_FORM
+        form_match = _required_cert_match(form_pattern, report_segment, "covered form")
         form_start = component.char_start + report_start + form_match.start()
         form_end = component.char_start + report_start + form_match.end()
-        covered_form = source_text[form_start:form_end]
+        raw_covered_form = source_text[form_start:form_end]
+        covered_form = (
+            re.sub(
+                r"\s+",
+                " ",
+                unescape(raw_covered_form).replace("\xa0", " "),
+            ).strip()
+            if legacy_gcs
+            else raw_covered_form
+        )
 
         date_pattern = (
-            _GCS_CERT_DATE
-            if component.parser_revision == ISSUER_GCS_MERGED_COMPONENT_REVISION
+            _GCS_LEGACY_CERT_DATE
+            if legacy_gcs
+            else _GCS_CERT_DATE
+            if component.parser_revision in ISSUER_GCS_MERGED_COMPONENT_REVISIONS
             else _CERT_DATE
         )
         date_matches = list(date_pattern.finditer(segment))
@@ -1102,7 +1230,7 @@ def parse_sec_certification_facts(
 
         if component.component_type.startswith("EX-31."):
             certification_kind = "section_302"
-            if component.parser_revision == ISSUER_GCS_MERGED_COMPONENT_REVISION:
+            if component.parser_revision in ISSUER_GCS_MERGED_COMPONENT_REVISIONS:
                 kind_text = f"Exhibit {component.component_type.removeprefix('EX-')}"
                 kind_offsets = [
                     match.start() for match in re.finditer(re.escape(kind_text), block)
@@ -1235,12 +1363,22 @@ def _validate_sec_certification_fact(
         for start, end in spans
     ):
         raise ProvenanceError("SEC certification attribute span is invalid")
+    raw_form = source_text[fact.form_char_start : fact.form_char_end]
+    legacy_gcs = (
+        component.parser_revision == ISSUER_GCS_MERGED_COMPONENT_REVISION_V2
+        and _GCS_LEGACY_EXHIBIT_FILENAME.fullmatch(component.filename) is not None
+    )
+    observed_form = (
+        re.sub(r"\s+", " ", unescape(raw_form).replace("\xa0", " ")).strip()
+        if legacy_gcs
+        else raw_form
+    )
     if (
         fact.officer_title not in _OFFICER_TITLES
         or source_text[fact.officer_title_char_start : fact.officer_title_char_end]
         != fact.officer_title
-        or source_text[fact.form_char_start : fact.form_char_end].lower() != "form 10-k"
-        or source_text[fact.form_char_start : fact.form_char_end] != fact.covered_form
+        or observed_form.lower() != "form 10-k"
+        or observed_form != fact.covered_form
         or fact.covered_form.lower() != "form 10-k"
         or _certification_date(source_text[fact.date_char_start : fact.date_char_end])
         != fact.certification_date
@@ -1255,7 +1393,7 @@ def _validate_sec_certification_fact(
     ).strip()
     if fact.component_type.startswith("EX-31."):
         expected_kind_quote = fact.component_type
-        if component.parser_revision == ISSUER_GCS_MERGED_COMPONENT_REVISION:
+        if component.parser_revision in ISSUER_GCS_MERGED_COMPONENT_REVISIONS:
             expected_kind_quote = f"Exhibit {fact.component_type.removeprefix('EX-')}"
         if (
             fact.certification_kind != "section_302"
@@ -1283,13 +1421,18 @@ def _validate_sec_certification_fact(
 
 
 def validate_sec_certification_fact(
-    source_text: str, fact: SecCertificationFact
+    source_text: str,
+    fact: SecCertificationFact,
+    *,
+    parser_revision: str = "",
 ) -> None:
     """Replay a certification officer span against its exact exhibit component."""
     components = {
         item.component_type: item
         for item in _source_components(
-            source_text, hashlib.sha256(source_text.encode()).hexdigest()
+            source_text,
+            hashlib.sha256(source_text.encode()).hexdigest(),
+            parser_revision=parser_revision,
         )
     }
     component = components.get(fact.component_type)
@@ -1363,7 +1506,11 @@ def _header_cik(source_text: str) -> str:
 
 
 def parse_sec_financial_program(
-    source_text: str, parent_source_sha256: str, *, report_date: str
+    source_text: str,
+    parent_source_sha256: str,
+    *,
+    report_date: str,
+    parser_revision: str = "",
 ) -> SecFinancialProgram:
     """Select staged, non-overlapping sections whose facts enter answer programs."""
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", report_date or ""):
@@ -1373,13 +1520,22 @@ def parse_sec_financial_program(
         raise ProvenanceError("SEC financial program is not defined for this issuer")
     components = {
         item.component_type: item
-        for item in _source_components(source_text, parent_source_sha256)
+        for item in _source_components(
+            source_text,
+            parent_source_sha256,
+            parser_revision=parser_revision,
+        )
     }
     required = (*SEC_REQUIRED_COMPONENT_TYPES, *spec.extra_cert_components)
     missing = [item for item in required if item not in components]
     if missing:
         raise ProvenanceError("SEC financial program is missing required components")
     filing = components["10-K"]
+    if (
+        parser_revision == ISSUER_GCS_MERGED_COMPONENT_REVISION_V2
+        and _GCS_LEGACY_PRIMARY_FILENAME.fullmatch(filing.filename)
+    ):
+        spec = _microsoft_legacy_spec(spec)
     facts = parse_sec_ixbrl_facts(source_text, filing)
     sections = [
         _section_from_headings(

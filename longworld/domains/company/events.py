@@ -62,6 +62,7 @@ def init_values(project: dict[str, Any]) -> dict[str, Any]:
         "sec_eligibility_approvals": {},
         "sec_xbrl_facts": {},
         "sec_certification_facts": {},
+        "sec_source_sections": {},
         "issuer_ir_metrics": {},
         "issuer_ir_relations": {},
     }
@@ -260,6 +261,23 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
             return False, "issuer_ir_relation_missing"
         return True, None
     if ev.type == "sec_financial_answer":
+        section_event_ids = ev.params.get("section_event_ids")
+        visible_sections = state.values.get("sec_source_sections") or {}
+        if (
+            not isinstance(section_event_ids, list)
+            or not section_event_ids
+            or any(
+                str(event_id) not in visible_sections for event_id in section_event_ids
+            )
+        ):
+            return False, "sec_source_section_missing"
+        required_relation_ids = ev.params.get("required_relation_ids") or []
+        filing_relations = state.values.get("sec_filing_relations") or {}
+        if not isinstance(required_relation_ids, list) or any(
+            str(relation_id) not in filing_relations
+            for relation_id in required_relation_ids
+        ):
+            return False, "sec_filing_relation_missing"
         if str(ev.params.get("compose") or "compute") == "copy":
             prerequisite = str(ev.params.get("prerequisite_answer_key") or "")
             if not prerequisite or not isinstance(state.values.get(prerequisite), str):
@@ -592,10 +610,15 @@ def apply_event(state: WorldState, ev: Event) -> None:
             return
         xbrl_facts = dict(state.values.get("sec_xbrl_facts") or {})
         cert_facts = dict(state.values.get("sec_certification_facts") or {})
+        source_sections = dict(state.values.get("sec_source_sections") or {})
         record_xbrl = dict(xbrl_facts.get(record_id) or {})
         record_certs = dict(cert_facts.get(record_id) or {})
         cert_names = list(record_certs.get(section_id) or [])
-        for span in p.get("fact_spans") or []:
+        fact_spans = p.get("fact_spans")
+        if not isinstance(fact_spans, list):
+            return
+        disclosure_present = False
+        for span in fact_spans:
             if not isinstance(span, dict):
                 return
             start = span.get("char_start")
@@ -636,6 +659,14 @@ def apply_event(state: WorldState, ev: Event) -> None:
                 if role in record_xbrl and record_xbrl[role] != value:
                     return
                 record_xbrl[role] = value
+            elif kind == "disclosure_presence":
+                role = str(span.get("role") or "")
+                if span.get("numeric_value") != 1 or not quote.strip() or not role:
+                    return
+                if role in record_xbrl and record_xbrl[role] != 1:
+                    return
+                record_xbrl[role] = 1
+                disclosure_present = True
             elif kind == "certification":
                 evidence_spans = span.get("evidence_spans")
                 if not isinstance(evidence_spans, dict):
@@ -682,6 +713,20 @@ def apply_event(state: WorldState, ev: Event) -> None:
                 cert_names.append(certification)
             else:
                 return
+        if (
+            section_id
+            in {
+                "item1_business",
+                "item1a_risk_factors",
+                "item2_properties",
+                "item3_legal_proceedings",
+                "item7_mda",
+                "item7a_market_risk",
+                "note11_income_taxes",
+            }
+            and not disclosure_present
+        ):
+            return
         if cert_names:
             record_certs[section_id] = cert_names
             cert_facts[record_id] = record_certs
@@ -689,6 +734,8 @@ def apply_event(state: WorldState, ev: Event) -> None:
         if record_xbrl != dict(xbrl_facts.get(record_id) or {}):
             xbrl_facts[record_id] = record_xbrl
             state.set("sec_xbrl_facts", xbrl_facts, eid, day)
+        source_sections[eid] = str(p["text_sha256"])
+        state.set("sec_source_sections", source_sections, eid, day)
     elif t == "issuer_ir_source_section":
         text = str(p.get("text") or "")
         prefix = "Issuer IR rendered XBRL statement\n"
@@ -891,6 +938,23 @@ def apply_event(state: WorldState, ev: Event) -> None:
         record_id = str(p.get("record_id") or "")
         answer_key = str(p.get("answer_key") or "")
         if not record_id or not answer_key:
+            return
+        section_event_ids = p.get("section_event_ids")
+        visible_sections = state.values.get("sec_source_sections") or {}
+        if (
+            not isinstance(section_event_ids, list)
+            or not section_event_ids
+            or any(
+                str(event_id) not in visible_sections for event_id in section_event_ids
+            )
+        ):
+            return
+        required_relation_ids = p.get("required_relation_ids") or []
+        filing_relations = state.values.get("sec_filing_relations") or {}
+        if not isinstance(required_relation_ids, list) or any(
+            str(relation_id) not in filing_relations
+            for relation_id in required_relation_ids
+        ):
             return
         if str(p.get("compose") or "compute") == "copy":
             prior = state.values.get(str(p.get("prerequisite_answer_key") or ""))

@@ -209,6 +209,31 @@ def _financial_facet_answer(
             f"{balance}||CERT:CEO:{ceo[0]['name']}||CFO:{cfo[0]['name']}||"
             f"SOX906:{sox[0]['name']}+{sox[1]['name']}"
         )
+    if query_type == "sec_financial_cashflow_tax_market_risk":
+        required = (
+            "cfo",
+            "cfi",
+            "cff",
+            "fx",
+            "delta_cash",
+            "note11_income_taxes",
+            "item7a_market_risk",
+        )
+        if any(role not in xbrl for role in required):
+            return "unknown"
+        gap = (
+            int(xbrl["cfo"])
+            + int(xbrl["cfi"])
+            + int(xbrl["cff"])
+            + int(xbrl["fx"])
+            - int(xbrl["delta_cash"])
+        )
+        return (
+            f"CF_RISK:{xbrl['cfo']}+{xbrl['cfi']}+{xbrl['cff']}+{xbrl['fx']}="
+            f"{xbrl['delta_cash']}|GAP:{gap}|"
+            f"STATUS:{'PASS' if gap == 0 else 'FAIL'}||"
+            "DISCLOSURE:INCOME_TAXES=1,MARKET_RISK=1"
+        )
     if query_type == "sec_financial_cashflow_notes":
         common = (
             "cfo",
@@ -292,6 +317,15 @@ _SEC_AMAZON_128K_ROLES = (
     "oi_2",
     "oi_total",
 )
+_SEC_CASHFLOW_TAX_MARKET_RISK_ROLES = (
+    "cfo",
+    "cfi",
+    "cff",
+    "fx",
+    "delta_cash",
+    "note11_income_taxes",
+    "item7a_market_risk",
+)
 _SEC_FINANCIAL_GRAMMAR_PREFIX = "Exact output grammar: `"
 
 
@@ -329,6 +363,21 @@ def _sec_financial_output_contract(
         if roles != _SEC_MIX_ROLES or control_tier != "16k":
             return None
         return mix, ", ".join(labels), branch
+    if query_type == "sec_financial_cashflow_tax_market_risk":
+        if roles != _SEC_CASHFLOW_TAX_MARKET_RISK_ROLES or control_tier != "64k":
+            return None
+        return (
+            (
+                "CF_RISK:<CFO>+<CFI>+<CFF>+<FX>=<DELTA_CASH>|GAP:<CF_GAP>|"
+                "STATUS:<STATUS>||DISCLOSURE:INCOME_TAXES=1,MARKET_RISK=1"
+            ),
+            "CF_RISK, GAP, STATUS, DISCLOSURE",
+            (
+                "CF_GAP is CFO + CFI + CFF + FX - DELTA_CASH; STATUS is PASS "
+                "exactly when CF_GAP is zero; both named disclosure flags must "
+                "be present in their independently sourced sections"
+            ),
+        )
     if query_type == "sec_financial_category_geography":
         categories, position = _consume_indexed_roles(roles, 0, "category_")
         geographies, position = _consume_indexed_roles(roles, position, "geo_")
@@ -518,6 +567,8 @@ def _sec_financial_role_name(role: str) -> str:
         "cff": "Net cash from financing activities",
         "fx": "Foreign-exchange effect on cash",
         "delta_cash": "Net change in cash",
+        "note11_income_taxes": "Income-tax note disclosure present",
+        "item7a_market_risk": "Item 7A market-risk disclosure present",
         "federal_tax": "Federal income tax",
         "state_tax": "State income tax",
         "foreign_tax": "Foreign income tax",
@@ -1807,6 +1858,24 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                     {"op": "RECONCILE_BALANCE_AND_CERTIFICATIONS"},
                 ),
             ),
+            (
+                "cashflow_tax_market_risk",
+                "64k",
+                (
+                    "item8_cash_flow",
+                    "note11_income_taxes",
+                    "item7a_market_risk",
+                ),
+                "item8_cash_flow",
+                "cfo",
+                (
+                    {"op": "READ_XBRL_FACT", "role": "cash_flow"},
+                    {"op": "READ_XBRL_FACT", "role": "cash_flow_fx"},
+                    {"op": "READ_DISCLOSURE", "role": "income_tax_note"},
+                    {"op": "READ_DISCLOSURE", "role": "market_risk"},
+                    {"op": "RECONCILE_CASHFLOW_TAX_MARKET_RISK"},
+                ),
+            ),
             *(
                 (
                     (
@@ -1926,7 +1995,11 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
             (
                 "32k",
                 3,
-                (*operation_sections, "note2_revenue", "note13_segments"),
+                (
+                    *operation_sections,
+                    "note2_revenue",
+                    "note13_segments",
+                ),
                 ("16k", "32k"),
             ),
             (
@@ -1978,13 +2051,17 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
             extra_answers,
         ) in staged:
             answer_event = by_tier[control_tier]
+            if (
+                answer_event.params.get("history_profile_active") is True
+                and str(answer_event.params.get("history_control_tier") or "")
+                != control_tier
+            ):
+                continue
             needed_sections = [by_section.get(name) for name in needed_names]
             needed_answers = [by_tier.get(name) for name in extra_answers]
             if any(item is None for item in (*needed_sections, *needed_answers)):
                 continue
-            essential_events = [
-                item for item in (*needed_sections, *needed_answers) if item is not None
-            ]
+            essential_events = _required_event_closure(world, answer_event)
             essential_ids = [event.id for event in essential_events]
             required_roles = [
                 str(role) for role in answer_event.params.get("required_roles") or []
@@ -2007,6 +2084,8 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                         "Reconstruct the tagged financial program for this issuer "
                         f"through the {control_tier} control stage using only the "
                         "itemized statements, notes, and certifications in context. "
+                        "Validate every declared adjacent prior-annual filing "
+                        "relation before executing the financial computation. "
                         "Do not use identity-header fields as substitutes for "
                         "statement amounts. " + question_schema
                     ),
@@ -2037,7 +2116,10 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                         if control_tier == "128k"
                         else "tagged MIX/CAT/GEO/BS/CERT reconstruction"
                     ),
-                    proof_depth=proof_depth,
+                    proof_depth=max(
+                        proof_depth,
+                        _required_event_proof_depth(essential_events, answer_event),
+                    ),
                     cf_op="numeric",
                     motif="source-financial-program",
                     topology_id=instance_topology(
@@ -2047,10 +2129,29 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                     ),
                     domain="company",
                     truth_regime="real_source_derived",
-                    program_ops=_financial_program_ops(control_tier, extra_128k),
+                    program_ops=[
+                        *(
+                            {
+                                "op": "VALIDATE_PRIOR_ANNUAL_FILING",
+                                "relation_index": index,
+                            }
+                            for index, _relation_id in enumerate(
+                                answer_event.params.get("required_relation_ids") or []
+                            )
+                        ),
+                        *_financial_program_ops(control_tier, extra_128k),
+                    ],
                     preferred_length_buckets=[control_tier],
                     semantic_growth_group="company_real_sec_financial_reconstruction",
-                    base_task_group=f"sec_financial_reconstruction:{source_key}",
+                    base_task_group=(
+                        "sec_financial_reconstruction:"
+                        + str(
+                            (
+                                answer_event.params.get("required_record_ids")
+                                or [source_key]
+                            )[0]
+                        ).replace(":", "_")
+                    ),
                 )
             )
 

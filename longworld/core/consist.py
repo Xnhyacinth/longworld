@@ -123,6 +123,8 @@ def artifact_text_issues(
             if event is None:
                 issues.append(ScanIssue(art.artifact_id, "unknown_event", event_id))
                 continue
+            if ground_values:
+                continue
             anchors = [
                 token
                 for token in TEXT_TOKEN_RE.findall(event.type.lower())

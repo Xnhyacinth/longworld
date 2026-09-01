@@ -809,6 +809,17 @@ def raw_token_fact_windows_insufficient(
     )
     if compute is None:
         return False, {"applicable": True, "error": "missing_answer_event"}
+    structural_ids = {
+        event_id
+        for event_id in spec.sufficient_event_ids
+        if event_id in event_index
+        and event_index[event_id].type
+        in {
+            "sec_filing",
+            "sec_prior_annual_filing_relation",
+            "sec_financial_answer",
+        }
+    }
     source_claims: Counter[str] = Counter()
     artifact_prefix = f"{world.spec.get('world_id', '')}."
     for artifact in artifacts:
@@ -938,7 +949,7 @@ def raw_token_fact_windows_insufficient(
                     "artifact_id": artifact.artifact_id,
                 }
             kind = str(span.get("kind") or "xbrl")
-            if kind not in {"xbrl", "certification"}:
+            if kind not in {"xbrl", "certification", "disclosure_presence"}:
                 return False, {
                     "applicable": True,
                     "error": "invalid_source_fact_spans",
@@ -1028,9 +1039,9 @@ def raw_token_fact_windows_insufficient(
                 max(end for _start, end in item_bounds),
             )
             span_roles[key] = (
-                str(span.get("role") or "")
-                if kind == "xbrl"
-                else f"cert:{event.id}:{span_index}"
+                f"cert:{event.id}:{span_index}"
+                if kind == "certification"
+                else str(span.get("role") or "")
             )
     if not source_params or not span_bounds:
         return False, {
@@ -1062,7 +1073,7 @@ def raw_token_fact_windows_insufficient(
         answer = answer_from_events(
             world,
             spec,
-            structural_source_ids | compute_ids,
+            structural_source_ids | structural_ids,
             extra_overrides=overrides,
             enforce_preconditions=True,
         )

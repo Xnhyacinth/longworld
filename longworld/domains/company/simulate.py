@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections import Counter, OrderedDict
 from copy import deepcopy
+from dataclasses import replace
 from datetime import date, timedelta
 from html import unescape
 from itertools import pairwise
@@ -11,6 +13,8 @@ from typing import Any
 from longworld.core.cascade import cascade_events
 from longworld.core.filingworkflow import (
     SEC_ANNUAL_IDENTITY_FIELDS,
+    SEC_MULTI_SPAN_PROJECTION_REVISION,
+    sec_multi_span_provenance_id,
     validated_sec_amendment_endpoints,
     validated_sec_annual_endpoints,
 )
@@ -31,9 +35,12 @@ from longworld.core.secvisible import (
     sec_visible_provenance_id,
 )
 from longworld.core.secxbrl import (
+    SEC_SECTION_REVISION,
+    SecFilingSection,
     derive_sec_filing_subsection,
     parse_sec_financial_program,
     split_sec_filing_section_by_facts,
+    validate_sec_filing_section,
 )
 from longworld.core.world import Event, SimulatedWorld, WorldSimulator
 from longworld.domains.company.events import (
@@ -47,6 +54,34 @@ _SEC_ANNUAL_IDENTITY_MARGIN = 256
 _SEC_SECTION_VIEW_PREFIX = "SEC source section\n"
 _SEC_FACT_CORRIDOR_MARGIN = 10_600
 _SEC_FACT_PROJECTION_REVISION = "sec-visible-fact-projection-v1"
+_SEC_NARRATIVE_DISCLOSURE_PREFIXES = {
+    "item1_business": "ITEM 1. BUSINESS",
+    "item1a_risk_factors": "ITEM 1A. RISK FACTORS",
+    "item2_properties": "ITEM 2. PROPERTIES",
+    "item3_legal_proceedings": "ITEM 3. LEGAL PROCEEDINGS",
+    "item7_mda": "ITEM 7. MANAGEMENT",
+    "item7a_market_risk": "ITEM 7A. QUANTITATIVE",
+    "note11_income_taxes": "NOTE ",
+}
+_MICROSOFT_NARRATIVE_MARKERS = {
+    "item2_properties": ('id="item_2_properties"', 'id="ITEM_2_PROPERTIES"'),
+    "item3_legal_proceedings": (
+        'id="item_3_legal_proceedings"',
+        'id="ITEM_3_LEGAL_PROCEEDINGS"',
+    ),
+    "item4_mine_safety": (
+        'id="item_4_mine_safety_disclosures"',
+        'id="ITEM_4_MINE_SAFETY_DISCLOSURES"',
+    ),
+    "item7a_market_risk": (
+        'id="item_7a_quantitative_qualitative_disclos"',
+        'id="ITEM_7A_QUANTITATIVE_QUALITATIVE_DISCLOS"',
+    ),
+    "item8_financial_statements": (
+        'id="item_8_financial_statements_and_supplem"',
+        'id="ITEM_8_FINANCIAL_STATEMENTS_AND_SUPPLEM"',
+    ),
+}
 _SEC_CANONICAL_SECTION_CACHE_MAX = 512
 _SEC_CANONICAL_SECTION_CACHE: OrderedDict[
     tuple[Any, ...], dict[str, dict[str, Any]]
@@ -132,6 +167,11 @@ _SEC_FINANCIAL_FACETS = (
         "64k",
         ("item8_balance_sheet", "ex_31_1", "ex_31_2", "ex_32_1"),
     ),
+    (
+        "cashflow_tax_market_risk",
+        "64k",
+        ("item8_cash_flow", "note11_income_taxes", "item7a_market_risk"),
+    ),
 )
 
 
@@ -171,6 +211,16 @@ def _sec_facet_roles(program, answer_family: str) -> tuple[str, ...]:
             if program.require_liabilities
             else ("assets", "equity", "liabilities_and_equity")
         )
+    if answer_family == "cashflow_tax_market_risk":
+        return (
+            "cfo",
+            "cfi",
+            "cff",
+            "fx",
+            "delta_cash",
+            "note11_income_taxes",
+            "item7a_market_risk",
+        )
     if answer_family == "cashflow_notes":
         return tuple(role for role in _SEC_128K_EXTRA_ROLES if role in program.roles)
     return ()
@@ -201,6 +251,86 @@ def _sec_section_cache_key(workflow, record) -> tuple[Any, ...] | None:
         str(record.occurred_at),
         tuple(record.attributes),
     )
+
+
+def _gcs_v2_identity_projection(
+    workflow, record, fact_spans: list[dict[str, Any]]
+) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]], str] | None:
+    authorization = workflow.source_authorization
+    if (
+        not isinstance(authorization, dict)
+        or authorization.get("adapter_revision") != "sourceworkflow@2"
+        or record.source_family != "issuer_gcs_merged_filing_v2"
+        or not fact_spans
+    ):
+        return None
+    ordered_spans = sorted(
+        fact_spans, key=lambda span: (int(span["char_start"]), int(span["char_end"]))
+    )
+    source_ranges: list[tuple[int, int]] = []
+    for span in ordered_spans:
+        start = int(span["char_start"])
+        end = int(span["char_end"])
+        if start < 0 or end <= start or end > len(record.text):
+            return None
+        if source_ranges and start < source_ranges[-1][1]:
+            previous_start, previous_end = source_ranges[-1]
+            source_ranges[-1] = (previous_start, max(previous_end, end))
+        else:
+            source_ranges.append((start, end))
+
+    projected_text = ""
+    range_bindings: list[dict[str, Any]] = []
+    for source_start, source_end in source_ranges:
+        text = record.text[source_start:source_end]
+        projected_start = len(projected_text)
+        projected_text += text
+        range_bindings.append(
+            {
+                "source_char_start": source_start,
+                "source_char_end": source_end,
+                "projected_char_start": projected_start,
+                "projected_char_end": len(projected_text),
+                "text": text,
+                "text_sha256": hashlib.sha256(text.encode()).hexdigest(),
+                "parent_source_sha256": record.source_sha256,
+                "parent_text_sha256": record.text_sha256,
+            }
+        )
+
+    projected_spans: list[dict[str, Any]] = []
+    for span in fact_spans:
+        source_start = int(span["char_start"])
+        source_end = int(span["char_end"])
+        binding = next(
+            (
+                item
+                for item in range_bindings
+                if item["source_char_start"] <= source_start
+                and source_end <= item["source_char_end"]
+            ),
+            None,
+        )
+        if binding is None:
+            return None
+        projected_start = int(binding["projected_char_start"]) + (
+            source_start - int(binding["source_char_start"])
+        )
+        projected_spans.append(
+            {
+                **span,
+                "char_start": projected_start,
+                "char_end": projected_start + (source_end - source_start),
+            }
+        )
+
+    provenance_id = sec_multi_span_provenance_id(
+        parent_provenance_id=record.provenance_id,
+        parent_source_sha256=record.source_sha256,
+        parent_text_sha256=record.text_sha256,
+        source_ranges=range_bindings,
+    )
+    return projected_text, projected_spans, range_bindings, provenance_id
 
 
 def _section_fact_spans(
@@ -327,7 +457,7 @@ def _section_fact_spans(
 
 
 def _interleaved_note13_views(
-    source_text: str, section, program
+    source_text: str, section, program, *, parser_revision: str
 ) -> list[dict[str, Any]]:
     grouped_roles = {
         "note13_segments": tuple(f"geo_{index}" for index in range(program.n_geo)),
@@ -353,6 +483,7 @@ def _interleaved_note13_views(
         source_text,
         section,
         tuple(fact for _role, fact in ordered),
+        parser_revision=parser_revision,
     )
     slices_by_role = {
         role: view for (role, _fact), view in zip(ordered, slices, strict=True)
@@ -442,6 +573,83 @@ def _interleaved_note13_views(
     return projections
 
 
+def _unique_microsoft_marker(source_text: str, marker_name: str) -> int:
+    markers = _MICROSOFT_NARRATIVE_MARKERS[marker_name]
+    matches = [
+        source_text.index(marker)
+        for marker in markers
+        if source_text.count(marker) == 1
+    ]
+    if len(matches) != 1 or any(source_text.count(marker) > 1 for marker in markers):
+        raise ProvenanceError(
+            f"Microsoft narrative marker is missing or ambiguous: {marker_name}"
+        )
+    return matches[0]
+
+
+def _microsoft_supplemental_narrative_sections(
+    source_text: str, program, *, parser_revision: str
+) -> tuple[SecFilingSection, ...]:
+    """Derive two raw-bound Part I sections omitted by the financial parser."""
+
+    component_section = next(
+        (section for section in program.sections if section.component_type == "10-K"),
+        None,
+    )
+    if component_section is None:
+        raise ProvenanceError("Microsoft narrative source component is missing")
+    item2_start = _unique_microsoft_marker(source_text, "item2_properties")
+    item3_start = _unique_microsoft_marker(source_text, "item3_legal_proceedings")
+    item4_start = _unique_microsoft_marker(source_text, "item4_mine_safety")
+    item7a_start = _unique_microsoft_marker(source_text, "item7a_market_risk")
+    item8_start = _unique_microsoft_marker(source_text, "item8_financial_statements")
+    ranges = (
+        ("item2_properties", item2_start, item3_start),
+        ("item3_legal_proceedings", item3_start, item4_start),
+        ("item7a_market_risk", item7a_start, item8_start),
+    )
+    sections = []
+    for section_id, char_start, char_end in ranges:
+        if not component_section.char_start <= char_start < char_end:
+            raise ProvenanceError("Microsoft narrative section range is invalid")
+        raw_section = source_text[char_start:char_end]
+        section_sha256 = hashlib.sha256(raw_section.encode()).hexdigest()
+        provenance_payload = {
+            "operation": SEC_SECTION_REVISION,
+            "section_id": section_id,
+            "component_type": component_section.component_type,
+            "char_start": char_start,
+            "char_end": char_end,
+            "parent_source_sha256": component_section.parent_source_sha256,
+            "component_sha256": component_section.component_sha256,
+            "section_sha256": section_sha256,
+        }
+        section = SecFilingSection(
+            section_id=section_id,
+            component_type=component_section.component_type,
+            char_start=char_start,
+            char_end=char_end,
+            parent_source_sha256=component_section.parent_source_sha256,
+            component_sha256=component_section.component_sha256,
+            section_sha256=section_sha256,
+            provenance_id=(
+                "derived-sha256:"
+                + hashlib.sha256(
+                    json.dumps(
+                        provenance_payload,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ).encode()
+                ).hexdigest()
+            ),
+        )
+        validate_sec_filing_section(
+            source_text, section, parser_revision=parser_revision
+        )
+        sections.append(section)
+    return tuple(sections)
+
+
 def _sec_financial_events(
     *,
     workflow,
@@ -456,13 +664,28 @@ def _sec_financial_events(
     if parent_hash != record.text_sha256:
         return []
     try:
+        parser_revision = record.attribute("parser")
         program = parse_sec_financial_program(
             full_text,
             parent_hash,
             report_date=record.attribute("report_date"),
+            parser_revision=parser_revision,
         )
     except ProvenanceError:
         return []
+    if record.attribute("cik") == "0000789019":
+        try:
+            program = replace(
+                program,
+                sections=(
+                    *program.sections,
+                    *_microsoft_supplemental_narrative_sections(
+                        full_text, program, parser_revision=parser_revision
+                    ),
+                ),
+            )
+        except ProvenanceError:
+            return []
     events: list[Event] = []
     section_ids: dict[str, str] = {}
     for section in program.sections:
@@ -483,11 +706,13 @@ def _sec_financial_events(
                         section.char_end,
                         program.roles["total_revenue"].char_end + 40_000,
                     ),
+                    parser_revision=parser_revision,
                 )
                 slices = split_sec_filing_section_by_facts(
                     full_text,
                     corridor,
                     tuple(program.roles[role] for role in roles),
+                    parser_revision=parser_revision,
                 )
             except ProvenanceError:
                 return []
@@ -512,6 +737,7 @@ def _sec_financial_events(
                 section_id="note2_revenue_current_mix",
                 char_start=corridor_start,
                 char_end=corridor_end,
+                parser_revision=parser_revision,
             )
             views = []
             if corridor_start > section.char_start:
@@ -521,6 +747,7 @@ def _sec_financial_events(
                     section_id="note2_revenue_preamble",
                     char_start=section.char_start,
                     char_end=corridor_start,
+                    parser_revision=parser_revision,
                 )
                 views.append((preamble, "", ""))
             views.append((current_view, "", "note2_revenue"))
@@ -531,6 +758,7 @@ def _sec_financial_events(
                     section_id="note2_revenue_tail",
                     char_start=corridor_end,
                     char_end=section.char_end,
+                    parser_revision=parser_revision,
                 )
                 views.append((tail, "", ""))
         elif section.section_id == "note13_segments":
@@ -538,7 +766,10 @@ def _sec_financial_events(
             if record.attribute("cik") == "0000789019":
                 try:
                     projected_views = _interleaved_note13_views(
-                        full_text, section, program
+                        full_text,
+                        section,
+                        program,
+                        parser_revision=parser_revision,
                     )
                 except ProvenanceError:
                     return []
@@ -563,6 +794,7 @@ def _sec_financial_events(
                     section_id="note13_current_geography",
                     char_start=current_start,
                     char_end=current_end,
+                    parser_revision=parser_revision,
                 )
                 prior_view = derive_sec_filing_subsection(
                     full_text,
@@ -570,6 +802,7 @@ def _sec_financial_events(
                     section_id="note13_prior_geography",
                     char_start=current_end,
                     char_end=section.char_end,
+                    parser_revision=parser_revision,
                 )
                 views = []
                 if current_start > section.char_start:
@@ -579,6 +812,7 @@ def _sec_financial_events(
                         section_id="note13_geography_preamble",
                         char_start=section.char_start,
                         char_end=current_start,
+                        parser_revision=parser_revision,
                     )
                     views.append((preamble, "", ""))
                 views.extend(
@@ -598,6 +832,7 @@ def _sec_financial_events(
                 section_id="item8_balance_sheet_preamble",
                 char_start=section.char_start,
                 char_end=core_start,
+                parser_revision=parser_revision,
             )
             core = derive_sec_filing_subsection(
                 full_text,
@@ -605,6 +840,7 @@ def _sec_financial_events(
                 section_id="item8_balance_sheet_core",
                 char_start=core_start,
                 char_end=section.char_end,
+                parser_revision=parser_revision,
             )
             views = [
                 (preamble, "", ""),
@@ -672,6 +908,24 @@ def _sec_financial_events(
                     if str(span.get("role") or "").startswith("prior_geo_")
                 ]
             section_text = _SEC_SECTION_VIEW_PREFIX + visible_text
+            narrative_prefix = _SEC_NARRATIVE_DISCLOSURE_PREFIXES.get(view_id)
+            if narrative_prefix is not None:
+                heading = visible_text.splitlines()[0].strip()
+                if not heading.upper().startswith(narrative_prefix) or (
+                    view_id == "note11_income_taxes"
+                    and "INCOME TAXES" not in heading.upper()
+                ):
+                    return []
+                fact_spans = [
+                    {
+                        "kind": "disclosure_presence",
+                        "role": view_id,
+                        "evidence_quote": heading,
+                        "char_start": len(_SEC_SECTION_VIEW_PREFIX),
+                        "char_end": len(_SEC_SECTION_VIEW_PREFIX) + len(heading),
+                        "numeric_value": 1,
+                    }
+                ]
             event_id = f"{prefix}.sec_section_{view_id}_{workflow_index}_{record_index}"
             section_ids[view_id] = event_id
             if section_alias and fact_spans:
@@ -1541,6 +1795,92 @@ def _sec_annual_history_events(
     return [*relation_events, *answer_events]
 
 
+def _bind_financial_programs_to_annual_history(
+    events: list[Event], *, workflow_id: str
+) -> None:
+    """Bind 16/32/64K financial programs to a real cumulative filing chain."""
+    filings = {
+        str(event.params.get("record_id") or ""): event
+        for event in events
+        if event.type == "sec_filing" and event.params.get("workflow_id") == workflow_id
+    }
+    relations = [
+        event
+        for event in events
+        if event.type == "sec_prior_annual_filing_relation"
+        and event.params.get("workflow_id") == workflow_id
+    ]
+    if len(filings) < 4 or len(relations) != len(filings) - 1:
+        return
+    by_current: dict[str, Event] = {}
+    prior_ids: set[str] = set()
+    for relation in relations:
+        current_id = str(relation.params.get("record_id") or "")
+        prior_id = str(relation.params.get("target_record_id") or "")
+        if (
+            not current_id
+            or not prior_id
+            or current_id in by_current
+            or current_id not in filings
+            or prior_id not in filings
+        ):
+            return
+        by_current[current_id] = relation
+        prior_ids.add(prior_id)
+    heads = set(by_current) - prior_ids
+    if len(heads) != 1:
+        return
+    newest_to_oldest = [next(iter(heads))]
+    relation_newest_to_oldest: list[Event] = []
+    while newest_to_oldest[-1] in by_current:
+        relation = by_current[newest_to_oldest[-1]]
+        prior_id = str(relation.params["target_record_id"])
+        if prior_id in newest_to_oldest:
+            return
+        relation_newest_to_oldest.append(relation)
+        newest_to_oldest.append(prior_id)
+    if set(newest_to_oldest) != set(filings):
+        return
+    record_ids = list(reversed(newest_to_oldest))
+    relation_by_current = {
+        str(relation.params["record_id"]): relation
+        for relation in relation_newest_to_oldest
+    }
+    tier_by_records = {2: "16k", 3: "32k", 4: "64k", 5: "128k"}
+    for event in events:
+        if (
+            event.type != "sec_financial_answer"
+            or event.params.get("workflow_id") != workflow_id
+            or event.params.get("answer_family")
+        ):
+            continue
+        record_id = str(event.params.get("record_id") or "")
+        if record_id not in record_ids:
+            continue
+        history = record_ids[: record_ids.index(record_id) + 1]
+        history_relations = [relation_by_current[item] for item in history[1:]]
+        dependency_events = [
+            *(filings[item] for item in history),
+            *history_relations,
+        ]
+        event.params["history_profile_active"] = True
+        event.params["history_control_tier"] = tier_by_records.get(len(history), "")
+        event.params["required_record_ids"] = history
+        event.params["required_relation_ids"] = [
+            str(relation.params["source_relation_id"]) for relation in history_relations
+        ]
+        for dependency in dependency_events:
+            if dependency.id not in event.causal_inputs:
+                event.causal_inputs.append(dependency.id)
+            if dependency.id not in event.required_inputs:
+                event.required_inputs.append(dependency.id)
+            event.relation_kinds[dependency.id] = (
+                "validates_prior_annual_filing"
+                if dependency.type == "sec_prior_annual_filing_relation"
+                else "reads_filing_identity"
+            )
+
+
 def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]:
     events: list[Event] = []
     source_workflows = project.get("source_workflows") or []
@@ -1601,45 +1941,62 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
             source_origin = record.source_origin.value
             provenance_id = record.provenance_id
             parent_provenance_id = ""
+            provenance_operation = ""
+            source_ranges: list[dict[str, Any]] = []
             annual_identity = record.record_id in annual_record_ids
             if annual_identity or len(source_text) > _SEC_REPLAY_MAX_CHARS:
                 first_fact = min(int(fact["char_start"]) for fact in fact_spans)
                 last_fact = max(int(fact["char_end"]) for fact in fact_spans)
                 if last_fact - first_fact > _SEC_REPLAY_MAX_CHARS:
-                    continue
-                if annual_identity:
-                    corridor_start = max(0, first_fact - _SEC_ANNUAL_IDENTITY_MARGIN)
-                    corridor_end = min(
-                        len(source_text), last_fact + _SEC_ANNUAL_IDENTITY_MARGIN
+                    projection = _gcs_v2_identity_projection(
+                        workflow, record, fact_spans
                     )
-                else:
-                    corridor_start = max(0, last_fact - _SEC_REPLAY_MAX_CHARS)
-                    corridor_start = min(corridor_start, first_fact)
-                    corridor_end = min(
-                        len(source_text), corridor_start + _SEC_REPLAY_MAX_CHARS
-                    )
-                if corridor_start != 0 or corridor_end != len(source_text):
-                    source_text = source_text[corridor_start:corridor_end]
-                    fact_spans = [
-                        {
-                            **fact,
-                            "char_start": int(fact["char_start"]) - corridor_start,
-                            "char_end": int(fact["char_end"]) - corridor_start,
-                        }
-                        for fact in fact_spans
-                    ]
-                    excerpt_sha256 = hashlib.sha256(source_text.encode()).hexdigest()
-                    parent_provenance_id = record.provenance_id
-                    provenance_id = (
-                        "derived-sha256:"
-                        + hashlib.sha256(
-                            (
-                                f"sec_evidence_corridor|{record.provenance_id}|"
-                                f"{corridor_start}|{corridor_end}|{excerpt_sha256}"
-                            ).encode()
-                        ).hexdigest()
-                    )
+                    if not annual_identity or projection is None:
+                        continue
+                    source_text, fact_spans, source_ranges, provenance_id = projection
                     source_origin = "real_derived"
+                    parent_provenance_id = record.provenance_id
+                    provenance_operation = SEC_MULTI_SPAN_PROJECTION_REVISION
+                else:
+                    if annual_identity:
+                        corridor_start = max(
+                            0, first_fact - _SEC_ANNUAL_IDENTITY_MARGIN
+                        )
+                        corridor_end = min(
+                            len(source_text), last_fact + _SEC_ANNUAL_IDENTITY_MARGIN
+                        )
+                    else:
+                        corridor_start = max(0, last_fact - _SEC_REPLAY_MAX_CHARS)
+                        corridor_start = min(corridor_start, first_fact)
+                        corridor_end = min(
+                            len(source_text), corridor_start + _SEC_REPLAY_MAX_CHARS
+                        )
+                    if corridor_start != 0 or corridor_end != len(source_text):
+                        source_text = source_text[corridor_start:corridor_end]
+                        fact_spans = [
+                            {
+                                **fact,
+                                "char_start": int(fact["char_start"]) - corridor_start,
+                                "char_end": int(fact["char_end"]) - corridor_start,
+                            }
+                            for fact in fact_spans
+                        ]
+                        excerpt_sha256 = hashlib.sha256(
+                            source_text.encode()
+                        ).hexdigest()
+                        parent_provenance_id = record.provenance_id
+                        provenance_id = (
+                            "derived-sha256:"
+                            + hashlib.sha256(
+                                (
+                                    "sec_evidence_corridor|"
+                                    f"{record.provenance_id}|{corridor_start}|"
+                                    f"{corridor_end}|{excerpt_sha256}"
+                                ).encode()
+                            ).hexdigest()
+                        )
+                        provenance_operation = "sec_evidence_corridor"
+                        source_origin = "real_derived"
             ratification_events: list[Event] = []
             ratification_parent = approval_id
             for control_tier, control_stage, offset in (
@@ -1699,8 +2056,11 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
                             "source_sha256": record.source_sha256,
                             "provenance_id": provenance_id,
                             "parent_provenance_id": parent_provenance_id,
-                            "provenance_operation": (
-                                "sec_evidence_corridor" if parent_provenance_id else ""
+                            "provenance_operation": provenance_operation,
+                            **(
+                                {"source_ranges": source_ranges}
+                                if source_ranges
+                                else {}
                             ),
                             "source_origin": source_origin,
                             "source_family": record.source_family,
@@ -1833,6 +2193,9 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
                 record_indexes=record_indexes,
                 existing_events=events,
             )
+        )
+        _bind_financial_programs_to_annual_history(
+            events, workflow_id=workflow.workflow_id
         )
     return events
 

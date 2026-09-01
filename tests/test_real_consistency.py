@@ -60,10 +60,16 @@ def test_real_workflow_body_allows_native_kv_and_casefolded_ground_values() -> N
     )
 
     assert consistency_scan(_world(), [artifact]).ok
-    assert not any(
-        issue.kind == "ungrounded"
-        for issue in artifact_text_issues(_world(), [artifact])
-    )
+    assert artifact_text_issues(_world(), [artifact]) == []
+
+
+def test_relationship_only_body_still_requires_an_event_type_anchor() -> None:
+    artifact = _artifact()
+    artifact.slots["ground_values"] = []
+
+    issues = artifact_text_issues(_world(), [artifact])
+
+    assert any(issue.kind == "event_unanchored" for issue in issues)
 
 
 def test_synthetic_body_still_rejects_kv_shortcuts() -> None:

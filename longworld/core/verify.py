@@ -226,7 +226,7 @@ def _sec_essential_evidence_issues(
             relevant = any(
                 isinstance(span, dict)
                 and (
-                    span.get("kind") == "certification"
+                    span.get("kind") in {"certification", "disclosure_presence"}
                     or str(span.get("role") or "") in required_roles
                 )
                 for span in event.params.get("fact_spans") or []

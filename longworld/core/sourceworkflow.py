@@ -719,6 +719,8 @@ def adapt_sec_manifest(
         source_kind=SEC_SOURCE_KIND,
         signed_bundle_authorized=signed_bundle_authorized,
     )
+    if adapter_revision not in SOURCE_WORKFLOW_ADAPTER_REVISIONS:
+        raise ProvenanceError("unsupported source workflow adapter revision")
     raw_filings = _objects(manifest.get("filings"), "SEC records")
     if manifest.get("n") != len(raw_filings):
         raise ProvenanceError("SEC source inventory count is invalid")
@@ -728,7 +730,9 @@ def adapt_sec_manifest(
             kind="sec_filing",
             occurred_at=str(raw.get("filing_date") or ""),
             source_family=(
-                "issuer_gcs_merged_filing"
+                "issuer_gcs_merged_filing_v2"
+                if raw.get("parser") == "issuer_gcs_merged_html@2"
+                else "issuer_gcs_merged_filing"
                 if raw.get("parser") == "issuer_gcs_merged_html@1"
                 else "sec_edgar_submission"
             ),
@@ -739,6 +743,11 @@ def adapt_sec_manifest(
                 "form",
                 "filing_date",
                 "report_date",
+                *(
+                    ("parser",)
+                    if adapter_revision == SOURCE_WORKFLOW_ADAPTER_REVISION_V2
+                    else ()
+                ),
             ),
             require_facts=True,
             fact_binding_field="source_sha256",
@@ -746,8 +755,6 @@ def adapt_sec_manifest(
         for raw in raw_filings
     ]
     records_by_id = {record.record_id: record for record in records}
-    if adapter_revision not in SOURCE_WORKFLOW_ADAPTER_REVISIONS:
-        raise ProvenanceError("unsupported source workflow adapter revision")
     allow_singleton = adapter_revision == SOURCE_WORKFLOW_ADAPTER_REVISION_V2
     raw_relations = _objects(
         manifest.get("filing_relations"),

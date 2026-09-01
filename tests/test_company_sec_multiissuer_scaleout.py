@@ -41,6 +41,7 @@ def test_microsoft_real_ex31_certification_spans_are_visible_and_source_bound() 
         source,
         MICROSOFT_SOURCE_SHA256,
         report_date="2025-06-30",
+        parser_revision="issuer_gcs_merged_html@1",
     )
     sections = {section.section_id: section for section in program.sections}
 

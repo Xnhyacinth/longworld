@@ -1,0 +1,62 @@
+{
+  "schema_version": "longworld.microsoft-gcs-annual-fetch-request.v1",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P13-MICROSOFT-GCS-FOUR-ANNUAL-20260901",
+    "scope": "Bounded public issuer-owned acquisition of Microsoft FY2022-FY2025 10-K detail and merged filing pages",
+    "basis": "User-authorized public-source LongWorld longitudinal company workflow construction",
+    "reviewed_at": "2026-09-01T00:00:00Z"
+  },
+  "requests_per_second": 5,
+  "timeout_seconds": 120,
+  "filings": [
+    {
+      "fiscal_year": 2022,
+      "accession": "0001564590-22-026876",
+      "cik": "0000789019",
+      "form": "10-K",
+      "filing_date": "2022-07-28",
+      "report_date": "2022-06-30",
+      "primary_document": "msft-10k_20220630.htm",
+      "node_id": 30786,
+      "detail_url": "https://microsoft.gcs-web.com/sec-filings/sec-filing/10-k/0001564590-22-026876",
+      "merged_url": "https://microsoft.gcs-web.com/node/30786/html"
+    },
+    {
+      "fiscal_year": 2023,
+      "accession": "0000950170-23-035122",
+      "cik": "0000789019",
+      "form": "10-K",
+      "filing_date": "2023-07-27",
+      "report_date": "2023-06-30",
+      "primary_document": "msft-20230630.htm",
+      "node_id": 31736,
+      "detail_url": "https://microsoft.gcs-web.com/sec-filings/sec-filing/10-k/0000950170-23-035122",
+      "merged_url": "https://microsoft.gcs-web.com/node/31736/html"
+    },
+    {
+      "fiscal_year": 2024,
+      "accession": "0000950170-24-087843",
+      "cik": "0000789019",
+      "form": "10-K",
+      "filing_date": "2024-07-30",
+      "report_date": "2024-06-30",
+      "primary_document": "msft-20240630.htm",
+      "node_id": 32871,
+      "detail_url": "https://microsoft.gcs-web.com/sec-filings/sec-filing/10-k/0000950170-24-087843",
+      "merged_url": "https://microsoft.gcs-web.com/node/32871/html"
+    },
+    {
+      "fiscal_year": 2025,
+      "accession": "0000950170-25-100235",
+      "cik": "0000789019",
+      "form": "10-K",
+      "filing_date": "2025-07-30",
+      "report_date": "2025-06-30",
+      "primary_document": "msft-20250630.htm",
+      "node_id": 33951,
+      "detail_url": "https://microsoft.gcs-web.com/sec-filings/sec-filing/10-k/0000950170-25-100235",
+      "merged_url": "https://microsoft.gcs-web.com/node/33951/html"
+    }
+  ]
+}

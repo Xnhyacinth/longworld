@@ -3,7 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+from dataclasses import replace
 from datetime import date
+from itertools import pairwise
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,6 +18,7 @@ from longworld.core.attestation import (
     ROLE_KEY_ID_ENVS,
     attach_attestation,
 )
+from longworld.core.engine import answer_from_artifacts, semantic_answer_from_artifacts
 from longworld.core.provenance import ProvenanceError
 from longworld.core.sampler import materialize
 from longworld.core.secxbrl import parse_sec_financial_program
@@ -111,10 +114,13 @@ def test_microsoft_fy2024_gcs_financial_program_parses_exact_source() -> None:
     source_sha256 = hashlib.sha256(source.encode()).hexdigest()
 
     program = parse_sec_financial_program(
-        source, source_sha256, report_date="2024-06-30"
+        source,
+        source_sha256,
+        report_date="2024-06-30",
+        parser_revision="issuer_gcs_merged_html@1",
     )
 
-    assert len(program.sections) == 12
+    assert len(program.sections) == 15
     assert len(program.roles) == 27
     assert program.n_category == 10
     assert program.n_geo == 2
@@ -139,6 +145,7 @@ def test_microsoft_fy2024_parser_still_fails_closed_on_real_tag_corruption() -> 
             unmatched,
             hashlib.sha256(unmatched.encode()).hexdigest(),
             report_date="2024-06-30",
+            parser_revision="issuer_gcs_merged_html@1",
         )
 
     non_nil = source.replace('xsi:nil="true"/>', 'xsi:nil="false"/>', 1)
@@ -148,6 +155,7 @@ def test_microsoft_fy2024_parser_still_fails_closed_on_real_tag_corruption() -> 
             non_nil,
             hashlib.sha256(non_nil.encode()).hexdigest(),
             report_date="2024-06-30",
+            parser_revision="issuer_gcs_merged_html@1",
         )
 
 
@@ -280,3 +288,171 @@ def test_microsoft_real_source_reaches_state_answer_and_all_declared_buckets(
         assert verification.remove_one_fails
         assert verification.essential_single_doc_insufficient
         assert verification.essential_text_grounded
+
+
+@pytest.mark.skipif(
+    not SOURCE_BUNDLE.is_file(),
+    reason="requires the local Microsoft issuer source inventory",
+)
+def test_microsoft_narrative_sections_do_not_become_reconstruction_essentials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    materialized = _microsoft_materialization(tmp_path, monkeypatch)
+    world = materialized.worlds["focal"]
+    artifacts = materialized.artifacts["focal"]
+    queries = {
+        query.preferred_length_buckets[0]: query
+        for query in materialized.queries
+        if query.query_type == "sec_financial_reconstruction"
+    }
+    assert set(queries) == {"16k", "32k", "64k"}
+
+    narrative_sections = {
+        str(event.params.get("section_id") or ""): event
+        for event in world.events
+        if event.type == "sec_source_section"
+        and event.params.get("section_id")
+        in {
+            "item1_business",
+            "item1a_risk_factors",
+            "item2_properties",
+            "item3_legal_proceedings",
+            "item7_mda",
+            "item7a_market_risk",
+        }
+    }
+    assert set(narrative_sections) == {
+        "item1_business",
+        "item1a_risk_factors",
+        "item2_properties",
+        "item3_legal_proceedings",
+        "item7_mda",
+        "item7a_market_risk",
+    }
+    ordered_ranges = sorted(
+        (
+            int(event.params["parent_char_start"]),
+            int(event.params["parent_char_end"]),
+            event,
+        )
+        for event in narrative_sections.values()
+    )
+    assert all(
+        left_end <= right_start
+        for (_left_start, left_end, _left), (
+            right_start,
+            _right_end,
+            _right,
+        ) in pairwise(ordered_ranges)
+    )
+    [source_record] = world.spec["project"]["source_workflows"][0].records
+    for start, end, event in ordered_ranges:
+        raw = source_record.text[start:end]
+        assert (
+            hashlib.sha256(raw.encode()).hexdigest()
+            == event.params["raw_section_sha256"]
+        )
+        [disclosure] = event.params["fact_spans"]
+        assert disclosure["kind"] == "disclosure_presence"
+        assert (
+            event.params["text"][disclosure["char_start"] : disclosure["char_end"]]
+            == disclosure["evidence_quote"]
+        )
+
+    artifact_index = {artifact.artifact_id: artifact for artifact in artifacts}
+    essential_by_band = {
+        band: [
+            artifact_index[artifact_id] for artifact_id in query.essential_artifact_ids
+        ]
+        for band, query in queries.items()
+    }
+    narrative_artifact_ids = {
+        section_id: f"{world.spec['world_id']}.{event.visibility[0]}"
+        for section_id, event in narrative_sections.items()
+    }
+    reconstruction_essential_ids = {
+        artifact.artifact_id
+        for essential in essential_by_band.values()
+        for artifact in essential
+    }
+    assert reconstruction_essential_ids.isdisjoint(narrative_artifact_ids.values())
+
+
+@pytest.mark.skipif(
+    not SOURCE_BUNDLE.is_file(),
+    reason="requires the local Microsoft issuer source inventory",
+)
+def test_microsoft_cashflow_tax_market_risk_is_an_independent_executable_task(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    materialized = _microsoft_materialization(tmp_path, monkeypatch)
+    world = materialized.worlds["focal"]
+    artifacts = materialized.artifacts["focal"]
+    query = next(
+        query
+        for query in materialized.queries
+        if query.query_type == "sec_financial_cashflow_tax_market_risk"
+    )
+    assert query.preferred_length_buckets == ["64k"]
+    assert query.motif == "source-financial-cashflow_tax_market_risk"
+    assert [operation["op"] for operation in query.program_ops] == [
+        "READ_XBRL_FACT",
+        "READ_XBRL_FACT",
+        "READ_DISCLOSURE",
+        "READ_DISCLOSURE",
+        "RECONCILE_CASHFLOW_TAX_MARKET_RISK",
+    ]
+
+    by_id = {artifact.artifact_id: artifact for artifact in artifacts}
+    essential = [by_id[artifact_id] for artifact_id in query.essential_artifact_ids]
+    section_events = {
+        str(event.params.get("section_id") or ""): event
+        for event in world.events
+        if event.type == "sec_source_section" and event.visibility
+    }
+    required_sections = {
+        section_id: by_id[artifact_id]
+        for section_id, event in section_events.items()
+        for artifact_id in [f"{world.spec['world_id']}.{event.visibility[0]}"]
+        if artifact_id in query.essential_artifact_ids
+    }
+    assert {
+        "item8_cash_flow",
+        "note11_income_taxes",
+        "item7a_market_risk",
+    } <= set(required_sections)
+    assert answer_from_artifacts(world, query, essential) == query.answer
+    assert query.answer.startswith("CF_RISK:")
+    assert query.answer != query.cf_answer
+
+    for section_id in (
+        "item8_cash_flow",
+        "note11_income_taxes",
+        "item7a_market_risk",
+    ):
+        removed = [
+            artifact
+            for artifact in essential
+            if artifact.artifact_id != required_sections[section_id].artifact_id
+        ]
+        assert answer_from_artifacts(world, query, removed) == "unknown"
+        corrupted = [
+            replace(
+                artifact,
+                text=artifact.text.replace(
+                    (
+                        str(
+                            section_events[section_id].params["fact_spans"][0][
+                                "evidence_quote"
+                            ]
+                        )
+                    ),
+                    "CORRUPTED ANSWER-BEARING TEXT",
+                    1,
+                ),
+            )
+            if artifact.artifact_id == required_sections[section_id].artifact_id
+            else artifact
+            for artifact in essential
+        ]
+        assert semantic_answer_from_artifacts(world, query, corrupted) == "unknown"

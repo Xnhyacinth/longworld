@@ -14,6 +14,7 @@ from longworld.core.engine import answer_from_artifacts, semantic_answer_from_ar
 from longworld.core.filingworkflow import (
     _audit_exported_manifest,
     _filing_relations,
+    _sec_source_event_matches_record,
     validated_sec_annual_endpoints,
 )
 from longworld.core.provenance import ProvenanceError
@@ -27,7 +28,7 @@ from longworld.core.sourceworkflow import (
     SourceWorkflow,
     adapt_sec_manifest,
 )
-from longworld.core.taxonomy import SourceOrigin
+from longworld.core.taxonomy import SourceOrigin, artifact_classification
 from longworld.core.verify import verify_question
 from longworld.core.views import render_cf_view
 from longworld.core.world import Event
@@ -153,6 +154,100 @@ def test_filing_relations_rejects_ungrounded_or_reversed_annual_history() -> Non
     assert _filing_relations([prior, reversed_filing_date]) == []
 
 
+def test_financial_programs_bind_to_cumulative_four_filing_history() -> None:
+    workflow_id = "source:sec_filing:fourannualhistory0123456789"
+    record_ids = [f"sec:annual-{year}" for year in range(2022, 2026)]
+    events = [
+        Event(
+            id=f"focal.sec_filing_0_{index}",
+            type="sec_filing",
+            time=date(year, 7, 30),
+            params={"workflow_id": workflow_id, "record_id": record_id},
+            visibility=[f"focal.sec_filing_0_{index}"],
+        )
+        for index, (year, record_id) in enumerate(zip(range(2022, 2026), record_ids))
+    ]
+    for index, (prior_id, current_id) in enumerate(pairwise(record_ids)):
+        events.append(
+            Event(
+                id=f"focal.sec_prior_annual_0_{index}",
+                type="sec_prior_annual_filing_relation",
+                time=date(2023 + index, 8, 2),
+                params={
+                    "workflow_id": workflow_id,
+                    "record_id": current_id,
+                    "target_record_id": prior_id,
+                    "source_relation_id": f"{current_id}:prior:{prior_id}",
+                },
+                visibility=[f"focal.sec_prior_annual_0_{index}"],
+            )
+        )
+    answers: list[Event] = []
+    for record_id in record_ids:
+        for tier in ("16k", "32k", "64k"):
+            answer = Event(
+                id=f"focal.financial.{record_id}.{tier}",
+                type="sec_financial_answer",
+                time=date(2030, 1, 1),
+                params={
+                    "workflow_id": workflow_id,
+                    "record_id": record_id,
+                    "control_tier": tier,
+                },
+                visibility=[f"focal.financial.{record_id}.{tier}"],
+            )
+            answers.append(answer)
+            events.append(answer)
+    independent_facet = Event(
+        id="focal.financial.cashflow_tax_market_risk",
+        type="sec_financial_answer",
+        time=date(2030, 1, 1),
+        params={
+            "workflow_id": workflow_id,
+            "record_id": record_ids[-1],
+            "control_tier": "64k",
+            "answer_family": "cashflow_tax_market_risk",
+        },
+        visibility=["focal.financial.cashflow_tax_market_risk"],
+    )
+    events.append(independent_facet)
+
+    company_simulate._bind_financial_programs_to_annual_history(
+        events, workflow_id=workflow_id
+    )
+
+    assert "history_profile_active" not in independent_facet.params
+    assert independent_facet.required_inputs == []
+
+    selected = [
+        answer
+        for answer in answers
+        if answer.params["history_control_tier"] == answer.params["control_tier"]
+    ]
+    assert [answer.params["control_tier"] for answer in selected] == [
+        "16k",
+        "32k",
+        "64k",
+    ]
+    for expected_records, answer in zip(range(2, 5), selected, strict=True):
+        assert answer.params["required_record_ids"] == record_ids[:expected_records]
+        assert len(answer.params["required_relation_ids"]) == expected_records - 1
+        assert (
+            sum(
+                input_id.startswith("focal.sec_filing_")
+                for input_id in answer.required_inputs
+            )
+            == expected_records
+        )
+        assert (
+            sum(
+                input_id.startswith("focal.sec_prior_annual_")
+                for input_id in answer.required_inputs
+            )
+            == expected_records - 1
+        )
+
+
 def _source_record(
     *,
     accession: str,
@@ -263,6 +358,68 @@ def _annual_workflow() -> tuple[SourceWorkflow, SourceRelation]:
         relations=(relation,),
     )
     return workflow, relation
+
+
+def _live_shaped_gcs_v2_record() -> SourceRecord:
+    accession = "0001564590-22-026876"
+    cik = "0000789019"
+    filing_date = "2022-07-28"
+    report_date = "2022-06-30"
+    text = (
+        f'<a title="{accession}.pdf">PDF</a>\n'
+        f'<ix:nonNumeric name="dei:EntityCentralIndexKey">{cik}</ix:nonNumeric>\n'
+        f"<!-- Creation Date :{filing_date}T17:24:57+00:00 -->\n"
+        f"<xbrli:endDate>{report_date}</xbrli:endDate>\n"
+        + ("historical-filing-body\n" * 2_000)
+        + '<ix:nonNumeric name="dei:DocumentType">10-K</ix:nonNumeric>\n'
+        + "Revenue: 198270\n"
+    )
+    digest = hashlib.sha256(text.encode()).hexdigest()
+    record_id = f"sec:{accession}"
+    facts = []
+    for fact_id, field, value in (
+        ("accession", "accession", accession),
+        ("cik", "cik", cik),
+        ("filing_date", "filing_date", filing_date),
+        ("report_date", "report_date", report_date),
+        ("form", "form", "10-K"),
+        ("revenue", "revenue", "198270"),
+    ):
+        start = text.index(value)
+        facts.append(
+            SourceFact(
+                fact_id=fact_id,
+                field=field,
+                value=value,
+                record_id=record_id,
+                evidence_quote=value,
+                char_start=start,
+                char_end=start + len(value),
+                value_offset=0,
+                source_sha256=digest,
+            )
+        )
+    return SourceRecord(
+        record_id=record_id,
+        kind="sec_filing",
+        occurred_at=filing_date,
+        text=text,
+        source_url="https://microsoft.gcs-web.com/node/30786/html",
+        retrieval_url="",
+        source_family="issuer_gcs_merged_filing_v2",
+        source_origin=SourceOrigin.REAL_PUBLIC,
+        provenance_id=f"sha256:{digest}",
+        source_sha256=digest,
+        text_sha256=digest,
+        facts=tuple(facts),
+        attributes=(
+            ("accession", accession),
+            ("cik", cik),
+            ("filing_date", filing_date),
+            ("form", "10-K"),
+            ("report_date", report_date),
+        ),
+    )
 
 
 def _annual_relation(current: SourceRecord, prior: SourceRecord) -> SourceRelation:
@@ -706,6 +863,72 @@ def test_annual_contract_materializes_and_replays_without_local_inventory(
     )
 
 
+def test_gcs_v2_long_identity_uses_replayable_exact_multi_span_projection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LONGWORLD_ATTESTATION_KEY", ARTIFACT_KEY)
+    monkeypatch.setattr(
+        company_simulate, "_sec_financial_events", _contract_financial_events
+    )
+    prior = _live_shaped_gcs_v2_record()
+    current = _source_record(
+        accession="0000950170-23-035122",
+        filing_date="2023-07-27",
+        report_date="2023-06-30",
+        revenue="211915",
+    )
+    relation = _annual_relation(current, prior)
+    workflow = SourceWorkflow(
+        workflow_id="source:sec_filing:gcsv2longidentity012345",
+        component_digest="7" * 64,
+        source_kind="sec_filing",
+        target_domain="company",
+        source_origin=SourceOrigin.REAL_PUBLIC,
+        source_families=(
+            "issuer_gcs_merged_filing_v2",
+            "sec_edgar_submission",
+        ),
+        provenance_ids=(prior.provenance_id, current.provenance_id),
+        records=(prior, current),
+        relations=(relation,),
+        source_authorization={"adapter_revision": "sourceworkflow@2"},
+    )
+
+    materialized = materialize(
+        1244,
+        n_parallel=0,
+        n_pulses=0,
+        domain="company",
+        source_workflows=[workflow],
+        include_program_joins=False,
+    )
+    event = next(
+        event
+        for event in materialized.worlds["focal"].events
+        if event.type == "sec_filing" and event.params["record_id"] == prior.record_id
+    )
+    assert event.params["provenance_operation"] == "sec_multi_span_projection_v1"
+    assert event.params["parent_provenance_id"] == prior.provenance_id
+    assert len(event.params["source_ranges"]) == 5
+    assert all(
+        item["parent_source_sha256"] == prior.source_sha256
+        and prior.text[item["source_char_start"] : item["source_char_end"]]
+        == item["text"]
+        and hashlib.sha256(item["text"].encode()).hexdigest() == item["text_sha256"]
+        for item in event.params["source_ranges"]
+    )
+    assert _sec_source_event_matches_record(event, prior)
+    corrupted_params = deepcopy(event.params)
+    corrupted_params["source_ranges"][0]["text_sha256"] = "0" * 64
+    assert not _sec_source_event_matches_record(
+        replace(event, params=corrupted_params), prior
+    )
+    assert any(
+        event.type == "sec_prior_annual_filing_relation"
+        for event in materialized.worlds["focal"].events
+    )
+
+
 def test_annual_history_grows_real_dependencies_across_all_bands(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1037,6 +1260,19 @@ def test_annual_revenue_answer_replays_both_filings_relation_and_corruption(
     assert verification.essential_single_doc_insufficient
     assert verification.essential_text_grounded, notes
 
+    filing_artifacts = [
+        artifact for artifact in essential if artifact.doc_type == "sec_filing"
+    ]
+    assert len(filing_artifacts) == 2
+    assert all(
+        artifact.slots["params"]["text"] in artifact.text
+        and artifact_classification(artifact).source_origin
+        == SourceOrigin(artifact.slots["params"]["source_origin"])
+        and artifact_classification(artifact).provenance_id
+        == artifact.slots["params"]["provenance_id"]
+        for artifact in filing_artifacts
+    )
+
     controls = [
         artifact
         for artifact in essential
@@ -1070,6 +1306,24 @@ def test_annual_revenue_answer_replays_both_filings_relation_and_corruption(
     assert (
         semantic_answer_from_artifacts(
             world, query, corrupted, enforce_preconditions=True
+        )
+        == "unknown"
+    )
+
+    current_filing = filing_artifacts[-1]
+    original_report_date = current_filing.slots["params"]["ground_values"][-1]
+    corrupted_filing = [
+        replace(
+            artifact,
+            text=artifact.text.replace(original_report_date, "2024-06-29", 1),
+        )
+        if artifact.artifact_id == current_filing.artifact_id
+        else artifact
+        for artifact in essential
+    ]
+    assert (
+        semantic_answer_from_artifacts(
+            world, query, corrupted_filing, enforce_preconditions=True
         )
         == "unknown"
     )
