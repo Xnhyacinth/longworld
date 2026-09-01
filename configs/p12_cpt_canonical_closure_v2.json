@@ -1,0 +1,28 @@
+{
+  "schema_version": "longworld.cpt-canonical-closure.v1",
+  "as_of": "2026-09-01",
+  "data_stage": "content_audited_local_probe",
+  "anchor_release": "data/releases/p12-cpt-git-history-multiband-godot-capacity-v8-current-root-dedup",
+  "anchor_manifest_sha256": "c71980d265429331625a6488430b9011e314d55bb53735cf6ae36bedcb725007",
+  "anchor_audit_sha256": "4873bfb9b389dc4733c86ce1242bf91718225cf990ea8d5854a196a7c429a9d2",
+  "anchor_cpt_rows_sha256": "15dd2fff63405bd7b02a6c9ad54bdc4225b9ee9d7605894d5584690ddcae05b6",
+  "anchor_train_sha256": "c73b12d13aa961dab61761829036531c44330b0dc7a4c8adaa36cf3e0d60071d",
+  "release_count": 6,
+  "recursive_reference_count": 5,
+  "rows": 3047,
+  "context_tokens": 288004845,
+  "by_length": {
+    "16k": 323,
+    "32k": 264,
+    "64k": 1115,
+    "128k": 1112,
+    "256k": 233
+  },
+  "cross_release_context_overlap": 0,
+  "cross_release_source_body_overlap": 0,
+  "cross_release_source_event_overlap": 0,
+  "audit_passed": true,
+  "train_ready": false,
+  "production_eligible": false,
+  "trust_scope": "local_probe"
+}

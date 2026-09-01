@@ -1,6 +1,6 @@
 # Current release status
 
-Last updated: 2026-08-31
+Last updated: 2026-09-01
 
 This file is the canonical publication-status summary. Historical receipts and
 `.hl/` logs remain useful for reproducibility, but they do not override this
@@ -22,11 +22,11 @@ The remote contains 19 release payload files plus the Hub-managed
 `.gitattributes`; the payload matches the local immutable P6 v4 staging package.
 No P6 payload is missing; no P12 production upload is authorized.
 
-## 2026-08-31 task replay and baseline checkpoint
+## 2026-09-01 task replay and baseline checkpoint
 
-LongWorld model accuracy remains **unmeasured**: no checkpoint has yet been
-trained and evaluated under a fixed baseline protocol. The current local
-inventory is 3,006 content-audited CPT rows / 286,634,406 exact Qwen tokens and
+LongWorld model accuracy remains **unmeasured**: no LongWorld-trained checkpoint
+has yet been evaluated under a fixed baseline protocol. The current local
+inventory is 3,047 content-audited CPT rows / 288,004,845 exact Qwen tokens and
 12 promotion-v2 SFT rows / 2 worlds / 454,846 tokens. Production/KMS-qualified
 rows remain zero.
 
@@ -72,7 +72,7 @@ and after a fresh load, but production still requires the resolved tokenizer
 asset snapshot itself to be mounted read-only or isolated from the audit
 process; local write access is not a production trust root.
 
-The final post-fix repository regression is **1,496 passed / 1 expected
+The final post-fix repository regression is **1,558 passed / 1 expected
 xfail**; focused tests, Ruff, MyPy, compileall, Bash syntax, and
 `git diff --check` also pass.
 
@@ -99,22 +99,32 @@ was fixed and the release rebuilt from 40 authenticated extraction checkpoints;
 the final signed audit passes. See
 `reports/p12_godot_raw_replay_bea_20260831.md`.
 
-Godot is not yet added to the canonical 3,006-row mutually disjoint union. The
-current local-probe root cannot verify the historical pandas source-role
-signatures, and the old source key is unavailable. Cross-release subtraction
-therefore fails closed rather than re-signing historical provenance. The
-canonical inventory remains **3,006 rows / 286,634,406 tokens**; Godot is
-reported separately until a legitimate old verification root is restored or
-the references are independently re-imported.
+The historical local-probe verification root was recovered outside the
+repository with mode `0600` and independently replayed the five-release pandas
+closure. Godot was then freshly re-imported with the current v6 extractor rather
+than reusing the unverifiable v7 signatures. The fresh 40 source manifests bind
+remote request/receipt identity, commit/tree/blob proofs, the approved-license
+boundary, and the complete 39,499-commit approved suffix. Recursive subtraction
+against the five-release closure retained all 41 rows; the final report replayed
+five references and found zero context, source-body, or source-event overlap.
+The Godot dedup release is now the local content-audited closure anchor, bringing
+the inventory to **3,047 rows / 288,004,845 tokens**. It remains
+`train_ready=false`, `production_eligible=false`, and local-probe only.
 
 A live fixed-URL BEA GDP/GDI workbook fetch bound 74,180 raw bytes to 3,959
 cell-provenanced observations, 3,567 temporal relations, and 384 trajectories
 of depth 3–16. Of those relations, 2,935 are answer-changing revisions and 632
-are unchanged-value supersessions. This is source inventory only: it has no
-long rendering, sidecar replay, promotion, or training rows. The macro,
-visual-compatibility, and game-compatibility modules likewise remain disabled
-nonproduction prototypes. Production/train-ready rows remain zero; no HF
-upload is authorized.
+are unchanged-value supersessions. Macro is now an explicit third task adapter
+beside Cyber and Finance. Its real 2005Q4 GDP path produces nested 16/32/64K
+contexts with 5/10/15 vintages, 9/19/29 essential artifacts, proof depth
+5/10/15, and 3,672/7,815/11,968 event-bearing tokens. Exact document lengths are
+16,000/32,000/64,016 tokens; all three rows pass fresh source/state/answer, CF,
+remove-one, window, lexical, dense top-k, and strict replay checks. Source,
+packing, and reference caches are separately signed by source/promotion/report
+roles and accelerate a repeated local materialization from about 60.5 to 14.6
+seconds without restoring any pass conclusion. The combined-key executable is
+hard-limited to local-probe diagnostics; production KMS and the 12-world gate
+remain unmet, so no HF upload is authorized.
 
 ## Longitudinal 64K/128K CPT candidate
 
@@ -169,9 +179,9 @@ ten complete rows to signed-source-body overlap with earlier releases. The final
 records. The audit recursively replays two pinned prior releases and finds zero
 remaining source-body, event, or context overlap.
 
-Across the five mutually disjoint current longitudinal/multiband CPT releases,
-the local candidate inventory is now **3,006 rows and 286,634,406 exact context
-tokens**: 300×16K, 253×32K, 1,111×64K, 1,109×128K, and 233×256K. The earlier
+Across the six mutually disjoint current longitudinal/multiband CPT releases,
+the local candidate inventory is now **3,047 rows and 288,004,845 exact context
+tokens**: 323×16K, 264×32K, 1,115×64K, 1,112×128K, and 233×256K. The earlier
 1,000-row 64K/128K groups are configured quotas; the remaining counts are filtered
 source capacity. The newest Bitcoin/pandas 381-row increment alone has the explicit
 minimum-span and truncation-quality replay gates; older rows must not be described
