@@ -49,6 +49,7 @@ from longworld.core.promotion import (
     _candidate_has_source_bound_proof,
     _candidate_has_verified_real_source,
     _selection_audit_matches_candidate,
+    _task_sidecar_matches_candidate,
     candidate_sha256,
     candidate_structural_preflight,
     select_release_worlds,
@@ -88,6 +89,29 @@ TOKENIZER_MODEL_ID = "Qwen/Qwen3.5-4B"
 TOKENIZER_REVISION = "c" * 40
 TOKENIZER_ASSET_SHA256 = "d" * 64
 _TASK_SIDECAR_TOKEN_COUNTER = taskpromotion_module.task_sidecar_token_counter
+
+
+def test_cross_cve_v3_sidecar_matches_registered_cyber_candidate() -> None:
+    candidate = {
+        "domain": "cyber",
+        "view": "full",
+        "composition_method": "same_case_dossier",
+        "strict_replay_revision": "longworld.cross-cve-remediation-replay.v1",
+        "dossier_id": "cross-cve-dossier",
+        "task_view_projection": {
+            "schema_version": "longworld.task-view-projection.v1",
+            "derivation_revision": "longworld.task-view-derivation.v4",
+            "view": "full",
+            "dossier_id": "cross-cve-dossier",
+        },
+    }
+    binding = {
+        "adapter_id": "cyber.cross_cve_remediation.v1",
+        "adapter_revision": "longworld.cross-cve-remediation-replay.v1",
+        "sidecar_schema_version": TASK_REPLAY_SIDECAR_SCHEMA_V3,
+    }
+
+    assert _task_sidecar_matches_candidate(candidate, binding)
 
 
 def test_task_view_projection_cli_bootstraps_repo_without_editable_install(

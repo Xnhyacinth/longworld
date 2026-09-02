@@ -1082,6 +1082,7 @@ def _task_sidecar_matches_candidate(
         projection = candidate.get("task_view_projection")
         view = str(candidate.get("view") or "")
         expected_domains = {
+            "cyber.cross_cve_remediation.v1": "cyber",
             "cyber.kev_history.v1": "cyber",
             "finance.multi_filing.v1": "finance",
             "macro.gdp_vintage_reconstruction.v1": "macro_economics",
