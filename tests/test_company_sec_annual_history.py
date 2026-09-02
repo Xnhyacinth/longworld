@@ -182,6 +182,26 @@ def test_financial_programs_bind_to_cumulative_four_filing_history() -> None:
                 visibility=[f"focal.sec_prior_annual_0_{index}"],
             )
         )
+    for section_name in (
+        "item1_business",
+        "item2_properties",
+        "item3_legal_proceedings",
+        "item7a_market_risk",
+        "note11_income_taxes",
+    ):
+        events.append(
+            Event(
+                id=f"focal.section.{record_ids[-2]}.{section_name}",
+                type="sec_source_section",
+                time=date(2024, 7, 30),
+                params={
+                    "workflow_id": workflow_id,
+                    "record_id": record_ids[-2],
+                    "section_id": section_name,
+                },
+                visibility=[f"focal.section.{record_ids[-2]}.{section_name}"],
+            )
+        )
     answers: list[Event] = []
     for record_id in record_ids:
         for tier in ("16k", "32k", "64k"):
@@ -211,6 +231,23 @@ def test_financial_programs_bind_to_cumulative_four_filing_history() -> None:
         visibility=["focal.financial.cashflow_tax_market_risk"],
     )
     events.append(independent_facet)
+    narrative_answers: list[Event] = []
+    for tier in ("16k", "32k", "64k"):
+        narrative = Event(
+            id=f"focal.financial.narrative.{tier}",
+            type="sec_financial_answer",
+            time=date(2030, 1, 1),
+            params={
+                "workflow_id": workflow_id,
+                "record_id": record_ids[-1],
+                "control_tier": tier,
+                "answer_family": "narrative_reconciliation",
+                "section_event_ids": [],
+            },
+            visibility=[f"focal.financial.narrative.{tier}"],
+        )
+        narrative_answers.append(narrative)
+        events.append(narrative)
 
     company_simulate._bind_financial_programs_to_annual_history(
         events, workflow_id=workflow_id
@@ -218,6 +255,20 @@ def test_financial_programs_bind_to_cumulative_four_filing_history() -> None:
 
     assert "history_profile_active" not in independent_facet.params
     assert independent_facet.required_inputs == []
+
+    for narrative in narrative_answers:
+        assert (
+            narrative.params["history_control_tier"] == narrative.params["control_tier"]
+        )
+        assert narrative.params["required_record_ids"] == record_ids[-2:]
+        assert len(narrative.params["required_relation_ids"]) == 1
+        assert (
+            sum(
+                input_id.startswith("focal.sec_filing_")
+                for input_id in narrative.required_inputs
+            )
+            == 2
+        )
 
     selected = [
         answer

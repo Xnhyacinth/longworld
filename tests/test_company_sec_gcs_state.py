@@ -456,3 +456,119 @@ def test_microsoft_cashflow_tax_market_risk_is_an_independent_executable_task(
             for artifact in essential
         ]
         assert semantic_answer_from_artifacts(world, query, corrupted) == "unknown"
+
+
+@pytest.mark.skipif(
+    not SOURCE_BUNDLE.is_file(),
+    reason="requires the local Microsoft issuer source inventory",
+)
+def test_microsoft_narrative_reconciliation_has_three_cumulative_stages(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    materialized = _microsoft_materialization(tmp_path, monkeypatch)
+    world = materialized.worlds["focal"]
+    artifacts = materialized.artifacts["focal"]
+    queries = [
+        query
+        for query in materialized.queries
+        if query.query_type == "sec_financial_narrative_reconciliation"
+    ]
+
+    assert [query.preferred_length_buckets for query in queries] == [
+        ["16k"],
+        ["32k"],
+        ["64k"],
+    ]
+    assert {query.semantic_growth_group for query in queries} == {
+        "company_real_sec_financial_narrative_reconciliation"
+    }
+    assert len({query.base_task_group for query in queries}) == 1
+
+    expected_ops = {
+        "16k": [
+            "READ_XBRL_FACT",
+            "RECONCILE_CASHFLOW",
+            "READ_DISCLOSURE",
+            "RECONCILE_PROPERTIES_DISCLOSURE",
+        ],
+        "32k": [
+            "READ_XBRL_FACT",
+            "RECONCILE_CASHFLOW",
+            "READ_DISCLOSURE",
+            "RECONCILE_PROPERTIES_DISCLOSURE",
+            "READ_DISCLOSURE",
+            "RECONCILE_BUSINESS_DISCLOSURE",
+            "READ_DISCLOSURE",
+            "RECONCILE_INCOME_TAX_DISCLOSURE",
+        ],
+        "64k": [
+            "READ_XBRL_FACT",
+            "RECONCILE_CASHFLOW",
+            "READ_DISCLOSURE",
+            "RECONCILE_PROPERTIES_DISCLOSURE",
+            "READ_DISCLOSURE",
+            "RECONCILE_BUSINESS_DISCLOSURE",
+            "READ_DISCLOSURE",
+            "RECONCILE_INCOME_TAX_DISCLOSURE",
+            "READ_DISCLOSURE",
+            "RECONCILE_MARKET_RISK_DISCLOSURE",
+        ],
+    }
+    by_id = {artifact.artifact_id: artifact for artifact in artifacts}
+    expected_sections = {
+        "16k": {"item8_cash_flow", "item2_properties"},
+        "32k": {
+            "item1_business",
+            "item8_cash_flow",
+            "item2_properties",
+            "note11_income_taxes",
+        },
+        "64k": {
+            "item1_business",
+            "item8_cash_flow",
+            "item2_properties",
+            "note11_income_taxes",
+            "item7a_market_risk",
+        },
+    }
+    section_by_artifact_id = {
+        f"{world.spec['world_id']}.{event.visibility[0]}": str(
+            event.params.get("section_id") or ""
+        )
+        for event in world.events
+        if event.type == "sec_source_section" and event.visibility
+    }
+
+    for query in queries:
+        [band] = query.preferred_length_buckets
+        assert [operation["op"] for operation in query.program_ops] == expected_ops[
+            band
+        ]
+        assert expected_sections[band] <= {
+            section_by_artifact_id[artifact_id]
+            for artifact_id in query.essential_artifact_ids
+            if artifact_id in section_by_artifact_id
+        }
+        essential = [by_id[artifact_id] for artifact_id in query.essential_artifact_ids]
+        assert answer_from_artifacts(world, query, essential) == query.answer
+        assert query.answer != "unknown"
+        assert query.answer != query.cf_answer
+        assert sec_financial_answer_conforms(query.question, query.answer)
+        for section_id in expected_sections[band]:
+            artifact_id = next(
+                artifact_id
+                for artifact_id in query.essential_artifact_ids
+                if section_by_artifact_id.get(artifact_id) == section_id
+            )
+            assert (
+                answer_from_artifacts(
+                    world,
+                    query,
+                    [
+                        artifact
+                        for artifact in essential
+                        if artifact.artifact_id != artifact_id
+                    ],
+                )
+                == "unknown"
+            )

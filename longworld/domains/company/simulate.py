@@ -174,6 +174,29 @@ _SEC_FINANCIAL_FACETS = (
     ),
 )
 
+_MICROSOFT_NARRATIVE_RECONCILIATION_STAGES = (
+    ("16k", ("item8_cash_flow", "item2_properties")),
+    (
+        "32k",
+        (
+            "item1_business",
+            "item8_cash_flow",
+            "item2_properties",
+            "note11_income_taxes",
+        ),
+    ),
+    (
+        "64k",
+        (
+            "item1_business",
+            "item8_cash_flow",
+            "item2_properties",
+            "note11_income_taxes",
+            "item7a_market_risk",
+        ),
+    ),
+)
+
 
 def _sec_tier_roles(program, control_tier: str) -> tuple[str, ...]:
     mix = ("product_revenue", "service_revenue", "total_revenue")
@@ -1099,6 +1122,59 @@ def _sec_financial_events(
                 relation_kinds={parent: "reads_section" for parent in parents},
             )
         )
+    if record.attribute("cik") == "0000789019":
+        for stage_index, (control_tier, needed_sections) in enumerate(
+            _MICROSOFT_NARRATIVE_RECONCILIATION_STAGES
+        ):
+            if any(name not in section_ids for name in needed_sections):
+                break
+            required_roles = ["cfo", "cfi", "cff", "fx", "delta_cash"]
+            required_roles.append("item2_properties")
+            if control_tier in {"32k", "64k"}:
+                required_roles.append("item1_business")
+                required_roles.append("note11_income_taxes")
+            parents = [section_ids[name] for name in needed_sections]
+            answer_key = (
+                f"sec_financial_narrative_ready:{record.record_id}:{control_tier}"
+            )
+            event_id = (
+                f"{prefix}.sec_financial_narrative_{control_tier}_{stage_index}_"
+                f"{workflow_index}_{record_index}"
+            )
+            events.append(
+                Event(
+                    id=event_id,
+                    type="sec_financial_answer",
+                    time=filing_day
+                    + timedelta(days={"16k": 6, "32k": 401, "64k": 801}[control_tier]),
+                    params={
+                        "workflow_id": workflow.workflow_id,
+                        "record_id": record.record_id,
+                        "control_tier": control_tier,
+                        "control_stage": (
+                            "cumulative Microsoft cash-flow and narrative "
+                            f"reconciliation through {control_tier}"
+                        ),
+                        "compose": "staged_narrative",
+                        "answer_family": "narrative_reconciliation",
+                        "answer_key": answer_key,
+                        "prerequisite_answer_key": "",
+                        "required_roles": required_roles,
+                        "section_event_ids": [
+                            section_ids[name] for name in needed_sections
+                        ],
+                        "ground_values": [
+                            "reconciliation-scope-approved",
+                            control_tier,
+                        ],
+                        "relation_provenance": "synthetic_executable",
+                    },
+                    visibility=[event_id],
+                    causal_inputs=parents,
+                    required_inputs=parents,
+                    relation_kinds={parent: ("reads_section") for parent in parents},
+                )
+            )
     cache_key = _sec_section_cache_key(workflow, record)
     if cache_key is not None:
         section_events = [
@@ -1810,7 +1886,7 @@ def _bind_financial_programs_to_annual_history(
         if event.type == "sec_prior_annual_filing_relation"
         and event.params.get("workflow_id") == workflow_id
     ]
-    if len(filings) < 4 or len(relations) != len(filings) - 1:
+    if len(filings) < 2 or len(relations) != len(filings) - 1:
         return
     by_current: dict[str, Event] = {}
     prior_ids: set[str] = set()
@@ -1847,24 +1923,76 @@ def _bind_financial_programs_to_annual_history(
         for relation in relation_newest_to_oldest
     }
     tier_by_records = {2: "16k", 3: "32k", 4: "64k", 5: "128k"}
+    sections_by_record = {
+        (
+            str(event.params.get("record_id") or ""),
+            str(event.params.get("section_id") or ""),
+        ): event
+        for event in events
+        if event.type == "sec_source_section"
+    }
     for event in events:
         if (
             event.type != "sec_financial_answer"
             or event.params.get("workflow_id") != workflow_id
             or event.params.get("answer_family")
+            not in {None, "", "narrative_reconciliation"}
         ):
             continue
         record_id = str(event.params.get("record_id") or "")
         if record_id not in record_ids:
             continue
-        history = record_ids[: record_ids.index(record_id) + 1]
+        answer_family = str(event.params.get("answer_family") or "")
+        if answer_family == "narrative_reconciliation":
+            if record_id != record_ids[-1]:
+                event.params["history_profile_active"] = True
+                event.params["history_control_tier"] = ""
+                continue
+            history = record_ids[-2:]
+        else:
+            history = record_ids[: record_ids.index(record_id) + 1]
         history_relations = [relation_by_current[item] for item in history[1:]]
         dependency_events = [
             *(filings[item] for item in history),
             *history_relations,
         ]
+        if answer_family == "narrative_reconciliation":
+            prior_section_names = {
+                "16k": (
+                    "item2_properties",
+                    "item3_legal_proceedings",
+                    "item7a_market_risk",
+                ),
+                "32k": (),
+                "64k": (
+                    "item1_business",
+                    "item7a_market_risk",
+                    "note11_income_taxes",
+                ),
+            }.get(str(event.params.get("control_tier") or ""), ())
+            prior_sections = [
+                sections_by_record.get((history[0], section_name))
+                for section_name in prior_section_names
+            ]
+            if any(section is None for section in prior_sections):
+                event.params["history_control_tier"] = ""
+                continue
+            bound_prior_sections = [
+                section for section in prior_sections if section is not None
+            ]
+            event.params["prior_narrative_section_ids"] = [
+                section.id for section in bound_prior_sections
+            ]
+            event.params["section_event_ids"].extend(
+                section.id for section in bound_prior_sections
+            )
+            dependency_events.extend(bound_prior_sections)
         event.params["history_profile_active"] = True
-        event.params["history_control_tier"] = tier_by_records.get(len(history), "")
+        event.params["history_control_tier"] = (
+            str(event.params.get("control_tier") or "")
+            if answer_family == "narrative_reconciliation"
+            else tier_by_records.get(len(history), "")
+        )
         event.params["required_record_ids"] = history
         event.params["required_relation_ids"] = [
             str(relation.params["source_relation_id"]) for relation in history_relations
@@ -1877,7 +2005,11 @@ def _bind_financial_programs_to_annual_history(
             event.relation_kinds[dependency.id] = (
                 "validates_prior_annual_filing"
                 if dependency.type == "sec_prior_annual_filing_relation"
-                else "reads_filing_identity"
+                else (
+                    "reads_prior_narrative"
+                    if dependency.type == "sec_source_section"
+                    else "reads_filing_identity"
+                )
             )
 
 

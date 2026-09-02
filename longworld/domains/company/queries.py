@@ -82,16 +82,23 @@ def eval_answer(
     ):
         if val != "READY":
             return "unknown"
-        record_id = (
-            key.removeprefix("sec_financial_facet_ready:").rsplit(":", 1)[0]
-            if key.startswith("sec_financial_facet_ready:")
-            else ""
-        )
+        control_tier = ""
+        if key.startswith("sec_financial_facet_ready:"):
+            record_id = key.removeprefix("sec_financial_facet_ready:").rsplit(":", 1)[0]
+        elif key.startswith("sec_financial_narrative_ready:"):
+            record_id, control_tier = key.removeprefix(
+                "sec_financial_narrative_ready:"
+            ).rsplit(":", 1)
+        else:
+            record_id = ""
+            control_tier = ""
         xbrl = dict((state_values.get("sec_xbrl_facts") or {}).get(record_id) or {})
         certs = dict(
             (state_values.get("sec_certification_facts") or {}).get(record_id) or {}
         )
-        return _financial_facet_answer(spec.query_type, xbrl, certs)
+        return _financial_facet_answer(
+            spec.query_type, xbrl, certs, control_tier=control_tier
+        )
     if spec.query_type == "version_diff":
         v2 = state_values.get("v2_deliverable")
         v3 = state_values.get("v3_deliverable")
@@ -152,7 +159,11 @@ def _indexed_values(values: dict[str, Any], prefix: str) -> list[int]:
 
 
 def _financial_facet_answer(
-    query_type: str, xbrl: dict[str, Any], certs: dict[str, Any]
+    query_type: str,
+    xbrl: dict[str, Any],
+    certs: dict[str, Any],
+    *,
+    control_tier: str = "",
 ) -> str:
     if query_type == "sec_financial_sales_mix":
         required = ("product_revenue", "service_revenue", "total_revenue")
@@ -234,6 +245,46 @@ def _financial_facet_answer(
             f"STATUS:{'PASS' if gap == 0 else 'FAIL'}||"
             "DISCLOSURE:INCOME_TAXES=1,MARKET_RISK=1"
         )
+    if query_type == "sec_financial_narrative_reconciliation":
+        cash_roles = ("cfo", "cfi", "cff", "fx", "delta_cash")
+        if any(role not in xbrl for role in cash_roles):
+            return "unknown"
+        required_disclosures = {
+            "16k": ("item2_properties",),
+            "32k": (
+                "item2_properties",
+                "item1_business",
+                "note11_income_taxes",
+            ),
+            "64k": (
+                "item2_properties",
+                "item1_business",
+                "note11_income_taxes",
+                "item7a_market_risk",
+            ),
+        }.get(control_tier)
+        if required_disclosures is None or any(
+            role not in xbrl for role in required_disclosures
+        ):
+            return "unknown"
+        gap = (
+            int(xbrl["cfo"])
+            + int(xbrl["cfi"])
+            + int(xbrl["cff"])
+            + int(xbrl["fx"])
+            - int(xbrl["delta_cash"])
+        )
+        answer = (
+            f"CF:{xbrl['cfo']}+{xbrl['cfi']}+{xbrl['cff']}+{xbrl['fx']}="
+            f"{xbrl['delta_cash']}|GAP:{gap}|"
+            f"STATUS:{'PASS' if gap == 0 else 'FAIL'}"
+        )
+        answer += "||DISCLOSURE:PROPERTIES=1"
+        if "item1_business" in required_disclosures:
+            answer += ",BUSINESS=1"
+        if "note11_income_taxes" in required_disclosures:
+            answer += ",INCOME_TAXES=1"
+        return answer
     if query_type == "sec_financial_cashflow_notes":
         common = (
             "cfo",
@@ -326,6 +377,14 @@ _SEC_CASHFLOW_TAX_MARKET_RISK_ROLES = (
     "note11_income_taxes",
     "item7a_market_risk",
 )
+_SEC_NARRATIVE_CASHFLOW_ROLES = (
+    "cfo",
+    "cfi",
+    "cff",
+    "fx",
+    "delta_cash",
+    "item2_properties",
+)
 _SEC_FINANCIAL_GRAMMAR_PREFIX = "Exact output grammar: `"
 
 
@@ -377,6 +436,37 @@ def _sec_financial_output_contract(
                 "exactly when CF_GAP is zero; both named disclosure flags must "
                 "be present in their independently sourced sections"
             ),
+        )
+    if query_type == "sec_financial_narrative_reconciliation":
+        expected_roles = _SEC_NARRATIVE_CASHFLOW_ROLES
+        disclosure = "||DISCLOSURE:PROPERTIES=1"
+        labels = "CF, GAP, STATUS, DISCLOSURE"
+        branch = (
+            "CF_GAP is CFO + CFI + CFF + FX - DELTA_CASH; STATUS is PASS "
+            "exactly when CF_GAP is zero, otherwise FAIL"
+        )
+        if control_tier == "32k":
+            expected_roles += ("item1_business", "note11_income_taxes")
+            disclosure += ",BUSINESS=1,INCOME_TAXES=1"
+            branch += "; the income-tax disclosure flag must be present"
+        elif control_tier == "64k":
+            expected_roles += (
+                "item1_business",
+                "note11_income_taxes",
+            )
+            disclosure += ",BUSINESS=1,INCOME_TAXES=1"
+            branch += "; both cumulative narrative disclosure flags must be present"
+        elif control_tier != "16k":
+            return None
+        if roles != expected_roles:
+            return None
+        return (
+            (
+                "CF:<CFO>+<CFI>+<CFF>+<FX>=<DELTA_CASH>|GAP:<CF_GAP>|"
+                f"STATUS:<STATUS>{disclosure}"
+            ),
+            labels,
+            branch,
         )
     if query_type == "sec_financial_category_geography":
         categories, position = _consume_indexed_roles(roles, 0, "category_")
@@ -1758,6 +1848,7 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
 
     computes: dict[str, dict[str, Event]] = {}
     facet_answers: dict[str, dict[str, Event]] = {}
+    narrative_answers: dict[str, dict[str, Event]] = {}
     sections: dict[str, dict[str, Event]] = {}
     for event in world.events:
         record_id = str(event.params.get("record_id") or "")
@@ -1766,7 +1857,9 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
         if event.type == "sec_financial_answer":
             tier = str(event.params.get("control_tier") or "")
             answer_family = str(event.params.get("answer_family") or "")
-            if answer_family:
+            if answer_family == "narrative_reconciliation" and tier:
+                narrative_answers.setdefault(record_id, {})[tier] = event
+            elif answer_family:
                 facet_answers.setdefault(record_id, {})[answer_family] = event
             elif str(event.params.get("compose") or "compute") != "copy" and tier:
                 computes.setdefault(record_id, {})[tier] = event
@@ -1988,6 +2081,169 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                         f"company_real_sec_financial_{answer_family}"
                     ),
                     base_task_group=f"sec_financial_{answer_family}:{source_key}",
+                )
+            )
+        by_narrative = narrative_answers.get(record_id) or {}
+        narrative_sections = {
+            "16k": ("item8_cash_flow", "item2_properties"),
+            "32k": (
+                "item1_business",
+                "item8_cash_flow",
+                "item2_properties",
+                "note11_income_taxes",
+            ),
+            "64k": (
+                "item1_business",
+                "item8_cash_flow",
+                "item2_properties",
+                "note11_income_taxes",
+                "item7a_market_risk",
+            ),
+        }
+        narrative_ops = {
+            "16k": [
+                {"op": "READ_XBRL_FACT", "role": "cash_flow_identity"},
+                {"op": "RECONCILE_CASHFLOW"},
+                {"op": "READ_DISCLOSURE", "role": "properties"},
+                {"op": "RECONCILE_PROPERTIES_DISCLOSURE"},
+            ],
+            "32k": [
+                {"op": "READ_XBRL_FACT", "role": "cash_flow_identity"},
+                {"op": "RECONCILE_CASHFLOW"},
+                {"op": "READ_DISCLOSURE", "role": "properties"},
+                {"op": "RECONCILE_PROPERTIES_DISCLOSURE"},
+                {"op": "READ_DISCLOSURE", "role": "business"},
+                {"op": "RECONCILE_BUSINESS_DISCLOSURE"},
+                {"op": "READ_DISCLOSURE", "role": "income_tax_note"},
+                {"op": "RECONCILE_INCOME_TAX_DISCLOSURE"},
+            ],
+            "64k": [
+                {"op": "READ_XBRL_FACT", "role": "cash_flow_identity"},
+                {"op": "RECONCILE_CASHFLOW"},
+                {"op": "READ_DISCLOSURE", "role": "properties"},
+                {"op": "RECONCILE_PROPERTIES_DISCLOSURE"},
+                {"op": "READ_DISCLOSURE", "role": "business"},
+                {"op": "RECONCILE_BUSINESS_DISCLOSURE"},
+                {"op": "READ_DISCLOSURE", "role": "income_tax_note"},
+                {"op": "RECONCILE_INCOME_TAX_DISCLOSURE"},
+                {"op": "READ_DISCLOSURE", "role": "market_risk"},
+                {"op": "RECONCILE_MARKET_RISK_DISCLOSURE"},
+            ],
+        }
+        for control_tier in ("16k", "32k", "64k"):
+            answer_event = by_narrative.get(control_tier)
+            if answer_event is None:
+                continue
+            if (
+                answer_event.params.get("history_profile_active") is True
+                and str(answer_event.params.get("history_control_tier") or "")
+                != control_tier
+            ):
+                continue
+            needed_sections = [
+                by_section.get(name) for name in narrative_sections[control_tier]
+            ]
+            if any(event is None for event in needed_sections):
+                continue
+            cash_flow = by_section.get("item8_cash_flow")
+            if cash_flow is None:
+                continue
+            required_roles = [
+                str(role) for role in answer_event.params.get("required_roles") or []
+            ]
+            question_schema = _sec_financial_question_schema(
+                query_type="sec_financial_narrative_reconciliation",
+                control_tier=control_tier,
+                required_roles=required_roles,
+            )
+            if question_schema is None:
+                continue
+            essential_events = _required_event_closure(world, answer_event)
+            essential_ids = [event.id for event in essential_events]
+            relation_ops = [
+                {"op": "VALIDATE_PRIOR_ANNUAL_FILING", "relation_index": index}
+                for index, _relation_id in enumerate(
+                    answer_event.params.get("required_relation_ids") or []
+                )
+            ]
+            prior_narrative_ops = [
+                {
+                    "op": "READ_PRIOR_ANNUAL_DISCLOSURE",
+                    "section_index": index,
+                }
+                for index, _section_id in enumerate(
+                    answer_event.params.get("prior_narrative_section_ids") or []
+                )
+            ]
+            base_record_id = str(
+                (answer_event.params.get("required_record_ids") or [record_id])[0]
+            )
+            queries.append(
+                QuerySpec(
+                    query_id=(
+                        f"{qid}:sec_financial_narrative_reconciliation:"
+                        f"{source_key}:{control_tier}"
+                    ),
+                    query_type="sec_financial_narrative_reconciliation",
+                    question=(
+                        "Execute the staged Microsoft SEC cash-flow and narrative "
+                        f"reconciliation through {control_tier}. Validate every "
+                        "declared adjacent prior-annual filing relation, then use "
+                        "only the statement and named narrative disclosures in "
+                        "context. " + question_schema
+                    ),
+                    answer="",
+                    as_of=answer_event.time,
+                    answer_key=str(answer_event.params["answer_key"]),
+                    essential_event_ids=essential_ids,
+                    essential_artifact_ids=[
+                        f"{world.spec['world_id']}.{event.visibility[0]}"
+                        for event in essential_events
+                    ],
+                    sufficient_event_ids=essential_ids,
+                    cf_event_id=cash_flow.id,
+                    cf_param_updates=_financial_cf_updates(cash_flow, "cfo"),
+                    cf_answer="",
+                    invariance_event_id=cash_flow.id,
+                    invariance_param_updates={
+                        "retrieval_url": (
+                            "https://www.sec.gov/Archives/edgar/data/0/noise.htm"
+                        )
+                    },
+                    gold_expression=" THEN ".join(
+                        operation["op"]
+                        for operation in [
+                            *relation_ops,
+                            *prior_narrative_ops,
+                            *narrative_ops[control_tier],
+                        ]
+                    ),
+                    proof_depth=max(
+                        2,
+                        _required_event_proof_depth(essential_events, answer_event),
+                    ),
+                    cf_op="numeric",
+                    motif="source-financial-narrative-reconciliation",
+                    topology_id=instance_topology(
+                        "company.sec_financial_narrative_reconciliation",
+                        record_id,
+                        control_tier,
+                    ),
+                    domain="company",
+                    truth_regime="real_source_derived",
+                    program_ops=[
+                        *relation_ops,
+                        *prior_narrative_ops,
+                        *narrative_ops[control_tier],
+                    ],
+                    preferred_length_buckets=[control_tier],
+                    semantic_growth_group=(
+                        "company_real_sec_financial_narrative_reconciliation"
+                    ),
+                    base_task_group=(
+                        "sec_financial_narrative_reconciliation:"
+                        + base_record_id.replace(":", "_")
+                    ),
                 )
             )
         staged = [
