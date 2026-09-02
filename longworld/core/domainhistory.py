@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import date
@@ -684,6 +684,136 @@ def _cross_cve_subset_documents(
     ]
 
 
+_RAW_TOKEN_WINDOW = 4096
+
+
+def _cross_cve_document_cve_id(record: Mapping[str, Any]) -> str:
+    return str(
+        record.get("cve_id")
+        or str(record.get("relation_id") or "").removeprefix("cyber:listed-in-kev:")
+    )
+
+
+def _cross_cve_cve_dates(documents: Sequence[str]) -> dict[str, str]:
+    dates: dict[str, str] = {}
+    for document in documents:
+        record = json.loads(document)
+        if record.get("kind") != "cisa_kev_entry":
+            continue
+        payload = json.loads(str(record.get("text") or ""))
+        cve_id = str(record.get("cve_id") or "")
+        date_added = str(payload.get("dateAdded") or "") if isinstance(payload, dict) else ""
+        if cve_id and date_added:
+            dates[cve_id] = date_added
+    return dates
+
+
+def _cross_cve_chrono_documents(documents: Sequence[str]) -> list[str]:
+    dates = _cross_cve_cve_dates(documents)
+    keyed: list[tuple[str, str]] = []
+    for document in documents:
+        record = json.loads(document)
+        cve_id = _cross_cve_document_cve_id(record)
+        ident = str(record.get("record_id") or record.get("relation_id") or "")
+        keyed.append((f"{dates.get(cve_id, '')}|{cve_id}|{ident}", document))
+    return [document for _key, document in sorted(keyed)]
+
+
+def _cross_cve_spread_of(documents: Sequence[str]) -> list[str]:
+    spread: list[str] = []
+    left = 0
+    right = len(documents) - 1
+    while left <= right:
+        spread.append(documents[left])
+        left += 1
+        if left <= right:
+            spread.append(documents[right])
+            right -= 1
+    return spread
+
+
+def _cross_cve_spread_documents(documents: Sequence[str]) -> list[str]:
+    return _cross_cve_spread_of(_cross_cve_chrono_documents(documents))
+
+
+def _cross_cve_token_spans(
+    documents: Sequence[str], token_counter: Callable[[str], int]
+) -> list[tuple[int, int]]:
+    spans: list[tuple[int, int]] = []
+    for index in range(len(documents)):
+        start = (
+            token_counter(SEP.join(documents[:index]) + SEP) if index else 0
+        )
+        end = token_counter(SEP.join(documents[: index + 1]))
+        spans.append((start, end))
+    return spans
+
+
+def _cross_cve_selected_joins_complete(
+    documents: Sequence[str], selected: Sequence[int]
+) -> bool:
+    required: dict[str, set[str]] = {}
+    observed: dict[str, set[str]] = {}
+    for index, document in enumerate(documents):
+        record = json.loads(document)
+        cve_id = _cross_cve_document_cve_id(record)
+        kind = str(record.get("kind") or "")
+        if not cve_id or not kind:
+            return False
+        required.setdefault(cve_id, set()).add(kind)
+        if index in selected:
+            observed.setdefault(cve_id, set()).add(kind)
+    return bool(required) and all(
+        kinds <= observed.get(cve_id, set()) for cve_id, kinds in required.items()
+    )
+
+
+def _cross_cve_order_has_4k_gold_window(
+    documents: Sequence[str], token_counter: Callable[[str], int]
+) -> bool:
+    """Return True when a 4k intersecting window can replay the full gold join."""
+    if len(documents) < 2:
+        return False
+    spans = _cross_cve_token_spans(documents, token_counter)
+    total = spans[-1][1]
+    if total < _RAW_TOKEN_WINDOW:
+        return False
+    starts = {0}
+    for start, end in spans:
+        starts.add(start)
+        if end > 0:
+            starts.add(end - 1)
+    max_start = total - _RAW_TOKEN_WINDOW
+    for start in starts:
+        window_start = min(max(start, 0), max_start)
+        window_end = window_start + _RAW_TOKEN_WINDOW
+        intersecting = [
+            index
+            for index, (artifact_start, artifact_end) in enumerate(spans)
+            if artifact_start < window_end and artifact_end > window_start
+        ]
+        if _cross_cve_selected_joins_complete(documents, intersecting):
+            return True
+    return False
+
+
+def _cross_cve_documents_fail_4k_bound(
+    documents: Sequence[str], token_counter: Callable[[str], int]
+) -> bool:
+    """Skip packs whose unit, ordered, or spread views leak gold into a 4k window."""
+    unit = list(documents)
+    chrono = _cross_cve_chrono_documents(unit)
+    return any(
+        _cross_cve_order_has_4k_gold_window(order, token_counter)
+        for order in (
+            unit,
+            chrono,
+            _cross_cve_spread_of(unit),
+            _cross_cve_spread_of(chrono),
+        )
+    )
+
+
 def _select_cross_cve_band_mask(
     units: Sequence[tuple[str, str, list[str]]],
     *,
@@ -714,6 +844,8 @@ def _select_cross_cve_band_mask(
             wrap_prompt(_CROSS_CVE_QUESTION, SEP.join(documents), "first")
         )
         if band.lower_tokens <= tokens <= band.upper_tokens:
+            if _cross_cve_documents_fail_4k_bound(documents, token_counter):
+                continue
             return mask, documents, tokens
     raise ProvenanceError(f"verified cross-CVE source cannot fill {band.name}")
 

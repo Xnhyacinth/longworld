@@ -172,6 +172,54 @@ def test_cross_cve_builder_grows_source_state_and_exact_replayed_proof() -> None
     )
 
 
+def test_cross_cve_builder_skips_two_giant_nvds_that_leak_gold_into_4k() -> None:
+    def _giant(cve_id: str, date_added: str, due_date: str, pad: int) -> list[dict]:
+        group = _documents(cve_id, date_added, due_date)
+        payload = json.loads(group[0]["text"])
+        payload["description"] = "x" * pad
+        group[0]["text"] = _canonical(payload)
+        group[0]["text_sha256"] = hashlib.sha256(group[0]["text"].encode()).hexdigest()
+        return group
+
+    groups = [
+        _giant("CVE-2019-19781", "2019-12-17", "2020-01-24", 4_500),
+        _giant("CVE-2020-1472", "2020-09-18", "2020-10-09", 4_500),
+        _documents("CVE-2021-34527", "2021-07-01", "2021-07-20"),
+        _documents("CVE-2022-22965", "2022-04-01", "2022-04-20"),
+        _documents("CVE-2023-34362", "2023-06-02", "2023-06-23"),
+        _documents("CVE-2024-3400", "2024-04-12", "2024-04-19"),
+    ]
+    manifest = {
+        "records": [
+            {key: value for key, value in record.items() if key != "record_type"}
+            for group in groups
+            for record in group[:2]
+        ],
+        "relations": [
+            {key: value for key, value in group[2].items() if key != "record_type"}
+            for group in groups
+        ],
+    }
+    rows = build_cross_cve_remediation_history_candidates(
+        manifest,
+        world_id="cross-cve-4k-skip-test",
+        source_binding={
+            "source_manifest_sha256": "a" * 64,
+            "fetch_inventory_sha256": "b" * 64,
+            "authorization_record_id": "public-cross-cve-test",
+            "observed_at": "2026-09-01T00:00:00Z",
+        },
+        bands=(HistoryBand("16k", 8_000, 20_000),),
+        token_counter=len,
+        tokenizer_model_id="test/tokenizer",
+        tokenizer_revision="c" * 40,
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["graph"]["proof_depth"] >= 3
+    assert rows[0]["event_count"] >= 9
+
+
 def test_cross_cve_builder_rejects_source_records_without_a_real_join() -> None:
     groups = [
         _documents("CVE-2020-1000", "2020-01-01", "2020-02-01"),
