@@ -59,21 +59,21 @@ Assumptions and tradeoffs:
 | Phase | Objective | Status | Validator |
 | ----- | --------- | ------ | --------- |
 | P14.0 | Reconcile dirty tree, current inventory, commands, and dead ends | complete | exact HEAD/status; current pinned audits and 8/6/72 ledger rechecked |
-| P14.1 | Company: new entity plus non-reconstruction executable relation | in_progress | Microsoft staged narrative implementation green; natural 9-cell/profile result pending |
-| P14.2 | ResearchLab: new naturally long paper/revision/benchmark program | in_progress | Adam capacity confirmed; cross-file section adapter remains to implement |
-| P14.3 | CodeForge: new repository/artifact program with natural three-band support | in_progress | Wasmtime provenance green but existing release task has 8K/16K shortcuts; new task type required |
-| P14.4 | Finance/integration: new issuer/program and deterministic inventory rebuild | complete | Microsoft Finance 9/9; ledger now 9 physical / 7 quota / 81 rows |
+| P14.1 | Company: new entity plus non-reconstruction executable relation | in_progress | Apple routes stopped at 6/9; Berkshire official-PDF source receipt green and task TDD active |
+| P14.2 | ResearchLab: new naturally long paper/revision/benchmark program | in_progress | Adam stopped at 6/9; PaLM file-delta source/task adapter active after capacity preflight |
+| P14.3 | CodeForge: new repository/artifact program with natural three-band support | complete | Wasmtime patch/review/test/release ancestry 9/9 strict audit; CodeForge 2/2 |
+| P14.4 | Finance/integration: new issuer/program and deterministic inventory rebuild | complete | Microsoft Finance 9/9; Finance 2/2 |
 | P14.5 | Fill remaining holes, select 12/12, promote, quality-gate, and export | planned | signed receipts; nonzero formal train export; `train_ready=true` |
-| P14.6 | Targeted regression, provenance report, and surgical Git commits | in_progress | Finance focused tests/audit green; integrated tests and scoped commits pending |
+| P14.6 | Targeted regression, provenance report, and surgical Git commits | in_progress | Finance and CodeForge committed; Company/ResearchLab tracks remain isolated |
 
 Success criterion: at least 12 quota-eligible worlds are fully audited and the
 current profile completes selection, promotion, quality gate, and training
 export with `train_ready=true`. Until then, report exact physical/quota/row
 counts and keep formal training at zero.
 
-Next step: close the Company staged-narrative result, implement the minimal
-ResearchLab cross-file section view, and design a CodeForge patch/review/test
-program that cannot be reconstructed from a local release-state window.
+Next step: finish Berkshire official-PDF task projection and PaLM file-delta
+task projection. The honest ledger is 10 physical / 8 quota / 90 rows; only
+Company and ResearchLab quota holes remain.
 
 Position: run the first honest 12-world P3 release while keeping synthetic
 executable and real-public provenance distinct. Complexity 10/10 (breadth,

@@ -1071,3 +1071,21 @@ so `n_real_source_relations=0` is correct. Do not use this slice to claim the
 - Reusing one source manifest for disjoint task sections may expand programs,
   but quota accounting must still apply the profile's source-workflow identity.
   Adapter-local workflow IDs are not evidence of independent provenance.
+- CodeForge's generator and strict auditor previously disagreed on authentic
+  relation semantics: a shared repository URL is not enough. The child record's
+  signed binding must name the exact parent record. Applying the auditor's
+  fail-closed predicate in generation made all 1/2/4-cycle Wasmtime relation
+  sets replay exactly without weakening the audit.
+- Single-file Company narratives can have enough total tokens yet remain
+  locally answerable. Apple reached 32K/64K but its 16K disclosure answer fit an
+  8K contiguous window; adding further sections solely to cross the threshold
+  would be gate-driven filler and was rejected.
+- Source-type expansion is sometimes the useful constraint reduction:
+  Berkshire has four issuer-owned PDF annual reports and 555,529 natural tokens,
+  but no native PDF extractor existed. A single locked `pypdf==6.0.0`
+  synthesis dependency is justified because the standard library, installed
+  platform tools, and existing lock cannot extract PDF text.
+- Paper payload size is not revision-dependence size. GPT-3 has 106,903 unique
+  source tokens but only 49,623 adjacent changed-file tokens; PaLM has 170,869
+  and supports nested 16/32/64K changed-file stages. File-delta receipts must
+  still exclude byte-identical, whitespace-only, and macro-metadata changes.

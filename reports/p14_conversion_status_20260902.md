@@ -3,11 +3,12 @@
 ## 当前结论
 
 P13/P14 当前有可审计的候选库存，但还没有可发布的正式训练包。Cyber
-cross-vendor remediation 和新的 Microsoft multi-filing asset/operating-cash
-trajectory 均已完成 16/32/64K × full/CF/ordered 的 9-cell dense audit。因此
-当前账本从 7 物理 / 5 配额更新为 **9 物理 / 7 配额 / 81 行 / 3,047,978
-exact Qwen context tokens**。所有行仍为 candidate，统一 selection 尚未在这个
-9-world 账本上重跑；在 12/12 前重跑只会重复 fail-closed。
+cross-vendor remediation、Microsoft multi-filing asset/operating-cash
+trajectory 和 Wasmtime patch/review/test/release ancestry 均已完成
+16/32/64K × full/CF/ordered 的 9-cell dense audit。因此当前账本从 7 物理 /
+5 配额更新为 **10 物理 / 8 配额 / 90 行 / 3,389,675 exact Qwen context
+tokens**。所有行仍为 candidate，统一 selection 尚未在这个 10-world 账本上
+重跑；在 12/12 前重跑只会重复 fail-closed。
 
 新增 Cyber world 的候选 SHA 为 `068a10daf9e4fbfbc0f59c91b4f2aff6fe043cbbcdef45b514f8bdf4adcfc18d`，
 audit SHA 为 `d64aabeb43804ca02b88f65e84314a3b536b5535b16d88db6daeec32ea25fcce`。
@@ -23,13 +24,21 @@ rows 和 1/2/3 条相邻 filing 关系。第一次只使用 revenue/assets/balan
 证据和 trajectory 后重新物化，9/9 audit 通过，near-dup 最大值为 0.0。该
 world 贡献 337,159 final-view tokens，使 Finance 达到 2/2。
 
+新增 CodeForge world 使用 Wasmtime v45--v48 四个真实 release episodes。
+16/32/64K 程序依次联合 1/2/4 个 patch diff、唯一 approved review、一个
+selected final pre-merge test、merge 与 exporter-verified tag ancestry；exact
+tokens 为 16,363/32,694/64,842，每档三视图一致。第一次 strict audit 正确发现
+generator 把同 repo、但没有 signed child-to-parent link 的关系误报为 authentic；
+shared relation builder 改为复用 auditor 的 fail-closed predicate 后，最终 9/9
+accepted、0 rejected。该 world 贡献 341,697 tokens，使 CodeForge 达到 2/2。
+
 ## 剩余缺口与 P14 路线
 
 | Domain | 当前/目标 | P14 路线 |
 | --- | ---: | --- |
 | Company | 0/2 | 换实体和 staged narrative/filing relation 程序，不再做 Microsoft reconstruction 或 YoY clone |
 | ResearchLab | 0/2 | 换自然长度足够的论文、revision/review/benchmark 程序，不复用 MLRC/AEVB/Megatron 死路 |
-| CodeForge | 1/2 | 换仓库与 artifact/task 类型，不再 retune oxc/ruff/pulumi/deno |
+| CodeForge | 2/2 | Wasmtime patch/review/test/release ancestry 已补齐；不再扩充配额 |
 | Finance | 2/2 | 已由 Microsoft asset/operating-cash trajectory 补齐；不再扩充配额 |
 
 硬 gate 不变：near-duplicate、exact band、`derived_view_gate`、真实 source

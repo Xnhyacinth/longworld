@@ -3,11 +3,12 @@
 ## P14 authentic-data conversion (2026-09-02)
 
 See `p14_conversion_status_20260902.md` and
-`p14_conversion_status_v1.json`. Cyber cross-vendor remediation and Microsoft
-asset/operating-cash trajectory are fully audited ninth-cell worlds, bringing
-the honest candidate ledger to 9 physical / 7 quota worlds / 81 rows. The
-formal training package remains empty until 12/12; the 2026-09-01 P13 report
-remains an immutable historical snapshot.
+`p14_conversion_status_v1.json`. Cyber cross-vendor remediation, Microsoft
+asset/operating-cash trajectory, and Wasmtime patch/review/test/release ancestry
+are fully audited ninth-cell worlds, bringing the honest candidate ledger to
+10 physical / 8 quota worlds / 90 rows. The formal training package remains
+empty until 12/12; the 2026-09-01 P13 report remains an immutable historical
+snapshot.
 
 ## Qwen3.5-4B MRCR / GraphWalks (2026-09-01)
 

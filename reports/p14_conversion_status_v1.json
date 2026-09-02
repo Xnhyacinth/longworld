@@ -58,22 +58,52 @@
       "dense_audit_complete": true,
       "source_token_measurement_valid": true,
       "train_ready": false
+    },
+    {
+      "domain": "codeforge",
+      "world_id": "code000130-sablewoodkit-44:focal",
+      "rows": 9,
+      "actual_context_tokens": 341697,
+      "bands": [
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "views": [
+        "full",
+        "cf",
+        "ordered_artifact_view"
+      ],
+      "candidate_path": "data/releases/p14-codeforge-wasmtime-patch-review-test-v2-candidate/train.jsonl",
+      "candidate_sha256": "3c4c817cc8bfd7a815ea95cccd0ecb739e1d3b5bf1f502291284568ced6790cc",
+      "candidate_row_set_sha256": "05e1550a2b66e6328b574040719e64ba31f9eec45f9de613ffbaf18836765743",
+      "ranking_sha256": "a963725f4ced29036d459d306e8af31f4fcc6c1a0ca178d450d7339fe9d88af1",
+      "audit_path": "reports/p14_codeforge_wasmtime_patch_review_test_v2/audit/audits.jsonl",
+      "audit_sha256": "c23a1c786ba51e940590b8f69c92ba3c38dd33564ecabc13d08181ea4b5f4c47",
+      "accepted_sha256": "9e8903306e3e0a1f034ace4821139b4dd7744692e5d40c54d089f13efac6d162",
+      "episode_replay_bundle_sha256": "50bd2e1ec48b99b74cbf85cdeec6bc73d2a3b6e902d9c93b0d985801e84872ac",
+      "answer_program_id": "codeforge.patch_review_test_ancestry.v1",
+      "motif": "patch_diff+approved_review+premerge_test+release_ancestry",
+      "unique_executable_proofs": 3,
+      "dense_audit_complete": true,
+      "source_token_measurement_valid": true,
+      "train_ready": false
     }
   ],
   "current_inventory": {
-    "physical_worlds": 9,
-    "quota_countable_worlds": 7,
+    "physical_worlds": 10,
+    "quota_countable_worlds": 8,
     "required_quota_worlds": 12,
-    "rows": 81,
-    "actual_context_tokens": 3047978,
-    "unique_motifs": 7,
-    "unique_executable_proofs": 22,
-    "unique_answer_programs": 7,
-    "unique_semantic_base_tasks": 7,
+    "rows": 90,
+    "actual_context_tokens": 3389675,
+    "unique_motifs": 8,
+    "unique_executable_proofs": 25,
+    "unique_answer_programs": 8,
+    "unique_semantic_base_tasks": 8,
     "quota_by_domain": {
       "company": 0,
       "researchlab": 0,
-      "codeforge": 1,
+      "codeforge": 2,
       "finance": 2,
       "cyber": 2,
       "macro_economics": 2
@@ -82,12 +112,12 @@
   "quota_holes": {
     "company": 2,
     "researchlab": 2,
-    "codeforge": 1,
+    "codeforge": 0,
     "finance": 0
   },
   "release_state": {
     "selection_attempted_against_current_inventory": false,
-    "last_selection_blocker": "insufficient fully audited worlds: 7<12",
+    "last_selection_blocker": "insufficient fully audited worlds: 8<12",
     "selection_run": false,
     "promotion_run": false,
     "quality_gate_run": false,

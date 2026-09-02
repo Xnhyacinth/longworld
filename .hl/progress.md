@@ -741,3 +741,21 @@ in`; no private-repository or upload claim was made.
   cross-file section view. CodeForge Wasmtime source lineage is valid, but the
   existing release-summary program remains locally solvable at 8K/16K and is
   not counted.
+- CodeForge replaced the locally solvable release-summary task with a
+  patch/review/test/release-ancestry program over Wasmtime v45--v48. Its
+  1/2/4-cycle histories produce 16,363/32,694/64,842 exact tokens and all nine
+  native views passed pinned dense and strict episode replay. This adds nine
+  rows and 341,697 tokens; commit `17145f1` records the implementation and
+  fail-closed authentic-edge repair.
+- The honest ledger is now 10 physical / 8 quota / 90 rows / 3,389,675 tokens.
+  CodeForge and Finance are 2/2; Company and ResearchLab remain 0/2. Formal
+  selection, promotion, and training export remain intentionally unrun at
+  8/12.
+- Company Apple stopped at 6/9 because its 16K ordered answer fits one 8K
+  window. Berkshire 2021--2024 official PDFs provide 555,529 natural tokens and
+  a current source-role inventory; a bounded official-PDF adapter and staged
+  non-financial disclosure task are in progress.
+- ResearchLab Adam stopped at 6/9 (16K 14,531); GPT-3 revisions have only
+  49,623 changed-file tokens. PaLM v1--v5 has 170,869 adjacent changed-file
+  tokens and sufficient 16/32/64K stage capacity; a fail-closed file-delta
+  receipt and nested file-view task are in progress.
