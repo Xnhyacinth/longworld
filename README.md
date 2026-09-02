@@ -351,6 +351,7 @@ release path starts from the profile-bound LLaMA-Factory export; Swift is an
 optional second, manifest-bound conversion for B1/B3/B5.
 
 ```bash
+source scripts/uv_project_env.sh
 uv sync --extra train
 bash scripts/setup_swift.sh
 INSTALL_SWIFT=1 bash scripts/setup_swift.sh
@@ -362,6 +363,9 @@ uv run --extra train python scripts/export_swift.py \
 
 # 128k related-work baselines (ACC → LongTraceRL → LongMIT), 8 GPU SP=4 DP=2.
 GPUS=0,1,2,3,4,5,6,7 bash scripts/train_baselines_128k.sh
+# 4B-Base ablation on 4 GPUs (still GBS 16: SP=4 DP=1 accum=16):
+# GPUS=4,5,6,7 CONDS="ext_acc ext_longtrace" MODEL=data/models/Qwen3.5-4B-Base \
+#   bash scripts/train_baselines_128k.sh
 
 # cutoff 256k is the native cap; signed B5 samples are 16k/32k/64k (packing off).
 LONGWORLD_RELEASE_PROFILE=p3-probe-12-v1 \

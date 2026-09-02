@@ -4,6 +4,8 @@
 # FLASH_ATTN=1 (default on GPU machines) tries FA3 then FA2.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$ROOT/scripts/uv_project_env.sh"
 DEST="${SWIFT_ROOT:-$ROOT/.vendor/ms-swift}"
 if [[ ! -d "$DEST/.git" ]]; then
   mkdir -p "$(dirname "$DEST")"
@@ -14,9 +16,8 @@ else
 fi
 if [[ "${INSTALL_SWIFT:-0}" == "1" ]]; then
   cd "$DEST"
-  # NFS venv + uv copy is extremely slow; symlink into local uv cache.
-  export UV_LINK_MODE="${UV_LINK_MODE:-symlink}"
-  uv venv --python 3.12
+  echo "uv cache=$UV_CACHE_DIR link-mode=$UV_LINK_MODE venv=$DEST/.venv"
+  uv venv --python 3.12 --clear
   # CUDA torch first so flash-attn compiles against it. Driver here is CUDA 13 / nvcc 12.6.
   uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
   # Qwen3.5 packing/padding_free + GDN SP needs transformers>=5.9 (ms-swift pin is <5.17).
@@ -40,6 +41,13 @@ if [[ "${INSTALL_SWIFT:-0}" == "1" ]]; then
     echo "FLASH_ATTN=0; skip flash-attn. configs use attn_impl flash_attn with runtime fallback."
   fi
   "$DEST/.venv/bin/python" -c "import swift; from swift.version import __version__; print('ms-swift', __version__)"
+  if [[ "${FLASH_ATTN:-1}" == "1" && "${SKIP_GDN_EXTRAS:-0}" != "1" ]]; then
+    "$DEST/.venv/bin/python" -c "from fla.ops.gated_delta_rule import chunk_gated_delta_rule; from fla.modules.convolution import causal_conv1d; print('fla_ok')"
+  fi
+  if find "$DEST/.venv/lib" -type l -lname '*/.cache/uv/archive-v0/*' | grep -q .; then
+    echo "refusing uv-cache archive symlinks under $DEST/.venv" >&2
+    exit 1
+  fi
 else
   echo "clone only. On the GPU machine run:"
   echo "  INSTALL_SWIFT=1 bash scripts/setup_swift.sh"

@@ -1,5 +1,10 @@
 # Frozen generation snapshots
 
+## Qwen3.5-4B MRCR / GraphWalks (2026-09-01)
+
+See `qwen35_4b_mrcr_graphwalks_20260901.md` for same-protocol greedy scores of
+instruct B0, ACC ckpt-680, and 4B-Base. Not an ACC Table 2 reproduction.
+
 ## P13 eligibility and Macro scale-out (2026-09-01)
 
 See `p13_eligibility_scaleout_20260901.md` for the current distinction between

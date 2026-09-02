@@ -2,6 +2,8 @@
 # Prepare env + vendor + external messages jsonl on a training machine. Does not train.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$ROOT/scripts/uv_project_env.sh"
 cd "$ROOT"
 uv sync --extra train
 bash scripts/setup_swift.sh

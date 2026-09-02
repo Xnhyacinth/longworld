@@ -5,6 +5,8 @@
 # Usage: GPUS=0,1,2,3,4,5,6,7 bash scripts/train_baselines_128k.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$ROOT/scripts/uv_project_env.sh"
 cd "$ROOT"
 if [[ -f "$ROOT/.env" ]]; then
   set -a
@@ -93,7 +95,10 @@ run_one() {
   local model="$2"
   local size="4b"
   local out="$ROOT/data/sft/swift_${cond}"
-  if [[ "$model" == *2B* ]]; then
+  if [[ "$model" == *Base* ]]; then
+    size="4b-base"
+    out="$ROOT/data/sft/swift_${cond}_base"
+  elif [[ "$model" == *2B* ]]; then
     size="2b"
     out="$ROOT/data/sft/swift_${cond}_2b"
   fi
@@ -118,7 +123,8 @@ run_one() {
 
 wait_gpus_free
 
-CONDS=(ext_acc ext_longtrace ext_longmit)
+# Default is the 8-GPU instruct trio. 4B-Base ablation: CONDS="ext_acc ext_longtrace".
+read -ra CONDS <<< "${CONDS:-ext_acc ext_longtrace ext_longmit}"
 for cond in "${CONDS[@]}"; do
   model="$MODEL"
   if run_one "$cond" "$model"; then

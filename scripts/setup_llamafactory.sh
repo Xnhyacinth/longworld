@@ -4,6 +4,8 @@
 # FLASH_ATTN=1 (default on GPU machines) tries FA3 then FA2.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$ROOT/scripts/uv_project_env.sh"
 DEST="${LLAMA_FACTORY_ROOT:-$ROOT/.vendor/LLaMA-Factory}"
 if [[ ! -d "$DEST/.git" ]]; then
   mkdir -p "$(dirname "$DEST")"
@@ -14,7 +16,8 @@ else
 fi
 if [[ "${INSTALL_LF:-0}" == "1" ]]; then
   cd "$DEST"
-  uv venv --python 3.12
+  echo "uv cache=$UV_CACHE_DIR link-mode=$UV_LINK_MODE venv=$DEST/.venv"
+  uv venv --python 3.12 --clear
   # CUDA torch first so flash-attn compiles against it. Driver here is CUDA 13 / nvcc 12.6.
   uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
   uv pip install -e .

@@ -4,6 +4,8 @@
 # Extra CLI overrides: bash scripts/train_swift.sh ext_acc --learning_rate 1e-5
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$ROOT/scripts/uv_project_env.sh"
 if [[ -f "$ROOT/.env" ]]; then
   set -a
   # shellcheck disable=SC1091

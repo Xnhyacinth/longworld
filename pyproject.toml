@@ -40,3 +40,7 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.4",
 ]
+
+# Packages are copied into .venv. Symlink-into-uv-cache breaks after `uv cache clean`.
+[tool.uv]
+link-mode = "copy"
