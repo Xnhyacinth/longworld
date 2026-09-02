@@ -1,0 +1,15 @@
+{
+  "schema_version": "longworld.sec-fetch-request.v1",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P13-SEC-APPLE-FOUR-ANNUAL-20260902",
+    "scope": "Bounded public EDGAR 10-K workflow export for Apple CIK 0000320193",
+    "basis": "User-authorized public-source LongWorld longitudinal company workflow construction",
+    "reviewed_at": "2026-09-02T00:00:00Z"
+  },
+  "allowed_ciks": ["0000320193"],
+  "forms": ["10-K"],
+  "max_filings_per_cik": 4,
+  "requests_per_second": 5,
+  "max_retries": 3
+}
