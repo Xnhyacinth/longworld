@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from itertools import pairwise
 from pathlib import Path, PurePath
 from typing import Any
@@ -20,11 +20,10 @@ from longworld.core.provenance import (
     _read_regular_file,
 )
 
-ISSUER_OFFICIAL_PDF_INVENTORY_SCHEMA = (
-    "longworld.issuer-official-pdf-inventory.v1"
-)
+ISSUER_OFFICIAL_PDF_INVENTORY_SCHEMA = "longworld.issuer-official-pdf-inventory.v1"
 ISSUER_OFFICIAL_PDF_SOURCE_KIND = "issuer_official_pdf"
 MAX_ISSUER_OFFICIAL_PDF_MANIFEST_BYTES = 4_000_000
+MAX_ISSUER_OFFICIAL_PDF_BYTES = 32_000_000
 SUPPORTED_PARSER = {"name": "pypdf", "version": "6.0.0"}
 
 
@@ -39,7 +38,7 @@ def _literal_file(value: object, suffix: str) -> str:
 def _extract(raw: bytes) -> tuple[str, int, int]:
     if (
         not raw.startswith(b"%PDF-")
-        or len(raw) > MAX_SOURCE_BYTES
+        or len(raw) > MAX_ISSUER_OFFICIAL_PDF_BYTES
         or pypdf.__version__ != SUPPORTED_PARSER["version"]
     ):
         raise ProvenanceError("issuer official PDF or parser identity is invalid")
@@ -108,7 +107,9 @@ def audit_issuer_official_pdf_inventory(
             raise ProvenanceError("issuer official PDF record identity is invalid")
         pdf_file = _literal_file(record.get("pdf_file"), ".pdf")
         text_file = _literal_file(record.get("text_file"), ".txt")
-        pdf_raw = _read_regular_file(base_directory / pdf_file, MAX_SOURCE_BYTES)
+        pdf_raw = _read_regular_file(
+            base_directory / pdf_file, MAX_ISSUER_OFFICIAL_PDF_BYTES
+        )
         text_raw = _read_regular_file(base_directory / text_file, MAX_SOURCE_BYTES)
         if (
             hashlib.sha256(pdf_raw).hexdigest() != record.get("pdf_sha256")
@@ -234,8 +235,7 @@ def audit_issuer_official_pdf_inventory(
             or edge in seen_edges
             or source is None
             or target is None
-            or relation.get("relation_id")
-            != f"{source_id}:prior_official:{target_id}"
+            or relation.get("relation_id") != f"{source_id}:prior_official:{target_id}"
         ):
             raise ProvenanceError("issuer official PDF relation identity is invalid")
         raw_evidence = relation.get("evidence")
@@ -261,3 +261,220 @@ def audit_issuer_official_pdf_inventory(
     adapted["adapted_records"] = adapted_records
     adapted["adapted_relations"] = adapted_relations
     return adapted
+
+
+def _selected_pdf_section_record(
+    *, event: Any, artifact: Any, workflow_id: str, record: Any, world_id: str
+) -> bool:
+    from longworld.core.render import semantic_attestation_valid
+
+    params = getattr(event, "params", None)
+    slots = getattr(artifact, "slots", None) or {}
+    classification = slots.get("classification")
+    if not isinstance(params, Mapping) or not isinstance(classification, Mapping):
+        return False
+    start, end = params.get("source_char_start"), params.get("source_char_end")
+    if (
+        isinstance(start, bool)
+        or isinstance(end, bool)
+        or not isinstance(start, int)
+        or not isinstance(end, int)
+        or start < 0
+        or end <= start
+        or end > len(record.text)
+    ):
+        return False
+    raw_section = record.text[start:end]
+    raw_sha256 = hashlib.sha256(raw_section.encode()).hexdigest()
+    operation = str(params.get("provenance_operation") or "")
+    expected_provenance = (
+        "derived-sha256:"
+        + hashlib.sha256(
+            (f"{operation}|{record.provenance_id}|{start}|{end}|{raw_sha256}").encode()
+        ).hexdigest()
+    )
+    text = str(params.get("text") or "")
+    return (
+        bool(operation)
+        and params.get("workflow_id") == workflow_id
+        and params.get("record_id") == record.record_id
+        and params.get("source_sha256") == record.source_sha256
+        and params.get("source_family") == record.source_family
+        and params.get("source_url") == record.source_url
+        and params.get("retrieval_url") == record.retrieval_url
+        and params.get("parent_provenance_id") == record.provenance_id
+        and params.get("section_sha256") == raw_sha256
+        and params.get("text_sha256") == hashlib.sha256(text.encode()).hexdigest()
+        and params.get("provenance_id") == expected_provenance
+        and text.count(raw_section) == 1
+        and list(getattr(event, "visibility", ())) == [event.id]
+        and slots.get("real_workflow_record") is True
+        and slots.get("source_workflow_id") == workflow_id
+        and slots.get("source_record_id") == record.record_id
+        and slots.get("event_type") == event.type
+        and slots.get("params") == params
+        and classification.get("source_origin")
+        in {"real_public", "real_private_export", "real_derived"}
+        and getattr(artifact, "artifact_id", "") == f"{world_id}.{event.id}"
+        and getattr(artifact, "doc_type", "") == event.type
+        and getattr(artifact, "time", None) == event.time
+        and str(getattr(artifact, "text", "")).count(text) == 1
+        and semantic_attestation_valid(artifact)
+    )
+
+
+def selected_issuer_official_pdf_relation_edges(
+    world: Any, spec: Any, artifacts: Sequence[Any]
+) -> list[dict[str, str]]:
+    """Return signed official-PDF relations with exact rendered endpoints."""
+    from longworld.core.render import semantic_attestation_valid
+
+    visible_event_ids = {
+        event_id
+        for artifact in artifacts
+        for event_id in getattr(artifact, "reveals_events", ())
+    }
+    sufficient_ids = set(getattr(spec, "sufficient_event_ids", ()) or ())
+    if sufficient_ids:
+        visible_event_ids &= sufficient_ids
+    event_index = {
+        event.id: event
+        for event in getattr(world, "events", ())
+        if event.id in visible_event_ids
+    }
+    project = getattr(world, "spec", {}).get("project")
+    if not isinstance(project, Mapping):
+        return []
+    workflow_matches: dict[str, list[Any]] = {}
+    for workflow in project.get("source_workflows") or ():
+        if getattr(workflow, "source_kind", "") != ISSUER_OFFICIAL_PDF_SOURCE_KIND:
+            continue
+        workflow_matches.setdefault(
+            str(getattr(workflow, "workflow_id", "")), []
+        ).append(workflow)
+    workflows = {
+        workflow_id: matches[0]
+        for workflow_id, matches in workflow_matches.items()
+        if workflow_id and len(matches) == 1
+    }
+    selected_events: dict[str, tuple[str, str]] = {}
+    world_id = str(getattr(world, "spec", {}).get("world_id") or "")
+    relation_artifacts: set[str] = set()
+    for artifact in artifacts:
+        slots = getattr(artifact, "slots", None) or {}
+        workflow_id = str(slots.get("source_workflow_id") or "")
+        workflow = workflows.get(workflow_id)
+        revealed = [
+            event_index[event_id]
+            for event_id in getattr(artifact, "reveals_events", ())
+            if event_id in event_index
+        ]
+        if workflow is None or len(revealed) != 1:
+            continue
+        event = revealed[0]
+        if event.type == "issuer_official_pdf_prior_annual_relation":
+            expected_text = (
+                "Issuer official annual-report temporal relation control\n"
+                f"Current official record: {event.params.get('record_id')}.\n"
+                f"Prior official record: {event.params.get('target_record_id')}.\n"
+                f"Signed relation: {event.params.get('source_relation_id')}.\n"
+                "Status: prior-official-annual-report-validated."
+            )
+            if (
+                slots.get("real_workflow_record") is False
+                and slots.get("event_type") == event.type
+                and slots.get("params") == event.params
+                and getattr(artifact, "artifact_id", "") == f"{world_id}.{event.id}"
+                and getattr(artifact, "doc_type", "") == event.type
+                and getattr(artifact, "time", None) == event.time
+                and str(getattr(artifact, "text", "")).count(expected_text) == 1
+                and semantic_attestation_valid(artifact)
+            ):
+                relation_artifacts.add(event.id)
+            continue
+        record_id = str(slots.get("source_record_id") or "")
+        record_matches = [
+            record
+            for record in getattr(workflow, "records", ())
+            if record.record_id == record_id
+        ]
+        if len(record_matches) == 1 and _selected_pdf_section_record(
+            event=event,
+            artifact=artifact,
+            workflow_id=workflow_id,
+            record=record_matches[0],
+            world_id=world_id,
+        ):
+            selected_events[event.id] = (workflow_id, record_id)
+
+    edges: list[dict[str, str]] = []
+    for event in event_index.values():
+        if (
+            event.type != "issuer_official_pdf_prior_annual_relation"
+            or event.id not in relation_artifacts
+        ):
+            continue
+        workflow_id = str(event.params.get("workflow_id") or "")
+        workflow = workflows.get(workflow_id)
+        authorization = getattr(workflow, "source_authorization", None)
+        if (
+            workflow is None
+            or not isinstance(authorization, Mapping)
+            or authorization.get("source_kind") != ISSUER_OFFICIAL_PDF_SOURCE_KIND
+            or authorization.get("workflow_id") != workflow_id
+            or authorization.get("component_digest") != workflow.component_digest
+            or not isinstance(authorization.get("attestation"), Mapping)
+        ):
+            continue
+        relation_matches = [
+            relation
+            for relation in getattr(workflow, "relations", ())
+            if relation.relation_id == event.params.get("source_relation_id")
+            and relation.kind == "prior_official_annual_report"
+            and relation.kind == event.params.get("relation_kind")
+            and relation.source_record_id == event.params.get("record_id")
+            and relation.target_record_id == event.params.get("target_record_id")
+        ]
+        if len(relation_matches) != 1:
+            continue
+        relation = relation_matches[0]
+        parent_records = {
+            selected_events[parent_id]
+            for parent_id in event.required_inputs
+            if parent_id in selected_events
+        }
+        if (
+            set(event.required_inputs) != set(event.causal_inputs)
+            or len(event.required_inputs) != 2
+            or parent_records
+            != {
+                (workflow_id, relation.source_record_id),
+                (workflow_id, relation.target_record_id),
+            }
+        ):
+            continue
+        records = {
+            record.record_id: record for record in getattr(workflow, "records", ())
+        }
+        source = records.get(relation.source_record_id)
+        target = records.get(relation.target_record_id)
+        if source is None or target is None:
+            continue
+        edges.append(
+            {
+                "parent_record_id": target.record_id,
+                "child_record_id": source.record_id,
+                "relation": relation.kind,
+                "relation_provenance": "authentic_source",
+                "parent_source_url": target.source_url,
+                "child_source_url": source.source_url,
+            }
+        )
+    return sorted(
+        edges,
+        key=lambda edge: (
+            edge["parent_record_id"],
+            edge["child_record_id"],
+            edge["relation"],
+        ),
+    )

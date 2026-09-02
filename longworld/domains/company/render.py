@@ -304,6 +304,8 @@ def render_company(sim: SimulatedWorld) -> list[Artifact]:
             "issuer_ir_source_section",
             "issuer_ir_prior_filing_relation",
             "issuer_ir_cross_year_answer",
+            "jpmorgan_risk_taxonomy_section",
+            "issuer_official_pdf_prior_annual_relation",
         }:
             params = event.params
             artifact_id = f"{sim.spec['world_id']}.{event.visibility[0]}"
@@ -311,6 +313,7 @@ def render_company(sim: SimulatedWorld) -> list[Artifact]:
                 "sec_filing",
                 "sec_source_section",
                 "issuer_ir_source_section",
+                "jpmorgan_risk_taxonomy_section",
             }:
                 text = str(params["text"])
                 source_origin = SourceOrigin(str(params["source_origin"]))
@@ -318,6 +321,21 @@ def render_company(sim: SimulatedWorld) -> list[Artifact]:
                 provenance_id = str(params["provenance_id"])
                 evidence_role = EvidenceRole.CAUSAL_SUPPORTING
                 real_record = True
+            elif event.type == "issuer_official_pdf_prior_annual_relation":
+                text = (
+                    "Issuer official annual-report temporal relation control\n"
+                    f"Current official record: {params['record_id']}.\n"
+                    f"Prior official record: {params['target_record_id']}.\n"
+                    f"Signed relation: {params['source_relation_id']}.\n"
+                    "Status: prior-official-annual-report-validated."
+                )
+                source_origin = SourceOrigin.SYNTHETIC_WORLD
+                workflow_kind = WorkflowKind.HYBRID_CAUSAL
+                provenance_id = (
+                    "derived-sha256:" + hashlib.sha256(text.encode()).hexdigest()
+                )
+                evidence_role = EvidenceRole.CAUSAL_SUPPORTING
+                real_record = False
             elif event.type == "issuer_ir_prior_filing_relation":
                 text = (
                     "Issuer annual-filing temporal relation control\n"

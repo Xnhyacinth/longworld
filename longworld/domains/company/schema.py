@@ -54,6 +54,8 @@ EVENT_TYPES = [
     "issuer_ir_source_section",
     "issuer_ir_prior_filing_relation",
     "issuer_ir_cross_year_answer",
+    "jpmorgan_risk_taxonomy_section",
+    "issuer_official_pdf_prior_annual_relation",
 ]
 
 ARTIFACT_KEYS_CORE = [
@@ -109,7 +111,8 @@ def sample_world_spec(
     workflows = list(source_workflows or [])
     if any(
         workflow.target_domain != "company"
-        or workflow.source_kind not in {"sec_filing", "issuer_ir_filing"}
+        or workflow.source_kind
+        not in {"sec_filing", "issuer_ir_filing", "issuer_official_pdf"}
         for workflow in workflows
     ):
         raise ValueError("company requires filing source workflows")

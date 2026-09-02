@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections import Counter, OrderedDict
 from copy import deepcopy
 from dataclasses import replace
@@ -196,6 +197,26 @@ _MICROSOFT_NARRATIVE_RECONCILIATION_STAGES = (
         ),
     ),
 )
+
+_JPMORGAN_RISK_HEADINGS = (
+    "FIRMWIDE RISK MANAGEMENT",
+    "STRATEGIC RISK MANAGEMENT",
+    "CAPITAL RISK MANAGEMENT",
+    "LIQUIDITY RISK MANAGEMENT",
+    "REPUTATION RISK MANAGEMENT",
+    "CREDIT AND INVESTMENT RISK MANAGEMENT",
+    "INVESTMENT PORTFOLIO RISK MANAGEMENT",
+    "MARKET RISK MANAGEMENT",
+    "COUNTRY RISK MANAGEMENT",
+    "CLIMATE RISK MANAGEMENT",
+    "OPERATIONAL RISK MANAGEMENT",
+    "COMPLIANCE RISK MANAGEMENT",
+    "CONDUCT RISK MANAGEMENT",
+    "LEGAL RISK MANAGEMENT",
+    "ESTIMATIONS AND MODEL RISK MANAGEMENT",
+)
+_JPMORGAN_RISK_VIEW_PREFIX = "JPMorgan official annual-report risk taxonomy section\n"
+_JPMORGAN_RISK_SECTION_CHARS = 10_000
 
 
 def _sec_tier_roles(program, control_tier: str) -> tuple[str, ...]:
@@ -2013,6 +2034,199 @@ def _bind_financial_programs_to_annual_history(
             )
 
 
+def _jpmorgan_risk_section_ranges(record) -> list[tuple[str, int, int]]:
+    if (
+        record.source_family != "jpmorgan_official_annual_report_pdf"
+        or hashlib.sha256(record.text.encode()).hexdigest() != record.text_sha256
+        or record.provenance_id != f"sha256:{record.source_sha256}"
+    ):
+        raise ProvenanceError("JPMorgan annual-report record identity is invalid")
+    try:
+        sections = json.loads(record.attribute("sections_json"))
+    except (AttributeError, TypeError, ValueError, json.JSONDecodeError) as error:
+        raise ProvenanceError("JPMorgan section receipt is invalid") from error
+    risk_sections = [
+        section
+        for section in sections
+        if isinstance(section, dict)
+        and section.get("section_id") == "firmwide_risk_management"
+    ]
+    if len(risk_sections) != 1:
+        raise ProvenanceError("JPMorgan risk section is missing")
+    risk = risk_sections[0]
+    start, end = risk.get("char_start"), risk.get("char_end")
+    if (
+        isinstance(start, bool)
+        or isinstance(end, bool)
+        or not isinstance(start, int)
+        or not isinstance(end, int)
+        or start < 0
+        or end <= start
+        or end > len(record.text)
+        or hashlib.sha256(record.text[start:end].encode()).hexdigest()
+        != risk.get("sha256")
+    ):
+        raise ProvenanceError("JPMorgan risk section receipt is invalid")
+    section_text = record.text[start:end]
+    heading_starts: list[int] = []
+    cursor = 0
+    for heading in _JPMORGAN_RISK_HEADINGS:
+        pattern = re.compile(
+            r"(?<![A-Z])"
+            + r"\s+".join(re.escape(word) for word in heading.split())
+            + r"(?![A-Z])"
+        )
+        match = pattern.search(section_text, cursor)
+        if match is None:
+            raise ProvenanceError("JPMorgan risk heading sequence is invalid")
+        heading_starts.append(start + match.start())
+        cursor = match.end()
+    return [
+        (
+            heading,
+            heading_start,
+            min(
+                heading_start + _JPMORGAN_RISK_SECTION_CHARS,
+                heading_starts[index + 1] if index + 1 < len(heading_starts) else end,
+            ),
+        )
+        for index, (heading, heading_start) in enumerate(
+            zip(_JPMORGAN_RISK_HEADINGS, heading_starts, strict=True)
+        )
+    ]
+
+
+def _jpmorgan_risk_taxonomy_events(
+    *, workflow, prefix: str, workflow_index: int, record_id_counts: Counter[str]
+) -> list[Event]:
+    records = sorted(workflow.records, key=lambda record: record.attribute("year"))
+    try:
+        years = [int(record.attribute("year")) for record in records]
+        if (
+            workflow.source_authorization.get("adapter_revision") != "sourceworkflow@1"
+            or years != [2022, 2023, 2024]
+            or any(record_id_counts[record.record_id] != 1 for record in records)
+        ):
+            return []
+        ranges_by_record = {
+            record.record_id: _jpmorgan_risk_section_ranges(record)
+            for record in records
+        }
+    except (AttributeError, TypeError, ValueError, ProvenanceError):
+        return []
+    event_ids = {
+        (year, heading_index): (
+            f"{prefix}.jpmorgan_risk_{workflow_index}_{record_index}_{heading_index}"
+        )
+        for record_index, year in enumerate(years)
+        for heading_index in range(len(_JPMORGAN_RISK_HEADINGS))
+    }
+    support_id = event_ids[(2024, 5)]
+    events: list[Event] = []
+    for record_index, (record, year) in enumerate(zip(records, years, strict=True)):
+        for heading_index, (heading, char_start, char_end) in enumerate(
+            ranges_by_record[record.record_id]
+        ):
+            raw_section = record.text[char_start:char_end]
+            text = _JPMORGAN_RISK_VIEW_PREFIX + raw_section
+            event_id = event_ids[(year, heading_index)]
+            causal_inputs = [] if event_id == support_id else [support_id]
+            events.append(
+                Event(
+                    id=event_id,
+                    type="jpmorgan_risk_taxonomy_section",
+                    time=date.fromisoformat(record.occurred_at[:10]),
+                    params={
+                        "workflow_id": workflow.workflow_id,
+                        "record_id": record.record_id,
+                        "report_year": year,
+                        "heading": heading,
+                        "heading_index": heading_index,
+                        "text": text,
+                        "text_sha256": hashlib.sha256(text.encode()).hexdigest(),
+                        "section_sha256": hashlib.sha256(
+                            raw_section.encode()
+                        ).hexdigest(),
+                        "source_sha256": record.source_sha256,
+                        "source_origin": "real_derived",
+                        "source_family": record.source_family,
+                        "source_url": record.source_url,
+                        "retrieval_url": record.retrieval_url,
+                        "provenance_id": (
+                            "derived-sha256:"
+                            + hashlib.sha256(
+                                (
+                                    "jpmorgan_risk_taxonomy_section|"
+                                    f"{record.provenance_id}|{char_start}|{char_end}|"
+                                    f"{hashlib.sha256(raw_section.encode()).hexdigest()}"
+                                ).encode()
+                            ).hexdigest()
+                        ),
+                        "parent_provenance_id": record.provenance_id,
+                        "provenance_operation": ("jpmorgan_risk_taxonomy_section"),
+                        "source_char_start": char_start,
+                        "source_char_end": char_end,
+                        "source_order": year * 100 + heading_index,
+                        "ground_values": [heading],
+                    },
+                    visibility=[event_id],
+                    causal_inputs=causal_inputs,
+                    relation_kinds={
+                        parent_id: "contextualizes_taxonomy"
+                        for parent_id in causal_inputs
+                    },
+                )
+            )
+    records_by_id = {record.record_id: record for record in records}
+    record_indexes = {
+        record.record_id: record_index for record_index, record in enumerate(records)
+    }
+    for relation_index, relation in enumerate(workflow.relations):
+        if relation.kind != "prior_official_annual_report":
+            continue
+        source = records_by_id.get(relation.source_record_id)
+        target = records_by_id.get(relation.target_record_id)
+        if source is None or target is None:
+            continue
+        source_year = int(source.attribute("year"))
+        target_year = int(target.attribute("year"))
+        source_heading_index = 5 if source_year == 2024 else 0
+        parents = [
+            event_ids[(target_year, 0)],
+            event_ids[(source_year, source_heading_index)],
+        ]
+        relation_id = (
+            f"{prefix}.issuer_official_pdf_relation_{workflow_index}_{relation_index}"
+        )
+        events.append(
+            Event(
+                id=relation_id,
+                type="issuer_official_pdf_prior_annual_relation",
+                time=date.fromisoformat(source.occurred_at[:10]) + timedelta(days=1),
+                params={
+                    "workflow_id": workflow.workflow_id,
+                    "source_relation_id": relation.relation_id,
+                    "record_id": source.record_id,
+                    "target_record_id": target.record_id,
+                    "relation_kind": relation.kind,
+                    "source_url": source.source_url,
+                    "target_source_url": target.source_url,
+                    "source_family": source.source_family,
+                    "source_record_index": record_indexes[source.record_id],
+                    "target_record_index": record_indexes[target.record_id],
+                    "ground_values": ["prior-official-annual-report-validated"],
+                },
+                visibility=[relation_id],
+                causal_inputs=parents,
+                required_inputs=parents,
+                relation_kinds={
+                    parent: "validates_official_annual_endpoint" for parent in parents
+                },
+            )
+        )
+    return events
+
+
 def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]:
     events: list[Event] = []
     source_workflows = project.get("source_workflows") or []
@@ -2020,6 +2234,16 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
         record.record_id for workflow in source_workflows for record in workflow.records
     )
     for workflow_index, workflow in enumerate(source_workflows):
+        if workflow.source_kind == "issuer_official_pdf":
+            events.extend(
+                _jpmorgan_risk_taxonomy_events(
+                    workflow=workflow,
+                    prefix=prefix,
+                    workflow_index=workflow_index,
+                    record_id_counts=record_id_counts,
+                )
+            )
+            continue
         if workflow.source_kind == "issuer_ir_filing":
             events.extend(
                 _issuer_ir_events(

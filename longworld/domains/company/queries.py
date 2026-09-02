@@ -75,6 +75,20 @@ def state_from_artifacts(
 def eval_answer(
     world: SimulatedWorld, spec: QuerySpec, state_values: dict[str, Any]
 ) -> str:
+    if spec.query_type.startswith("jpmorgan_risk_taxonomy_"):
+        units = state_values.get("jpmorgan_risk_taxonomy_units") or {}
+        if any(event_id not in units for event_id in spec.essential_event_ids):
+            return "unknown"
+        selected = sorted(
+            (units[event_id] for event_id in spec.essential_event_ids),
+            key=lambda unit: int(unit["source_order"]),
+        )
+        return " | ".join(
+            [
+                "JPMORGAN_RISK_TAXONOMY",
+                *(f"{int(unit['report_year'])}:{unit['heading']}" for unit in selected),
+            ]
+        )
     key = spec.answer_key
     val = state_values.get(key)
     if spec.query_type.startswith("sec_financial_") and spec.query_type != (
@@ -1218,6 +1232,188 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
 
     qid = world.spec["world_id"].split(":")[0]
     queries: list[QuerySpec] = []
+
+    jpmorgan_events = {
+        (int(event.params["report_year"]), int(event.params["heading_index"])): event
+        for event in world.events
+        if event.type == "jpmorgan_risk_taxonomy_section"
+    }
+    issuer_pdf_relations = {
+        (
+            str(event.params["record_id"]),
+            str(event.params["target_record_id"]),
+        ): event
+        for event in world.events
+        if event.type == "issuer_official_pdf_prior_annual_relation"
+    }
+    jpmorgan_stages = (
+        (
+            "16k",
+            "current",
+            (
+                (2024, 11),
+                (2024, 1),
+                (2024, 2),
+                (2024, 3),
+                (2024, 4),
+                (2024, 8),
+                (2024, 9),
+                (2024, 10),
+                (2024, 13),
+                (2024, 14),
+            ),
+        ),
+        (
+            "32k",
+            "transition",
+            (
+                (2023, 0),
+                (2023, 2),
+                (2023, 3),
+                (2023, 4),
+                (2023, 5),
+                (2023, 6),
+                (2023, 8),
+                (2023, 9),
+                (2023, 10),
+                (2023, 11),
+                (2023, 12),
+            ),
+        ),
+        (
+            "64k",
+            "full_chain",
+            (
+                *((2022, index) for index in range(15) if index != 12),
+                (2023, 1),
+                (2023, 7),
+                (2023, 13),
+                (2023, 14),
+                (2024, 0),
+                (2024, 6),
+                (2024, 7),
+                (2024, 12),
+            ),
+        ),
+    )
+    if jpmorgan_events and all(
+        key in jpmorgan_events
+        for _, _, additions in jpmorgan_stages
+        for key in additions
+    ):
+        cf_source = jpmorgan_events[(2024, 11)]
+        old_heading = str(cf_source.params["heading"])
+        new_heading = "TECHNOLOGY RISK MANAGEMENT"
+        old_text = str(cf_source.params["text"])
+        if old_text.startswith(
+            "JPMorgan official annual-report risk taxonomy section\n" + old_heading
+        ):
+            cf_text = old_text.replace(old_heading, new_heading, 1)
+            cf_raw = cf_text.removeprefix(
+                "JPMorgan official annual-report risk taxonomy section\n"
+            )
+            cf_updates = {
+                "heading": new_heading,
+                "text": cf_text,
+                "text_sha256": hashlib.sha256(cf_text.encode()).hexdigest(),
+                "section_sha256": hashlib.sha256(cf_raw.encode()).hexdigest(),
+                "source_origin": "synthetic_counterfactual",
+                "provenance_id": (
+                    "derived-sha256:"
+                    + hashlib.sha256(
+                        (
+                            "jpmorgan_risk_taxonomy_counterfactual|"
+                            + str(cf_source.params["provenance_id"])
+                            + "|"
+                            + hashlib.sha256(cf_raw.encode()).hexdigest()
+                        ).encode()
+                    ).hexdigest()
+                ),
+                "provenance_operation": (
+                    "jpmorgan_risk_taxonomy_heading_counterfactual"
+                ),
+                "ground_values": [new_heading],
+            }
+            cumulative: list[tuple[int, int]] = []
+            for tier, label, additions in jpmorgan_stages:
+                cumulative.extend(additions)
+                essential_events = [jpmorgan_events[key] for key in cumulative]
+                essential_ids = [event.id for event in essential_events]
+                support_id = jpmorgan_events[(2024, 5)].id
+                stage_years = {year for year, _ in cumulative}
+                relation_ids = [
+                    event.id
+                    for (source_id, target_id), event in sorted(
+                        issuer_pdf_relations.items()
+                    )
+                    if int(source_id.rsplit(":", 1)[-1]) in stage_years
+                    and int(target_id.rsplit(":", 1)[-1]) in stage_years
+                ]
+                queries.append(
+                    QuerySpec(
+                        query_id=(
+                            f"{qid}:jpmorgan_risk_taxonomy_{label}:"
+                            f"{cf_source.params['workflow_id']}"
+                        ),
+                        query_type=f"jpmorgan_risk_taxonomy_{label}",
+                        question=(
+                            "Using only the bounded risk-management sections from "
+                            "JPMorgan Chase's signed official annual reports, list "
+                            "each requested taxonomy heading in report-year then "
+                            "source order. Return `JPMORGAN_RISK_TAXONOMY`, followed "
+                            "by one `YEAR:HEADING` field per requested section, "
+                            "joined with ` | `. Validate every signed prior-official "
+                            "annual-report relation present in context. Every "
+                            "requested section is required."
+                        ),
+                        answer="",
+                        as_of=date(2025, 1, 2),
+                        answer_key="jpmorgan_risk_taxonomy_units",
+                        essential_event_ids=essential_ids,
+                        essential_artifact_ids=[
+                            f"{world.spec['world_id']}.{event_id}"
+                            for event_id in essential_ids
+                        ],
+                        sufficient_event_ids=[
+                            *essential_ids,
+                            support_id,
+                            *relation_ids,
+                        ],
+                        cf_event_id=cf_source.id,
+                        cf_param_updates=cf_updates,
+                        cf_answer="",
+                        invariance_event_id=None,
+                        gold_expression=(
+                            "read every signed bounded risk-taxonomy unit; order by "
+                            "report year and source position; format the complete "
+                            "cross-year taxonomy"
+                        ),
+                        proof_depth=len(essential_ids),
+                        cf_op="version",
+                        motif="company.jpmorgan_cross_year_risk_taxonomy",
+                        truth_regime="real_source_derived",
+                        topology_id=instance_topology(
+                            "company.jpmorgan_risk_taxonomy",
+                            tier,
+                            len(essential_ids),
+                        ),
+                        program_ops=[
+                            {"op": "READ_SIGNED_RISK_TAXONOMY_UNIT"},
+                            {"op": "VALIDATE_PRIOR_OFFICIAL_ANNUAL_RELATION"},
+                            {"op": "ORDER_RISK_MANAGEMENT_SECTIONS"},
+                            {"op": "RECONCILE_CROSS_YEAR_TAXONOMY"},
+                            {"op": ("APPLY_GOVERNANCE_HEADING_COUNTERFACTUAL")},
+                        ],
+                        preferred_length_buckets=[tier],
+                        semantic_growth_group=(
+                            "company.jpmorgan_cross_year_risk_taxonomy"
+                        ),
+                        base_task_group=(
+                            "jpmorgan_risk_taxonomy:"
+                            + str(cf_source.params["workflow_id"])
+                        ),
+                    )
+                )
 
     issuer_answers = sorted(
         (

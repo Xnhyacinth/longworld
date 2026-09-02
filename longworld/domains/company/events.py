@@ -65,6 +65,8 @@ def init_values(project: dict[str, Any]) -> dict[str, Any]:
         "sec_source_sections": {},
         "issuer_ir_metrics": {},
         "issuer_ir_relations": {},
+        "jpmorgan_risk_taxonomy_units": {},
+        "issuer_official_pdf_relations": {},
     }
 
 
@@ -228,6 +230,13 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
     if ev.type == "sec_source_section":
         return True, None
     if ev.type == "issuer_ir_source_section":
+        return True, None
+    if ev.type == "jpmorgan_risk_taxonomy_section":
+        return True, None
+    if ev.type == "issuer_official_pdf_prior_annual_relation":
+        units = state.values.get("jpmorgan_risk_taxonomy_units") or {}
+        if any(parent_id not in units for parent_id in ev.required_inputs):
+            return False, "issuer_official_pdf_relation_endpoint_missing"
         return True, None
     if ev.type == "issuer_ir_prior_filing_relation":
         metrics = state.values.get("issuer_ir_metrics") or {}
@@ -736,6 +745,40 @@ def apply_event(state: WorldState, ev: Event) -> None:
             state.set("sec_xbrl_facts", xbrl_facts, eid, day)
         source_sections[eid] = str(p["text_sha256"])
         state.set("sec_source_sections", source_sections, eid, day)
+    elif t == "jpmorgan_risk_taxonomy_section":
+        text = str(p.get("text") or "")
+        prefix = "JPMorgan official annual-report risk taxonomy section\n"
+        heading = str(p.get("heading") or "")
+        raw_section = text[len(prefix) :] if text.startswith(prefix) else ""
+        first_line = (
+            " ".join(raw_section.splitlines()[0].split()) if raw_section else ""
+        )
+        if (
+            not raw_section
+            or first_line != heading
+            or hashlib.sha256(text.encode()).hexdigest() != p.get("text_sha256")
+            or hashlib.sha256(raw_section.encode()).hexdigest()
+            != p.get("section_sha256")
+        ):
+            return
+        units = dict(state.values.get("jpmorgan_risk_taxonomy_units") or {})
+        units[eid] = {
+            "report_year": int(p["report_year"]),
+            "heading": heading,
+            "source_order": int(p["source_order"]),
+        }
+        state.set("jpmorgan_risk_taxonomy_units", units, eid, day)
+    elif t == "issuer_official_pdf_prior_annual_relation":
+        relation_id = str(p.get("source_relation_id") or "")
+        if not relation_id or p.get("relation_kind") != "prior_official_annual_report":
+            return
+        relations = dict(state.values.get("issuer_official_pdf_relations") or {})
+        relations[relation_id] = {
+            "source_record_id": str(p.get("record_id") or ""),
+            "target_record_id": str(p.get("target_record_id") or ""),
+            "kind": str(p.get("relation_kind") or ""),
+        }
+        state.set("issuer_official_pdf_relations", relations, eid, day)
     elif t == "issuer_ir_source_section":
         text = str(p.get("text") or "")
         prefix = "Issuer IR rendered XBRL statement\n"

@@ -34,6 +34,9 @@ from longworld.core.issuerfilingworkflow import (
     ISSUER_IR_HYBRID_CHILD_EVENT_TYPES,
     selected_issuer_ir_source_relation_edges,
 )
+from longworld.core.issuerpdfworkflow import (
+    selected_issuer_official_pdf_relation_edges,
+)
 from longworld.core.pack import (
     SEP,
     compute_view_metrics,
@@ -3559,6 +3562,7 @@ def _replayed_source_metadata(
     edges.extend(selected_sec_source_relation_edges(world, spec, artifacts))
     edges.extend(selected_wiki_source_relation_edges(world, spec, artifacts))
     edges.extend(selected_issuer_ir_source_relation_edges(world, spec, artifacts))
+    edges.extend(selected_issuer_official_pdf_relation_edges(world, spec, artifacts))
     for child in all_events.values():
         if child.type not in (
             SEC_HYBRID_CHILD_EVENT_TYPES

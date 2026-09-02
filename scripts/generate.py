@@ -48,6 +48,9 @@ from longworld.core.issuerfilingworkflow import (
     ISSUER_IR_HYBRID_CHILD_EVENT_TYPES,
     selected_issuer_ir_source_relation_edges,
 )
+from longworld.core.issuerpdfworkflow import (
+    selected_issuer_official_pdf_relation_edges,
+)
 from longworld.core.pack import (
     PackedContext,
     compute_view_metrics,
@@ -1113,6 +1116,9 @@ def real_source_relation_edges(
     edges.extend(selected_sec_source_relation_edges(world, spec, artifacts or []))
     edges.extend(selected_wiki_source_relation_edges(world, spec, artifacts or []))
     edges.extend(selected_issuer_ir_source_relation_edges(world, spec, artifacts or []))
+    edges.extend(
+        selected_issuer_official_pdf_relation_edges(world, spec, artifacts or [])
+    )
     for child in all_events.values():
         if child.type not in HYBRID_CHILD_EVENT_TYPES:
             continue
@@ -1169,6 +1175,9 @@ def context_source_relation_count(
     issuer_source_relations = len(
         selected_issuer_ir_source_relation_edges(world, spec, artifacts)
     )
+    issuer_pdf_source_relations = len(
+        selected_issuer_official_pdf_relation_edges(world, spec, artifacts)
+    )
     sec_edges = sum(
         parent_id in events
         for event in events.values()
@@ -1181,6 +1190,7 @@ def context_source_relation_count(
         + sec_source_relations
         + wiki_source_relations
         + issuer_source_relations
+        + issuer_pdf_source_relations
         + sec_edges
     )
 

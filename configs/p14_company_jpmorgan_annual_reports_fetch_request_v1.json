@@ -1,0 +1,26 @@
+{
+  "schema_version": "longworld.jpmorgan-annual-report-request.v1",
+  "user_agent": "LongWorld/0.2 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P14-JPMORGAN-OFFICIAL-ANNUALS-20260902",
+    "scope": "JPMorgan Chase issuer-owned 2022 through 2024 annual-report PDFs",
+    "basis": "User-authorized public-source LongWorld Company workflow acquisition",
+    "reviewed_at": "2026-09-02T19:00:00Z"
+  },
+  "reports": [
+    {
+      "year": 2022,
+      "url": "https://www.jpmorganchase.com/content/dam/jpmc/jpmorgan-chase-and-co/investor-relations/documents/annualreport-2022.pdf"
+    },
+    {
+      "year": 2023,
+      "url": "https://www.jpmorganchase.com/content/dam/jpmc/jpmorgan-chase-and-co/investor-relations/documents/annualreport-2023.pdf"
+    },
+    {
+      "year": 2024,
+      "url": "https://www.jpmorganchase.com/content/dam/jpmc/jpmorgan-chase-and-co/investor-relations/documents/annualreport-2024.pdf"
+    }
+  ],
+  "requests_per_second": 2,
+  "timeout_seconds": 120
+}
