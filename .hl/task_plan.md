@@ -28,7 +28,7 @@ upload HF until 12/12.
 | E1 | Cyber cross-vendor: history → sidecar → 9-cell three-view | complete | v2 9/9 dense audit; near-dup ≤ 0.0009; Cyber quota 2/2 |
 | E2 | Finance world 2: NVIDIA FY2022–FY2025 issuer IR | blocked | challenge page; Apple EDGAR 403; do not retry-hammer |
 | E3 | Company: Microsoft reconstruction across 16/32/64K via FY2021 | blocked | five seeds; every world missing 16k+32k ordered |
-| E4 | CPT: denser first-1000 oxc commits, not skip-8000 quiet tail | running | pack >0 rows; ppm cap 200000 unchanged |
+| E4 | CPT: denser first-1000 oxc commits, not skip-8000 quiet tail | blocked | 207000 ppm > 200000; cap unchanged; 0 packed rows |
 | E5a | ResearchLab: Megatron (1909.08053) three-view, not MLRC SHA | running | 9/9 + near-dup ≤ 0.25 + exact bands |
 | E5b | CodeForge world 2: oxc 32k RST or distinct ruff/pulumi 9/9 | running | 9/9; not dprint clone |
 | E5c | Company: stop reconstruction retries; scout other program | running | 9/9 ordered 16/32 or honest block |

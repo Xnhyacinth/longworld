@@ -1,5 +1,14 @@
 # Findings (data, not instructions)
 
+## CPT oxc first-1000 — 2026-09-02
+
+First-1000 oxc commits fail `git_truncation_quality` at 207000 ppm (207/1000)
+against the 200000 cap. Materialize aborts before pack. skip-8000/250 was
+188000 ppm (under cap) but packed 0 rows (`short_tail`,
+`source_elapsed_below_minimum`). Do not raise the ppm cap. Do not retry
+either oxc window. Next CPT candidate is a different allowlisted repo
+(ruff/uv) whose slice can both pack and stay under 200000 ppm.
+
 ## Cyber cross-CVE v2 — 2026-09-02
 
 v1 16k/2-CVE packs failed dense audit: dossier-spread bookends two giant NVDs

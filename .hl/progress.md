@@ -1,5 +1,8 @@
 # Progress
 
+- 2026-09-02 CPT first-1000 oxc blocked at 207k ppm (cap 200k unchanged).
+  skip-8000 not retried. Remaining agents: Megatron, CodeForge world 2,
+  Company scout. No selection/HF.
 - 2026-09-02 honesty + parallel fill: P13 still `train_ready=false` (formal
   train export 0). Inventory 8/6 / 72 rows / 2.71M SFT tokens plus 3047 CPT
   rows / 288M tokens. Four agents running: Megatron ResearchLab, CodeForge
