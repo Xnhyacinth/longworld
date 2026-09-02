@@ -474,15 +474,24 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
             ).encode()
         ).hexdigest()
         claim_count = len(decision.params["required_claim_ids"])
-        source_revision_id = str(decision.params["source_revision_id"])
-        target_revision_id = str(decision.params["target_revision_id"])
-        revision_edge = f"{source_revision_id} revision_of {target_revision_id}"
+        revision_edges = [
+            str(value) for value in decision.params.get("revision_edges") or []
+        ]
+        if revision_edges:
+            revision_instruction = (
+                f"verify the signed {' ; '.join(revision_edges)} chain and apply"
+            )
+            answer_shape = " || ".join(
+                [*revision_edges, "<claim 1>", "..."]
+            )
+        else:
+            revision_instruction = "use only the latest signed revision and apply"
+            answer_shape = "<claim 1> || ..."
         question = (
-            f"For {decision.params['work_id']}, verify the signed {revision_edge} "
-            f"edge and apply the {tier} compiled-source control. Reconcile all "
-            f"{claim_count} selected section claims in control order. Reply exactly "
-            f"as {revision_edge} || <claim 1> || ... using the exact grounded "
-            "claim sentence from every selected section."
+            f"For {decision.params['work_id']}, {revision_instruction} the {tier} "
+            f"compiled-source control. Reconcile all {claim_count} selected section "
+            f"claims in control order. Reply exactly as {answer_shape} using the "
+            "exact grounded claim sentence from every selected section."
         )
         workflow_key = hashlib.sha256(
             str(decision.params["workflow_id"]).encode()
@@ -524,10 +533,14 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                 invariance_event_id=tok.id,
                 invariance_param_updates={"commit": "ab00ab"},
                 gold_expression=(
-                    f"FOLLOW({revision_edge}) AND COMPILE({tier}) AND "
-                    f"RECONCILE({claim_count} SECTION_CLAIMS)"
+                    (
+                        f"FOLLOW({', '.join(revision_edges)}) AND "
+                        if revision_edges
+                        else "READ_LATEST_REVISION AND "
+                    )
+                    + f"COMPILE({tier}) AND RECONCILE({claim_count} SECTION_CLAIMS)"
                 ),
-                proof_depth=4,
+                proof_depth=2 + len(revision_edges),
                 cf_op="section_claim",
                 motif="paper_revision_section_reconciliation",
                 topology_id=instance_topology(
@@ -537,7 +550,10 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                 truth_regime="real_source_derived",
                 program_ops=[
                     *({"op": "READ_SECTION_CLAIM"} for _ in range(claim_count)),
-                    {"op": "FOLLOW_REVISION_OF"},
+                    *(
+                        {"op": "FOLLOW_REVISION_OF"}
+                        for _ in range(len(revision_edges))
+                    ),
                     {"op": "APPLY_COMPILED_SOURCE_CONTROL"},
                     {"op": "RECONCILE_SECTION_CLAIMS"},
                 ],

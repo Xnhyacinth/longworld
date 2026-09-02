@@ -290,24 +290,21 @@ def test_llama3_materializes_changed_endpoint_and_remove_one_program() -> None:
             [receipt] = event.params["source_compile_receipts"]
             assert receipt["path"] == source_path
 
-        [target] = [
+        targets = [
             event
             for event in selected
             if event.type == "arxiv_revision"
-            and event.params.get("record_id") == f"{WORK_ID}v2"
+            and event.params.get("record_id") in {f"{WORK_ID}v1", f"{WORK_ID}v2"}
         ]
-        [target_span] = target.params["source_file_spans"]
-        [target_receipt] = target.params["source_compile_receipts"]
-        assert target_span["path"] == "pretraining/model_scaling.tex"
-        assert str(target.params["text"]).count(V2_SCALING_ROW) == 1
-        if tier == "16k":
-            assert target_receipt["source_file_sha256"] == V2_FILE_SHA256
-            assert target_receipt["source_text_sha256"] != V2_FILE_SHA256
-            assert target_receipt["source_byte_start"] > 0
-            assert (
-                target_receipt["source_byte_end"] < target_receipt["source_byte_total"]
-            )
-        else:
+        assert len(targets) == {"16k": 0, "32k": 1, "64k": 2}[tier]
+        for target in targets:
+            [target_span] = target.params["source_file_spans"]
+            [target_receipt] = target.params["source_compile_receipts"]
+            assert target_span["path"] == "pretraining/model_scaling.tex"
+            assert str(target.params["text"]).count(V2_SCALING_ROW) == 1
+        if tier == "32k":
+            [target] = targets
+            [target_receipt] = target.params["source_compile_receipts"]
             assert target_receipt["source_text_sha256"] == V2_FILE_SHA256
 
         source = claim_by_path["pretraining/model_scaling.tex"]
@@ -316,14 +313,28 @@ def test_llama3_materializes_changed_endpoint_and_remove_one_program() -> None:
         assert str(source.params["text"]).count(V3_SCALING_ROW) == 1
         assert V3_FILE_SHA256 != V2_FILE_SHA256
 
-        [relation] = [
+        relations = [
             event for event in selected if event.type == "arxiv_revision_relation"
         ]
-        assert relation.params["source_record_id"] == f"{WORK_ID}v3"
-        assert relation.params["target_record_id"] == f"{WORK_ID}v2"
-        assert relation.params["source_record_event_id"] == source.id
-        assert relation.params["target_record_event_id"] == target.id
-        assert valid_arxiv_revision_relation_event(relation, events)
+        assert len(relations) == {"16k": 0, "32k": 1, "64k": 2}[tier]
+        assert all(
+            valid_arxiv_revision_relation_event(relation, events)
+            for relation in relations
+        )
+        if tier != "16k":
+            latest = next(
+                relation
+                for relation in relations
+                if relation.params["source_record_id"] == f"{WORK_ID}v3"
+            )
+            target = next(
+                event
+                for event in targets
+                if event.params["record_id"] == f"{WORK_ID}v2"
+            )
+            assert latest.params["target_record_id"] == f"{WORK_ID}v2"
+            assert latest.params["source_record_event_id"] == source.id
+            assert latest.params["target_record_event_id"] == target.id
         assert any(
             event.type == "arxiv_section_reconciliation_control" for event in selected
         )
@@ -335,7 +346,13 @@ def test_llama3_materializes_changed_endpoint_and_remove_one_program() -> None:
             if artifact.artifact_id in query.essential_artifact_ids
         ]
         assert semantic_answer_from_artifacts(world, query, essential) == query.answer
-        assert query.answer.startswith("v3 revision_of v2 || ")
+        assert query.answer.startswith(
+            {
+                "16k": CLAIMS[STAGE_PATHS[tier][0]][1],
+                "32k": "v3 revision_of v2 || ",
+                "64k": "v3 revision_of v2 || v2 revision_of v1 || ",
+            }[tier]
+        )
         assert all(CLAIMS[path][1] in query.answer for path in STAGE_PATHS[tier])
         assert all(
             CLAIMS[path][1] not in query.answer
@@ -388,17 +405,23 @@ def test_llama3_materializes_changed_endpoint_and_remove_one_program() -> None:
             )
             assert semantic_answer_from_artifacts(world, query, remaining) == "unknown"
 
-        assert real_source_relation_edges(world, query, essential) == [
-            {
-                "parent_record_id": f"{WORK_ID}v2",
-                "child_record_id": f"{WORK_ID}v3",
-                "relation": "revision_of",
-                "relation_provenance": "authentic_source",
-                "parent_source_url": "https://arxiv.org/abs/2407.21783v2",
-                "child_source_url": "https://arxiv.org/abs/2407.21783v3",
-            }
-        ]
-        assert context_source_relation_count(world, essential, spec=query) == 1
+        relation_edges = real_source_relation_edges(world, query, essential)
+        assert {
+            (edge["child_record_id"], edge["parent_record_id"])
+            for edge in relation_edges
+        } == {
+            "16k": set(),
+            "32k": {(f"{WORK_ID}v3", f"{WORK_ID}v2")},
+            "64k": {
+                (f"{WORK_ID}v3", f"{WORK_ID}v2"),
+                (f"{WORK_ID}v2", f"{WORK_ID}v1"),
+            },
+        }[tier]
+        assert context_source_relation_count(world, essential, spec=query) == {
+            "16k": 0,
+            "32k": 1,
+            "64k": 2,
+        }[tier]
 
     assert claim_sets[0] < claim_sets[1] < claim_sets[2]
 

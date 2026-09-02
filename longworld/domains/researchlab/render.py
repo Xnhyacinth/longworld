@@ -230,6 +230,13 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
                 "selected_compile_include_receipts": ev.params[
                     "selected_compile_include_receipts"
                 ],
+                "selected_compile_receipts": ev.params["selected_compile_receipts"],
+            }
+        elif tier == "16k":
+            compile_detail = {
+                "selected_compile_receipts": ev.params["selected_compile_receipts"][
+                    :2
+                ]
             }
         elif tier == "32k" and render_selected_provenance:
             compile_detail = {
@@ -241,7 +248,8 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
                 "target_revision_id": ev.params["target_revision_id"],
                 "source_record_id": ev.params["source_record_id"],
                 "target_record_id": ev.params["target_record_id"],
-                "required_relation_id": ev.params["required_relation_id"],
+                "required_relation_ids": ev.params["required_relation_ids"],
+                "revision_edges": ev.params["revision_edges"],
                 "compiled_source_order": ev.params["compiled_source_order"],
             }
         elif tier == "32k":
@@ -265,10 +273,12 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
                     "compiled_source_graph_sha256"
                 ],
                 "excluded_content_classes": ev.params["excluded_content_classes"],
+                "required_relation_ids": ev.params["required_relation_ids"],
+                "revision_edges": ev.params["revision_edges"],
                 **compile_detail,
                 "rule": (
-                    "reconcile every claim in compiled order after the signed edge "
-                    "and both endpoints replay"
+                    "reconcile every claim in compiled order after replaying every "
+                    "revision edge and required endpoint"
                 ),
                 "answer_disclosure": "omitted",
             },
@@ -293,16 +303,12 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
             sort_keys=True,
         ) + "\n"
     if t == "arxiv_section_reconciliation_decision":
-        revision_edge = (
-            f"{ev.params['source_revision_id']} revision_of "
-            f"{ev.params['target_revision_id']}"
-        )
         return "json", json.dumps(
             {
                 "kind": "arxiv_section_reconciliation_decision",
                 "control_tier": ev.params["control_tier"],
                 "required_claim_count": len(ev.params["required_claim_ids"]),
-                "required_revision_relation": revision_edge,
+                "required_revision_relations": ev.params["revision_edges"],
                 "rule": "emit every grounded section claim in control order",
                 "answer_disclosure": "omitted",
             },

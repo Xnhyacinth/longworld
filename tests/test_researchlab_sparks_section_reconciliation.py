@@ -76,13 +76,23 @@ def test_sparks_bundle_materializes_nested_section_reconciliation_queries() -> N
     ]
     assert [len(tier_claims) for tier_claims in claims] == [3, 5, 10]
     assert claims[0] < claims[1] < claims[2]
-    for query in queries:
+    expected_edges = [
+        set(),
+        {("arxiv:2303.12712v5", "arxiv:2303.12712v4")},
+        {
+            ("arxiv:2303.12712v5", "arxiv:2303.12712v4"),
+            ("arxiv:2303.12712v4", "arxiv:2303.12712v3"),
+        },
+    ]
+    for query, tier_edges in zip(queries, expected_edges, strict=True):
         selected = [events[event_id] for event_id in query.essential_event_ids]
-        [relation] = [
+        relations = [
             event for event in selected if event.type == "arxiv_revision_relation"
         ]
-        assert relation.params["source_record_id"] == "arxiv:2303.12712v5"
-        assert relation.params["target_record_id"] == "arxiv:2303.12712v4"
+        assert {
+            (event.params["source_record_id"], event.params["target_record_id"])
+            for event in relations
+        } == tier_edges
         assert any(
             event.type == "arxiv_section_reconciliation_control"
             for event in selected
@@ -98,6 +108,33 @@ def test_sparks_bundle_materializes_nested_section_reconciliation_queries() -> N
         assert selected[-1].type == "arxiv_section_reconciliation_decision"
 
 
+def test_sparks_revision_proof_grows_only_after_the_single_revision_tier() -> None:
+    materialized = _materialized()
+    world = materialized.worlds["focal"]
+    events = {event.id: event for event in world.events}
+    queries = [
+        query
+        for query in materialized.queries
+        if query.query_type == "paper_revision_section_reconciliation"
+    ]
+
+    relation_sets = []
+    for query in queries:
+        selected = [events[event_id] for event_id in query.essential_event_ids]
+        relations = [
+            event for event in selected if event.type == "arxiv_revision_relation"
+        ]
+        relation_sets.append(
+            {str(event.params["relation_id"]) for event in relations}
+        )
+    assert [len(relations) for relations in relation_sets] == [0, 1, 2]
+    assert relation_sets[0] < relation_sets[1] < relation_sets[2]
+    assert [query.proof_depth for query in queries] == [2, 3, 4]
+    assert "revision_of" not in queries[0].question
+    assert queries[1].question.count("revision_of") == 2
+    assert queries[2].question.count("revision_of") == 4
+
+
 def test_sparks_reconciliation_requires_every_signed_input_and_changes_under_cf(
 ) -> None:
     materialized = _materialized()
@@ -108,14 +145,19 @@ def test_sparks_reconciliation_requires_every_signed_input_and_changes_under_cf(
         if query.query_type == "paper_revision_section_reconciliation"
     ]
 
-    for query in queries:
+    expected_prefixes = [
+        "Theory of mind is",
+        "v5 revision_of v4 || ",
+        "v5 revision_of v4 || v4 revision_of v3 || ",
+    ]
+    for query, expected_prefix in zip(queries, expected_prefixes, strict=True):
         essential = [
             artifact
             for artifact in materialized.artifacts["focal"]
             if artifact.artifact_id in query.essential_artifact_ids
         ]
         assert semantic_answer_from_artifacts(world, query, essential) == query.answer
-        assert query.answer.startswith("v5 revision_of v4 || ")
+        assert query.answer.startswith(expected_prefix)
         assert query.answer.count(" || ") == len(query.program_ops) - 3
         assert query.cf_answer != query.answer
         for removed in essential:

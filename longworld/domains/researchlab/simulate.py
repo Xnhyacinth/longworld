@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 from difflib import SequenceMatcher
+from itertools import pairwise
 from typing import Any
 
 from longworld.core.cascade import cascade_events
@@ -1563,10 +1564,13 @@ class _PaperSectionProgram:
     claims: dict[str, tuple[str, str]]
     tiers: dict[str, tuple[str, ...]]
     target_claim_quote: str = ""
+    relation_endpoint_quote: str = ""
     strip_after_path: str = ""
     strip_after_marker: str = ""
     render_selected_compile_provenance: bool = False
     target_16k_excerpt_chars: int = 0
+    target_relation_excerpt_chars: int = 0
+    additional_relation_endpoint_excerpt_chars: int = 0
 
 
 _LLAMA3_V2_SCALING_ROW = (
@@ -1725,8 +1729,16 @@ _PAPER_SECTION_PROGRAMS = {
         counterfactual_new="they tend to capture",
         claims=_SPARKS_SECTION_CLAIMS,
         tiers=_SPARKS_SECTION_TIERS,
+        relation_endpoint_quote=(
+            "Artificial intelligence (AI) researchers have been developing and "
+            "refining large language models (LLMs) that exhibit remarkable "
+            "capabilities across a variety of domains and tasks, challenging our "
+            "understanding of learning and cognition."
+        ),
         strip_after_path="contents/conclusion.tex",
         strip_after_marker=_SPARKS_ACKNOWLEDGMENTS,
+        target_relation_excerpt_chars=256,
+        additional_relation_endpoint_excerpt_chars=256,
     ),
     "arxiv:2407.21783": _PaperSectionProgram(
         work_id="arxiv:2407.21783",
@@ -1743,6 +1755,7 @@ _PAPER_SECTION_PROGRAMS = {
         target_claim_quote=_LLAMA3_V2_SCALING_ROW,
         render_selected_compile_provenance=True,
         target_16k_excerpt_chars=6_000,
+        additional_relation_endpoint_excerpt_chars=512,
     ),
 }
 _ARXIV_BENCHMARK_TRACE_VIEWS: dict[
@@ -2405,7 +2418,7 @@ def _paper_section_reconciliation_records(
     tuple[
         _PaperSectionProgram,
         dict[str, Any],
-        Any,
+        dict[tuple[str, str], Any],
         tuple[str, ...],
         tuple[tuple[str, str], ...],
     ]
@@ -2498,7 +2511,7 @@ def _paper_section_reconciliation_records(
     return (
         program,
         records,
-        relations[(source_record.record_id, target_record.record_id)],
+        relations,
         reachable_order,
         reachable_edges,
     )
@@ -2511,20 +2524,19 @@ def _paper_section_reconciliation_events(
     recognized: tuple[
         _PaperSectionProgram,
         dict[str, Any],
-        Any,
+        dict[tuple[str, str], Any],
         tuple[str, ...],
         tuple[tuple[str, str], ...],
     ],
 ) -> list[Event]:
-    program, records, relation, reachable_order, reachable_edges = recognized
+    program, records, relations, reachable_order, reachable_edges = recognized
     record_indices = {
         record.record_id: index for index, record in enumerate(workflow.records)
     }
-    relation_index = next(
-        index
-        for index, candidate in enumerate(workflow.relations)
-        if candidate.relation_id == relation.relation_id
-    )
+    relation_indices = {
+        relation.relation_id: index
+        for index, relation in enumerate(workflow.relations)
+    }
     workflow_key = hashlib.sha256(workflow.workflow_id.encode()).hexdigest()[:12]
     graph_sha256 = hashlib.sha256(
         json.dumps(reachable_edges, separators=(",", ":")).encode()
@@ -2536,23 +2548,6 @@ def _paper_section_reconciliation_events(
     )
     events: list[Event] = []
     for tier, source_paths in program.tiers.items():
-        target_event, _target_body, target_revision_fact, _target_facts = (
-            _multiband_arxiv_revision_event(
-                workflow=workflow,
-                record=target_record,
-                prefix=prefix,
-                workflow_index=workflow_index,
-                record_index=record_indices[target_record.record_id],
-                tier=tier,
-                included_basenames=None,
-                view_channel="prior_endpoint",
-                source_path=program.target_source_path,
-                preserved_quote=program.target_claim_quote,
-                source_excerpt_chars=(
-                    program.target_16k_excerpt_chars if tier == "16k" else 0
-                ),
-            )
-        )
         claim_events: list[Event] = []
         claim_bodies: dict[str, str] = {}
         claim_revision_facts: dict[str, str] = {}
@@ -2586,37 +2581,111 @@ def _paper_section_reconciliation_events(
         # Full views follow the task's latest-revision-first reading program;
         # ordered views restore source chronology and therefore remain distinct.
         events.extend(claim_events)
-        events.append(target_event)
         relation_source = next(
             event
             for event in claim_events
             if event.params["section_claim_id"] == program.relation_claim_id
         )
-        relation_event = _multiband_arxiv_relation_event(
-            workflow=workflow,
-            records=records,
-            relation=relation,
-            relation_index=relation_index,
-            workflow_index=workflow_index,
-            tier=tier,
-            source_event=relation_source,
-            target_event=target_event,
-            source_body=claim_bodies[program.relation_claim_id],
-            source_revision_fact_id=claim_revision_facts[program.relation_claim_id],
-            target_revision_fact_id=target_revision_fact,
-            source_fact_ids=claim_source_facts[program.relation_claim_id],
+        relation_count = {"16k": 0, "32k": 1, "64k": 2}[tier]
+        source_revision_index = program.revision_ids.index(program.source_revision_id)
+        chain_revision_ids = tuple(
+            reversed(
+                program.revision_ids[
+                    source_revision_index - relation_count : source_revision_index + 1
+                ]
+            )
         )
-        relation_event.params["render_control_tier"] = True
-        events.append(relation_event)
+        if chain_revision_ids[0] != program.source_revision_id:
+            raise ValueError("paper section revision chain is not latest-first")
+        relation_pairs = list(pairwise(chain_revision_ids))
+        endpoint_events: dict[str, Event] = {
+            program.source_revision_id: relation_source
+        }
+        endpoint_bodies = {
+            program.source_revision_id: claim_bodies[program.relation_claim_id]
+        }
+        endpoint_revision_facts = {
+            program.source_revision_id: claim_revision_facts[
+                program.relation_claim_id
+            ]
+        }
+        endpoint_source_facts = {
+            program.source_revision_id: claim_source_facts[program.relation_claim_id]
+        }
+        for endpoint_index, revision_id in enumerate(chain_revision_ids[1:]):
+            record = records[revision_id]
+            excerpt_chars = (
+                program.target_relation_excerpt_chars
+                if endpoint_index == 0
+                else program.additional_relation_endpoint_excerpt_chars
+            )
+            endpoint, body, revision_fact, source_facts = (
+                _multiband_arxiv_revision_event(
+                    workflow=workflow,
+                    record=record,
+                    prefix=prefix,
+                    workflow_index=workflow_index,
+                    record_index=record_indices[record.record_id],
+                    tier=tier,
+                    included_basenames=None,
+                    view_channel=f"prior_endpoint_{revision_id}",
+                    source_path=program.target_source_path,
+                    preserved_quote=(
+                        program.target_claim_quote or program.relation_endpoint_quote
+                    ),
+                    source_excerpt_chars=excerpt_chars,
+                )
+            )
+            endpoint_events[revision_id] = endpoint
+            endpoint_bodies[revision_id] = body
+            endpoint_revision_facts[revision_id] = revision_fact
+            endpoint_source_facts[revision_id] = source_facts
+            events.append(endpoint)
+        relation_events_by_pair: dict[tuple[str, str], Event] = {}
+        prior_relation_id = ""
+        for source_revision_id, target_revision_id in reversed(relation_pairs):
+            relation = relations[
+                (
+                    records[source_revision_id].record_id,
+                    records[target_revision_id].record_id,
+                )
+            ]
+            relation_event = _multiband_arxiv_relation_event(
+                workflow=workflow,
+                records=records,
+                relation=relation,
+                relation_index=relation_indices[relation.relation_id],
+                workflow_index=workflow_index,
+                tier=tier,
+                source_event=endpoint_events[source_revision_id],
+                target_event=endpoint_events[target_revision_id],
+                source_body=endpoint_bodies[source_revision_id],
+                source_revision_fact_id=endpoint_revision_facts[source_revision_id],
+                target_revision_fact_id=endpoint_revision_facts[target_revision_id],
+                source_fact_ids=endpoint_source_facts[source_revision_id],
+                prior_relation_id=prior_relation_id,
+            )
+            relation_event.params["render_control_tier"] = True
+            relation_events_by_pair[(source_revision_id, target_revision_id)] = (
+                relation_event
+            )
+            events.append(relation_event)
+            prior_relation_id = relation_event.id
+        relation_events = [
+            relation_events_by_pair[pair] for pair in relation_pairs
+        ]
         claim_ids = [str(event.params["section_claim_id"]) for event in claim_events]
         compile_context_id = (
             f"{prefix}.arxiv_section_compile_context_{tier}_{workflow_index}"
+        )
+        evidence_time = max(
+            event.time for event in [*claim_events, *endpoint_events.values()]
         )
         events.append(
             Event(
                 id=compile_context_id,
                 type="arxiv_section_compile_context",
-                time=relation_event.time,
+                time=evidence_time,
                 params={
                     "workflow_id": workflow.workflow_id,
                     "control_tier": tier,
@@ -2633,9 +2702,12 @@ def _paper_section_reconciliation_events(
             f"{prefix}.arxiv_section_reconciliation_control_{tier}_{workflow_index}"
         )
         control_inputs = [
-            target_event.id,
             *[event.id for event in claim_events],
-            relation_event.id,
+            *[
+                endpoint_events[revision_id].id
+                for revision_id in chain_revision_ids[1:]
+            ],
+            *[event.id for event in relation_events],
         ]
         selected_paths = list(source_paths)
         selected_compile_paths = set(selected_paths)
@@ -2658,7 +2730,7 @@ def _paper_section_reconciliation_events(
         control = Event(
             id=control_id,
             type="arxiv_section_reconciliation_control",
-            time=relation_event.time + timedelta(days=1),
+            time=evidence_time + timedelta(days=1),
             params={
                 "workflow_id": workflow.workflow_id,
                 "work_id": program.work_id,
@@ -2668,9 +2740,18 @@ def _paper_section_reconciliation_events(
                 "target_revision_id": program.target_revision_id,
                 "source_record_id": source_record.record_id,
                 "target_record_id": target_record.record_id,
-                "target_record_event_id": target_event.id,
-                "relation_event_id": relation_event.id,
-                "required_relation_id": relation.relation_id,
+                "endpoint_event_ids": [
+                    endpoint_events[revision_id].id
+                    for revision_id in chain_revision_ids[1:]
+                ],
+                "relation_event_ids": [event.id for event in relation_events],
+                "required_relation_ids": [
+                    str(event.params["relation_id"]) for event in relation_events
+                ],
+                "revision_edges": [
+                    f"{source_revision_id} revision_of {target_revision_id}"
+                    for source_revision_id, target_revision_id in relation_pairs
+                ],
                 "claim_event_ids": [event.id for event in claim_events],
                 "required_claim_ids": claim_ids,
                 "selected_source_paths": selected_paths,
@@ -2702,9 +2783,14 @@ def _paper_section_reconciliation_events(
             causal_inputs=[*control_inputs, compile_context_id],
             required_inputs=list(control_inputs),
             relation_kinds={
-                target_event.id: "reads_prior_endpoint",
                 **{event.id: "reads_compiled_section" for event in claim_events},
-                relation_event.id: "authenticates_revision",
+                **{
+                    endpoint_events[revision_id].id: "reads_prior_endpoint"
+                    for revision_id in chain_revision_ids[1:]
+                },
+                **{
+                    event.id: "authenticates_revision" for event in relation_events
+                },
                 compile_context_id: "reads_compile_receipt",
             },
         )
@@ -2726,8 +2812,12 @@ def _paper_section_reconciliation_events(
                     "answer_key": f"paper_section_reconciliation:{workflow_key}:{tier}",
                     "source_revision_id": program.source_revision_id,
                     "target_revision_id": program.target_revision_id,
-                    "required_relation_id": relation.relation_id,
-                    "relation_event_id": relation_event.id,
+                    "endpoint_event_ids": control.params["endpoint_event_ids"],
+                    "required_relation_ids": control.params[
+                        "required_relation_ids"
+                    ],
+                    "relation_event_ids": control.params["relation_event_ids"],
+                    "revision_edges": control.params["revision_edges"],
                     "required_claim_ids": claim_ids,
                     "control_event_id": control.id,
                     "counterfactual_claim_event_id": relation_source.id,
@@ -2736,11 +2826,14 @@ def _paper_section_reconciliation_events(
                     "proof_event_ids": proof_event_ids,
                 },
                 visibility=[decision_id],
-                causal_inputs=[control.id, relation_event.id],
-                required_inputs=[control.id, relation_event.id],
+                causal_inputs=[control.id, *control.params["relation_event_ids"]],
+                required_inputs=[control.id, *control.params["relation_event_ids"]],
                 relation_kinds={
                     control.id: "applies_compiled_control",
-                    relation_event.id: "applies_revision_chain",
+                    **{
+                        event_id: "applies_revision_chain"
+                        for event_id in control.params["relation_event_ids"]
+                    },
                 },
             )
         )

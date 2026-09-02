@@ -1256,16 +1256,26 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
             )
         ):
             return False, "source_section_claims_incomplete"
-        if str(ev.params.get("target_record_event_id") or "") not in (
-            state.values.get("source_grounded_bindings") or {}
-        ):
+        endpoint_event_ids = [
+            str(value) for value in ev.params.get("endpoint_event_ids") or []
+        ]
+        bindings = state.values.get("source_grounded_bindings") or {}
+        if any(event_id not in bindings for event_id in endpoint_event_ids):
             return False, "source_revision_endpoint_missing"
-        if str(ev.params.get("relation_event_id") or "") not in set(
-            state.values.get("verified_revision_relation_events") or []
+        relation_event_ids = {
+            str(value) for value in ev.params.get("relation_event_ids") or []
+        }
+        if not relation_event_ids.issubset(
+            set(state.values.get("verified_revision_relation_events") or [])
         ):
             return False, "source_revision_relation_missing"
-        if str(ev.params.get("required_relation_id") or "") not in set(
-            state.values.get("verified_revision_relations") or []
+        required_relation_ids = {
+            str(value) for value in ev.params.get("required_relation_ids") or []
+        }
+        if len(required_relation_ids) != len(relation_event_ids) or not (
+            required_relation_ids.issubset(
+                set(state.values.get("verified_revision_relations") or [])
+            )
         ):
             return False, "source_revision_chain_incomplete"
         return True, None
@@ -1277,8 +1287,11 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
         controls = state.values.get("paper_section_controls") or {}
         if controls.get(control_key) != required_claim_ids:
             return False, "source_section_control_missing"
-        if str(ev.params.get("required_relation_id") or "") not in set(
-            state.values.get("verified_revision_relations") or []
+        required_relation_ids = {
+            str(value) for value in ev.params.get("required_relation_ids") or []
+        }
+        if not required_relation_ids.issubset(
+            set(state.values.get("verified_revision_relations") or [])
         ):
             return False, "source_revision_chain_incomplete"
         return True, None
@@ -1669,16 +1682,13 @@ def apply_event(state: WorldState, ev: Event) -> None:
         required_claim_ids = [str(value) for value in p["required_claim_ids"]]
         if any(claim_id not in claims for claim_id in required_claim_ids):
             return
-        revision_edge = (
-            f"{p['source_revision_id']} revision_of {p['target_revision_id']}"
-        )
-        answer = (
-            revision_edge
-            + " || "
-            + " || ".join(
+        answer_parts = [
+            *[str(value) for value in p.get("revision_edges") or []],
+            *[
                 str(claims[claim_id]["quote"]) for claim_id in required_claim_ids
-            )
-        )
+            ],
+        ]
+        answer = " || ".join(answer_parts)
         state.set(str(p["answer_key"]), answer, eid, day)
     elif t == "wiki_source_section":
         try:
