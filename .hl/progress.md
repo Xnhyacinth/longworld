@@ -1,5 +1,12 @@
 # Progress
 
+- 2026-09-02 retry wave closed: no new countable SFT world. Microsoft
+  v2 is 53 rows / 5 worlds, all missing 16k+32k ordered. Oxc CodeForge
+  v8 is 5/9. MLRC generate-time 9-cell is the same SHA as a prior run
+  whose CF audit near-dup exceeds 0.25. CPT oxc quieter slice packs 0
+  rows. Apple 0 rows. Cyber 9-cell still unranked. Gated ledger remains
+  7 physical / 5 quota-countable. Commits through `8414525` plus this
+  note.
 - 2026-09-02 retry wave (later): MLRC generate retry emitted a **9-cell**
   three-view world (9 rows, near-dup 0.015). Not yet ranked/audited, so
   ResearchLab is still 0/2 in the gated ledger. AEVB retry still missing

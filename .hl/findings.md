@@ -2,21 +2,19 @@
 
 ## Retry wave — 2026-09-02 later
 
-MLRC workspace-v2 retry produced 9 rows / 3 slots / full+cf+ordered at
-16/32/64K with `mean_near_dup_sentence_ratio=0.015`. That is a complete
-9-cell ResearchLab candidate, still unranked. AEVB retry is 32/64 only
-and near-dup 0.4586. Oxc CPT skip-8000/250 is within the 200k ppm cap
-(188k) but packed zero rows (elapsed/event minima). GitHub SFT/CPT
-exports need `LONGWORLD_GH_BINARY_SHA256=2fd925d6…7791673`. Apple P12
-SEC bundle is signed by a different probe; live EDGAR fetch is 403.
+Code landed on `worlds` (`83192ce` adapter, `302192b` oxc license-binding,
+`0d8bac5` Company configs). Parallel retries:
 
-## Retry wave — 2026-09-02 later
-
-
-Code landed on `worlds`: cross-CVE adapter `83192ce`, oxc license-binding
-`302192b`, Company Apple/Microsoft configs `0d8bac5`. Next countable SFT
-move is ranking the existing Cyber 9-cell projections; CPT retry uses a
-quieter oxc window instead of raising truncation ppm.
+- MLRC generate-time 9-cell, near-dup 0.015, SHA identical to prior
+  rerun3. Previous dense audit of that SHA still has CF 32k 0.347 and
+  CF 64k 0.317, so it is **not** a countable ResearchLab world.
+- AEVB still missing 16K (14980) and near-dup 0.4586.
+- Microsoft five-seed v2: 53 rows / 5 worlds; every world still lacks
+  16k and 32k `ordered_artifact_view`. Not 9/9.
+- CodeForge oxc v8: 5/9 cells (16k full/cf + 64k three-view); 32k empty.
+- Oxc CPT skip-8000/250: truncation 188k ppm OK, packed 0 rows.
+- Apple single 10-K: 0 rows. EDGAR four-annual fetch HTTP 403.
+- Cyber 9-cell views still unranked (MiniLM extra install incomplete).
 
 ## Product split — 2026-09-02
 
