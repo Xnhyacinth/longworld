@@ -21,6 +21,8 @@ from longworld.core.domainhistory import (
 )
 from longworld.core.pack import SEP
 from longworld.core.promotion import CANDIDATE_ATTESTATION_PURPOSE
+from longworld.core.taskpromotion import _cross_cve_chronology
+from longworld.core.taskproof import _projection_chronology
 from longworld.core.taskreplaysidecar import (
     CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
     build_task_replay_sidecar,
@@ -207,3 +209,15 @@ def test_sidecar_commitments_survive_rebinding(
     assert task_candidate_content_commitment(rebound) == commitment
     assert rebound["task_replay_sidecar"] == binding
     assert rebound["generation_integration"] == "task_replay_sidecar_bound"
+
+
+def test_ordered_view_chronology_matches_cross_cve_adapter() -> None:
+    candidate = _candidate()
+    documents = candidate["document_context"].split(SEP)
+    classifications = candidate["artifact_classification"]
+    proof = _projection_chronology(candidate, classifications, documents)
+    promotion = _cross_cve_chronology(list(zip(classifications, documents)))
+    assert [item["order_key"] for item in proof] == [item[0] for item in promotion]
+    assert [item["artifact_id"] for item in proof] == [
+        item[1]["artifact_id"] for item in promotion
+    ]

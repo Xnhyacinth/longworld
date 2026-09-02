@@ -440,7 +440,7 @@ def _projection_chronology(
                         if cve_id and date_added:
                             cve_dates[cve_id] = date_added
                 dates = []
-                kinds = []
+                cve_ids = []
                 for record in value:
                     if not isinstance(record, dict):
                         raise TaskProofError("cross-CVE chronology record is malformed")
@@ -450,12 +450,11 @@ def _projection_chronology(
                             "cyber:listed-in-kev:"
                         )
                     )
-                    kind = str(record.get("kind") or record.get("record_type") or "")
                     dates.append(cve_dates.get(cve_id, ""))
-                    kinds.append(kind)
+                    cve_ids.append(cve_id)
                 start = min(dates) if dates and all(dates) else ""
-                kind_key = min(kinds) if kinds else ""
-                order_key = f"{start}|{kind_key}|{artifact_id}"
+                cve_key = min(cve_ids) if cve_ids and all(cve_ids) else ""
+                order_key = f"{start}|{cve_key}|{artifact_id}"
             else:
                 dates = [
                     str((record.get("source_payload") or {}).get("dateAdded") or "")
