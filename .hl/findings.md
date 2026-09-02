@@ -858,6 +858,11 @@ LLaMA-Factory `B1`–`B5`, `B5w`, `ext_acc`, `ext_longtrace`: `cutoff_len: 26214
   spans, duplicate filings, secret patterns and email redaction. It remains
   `production_eligible=false` and `generation_integration=disabled`; no real
   EDGAR source has yet entered a world or answer.
+- JPMorgan's official-PDF task proves a new Company program rather than another
+  financial-value reconstruction: 10/21/43 bounded risk-taxonomy sections are
+  necessary across 16/32/64K, while signed source relations grow 0/1/2. Strict
+  audit accepted all nine views (342,420 tokens) after generation and promotion
+  replay were wired to the same fail-closed relation selector.
 
 # P5 real-source, eval, trust, and audit findings (2026-08-25)
 
@@ -1089,3 +1094,12 @@ so `n_real_source_relations=0` is correct. Do not use this slice to claim the
   source tokens but only 49,623 adjacent changed-file tokens; PaLM has 170,869
   and supports nested 16/32/64K changed-file stages. File-delta receipts must
   still exclude byte-identical, whitespace-only, and macro-metadata changes.
+- Total narrative capacity is not executable proof distance. Berkshire's
+  selected Pilot/cyber/governance facts occupy only about 8K of causal span at
+  every band despite a 115,874-token section pool; unrelated authentic PDF
+  chunks remain filler unless the answer program consumes them.
+- PaLM v5 offers a more promising content task than its failed file-delta
+  task: 39 recursively reachable TeX files provide about 84.9K tokens, and a
+  strict 6/11/26-file content plan exists after excluding bibliography,
+  caches, and one unreachable file. Packed-view distance still requires
+  verification before implementation.

@@ -759,3 +759,23 @@ in`; no private-repository or upload claim was made.
   49,623 changed-file tokens. PaLM v1--v5 has 170,869 adjacent changed-file
   tokens and sufficient 16/32/64K stage capacity; a fail-closed file-delta
   receipt and nested file-view task are in progress.
+- Berkshire's official-PDF source foundation is now isolated in commit
+  `c9d0878`: four signed/replayable reports, 555,529 natural tokens, five
+  focused tests, and no failed task code. Its disclosure task remains an
+  honest 0/9 at spans 7,837/7,904/8,044 and contributes no quota.
+- The formal ledger remains 10 physical / 8 quota / 90 rows / 3,389,675
+  tokens. JPMorgan source/task preflight and PaLM compiled-content preflight
+  are the active quota-closing tracks; selection/export stays deferred.
+- JPMorgan's signed 2022--2024 official-PDF workflow is source-GREEN (3
+  records/2 adjacent relations). Its bounded risk-taxonomy/governance plan
+  preplays at 16,049/32,134/64,083 tokens with 10/21/43 essential sections and
+  ordered spans 13,804/29,889/61,838; Company TDD implementation is active.
+- JPMorgan risk-taxonomy is now 9/9 strict-audited: 342,420 tokens, exact
+  16,377/32,731/65,032 per view, 10/21/43 essential sections, and 0/1/2 signed
+  adjacent-report relations. Commit `b0eafee` records the source adapter, task,
+  replay symmetry, tests, and closeout. The honest ledger is now 11 physical /
+  9 quota / 99 rows / 3,732,095 tokens; Company is 1/2 and formal export remains
+  zero at 9/12.
+- PaLM's failed file-delta/Adam implementation was fully removed before the
+  new compiled-content task began. The new 7/14/27-file plan preplays at
+  16,182/32,709/64,846 with every selected file bound to one required claim.

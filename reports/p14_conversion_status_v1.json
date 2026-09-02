@@ -88,20 +88,49 @@
       "dense_audit_complete": true,
       "source_token_measurement_valid": true,
       "train_ready": false
+    },
+    {
+      "domain": "company",
+      "world_id": "w014201-sablewood96:focal",
+      "rows": 9,
+      "actual_context_tokens": 342420,
+      "bands": [
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "views": [
+        "full",
+        "cf",
+        "ordered_artifact_view"
+      ],
+      "candidate_path": "reports/p14_company_jpmorgan_risk_taxonomy_v1/candidate/train.jsonl",
+      "candidate_sha256": "f4b8003df2d381be547d4ee4d1d0e2ffd08b32d9eca7126e62ebe5214ef3317d",
+      "ranking_sha256": "f541a3d69c497cc1d8def5cd4ee742991ce0b39aef7c56df0feeb1866cf9a533",
+      "audit_path": "reports/p14_company_jpmorgan_risk_taxonomy_v1/audit/audits.jsonl",
+      "audit_sha256": "571322d98f178fe23fbcb136d403af1ac888a76923ee7e26e8965956e919ad3e",
+      "accepted_sha256": "7643acf1f10a76ca876feb71fd790caea9cbf5efa601aedd83d27549c56804ca",
+      "source_workflow_bundle_sha256": "7ebcf5142bca7a2b086636f3a6989e62b42a2567e789955edfc0721634ba0928",
+      "answer_program_id": "company.jpmorgan_cross_year_risk_taxonomy.v1",
+      "motif": "risk_taxonomy_sections+cross_year_ordering+signed_annual_relations",
+      "unique_executable_proofs": 3,
+      "dense_audit_complete": true,
+      "source_token_measurement_valid": true,
+      "train_ready": false
     }
   ],
   "current_inventory": {
-    "physical_worlds": 10,
-    "quota_countable_worlds": 8,
+    "physical_worlds": 11,
+    "quota_countable_worlds": 9,
     "required_quota_worlds": 12,
-    "rows": 90,
-    "actual_context_tokens": 3389675,
-    "unique_motifs": 8,
-    "unique_executable_proofs": 25,
-    "unique_answer_programs": 8,
-    "unique_semantic_base_tasks": 8,
+    "rows": 99,
+    "actual_context_tokens": 3732095,
+    "unique_motifs": 9,
+    "unique_executable_proofs": 28,
+    "unique_answer_programs": 9,
+    "unique_semantic_base_tasks": 9,
     "quota_by_domain": {
-      "company": 0,
+      "company": 1,
       "researchlab": 0,
       "codeforge": 2,
       "finance": 2,
@@ -110,14 +139,14 @@
     }
   },
   "quota_holes": {
-    "company": 2,
+    "company": 1,
     "researchlab": 2,
     "codeforge": 0,
     "finance": 0
   },
   "release_state": {
     "selection_attempted_against_current_inventory": false,
-    "last_selection_blocker": "insufficient fully audited worlds: 8<12",
+    "last_selection_blocker": "insufficient fully audited worlds: 9<12",
     "selection_run": false,
     "promotion_run": false,
     "quality_gate_run": false,

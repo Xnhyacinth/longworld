@@ -13,13 +13,13 @@ inventory exists but is not a train release.
 
 | Bucket | What it is | Trainable now? |
 | ------ | ---------- | -------------- |
-| P13 SFT inventory | 8 physical / 6 quota / 72 rows / 2,710,819 tokens | No (`train_ready=false`, not selected) |
+| P14 SFT inventory | 11 physical / 9 quota / 99 rows / 3,732,095 tokens | No (`train_ready=false`, not selected) |
 | P13 CPT closure | 3,047 rows / 288,004,845 tokens | No (`train_ready=false`) |
 | HF private | P6 542-row local-engineering SFT | Old package only; not this inventory |
 | P13 formal train | selection + promotion + B-export | 0 until 12/12 audited SFT worlds |
 
-Quota holes: Company 0/2, ResearchLab 0/2, Finance 1/2, CodeForge 1/2.
-Cyber 2/2 and Macro 2/2 are capped. Do not promote, export B1/B3/B5, or
+Quota holes: Company 1/2 and ResearchLab 0/2. Finance, CodeForge, Cyber, and
+Macro are 2/2. Do not promote, export B1/B3/B5, or
 upload HF until 12/12.
 
 | Phase | Objective | Status | Validator |
@@ -59,21 +59,21 @@ Assumptions and tradeoffs:
 | Phase | Objective | Status | Validator |
 | ----- | --------- | ------ | --------- |
 | P14.0 | Reconcile dirty tree, current inventory, commands, and dead ends | complete | exact HEAD/status; current pinned audits and 8/6/72 ledger rechecked |
-| P14.1 | Company: new entity plus non-reconstruction executable relation | in_progress | Apple routes stopped at 6/9; Berkshire official-PDF source receipt green and task TDD active |
-| P14.2 | ResearchLab: new naturally long paper/revision/benchmark program | in_progress | Adam stopped at 6/9; PaLM file-delta source/task adapter active after capacity preflight |
+| P14.1 | Company: new entity plus non-reconstruction executable relation | in_progress | JPMorgan risk-taxonomy 9/9; Company 1/2; Walmart task active |
+| P14.2 | ResearchLab: new naturally long paper/revision/benchmark program | in_progress | PaLM stopped at strict relation overflow; Sparks task and Gopher source active |
 | P14.3 | CodeForge: new repository/artifact program with natural three-band support | complete | Wasmtime patch/review/test/release ancestry 9/9 strict audit; CodeForge 2/2 |
 | P14.4 | Finance/integration: new issuer/program and deterministic inventory rebuild | complete | Microsoft Finance 9/9; Finance 2/2 |
 | P14.5 | Fill remaining holes, select 12/12, promote, quality-gate, and export | planned | signed receipts; nonzero formal train export; `train_ready=true` |
-| P14.6 | Targeted regression, provenance report, and surgical Git commits | in_progress | Finance and CodeForge committed; Company/ResearchLab tracks remain isolated |
+| P14.6 | Targeted regression, provenance report, and surgical Git commits | in_progress | Finance, CodeForge, and JPMorgan Company committed; remaining tracks isolated |
 
 Success criterion: at least 12 quota-eligible worlds are fully audited and the
 current profile completes selection, promotion, quality gate, and training
 export with `train_ready=true`. Until then, report exact physical/quota/row
 counts and keep formal training at zero.
 
-Next step: finish Berkshire official-PDF task projection and PaLM file-delta
-task projection. The honest ledger is 10 physical / 8 quota / 90 rows; only
-Company and ResearchLab quota holes remain.
+Next step: finish Walmart Company and Sparks/Gopher ResearchLab task projections.
+The honest ledger is 11 physical / 9 quota / 99 rows; only Company and
+ResearchLab quota holes remain.
 
 Position: run the first honest 12-world P3 release while keeping synthetic
 executable and real-public provenance distinct. Complexity 10/10 (breadth,
