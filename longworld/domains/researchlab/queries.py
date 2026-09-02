@@ -424,6 +424,130 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
     queries: list[QuerySpec] = []
     events_by_id = {event.id: event for event in world.events}
 
+    section_decisions = sorted(
+        (
+            event
+            for event in world.events
+            if event.type == "arxiv_section_reconciliation_decision"
+        ),
+        key=lambda event: {"16k": 0, "32k": 1, "64k": 2}[
+            str(event.params["control_tier"])
+        ],
+    )
+    for decision in section_decisions:
+        tier = str(decision.params["control_tier"])
+        proof_event_ids = [str(value) for value in decision.params["proof_event_ids"]]
+        source = events_by_id[str(decision.params["counterfactual_claim_event_id"])]
+        original_claim = str(source.params["section_claim_quote"])
+        changed_claim = original_claim.replace(
+            "they fail to capture", "they tend to capture"
+        )
+        if changed_claim == original_claim or str(source.params["text"]).count(
+            original_claim
+        ) != 1:
+            raise ValueError("Sparks counterfactual claim is not uniquely grounded")
+        changed_text = str(source.params["text"]).replace(
+            original_claim, changed_claim
+        )
+        changed_text_sha256 = hashlib.sha256(changed_text.encode()).hexdigest()
+        changed_grounded_source = _counterfactual_grounded_source(
+            source.params.get("grounded_source"),
+            original_quote=original_claim,
+            changed_quote=changed_claim,
+            changed_text=changed_text,
+        )
+        changed_file_spans = _counterfactual_source_file_spans(
+            source.params.get("source_file_spans"), changed_text=changed_text
+        )
+        changed_provenance = hashlib.sha256(
+            json.dumps(
+                {
+                    "operation": "counterfactual_revision_text",
+                    "parent_provenance_id": source.params["provenance_id"],
+                    "source_file_spans": changed_file_spans,
+                    "source_view_basenames": source.params["source_view_basenames"],
+                    "text_sha256": changed_text_sha256,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        claim_count = len(decision.params["required_claim_ids"])
+        question = (
+            f"For {decision.params['work_id']}, verify the signed v5 revision_of v4 "
+            f"edge and apply the {tier} compiled-source control. Reconcile all "
+            f"{claim_count} selected section claims in control order. Reply exactly "
+            "as v5 revision_of v4 || <claim 1> || ... using the exact grounded "
+            "claim sentence from every selected section."
+        )
+        workflow_key = hashlib.sha256(
+            str(decision.params["workflow_id"]).encode()
+        ).hexdigest()[:12]
+        queries.append(
+            QuerySpec(
+                query_id=f"{qid}:paper_revision_section_reconciliation:{workflow_key}:{tier}",
+                query_type="paper_revision_section_reconciliation",
+                question=question,
+                answer="",
+                as_of=decision.time,
+                answer_key=str(decision.params["answer_key"]),
+                essential_event_ids=proof_event_ids,
+                essential_artifact_ids=[
+                    _event_artifact_id(world, events_by_id[event_id])
+                    for event_id in proof_event_ids
+                ],
+                sufficient_event_ids=proof_event_ids,
+                cf_event_id=source.id,
+                cf_param_updates={
+                    "text": changed_text,
+                    "text_sha256": changed_text_sha256,
+                    "section_claim_quote": changed_claim,
+                    "parent_provenance_id": source.params["provenance_id"],
+                    "provenance_id": f"derived-sha256:{changed_provenance}",
+                    "provenance_operation": "counterfactual_revision_text",
+                    "source_binding_provenance": "synthetic_executable",
+                    "source_origin": "synthetic_world",
+                    "parent_source_origin": "real_derived",
+                    "parent_source_envelope_sha256": source.params[
+                        "canonical_source_envelope_sha256"
+                    ],
+                    "parent_source_text_sha256": source.params["text_sha256"],
+                    "excluded_paths": [],
+                    "source_file_spans": changed_file_spans,
+                    "grounded_source": changed_grounded_source,
+                },
+                cf_answer="",
+                invariance_event_id=tok.id,
+                invariance_param_updates={"commit": "ab00ab"},
+                gold_expression=(
+                    f"FOLLOW(v5 revision_of v4) AND COMPILE({tier}) AND "
+                    f"RECONCILE({claim_count} SECTION_CLAIMS)"
+                ),
+                proof_depth=4,
+                cf_op="section_claim",
+                motif="paper_revision_section_reconciliation",
+                topology_id=instance_topology(
+                    "lab.paper_revision_section_reconciliation", tier, claim_count
+                ),
+                domain="researchlab",
+                truth_regime="real_source_derived",
+                program_ops=[
+                    *({"op": "READ_SECTION_CLAIM"} for _ in range(claim_count)),
+                    {"op": "FOLLOW_REVISION_OF"},
+                    {"op": "APPLY_COMPILED_SOURCE_CONTROL"},
+                    {"op": "RECONCILE_SECTION_CLAIMS"},
+                ],
+                preferred_length_buckets=[tier],
+                semantic_growth_group=(
+                    "researchlab_paper_revision_section_reconciliation"
+                ),
+                base_task_group=(
+                    f"paper_revision_section_reconciliation:"
+                    f"{decision.params['work_id']}:{workflow_key}"
+                ),
+            )
+        )
+
     benchmark_decisions = sorted(
         (
             event

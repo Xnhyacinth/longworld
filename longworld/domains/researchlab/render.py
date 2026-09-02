@@ -135,6 +135,12 @@ def _ground(ev: Event) -> list[str]:
         return []
     if t == "arxiv_benchmark_trace_decision":
         return []
+    if t in {
+        "arxiv_section_compile_context",
+        "arxiv_section_reconciliation_control",
+        "arxiv_section_reconciliation_decision",
+    }:
+        return []
     if t == "wiki_source_section":
         return [str(value) for value in p.get("ground_values") or []]
     if t == "wiki_claim_answer":
@@ -209,6 +215,71 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
                     "include detailed-result spans only when the control tier "
                     "requires them"
                 ),
+                "answer_disclosure": "omitted",
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        ) + "\n"
+    if t == "arxiv_section_reconciliation_control":
+        tier = str(ev.params["control_tier"])
+        compile_detail = (
+            {"selected_compile_receipts": ev.params["selected_compile_receipts"]}
+            if tier == "32k"
+            else {
+                "compiled_source_include_receipts": ev.params[
+                    "compiled_source_include_receipts"
+                ],
+            }
+            if tier == "64k"
+            else {}
+        )
+        return "json", json.dumps(
+            {
+                "kind": "arxiv_section_reconciliation_control",
+                "control_tier": ev.params["control_tier"],
+                "required_claim_ids": ev.params["required_claim_ids"],
+                "selected_source_paths": ev.params["selected_source_paths"],
+                "compiled_source_edges": ev.params["compiled_source_edges"],
+                "compiled_source_graph_sha256": ev.params[
+                    "compiled_source_graph_sha256"
+                ],
+                "excluded_content_classes": ev.params["excluded_content_classes"],
+                **compile_detail,
+                "rule": (
+                    "reconcile every claim in compiled order after the signed edge "
+                    "and both endpoints replay"
+                ),
+                "answer_disclosure": "omitted",
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        ) + "\n"
+    if t == "arxiv_section_compile_context":
+        return "json", json.dumps(
+            {
+                "kind": "arxiv_section_compile_context",
+                "control_tier": ev.params["control_tier"],
+                "compiled_source_graph_sha256": ev.params[
+                    "compiled_source_graph_sha256"
+                ],
+                "selected_source_paths": ev.params["selected_source_paths"],
+                "excluded_source_paths": ev.params["excluded_source_paths"],
+                "role": "bounded compiled-source exclusion receipt",
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        ) + "\n"
+    if t == "arxiv_section_reconciliation_decision":
+        return "json", json.dumps(
+            {
+                "kind": "arxiv_section_reconciliation_decision",
+                "control_tier": ev.params["control_tier"],
+                "required_claim_count": len(ev.params["required_claim_ids"]),
+                "required_revision_relation": "v5 revision_of v4",
+                "rule": "emit every grounded section claim in control order",
                 "answer_disclosure": "omitted",
             },
             ensure_ascii=False,
@@ -563,6 +634,9 @@ def render_lab(sim: SimulatedWorld) -> list[Artifact]:
             "arxiv_revision_relation",
             "arxiv_revision_decision",
             "arxiv_benchmark_trace_decision",
+            "arxiv_section_compile_context",
+            "arxiv_section_reconciliation_control",
+            "arxiv_section_reconciliation_decision",
         }:
             is_record = ev.type in {"arxiv_revision", "arxiv_revision_context"}
             source_origin = (

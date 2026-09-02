@@ -265,6 +265,108 @@ def _semantic_arxiv_section_body(
     return body, f"derived-sha256:{provenance}", excluded_paths, [span]
 
 
+def _semantic_arxiv_file_body(
+    record: Any,
+    *,
+    source_path: str,
+    strip_after: str = "",
+    preserved_quote: str = "",
+) -> tuple[str, str, list[str], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Compile one reachable LaTeX file while preserving one grounded claim."""
+    payload = json.loads(record.text)
+    raw_sources = payload.get("latex_sources") if isinstance(payload, dict) else None
+    matches = [
+        source
+        for source in raw_sources or []
+        if str(source.get("path") or "") == source_path
+    ]
+    if len(matches) != 1:
+        raise ValueError("arXiv exact source path is not unique")
+    source_text = str(matches[0].get("text") or "")
+    selected_text = source_text
+    if strip_after:
+        if selected_text.count(strip_after) != 1:
+            raise ValueError("arXiv exact source suffix is not unique")
+        selected_text = selected_text[: selected_text.index(strip_after)].rstrip() + "\n"
+    placeholder = "LONGWORLDSPARKSGROUNDEDCLAIM"
+    if preserved_quote:
+        if selected_text.count(preserved_quote) != 1 or placeholder in selected_text:
+            raise ValueError("arXiv compiled claim is not unique")
+        selected_text = selected_text.replace(preserved_quote, placeholder)
+    compiled_lines: list[str] = []
+    for raw_line in selected_text.splitlines():
+        visible = re.split(r"(?<!\\)%", raw_line, maxsplit=1)[0].rstrip()
+        if visible.strip():
+            compiled_lines.append(visible)
+    selected_text = "\n".join(compiled_lines) + "\n"
+    selected_text = re.sub(
+        r"\\(?:label|ref|eqref|cite|citep|citet|autoref|cref|Cref|vspace|hspace)"
+        r"\*?(?:\[[^\]]*\])?\{[^{}]*\}",
+        "",
+        selected_text,
+    )
+    for _ in range(3):
+        selected_text = re.sub(
+            r"\\(?:textit|textbf|textrm|texttt|emph|underline)\*?\{([^{}]*)\}",
+            r"\1",
+            selected_text,
+        )
+    selected_text = re.sub(
+        r"\\(?:clearpage|newpage|noindent|centering)\b", "", selected_text
+    )
+    if preserved_quote:
+        selected_text = selected_text.replace(placeholder, preserved_quote)
+    if not selected_text:
+        raise ValueError("arXiv exact source view is empty")
+    revision_id = record.attribute("revision_id")
+    header = (
+        f"% arXiv manuscript revision {revision_id}\n"
+        f"% arXiv submitted_at {record.occurred_at}\n"
+    )
+    body = header + selected_text
+    basename = source_path.rsplit("/", 1)[-1]
+    span = {
+        "path": source_path,
+        "basename": basename,
+        "char_start": len(header),
+        "char_end": len(body),
+        "text_sha256": hashlib.sha256(selected_text.encode()).hexdigest(),
+    }
+    excluded_paths = sorted(
+        str(source["path"])
+        for source in raw_sources or []
+        if str(source.get("path") or "") != source_path
+    )
+    digest_payload = {
+        "operation": "arxiv_semantic_latex_body_v2",
+        "parent_provenance_id": record.provenance_id,
+        "excluded_paths": excluded_paths,
+        "source_file_spans": [span],
+        "source_compile_receipts": [
+            {
+                "path": source_path,
+                "compiler_revision": "visible-latex-v1",
+                "source_byte_start": 0,
+                "source_byte_end": len(source_text.encode()),
+                "source_text_sha256": hashlib.sha256(source_text.encode()).hexdigest(),
+                "compiled_text_sha256": span["text_sha256"],
+            }
+        ],
+        "source_view_basenames": [basename],
+        "text_sha256": hashlib.sha256(body.encode()).hexdigest(),
+    }
+    provenance = hashlib.sha256(
+        json.dumps(digest_payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return (
+        body,
+        f"derived-sha256:{provenance}",
+        excluded_paths,
+        [span],
+        list(digest_payload["source_compile_receipts"]),
+    )
+
+
 def _canonical_digest(payload: dict[str, Any]) -> str:
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
@@ -279,6 +381,7 @@ def _arxiv_source_envelope(
     provenance_id: str,
     provenance_operation: str = "arxiv_semantic_latex_body_v1",
     source_file_spans: list[dict[str, Any]] | None = None,
+    source_compile_receipts: list[dict[str, Any]] | None = None,
     source_view_basenames: list[str] | None = None,
 ) -> dict[str, Any]:
     payload = {
@@ -297,6 +400,8 @@ def _arxiv_source_envelope(
     if provenance_operation == "arxiv_semantic_latex_body_v2":
         payload["source_file_spans"] = list(source_file_spans or [])
         payload["source_view_basenames"] = list(source_view_basenames or [])
+        if source_compile_receipts:
+            payload["source_compile_receipts"] = list(source_compile_receipts)
     return payload
 
 
@@ -1309,6 +1414,94 @@ _ARXIV_32K_FILES = frozenset(
 )
 _ARXIV_TERMINAL_FILES = frozenset({"abstract.tex", "acknowledgements.tex"})
 _ARXIV_TIER_OFFSETS = {"16k": 0, "32k": 365, "64k": 730}
+_SPARKS_WORK_ID = "arxiv:2303.12712"
+_SPARKS_ACKNOWLEDGMENTS = "\\paragraph{Acknowledgments.}"
+_SPARKS_SECTION_CLAIMS = {
+    "contents/1_intro.tex": (
+        "agi_scope",
+        ("We use AGI to refer to systems that demonstrate broad capabilities of "
+        "intelligence, including reasoning, planning, and the ability to learn "
+        "from experience, and with these capabilities at or above human-level."),
+    ),
+    "contents/2_see.tex": (
+        "cross_domain_composition",
+        ("A key measure of intelligence is the ability to synthesize information "
+        "from different domains or modalities and the capacity to apply knowledge "
+        "and skills across different contexts or disciplines."),
+    ),
+    "contents/4_math.tex": (
+        "mathematical_research_limit",
+        ("As it seems, however, \\DV \\ is still quite far from the level of experts, "
+        "and does not have the capacity required to conduct mathematical research."),
+    ),
+    "contents/5.2_interact_environment.tex": (
+        "embodied_text_interface",
+        ("While \\DV\\ is obviously not embodied,  we explore whether it can engage "
+        "in embodied interaction by using natural language as a text interface to "
+        "various simulated or real-world environments."),
+    ),
+    "contents/roleplaying.tex": (
+        "theory_of_mind",
+        ("Theory of mind is the ability to attribute mental states such as beliefs, "
+        "emotions, desires, intentions, and knowledge to oneself and others, and "
+        "to understand how they affect behavior and communication~"
+        "\\cite{wellman1992child}."),
+    ),
+    "contents/7.1_pii.tex": (
+        "pii_corpus_size",
+        "We are able to obtain a total of 6764 sentences.",
+    ),
+    "contents/7.2_misconceptions.tex": (
+        "similarity_metric_limit",
+        ("This raises an important shortcoming of the current metrics: they fail "
+        "to capture \\textit{semantic} similarities within statements, and rely "
+        "primarily on word or sentence-level similarity metrics which capture "
+        "\\textit{syntax}."),
+    ),
+    "contents/reasoninglimitations.tex": (
+        "autoregressive_planning_limit",
+        ("These examples illustrate some of the limitations of the next-word "
+        "prediction paradigm, which manifest as the model's lack of planning, "
+        "working memory, ability to backtrack, and reasoning abilities."),
+    ),
+    "contents/societal.tex": (
+        "personalized_manipulation_risk",
+        ("Moreover, the message can be customized and personalized per individual, "
+        "showing the possibility of a personalized, scalable attack vector."),
+    ),
+    "contents/conclusion.tex": (
+        "mechanism_status",
+        ("Overall, elucidating the nature and mechanisms of AI systems such as "
+        "{\\DV} is a formidable challenge that has suddenly become important and "
+        "urgent."),
+    ),
+}
+_SPARKS_SECTION_TIERS = {
+    "16k": (
+        "contents/roleplaying.tex",
+        "contents/7.2_misconceptions.tex",
+        "contents/reasoninglimitations.tex",
+    ),
+    "32k": (
+        "contents/2_see.tex",
+        "contents/4_math.tex",
+        "contents/roleplaying.tex",
+        "contents/7.2_misconceptions.tex",
+        "contents/reasoninglimitations.tex",
+    ),
+    "64k": (
+        "contents/1_intro.tex",
+        "contents/2_see.tex",
+        "contents/4_math.tex",
+        "contents/5.2_interact_environment.tex",
+        "contents/roleplaying.tex",
+        "contents/7.1_pii.tex",
+        "contents/7.2_misconceptions.tex",
+        "contents/reasoninglimitations.tex",
+        "contents/societal.tex",
+        "contents/conclusion.tex",
+    ),
+}
 _ARXIV_BENCHMARK_TRACE_VIEWS: dict[
     str, tuple[tuple[str, str, frozenset[str], bool, bool, bool], ...]
 ] = {
@@ -1585,8 +1778,28 @@ def _multiband_arxiv_revision_event(
     view_channel: str = "",
     section_basename: str = "",
     section_names: frozenset[str] = frozenset(),
+    source_path: str = "",
+    strip_after: str = "",
+    section_claim_id: str = "",
+    section_claim_quote: str = "",
 ) -> tuple[Event, str, str, dict[str, str]]:
-    if section_names:
+    source_compile_receipts: list[dict[str, Any]] = []
+    if source_path:
+        (
+            body,
+            provenance_id,
+            excluded_paths,
+            source_file_spans,
+            source_compile_receipts,
+        ) = (
+            _semantic_arxiv_file_body(
+                record,
+                source_path=source_path,
+                strip_after=strip_after,
+                preserved_quote=section_claim_quote,
+            )
+        )
+    elif section_names:
         body, provenance_id, excluded_paths, source_file_spans = (
             _semantic_arxiv_section_body(
                 record,
@@ -1626,6 +1839,22 @@ def _multiband_arxiv_revision_event(
             char_start=submitted_start,
         ),
     ]
+    if section_claim_id or section_claim_quote:
+        if (
+            not section_claim_id
+            or not section_claim_quote
+            or body.count(section_claim_quote) != 1
+        ):
+            raise ValueError("arXiv section claim is not uniquely grounded")
+        grounded_facts.append(
+            _grounded_fact(
+                source_id=event_id,
+                text=body,
+                fact_id=f"{event_id}:section_claim:{section_claim_id}",
+                quote=section_claim_quote,
+                char_start=body.index(section_claim_quote),
+            )
+        )
     source_fact_ids: dict[str, str] = {}
     for fact_index, fact in enumerate(record.facts):
         if body.count(fact.value) != 1:
@@ -1649,6 +1878,7 @@ def _multiband_arxiv_revision_event(
         provenance_id=provenance_id,
         provenance_operation="arxiv_semantic_latex_body_v2",
         source_file_spans=source_file_spans,
+        source_compile_receipts=source_compile_receipts,
         source_view_basenames=sorted(
             str(span["basename"]) for span in source_file_spans
         ),
@@ -1675,8 +1905,22 @@ def _multiband_arxiv_revision_event(
             "canonical_source_envelope_sha256": _canonical_digest(source_envelope),
             "excluded_paths": excluded_paths,
             "source_file_spans": source_file_spans,
+            **(
+                {"source_compile_receipts": source_compile_receipts}
+                if source_compile_receipts
+                else {}
+            ),
             "source_view_basenames": sorted(
                 str(span["basename"]) for span in source_file_spans
+            ),
+            **(
+                {
+                    "section_claim_id": section_claim_id,
+                    "section_claim_quote": section_claim_quote,
+                    "section_source_path": source_path,
+                }
+                if section_claim_id
+                else {}
             ),
             "source_origin": "real_derived",
             "source_family": record.source_family,
@@ -1838,6 +2082,347 @@ def _multiband_arxiv_relation_event(
         ],
         relation_kinds=relation_kinds,
     )
+
+
+def _arxiv_reachable_source_graph(
+    sources: dict[str, str],
+) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
+    """Resolve the bounded input/include graph from the attested root TeX file."""
+    include = re.compile(r"\\(?:input|include)\s*\{([^}]+)\}")
+    order: list[str] = []
+    edges: list[tuple[str, str]] = []
+
+    def resolve(raw: str) -> str:
+        if raw.startswith("/") or ".." in raw.split("/") or "\\" in raw:
+            raise ValueError("arXiv compiled source reference is unsafe")
+        if raw in sources:
+            return raw
+        with_suffix = f"{raw}.tex"
+        if with_suffix in sources:
+            return with_suffix
+        raise ValueError("arXiv compiled source reference is missing")
+
+    def visit(path: str) -> None:
+        if path in order:
+            return
+        order.append(path)
+        for raw_line in sources[path].splitlines():
+            line = re.split(r"(?<!\\)%", raw_line, maxsplit=1)[0]
+            for match in include.finditer(line):
+                target = resolve(match.group(1).strip())
+                edges.append((path, target))
+                visit(target)
+
+    visit(resolve("main.tex"))
+    return tuple(order), tuple(edges)
+
+
+def _arxiv_include_receipts(record: Any) -> list[dict[str, Any]]:
+    payload = json.loads(record.text)
+    raw_sources = payload.get("latex_sources") if isinstance(payload, dict) else None
+    sources = {
+        str(source.get("path") or ""): str(source.get("text") or "")
+        for source in raw_sources or []
+    }
+    _order, edges = _arxiv_reachable_source_graph(sources)
+    receipts: list[dict[str, Any]] = []
+    for parent, child in edges:
+        matches = []
+        for match in re.finditer(r"\\(?:input|include)\s*\{([^}]+)\}", sources[parent]):
+            raw = match.group(1).strip()
+            resolved = raw if raw in sources else f"{raw}.tex"
+            if resolved == child:
+                matches.append(match)
+        if len(matches) != 1:
+            raise ValueError("arXiv compiled include binding is not unique")
+        match = matches[0]
+        receipts.append(
+            {
+                "parent_path": parent,
+                "child_path": child,
+                "directive": match.group(0),
+                "source_char_start": match.start(),
+                "source_char_end": match.end(),
+                "source_text_sha256": hashlib.sha256(
+                    sources[parent].encode()
+                ).hexdigest(),
+            }
+        )
+    return receipts
+
+
+def _sparks_revision_section_records(
+    workflow: Any,
+) -> tuple[dict[str, Any], Any, tuple[str, ...], tuple[tuple[str, str], ...]] | None:
+    records = {str(record.attribute("revision_id")): record for record in workflow.records}
+    if set(records) != {"v1", "v2", "v3", "v4", "v5"}:
+        return None
+    if any(
+        record.attribute("work_id") != _SPARKS_WORK_ID
+        or record.record_id != f"{_SPARKS_WORK_ID}{revision}"
+        or record.source_family != "arxiv_record"
+        for revision, record in records.items()
+    ):
+        return None
+    expected_relations = {
+        (f"{_SPARKS_WORK_ID}v{version}", f"{_SPARKS_WORK_ID}v{version - 1}")
+        for version in range(2, 6)
+    }
+    relations = {
+        (relation.source_record_id, relation.target_record_id): relation
+        for relation in workflow.relations
+        if relation.kind == "revision_of" and len(relation.evidence) == 1
+    }
+    if set(relations) != expected_relations:
+        return None
+    payload = json.loads(records["v5"].text)
+    raw_sources = payload.get("latex_sources") if isinstance(payload, dict) else None
+    if not isinstance(raw_sources, list):
+        return None
+    sources = {
+        str(source.get("path") or ""): str(source.get("text") or "")
+        for source in raw_sources
+    }
+    if len(sources) != len(raw_sources) or any(
+        not path or not text for path, text in sources.items()
+    ):
+        return None
+    try:
+        reachable_order, reachable_edges = _arxiv_reachable_source_graph(sources)
+    except ValueError:
+        return None
+    required_paths = set(_SPARKS_SECTION_TIERS["64k"])
+    if not required_paths.issubset(reachable_order):
+        return None
+    for path, (_claim_id, quote) in _SPARKS_SECTION_CLAIMS.items():
+        if sources.get(path, "").count(quote) != 1:
+            return None
+    if sources["contents/conclusion.tex"].count(_SPARKS_ACKNOWLEDGMENTS) != 1:
+        return None
+    prior_payload = json.loads(records["v4"].text)
+    prior_sources = prior_payload.get("latex_sources") if isinstance(prior_payload, dict) else None
+    if not isinstance(prior_sources, list) or sum(
+        str(source.get("path") or "") == "contents/abstract.tex"
+        for source in prior_sources
+    ) != 1:
+        return None
+    return (
+        records,
+        relations[(records["v5"].record_id, records["v4"].record_id)],
+        reachable_order,
+        reachable_edges,
+    )
+
+
+def _sparks_revision_section_events(
+    workflow: Any,
+    prefix: str,
+    workflow_index: int,
+    recognized: tuple[
+        dict[str, Any], Any, tuple[str, ...], tuple[tuple[str, str], ...]
+    ],
+) -> list[Event]:
+    records, relation, reachable_order, reachable_edges = recognized
+    record_indices = {
+        record.record_id: index for index, record in enumerate(workflow.records)
+    }
+    relation_index = next(
+        index
+        for index, candidate in enumerate(workflow.relations)
+        if candidate.relation_id == relation.relation_id
+    )
+    workflow_key = hashlib.sha256(workflow.workflow_id.encode()).hexdigest()[:12]
+    graph_sha256 = hashlib.sha256(
+        json.dumps(reachable_edges, separators=(",", ":")).encode()
+    ).hexdigest()
+    include_receipts = _arxiv_include_receipts(records["v5"])
+    events: list[Event] = []
+    for tier, source_paths in _SPARKS_SECTION_TIERS.items():
+        target_event, _target_body, target_revision_fact, _target_facts = (
+            _multiband_arxiv_revision_event(
+                workflow=workflow,
+                record=records["v4"],
+                prefix=prefix,
+                workflow_index=workflow_index,
+                record_index=record_indices[records["v4"].record_id],
+                tier=tier,
+                included_basenames=None,
+                view_channel="prior_endpoint",
+                source_path="contents/abstract.tex",
+            )
+        )
+        claim_events: list[Event] = []
+        claim_bodies: dict[str, str] = {}
+        claim_revision_facts: dict[str, str] = {}
+        claim_source_facts: dict[str, dict[str, str]] = {}
+        for source_index, source_path in enumerate(source_paths):
+            claim_id, claim_quote = _SPARKS_SECTION_CLAIMS[source_path]
+            event, body, revision_fact, source_facts = (
+                _multiband_arxiv_revision_event(
+                    workflow=workflow,
+                    record=records["v5"],
+                    prefix=prefix,
+                    workflow_index=workflow_index,
+                    record_index=record_indices[records["v5"].record_id],
+                    tier=tier,
+                    included_basenames=None,
+                    view_channel=(
+                        f"section_{len(source_paths) - source_index:02d}_{claim_id}"
+                    ),
+                    source_path=source_path,
+                    strip_after=(
+                        _SPARKS_ACKNOWLEDGMENTS
+                        if source_path == "contents/conclusion.tex"
+                        else ""
+                    ),
+                    section_claim_id=claim_id,
+                    section_claim_quote=claim_quote,
+                )
+            )
+            claim_events.append(event)
+            claim_bodies[claim_id] = body
+            claim_revision_facts[claim_id] = revision_fact
+            claim_source_facts[claim_id] = source_facts
+        # Full views follow the task's latest-revision-first reading program;
+        # ordered views restore source chronology and therefore remain distinct.
+        events.extend(claim_events)
+        events.append(target_event)
+        relation_source = next(
+            event
+            for event in claim_events
+            if event.params["section_claim_id"] == "similarity_metric_limit"
+        )
+        relation_event = _multiband_arxiv_relation_event(
+            workflow=workflow,
+            records=records,
+            relation=relation,
+            relation_index=relation_index,
+            workflow_index=workflow_index,
+            tier=tier,
+            source_event=relation_source,
+            target_event=target_event,
+            source_body=claim_bodies["similarity_metric_limit"],
+            source_revision_fact_id=claim_revision_facts["similarity_metric_limit"],
+            target_revision_fact_id=target_revision_fact,
+            source_fact_ids=claim_source_facts["similarity_metric_limit"],
+        )
+        relation_event.params["render_control_tier"] = True
+        events.append(relation_event)
+        claim_ids = [str(event.params["section_claim_id"]) for event in claim_events]
+        compile_context_id = (
+            f"{prefix}.arxiv_section_compile_context_{tier}_{workflow_index}"
+        )
+        events.append(
+            Event(
+                id=compile_context_id,
+                type="arxiv_section_compile_context",
+                time=relation_event.time,
+                params={
+                    "workflow_id": workflow.workflow_id,
+                    "control_tier": tier,
+                    "compiled_source_graph_sha256": graph_sha256,
+                    "selected_source_paths": list(source_paths),
+                    "excluded_source_paths": sorted(
+                        set(reachable_order) - set(source_paths)
+                    ),
+                },
+                visibility=[compile_context_id],
+            )
+        )
+        control_id = (
+            f"{prefix}.arxiv_section_reconciliation_control_"
+            f"{tier}_{workflow_index}"
+        )
+        control_inputs = [
+            target_event.id,
+            *[event.id for event in claim_events],
+            relation_event.id,
+        ]
+        selected_paths = list(source_paths)
+        control = Event(
+            id=control_id,
+            type="arxiv_section_reconciliation_control",
+            time=relation_event.time + timedelta(days=1),
+            params={
+                "workflow_id": workflow.workflow_id,
+                "work_id": _SPARKS_WORK_ID,
+                "control_tier": tier,
+                "control_key": f"paper_section_control:{workflow_key}:{tier}",
+                "source_revision_id": "v5",
+                "target_revision_id": "v4",
+                "source_record_id": records["v5"].record_id,
+                "target_record_id": records["v4"].record_id,
+                "target_record_event_id": target_event.id,
+                "relation_event_id": relation_event.id,
+                "required_relation_id": relation.relation_id,
+                "claim_event_ids": [event.id for event in claim_events],
+                "required_claim_ids": claim_ids,
+                "selected_source_paths": selected_paths,
+                "compiled_source_order": list(reachable_order),
+                "compiled_source_edges": [list(edge) for edge in reachable_edges],
+                "compiled_source_graph_sha256": graph_sha256,
+                "selected_compile_receipts": [
+                    event.params["source_compile_receipts"][0]
+                    for event in claim_events
+                ],
+                "compiled_source_include_receipts": include_receipts,
+                "excluded_source_paths": sorted(set(reachable_order) - set(selected_paths)),
+                "excluded_content_classes": [
+                    "acknowledgments",
+                    "author_block",
+                    "bibliography",
+                    "build_cache",
+                    "macro_only",
+                    "table_of_contents",
+                    "unreachable_source",
+                ],
+            },
+            visibility=[control_id],
+            causal_inputs=[*control_inputs, compile_context_id],
+            required_inputs=list(control_inputs),
+            relation_kinds={
+                target_event.id: "reads_prior_endpoint",
+                **{event.id: "reads_compiled_section" for event in claim_events},
+                relation_event.id: "authenticates_revision",
+                compile_context_id: "reads_compile_receipt",
+            },
+        )
+        events.append(control)
+        decision_id = (
+            f"{prefix}.arxiv_section_reconciliation_decision_"
+            f"{tier}_{workflow_index}"
+        )
+        proof_event_ids = [*control_inputs, control.id, decision_id]
+        events.append(
+            Event(
+                id=decision_id,
+                type="arxiv_section_reconciliation_decision",
+                time=control.time + timedelta(days=1),
+                params={
+                    "workflow_id": workflow.workflow_id,
+                    "work_id": _SPARKS_WORK_ID,
+                    "control_tier": tier,
+                    "control_key": control.params["control_key"],
+                    "answer_key": f"paper_section_reconciliation:{workflow_key}:{tier}",
+                    "source_revision_id": "v5",
+                    "target_revision_id": "v4",
+                    "required_relation_id": relation.relation_id,
+                    "relation_event_id": relation_event.id,
+                    "required_claim_ids": claim_ids,
+                    "control_event_id": control.id,
+                    "counterfactual_claim_event_id": relation_source.id,
+                    "proof_event_ids": proof_event_ids,
+                },
+                visibility=[decision_id],
+                causal_inputs=[control.id, relation_event.id],
+                required_inputs=[control.id, relation_event.id],
+                relation_kinds={
+                    control.id: "applies_compiled_control",
+                    relation_event.id: "applies_revision_chain",
+                },
+            )
+        )
+    return events
 
 
 def _paper_substantive_revision_records(
@@ -2611,6 +3196,14 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
             )
             continue
         if workflow.source_kind != PAPER_SOURCE_KIND:
+            continue
+        sparks_records = _sparks_revision_section_records(workflow)
+        if sparks_records is not None:
+            events.extend(
+                _sparks_revision_section_events(
+                    workflow, prefix, workflow_index, sparks_records
+                )
+            )
             continue
         benchmark_records = _paper_benchmark_trace_records(workflow)
         if benchmark_records is not None:

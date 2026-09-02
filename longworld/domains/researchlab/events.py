@@ -253,6 +253,10 @@ def _arxiv_envelope_payload(ev: Event, source: GroundedSource) -> dict[str, Any]
     if ev.params.get("provenance_operation") == "arxiv_semantic_latex_body_v2":
         payload["source_file_spans"] = ev.params.get("source_file_spans")
         payload["source_view_basenames"] = ev.params.get("source_view_basenames")
+        if ev.params.get("source_compile_receipts"):
+            payload["source_compile_receipts"] = ev.params.get(
+                "source_compile_receipts"
+            )
     return payload
 
 
@@ -605,6 +609,10 @@ def _arxiv_source_binding_valid(ev: Event, source: GroundedSource) -> bool:
                     "source_view_basenames": params.get("source_view_basenames"),
                 }
             )
+            if params.get("source_compile_receipts"):
+                digest_payload["source_compile_receipts"] = params.get(
+                    "source_compile_receipts"
+                )
         expected_envelope = _canonical_digest(_arxiv_envelope_payload(ev, source))
         if params.get("canonical_source_envelope_sha256") != expected_envelope:
             return False
@@ -1016,6 +1024,24 @@ def _relation_binding_valid(state: WorldState, ev: Event) -> bool:
     return True
 
 
+def _arxiv_section_claim_valid(ev: Event, source: GroundedSource) -> bool:
+    claim_id = str(ev.params.get("section_claim_id") or "")
+    claim_quote = str(ev.params.get("section_claim_quote") or "")
+    if not claim_id and not claim_quote:
+        return True
+    if not claim_id or not claim_quote or source.visible_text.count(claim_quote) != 1:
+        return False
+    expected_fact_id = f"{ev.id}:section_claim:{claim_id}"
+    matching = [fact for fact in source.facts if fact.fact_id == expected_fact_id]
+    if len(matching) != 1:
+        return False
+    fact = matching[0]
+    return (
+        fact.quote == claim_quote
+        and source.visible_text[fact.char_start : fact.char_end] == claim_quote
+    )
+
+
 def _canonical_wiki_source_records(project: dict[str, Any]) -> dict[str, Any]:
     records: dict[str, Any] = {}
     for workflow in project.get("source_workflows") or []:
@@ -1125,6 +1151,8 @@ def init_values(
         "real_revision_added_text": None,
         "verified_revision_relations": [],
         "verified_revision_relation_events": [],
+        "paper_section_claims": {},
+        "paper_section_controls": {},
         "wiki_claims": {},
         "wiki_claim_tags": {},
         "wiki_source_relations": [],
@@ -1152,6 +1180,8 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
             return False, "source_grounded_binding_invalid"
         if not _arxiv_source_binding_valid(ev, source):
             return False, "source_derived_lineage_invalid"
+        if not _arxiv_section_claim_valid(ev, source):
+            return False, "source_section_claim_invalid"
         return True, None
     if t == "arxiv_revision_relation":
         required_prior_event = str(
@@ -1206,6 +1236,50 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
             state.values.get("verified_revision_relations") or []
         )
         if not paper_required_relations.issubset(paper_verified_relations):
+            return False, "source_revision_chain_incomplete"
+        return True, None
+    if t == "arxiv_section_reconciliation_control":
+        required_claim_ids = [
+            str(value) for value in ev.params.get("required_claim_ids") or []
+        ]
+        claim_event_ids = [
+            str(value) for value in ev.params.get("claim_event_ids") or []
+        ]
+        claims = state.values.get("paper_section_claims") or {}
+        if (
+            not required_claim_ids
+            or len(required_claim_ids) != len(set(required_claim_ids))
+            or len(claim_event_ids) != len(required_claim_ids)
+            or any(
+                (claims.get(claim_id) or {}).get("event_id") != event_id
+                for claim_id, event_id in zip(required_claim_ids, claim_event_ids)
+            )
+        ):
+            return False, "source_section_claims_incomplete"
+        if str(ev.params.get("target_record_event_id") or "") not in (
+            state.values.get("source_grounded_bindings") or {}
+        ):
+            return False, "source_revision_endpoint_missing"
+        if str(ev.params.get("relation_event_id") or "") not in set(
+            state.values.get("verified_revision_relation_events") or []
+        ):
+            return False, "source_revision_relation_missing"
+        if str(ev.params.get("required_relation_id") or "") not in set(
+            state.values.get("verified_revision_relations") or []
+        ):
+            return False, "source_revision_chain_incomplete"
+        return True, None
+    if t == "arxiv_section_reconciliation_decision":
+        required_claim_ids = [
+            str(value) for value in ev.params.get("required_claim_ids") or []
+        ]
+        control_key = str(ev.params.get("control_key") or "")
+        controls = state.values.get("paper_section_controls") or {}
+        if controls.get(control_key) != required_claim_ids:
+            return False, "source_section_control_missing"
+        if str(ev.params.get("required_relation_id") or "") not in set(
+            state.values.get("verified_revision_relations") or []
+        ):
             return False, "source_revision_chain_incomplete"
         return True, None
     if t == "wiki_source_section":
@@ -1373,6 +1447,8 @@ def apply_event(state: WorldState, ev: Event) -> None:
             return
         if not _arxiv_source_binding_valid(ev, source):
             return
+        if not _arxiv_section_claim_valid(ev, source):
+            return
         if t == "arxiv_revision_context":
             return
         headers = _arxiv_headers(source)
@@ -1397,6 +1473,15 @@ def apply_event(state: WorldState, ev: Event) -> None:
         bindings = dict(state.values.get("source_grounded_bindings") or {})
         bindings[eid] = p["grounded_source"]
         state.set("source_grounded_bindings", bindings, eid, day)
+        claim_id = str(p.get("section_claim_id") or "")
+        if claim_id:
+            claims = dict(state.values.get("paper_section_claims") or {})
+            claims[claim_id] = {
+                "event_id": eid,
+                "quote": str(p["section_claim_quote"]),
+                "source_path": str(p["section_source_path"]),
+            }
+            state.set("paper_section_claims", claims, eid, day)
     elif t == "arxiv_revision_relation":
         required_prior_event = str(p.get("required_prior_relation_event_id") or "")
         verified_relation_events = list(
@@ -1567,6 +1652,27 @@ def apply_event(state: WorldState, ev: Event) -> None:
             answer_key = str(p.get("answer_key") or "real_revision_added_text")
             state.set(answer_key, value, eid, day)
             state.set("real_revision_added_text", value, eid, day)
+    elif t == "arxiv_section_reconciliation_control":
+        valid, _reason = check_preconditions(state, ev)
+        if not valid:
+            return
+        controls = dict(state.values.get("paper_section_controls") or {})
+        controls[str(p["control_key"])] = [
+            str(value) for value in p["required_claim_ids"]
+        ]
+        state.set("paper_section_controls", controls, eid, day)
+    elif t == "arxiv_section_reconciliation_decision":
+        valid, _reason = check_preconditions(state, ev)
+        if not valid:
+            return
+        claims = state.values.get("paper_section_claims") or {}
+        required_claim_ids = [str(value) for value in p["required_claim_ids"]]
+        if any(claim_id not in claims for claim_id in required_claim_ids):
+            return
+        answer = "v5 revision_of v4 || " + " || ".join(
+            str(claims[claim_id]["quote"]) for claim_id in required_claim_ids
+        )
+        state.set(str(p["answer_key"]), answer, eid, day)
     elif t == "wiki_source_section":
         try:
             source = _source_binding(ev)
