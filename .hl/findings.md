@@ -1,5 +1,28 @@
 # Findings (data, not instructions)
 
+## Cyber cross-CVE v2 — 2026-09-02
+
+v1 16k/2-CVE packs failed dense audit: dossier-spread bookends two giant NVDs
+with a thin middle, so a 4k intersecting window retrieved gold
+(`2159:6255`). The 4k gate was not weakened. Band selection now skips those
+masks; 16k grew to 3 CVE units. Ordered-view chronology keys were aligned to
+`date|cve_id|artifact_id` (promotion), not record kind.
+
+v2 dense audit is complete at
+`data/releases/p13-cyber-cross-vendor-task-views-v2-audit/`
+(`projection_candidates_sha256=068a10da…`, `audits_sha256=d64aabeb…`).
+9/9 cells; near-dup 0.0 / 0.0 / 0.0009; exact 16/32/64k; source-token v2
+valid; `global_proof_green=true`; `train_ready=false`; not selected.
+
+This is a new physical Cyber world, distinct from CISA KEV. Quota Cyber
+becomes 2/2. Canonical P13 SFT inventory is now **8 physical / 6
+quota-countable**, 72 rows, 2,710,819 Qwen tokens. No promotion, B-export,
+or HF.
+
+Do not `uv sync` the project venvs. Ranking/materialize uses
+`/tmp/p13-st-venv` (`sentence-transformers==6.0.0`). A prior
+`uv sync --extra synthesis` raced and broke `longworld/.venv`.
+
 ## Retry wave — 2026-09-02 later
 
 Code landed on `worlds` (`83192ce` adapter, `302192b` oxc license-binding,
@@ -21,8 +44,8 @@ Code landed on `worlds` (`83192ce` adapter, `302192b` oxc license-binding,
 LongWorld has two trainable products. They are not interchangeable.
 
 1. **WorldLong-SFT**: question + answer + CF twin + ordered view. Current P13
-   content-gated SFT is 7 worlds / 63 rows / 2,371,273 tokens; quota-countable
-   5/12; `train_ready=false`.
+   content-gated SFT is 8 worlds / 72 rows / 2,710,819 tokens; quota-countable
+   6/12; `train_ready=false`.
 2. **WorldLong-CPT**: chronological git-history documents, no QA/CF program.
    Canonical closure is 3,047 rows / 288,004,845 tokens; `train_ready=false`.
 3. **Diagnostic / incomplete**: Microsoft five-annual reconstruction (64K now

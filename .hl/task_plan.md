@@ -14,7 +14,7 @@ B1/B3/B5, or upload HF until 12/12 audited SFT worlds exist.
 | Phase | Objective | Status | Validator |
 | ----- | --------- | ------ | --------- |
 | E0 | Inventory CPT vs SFT and freeze expansion tracks | complete | counts match CURRENT_RELEASE + p13 ledger |
-| E1 | Cyber cross-vendor: history → sidecar → 9-cell three-view | ranking | MiniLM extra install incomplete; 9/9 views on disk |
+| E1 | Cyber cross-vendor: history → sidecar → 9-cell three-view | complete | v2 9/9 dense audit; near-dup ≤ 0.0009; Cyber quota 2/2 |
 | E2 | Finance world 2: NVIDIA FY2022–FY2025 issuer IR | blocked | challenge page; Apple EDGAR 403; do not retry-hammer |
 | E3 | Company: Microsoft reconstruction across 16/32/64K via FY2021 | blocked | five seeds; every world missing 16k+32k ordered |
 | E4 | CPT wave: unused allowlisted git caches (uv, ruff, oxc) | blocked | skip-8000/250 trunc-ok, 0 packed rows |

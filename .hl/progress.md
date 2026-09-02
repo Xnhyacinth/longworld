@@ -1,5 +1,10 @@
 # Progress
 
+- 2026-09-02 Cyber cross-CVE v2: 9/9 dense audit complete (near-dup ≤
+  0.0009). 16k is 3 CVE units after skipping 4k-leaking 2-unit packs.
+  Ledger is 8 physical / 6 quota-countable (Cyber 2/2). `train_ready=false`.
+  No selection/HF. Commits `bae500e` (4k skip) and `e1760ca` (chronology).
+  Ranking used `/tmp/p13-st-venv`; do not `uv sync`.
 - 2026-09-02 retry wave closed: no new countable SFT world. Microsoft
   v2 is 53 rows / 5 worlds, all missing 16k+32k ordered. Oxc CodeForge
   v8 is 5/9. MLRC generate-time 9-cell is the same SHA as a prior run
