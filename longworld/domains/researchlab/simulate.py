@@ -271,6 +271,7 @@ def _semantic_arxiv_file_body(
     source_path: str,
     strip_after: str = "",
     preserved_quote: str = "",
+    source_excerpt_chars: int = 0,
 ) -> tuple[str, str, list[str], list[dict[str, Any]], list[dict[str, Any]]]:
     """Compile one reachable LaTeX file while preserving one grounded claim."""
     payload = json.loads(record.text)
@@ -284,10 +285,27 @@ def _semantic_arxiv_file_body(
         raise ValueError("arXiv exact source path is not unique")
     source_text = str(matches[0].get("text") or "")
     selected_text = source_text
+    source_char_start = 0
+    source_char_end = len(source_text)
+    if source_excerpt_chars:
+        if not preserved_quote or selected_text.count(preserved_quote) != 1:
+            raise ValueError("arXiv excerpt claim is not unique")
+        quote_start = selected_text.index(preserved_quote)
+        quote_end = quote_start + len(preserved_quote)
+        source_char_start = max(0, quote_start - source_excerpt_chars // 2)
+        source_char_end = min(
+            len(source_text), source_char_start + source_excerpt_chars
+        )
+        source_char_start = max(0, source_char_end - source_excerpt_chars)
+        if not source_char_start <= quote_start < quote_end <= source_char_end:
+            raise ValueError("arXiv excerpt does not contain its claim")
+        selected_text = source_text[source_char_start:source_char_end]
     if strip_after:
         if selected_text.count(strip_after) != 1:
             raise ValueError("arXiv exact source suffix is not unique")
-        selected_text = selected_text[: selected_text.index(strip_after)].rstrip() + "\n"
+        selected_text = (
+            selected_text[: selected_text.index(strip_after)].rstrip() + "\n"
+        )
     placeholder = "LONGWORLDSPARKSGROUNDEDCLAIM"
     if preserved_quote:
         if selected_text.count(preserved_quote) != 1 or placeholder in selected_text:
@@ -337,21 +355,31 @@ def _semantic_arxiv_file_body(
         for source in raw_sources or []
         if str(source.get("path") or "") != source_path
     )
+    source_byte_start = len(source_text[:source_char_start].encode())
+    source_byte_end = len(source_text[:source_char_end].encode())
+    source_receipt = {
+        "path": source_path,
+        "compiler_revision": "visible-latex-v1",
+        "source_byte_start": source_byte_start,
+        "source_byte_end": source_byte_end,
+        "source_text_sha256": hashlib.sha256(
+            source_text[source_char_start:source_char_end].encode()
+        ).hexdigest(),
+        "compiled_text_sha256": span["text_sha256"],
+    }
+    if source_excerpt_chars:
+        source_receipt.update(
+            {
+                "source_byte_total": len(source_text.encode()),
+                "source_file_sha256": hashlib.sha256(source_text.encode()).hexdigest(),
+            }
+        )
     digest_payload = {
         "operation": "arxiv_semantic_latex_body_v2",
         "parent_provenance_id": record.provenance_id,
         "excluded_paths": excluded_paths,
         "source_file_spans": [span],
-        "source_compile_receipts": [
-            {
-                "path": source_path,
-                "compiler_revision": "visible-latex-v1",
-                "source_byte_start": 0,
-                "source_byte_end": len(source_text.encode()),
-                "source_text_sha256": hashlib.sha256(source_text.encode()).hexdigest(),
-                "compiled_text_sha256": span["text_sha256"],
-            }
-        ],
+        "source_compile_receipts": [source_receipt],
         "source_view_basenames": [basename],
         "text_sha256": hashlib.sha256(body.encode()).hexdigest(),
     }
@@ -1414,38 +1442,47 @@ _ARXIV_32K_FILES = frozenset(
 )
 _ARXIV_TERMINAL_FILES = frozenset({"abstract.tex", "acknowledgements.tex"})
 _ARXIV_TIER_OFFSETS = {"16k": 0, "32k": 365, "64k": 730}
-_SPARKS_WORK_ID = "arxiv:2303.12712"
 _SPARKS_ACKNOWLEDGMENTS = "\\paragraph{Acknowledgments.}"
 _SPARKS_SECTION_CLAIMS = {
     "contents/1_intro.tex": (
         "agi_scope",
-        ("We use AGI to refer to systems that demonstrate broad capabilities of "
-        "intelligence, including reasoning, planning, and the ability to learn "
-        "from experience, and with these capabilities at or above human-level."),
+        (
+            "We use AGI to refer to systems that demonstrate broad capabilities of "
+            "intelligence, including reasoning, planning, and the ability to learn "
+            "from experience, and with these capabilities at or above human-level."
+        ),
     ),
     "contents/2_see.tex": (
         "cross_domain_composition",
-        ("A key measure of intelligence is the ability to synthesize information "
-        "from different domains or modalities and the capacity to apply knowledge "
-        "and skills across different contexts or disciplines."),
+        (
+            "A key measure of intelligence is the ability to synthesize information "
+            "from different domains or modalities and the capacity to apply knowledge "
+            "and skills across different contexts or disciplines."
+        ),
     ),
     "contents/4_math.tex": (
         "mathematical_research_limit",
-        ("As it seems, however, \\DV \\ is still quite far from the level of experts, "
-        "and does not have the capacity required to conduct mathematical research."),
+        (
+            "As it seems, however, \\DV \\ is still quite far from the level of experts, "
+            "and does not have the capacity required to conduct mathematical research."
+        ),
     ),
     "contents/5.2_interact_environment.tex": (
         "embodied_text_interface",
-        ("While \\DV\\ is obviously not embodied,  we explore whether it can engage "
-        "in embodied interaction by using natural language as a text interface to "
-        "various simulated or real-world environments."),
+        (
+            "While \\DV\\ is obviously not embodied,  we explore whether it can engage "
+            "in embodied interaction by using natural language as a text interface to "
+            "various simulated or real-world environments."
+        ),
     ),
     "contents/roleplaying.tex": (
         "theory_of_mind",
-        ("Theory of mind is the ability to attribute mental states such as beliefs, "
-        "emotions, desires, intentions, and knowledge to oneself and others, and "
-        "to understand how they affect behavior and communication~"
-        "\\cite{wellman1992child}."),
+        (
+            "Theory of mind is the ability to attribute mental states such as beliefs, "
+            "emotions, desires, intentions, and knowledge to oneself and others, and "
+            "to understand how they affect behavior and communication~"
+            "\\cite{wellman1992child}."
+        ),
     ),
     "contents/7.1_pii.tex": (
         "pii_corpus_size",
@@ -1453,27 +1490,35 @@ _SPARKS_SECTION_CLAIMS = {
     ),
     "contents/7.2_misconceptions.tex": (
         "similarity_metric_limit",
-        ("This raises an important shortcoming of the current metrics: they fail "
-        "to capture \\textit{semantic} similarities within statements, and rely "
-        "primarily on word or sentence-level similarity metrics which capture "
-        "\\textit{syntax}."),
+        (
+            "This raises an important shortcoming of the current metrics: they fail "
+            "to capture \\textit{semantic} similarities within statements, and rely "
+            "primarily on word or sentence-level similarity metrics which capture "
+            "\\textit{syntax}."
+        ),
     ),
     "contents/reasoninglimitations.tex": (
         "autoregressive_planning_limit",
-        ("These examples illustrate some of the limitations of the next-word "
-        "prediction paradigm, which manifest as the model's lack of planning, "
-        "working memory, ability to backtrack, and reasoning abilities."),
+        (
+            "These examples illustrate some of the limitations of the next-word "
+            "prediction paradigm, which manifest as the model's lack of planning, "
+            "working memory, ability to backtrack, and reasoning abilities."
+        ),
     ),
     "contents/societal.tex": (
         "personalized_manipulation_risk",
-        ("Moreover, the message can be customized and personalized per individual, "
-        "showing the possibility of a personalized, scalable attack vector."),
+        (
+            "Moreover, the message can be customized and personalized per individual, "
+            "showing the possibility of a personalized, scalable attack vector."
+        ),
     ),
     "contents/conclusion.tex": (
         "mechanism_status",
-        ("Overall, elucidating the nature and mechanisms of AI systems such as "
-        "{\\DV} is a formidable challenge that has suddenly become important and "
-        "urgent."),
+        (
+            "Overall, elucidating the nature and mechanisms of AI systems such as "
+            "{\\DV} is a formidable challenge that has suddenly become important and "
+            "urgent."
+        ),
     ),
 }
 _SPARKS_SECTION_TIERS = {
@@ -1500,6 +1545,204 @@ _SPARKS_SECTION_TIERS = {
         "contents/reasoninglimitations.tex",
         "contents/societal.tex",
         "contents/conclusion.tex",
+    ),
+}
+
+
+@dataclass(frozen=True)
+class _PaperSectionProgram:
+    work_id: str
+    revision_ids: tuple[str, ...]
+    source_revision_id: str
+    target_revision_id: str
+    root_source_path: str
+    target_source_path: str
+    relation_claim_id: str
+    counterfactual_old: str
+    counterfactual_new: str
+    claims: dict[str, tuple[str, str]]
+    tiers: dict[str, tuple[str, ...]]
+    target_claim_quote: str = ""
+    strip_after_path: str = ""
+    strip_after_marker: str = ""
+    render_selected_compile_provenance: bool = False
+    target_16k_excerpt_chars: int = 0
+
+
+_LLAMA3_V2_SCALING_ROW = (
+    "16,384   & 8 & 16 & 16 & 4   & 131,072 &   16 & 16M   & 380     "
+    "& 38\\%        \\\\"
+)
+_LLAMA3_V3_SCALING_ROW = _LLAMA3_V2_SCALING_ROW.replace(
+    "& 4   & 131,072", "& 8   & 131,072"
+)
+_LLAMA3_SECTION_CLAIMS = {
+    "overview.tex": (
+        "pretraining_scale",
+        (
+            "To do this effectively, pre-training is performed at massive scale: we "
+            "pre-train a model with 405B parameters on 15.6T tokens using a context "
+            "window of 8K tokens."
+        ),
+    ),
+    "pretraining/model_scaling.tex": (
+        "parallelism_delta",
+        _LLAMA3_V3_SCALING_ROW,
+    ),
+    "results/video_recognition.tex": (
+        "perception_test_size",
+        (
+            "It consists of $11.6K$ test QA pairs, each with an on-average $23s$ long "
+            "video, filmed by $100$ participants worldwide to show perceptually "
+            "interesting tasks."
+        ),
+    ),
+    "results/tables/speech_ast_results.tex": (
+        "fleurs_ast_scores",
+        (
+            "FLEURS \\scriptsize{(33 lang. $\\rightarrow$ English)} & 29.5 & "
+            "\\textbf{33.7}  & 21.9  & 28.6  \\\\"
+        ),
+    ),
+    "posttraining.tex": (
+        "sft_schedule",
+        (
+            "Our largest models are finetuned with a learning rate of $10^{-5}$ over "
+            "the course of 8.5K to 9K steps."
+        ),
+    ),
+    "results/tables/benchmarks.tex": (
+        "long_context_benchmarks",
+        (
+            "\\makecell{\\textbf{Long context}} & "
+            "\\makecell[l]{QuALITY~\\citep{pang-etal-2022-quality}, many-shot "
+            "GSM8K~\\citep{an2023eval}"
+        ),
+    ),
+    "inference/fp8.tex": (
+        "ffn_fp8_compute_share",
+        (
+            "In particular, we quantize most parameters and activations in the "
+            "feedforward network layers in the model, which account for roughly "
+            "50\\% of the inference compute time."
+        ),
+    ),
+    "vision/data.tex": (
+        "vision_data_pipeline",
+        (
+            "We construct this dataset via a complex data processing pipeline that "
+            "consists of four main stages: \\textbf{(1)} quality filtering, "
+            "\\textbf{(2)} perceptual de-duplication, \\textbf{(3)} resampling, and "
+            "\\textbf{(4)} optical character recognition."
+        ),
+    ),
+    "introduction.tex": (
+        "flagship_context",
+        (
+            "Our largest model is dense Transformer with 405B parameters, processing "
+            "information in a context window of up to 128K tokens."
+        ),
+    ),
+    "pretraining/data.tex": (
+        "pretraining_knowledge_cutoff",
+        (
+            "We create our dataset for language model pre-training from a variety of "
+            "data sources containing knowledge until the end of 2023."
+        ),
+    ),
+    "pretraining/model_architecture.tex": (
+        "gqa_key_value_heads",
+        "Key/Value Heads       & 8            & 8             & 8           \\\\",
+    ),
+    "results/finetuned.tex": (
+        "ifeval_scope",
+        (
+            "IFEval comprises approximately 500 ``verifiable instructions'' such as "
+            "``write in more than 400 words'', which can be verified by heuristics."
+        ),
+    ),
+    "results/safety.tex": (
+        "cyber_uplift_cohort",
+        "A two-stage study was conducted with 62 internal volunteers.",
+    ),
+    "results/speech.tex": (
+        "speech_task_scope",
+        (
+            "We evaluate the speech understanding capabilities of our speech "
+            "interface for Llama 3 on three tasks: \\textbf{(1)} automatic speech "
+            "recognition, \\textbf{(2)} speech translation, and \\textbf{(3)} spoken "
+            "question answering."
+        ),
+    ),
+}
+_LLAMA3_SECTION_TIERS = {
+    "16k": (
+        "overview.tex",
+        "pretraining/model_scaling.tex",
+        "results/video_recognition.tex",
+        "results/tables/speech_ast_results.tex",
+        "results/tables/benchmarks.tex",
+        "inference/fp8.tex",
+        "vision/data.tex",
+    ),
+    "32k": (
+        "overview.tex",
+        "pretraining/model_scaling.tex",
+        "results/video_recognition.tex",
+        "results/tables/speech_ast_results.tex",
+        "posttraining.tex",
+        "results/tables/benchmarks.tex",
+        "inference/fp8.tex",
+        "vision/data.tex",
+    ),
+    "64k": (
+        "overview.tex",
+        "pretraining/model_scaling.tex",
+        "results/video_recognition.tex",
+        "results/tables/speech_ast_results.tex",
+        "posttraining.tex",
+        "results/tables/benchmarks.tex",
+        "inference/fp8.tex",
+        "vision/data.tex",
+        "introduction.tex",
+        "pretraining/data.tex",
+        "pretraining/model_architecture.tex",
+        "results/finetuned.tex",
+        "results/safety.tex",
+        "results/speech.tex",
+    ),
+}
+_PAPER_SECTION_PROGRAMS = {
+    "arxiv:2303.12712": _PaperSectionProgram(
+        work_id="arxiv:2303.12712",
+        revision_ids=("v1", "v2", "v3", "v4", "v5"),
+        source_revision_id="v5",
+        target_revision_id="v4",
+        root_source_path="main.tex",
+        target_source_path="contents/abstract.tex",
+        relation_claim_id="similarity_metric_limit",
+        counterfactual_old="they fail to capture",
+        counterfactual_new="they tend to capture",
+        claims=_SPARKS_SECTION_CLAIMS,
+        tiers=_SPARKS_SECTION_TIERS,
+        strip_after_path="contents/conclusion.tex",
+        strip_after_marker=_SPARKS_ACKNOWLEDGMENTS,
+    ),
+    "arxiv:2407.21783": _PaperSectionProgram(
+        work_id="arxiv:2407.21783",
+        revision_ids=("v1", "v2", "v3"),
+        source_revision_id="v3",
+        target_revision_id="v2",
+        root_source_path="paper.tex",
+        target_source_path="pretraining/model_scaling.tex",
+        relation_claim_id="parallelism_delta",
+        counterfactual_old="& 8   & 131,072",
+        counterfactual_new="& 7   & 131,072",
+        claims=_LLAMA3_SECTION_CLAIMS,
+        tiers=_LLAMA3_SECTION_TIERS,
+        target_claim_quote=_LLAMA3_V2_SCALING_ROW,
+        render_selected_compile_provenance=True,
+        target_16k_excerpt_chars=6_000,
     ),
 }
 _ARXIV_BENCHMARK_TRACE_VIEWS: dict[
@@ -1780,8 +2023,10 @@ def _multiband_arxiv_revision_event(
     section_names: frozenset[str] = frozenset(),
     source_path: str = "",
     strip_after: str = "",
+    preserved_quote: str = "",
     section_claim_id: str = "",
     section_claim_quote: str = "",
+    source_excerpt_chars: int = 0,
 ) -> tuple[Event, str, str, dict[str, str]]:
     source_compile_receipts: list[dict[str, Any]] = []
     if source_path:
@@ -1791,13 +2036,12 @@ def _multiband_arxiv_revision_event(
             excluded_paths,
             source_file_spans,
             source_compile_receipts,
-        ) = (
-            _semantic_arxiv_file_body(
-                record,
-                source_path=source_path,
-                strip_after=strip_after,
-                preserved_quote=section_claim_quote,
-            )
+        ) = _semantic_arxiv_file_body(
+            record,
+            source_path=source_path,
+            strip_after=strip_after,
+            preserved_quote=preserved_quote or section_claim_quote,
+            source_excerpt_chars=source_excerpt_chars,
         )
     elif section_names:
         body, provenance_id, excluded_paths, source_file_spans = (
@@ -2085,7 +2329,7 @@ def _multiband_arxiv_relation_event(
 
 
 def _arxiv_reachable_source_graph(
-    sources: dict[str, str],
+    sources: dict[str, str], *, root_source_path: str
 ) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
     """Resolve the bounded input/include graph from the attested root TeX file."""
     include = re.compile(r"\\(?:input|include)\s*\{([^}]+)\}")
@@ -2113,18 +2357,22 @@ def _arxiv_reachable_source_graph(
                 edges.append((path, target))
                 visit(target)
 
-    visit(resolve("main.tex"))
+    visit(resolve(root_source_path))
     return tuple(order), tuple(edges)
 
 
-def _arxiv_include_receipts(record: Any) -> list[dict[str, Any]]:
+def _arxiv_include_receipts(
+    record: Any, *, root_source_path: str
+) -> list[dict[str, Any]]:
     payload = json.loads(record.text)
     raw_sources = payload.get("latex_sources") if isinstance(payload, dict) else None
     sources = {
         str(source.get("path") or ""): str(source.get("text") or "")
         for source in raw_sources or []
     }
-    _order, edges = _arxiv_reachable_source_graph(sources)
+    _order, edges = _arxiv_reachable_source_graph(
+        sources, root_source_path=root_source_path
+    )
     receipts: list[dict[str, Any]] = []
     for parent, child in edges:
         matches = []
@@ -2151,22 +2399,41 @@ def _arxiv_include_receipts(record: Any) -> list[dict[str, Any]]:
     return receipts
 
 
-def _sparks_revision_section_records(
+def _paper_section_reconciliation_records(
     workflow: Any,
-) -> tuple[dict[str, Any], Any, tuple[str, ...], tuple[tuple[str, str], ...]] | None:
-    records = {str(record.attribute("revision_id")): record for record in workflow.records}
-    if set(records) != {"v1", "v2", "v3", "v4", "v5"}:
+) -> (
+    tuple[
+        _PaperSectionProgram,
+        dict[str, Any],
+        Any,
+        tuple[str, ...],
+        tuple[tuple[str, str], ...],
+    ]
+    | None
+):
+    work_ids = {str(record.attribute("work_id")) for record in workflow.records}
+    if len(work_ids) != 1:
+        return None
+    program = _PAPER_SECTION_PROGRAMS.get(next(iter(work_ids)))
+    if program is None:
+        return None
+    records = {
+        str(record.attribute("revision_id")): record for record in workflow.records
+    }
+    if set(records) != set(program.revision_ids):
         return None
     if any(
-        record.attribute("work_id") != _SPARKS_WORK_ID
-        or record.record_id != f"{_SPARKS_WORK_ID}{revision}"
+        record.attribute("work_id") != program.work_id
+        or record.record_id != f"{program.work_id}{revision}"
         or record.source_family != "arxiv_record"
         for revision, record in records.items()
     ):
         return None
     expected_relations = {
-        (f"{_SPARKS_WORK_ID}v{version}", f"{_SPARKS_WORK_ID}v{version - 1}")
-        for version in range(2, 6)
+        (f"{program.work_id}{source}", f"{program.work_id}{target}")
+        for source, target in zip(
+            program.revision_ids[1:], program.revision_ids[:-1], strict=True
+        )
     }
     relations = {
         (relation.source_record_id, relation.target_record_id): relation
@@ -2175,7 +2442,9 @@ def _sparks_revision_section_records(
     }
     if set(relations) != expected_relations:
         return None
-    payload = json.loads(records["v5"].text)
+    source_record = records[program.source_revision_id]
+    target_record = records[program.target_revision_id]
+    payload = json.loads(source_record.text)
     raw_sources = payload.get("latex_sources") if isinstance(payload, dict) else None
     if not isinstance(raw_sources, list):
         return None
@@ -2188,41 +2457,66 @@ def _sparks_revision_section_records(
     ):
         return None
     try:
-        reachable_order, reachable_edges = _arxiv_reachable_source_graph(sources)
+        reachable_order, reachable_edges = _arxiv_reachable_source_graph(
+            sources, root_source_path=program.root_source_path
+        )
     except ValueError:
         return None
-    required_paths = set(_SPARKS_SECTION_TIERS["64k"])
+    required_paths = set(program.tiers["64k"])
     if not required_paths.issubset(reachable_order):
         return None
-    for path, (_claim_id, quote) in _SPARKS_SECTION_CLAIMS.items():
+    for path, (_claim_id, quote) in program.claims.items():
         if sources.get(path, "").count(quote) != 1:
             return None
-    if sources["contents/conclusion.tex"].count(_SPARKS_ACKNOWLEDGMENTS) != 1:
+    if program.strip_after_path and (
+        sources.get(program.strip_after_path, "").count(program.strip_after_marker) != 1
+    ):
         return None
-    prior_payload = json.loads(records["v4"].text)
-    prior_sources = prior_payload.get("latex_sources") if isinstance(prior_payload, dict) else None
-    if not isinstance(prior_sources, list) or sum(
-        str(source.get("path") or "") == "contents/abstract.tex"
+    prior_payload = json.loads(target_record.text)
+    prior_sources = (
+        prior_payload.get("latex_sources") if isinstance(prior_payload, dict) else None
+    )
+    if not isinstance(prior_sources, list):
+        return None
+    target_matches = [
+        source
         for source in prior_sources
-    ) != 1:
+        if str(source.get("path") or "") == program.target_source_path
+    ]
+    if len(target_matches) != 1:
         return None
+    if program.target_claim_quote:
+        target_text = str(target_matches[0].get("text") or "")
+        source_text = sources.get(program.target_source_path, "")
+        if (
+            target_text.count(program.target_claim_quote) != 1
+            or not source_text
+            or hashlib.sha256(target_text.encode()).digest()
+            == hashlib.sha256(source_text.encode()).digest()
+        ):
+            return None
     return (
+        program,
         records,
-        relations[(records["v5"].record_id, records["v4"].record_id)],
+        relations[(source_record.record_id, target_record.record_id)],
         reachable_order,
         reachable_edges,
     )
 
 
-def _sparks_revision_section_events(
+def _paper_section_reconciliation_events(
     workflow: Any,
     prefix: str,
     workflow_index: int,
     recognized: tuple[
-        dict[str, Any], Any, tuple[str, ...], tuple[tuple[str, str], ...]
+        _PaperSectionProgram,
+        dict[str, Any],
+        Any,
+        tuple[str, ...],
+        tuple[tuple[str, str], ...],
     ],
 ) -> list[Event]:
-    records, relation, reachable_order, reachable_edges = recognized
+    program, records, relation, reachable_order, reachable_edges = recognized
     record_indices = {
         record.record_id: index for index, record in enumerate(workflow.records)
     }
@@ -2235,20 +2529,28 @@ def _sparks_revision_section_events(
     graph_sha256 = hashlib.sha256(
         json.dumps(reachable_edges, separators=(",", ":")).encode()
     ).hexdigest()
-    include_receipts = _arxiv_include_receipts(records["v5"])
+    source_record = records[program.source_revision_id]
+    target_record = records[program.target_revision_id]
+    include_receipts = _arxiv_include_receipts(
+        source_record, root_source_path=program.root_source_path
+    )
     events: list[Event] = []
-    for tier, source_paths in _SPARKS_SECTION_TIERS.items():
+    for tier, source_paths in program.tiers.items():
         target_event, _target_body, target_revision_fact, _target_facts = (
             _multiband_arxiv_revision_event(
                 workflow=workflow,
-                record=records["v4"],
+                record=target_record,
                 prefix=prefix,
                 workflow_index=workflow_index,
-                record_index=record_indices[records["v4"].record_id],
+                record_index=record_indices[target_record.record_id],
                 tier=tier,
                 included_basenames=None,
                 view_channel="prior_endpoint",
-                source_path="contents/abstract.tex",
+                source_path=program.target_source_path,
+                preserved_quote=program.target_claim_quote,
+                source_excerpt_chars=(
+                    program.target_16k_excerpt_chars if tier == "16k" else 0
+                ),
             )
         )
         claim_events: list[Event] = []
@@ -2256,28 +2558,26 @@ def _sparks_revision_section_events(
         claim_revision_facts: dict[str, str] = {}
         claim_source_facts: dict[str, dict[str, str]] = {}
         for source_index, source_path in enumerate(source_paths):
-            claim_id, claim_quote = _SPARKS_SECTION_CLAIMS[source_path]
-            event, body, revision_fact, source_facts = (
-                _multiband_arxiv_revision_event(
-                    workflow=workflow,
-                    record=records["v5"],
-                    prefix=prefix,
-                    workflow_index=workflow_index,
-                    record_index=record_indices[records["v5"].record_id],
-                    tier=tier,
-                    included_basenames=None,
-                    view_channel=(
-                        f"section_{len(source_paths) - source_index:02d}_{claim_id}"
-                    ),
-                    source_path=source_path,
-                    strip_after=(
-                        _SPARKS_ACKNOWLEDGMENTS
-                        if source_path == "contents/conclusion.tex"
-                        else ""
-                    ),
-                    section_claim_id=claim_id,
-                    section_claim_quote=claim_quote,
-                )
+            claim_id, claim_quote = program.claims[source_path]
+            event, body, revision_fact, source_facts = _multiband_arxiv_revision_event(
+                workflow=workflow,
+                record=source_record,
+                prefix=prefix,
+                workflow_index=workflow_index,
+                record_index=record_indices[source_record.record_id],
+                tier=tier,
+                included_basenames=None,
+                view_channel=(
+                    f"section_{len(source_paths) - source_index:02d}_{claim_id}"
+                ),
+                source_path=source_path,
+                strip_after=(
+                    program.strip_after_marker
+                    if source_path == program.strip_after_path
+                    else ""
+                ),
+                section_claim_id=claim_id,
+                section_claim_quote=claim_quote,
             )
             claim_events.append(event)
             claim_bodies[claim_id] = body
@@ -2290,7 +2590,7 @@ def _sparks_revision_section_events(
         relation_source = next(
             event
             for event in claim_events
-            if event.params["section_claim_id"] == "similarity_metric_limit"
+            if event.params["section_claim_id"] == program.relation_claim_id
         )
         relation_event = _multiband_arxiv_relation_event(
             workflow=workflow,
@@ -2301,10 +2601,10 @@ def _sparks_revision_section_events(
             tier=tier,
             source_event=relation_source,
             target_event=target_event,
-            source_body=claim_bodies["similarity_metric_limit"],
-            source_revision_fact_id=claim_revision_facts["similarity_metric_limit"],
+            source_body=claim_bodies[program.relation_claim_id],
+            source_revision_fact_id=claim_revision_facts[program.relation_claim_id],
             target_revision_fact_id=target_revision_fact,
-            source_fact_ids=claim_source_facts["similarity_metric_limit"],
+            source_fact_ids=claim_source_facts[program.relation_claim_id],
         )
         relation_event.params["render_control_tier"] = True
         events.append(relation_event)
@@ -2330,8 +2630,7 @@ def _sparks_revision_section_events(
             )
         )
         control_id = (
-            f"{prefix}.arxiv_section_reconciliation_control_"
-            f"{tier}_{workflow_index}"
+            f"{prefix}.arxiv_section_reconciliation_control_{tier}_{workflow_index}"
         )
         control_inputs = [
             target_event.id,
@@ -2339,19 +2638,36 @@ def _sparks_revision_section_events(
             relation_event.id,
         ]
         selected_paths = list(source_paths)
+        selected_compile_paths = set(selected_paths)
+        while True:
+            parents = {
+                parent
+                for parent, child in reachable_edges
+                if child in selected_compile_paths
+            }
+            expanded = selected_compile_paths | parents
+            if expanded == selected_compile_paths:
+                break
+            selected_compile_paths = expanded
+        selected_include_receipts = [
+            receipt
+            for receipt in include_receipts
+            if receipt["parent_path"] in selected_compile_paths
+            and receipt["child_path"] in selected_compile_paths
+        ]
         control = Event(
             id=control_id,
             type="arxiv_section_reconciliation_control",
             time=relation_event.time + timedelta(days=1),
             params={
                 "workflow_id": workflow.workflow_id,
-                "work_id": _SPARKS_WORK_ID,
+                "work_id": program.work_id,
                 "control_tier": tier,
                 "control_key": f"paper_section_control:{workflow_key}:{tier}",
-                "source_revision_id": "v5",
-                "target_revision_id": "v4",
-                "source_record_id": records["v5"].record_id,
-                "target_record_id": records["v4"].record_id,
+                "source_revision_id": program.source_revision_id,
+                "target_revision_id": program.target_revision_id,
+                "source_record_id": source_record.record_id,
+                "target_record_id": target_record.record_id,
                 "target_record_event_id": target_event.id,
                 "relation_event_id": relation_event.id,
                 "required_relation_id": relation.relation_id,
@@ -2362,11 +2678,16 @@ def _sparks_revision_section_events(
                 "compiled_source_edges": [list(edge) for edge in reachable_edges],
                 "compiled_source_graph_sha256": graph_sha256,
                 "selected_compile_receipts": [
-                    event.params["source_compile_receipts"][0]
-                    for event in claim_events
+                    event.params["source_compile_receipts"][0] for event in claim_events
                 ],
+                "selected_compile_include_receipts": selected_include_receipts,
+                "render_selected_compile_provenance": (
+                    program.render_selected_compile_provenance
+                ),
                 "compiled_source_include_receipts": include_receipts,
-                "excluded_source_paths": sorted(set(reachable_order) - set(selected_paths)),
+                "excluded_source_paths": sorted(
+                    set(reachable_order) - set(selected_paths)
+                ),
                 "excluded_content_classes": [
                     "acknowledgments",
                     "author_block",
@@ -2389,8 +2710,7 @@ def _sparks_revision_section_events(
         )
         events.append(control)
         decision_id = (
-            f"{prefix}.arxiv_section_reconciliation_decision_"
-            f"{tier}_{workflow_index}"
+            f"{prefix}.arxiv_section_reconciliation_decision_{tier}_{workflow_index}"
         )
         proof_event_ids = [*control_inputs, control.id, decision_id]
         events.append(
@@ -2400,17 +2720,19 @@ def _sparks_revision_section_events(
                 time=control.time + timedelta(days=1),
                 params={
                     "workflow_id": workflow.workflow_id,
-                    "work_id": _SPARKS_WORK_ID,
+                    "work_id": program.work_id,
                     "control_tier": tier,
                     "control_key": control.params["control_key"],
                     "answer_key": f"paper_section_reconciliation:{workflow_key}:{tier}",
-                    "source_revision_id": "v5",
-                    "target_revision_id": "v4",
+                    "source_revision_id": program.source_revision_id,
+                    "target_revision_id": program.target_revision_id,
                     "required_relation_id": relation.relation_id,
                     "relation_event_id": relation_event.id,
                     "required_claim_ids": claim_ids,
                     "control_event_id": control.id,
                     "counterfactual_claim_event_id": relation_source.id,
+                    "counterfactual_old": program.counterfactual_old,
+                    "counterfactual_new": program.counterfactual_new,
                     "proof_event_ids": proof_event_ids,
                 },
                 visibility=[decision_id],
@@ -3197,11 +3519,11 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
             continue
         if workflow.source_kind != PAPER_SOURCE_KIND:
             continue
-        sparks_records = _sparks_revision_section_records(workflow)
-        if sparks_records is not None:
+        section_records = _paper_section_reconciliation_records(workflow)
+        if section_records is not None:
             events.extend(
-                _sparks_revision_section_events(
-                    workflow, prefix, workflow_index, sparks_records
+                _paper_section_reconciliation_events(
+                    workflow, prefix, workflow_index, section_records
                 )
             )
             continue

@@ -1669,8 +1669,15 @@ def apply_event(state: WorldState, ev: Event) -> None:
         required_claim_ids = [str(value) for value in p["required_claim_ids"]]
         if any(claim_id not in claims for claim_id in required_claim_ids):
             return
-        answer = "v5 revision_of v4 || " + " || ".join(
-            str(claims[claim_id]["quote"]) for claim_id in required_claim_ids
+        revision_edge = (
+            f"{p['source_revision_id']} revision_of {p['target_revision_id']}"
+        )
+        answer = (
+            revision_edge
+            + " || "
+            + " || ".join(
+                str(claims[claim_id]["quote"]) for claim_id in required_claim_ids
+            )
         )
         state.set(str(p["answer_key"]), answer, eid, day)
     elif t == "wiki_source_section":

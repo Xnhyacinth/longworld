@@ -223,17 +223,37 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
         ) + "\n"
     if t == "arxiv_section_reconciliation_control":
         tier = str(ev.params["control_tier"])
-        compile_detail = (
-            {"selected_compile_receipts": ev.params["selected_compile_receipts"]}
-            if tier == "32k"
-            else {
+        compile_detail = {}
+        render_selected_provenance = ev.params.get("render_selected_compile_provenance")
+        if tier == "16k" and render_selected_provenance:
+            compile_detail = {
+                "selected_compile_include_receipts": ev.params[
+                    "selected_compile_include_receipts"
+                ],
+            }
+        elif tier == "32k" and render_selected_provenance:
+            compile_detail = {
+                "selected_compile_include_receipts": ev.params[
+                    "selected_compile_include_receipts"
+                ],
+                "selected_compile_receipts": ev.params["selected_compile_receipts"],
+                "source_revision_id": ev.params["source_revision_id"],
+                "target_revision_id": ev.params["target_revision_id"],
+                "source_record_id": ev.params["source_record_id"],
+                "target_record_id": ev.params["target_record_id"],
+                "required_relation_id": ev.params["required_relation_id"],
+                "compiled_source_order": ev.params["compiled_source_order"],
+            }
+        elif tier == "32k":
+            compile_detail = {
+                "selected_compile_receipts": ev.params["selected_compile_receipts"]
+            }
+        elif tier == "64k":
+            compile_detail = {
                 "compiled_source_include_receipts": ev.params[
                     "compiled_source_include_receipts"
                 ],
             }
-            if tier == "64k"
-            else {}
-        )
         return "json", json.dumps(
             {
                 "kind": "arxiv_section_reconciliation_control",
@@ -273,12 +293,16 @@ def _text(project: dict, ev: Event, aid: str) -> tuple[str, str]:
             sort_keys=True,
         ) + "\n"
     if t == "arxiv_section_reconciliation_decision":
+        revision_edge = (
+            f"{ev.params['source_revision_id']} revision_of "
+            f"{ev.params['target_revision_id']}"
+        )
         return "json", json.dumps(
             {
                 "kind": "arxiv_section_reconciliation_decision",
                 "control_tier": ev.params["control_tier"],
                 "required_claim_count": len(ev.params["required_claim_ids"]),
-                "required_revision_relation": "v5 revision_of v4",
+                "required_revision_relation": revision_edge,
                 "rule": "emit every grounded section claim in control order",
                 "answer_disclosure": "omitted",
             },

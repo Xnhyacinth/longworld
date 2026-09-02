@@ -439,16 +439,17 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
         proof_event_ids = [str(value) for value in decision.params["proof_event_ids"]]
         source = events_by_id[str(decision.params["counterfactual_claim_event_id"])]
         original_claim = str(source.params["section_claim_quote"])
-        changed_claim = original_claim.replace(
-            "they fail to capture", "they tend to capture"
-        )
-        if changed_claim == original_claim or str(source.params["text"]).count(
-            original_claim
-        ) != 1:
-            raise ValueError("Sparks counterfactual claim is not uniquely grounded")
-        changed_text = str(source.params["text"]).replace(
-            original_claim, changed_claim
-        )
+        counterfactual_old = str(decision.params["counterfactual_old"])
+        counterfactual_new = str(decision.params["counterfactual_new"])
+        changed_claim = original_claim.replace(counterfactual_old, counterfactual_new)
+        if (
+            original_claim.count(counterfactual_old) != 1
+            or not counterfactual_new
+            or changed_claim == original_claim
+            or str(source.params["text"]).count(original_claim) != 1
+        ):
+            raise ValueError("paper counterfactual claim is not uniquely grounded")
+        changed_text = str(source.params["text"]).replace(original_claim, changed_claim)
         changed_text_sha256 = hashlib.sha256(changed_text.encode()).hexdigest()
         changed_grounded_source = _counterfactual_grounded_source(
             source.params.get("grounded_source"),
@@ -473,11 +474,14 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
             ).encode()
         ).hexdigest()
         claim_count = len(decision.params["required_claim_ids"])
+        source_revision_id = str(decision.params["source_revision_id"])
+        target_revision_id = str(decision.params["target_revision_id"])
+        revision_edge = f"{source_revision_id} revision_of {target_revision_id}"
         question = (
-            f"For {decision.params['work_id']}, verify the signed v5 revision_of v4 "
+            f"For {decision.params['work_id']}, verify the signed {revision_edge} "
             f"edge and apply the {tier} compiled-source control. Reconcile all "
             f"{claim_count} selected section claims in control order. Reply exactly "
-            "as v5 revision_of v4 || <claim 1> || ... using the exact grounded "
+            f"as {revision_edge} || <claim 1> || ... using the exact grounded "
             "claim sentence from every selected section."
         )
         workflow_key = hashlib.sha256(
@@ -520,7 +524,7 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                 invariance_event_id=tok.id,
                 invariance_param_updates={"commit": "ab00ab"},
                 gold_expression=(
-                    f"FOLLOW(v5 revision_of v4) AND COMPILE({tier}) AND "
+                    f"FOLLOW({revision_edge}) AND COMPILE({tier}) AND "
                     f"RECONCILE({claim_count} SECTION_CLAIMS)"
                 ),
                 proof_depth=4,
