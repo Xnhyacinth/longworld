@@ -1,0 +1,30 @@
+{
+  "schema_version": "longworld.walmart-annual-report-request.v1",
+  "user_agent": "LongWorld/0.2 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P14-WALMART-OFFICIAL-ANNUALS-20260902",
+    "scope": "Walmart issuer-owned fiscal 2022 through 2025 annual-report PDFs",
+    "basis": "User-authorized public-source LongWorld Company workflow acquisition",
+    "reviewed_at": "2026-09-02T20:00:00Z"
+  },
+  "reports": [
+    {
+      "year": 2022,
+      "url": "https://stock.walmart.com/_assets/_5626a6ac33b6bc771a4a9e521fea7c96/walmart/db/950/9649/annual_report/WMT-FY2022-Annual-Report.pdf"
+    },
+    {
+      "year": 2023,
+      "url": "https://stock.walmart.com/_assets/_5626a6ac33b6bc771a4a9e521fea7c96/walmart/db/950/9650/annual_report/Walmart+2023+Annual+Report.pdf"
+    },
+    {
+      "year": 2024,
+      "url": "https://stock.walmart.com/_assets/_5626a6ac33b6bc771a4a9e521fea7c96/walmart/db/950/9651/annual_report/Walmart+2024+Annual+Report.pdf"
+    },
+    {
+      "year": 2025,
+      "url": "https://stock.walmart.com/_assets/_5626a6ac33b6bc771a4a9e521fea7c96/walmart/db/950/9949/annual_report/Walmart+2025+Annual+Report.pdf"
+    }
+  ],
+  "requests_per_second": 2,
+  "timeout_seconds": 90
+}
