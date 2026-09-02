@@ -1288,6 +1288,19 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
             root_revision = _git(checkout, "rev-parse", "HEAD")
         if _GIT_OBJECT_ID.fullmatch(root_revision) is None:
             raise ValueError("Git history source root revision is invalid")
+        if "history_coverage" not in source:
+            total = int(
+                _git(
+                    checkout,
+                    "rev-list",
+                    "--first-parent",
+                    "--count",
+                    root_revision,
+                )
+            )
+            source["history_coverage"] = _validated_history_coverage(
+                source, checkout, root_revision, total
+            )
         max_commits = int(source.get("max_commits") or 0)
         skip_commits = int(source.get("skip_commits") or 0)
         slice_name = f"skip-{skip_commits:06d}-count-{max_commits:06d}"
