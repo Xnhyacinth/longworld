@@ -66,6 +66,7 @@ def init_values(project: dict[str, Any]) -> dict[str, Any]:
         "issuer_ir_metrics": {},
         "issuer_ir_relations": {},
         "jpmorgan_risk_taxonomy_units": {},
+        "walmart_reconciliation_units": {},
         "issuer_official_pdf_relations": {},
     }
 
@@ -233,8 +234,13 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
         return True, None
     if ev.type == "jpmorgan_risk_taxonomy_section":
         return True, None
+    if ev.type == "walmart_reconciliation_section":
+        return True, None
     if ev.type == "issuer_official_pdf_prior_annual_relation":
-        units = state.values.get("jpmorgan_risk_taxonomy_units") or {}
+        units = {
+            **(state.values.get("jpmorgan_risk_taxonomy_units") or {}),
+            **(state.values.get("walmart_reconciliation_units") or {}),
+        }
         if any(parent_id not in units for parent_id in ev.required_inputs):
             return False, "issuer_official_pdf_relation_endpoint_missing"
         return True, None
@@ -768,6 +774,55 @@ def apply_event(state: WorldState, ev: Event) -> None:
             "source_order": int(p["source_order"]),
         }
         state.set("jpmorgan_risk_taxonomy_units", units, eid, day)
+    elif t == "walmart_reconciliation_section":
+        section_id = str(p.get("section_id") or "")
+        prefix = (
+            f"Walmart official annual-report reconciliation section\n{section_id}\n"
+        )
+        text = str(p.get("text") or "")
+        raw_section = text.removeprefix(prefix) if text.startswith(prefix) else ""
+        fact_values = p.get("fact_values")
+        evidence_quotes = p.get("evidence_quotes")
+        evidence_spans = p.get("evidence_spans")
+        if (
+            not raw_section
+            or not isinstance(fact_values, dict)
+            or not isinstance(evidence_quotes, dict)
+            or not isinstance(evidence_spans, dict)
+            or set(fact_values) != set(evidence_quotes)
+            or set(fact_values) != set(evidence_spans)
+            or any(
+                not isinstance(value, str)
+                or not isinstance(evidence_quotes.get(field), str)
+                or not isinstance(evidence_spans.get(field), list)
+                or len(evidence_spans[field]) != 2
+                or any(
+                    isinstance(offset, bool) or not isinstance(offset, int)
+                    for offset in evidence_spans[field]
+                )
+                or not 0
+                <= evidence_spans[field][0]
+                < evidence_spans[field][1]
+                <= len(raw_section)
+                or raw_section[evidence_spans[field][0] : evidence_spans[field][1]]
+                != evidence_quotes[field]
+                or value not in evidence_quotes[field]
+                for field, value in fact_values.items()
+            )
+            or hashlib.sha256(text.encode()).hexdigest() != p.get("text_sha256")
+            or hashlib.sha256(raw_section.encode()).hexdigest()
+            != p.get("section_sha256")
+        ):
+            return
+        units = dict(state.values.get("walmart_reconciliation_units") or {})
+        units[eid] = {
+            "report_year": int(p["report_year"]),
+            "section_id": section_id,
+            "source_order": int(p["source_order"]),
+            "fact_values": dict(fact_values),
+            "evidence_quotes": dict(evidence_quotes),
+        }
+        state.set("walmart_reconciliation_units", units, eid, day)
     elif t == "issuer_official_pdf_prior_annual_relation":
         relation_id = str(p.get("source_relation_id") or "")
         if not relation_id or p.get("relation_kind") != "prior_official_annual_report":

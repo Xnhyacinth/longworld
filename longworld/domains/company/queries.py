@@ -75,6 +75,57 @@ def state_from_artifacts(
 def eval_answer(
     world: SimulatedWorld, spec: QuerySpec, state_values: dict[str, Any]
 ) -> str:
+    if spec.query_type.startswith("walmart_reconciliation_"):
+        units = state_values.get("walmart_reconciliation_units") or {}
+        if any(event_id not in units for event_id in spec.essential_event_ids):
+            return "unknown"
+        by_year: dict[int, dict[str, dict[str, Any]]] = {}
+        for event_id in spec.essential_event_ids:
+            unit = units[event_id]
+            year = int(unit["report_year"])
+            by_year.setdefault(year, {})[str(unit["section_id"])] = unit
+        required = {
+            "business_segments",
+            "strategy_execution_risk",
+            "capital_expenditures",
+            "icfr_opinion",
+            "segment_note",
+        }
+        if any(set(year_units) != required for year_units in by_year.values()):
+            return "unknown"
+
+        def compact(value: str) -> str:
+            return " ".join(value.split())
+
+        fields = ["WALMART_SEGMENT_STRATEGY_CAPEX_ICFR"]
+        for year, year_units in sorted(by_year.items()):
+            business = year_units["business_segments"]
+            strategy = year_units["strategy_execution_risk"]
+            capital = year_units["capital_expenditures"]
+            icfr = year_units["icfr_opinion"]
+            segment_note = year_units["segment_note"]
+            business_label = (
+                compact(business["evidence_quotes"]["reportable_segments"])
+                .split(":", 1)[-1]
+                .strip()
+            )
+            note_label = (
+                compact(segment_note["evidence_quotes"]["segment_note_identity"])
+                .split(":", 1)[-1]
+                .strip()
+            )
+            fields.append(
+                f"FY{year}[BUSINESS={business_label};"
+                "STRATEGY_RISK="
+                f"{compact(strategy['evidence_quotes']['strategy_execution_risk'])};"
+                "CAPEX_TOTAL="
+                f"{capital['fact_values']['total_capital_expenditures']};"
+                "CAPEX_LARGEST="
+                f"{capital['fact_values']['largest_capex_allocation']};"
+                f"ICFR={icfr['fact_values']['icfr_effective']};"
+                f"NOTE={note_label};SEGMENT_MATCH={business_label == note_label}]"
+            )
+        return " | ".join(fields)
     if spec.query_type.startswith("jpmorgan_risk_taxonomy_"):
         units = state_values.get("jpmorgan_risk_taxonomy_units") or {}
         if any(event_id not in units for event_id in spec.essential_event_ids):
@@ -1232,6 +1283,157 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
 
     qid = world.spec["world_id"].split(":")[0]
     queries: list[QuerySpec] = []
+
+    walmart_events = {
+        (int(event.params["report_year"]), str(event.params["section_id"])): event
+        for event in world.events
+        if event.type == "walmart_reconciliation_section"
+    }
+    walmart_relations = {
+        (
+            str(event.params["record_id"]),
+            str(event.params["target_record_id"]),
+        ): event
+        for event in world.events
+        if event.type == "issuer_official_pdf_prior_annual_relation"
+        and str(event.params.get("source_family") or "")
+        == "walmart_official_annual_report_pdf"
+    }
+    walmart_stages = (
+        ("16k", "current", (2025,)),
+        ("32k", "transition", (2024, 2025)),
+        ("64k", "full_chain", (2022, 2023, 2024, 2025)),
+    )
+    if walmart_events and all(
+        (year, section_id) in walmart_events
+        for _, _, years in walmart_stages
+        for year in years
+        for section_id in (
+            "business_segments",
+            "strategy_execution_risk",
+            "capital_expenditures",
+            "icfr_opinion",
+            "segment_note",
+        )
+    ):
+        cf_source = walmart_events[(2025, "icfr_opinion")]
+        cf_prefix = (
+            "Walmart official annual-report reconciliation section\nicfr_opinion\n"
+        )
+        cf_raw = str(cf_source.params["text"]).removeprefix(cf_prefix)
+        cf_start, cf_end = cf_source.params["evidence_spans"]["icfr_effective"]
+        cf_phrase = "material weakness found"
+        cf_raw = cf_raw[:cf_start] + cf_phrase + cf_raw[cf_end:]
+        cf_text = cf_prefix + cf_raw
+        cf_fact_values = dict(cf_source.params["fact_values"])
+        cf_fact_values["icfr_effective"] = cf_phrase
+        cf_evidence_quotes = dict(cf_source.params["evidence_quotes"])
+        cf_evidence_quotes["icfr_effective"] = cf_phrase
+        cf_evidence_spans = dict(cf_source.params["evidence_spans"])
+        cf_evidence_spans["icfr_effective"] = [
+            cf_start,
+            cf_start + len(cf_phrase),
+        ]
+        cf_updates = {
+            "text": cf_text,
+            "text_sha256": hashlib.sha256(cf_text.encode()).hexdigest(),
+            "section_sha256": hashlib.sha256(cf_raw.encode()).hexdigest(),
+            "fact_values": cf_fact_values,
+            "evidence_quotes": cf_evidence_quotes,
+            "evidence_spans": cf_evidence_spans,
+            "source_origin": "synthetic_counterfactual",
+            "provenance_id": (
+                "derived-sha256:"
+                + hashlib.sha256(
+                    (
+                        "walmart_icfr_conclusion_counterfactual|"
+                        + str(cf_source.params["provenance_id"])
+                        + "|"
+                        + hashlib.sha256(cf_raw.encode()).hexdigest()
+                    ).encode()
+                ).hexdigest()
+            ),
+            "provenance_operation": "walmart_icfr_conclusion_counterfactual",
+            "ground_values": [cf_phrase],
+        }
+        for tier, label, years in walmart_stages:
+            essential_events = [
+                walmart_events[(year, section_id)]
+                for year in years
+                for section_id in (
+                    "business_segments",
+                    "strategy_execution_risk",
+                    "capital_expenditures",
+                    "icfr_opinion",
+                    "segment_note",
+                )
+            ]
+            essential_ids = [event.id for event in essential_events]
+            relation_ids = [
+                event.id
+                for (source_id, target_id), event in sorted(walmart_relations.items())
+                if int(source_id.rsplit(":", 1)[-1]) in years
+                and int(target_id.rsplit(":", 1)[-1]) in years
+            ]
+            queries.append(
+                QuerySpec(
+                    query_id=(
+                        f"{qid}:walmart_reconciliation_{label}:"
+                        f"{cf_source.params['workflow_id']}"
+                    ),
+                    query_type=f"walmart_reconciliation_{label}",
+                    question=(
+                        "Using only Walmart's bounded signed annual-report "
+                        "sections, reconcile for every requested fiscal year the "
+                        "Business segment identity, strategy-execution risk phrase, "
+                        "total and largest capital-expenditure allocation, auditor "
+                        "ICFR conclusion, and distant segment-note identity. Return "
+                        "`WALMART_SEGMENT_STRATEGY_CAPEX_ICFR` followed by one "
+                        "year field in ascending order. Validate every signed "
+                        "prior-official annual-report relation present in context. "
+                        "Every requested section is required."
+                    ),
+                    answer="",
+                    as_of=date(2026, 1, 2),
+                    answer_key="walmart_reconciliation_units",
+                    essential_event_ids=essential_ids,
+                    essential_artifact_ids=[
+                        f"{world.spec['world_id']}.{event_id}"
+                        for event_id in essential_ids
+                    ],
+                    sufficient_event_ids=[*essential_ids, *relation_ids],
+                    cf_event_id=cf_source.id,
+                    cf_param_updates=cf_updates,
+                    cf_answer="",
+                    invariance_event_id=None,
+                    gold_expression=(
+                        "read five signed disclosure classes per requested year; "
+                        "reconcile segment identity, strategy risk, capex allocation, "
+                        "and ICFR; validate adjacent official-report relations"
+                    ),
+                    proof_depth=2,
+                    cf_op="version",
+                    motif="company.walmart_segment_strategy_capex_icfr",
+                    truth_regime="real_source_derived",
+                    topology_id=instance_topology(
+                        "company.walmart_reconciliation", tier, len(essential_ids)
+                    ),
+                    program_ops=[
+                        {"op": "READ_SIGNED_DISCLOSURE_CLASS"},
+                        {"op": "VALIDATE_PRIOR_OFFICIAL_ANNUAL_RELATION"},
+                        {"op": "RECONCILE_SEGMENT_IDENTITIES"},
+                        {"op": "LINK_STRATEGY_RISK_TO_CAPEX_ALLOCATION"},
+                        {"op": "VERIFY_AUDITOR_ICFR_CONCLUSION"},
+                    ],
+                    preferred_length_buckets=[tier],
+                    semantic_growth_group=(
+                        "company.walmart_segment_strategy_capex_icfr"
+                    ),
+                    base_task_group=(
+                        "walmart_reconciliation:" + str(cf_source.params["workflow_id"])
+                    ),
+                )
+            )
 
     jpmorgan_events = {
         (int(event.params["report_year"]), int(event.params["heading_index"])): event

@@ -217,6 +217,20 @@ _JPMORGAN_RISK_HEADINGS = (
 )
 _JPMORGAN_RISK_VIEW_PREFIX = "JPMorgan official annual-report risk taxonomy section\n"
 _JPMORGAN_RISK_SECTION_CHARS = 10_000
+_WALMART_RECONCILIATION_SECTIONS = (
+    "business_segments",
+    "strategy_execution_risk",
+    "capital_expenditures",
+    "icfr_opinion",
+    "segment_note",
+)
+_WALMART_SECTION_CHARS = {
+    2022: 11_650,
+    2023: 11_650,
+    2024: 11_900,
+    2025: 11_400,
+}
+_WALMART_VIEW_PREFIX = "Walmart official annual-report reconciliation section\n"
 
 
 def _sec_tier_roles(program, control_tier: str) -> tuple[str, ...]:
@@ -2096,6 +2110,66 @@ def _jpmorgan_risk_section_ranges(record) -> list[tuple[str, int, int]]:
     ]
 
 
+def _issuer_official_pdf_relation_events(
+    *,
+    workflow,
+    prefix: str,
+    workflow_index: int,
+    records: list,
+    endpoint_ids: dict[str, str],
+) -> list[Event]:
+    records_by_id = {record.record_id: record for record in records}
+    record_indexes = {
+        record.record_id: record_index for record_index, record in enumerate(records)
+    }
+    events: list[Event] = []
+    for relation_index, relation in enumerate(workflow.relations):
+        if relation.kind != "prior_official_annual_report":
+            continue
+        source = records_by_id.get(relation.source_record_id)
+        target = records_by_id.get(relation.target_record_id)
+        source_endpoint = endpoint_ids.get(relation.source_record_id)
+        target_endpoint = endpoint_ids.get(relation.target_record_id)
+        if (
+            source is None
+            or target is None
+            or source_endpoint is None
+            or target_endpoint is None
+        ):
+            continue
+        relation_id = (
+            f"{prefix}.issuer_official_pdf_relation_{workflow_index}_{relation_index}"
+        )
+        parents = [target_endpoint, source_endpoint]
+        events.append(
+            Event(
+                id=relation_id,
+                type="issuer_official_pdf_prior_annual_relation",
+                time=date.fromisoformat(source.occurred_at[:10]) + timedelta(days=1),
+                params={
+                    "workflow_id": workflow.workflow_id,
+                    "source_relation_id": relation.relation_id,
+                    "record_id": source.record_id,
+                    "target_record_id": target.record_id,
+                    "relation_kind": relation.kind,
+                    "source_url": source.source_url,
+                    "target_source_url": target.source_url,
+                    "source_family": source.source_family,
+                    "source_record_index": record_indexes[source.record_id],
+                    "target_record_index": record_indexes[target.record_id],
+                    "ground_values": ["prior-official-annual-report-validated"],
+                },
+                visibility=[relation_id],
+                causal_inputs=parents,
+                required_inputs=parents,
+                relation_kinds={
+                    parent: "validates_official_annual_endpoint" for parent in parents
+                },
+            )
+        )
+    return events
+
+
 def _jpmorgan_risk_taxonomy_events(
     *, workflow, prefix: str, workflow_index: int, record_id_counts: Counter[str]
 ) -> list[Event]:
@@ -2177,53 +2251,216 @@ def _jpmorgan_risk_taxonomy_events(
                     },
                 )
             )
-    records_by_id = {record.record_id: record for record in records}
-    record_indexes = {
-        record.record_id: record_index for record_index, record in enumerate(records)
-    }
-    for relation_index, relation in enumerate(workflow.relations):
-        if relation.kind != "prior_official_annual_report":
-            continue
-        source = records_by_id.get(relation.source_record_id)
-        target = records_by_id.get(relation.target_record_id)
-        if source is None or target is None:
-            continue
-        source_year = int(source.attribute("year"))
-        target_year = int(target.attribute("year"))
-        source_heading_index = 5 if source_year == 2024 else 0
-        parents = [
-            event_ids[(target_year, 0)],
-            event_ids[(source_year, source_heading_index)],
-        ]
-        relation_id = (
-            f"{prefix}.issuer_official_pdf_relation_{workflow_index}_{relation_index}"
-        )
-        events.append(
-            Event(
-                id=relation_id,
-                type="issuer_official_pdf_prior_annual_relation",
-                time=date.fromisoformat(source.occurred_at[:10]) + timedelta(days=1),
-                params={
-                    "workflow_id": workflow.workflow_id,
-                    "source_relation_id": relation.relation_id,
-                    "record_id": source.record_id,
-                    "target_record_id": target.record_id,
-                    "relation_kind": relation.kind,
-                    "source_url": source.source_url,
-                    "target_source_url": target.source_url,
-                    "source_family": source.source_family,
-                    "source_record_index": record_indexes[source.record_id],
-                    "target_record_index": record_indexes[target.record_id],
-                    "ground_values": ["prior-official-annual-report-validated"],
-                },
-                visibility=[relation_id],
-                causal_inputs=parents,
-                required_inputs=parents,
-                relation_kinds={
-                    parent: "validates_official_annual_endpoint" for parent in parents
-                },
+    endpoint_ids = {
+        record.record_id: event_ids[
+            (
+                int(record.attribute("year")),
+                5 if record.attribute("year") == "2024" else 0,
             )
+        ]
+        for record in records
+    }
+    events.extend(
+        _issuer_official_pdf_relation_events(
+            workflow=workflow,
+            prefix=prefix,
+            workflow_index=workflow_index,
+            records=records,
+            endpoint_ids=endpoint_ids,
         )
+    )
+    return events
+
+
+def _walmart_reconciliation_ranges(record) -> list[tuple[str, int, int, list]]:
+    try:
+        year = int(record.attribute("year"))
+        sections = json.loads(record.attribute("sections_json"))
+    except (AttributeError, TypeError, ValueError, json.JSONDecodeError) as error:
+        raise ProvenanceError("Walmart section receipt is invalid") from error
+    if (
+        record.source_family != "walmart_official_annual_report_pdf"
+        or year not in _WALMART_SECTION_CHARS
+        or hashlib.sha256(record.text.encode()).hexdigest() != record.text_sha256
+        or record.provenance_id != f"sha256:{record.source_sha256}"
+        or not isinstance(sections, list)
+    ):
+        raise ProvenanceError("Walmart annual-report record identity is invalid")
+    sections_by_id = {
+        str(section.get("section_id") or ""): section
+        for section in sections
+        if isinstance(section, dict)
+    }
+    facts_by_section: dict[str, list] = {
+        section_id: [] for section_id in _WALMART_RECONCILIATION_SECTIONS
+    }
+    for fact in record.facts:
+        section_id = next(
+            (
+                name
+                for name, section in sections_by_id.items()
+                if int(section["char_start"])
+                <= fact.char_start
+                < fact.char_end
+                <= int(section["char_end"])
+            ),
+            "",
+        )
+        if section_id in facts_by_section:
+            facts_by_section[section_id].append(fact)
+    expected_fields = {
+        "business_segments": {"reportable_segments"},
+        "strategy_execution_risk": {"strategy_execution_risk"},
+        "capital_expenditures": {
+            "total_capital_expenditures",
+            "largest_capex_allocation",
+        },
+        "icfr_opinion": {"icfr_effective"},
+        "segment_note": {"segment_note_identity"},
+    }
+    ranges: list[tuple[str, int, int, list]] = []
+    previous_end = 0
+    for section_id in _WALMART_RECONCILIATION_SECTIONS:
+        receipt = sections_by_id.get(section_id)
+        facts = facts_by_section[section_id]
+        if (
+            receipt is None
+            or {fact.field for fact in facts} != expected_fields[section_id]
+        ):
+            raise ProvenanceError("Walmart reconciliation fact set is invalid")
+        receipt_start = receipt.get("char_start")
+        receipt_end = receipt.get("char_end")
+        if (
+            isinstance(receipt_start, bool)
+            or isinstance(receipt_end, bool)
+            or not isinstance(receipt_start, int)
+            or not isinstance(receipt_end, int)
+            or receipt_start < 0
+            or receipt_end <= receipt_start
+            or receipt_end > len(record.text)
+            or hashlib.sha256(
+                record.text[receipt_start:receipt_end].encode()
+            ).hexdigest()
+            != receipt.get("sha256")
+        ):
+            raise ProvenanceError("Walmart reconciliation section receipt is invalid")
+        start = max(previous_end, receipt_start - 1_000)
+        end = min(len(record.text), start + _WALMART_SECTION_CHARS[year])
+        if end < receipt_end or any(
+            not start <= fact.char_start < fact.char_end <= end for fact in facts
+        ):
+            raise ProvenanceError("Walmart reconciliation slice misses evidence")
+        ranges.append((section_id, start, end, facts))
+        previous_end = end
+    return ranges
+
+
+def _walmart_reconciliation_events(
+    *, workflow, prefix: str, workflow_index: int, record_id_counts: Counter[str]
+) -> list[Event]:
+    records = sorted(workflow.records, key=lambda record: record.attribute("year"))
+    try:
+        years = [int(record.attribute("year")) for record in records]
+        if (
+            workflow.source_authorization.get("adapter_revision") != "sourceworkflow@1"
+            or years != [2022, 2023, 2024, 2025]
+            or any(record_id_counts[record.record_id] != 1 for record in records)
+        ):
+            return []
+        ranges_by_record = {
+            record.record_id: _walmart_reconciliation_ranges(record)
+            for record in records
+        }
+    except (AttributeError, TypeError, ValueError, ProvenanceError):
+        return []
+    event_ids = {
+        (year, section_id): (
+            f"{prefix}.walmart_reconciliation_{workflow_index}_{record_index}_{section_index}"
+        )
+        for record_index, year in enumerate(years)
+        for section_index, section_id in enumerate(_WALMART_RECONCILIATION_SECTIONS)
+    }
+    events: list[Event] = []
+    for record_index, (record, year) in enumerate(zip(records, years, strict=True)):
+        anchor_id = event_ids[(year, "business_segments")]
+        for section_index, (section_id, start, end, facts) in enumerate(
+            ranges_by_record[record.record_id]
+        ):
+            raw_section = record.text[start:end]
+            text = f"{_WALMART_VIEW_PREFIX}{section_id}\n{raw_section}"
+            event_id = event_ids[(year, section_id)]
+            causal_inputs = [] if event_id == anchor_id else [anchor_id]
+            fact_values = {fact.field: fact.value for fact in facts}
+            evidence_quotes = {fact.field: fact.evidence_quote for fact in facts}
+            evidence_spans = {
+                fact.field: [fact.char_start - start, fact.char_end - start]
+                for fact in facts
+            }
+            raw_sha256 = hashlib.sha256(raw_section.encode()).hexdigest()
+            operation = "walmart_segment_strategy_risk_capex_icfr_section"
+            events.append(
+                Event(
+                    id=event_id,
+                    type="walmart_reconciliation_section",
+                    time=date.fromisoformat(record.occurred_at[:10]),
+                    params={
+                        "workflow_id": workflow.workflow_id,
+                        "record_id": record.record_id,
+                        "report_year": year,
+                        "section_id": section_id,
+                        "section_index": section_index,
+                        "text": text,
+                        "text_sha256": hashlib.sha256(text.encode()).hexdigest(),
+                        "section_sha256": raw_sha256,
+                        "source_sha256": record.source_sha256,
+                        "source_origin": "real_derived",
+                        "source_family": record.source_family,
+                        "source_url": record.source_url,
+                        "retrieval_url": record.retrieval_url,
+                        "provenance_id": (
+                            "derived-sha256:"
+                            + hashlib.sha256(
+                                (
+                                    f"{operation}|{record.provenance_id}|{start}|"
+                                    f"{end}|{raw_sha256}"
+                                ).encode()
+                            ).hexdigest()
+                        ),
+                        "parent_provenance_id": record.provenance_id,
+                        "provenance_operation": operation,
+                        "source_char_start": start,
+                        "source_char_end": end,
+                        "source_order": year * 100 + section_index,
+                        "fact_values": fact_values,
+                        "evidence_quotes": evidence_quotes,
+                        "evidence_spans": evidence_spans,
+                        "ground_values": [
+                            *fact_values.values(),
+                            *evidence_quotes.values(),
+                        ],
+                    },
+                    visibility=[event_id],
+                    causal_inputs=causal_inputs,
+                    relation_kinds={
+                        parent_id: "anchors_annual_reconciliation"
+                        for parent_id in causal_inputs
+                    },
+                )
+            )
+    events.extend(
+        _issuer_official_pdf_relation_events(
+            workflow=workflow,
+            prefix=prefix,
+            workflow_index=workflow_index,
+            records=records,
+            endpoint_ids={
+                record.record_id: event_ids[
+                    (int(record.attribute("year")), "business_segments")
+                ]
+                for record in records
+            },
+        )
+    )
     return events
 
 
@@ -2235,14 +2472,20 @@ def _source_workflow_events(project: dict[str, Any], prefix: str) -> list[Event]
     )
     for workflow_index, workflow in enumerate(source_workflows):
         if workflow.source_kind == "issuer_official_pdf":
-            events.extend(
-                _jpmorgan_risk_taxonomy_events(
+            issuer_pdf_events = _jpmorgan_risk_taxonomy_events(
+                workflow=workflow,
+                prefix=prefix,
+                workflow_index=workflow_index,
+                record_id_counts=record_id_counts,
+            )
+            if not issuer_pdf_events:
+                issuer_pdf_events = _walmart_reconciliation_events(
                     workflow=workflow,
                     prefix=prefix,
                     workflow_index=workflow_index,
                     record_id_counts=record_id_counts,
                 )
-            )
+            events.extend(issuer_pdf_events)
             continue
         if workflow.source_kind == "issuer_ir_filing":
             events.extend(

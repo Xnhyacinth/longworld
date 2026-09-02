@@ -55,6 +55,7 @@ EVENT_TYPES = [
     "issuer_ir_prior_filing_relation",
     "issuer_ir_cross_year_answer",
     "jpmorgan_risk_taxonomy_section",
+    "walmart_reconciliation_section",
     "issuer_official_pdf_prior_annual_relation",
 ]
 
