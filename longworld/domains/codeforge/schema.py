@@ -36,6 +36,7 @@ from longworld.core.realworkflow import RealWorkflow, WorkflowRecord
 from longworld.domains.company.names import FIRST, LAST, STEMS
 
 SCHEMA_VERSION = "p1.1"
+_GIT_SHA = re.compile(r"[0-9a-f]{40}")
 
 
 _FACT_PATTERNS = {
@@ -197,6 +198,37 @@ def _record_facts(record: WorkflowRecord) -> dict[str, Any]:
     return facts
 
 
+def _verified_release_ancestry(record: WorkflowRecord) -> dict[str, str]:
+    """Retain only an exporter-verified merge-to-tag ancestry receipt."""
+    if (
+        record.kind != "release"
+        or record.attributes.get("ancestry_verified") is not True
+    ):
+        return {}
+    attributes = record.attributes
+    merge_sha = str(attributes.get("merge_commit_sha") or "").lower()
+    tag_sha = str(attributes.get("tag_commit_sha") or "").lower()
+    compare_base = str(attributes.get("compare_base_sha") or "").lower()
+    compare_head = str(attributes.get("compare_head_sha") or "").lower()
+    compare_status = str(attributes.get("compare_status") or "").lower()
+    ci_scope = str(attributes.get("ci_evidence_scope") or "")
+    if (
+        _GIT_SHA.fullmatch(merge_sha) is None
+        or _GIT_SHA.fullmatch(tag_sha) is None
+        or compare_base != merge_sha
+        or compare_head != tag_sha
+        or compare_status not in {"ahead", "identical"}
+        or ci_scope != "observed_selected_final_pre_merge_check_runs"
+    ):
+        return {}
+    return {
+        "merge_commit_sha": merge_sha,
+        "tag_commit_sha": tag_sha,
+        "compare_status": compare_status,
+        "ci_evidence_scope": ci_scope,
+    }
+
+
 def _fact_quote_span(text: str, key: str, value: Any) -> tuple[int, int, str]:
     if key == "result":
         patterns = {
@@ -334,6 +366,10 @@ def _validate_record_binding(params: Mapping[str, Any]) -> list[str]:
     ):
         raise GroundedSpanError(
             "repository grounded relations differ from canonical record binding"
+        )
+    if binding.get("release_ancestry") != dict(params.get("release_ancestry") or {}):
+        raise GroundedSpanError(
+            "repository release ancestry differs from canonical record binding"
         )
     return links
 
@@ -486,6 +522,7 @@ def _normalized_workflow_records(
             ).hexdigest()[:24]
         )
         body_sha256 = sha256_text(record.text)
+        release_ancestry = _verified_release_ancestry(record)
         records.append(
             {
                 "index": index,
@@ -510,6 +547,7 @@ def _normalized_workflow_records(
                 ],
                 "source_links": list(record.links),
                 "body_facts": body_facts,
+                "release_ancestry": release_ancestry,
                 "source_pointer": record.source_pointer,
                 "source_observations": [
                     {
@@ -544,6 +582,11 @@ def _collapse_identical_record_snapshots(
             str(record["source_pointer"]).partition("?ref=")[0],
             json.dumps(record["source_links"], sort_keys=True, separators=(",", ":")),
             json.dumps(record["body_facts"], sort_keys=True, separators=(",", ":")),
+            json.dumps(
+                record.get("release_ancestry") or {},
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
             str(record["workflow_id"]) if record["source_links"] else "",
         )
         canonical = canonical_by_identity.get(identity)
@@ -651,6 +694,7 @@ def bind_real_workflows(project: dict[str, Any], workflows: list[RealWorkflow]) 
             "source_observations": list(record["source_observations"]),
             "links": link_bindings,
             "grounded_relations": list(record["grounded_relations"]),
+            "release_ancestry": dict(record.get("release_ancestry") or {}),
         }
         record["source_record_binding"] = binding
         record["source_record_binding_sha256"] = _canonical_binding_sha256(binding)

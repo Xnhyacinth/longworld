@@ -1,0 +1,31 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "reports/p14_codeforge_wasmtime_sources_v4/wasmtime_pr13251_v45.0.0.json",
+      "sha256": "b8aa3d4b3c2add33c13f18601aaab5bbd5fec463b92ebab5cf9acce708f75bb6"
+    },
+    {
+      "path": "reports/p14_codeforge_wasmtime_sources_v1/wasmtime_pr13354_v46.0.0.json",
+      "sha256": "bfa6b808ed511db51aa0f26a13cf98b91d13595ec386ed602b652999d798901c"
+    },
+    {
+      "path": "reports/p14_codeforge_wasmtime_sources_v1/wasmtime_pr13580_v47.0.0.json",
+      "sha256": "a5615762b167cd34602eb9a7c1a352c4a95f844b33059b659f726eb85e17143b"
+    },
+    {
+      "path": "reports/p14_codeforge_wasmtime_sources_v1/wasmtime_pr13806_v48.0.0.json",
+      "sha256": "533a52d3d01f27997fd3d6d26f8b18f831fd0187115a362425329d4f9e8228f2"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "probe-source-e4bac7778cdcfa3808f3c373b474e85f",
+    "environment": "probe",
+    "digest": "455cfe6b980aceffb3e4266be37ea68832f373fd37e135b9cb44416c3331f2da"
+  }
+}

@@ -16,7 +16,8 @@ _RELEASE_HISTORY_QUERY_TYPES = {
     "version_selection",
     "release_supersession_trace",
 }
-_BAND_CYCLE_COUNT = {"16k": 1, "32k": 2, "64k": 3}
+_RELEASE_BAND_CYCLE_COUNT = {"16k": 1, "32k": 2, "64k": 3}
+_PATCH_REVIEW_TEST_BAND_CYCLE_COUNT = {"16k": 1, "32k": 2, "64k": 4}
 _REAL_SOURCE_ORIGINS = {"real_public", "real_private_export", "real_derived"}
 _SOURCE_RELATION_KINDS = {"derived_from", "source_context"}
 
@@ -199,7 +200,7 @@ def bind_cumulative_release_history(
             )
             if query.query_type != expected_query_type:
                 raise ValueError("release-history band uses the wrong answer operator")
-            if len(keys) != _BAND_CYCLE_COUNT[band]:
+            if len(keys) != _RELEASE_BAND_CYCLE_COUNT[band]:
                 raise ValueError("release-history band has the wrong cycle count")
             declared_counts = [
                 op["cycle_count"] for op in query.program_ops if "cycle_count" in op
@@ -265,5 +266,91 @@ def bind_cumulative_release_history(
                 )
 
         base_task_group = f"codeforge.release_history|{group_id}"
+        for query in group:
+            query.base_task_group = base_task_group
+
+
+def bind_cumulative_patch_review_test_history(
+    world: SimulatedWorld, queries: list[QuerySpec]
+) -> None:
+    """Validate nested patch/review/test/ancestry programs across exact bands."""
+    groups: dict[str, list[QuerySpec]] = {}
+    for query in queries:
+        if query.query_type != "patch_review_test_ancestry":
+            continue
+        if (
+            len(query.preferred_length_buckets) != 1
+            or query.preferred_length_buckets[0] not in _BAND_ORDER
+            or not query.semantic_growth_group
+        ):
+            raise ValueError("patch-review-test query has no exact growth binding")
+        groups.setdefault(query.semantic_growth_group, []).append(query)
+
+    events_by_record = {
+        str(event.params.get("record_key")): event
+        for event in world.events
+        if event.type == "repo_record"
+    }
+    for group in groups.values():
+        group.sort(key=lambda item: _BAND_ORDER[item.preferred_length_buckets[0]])
+        bands = [query.preferred_length_buckets[0] for query in group]
+        if bands != ["16k", "32k", "64k"][: len(group)]:
+            raise ValueError(
+                "patch-review-test group has a non-cumulative band sequence"
+            )
+        programs: list[list[dict[str, object]]] = []
+        for query, band in zip(group, bands, strict=True):
+            ops = [
+                op
+                for op in query.program_ops
+                if op.get("op") == "JOIN_PATCH_REVIEW_TEST_ANCESTRY"
+            ]
+            if len(ops) != _PATCH_REVIEW_TEST_BAND_CYCLE_COUNT[band]:
+                raise ValueError("patch-review-test band has the wrong cycle count")
+            programs.append(ops)
+            selected = set(query.sufficient_event_ids)
+            for op in ops:
+                patch = events_by_record.get(str(op.get("patch_record_key") or ""))
+                review = events_by_record.get(str(op.get("review_record_key") or ""))
+                ci = events_by_record.get(str(op.get("ci_record_key") or ""))
+                merge = events_by_record.get(str(op.get("merge_record_key") or ""))
+                release = events_by_record.get(str(op.get("release_record_key") or ""))
+                cycle = (patch, review, ci, merge, release)
+                if any(event is None or event.id not in selected for event in cycle):
+                    raise ValueError("patch-review-test program is missing an episode")
+                assert patch is not None and review is not None and ci is not None
+                assert merge is not None and release is not None
+                required_edges = (
+                    (patch, merge),
+                    (review, merge),
+                    (patch, ci),
+                    (merge, release),
+                    (ci, release),
+                )
+                if any(
+                    parent.id not in child.causal_inputs
+                    or not _has_authentic_source_relation(parent, child, parent.id)
+                    for parent, child in required_edges
+                ):
+                    raise ValueError(
+                        "patch-review-test program lacks an authentic source link"
+                    )
+        longest = programs[-1]
+        if any(program != longest[-len(program) :] for program in programs[:-1]):
+            raise ValueError("patch-review-test programs are not an ordered history")
+        for before, after in pairwise(group):
+            if not set(before.essential_event_ids) < set(after.essential_event_ids):
+                raise ValueError("patch-review-test necessary evidence does not grow")
+            if not set(before.sufficient_event_ids) < set(after.sufficient_event_ids):
+                raise ValueError("patch-review-test sufficient evidence does not grow")
+            if not _authentic_relation_edges(
+                world, before.sufficient_event_ids
+            ) < _authentic_relation_edges(world, after.sufficient_event_ids):
+                raise ValueError(
+                    "patch-review-test authentic source relations do not grow"
+                )
+        base_task_group = (
+            f"codeforge.patch_review_test|{group[0].semantic_growth_group}"
+        )
         for query in group:
             query.base_task_group = base_task_group

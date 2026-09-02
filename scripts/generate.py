@@ -118,6 +118,7 @@ from longworld.core.verify import (
 from longworld.core.views import memory_card, render_cf_view, split_views, view_answer
 from longworld.core.wikiparse import WIKI_HYBRID_CHILD_EVENT_TYPES
 from longworld.core.world import SimulatedWorld
+from longworld.domains.codeforge.multiband import _has_authentic_source_relation
 from longworld.domains.researchlab.simulate import (
     selected_wiki_source_relation_edges,
     valid_arxiv_revision_relation_event,
@@ -1087,6 +1088,7 @@ def real_source_relation_edges(
                         if parent_id in synthetic_inputs
                         or endpoint_is_real.get(parent_id, True) is not True
                         or endpoint_is_real.get(child.id, True) is not True
+                        or not _has_authentic_source_relation(parent, child, parent_id)
                         else "authentic_source"
                     ),
                     "parent_source_url": str(parent.params["source_url"]),

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import re
 from typing import Any
 
 from longworld.core.cascade import apply_cascade, check_cascade
@@ -7,6 +9,10 @@ from longworld.core.grounded import apply_grounded, check_grounded
 from longworld.core.state import WorldState
 from longworld.core.world import Event
 from longworld.domains.codeforge.schema import materialize_grounded_repo_record
+
+_PATCH_EVIDENCE = re.compile(
+    r"(?m)^(?:diff --(?:git )?|\d+ files changed \(GitHub commit API summary\):)"
+)
 
 
 def init_values(project: dict[str, Any]) -> dict[str, Any]:
@@ -296,7 +302,21 @@ def _apply_repo_record(state: WorldState, ev: Event) -> None:
                 state.set(f"{alias_prefix}:{key}", value, ev.id, ev.time)
 
     kind = str(p["record_kind"])
-    if kind == "ci_run":
+    if kind == "commit":
+        marker = _PATCH_EVIDENCE.search(str(p["body_text"]))
+        if marker is not None:
+            patch = str(p["body_text"])[marker.start() :]
+            state.set(
+                f"real:patch:{record_id}:sha256",
+                hashlib.sha256(patch.encode()).hexdigest(),
+                ev.id,
+                ev.time,
+            )
+    elif kind == "review":
+        decision = state.values.get(f"{prefix}:result")
+        if decision is not None:
+            state.set(f"real:review:{record_id}:decision", decision, ev.id, ev.time)
+    elif kind == "ci_run":
         run = state.values.get(f"{prefix}:resolved:run") or source_record_id
         result = state.values.get(f"{prefix}:resolved:result")
         test = state.values.get(f"{prefix}:test")
@@ -328,6 +348,14 @@ def _apply_repo_record(state: WorldState, ev: Event) -> None:
                     ev.time,
                 )
     elif kind == "merge":
+        head_commit = state.values.get(f"{prefix}:resolved:commit")
+        if head_commit is not None:
+            state.set(
+                f"real:patch_review_merge:{record_id}:head_commit",
+                head_commit,
+                ev.id,
+                ev.time,
+            )
         decision_prefix = f"real:license_decision:{record_id}"
         compatible = state.values.get(f"{prefix}:resolved:compatible")
         review_result = state.values.get(f"{prefix}:resolved:result")
@@ -368,6 +396,11 @@ def _apply_repo_record(state: WorldState, ev: Event) -> None:
             state.set(f"{decision_prefix}:license", selected_license, ev.id, ev.time)
     elif kind == "release":
         release_prefix = f"real:release:{record_id}"
+        ancestry = dict(p.get("release_ancestry") or {})
+        for key in ("merge_commit_sha", "tag_commit_sha", "compare_status"):
+            value = ancestry.get(key)
+            if value:
+                state.set(f"{release_prefix}:ancestry:{key}", value, ev.id, ev.time)
         linked_record_kinds = dict(p.get("linked_record_kinds") or {})
         linked_record_results = dict(p.get("linked_record_results") or {})
         ci_links = [

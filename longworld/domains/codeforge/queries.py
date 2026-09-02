@@ -1,16 +1,24 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from typing import Any
 
 from longworld.core.asof import find_event, world_as_of
 from longworld.core.world import Event, SimulatedWorld, WorldSimulator
 from longworld.domains.codeforge.events import apply_event, check_preconditions
-from longworld.domains.codeforge.multiband import bind_cumulative_release_history
+from longworld.domains.codeforge.multiband import (
+    bind_cumulative_patch_review_test_history,
+    bind_cumulative_release_history,
+)
 from longworld.domains.company.queries import (
     QuerySpec,
     _merge_overrides,
     instance_topology,
+)
+
+_PATCH_EVIDENCE = re.compile(
+    r"(?m)^(?:diff --(?:git )?|\d+ files changed \(GitHub commit API summary\):)"
 )
 
 
@@ -27,6 +35,58 @@ def eval_answer(
     world: SimulatedWorld, spec: QuerySpec, state_values: dict[str, Any]
 ) -> str:
     val = state_values.get(spec.answer_key)
+    if spec.query_type == "patch_review_test_ancestry":
+        selections: list[str] = []
+        for op in spec.program_ops:
+            if op.get("op") != "JOIN_PATCH_REVIEW_TEST_ANCESTRY":
+                continue
+            patch_key = str(op["patch_record_key"])
+            review_key = str(op["review_record_key"])
+            ci_key = str(op["ci_record_key"])
+            merge_key = str(op["merge_record_key"])
+            release_key = str(op["release_record_key"])
+            patch_prefix = f"repo:{patch_key}"
+            release_prefix = f"real:release:{release_key}"
+            patch_sha256 = state_values.get(f"real:patch:{patch_key}:sha256")
+            patch_commit = state_values.get(f"{patch_prefix}:commit")
+            review = state_values.get(f"real:review:{review_key}:decision")
+            test = state_values.get(f"repo:{ci_key}:test")
+            test_result = state_values.get(f"repo:{ci_key}:result")
+            test_commit = state_values.get(f"repo:{ci_key}:resolved:commit")
+            merge_head = state_values.get(
+                f"real:patch_review_merge:{merge_key}:head_commit"
+            )
+            tag = state_values.get(f"{release_prefix}:tag")
+            merge_sha = state_values.get(f"{release_prefix}:ancestry:merge_commit_sha")
+            tag_sha = state_values.get(f"{release_prefix}:ancestry:tag_commit_sha")
+            compare_status = state_values.get(
+                f"{release_prefix}:ancestry:compare_status"
+            )
+            if (
+                not all(
+                    (
+                        patch_sha256,
+                        patch_commit,
+                        test,
+                        test_commit,
+                        merge_head,
+                        tag,
+                        merge_sha,
+                        tag_sha,
+                    )
+                )
+                or review not in {"approved", "rejected"}
+                or test_result not in {"passed", "failed"}
+                or compare_status not in {"ahead", "identical"}
+                or patch_commit != test_commit
+                or patch_commit != merge_head
+            ):
+                return "unknown"
+            selections.append(
+                f"tag={tag};patch={patch_sha256};review={review};"
+                f"test={test}:{test_result};ancestry={merge_sha}->{tag_sha}"
+            )
+        return " | ".join(selections) if selections else "unknown"
     if spec.query_type == "fork_join":
         flake = state_values.get("flake_token")
         fail = state_values.get("fail_token")
@@ -791,6 +851,7 @@ def build_code_queries(world: SimulatedWorld) -> list[QuerySpec]:
         q.answer = gold_from_full(world, q)
         q.cf_answer = cf_from_full(world, q)
         if q.query_type in {
+            "patch_review_test_ancestry",
             "version_selection",
             "release_supersession_trace",
             "ci_regression_origin",
@@ -803,6 +864,7 @@ def build_code_queries(world: SimulatedWorld) -> list[QuerySpec]:
             q.proof_depth = replayed_proof_depth(world, q)
         out.append(q)
     bind_cumulative_release_history(world, out)
+    bind_cumulative_patch_review_test_history(world, out)
     return out
 
 
@@ -897,6 +959,150 @@ def _build_real_repo_queries(
         release_artifact_ids = [
             _event_artifact_id(world, event) for event in release_events
         ]
+    event_by_id = {event.id: event for event in world.events}
+    patch_cycles: list[tuple[Event, list[Event], dict[str, Any]]] = []
+    for selected_release in sorted(releases, key=lambda event: (event.time, event.id)):
+        ancestry = dict(selected_release.params.get("release_ancestry") or {})
+        if not ancestry:
+            continue
+        direct_events = [
+            event_by_id[event_id]
+            for event_id in selected_release.causal_inputs
+            if event_id in event_by_id
+        ]
+        merge = next(
+            (event for event in direct_events if _repo_kind(event, "merge")), None
+        )
+        passed_ci = [
+            event
+            for event in direct_events
+            if _repo_kind(event, "ci_run") and event.params.get("result") == "passed"
+        ]
+        if merge is None or not passed_ci:
+            continue
+        merge_inputs = [
+            event_by_id[event_id]
+            for event_id in merge.causal_inputs
+            if event_id in event_by_id
+        ]
+        review = next(
+            (
+                event
+                for event in merge_inputs
+                if _repo_kind(event, "review")
+                and event.params.get("result") == "approved"
+            ),
+            None,
+        )
+        patch = next(
+            (
+                event
+                for event in merge_inputs
+                if _repo_kind(event, "commit")
+                and _PATCH_EVIDENCE.search(str(event.params.get("body_text") or ""))
+            ),
+            None,
+        )
+        if patch is None or review is None:
+            continue
+        patch_commit = str(patch.params.get("commit") or "")
+        ci = next(
+            (
+                event
+                for event in passed_ci
+                if event.params.get("commit") == patch_commit
+                and event.params.get("test")
+            ),
+            None,
+        )
+        if ci is None:
+            continue
+        selected_events = [patch, review, ci, merge, selected_release]
+        release_key = str(selected_release.params["record_key"])
+        patch_cycles.append(
+            (
+                selected_release,
+                selected_events,
+                {
+                    "op": "JOIN_PATCH_REVIEW_TEST_ANCESTRY",
+                    "patch_record_key": patch.params["record_key"],
+                    "review_record_key": review.params["record_key"],
+                    "ci_record_key": ci.params["record_key"],
+                    "merge_record_key": merge.params["record_key"],
+                    "release_record_key": release_key,
+                },
+            )
+        )
+    patch_cycles = patch_cycles[-4:]
+    for cycle_count in (1, 2, 4):
+        if cycle_count > len(patch_cycles):
+            continue
+        selected_cycles = patch_cycles[-cycle_count:]
+        selected_events = [
+            event
+            for _release, cycle_events, _op in selected_cycles
+            for event in cycle_events
+        ]
+        selected_release = selected_cycles[-1][0]
+        selected_ci = selected_cycles[-1][1][2]
+        release_keys = [
+            str(cycle_release.params["record_key"])
+            for cycle_release, _events, _op in selected_cycles
+        ]
+        bucket = {1: "16k", 2: "32k", 4: "64k"}[cycle_count]
+        queries.append(
+            QuerySpec(
+                query_id=(
+                    f"{qid}:patch_review_test_ancestry:{cycle_count}_cycles:"
+                    f"{selected_release.params['record_id']}"
+                ),
+                query_type="patch_review_test_ancestry",
+                question=(
+                    f"For the latest {cycle_count} real {repo} release cycle"
+                    f"{'s' if cycle_count != 1 else ''}, execute each source-linked "
+                    "proof joining the merged patch diff, its approved review, one "
+                    "selected final pre-merge test result, and the verified "
+                    "merge-to-tag ancestry. Report cycles chronologically as "
+                    "`tag=...;patch=SHA256;review=approved;test=name:result;"
+                    "ancestry=merge_sha->tag_sha`, separated by ` | `."
+                ),
+                answer="",
+                as_of=world_as_of(world),
+                answer_key="|".join(release_keys),
+                essential_event_ids=[event.id for event in selected_events],
+                essential_artifact_ids=[
+                    _event_artifact_id(world, event) for event in selected_events
+                ],
+                sufficient_event_ids=[event.id for event in selected_events],
+                cf_event_id=selected_ci.id,
+                cf_param_updates={"result": "failed"},
+                cf_answer="",
+                invariance_event_id=invariance_event.id,
+                invariance_param_updates={"quoted_hash": "fffffff"},
+                gold_expression=(
+                    "JOIN(patch_diff_sha256, approved_review, "
+                    "selected_pre_merge_test, verified_release_ancestry)"
+                ),
+                proof_depth=4 + cycle_count,
+                cf_op="test_result",
+                motif="patch_review_test_ancestry",
+                topology_id=instance_topology(
+                    "code.real_patch_review_test_ancestry",
+                    *[
+                        cycle_release.params["record_id"]
+                        for cycle_release, _events, _op in selected_cycles
+                    ],
+                ),
+                domain="codeforge",
+                truth_regime="real_workflow_hybrid_executable",
+                program_ops=[op for _release, _events, op in selected_cycles],
+                preferred_length_buckets=[bucket],
+                semantic_growth_group=(
+                    f"{selected_release.params.get('source_url') or repo}|"
+                    "patch_review_test_ancestry"
+                ),
+            )
+        )
     if release is not None:
         raw_same_repo_releases = sorted(
             [

@@ -1,0 +1,37 @@
+{
+  "schema_version": "longworld.public-github-export-request.v1",
+  "request_id": "p14-codeforge-wasmtime-patch-review-test-v2",
+  "repository": "bytecodealliance/wasmtime",
+  "allowlist": "configs/public_repo_allowlist.yaml",
+  "episodes": [
+    {
+      "pull": 13251,
+      "release": "v45.0.0",
+      "role": "patch_review_test_ancestry_cycle",
+      "artifact_type": "cranelift_idempotent_store_elimination_patch"
+    },
+    {
+      "pull": 13354,
+      "release": "v46.0.0",
+      "role": "patch_review_test_ancestry_cycle",
+      "artifact_type": "aarch64_inst_size_assertion_patch"
+    },
+    {
+      "pull": 13580,
+      "release": "v47.0.0",
+      "role": "patch_review_test_ancestry_cycle",
+      "artifact_type": "cranelift_stack_instruction_removal_patch"
+    },
+    {
+      "pull": 13806,
+      "release": "v48.0.0",
+      "role": "patch_review_test_ancestry_cycle",
+      "artifact_type": "cranelift_alias_analysis_dead_store_patch"
+    }
+  ],
+  "composition": "chronological_causal_union",
+  "synthetic_filler_allowed": false,
+  "random_join_allowed": false,
+  "trust_scope": "local_probe",
+  "notes": "Each cycle requires a patch-bearing merged head, one merge-linked approved review, selected successful pre-merge CI, and verified merge-to-tag ancestry."
+}

@@ -287,6 +287,7 @@ def events_for_repo(project: dict[str, Any], prefix: str) -> list[Event]:
                     record["source_record_binding_sha256"]
                 ),
                 "source_body_facts": facts,
+                "release_ancestry": dict(record.get("release_ancestry") or {}),
                 "links": links,
                 "linked_record_kinds": {
                     link: kind_by_record[link]
