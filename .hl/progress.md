@@ -776,6 +776,11 @@ in`; no private-repository or upload claim was made.
   replay symmetry, tests, and closeout. The honest ledger is now 11 physical /
   9 quota / 99 rows / 3,732,095 tokens; Company is 1/2 and formal export remains
   zero at 9/12.
+- Walmart reconciliation is now 9/9 strict-audited: 338,286 tokens, exact
+  16,371/32,250/64,141 per view, 5/10/20 essential sections, and 0/1/3 signed
+  adjacent-report relations. Commit `ce5e171` records the task and closeout.
+  The honest ledger is now 12 physical / 10 quota / 108 rows / 4,070,381
+  tokens; Company is 2/2 and formal export remains zero at 10/12.
 - PaLM's failed file-delta/Adam implementation was fully removed before the
   new compiled-content task began. The new 7/14/27-file plan preplays at
   16,182/32,709/64,846 with every selected file bound to one required claim.

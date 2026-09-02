@@ -863,6 +863,11 @@ LLaMA-Factory `B1`–`B5`, `B5w`, `ext_acc`, `ext_longtrace`: `cutoff_len: 26214
   necessary across 16/32/64K, while signed source relations grow 0/1/2. Strict
   audit accepted all nine views (342,420 tokens) after generation and promotion
   replay were wired to the same fail-closed relation selector.
+- Walmart adds a distinct Company program over four official annual reports:
+  segment identity, strategy risk, capex allocation, ICFR, and distant segment
+  notes are jointly necessary. All nine views passed with 0/1/3 signed adjacent
+  report relations after the fixture-signed source was re-attested by the
+  current probe source role without changing content hashes.
 
 # P5 real-source, eval, trust, and audit findings (2026-08-25)
 

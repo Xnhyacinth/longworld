@@ -4,11 +4,12 @@
 
 P13/P14 当前有可审计的候选库存，但还没有可发布的正式训练包。Cyber
 cross-vendor remediation、Microsoft multi-filing asset/operating-cash
-trajectory、Wasmtime patch/review/test/release ancestry 和 JPMorgan
-cross-year risk taxonomy 均已完成 16/32/64K × full/CF/ordered 的 9-cell
-dense audit。因此当前账本从 7 物理 / 5 配额更新为 **11 物理 / 9 配额 /
-99 行 / 3,732,095 exact Qwen context tokens**。所有行仍为 candidate，统一
-selection 尚未在这个 11-world 账本上
+trajectory、Wasmtime patch/review/test/release ancestry、JPMorgan
+cross-year risk taxonomy 和 Walmart cross-year reconciliation 均已完成
+16/32/64K × full/CF/ordered 的 9-cell dense audit。因此当前账本从 7 物理 /
+5 配额更新为 **12 物理 / 10 配额 / 108 行 / 4,070,381 exact Qwen context
+tokens**。所有行仍为 candidate，统一 selection 尚未在这个 12-physical /
+10-quota 账本上
 重跑；在 12/12 前重跑只会重复 fail-closed。
 
 新增 Cyber world 的候选 SHA 为 `068a10daf9e4fbfbc0f59c91b4f2aff6fe043cbbcdef45b514f8bdf4adcfc18d`，
@@ -40,11 +41,18 @@ section，并验证 0/1/2 条 signed 相邻年报关系；三档 exact tokens �
 tokens，使 Company 达到 1/2。relation artifact 的 `source_family` 与 promotion
 replay 对称接线均由失败优先测试定位并修复，没有修改任何内容阈值。
 
+第二个 Company world 使用 Walmart FY2022--FY2025 四份 issuer-owned 官方
+年报。16/32/64K 程序分别联合 5/10/20 个 segment、strategy-execution risk、
+capex、ICFR 与 distant segment-note sections，并验证 0/1/3 条 signed 相邻
+年报关系；三档 exact tokens 为 16,371/32,250/64,141。最终 9/9 strict audit
+通过、0 rejected，贡献 338,286 tokens，使 Company 达到 2/2。原 source
+fixture 签名已在内容 hashes 不变的条件下由当前 source role 重签并 replay。
+
 ## 剩余缺口与 P14 路线
 
 | Domain | 当前/目标 | P14 路线 |
 | --- | ---: | --- |
-| Company | 1/2 | JPMorgan 已通过；继续 Walmart segment/strategy/risk/capex/ICFR，不再做 Microsoft reconstruction 或 YoY clone |
+| Company | 2/2 | JPMorgan 与 Walmart 均通过；停止扩充配额 |
 | ResearchLab | 0/2 | 换自然长度足够的论文、revision/review/benchmark 程序，不复用 MLRC/AEVB/Megatron 死路 |
 | CodeForge | 2/2 | Wasmtime patch/review/test/release ancestry 已补齐；不再扩充配额 |
 | Finance | 2/2 | 已由 Microsoft asset/operating-cash trajectory 补齐；不再扩充配额 |

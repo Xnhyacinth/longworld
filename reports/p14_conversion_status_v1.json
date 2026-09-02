@@ -117,20 +117,50 @@
       "dense_audit_complete": true,
       "source_token_measurement_valid": true,
       "train_ready": false
+    },
+    {
+      "domain": "company",
+      "world_id": "w014202-sablewood16:focal",
+      "rows": 9,
+      "actual_context_tokens": 338286,
+      "bands": [
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "views": [
+        "full",
+        "cf",
+        "ordered_artifact_view"
+      ],
+      "candidate_path": "reports/p14_company_walmart_reconciliation_v1/candidate/train.jsonl",
+      "candidate_sha256": "f51ed62b2ae345c91fded2a2c2b23f24901f3f60b5772ca0958da6630f308f39",
+      "candidate_row_set_sha256": "9f57157e116b0987643cc19fd8d4dd5305c7a524a5eb949ed3242fd455f69af6",
+      "ranking_sha256": "a182ac5e9a9ec06b2e894c7e464dbda1eafc92866d72f087d51431d7888080fc",
+      "audit_path": "reports/p14_company_walmart_reconciliation_v1/audit/audits.jsonl",
+      "audit_sha256": "54f8a5c89a3469b60b51910300281a685ae1d14ec94b8efd76b82d32f26b05f5",
+      "accepted_sha256": "d06448c123c533f822ed8087baea3567074d52528723d94ba2556ed859e40547",
+      "source_workflow_bundle_sha256": "0f70cd144303aa65bd07add0f66c04de992b710118c12f42e7240b051a2a9a34",
+      "answer_program_id": "company.walmart_cross_year_reconciliation.v1",
+      "motif": "segment_identity+strategy_risk+capex+icfr+signed_annual_relations",
+      "unique_executable_proofs": 3,
+      "dense_audit_complete": true,
+      "source_token_measurement_valid": true,
+      "train_ready": false
     }
   ],
   "current_inventory": {
-    "physical_worlds": 11,
-    "quota_countable_worlds": 9,
+    "physical_worlds": 12,
+    "quota_countable_worlds": 10,
     "required_quota_worlds": 12,
-    "rows": 99,
-    "actual_context_tokens": 3732095,
-    "unique_motifs": 9,
-    "unique_executable_proofs": 28,
-    "unique_answer_programs": 9,
-    "unique_semantic_base_tasks": 9,
+    "rows": 108,
+    "actual_context_tokens": 4070381,
+    "unique_motifs": 10,
+    "unique_executable_proofs": 31,
+    "unique_answer_programs": 10,
+    "unique_semantic_base_tasks": 10,
     "quota_by_domain": {
-      "company": 1,
+      "company": 2,
       "researchlab": 0,
       "codeforge": 2,
       "finance": 2,
@@ -139,14 +169,14 @@
     }
   },
   "quota_holes": {
-    "company": 1,
+    "company": 0,
     "researchlab": 2,
     "codeforge": 0,
     "finance": 0
   },
   "release_state": {
     "selection_attempted_against_current_inventory": false,
-    "last_selection_blocker": "insufficient fully audited worlds: 9<12",
+    "last_selection_blocker": "insufficient fully audited worlds: 10<12",
     "selection_run": false,
     "promotion_run": false,
     "quality_gate_run": false,
