@@ -29,7 +29,7 @@ upload HF until 12/12.
 | E2 | Finance world 2: NVIDIA FY2022–FY2025 issuer IR | blocked | challenge page; Apple EDGAR 403; do not retry-hammer |
 | E3 | Company: Microsoft reconstruction across 16/32/64K via FY2021 | blocked | five seeds; every world missing 16k+32k ordered |
 | E4 | CPT: denser first-1000 oxc commits, not skip-8000 quiet tail | blocked | 207000 ppm > 200000; cap unchanged; 0 packed rows |
-| E5a | ResearchLab: Megatron (1909.08053) three-view, not MLRC SHA | running | 9/9 + near-dup ≤ 0.25 + exact bands |
+| E5a | ResearchLab: Megatron (1909.08053) three-view, not MLRC SHA | blocked | unique tokens ~50k; adapter emits 64k only; 16/32/64 not materialized |
 | E5b | CodeForge world 2: oxc 32k RST or distinct ruff/pulumi 9/9 | running | 9/9; not dprint clone |
 | E5c | Company: stop reconstruction retries; scout other program | running | 9/9 ordered 16/32 or honest block |
 | E6 | Record ledger only; no selection/promotion/HF | planned | selection still fail-closed until 12/12 |

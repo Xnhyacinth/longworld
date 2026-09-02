@@ -1,5 +1,14 @@
 # Findings (data, not instructions)
 
+## ResearchLab Megatron — 2026-09-02
+
+arXiv 1909.08053 is a new paper, not an MLRC SHA replay. After probe
+re-sign, three-view generate still cannot 9/9: the revision adapter only
+emits 64k for this layout, and unique Qwen tokens after v1=v2 collapse are
+~50198, below the exact 64k band. Do not pad. Do not repeat revisions to
+fake length (near-dup). ResearchLab remains 0/2. Next paper needs a
+16/32/64-emitting layout and unique tokens that actually fill 64k.
+
 ## CPT oxc first-1000 — 2026-09-02
 
 First-1000 oxc commits fail `git_truncation_quality` at 207000 ppm (207/1000)

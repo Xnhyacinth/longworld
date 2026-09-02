@@ -1,5 +1,8 @@
 # Progress
 
+- 2026-09-02 Megatron ResearchLab blocked (~50k unique tokens; 16/32
+  undeclared by adapter). Config `9bd14e8`. Remaining: CodeForge world 2,
+  Company scout. No selection/HF.
 - 2026-09-02 CPT first-1000 oxc blocked at 207k ppm (cap 200k unchanged).
   skip-8000 not retried. Remaining agents: Megatron, CodeForge world 2,
   Company scout. No selection/HF.
