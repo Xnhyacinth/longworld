@@ -1,5 +1,15 @@
 # Findings (data, not instructions)
 
+## CodeForge world 2 — 2026-09-02
+
+Not 9/9. Best is oxc v12 at 6/9 (`7873977`): 16k version_selection now
+has all three views; 64k RST holds; near-dup 0.1213. 32k RST still fails
+`derived_view_gate` because a 16k window covers both `#25403` and
+`#26144` mappings. A fatter 0.147.0 would split that window but overflows
+exact-32k. Leftover gap PRs do not sit between the two cores after
+time-sort. ruff v3 is 3/9 (64k RST only). dprint stays the only countable
+CodeForge world. Do not weaken `derived_view_gate`. Do not count v12.
+
 ## Company scout — 2026-09-02
 
 Reconstruction is dead for ordered 16/32: best spans 4239<8000 and

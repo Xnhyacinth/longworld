@@ -1,5 +1,10 @@
 # Rejected or blocked directions
 
+- Do not retry oxc leftover-PR stuffing (v10–v11, v13–v17) or ruff
+  v1/v2/v4 for a second 9/9 world. 32k RST still has a 16k window over
+  both mapping cores; fatter 0.147.0 overflows exact-32k.
+- Do not emit 16k and 32k for the same CodeForge proof when a 16k window
+  already replays both release mappings.
 - Do not retry Microsoft five-annual reconstruction for ordered 16/32.
   Extra years cannot grow 16k distance when gold is same-year Item 8.
 - Do not retry four-annual `sec_annual_revenue_change` yaml for 9/9.
