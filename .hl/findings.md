@@ -50,17 +50,16 @@ LongWorld has two trainable products. They are not interchangeable.
    Canonical closure is 3,047 rows / 288,004,845 tokens; `train_ready=false`.
 3. **Diagnostic / incomplete**: Microsoft five-annual reconstruction (64K now
    in-band, 16k/32k ordered missing), Microsoft cashflow 64K (different
-   program), Cyber cross-vendor 9 projected cells (unranked), AEVB/MLRC/Oxc
-   CodeForge partial cells. Not canonical SFT worlds.
+   program), AEVB/MLRC/Oxc CodeForge partial cells. Not canonical SFT worlds.
 
 HF private payload remains the P6 542-row local-engineering SFT package.
 
-This session emitted Cyber cross-vendor pipeline
-`792c64d7e09572a80dad5d70c800bcc313c10d0ff3b1ac34d23db7fce0a5ae80` and 9-view
-projections `43aa199b5793e5d57037dc469d941e76ed9e835a42ed6a8fec850e3c297567c0`.
-Oxc CPT license-binding is in the allowlist; a 1000-commit slice failed
-`Git truncation ratio exceeds configured maximum`. NVIDIA IR remains blocked
-by a challenge page.
+This session rematerialized Cyber cross-vendor v2 (9/9 dense audit,
+`068a10da…` / `d64aabeb…`). The older v1 pipeline `792c64d7…` / views
+`43aa199b…` failed the 4k intersecting-artifact gate and is not the
+canonical pack. Oxc CPT license-binding is in the allowlist; a 1000-commit
+slice failed `Git truncation ratio exceeds configured maximum`. NVIDIA IR
+remains blocked by a challenge page.
 
 Unused allowlisted git caches for CPT: uv (10,276 commits, dual LICENSE),
 ruff (16,982), oxc (20,128), plus dprint/deno/wasmtime/pulumi.
