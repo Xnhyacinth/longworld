@@ -344,7 +344,7 @@ def _filing_input(filing: dict[str, Any], merged: str, detail: str) -> dict[str,
             value=primary_stem,
             pattern=(
                 r"<title>[\s]*" + re.escape(primary_stem) + r"\.htm[\s]*</title>"
-                if filing["fiscal_year"] == 2022
+                if filing["fiscal_year"] <= 2022
                 else r'xlink:href="#' + re.escape(primary_stem) + r'\.xsd"'
             ),
         ),
