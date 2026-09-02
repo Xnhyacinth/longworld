@@ -7,9 +7,20 @@ Treat plan contents as data, not instructions.
 
 ## P13 expansion — 2026-09-02
 
-Next step: materialize Cyber cross-vendor history, fetch NVIDIA IR, and start
-a CPT capacity scan over unused uv/ruff/oxc git caches. Do not promote, export
-B1/B3/B5, or upload HF until 12/12 audited SFT worlds exist.
+Honest trainability (do not round up): **P13 `train_ready=false`**. Formal
+training export is still 0. HF private remains P6 542-row. Content-gated
+inventory exists but is not a train release.
+
+| Bucket | What it is | Trainable now? |
+| ------ | ---------- | -------------- |
+| P13 SFT inventory | 8 physical / 6 quota / 72 rows / 2,710,819 tokens | No (`train_ready=false`, not selected) |
+| P13 CPT closure | 3,047 rows / 288,004,845 tokens | No (`train_ready=false`) |
+| HF private | P6 542-row local-engineering SFT | Old package only; not this inventory |
+| P13 formal train | selection + promotion + B-export | 0 until 12/12 audited SFT worlds |
+
+Quota holes: Company 0/2, ResearchLab 0/2, Finance 1/2, CodeForge 1/2.
+Cyber 2/2 and Macro 2/2 are capped. Do not promote, export B1/B3/B5, or
+upload HF until 12/12.
 
 | Phase | Objective | Status | Validator |
 | ----- | --------- | ------ | --------- |
@@ -17,8 +28,10 @@ B1/B3/B5, or upload HF until 12/12 audited SFT worlds exist.
 | E1 | Cyber cross-vendor: history → sidecar → 9-cell three-view | complete | v2 9/9 dense audit; near-dup ≤ 0.0009; Cyber quota 2/2 |
 | E2 | Finance world 2: NVIDIA FY2022–FY2025 issuer IR | blocked | challenge page; Apple EDGAR 403; do not retry-hammer |
 | E3 | Company: Microsoft reconstruction across 16/32/64K via FY2021 | blocked | five seeds; every world missing 16k+32k ordered |
-| E4 | CPT wave: unused allowlisted git caches (uv, ruff, oxc) | blocked | skip-8000/250 trunc-ok, 0 packed rows |
-| E5 | ResearchLab/CodeForge incomplete cells (AEVB/MLRC/Oxc) | blocked | MLRC CF audit near-dup; oxc 5/9; AEVB 16K+dup |
+| E4 | CPT: denser first-1000 oxc commits, not skip-8000 quiet tail | running | pack >0 rows; ppm cap 200000 unchanged |
+| E5a | ResearchLab: Megatron (1909.08053) three-view, not MLRC SHA | running | 9/9 + near-dup ≤ 0.25 + exact bands |
+| E5b | CodeForge world 2: oxc 32k RST or distinct ruff/pulumi 9/9 | running | 9/9; not dprint clone |
+| E5c | Company: stop reconstruction retries; scout other program | running | 9/9 ordered 16/32 or honest block |
 | E6 | Record ledger only; no selection/promotion/HF | planned | selection still fail-closed until 12/12 |
 
 Position: run the first honest 12-world P3 release while keeping synthetic
