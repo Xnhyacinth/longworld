@@ -159,9 +159,19 @@ export_venv_torch_lib
 require_qwen35_fla() {
   local py
   py="$(pick_py)"
-  if ! "$py" -c 'from fla.ops.gated_delta_rule import chunk_gated_delta_rule; from fla.modules.convolution import causal_conv1d' >/dev/null 2>&1; then
+  if ! "$py" -c 'from fla.ops.gated_delta_rule import chunk_gated_delta_rule; from fla.modules.convolution import causal_conv1d; import causal_conv1d_cuda' >/dev/null 2>&1; then
     echo "Qwen3.5 128k SFT needs flash-linear-attention in the ms-swift venv (torch GDN fallback is ~40min/step)." >&2
     echo "Install: SKIP_GDN_EXTRAS=0 INSTALL_SWIFT=1 bash scripts/setup_swift.sh" >&2
+    exit 1
+  fi
+}
+
+require_flash_attn_2() {
+  local py
+  py="$(pick_py)"
+  if ! "$py" -c 'import flash_attn' >/dev/null 2>&1; then
+    echo "Ulysses SP + padding_free needs flash-attn FA2 in the ms-swift venv." >&2
+    echo "Install: INSTALL_SWIFT=1 bash scripts/setup_swift.sh" >&2
     exit 1
   fi
 }
@@ -234,6 +244,9 @@ if [[ -z "$ATTN" ]]; then
   else
     ATTN="$(detect_attn)"
   fi
+fi
+if [[ "$SP" -gt 1 && "$ATTN" == "flash_attn" ]]; then
+  require_flash_attn_2
 fi
 
 EXTRA=(
