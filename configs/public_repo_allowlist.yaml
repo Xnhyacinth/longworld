@@ -23,6 +23,25 @@ repositories:
   oxc-project/oxc:
     visibility: public
     license: MIT
+    license_binding:
+      schema_version: longworld.repo-license-binding-policy.v1
+      approved_path: LICENSE
+      approved_blobs:
+        - git_blob_sha: 444bffc00e5190817c0092e5e6fde787102977d2
+          sha256: 95ced5ecf1133fbf41d409b5555c86c344f83f3b019926057ddbc07cfdcc27b3
+          size: 1119
+        - git_blob_sha: 58cd98713f056fbc3dac89d09894a0c24bd99f2e
+          sha256: f44740e6ea6f969b8edc7f4fa5df74fa6ff496eb551b538b4aed504ad7fd2134
+          size: 1076
+        - git_blob_sha: 85639556e8031f807c32cc5f7b21697f330634c6
+          sha256: 3a85964b276323ffed404476f8316d6a9705507da604d3b59b01298214ef079e
+          size: 1063
+        - git_blob_sha: c8a5d27fb28f744ab006d2cefe862c89d0185036
+          sha256: dd3987c217dd60556d75e2d22bab1153910201df72ea45cdecc67c865411b106
+          size: 1098
+        - git_blob_sha: e8308cad6bca621393aab938fb91e61f027c37bd
+          sha256: 2cfb14c48ec96dd315f643f23aa9206fa834aad77b736a95e0b6765bff0030c9
+          size: 1071
     authorization:
       record_id: PUBLIC-GITHUB-TERMS-2026-08
       scope: read-only workflow export

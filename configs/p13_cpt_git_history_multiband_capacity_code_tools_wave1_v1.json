@@ -1,0 +1,47 @@
+{
+  "schema_version": "longworld.git-history-cpt-materialization.v1",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "bands": {
+    "16k": { "lower_tokens": 16000, "upper_tokens": 16384 },
+    "32k": { "lower_tokens": 32000, "upper_tokens": 32768 },
+    "64k": { "lower_tokens": 64000, "upper_tokens": 65536 },
+    "128k": { "lower_tokens": 128000, "upper_tokens": 131072 },
+    "256k": { "lower_tokens": 256000, "upper_tokens": 262144 }
+  },
+  "target_rows": {
+    "16k": 1000,
+    "32k": 1000,
+    "64k": 1000,
+    "128k": 1000,
+    "256k": 1000
+  },
+  "require_full_target": false,
+  "attempt_multiplier": 1,
+  "minimum_source_events": {
+    "16k": 4,
+    "32k": 8,
+    "64k": 12,
+    "128k": 24,
+    "256k": 48
+  },
+  "minimum_source_elapsed_seconds": {
+    "16k": 86400,
+    "32k": 259200,
+    "64k": 604800,
+    "128k": 1209600,
+    "256k": 2592000
+  },
+  "maximum_truncated_commit_ratio_ppm": 200000,
+  "max_record_tokens": 768,
+  "max_chunks_per_commit": 10,
+  "source_slice_commits": 1000,
+  "sources": [
+    {
+      "repository": "oxc-project/oxc",
+      "checkout": "data/source_cache/git_history/oxc"
+    }
+  ]
+}
