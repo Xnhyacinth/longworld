@@ -1520,13 +1520,54 @@ def _canonical_task_identifiers(
 ) -> dict[str, str]:
     family = adapter_key[:2]
     if family == FINANCE_TASK_REPLAY_ADAPTER[:2]:
-        motif = "multi_filing_trajectory+certification+cross_statement_reconciliation"
-        answer_program_id = "finance.multi_filing_reconstruction.v1"
-        program_ops = (
-            "select_filing_chain",
-            "reconcile_financial_facts",
-            "verify_balance_cashflow_margin",
-        )
+        finance_task = candidate.get("finance_task")
+        if not isinstance(finance_task, Mapping):
+            raise PromotionError("finance answer program is unsupported")
+        answer_program_id = str(finance_task.get("answer_program_id") or "")
+        finance_programs = {
+            "finance.multi_filing_reconstruction.v1": (
+                "multi_filing_trajectory+certification+cross_statement_reconciliation",
+                "multi_filing_financial_reconstruction",
+                (
+                    "source_span_parse",
+                    "cross_filing_trajectory",
+                    "balance_sheet_certification",
+                    "cashflow_reconciliation",
+                    "operating_margin_reconciliation",
+                ),
+                (
+                    "select_filing_chain",
+                    "reconcile_financial_facts",
+                    "verify_balance_cashflow_margin",
+                ),
+            ),
+            "finance.multi_filing_asset_trajectory.v1": (
+                "multi_filing_asset_and_operating_cash_trajectory+balance_sheet_certification",
+                "multi_filing_asset_trajectory",
+                (
+                    "source_span_parse",
+                    "cross_filing_revenue_trajectory",
+                    "cross_filing_asset_trajectory",
+                    "cross_filing_operating_cash_trajectory",
+                    "balance_sheet_certification",
+                ),
+                (
+                    "select_filing_chain",
+                    "reconcile_revenue_assets_and_operating_cash",
+                    "verify_balance_sheet",
+                ),
+            ),
+        }
+        program = finance_programs.get(answer_program_id)
+        if (
+            program is None
+            or candidate.get("answer_program_id") != answer_program_id
+            or finance_task.get("query_type") != program[1]
+            or finance_task.get("answer_program_operations") != list(program[2])
+        ):
+            raise PromotionError("finance answer program is unsupported")
+        motif = program[0]
+        program_ops = program[3]
     elif family == CYBER_KEV_TASK_REPLAY_ADAPTER[:2]:
         motif = "chronology+annual_aggregation+remediation_window"
         answer_program_id = "cyber.kev_catalog_chronology_audit.v1"

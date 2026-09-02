@@ -798,6 +798,42 @@ def test_executable_proof_identity_ignores_instance_labels_but_binds_topology(
     )
 
 
+def test_finance_semantic_identity_binds_supported_answer_program() -> None:
+    [history] = build_financial_history_candidates(
+        _financial_filings(),
+        world_id="finance-asset-trajectory-identity-test",
+        issuer_name="Microsoft Corporation",
+        cik="0000789019",
+        source_binding={
+            "signed_manifest_sha256": "a" * 64,
+            "source_family": "issuer_owned_sec_ixbrl",
+            "authorization_record_id": "AUTH-MICROSOFT",
+        },
+        bands=(HistoryBand("16k", 1_000, 20_000),),
+        token_counter=_test_token_count,
+        tokenizer_model_id=TOKENIZER_MODEL_ID,
+        tokenizer_revision=TOKENIZER_REVISION,
+        answer_program_id="finance.multi_filing_asset_trajectory.v1",
+    )
+    candidate = build_finance_pipeline_candidate(history)
+
+    identifiers = taskpromotion_module._canonical_task_identifiers(
+        candidate, FINANCE_TASK_REPLAY_ADAPTER
+    )
+
+    assert identifiers["answer_program_id"] == candidate["answer_program_id"]
+    assert identifiers["motif"] == (
+        "multi_filing_asset_and_operating_cash_trajectory+balance_sheet_certification"
+    )
+
+    forged = deepcopy(candidate)
+    forged["finance_task"]["answer_program_id"] = "finance.unsupported.v1"
+    with pytest.raises(PromotionError, match="finance answer program is unsupported"):
+        taskpromotion_module._canonical_task_identifiers(
+            forged, FINANCE_TASK_REPLAY_ADAPTER
+        )
+
+
 def test_macro_task_dense_audit_uses_explicit_adapter(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

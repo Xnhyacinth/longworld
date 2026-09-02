@@ -20,11 +20,16 @@ from longworld.core.attestation import (
     sanitized_attestation_environment,
 )
 from longworld.core.domainhistory import HistoryBand, audit_cumulative_history
+from longworld.core.filingworkflow import (
+    MAX_SEC_MANIFEST_BYTES,
+    load_sec_filing_manifest,
+)
 from longworld.core.financehistory import (
     audit_financial_history_candidate,
     build_finance_pipeline_candidate,
     build_financial_history_candidates,
     extract_financial_filings,
+    extract_sec_financial_filings,
 )
 from longworld.core.issuerfilingworkflow import (
     MAX_ISSUER_IR_MANIFEST_BYTES,
@@ -98,9 +103,25 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     if config.get("schema_version") != "longworld.finance-history-materialization.v1":
         raise ProvenanceError("unsupported finance-history materialization config")
     manifest_path = _resolve_path(config.get("signed_issuer_manifest"))
-    manifest_raw = _read_regular_file(manifest_path, MAX_ISSUER_IR_MANIFEST_BYTES)
-    manifest = load_issuer_ir_filing_manifest_bytes(manifest_raw)
-    filings = extract_financial_filings(manifest)
+    manifest_kind = str(config.get("source_manifest_kind") or "issuer_ir")
+    if manifest_kind == "issuer_ir":
+        manifest_raw = _read_regular_file(manifest_path, MAX_ISSUER_IR_MANIFEST_BYTES)
+        manifest = load_issuer_ir_filing_manifest_bytes(manifest_raw)
+        filings = extract_financial_filings(manifest)
+        issuer = manifest.get("issuer")
+        source_family = str(manifest.get("source_family") or "")
+    elif manifest_kind == "issuer_sec":
+        manifest_raw = _read_regular_file(manifest_path, MAX_SEC_MANIFEST_BYTES)
+        manifest = load_sec_filing_manifest(manifest_path)
+        issuer = config.get("issuer")
+        if not isinstance(issuer, dict):
+            raise ProvenanceError("finance-history SEC issuer binding is invalid")
+        filings = extract_sec_financial_filings(
+            manifest, cik=str(issuer.get("cik") or "")
+        )
+        source_family = "issuer_owned_sec_ixbrl"
+    else:
+        raise ProvenanceError("unsupported finance-history source manifest kind")
     tokenizer_config = config.get("tokenizer")
     if not isinstance(tokenizer_config, dict):
         raise ProvenanceError("finance-history tokenizer config is missing")
@@ -126,13 +147,12 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     )
     if len(bands) != len(bands_value):
         raise ProvenanceError("finance-history band config is invalid")
-    issuer = manifest.get("issuer")
     authorization = manifest.get("authorization")
     if not isinstance(issuer, dict) or not isinstance(authorization, dict):
         raise ProvenanceError("finance-history issuer binding is invalid")
     source_binding = {
         "signed_manifest_sha256": hashlib.sha256(manifest_raw).hexdigest(),
-        "source_family": str(manifest.get("source_family") or ""),
+        "source_family": source_family,
         "authorization_record_id": str(authorization.get("record_id") or ""),
     }
     rows = build_financial_history_candidates(
@@ -145,6 +165,9 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         token_counter=token_counter,
         tokenizer_model_id=model_id,
         tokenizer_revision=revision,
+        answer_program_id=str(
+            config.get("answer_program_id") or "finance.multi_filing_reconstruction.v1"
+        ),
     )
     tokenizer_asset_manifest_sha256 = resolved_tokenizer_asset_manifest_sha256(
         model_id, revision

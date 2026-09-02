@@ -1,0 +1,20 @@
+{
+  "schema_version": "longworld.finance-history-materialization.v1",
+  "world_id": "finance_microsoft_asset_trajectory_2022_2025_v1",
+  "signed_issuer_manifest": "data/source_inventory/p13_company_microsoft_four_annual_v4/sec_filing_manifest.p14.finance.v1.signed.json",
+  "source_manifest_kind": "issuer_sec",
+  "issuer": {
+    "name": "Microsoft Corporation",
+    "cik": "0000789019"
+  },
+  "answer_program_id": "finance.multi_filing_asset_trajectory.v1",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "bands": [
+    { "name": "16k", "lower_tokens": 16000, "upper_tokens": 16384 },
+    { "name": "32k", "lower_tokens": 32000, "upper_tokens": 32768 },
+    { "name": "64k", "lower_tokens": 64000, "upper_tokens": 65536 }
+  ]
+}

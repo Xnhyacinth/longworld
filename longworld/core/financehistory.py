@@ -19,9 +19,11 @@ from typing import Any
 from urllib.parse import urlparse
 
 from longworld.core.domainhistory import HistoryBand, audit_cumulative_history
+from longworld.core.filingworkflow import ISSUER_GCS_MERGED_COMPONENT_REVISION_V2
 from longworld.core.issuerfilingworkflow import parse_issuer_ir_rendered_metrics
 from longworld.core.pack import SEP
 from longworld.core.provenance import ProvenanceError
+from longworld.core.secxbrl import parse_sec_financial_program
 
 FINANCIAL_HISTORY_SCHEMA = "longworld.financial-cumulative-history.v1"
 FINANCIAL_HISTORY_REPLAY_REVISION = "longworld.financial-history-replay.v1"
@@ -75,6 +77,59 @@ _SEMANTIC_ROLE_MARKERS = {
         "defref_us-gaap_CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
         "Net increase (decrease) in cash",
     ),
+}
+_SEC_SEMANTIC_ROLE_MARKERS = {
+    "revenue": ("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",),
+    "assets": ("us-gaap:Assets",),
+    "liabilities_and_equity": ("us-gaap:LiabilitiesAndStockholdersEquity",),
+    "cash_from_operations": ("us-gaap:NetCashProvidedByUsedInOperatingActivities",),
+}
+_SEC_FINANCIAL_ROLE_MAP = {
+    "total_revenue": "revenue",
+    "assets": "assets",
+    "liabilities_and_equity": "liabilities_and_equity",
+    "cfo": "cash_from_operations",
+}
+_DEFAULT_ANSWER_PROGRAM_ID = "finance.multi_filing_reconstruction.v1"
+_ANSWER_PROGRAMS = {
+    _DEFAULT_ANSWER_PROGRAM_ID: {
+        "query_type": "multi_filing_financial_reconstruction",
+        "operations": (
+            "source_span_parse",
+            "cross_filing_trajectory",
+            "balance_sheet_certification",
+            "cashflow_reconciliation",
+            "operating_margin_reconciliation",
+        ),
+        "roles": tuple(sorted(_CORE_ROLES)),
+        "question": (
+            "Using the source-span financial facts and the complete prior-filing "
+            "chain, report the earliest-to-latest revenue change and independently "
+            "certify each available balance sheet, cash-flow reconciliation, and "
+            "operating margin."
+        ),
+    },
+    "finance.multi_filing_asset_trajectory.v1": {
+        "query_type": "multi_filing_asset_trajectory",
+        "operations": (
+            "source_span_parse",
+            "cross_filing_revenue_trajectory",
+            "cross_filing_asset_trajectory",
+            "cross_filing_operating_cash_trajectory",
+            "balance_sheet_certification",
+        ),
+        "roles": (
+            "assets",
+            "cash_from_operations",
+            "liabilities_and_equity",
+            "revenue",
+        ),
+        "question": (
+            "Using the exact annual statement rows and the complete prior-filing "
+            "chain, report earliest-to-latest revenue, asset, and operating-cash "
+            "changes and certify the balance-sheet identity for every filing."
+        ),
+    },
 }
 
 
@@ -345,6 +400,101 @@ def extract_financial_filings(manifest: dict[str, Any]) -> tuple[FinancialFiling
     return tuple(filings)
 
 
+def extract_sec_financial_filings(
+    manifest: dict[str, Any], *, cik: str
+) -> tuple[FinancialFiling, ...]:
+    """Extract exact statement rows from an already verified issuer SEC manifest."""
+    records = manifest.get("filings")
+    if (
+        manifest.get("schema_version") != "longworld.sec-filing-manifest.v1"
+        or manifest.get("source_status") != "issuer_owned_public_export"
+        or not cik
+        or not isinstance(records, list)
+        or len(records) < 2
+    ):
+        raise ProvenanceError("issuer SEC financial manifest is invalid")
+    filings: list[FinancialFiling] = []
+    seen_row_hashes: set[str] = set()
+    for record in sorted(records, key=lambda item: str(item.get("report_date") or "")):
+        if not isinstance(record, dict) or record.get("cik") != cik:
+            raise ProvenanceError("issuer SEC financial record is invalid")
+        source_text = record.get("text")
+        source_sha256 = str(record.get("source_sha256") or "")
+        text_sha256 = str(record.get("text_sha256") or "")
+        report_date = str(record.get("report_date") or "")
+        if (
+            not isinstance(source_text, str)
+            or not source_text
+            or _SHA256.fullmatch(source_sha256) is None
+            or _sha256_text(source_text) != text_sha256
+            or record.get("parser") != ISSUER_GCS_MERGED_COMPONENT_REVISION_V2
+        ):
+            raise ProvenanceError("issuer SEC financial source identity is invalid")
+        program = parse_sec_financial_program(
+            source_text,
+            text_sha256,
+            report_date=report_date,
+            parser_revision=ISSUER_GCS_MERGED_COMPONENT_REVISION_V2,
+        )
+        role_facts = {
+            output_role: program.roles[program_role]
+            for program_role, output_role in _SEC_FINANCIAL_ROLE_MAP.items()
+        }
+        source_rows: list[FinancialSourceRow] = []
+        mapped_roles: set[str] = set()
+        for section in sorted(program.sections, key=lambda item: item.char_start):
+            for row_index, match in enumerate(
+                _ROW.finditer(source_text, section.char_start, section.char_end)
+            ):
+                row_start, row_end = match.span()
+                raw_row = match.group()
+                raw_hash = _sha256_text(raw_row)
+                if raw_hash in seen_row_hashes:
+                    continue
+                seen_row_hashes.add(raw_hash)
+                facts = tuple(
+                    FinancialFact(
+                        role=role,
+                        evidence_quote=fact.evidence_quote,
+                        relative_start=fact.char_start - row_start,
+                    )
+                    for role, fact in role_facts.items()
+                    if row_start <= fact.char_start < fact.char_end <= row_end
+                )
+                mapped_roles.update(fact.role for fact in facts)
+                source_rows.append(
+                    FinancialSourceRow(
+                        record_id=(
+                            f"{record['record_id']}:section:{section.section_id}:"
+                            f"row:{row_index}"
+                        ),
+                        filing_record_id=str(record.get("record_id") or ""),
+                        report_date=report_date,
+                        source_url=str(record.get("source_url") or ""),
+                        source_sha256=source_sha256,
+                        section=section.section_id,
+                        source_char_start=row_start,
+                        source_char_end=row_end,
+                        source_text=raw_row,
+                        facts=facts,
+                    )
+                )
+        if mapped_roles != set(_SEC_FINANCIAL_ROLE_MAP.values()):
+            raise ProvenanceError("issuer SEC core financial facts do not map to rows")
+        filings.append(
+            FinancialFiling(
+                record_id=str(record.get("record_id") or ""),
+                filing_date=str(record.get("filing_date") or ""),
+                report_date=report_date,
+                source_url=str(record.get("source_url") or ""),
+                source_sha256=source_sha256,
+                rows=tuple(source_rows),
+            )
+        )
+    _validate_source_rows(filings)
+    return tuple(filings)
+
+
 def _parse_context(context: object) -> list[dict[str, Any]]:
     if not isinstance(context, str) or not context:
         raise ProvenanceError("financial history context is empty")
@@ -448,7 +598,12 @@ def _filing_chain(
     return order
 
 
-def _answer(facts: Sequence[dict[str, Any]], filing_chain: Sequence[str]) -> str:
+def _answer(
+    facts: Sequence[dict[str, Any]],
+    filing_chain: Sequence[str],
+    *,
+    answer_program_id: str,
+) -> str:
     filing_order = {filing_id: index for index, filing_id in enumerate(filing_chain)}
     ledger = sorted(
         facts,
@@ -468,7 +623,11 @@ def _answer(facts: Sequence[dict[str, Any]], filing_chain: Sequence[str]) -> str
             check["balance_sheet_certified"] = (
                 values["assets"] == values["liabilities_and_equity"]
             )
-        if {"revenue", "operating_income"} <= values.keys() and int(values["revenue"]):
+        if (
+            answer_program_id == _DEFAULT_ANSWER_PROGRAM_ID
+            and {"revenue", "operating_income"} <= values.keys()
+            and int(values["revenue"])
+        ):
             check["operating_margin_basis_points"] = (
                 int(values["operating_income"]) * 10_000 // int(values["revenue"])
             )
@@ -479,7 +638,10 @@ def _answer(facts: Sequence[dict[str, Any]], filing_chain: Sequence[str]) -> str
             "cash_fx_effect",
             "cash_period_change",
         }
-        if cash_roles <= values.keys():
+        if (
+            answer_program_id == _DEFAULT_ANSWER_PROGRAM_ID
+            and cash_roles <= values.keys()
+        ):
             check["cashflow_reconciled"] = (
                 sum(
                     int(values[role])
@@ -501,13 +663,53 @@ def _answer(facts: Sequence[dict[str, Any]], filing_chain: Sequence[str]) -> str
             "latest_report_date": revenue[-1]["report_date"],
             "revenue_change": revenue[-1]["value"] - revenue[0]["value"],
         }
-    return _canonical_json(
-        {
-            "annual_checks": annual_checks,
-            "cross_filing_revenue_trajectory": trajectory,
-            "filing_chain": list(filing_chain),
-        }
-    )
+    answer = {
+        "annual_checks": annual_checks,
+        "cross_filing_revenue_trajectory": trajectory,
+        "filing_chain": list(filing_chain),
+    }
+    if answer_program_id == "finance.multi_filing_asset_trajectory.v1":
+        answer["annual_observations"] = [
+            {
+                "report_date": report_date,
+                "revenue": values.get("revenue"),
+                "assets": values.get("assets"),
+                "liabilities_and_equity": values.get("liabilities_and_equity"),
+                "cash_from_operations": values.get("cash_from_operations"),
+            }
+            for report_date, values in sorted(by_year.items())
+        ]
+        assets = [
+            fact
+            for fact in ledger
+            if fact["role"] == "assets" and isinstance(fact["value"], int)
+        ]
+        answer["cross_filing_asset_trajectory"] = (
+            {
+                "earliest_report_date": assets[0]["report_date"],
+                "latest_report_date": assets[-1]["report_date"],
+                "asset_change": assets[-1]["value"] - assets[0]["value"],
+            }
+            if len(assets) >= 2
+            else None
+        )
+        operating_cash = [
+            fact
+            for fact in ledger
+            if fact["role"] == "cash_from_operations" and isinstance(fact["value"], int)
+        ]
+        answer["cross_filing_operating_cash_trajectory"] = (
+            {
+                "earliest_report_date": operating_cash[0]["report_date"],
+                "latest_report_date": operating_cash[-1]["report_date"],
+                "operating_cash_change": (
+                    operating_cash[-1]["value"] - operating_cash[0]["value"]
+                ),
+            }
+            if len(operating_cash) >= 2
+            else None
+        )
+    return _canonical_json(answer)
 
 
 def replay_financial_history(
@@ -526,6 +728,19 @@ def replay_financial_history(
             or header.get("source_binding") != task.get("source_binding")
         ):
             raise ProvenanceError("financial history header binding mismatch")
+        answer_program_id = str(
+            task.get("answer_program_id") or _DEFAULT_ANSWER_PROGRAM_ID
+        )
+        if answer_program_id not in _ANSWER_PROGRAMS or (
+            header.get("answer_program_id") not in (None, answer_program_id)
+        ):
+            raise ProvenanceError("financial history answer program binding mismatch")
+        if (
+            header.get("answer_program_id") is None
+            and answer_program_id != _DEFAULT_ANSWER_PROGRAM_ID
+        ):
+            raise ProvenanceError("financial history answer program is unbound")
+        active_roles = set(_ANSWER_PROGRAMS[answer_program_id]["roles"])
         for record in records:
             if record.get("record_type") != "financial_source_row":
                 continue
@@ -571,16 +786,26 @@ def replay_financial_history(
                 if not isinstance(fact, dict):
                     raise ProvenanceError("financial row fact is invalid")
                 role = str(fact.get("role") or "")
-                if role not in _CORE_ROLES:
+                if role not in active_roles:
                     continue
                 start = fact.get("relative_start")
                 quote = fact.get("evidence_quote")
-                markers = _SEMANTIC_ROLE_MARKERS[role]
+                marker_options = (
+                    _SEMANTIC_ROLE_MARKERS[role],
+                    *(
+                        (_SEC_SEMANTIC_ROLE_MARKERS[role],)
+                        if role in _SEC_SEMANTIC_ROLE_MARKERS
+                        else ()
+                    ),
+                )
                 if (
                     not isinstance(start, int)
                     or not isinstance(quote, str)
                     or source_text[start : start + len(quote)] != quote
-                    or not all(marker in source_text for marker in markers)
+                    or not any(
+                        all(marker in source_text for marker in markers)
+                        for markers in marker_options
+                    )
                 ):
                     raise ProvenanceError("financial row fact span mismatch")
                 identity = (str(record["report_date"]), role)
@@ -637,7 +862,11 @@ def replay_financial_history(
             *(edge[2] for edge in derived_edges),
         ]
         return {
-            "answer": _answer(fact_ledger, filing_chain),
+            "answer": _answer(
+                fact_ledger,
+                filing_chain,
+                answer_program_id=answer_program_id,
+            ),
             "source_record_ids": source_record_ids,
             "source_relation_ids": relation_ids,
             "essential_evidence_ids": essential_ids,
@@ -709,6 +938,7 @@ def build_financial_history_candidates(
     token_counter: Callable[[str], int],
     tokenizer_model_id: str,
     tokenizer_revision: str,
+    answer_program_id: str = _DEFAULT_ANSWER_PROGRAM_ID,
 ) -> list[dict[str, Any]]:
     """Build exact nested 16/32/64K histories from distinct filing rows."""
     _validate_source_rows(filings)
@@ -717,10 +947,12 @@ def build_financial_history_candidates(
         or not issuer_name
         or not cik
         or not tokenizer_model_id
+        or answer_program_id not in _ANSWER_PROGRAMS
         or _COMMIT_SHA.fullmatch(tokenizer_revision) is None
         or [band.name for band in bands] != list(_EXPECTED_BANDS[: len(bands)])
     ):
         raise ProvenanceError("financial history materialization identity is invalid")
+    active_roles = set(_ANSWER_PROGRAMS[answer_program_id]["roles"])
     if (
         set(source_binding)
         != {
@@ -742,6 +974,7 @@ def build_financial_history_candidates(
             "issuer_name": issuer_name,
             "cik": cik,
             "source_binding": deepcopy(source_binding),
+            "answer_program_id": answer_program_id,
         }
     ]
     used_row_ids: set[str] = set()
@@ -765,7 +998,7 @@ def build_financial_history_candidates(
                 row
                 for row in filing.rows
                 if row.facts
-                and any(fact.role in _CORE_ROLES for fact in row.facts)
+                and any(fact.role in active_roles for fact in row.facts)
                 and row.record_id not in used_row_ids
             ]
             for row in mandatory:
@@ -792,6 +1025,7 @@ def build_financial_history_candidates(
             raise ProvenanceError(
                 f"cannot fill exact {band.name} from verified source rows: {tokens} tokens"
             )
+        answer_program = _ANSWER_PROGRAMS[answer_program_id]
         task: dict[str, Any] = {
             "schema_version": FINANCIAL_HISTORY_SCHEMA,
             "data_stage": "candidate_history",
@@ -804,23 +1038,12 @@ def build_financial_history_candidates(
             "world_id": world_id,
             "domain": "finance",
             "workflow_kind": "real_source_derived",
-            "query_type": "multi_filing_financial_reconstruction",
-            "answer_program_id": "finance.multi_filing_reconstruction.v1",
-            "answer_program_operations": [
-                "source_span_parse",
-                "cross_filing_trajectory",
-                "balance_sheet_certification",
-                "cashflow_reconciliation",
-                "operating_margin_reconciliation",
-            ],
+            "query_type": answer_program["query_type"],
+            "answer_program_id": answer_program_id,
+            "answer_program_operations": list(answer_program["operations"]),
             "semantic_growth_group_id": f"{world_id}|multi-filing-finance",
             "length_bucket": band.name,
-            "question": (
-                "Using the source-span financial facts and the complete prior-"
-                "filing chain, report the earliest-to-latest "
-                "revenue change and independently certify each available balance "
-                "sheet, cash-flow reconciliation, and operating margin."
-            ),
+            "question": answer_program["question"],
             "context": context,
             "context_sha256": _sha256_text(context),
             "answer": "",
@@ -1486,10 +1709,26 @@ def audit_financial_history_candidate(task: dict[str, Any]) -> dict[str, bool]:
             for value in record.get("facts") or []
             if isinstance(value, dict) and value.get("role") in _SEMANTIC_ROLE_MARKERS
         )
-        marker = _SEMANTIC_ROLE_MARKERS[str(fact["role"])][1]
-        target["source_text"] = str(target["source_text"]).replace(
-            marker, "X" * len(marker), 1
-        )
+        role = str(fact["role"])
+        marker_sets = [
+            markers
+            for markers in (
+                _SEMANTIC_ROLE_MARKERS[role],
+                *(
+                    (_SEC_SEMANTIC_ROLE_MARKERS[role],)
+                    if role in _SEC_SEMANTIC_ROLE_MARKERS
+                    else ()
+                ),
+            )
+            if all(marker in str(target["source_text"]) for marker in markers)
+        ]
+        if not marker_sets:
+            raise ProvenanceError("financial semantic marker set is missing")
+        for markers in marker_sets:
+            marker = markers[0]
+            target["source_text"] = str(target["source_text"]).replace(
+                marker, "X" * len(marker)
+            )
         target["source_text_sha256"] = _sha256_text(target["source_text"])
         label_corrupted["context"] = _context(records)
         label_corrupted["context_sha256"] = _sha256_text(label_corrupted["context"])

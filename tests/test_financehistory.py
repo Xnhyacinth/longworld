@@ -5,6 +5,7 @@ import json
 from copy import deepcopy
 from itertools import pairwise
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -26,6 +27,7 @@ from longworld.core.financehistory import (
     audit_financial_history_candidate,
     build_finance_pipeline_candidate,
     build_financial_history_candidates,
+    extract_sec_financial_filings,
     replay_finance_pipeline_selection,
     replay_financial_history,
 )
@@ -183,6 +185,143 @@ def test_builds_nested_multi_filing_financial_histories() -> None:
         assert row["real_source_token_ratio"] == pytest.approx(
             row["semantic_tokens"]["event_bearing"] / row["semantic_tokens"]["internal"]
         )
+
+
+def test_builds_distinct_multi_filing_asset_trajectory_program() -> None:
+    rows = build_financial_history_candidates(
+        _filings(),
+        world_id="finance-microsoft-asset-trajectory-test",
+        issuer_name="Microsoft Corporation",
+        cik="0000789019",
+        source_binding={
+            "signed_manifest_sha256": "a" * 64,
+            "source_family": "issuer_owned_sec_ixbrl",
+            "authorization_record_id": "AUTH-MICROSOFT",
+        },
+        bands=_bands(),
+        token_counter=len,
+        tokenizer_model_id="Qwen/Qwen3.5-4B",
+        tokenizer_revision="b" * 40,
+        answer_program_id="finance.multi_filing_asset_trajectory.v1",
+    )
+
+    assert {row["query_type"] for row in rows} == {"multi_filing_asset_trajectory"}
+    assert {row["answer_program_id"] for row in rows} == {
+        "finance.multi_filing_asset_trajectory.v1"
+    }
+    for row in rows:
+        answer = json.loads(row["answer"])
+        assert len(answer["annual_observations"]) == row["selected_filing_count"]
+        assert all(
+            set(observation)
+            == {
+                "report_date",
+                "revenue",
+                "assets",
+                "liabilities_and_equity",
+                "cash_from_operations",
+            }
+            for observation in answer["annual_observations"]
+        )
+        assert answer["cross_filing_asset_trajectory"] is not None
+        assert answer["cross_filing_operating_cash_trajectory"] is not None
+        assert answer["cross_filing_revenue_trajectory"] is not None
+        assert all(
+            set(check) == {"report_date", "balance_sheet_certified"}
+            for check in answer["annual_checks"]
+        )
+        assert all(audit_financial_history_candidate(row).values())
+
+
+def test_extracts_financial_rows_from_verified_sec_manifest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def filing(year: int, value: int) -> dict:
+        rows = [
+            (
+                "total_revenue",
+                "revenue",
+                "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+                value,
+            ),
+            ("assets", "assets", "us-gaap:Assets", value * 2),
+            (
+                "liabilities_and_equity",
+                "liabilities_and_equity",
+                "us-gaap:LiabilitiesAndStockholdersEquity",
+                value * 2,
+            ),
+            (
+                "cfo",
+                "cash_from_operations",
+                "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+                value // 2,
+            ),
+        ]
+        source = "".join(
+            f'<tr><td><ix:nonFraction name="{concept}">{amount:,}'
+            f"</ix:nonFraction></td></tr>"
+            for _program_role, _role, concept, amount in rows
+        )
+        roles = {}
+        cursor = 0
+        for program_role, _role, concept, amount in rows:
+            marker = f'name="{concept}">'
+            quote = f"{amount:,}"
+            start = source.index(marker, cursor) + len(marker)
+            roles[program_role] = SimpleNamespace(
+                concept=concept,
+                evidence_quote=quote,
+                char_start=start,
+                char_end=start + len(quote),
+            )
+            cursor = start + len(quote)
+        return {
+            "record_id": f"sec:{year}",
+            "filing_date": f"{year + 1}-02-01",
+            "report_date": f"{year}-12-31",
+            "source_url": f"https://issuer.example/{year}",
+            "source_sha256": hashlib.sha256(source.encode()).hexdigest(),
+            "text_sha256": hashlib.sha256(source.encode()).hexdigest(),
+            "parser": "issuer_gcs_merged_html@2",
+            "cik": "0000789019",
+            "text": source,
+            "_program": SimpleNamespace(
+                sections=(
+                    SimpleNamespace(
+                        section_id="statements",
+                        char_start=0,
+                        char_end=len(source),
+                    ),
+                ),
+                roles=roles,
+            ),
+        }
+
+    filings = [filing(2022, 1000), filing(2023, 1100)]
+    programs = {item["report_date"]: item.pop("_program") for item in filings}
+    monkeypatch.setattr(
+        financehistory,
+        "parse_sec_financial_program",
+        lambda _text, _digest, *, report_date, parser_revision: programs[report_date],
+    )
+    manifest = {
+        "schema_version": "longworld.sec-filing-manifest.v1",
+        "source_status": "issuer_owned_public_export",
+        "filings": filings,
+    }
+
+    extracted = extract_sec_financial_filings(manifest, cik="0000789019")
+
+    assert len(extracted) == 2
+    assert [len(item.rows) for item in extracted] == [4, 4]
+    assert [
+        sorted(fact.role for row in item.rows for fact in row.facts)
+        for item in extracted
+    ] == [
+        ["assets", "cash_from_operations", "liabilities_and_equity", "revenue"],
+        ["assets", "cash_from_operations", "liabilities_and_equity", "revenue"],
+    ]
 
 
 def test_adapts_financial_history_for_dense_ranking_and_strict_selection() -> None:
@@ -436,6 +575,88 @@ def test_materializer_emits_source_sidecar_after_manifest_verification(
         loaded.replay_payload["signed_manifest_sha256"]
         == hashlib.sha256(source_path.read_bytes()).hexdigest()
     )
+
+
+def test_materializer_accepts_verified_issuer_sec_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(ROLE_KEY_ENVS["source"], SOURCE_KEY.decode())
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["source"], "probe-finance-source-v1")
+    source_path = tmp_path / "sec.json"
+    source_path.write_text('{"signed":"sec-source-bytes"}\n', encoding="utf-8")
+    manifest = {
+        "schema_version": "longworld.sec-filing-manifest.v1",
+        "source_status": "issuer_owned_public_export",
+        "authorization": {"record_id": "AUTH-MICROSOFT"},
+    }
+    loaded_paths: list[Path] = []
+
+    def verified_loader(path: Path) -> dict:
+        loaded_paths.append(path)
+        return manifest
+
+    class CharacterTokenizer:
+        def encode(self, text: str, *, add_special_tokens: bool) -> list[str]:
+            assert add_special_tokens is False
+            return list(text)
+
+    monkeypatch.setattr(
+        finance_materializer, "load_sec_filing_manifest", verified_loader
+    )
+    monkeypatch.setattr(
+        finance_materializer,
+        "extract_sec_financial_filings",
+        lambda value, *, cik: _filings(),
+    )
+    monkeypatch.setattr(
+        finance_materializer, "_load_tokenizer", lambda *_: CharacterTokenizer()
+    )
+    monkeypatch.setattr(
+        finance_materializer,
+        "resolved_tokenizer_asset_manifest_sha256",
+        lambda model_id, revision: "d" * 64,
+    )
+    config = {
+        "schema_version": "longworld.finance-history-materialization.v1",
+        "world_id": "finance-microsoft-test",
+        "signed_issuer_manifest": str(source_path),
+        "source_manifest_kind": "issuer_sec",
+        "issuer": {"name": "Microsoft Corporation", "cik": "0000789019"},
+        "answer_program_id": "finance.multi_filing_asset_trajectory.v1",
+        "tokenizer": {
+            "model_id": "Qwen/Qwen3.5-4B",
+            "revision": "b" * 40,
+        },
+        "bands": [
+            {
+                "name": band.name,
+                "lower_tokens": band.lower_tokens,
+                "upper_tokens": band.upper_tokens,
+            }
+            for band in _bands()
+        ],
+    }
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+
+    report = finance_materializer.materialize(config_path, tmp_path / "history")
+    rows = [
+        json.loads(line)
+        for line in (tmp_path / "history/candidates.jsonl").read_text().splitlines()
+    ]
+
+    assert loaded_paths == [source_path]
+    assert (
+        report["source_manifest_sha256"]
+        == hashlib.sha256(source_path.read_bytes()).hexdigest()
+    )
+    assert {row["answer_program_id"] for row in rows} == {
+        "finance.multi_filing_asset_trajectory.v1"
+    }
+    assert {row["source_binding"]["source_family"] for row in rows} == {
+        "issuer_owned_sec_ixbrl"
+    }
 
 
 def test_replay_recomputes_answer_cf_remove_one_and_corruption() -> None:
