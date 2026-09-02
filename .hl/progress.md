@@ -1,5 +1,9 @@
 # Progress
 
+- 2026-09-02 Company scout blocked: reconstruction ordered 16/32 cannot
+  reach 8000/16000; four-annual `sec_annual_revenue_change` materialized
+  queries but 0 rows (16k 6561<8000, wrap 15088, 32/64 YoY clones). Yaml
+  not committed. Remaining: CodeForge world 2. No selection/HF.
 - 2026-09-02 Megatron ResearchLab blocked (~50k unique tokens; 16/32
   undeclared by adapter). Config `9bd14e8`. Remaining: CodeForge world 2,
   Company scout. No selection/HF.

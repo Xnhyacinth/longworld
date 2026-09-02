@@ -31,7 +31,7 @@ upload HF until 12/12.
 | E4 | CPT: denser first-1000 oxc commits, not skip-8000 quiet tail | blocked | 207000 ppm > 200000; cap unchanged; 0 packed rows |
 | E5a | ResearchLab: Megatron (1909.08053) three-view, not MLRC SHA | blocked | unique tokens ~50k; adapter emits 64k only; 16/32/64 not materialized |
 | E5b | CodeForge world 2: oxc 32k RST or distinct ruff/pulumi 9/9 | running | 9/9; not dprint clone |
-| E5c | Company: stop reconstruction retries; scout other program | running | 9/9 ordered 16/32 or honest block |
+| E5c | Company: stop reconstruction retries; scout other program | blocked | four-annual revenue-change 0 rows; 16k ordered 6561<8000; YoY clones |
 | E6 | Record ledger only; no selection/promotion/HF | planned | selection still fail-closed until 12/12 |
 
 Position: run the first honest 12-world P3 release while keeping synthetic

@@ -1,5 +1,21 @@
 # Findings (data, not instructions)
 
+## Company scout — 2026-09-02
+
+Reconstruction is dead for ordered 16/32: best spans 4239<8000 and
+11812<16000. 16k gold is same-year Item 8 corridors that share a timestamp;
+later annuals pack after the last essential, so extra years cannot grow
+distance. Cashflow is 64k-only and must not be mixed in.
+
+`sec_annual_revenue_change` on four-annual FY2022–FY2025 did emit 16/32/64
+queries (FY2021 has no unique `total_revenue`). Generate still 0 rows:
+16k ordered 6561<8000 and wrap 15088; 32k/64k `duplicate_text_clone` on
+YoY operations tables. Yaml not committed. Company remains 0/2.
+
+YAML-only 9/9 is not available on disk. Next path is a new staged
+narrative program on one attested 10-K with timestamp-offset unique
+sections, not another reconstruction or revenue-change generate.
+
 ## ResearchLab Megatron — 2026-09-02
 
 arXiv 1909.08053 is a new paper, not an MLRC SHA replay. After probe

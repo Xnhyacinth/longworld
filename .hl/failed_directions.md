@@ -1,5 +1,10 @@
 # Rejected or blocked directions
 
+- Do not retry Microsoft five-annual reconstruction for ordered 16/32.
+  Extra years cannot grow 16k distance when gold is same-year Item 8.
+- Do not retry four-annual `sec_annual_revenue_change` yaml for 9/9.
+  16k ordered stays under 8000; 32/64 are YoY table clones.
+- Do not mix cashflow into reconstruction. Cashflow is 64k-only.
 - Do not scale P4/P6 by copying JSON rows or adding fixed background documents.
 - Do not reduce evidence-distance, retrieval, corruption, or replay gates to
   increase retention.
