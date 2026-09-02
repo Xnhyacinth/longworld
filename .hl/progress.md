@@ -1,5 +1,26 @@
 # Progress
 
+- 2026-09-02 retry wave: committed adapter/configs on `worlds`
+  (`83192ce`, `302192b`, `0d8bac5`). Parallel tracks now running:
+  Cyber 9-cell dense rank+audit, oxc CPT skip-2500/400 slice (ppm cap
+  unchanged), Microsoft five-seed ordered-view retry, Apple 16/32/64K
+  reconstruction, CodeForge oxc generate retry. No selection/HF.
+- 2026-09-02 expansion: Cyber cross-vendor now has a new adapter
+  (`cyber.cross_cve_remediation.v1`), sidecar-bound pipeline (3/3), and 9/9
+  three-view projections (16/32/64K × full/cf/ordered, all in-band). Ranking
+  and source-token v2 audit are still pending, so it is **not** added to the
+  7-world content-gated ledger. Microsoft five-annual reconstruction 64K now
+  lands in-band (65521/65287) but 16k/32k ordered views still fail distance,
+  so Company remains 0/2. Oxc CPT license-binding v2 is pinned; materialize
+  then failed the existing truncation-ratio cap. No selection, promotion, or
+  HF upload.
+- 2026-09-02 inventory: HEAD `44c8a0d` on `worlds` (same as `main`). P13 SFT
+  remains 7/12 physical worlds, 5/12 quota, 63 rows, 2.37M tokens, all
+  `train_ready=false`. CPT closure remains 3,047 rows / 288M tokens. Formal
+  train release is still 0. Canonical data is in the `longworld` worktree;
+  this worktree uses a gitignored `data/` symlink. Started Cyber history
+  materialization, NVIDIA IR fetch, and uv/ruff/oxc CPT capacity scan. No
+  selection, promotion, B-export, or HF upload this session.
 - 2026-08-29 superseding P12 checkpoint: the strict content-gated baseline is
   29 rows / 4 source-bound worlds / 1,120,639 receipt-reported exact Qwen
   context tokens. The 12-world target remains unevaluated and production/KMS

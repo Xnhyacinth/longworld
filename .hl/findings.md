@@ -1,5 +1,38 @@
 # Findings (data, not instructions)
 
+## Retry wave — 2026-09-02 later
+
+Code landed on `worlds`: cross-CVE adapter `83192ce`, oxc license-binding
+`302192b`, Company Apple/Microsoft configs `0d8bac5`. Next countable SFT
+move is ranking the existing Cyber 9-cell projections; CPT retry uses a
+quieter oxc window instead of raising truncation ppm.
+
+## Product split — 2026-09-02
+
+LongWorld has two trainable products. They are not interchangeable.
+
+1. **WorldLong-SFT**: question + answer + CF twin + ordered view. Current P13
+   content-gated SFT is 7 worlds / 63 rows / 2,371,273 tokens; quota-countable
+   5/12; `train_ready=false`.
+2. **WorldLong-CPT**: chronological git-history documents, no QA/CF program.
+   Canonical closure is 3,047 rows / 288,004,845 tokens; `train_ready=false`.
+3. **Diagnostic / incomplete**: Microsoft five-annual reconstruction (64K now
+   in-band, 16k/32k ordered missing), Microsoft cashflow 64K (different
+   program), Cyber cross-vendor 9 projected cells (unranked), AEVB/MLRC/Oxc
+   CodeForge partial cells. Not canonical SFT worlds.
+
+HF private payload remains the P6 542-row local-engineering SFT package.
+
+This session emitted Cyber cross-vendor pipeline
+`792c64d7e09572a80dad5d70c800bcc313c10d0ff3b1ac34d23db7fce0a5ae80` and 9-view
+projections `43aa199b5793e5d57037dc469d941e76ed9e835a42ed6a8fec850e3c297567c0`.
+Oxc CPT license-binding is in the allowlist; a 1000-commit slice failed
+`Git truncation ratio exceeds configured maximum`. NVIDIA IR remains blocked
+by a challenge page.
+
+Unused allowlisted git caches for CPT: uv (10,276 commits, dual LICENSE),
+ruff (16,982), oxc (20,128), plus dprint/deno/wasmtime/pulumi.
+
 ## P12 current publication truth (2026-08-29)
 
 - The current strict content-gated baseline is 29 rows across four source-bound
