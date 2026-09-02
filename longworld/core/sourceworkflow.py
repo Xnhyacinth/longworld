@@ -32,6 +32,10 @@ from longworld.core.issuerfilingworkflow import (
     ISSUER_IR_SOURCE_FAMILY,
     ISSUER_IR_SOURCE_KIND,
 )
+from longworld.core.issuerpdfworkflow import (
+    ISSUER_OFFICIAL_PDF_INVENTORY_SCHEMA,
+    ISSUER_OFFICIAL_PDF_SOURCE_KIND,
+)
 from longworld.core.provenance import ProvenanceError
 from longworld.core.standardsworkflow import IETF_WORKFLOW_MANIFEST_SCHEMA
 from longworld.core.taxonomy import SourceOrigin
@@ -54,6 +58,9 @@ _SOURCE_KIND_SCHEMAS = {
     WIKIMEDIA_SOURCE_KIND: frozenset({WIKIPEDIA_WORKFLOW_MANIFEST_SCHEMA}),
     ISSUER_IR_SOURCE_KIND: frozenset({ISSUER_IR_FILING_MANIFEST_SCHEMA}),
     STANDARDS_SOURCE_KIND: frozenset({IETF_WORKFLOW_MANIFEST_SCHEMA}),
+    ISSUER_OFFICIAL_PDF_SOURCE_KIND: frozenset(
+        {ISSUER_OFFICIAL_PDF_INVENTORY_SCHEMA}
+    ),
 }
 _SOURCE_KIND_DOMAINS = {
     SEC_SOURCE_KIND: "company",
@@ -61,6 +68,7 @@ _SOURCE_KIND_DOMAINS = {
     WIKIMEDIA_SOURCE_KIND: "researchlab",
     ISSUER_IR_SOURCE_KIND: "company",
     STANDARDS_SOURCE_KIND: "standards",
+    ISSUER_OFFICIAL_PDF_SOURCE_KIND: "company",
 }
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _PUBLIC_STATUS = {
@@ -69,6 +77,7 @@ _PUBLIC_STATUS = {
     WIKIMEDIA_SOURCE_KIND: "public_api_export",
     ISSUER_IR_SOURCE_KIND: "issuer_owned_ir_download",
     STANDARDS_SOURCE_KIND: "public_api_export",
+    ISSUER_OFFICIAL_PDF_SOURCE_KIND: "issuer_owned_official_pdf",
 }
 _PAPER_RELATION_ROLES = {
     "revision_of": ("manuscript_revision", "manuscript_revision"),
@@ -825,6 +834,112 @@ def adapt_issuer_ir_manifest(
     )
 
 
+def adapt_issuer_official_pdf_manifest(
+    manifest: Mapping[str, Any], *, signed_bundle_authorized: bool = False
+) -> tuple[SourceWorkflow, ...]:
+    """Normalize replay-audited issuer-owned annual-report PDFs."""
+    _check_schema(
+        manifest,
+        source_kind=ISSUER_OFFICIAL_PDF_SOURCE_KIND,
+        expected_schemas=_SOURCE_KIND_SCHEMAS[ISSUER_OFFICIAL_PDF_SOURCE_KIND],
+    )
+    origin = _inventory_origin(
+        manifest,
+        source_kind=ISSUER_OFFICIAL_PDF_SOURCE_KIND,
+        signed_bundle_authorized=signed_bundle_authorized,
+    )
+    raw_records = _objects(
+        manifest.get("adapted_records"), "issuer official PDF records"
+    )
+    if manifest.get("n") != len(raw_records):
+        raise ProvenanceError("issuer official PDF inventory count is invalid")
+    records = [
+        _record(
+            raw,
+            kind="issuer_official_annual_report",
+            occurred_at=str(raw.get("occurred_at") or ""),
+            source_family=str(raw.get("source_family") or ""),
+            source_origin=origin,
+            identity_fields=("year", "sections_json"),
+            require_facts=True,
+        )
+        for raw in raw_records
+    ]
+    records_by_id = {record.record_id: record for record in records}
+    relations: list[SourceRelation] = []
+    for raw in _objects(
+        manifest.get("adapted_relations"), "issuer official PDF relations"
+    ):
+        relation_id = str(raw.get("relation_id") or "")
+        kind = str(raw.get("kind") or "")
+        source_id = str(raw.get("source_record_id") or "")
+        target_id = str(raw.get("target_record_id") or "")
+        source = records_by_id.get(source_id)
+        target = records_by_id.get(target_id)
+        if (
+            kind != "prior_official_annual_report"
+            or source is None
+            or target is None
+            or int(source.attribute("year")) != int(target.attribute("year")) + 1
+            or relation_id != f"{source_id}:prior_official:{target_id}"
+        ):
+            raise ProvenanceError("issuer official PDF relation identity is invalid")
+        evidence: list[SourceEvidence] = []
+        referenced: set[tuple[str, str]] = set()
+        raw_evidence = _objects(
+            raw.get("evidence"), "issuer official PDF relation evidence"
+        )
+        if {str(item.get("record_id") or "") for item in raw_evidence} != {
+            source_id,
+            target_id,
+        }:
+            raise ProvenanceError("issuer official PDF relation lacks endpoint evidence")
+        for item in raw_evidence:
+            record_id = str(item.get("record_id") or "")
+            record = records_by_id[record_id]
+            fact_ids = item.get("fact_ids")
+            if not isinstance(fact_ids, list) or set(fact_ids) != {
+                fact.fact_id for fact in record.facts
+            }:
+                raise ProvenanceError(
+                    "issuer official PDF relation evidence is incomplete"
+                )
+            facts_by_id = {fact.fact_id: fact for fact in record.facts}
+            for fact_id in fact_ids:
+                identity = (record_id, fact_id)
+                if identity in referenced:
+                    raise ProvenanceError(
+                        "issuer official PDF relation evidence is duplicated"
+                    )
+                fact = facts_by_id[fact_id]
+                evidence.append(
+                    SourceEvidence(
+                        record_id=record_id,
+                        evidence_quote=fact.evidence_quote,
+                        char_start=fact.char_start,
+                        char_end=fact.char_end,
+                        source_sha256=fact.source_sha256,
+                        fact_ids=(fact_id,),
+                    )
+                )
+                referenced.add(identity)
+        relations.append(
+            SourceRelation(
+                relation_id=relation_id,
+                kind=kind,
+                source_record_id=source_id,
+                target_record_id=target_id,
+                evidence=tuple(evidence),
+            )
+        )
+    return _normalize_components(
+        source_kind=ISSUER_OFFICIAL_PDF_SOURCE_KIND,
+        source_origin=origin,
+        records=records,
+        relations=relations,
+    )
+
+
 def adapt_paper_manifest(
     manifest: Mapping[str, Any], *, signed_bundle_authorized: bool = False
 ) -> tuple[SourceWorkflow, ...]:
@@ -1130,6 +1245,10 @@ def adapt_source_manifest(
         )
     if source_kind == ISSUER_IR_SOURCE_KIND:
         return adapt_issuer_ir_manifest(
+            manifest, signed_bundle_authorized=signed_bundle_authorized
+        )
+    if source_kind == ISSUER_OFFICIAL_PDF_SOURCE_KIND:
+        return adapt_issuer_official_pdf_manifest(
             manifest, signed_bundle_authorized=signed_bundle_authorized
         )
     if source_kind == STANDARDS_SOURCE_KIND:

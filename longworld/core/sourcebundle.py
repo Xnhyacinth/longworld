@@ -52,6 +52,12 @@ from longworld.core.issuerfilingworkflow import (
     MAX_ISSUER_IR_MANIFEST_BYTES,
     _audit_issuer_ir_filing_manifest,
 )
+from longworld.core.issuerpdfworkflow import (
+    ISSUER_OFFICIAL_PDF_INVENTORY_SCHEMA,
+    ISSUER_OFFICIAL_PDF_SOURCE_KIND,
+    MAX_ISSUER_OFFICIAL_PDF_MANIFEST_BYTES,
+    audit_issuer_official_pdf_inventory,
+)
 from longworld.core.provenance import ProvenanceError, _read_regular_file
 from longworld.core.sourceworkflow import (
     PAPER_SOURCE_KIND,
@@ -110,6 +116,11 @@ _KIND_CONTRACTS = {
         "company",
         frozenset({ISSUER_IR_FILING_MANIFEST_SCHEMA}),
         MAX_ISSUER_IR_MANIFEST_BYTES,
+    ),
+    ISSUER_OFFICIAL_PDF_SOURCE_KIND: (
+        "company",
+        frozenset({ISSUER_OFFICIAL_PDF_INVENTORY_SCHEMA}),
+        MAX_ISSUER_OFFICIAL_PDF_MANIFEST_BYTES,
     ),
     STANDARDS_SOURCE_KIND: (
         "standards",
@@ -292,6 +303,8 @@ def _verified_manifest_payload(
         )
     elif entry.kind == ISSUER_IR_SOURCE_KIND:
         _audit_issuer_ir_filing_manifest(payload)
+    elif entry.kind == ISSUER_OFFICIAL_PDF_SOURCE_KIND:
+        payload = audit_issuer_official_pdf_inventory(payload, base_directory)
     elif entry.kind == STANDARDS_SOURCE_KIND:
         audit_ietf_workflow_manifest(payload)
     else:

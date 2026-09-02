@@ -1,0 +1,30 @@
+{
+  "schema_version": "longworld.berkshire-annual-report-request.v1",
+  "user_agent": "LongWorld/0.2 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P14-BERKSHIRE-OFFICIAL-ANNUALS-20260902",
+    "scope": "Berkshire Hathaway issuer-owned 2021 through 2024 annual-report PDFs",
+    "basis": "User-authorized public-source LongWorld Company workflow acquisition",
+    "reviewed_at": "2026-09-02T17:00:00Z"
+  },
+  "reports": [
+    {
+      "year": 2021,
+      "url": "https://www.berkshirehathaway.com/2021ar/2021ar.pdf"
+    },
+    {
+      "year": 2022,
+      "url": "https://www.berkshirehathaway.com/2022ar/2022ar.pdf"
+    },
+    {
+      "year": 2023,
+      "url": "https://www.berkshirehathaway.com/2023ar/2023ar.pdf"
+    },
+    {
+      "year": 2024,
+      "url": "https://www.berkshirehathaway.com/2024ar/2024ar.pdf"
+    }
+  ],
+  "requests_per_second": 2,
+  "timeout_seconds": 90
+}

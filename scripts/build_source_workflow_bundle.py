@@ -30,6 +30,11 @@ from longworld.core.issuerfilingworkflow import (
     ISSUER_IR_SOURCE_KIND,
     MAX_ISSUER_IR_MANIFEST_BYTES,
 )
+from longworld.core.issuerpdfworkflow import (
+    ISSUER_OFFICIAL_PDF_INVENTORY_SCHEMA,
+    ISSUER_OFFICIAL_PDF_SOURCE_KIND,
+    MAX_ISSUER_OFFICIAL_PDF_MANIFEST_BYTES,
+)
 from longworld.core.provenance import ProvenanceError, _read_regular_file
 from longworld.core.sourcebundle import (
     SOURCE_WORKFLOW_ADAPTER_REVISION,
@@ -61,6 +66,11 @@ _CONTRACTS = {
         "company",
         {ISSUER_IR_FILING_MANIFEST_SCHEMA},
         MAX_ISSUER_IR_MANIFEST_BYTES,
+    ),
+    ISSUER_OFFICIAL_PDF_SOURCE_KIND: (
+        "company",
+        {ISSUER_OFFICIAL_PDF_INVENTORY_SCHEMA},
+        MAX_ISSUER_OFFICIAL_PDF_MANIFEST_BYTES,
     ),
     STANDARDS_SOURCE_KIND: (
         "standards",
@@ -156,6 +166,9 @@ def main() -> None:
     parser.add_argument("--sec-manifest", action="append", type=Path, default=[])
     parser.add_argument("--wikimedia-manifest", action="append", type=Path, default=[])
     parser.add_argument("--issuer-ir-manifest", action="append", type=Path, default=[])
+    parser.add_argument(
+        "--issuer-official-pdf-manifest", action="append", type=Path, default=[]
+    )
     parser.add_argument("--standards-manifest", action="append", type=Path, default=[])
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument(
@@ -172,6 +185,10 @@ def main() -> None:
         *(("sec_filing", path) for path in args.sec_manifest),
         *(("wikimedia", path) for path in args.wikimedia_manifest),
         *((ISSUER_IR_SOURCE_KIND, path) for path in args.issuer_ir_manifest),
+        *(
+            (ISSUER_OFFICIAL_PDF_SOURCE_KIND, path)
+            for path in args.issuer_official_pdf_manifest
+        ),
         *((STANDARDS_SOURCE_KIND, path) for path in args.standards_manifest),
     ]
     build_source_workflow_bundle(

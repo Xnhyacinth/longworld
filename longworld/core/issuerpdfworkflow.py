@@ -1,0 +1,263 @@
+"""Fail-closed replay for issuer-owned annual-report PDF inventories."""
+
+from __future__ import annotations
+
+import hashlib
+import io
+import json
+from collections.abc import Mapping
+from itertools import pairwise
+from pathlib import Path, PurePath
+from typing import Any
+from urllib.parse import urlparse
+
+import pypdf
+from pypdf import PdfReader
+
+from longworld.core.provenance import (
+    MAX_SOURCE_BYTES,
+    ProvenanceError,
+    _read_regular_file,
+)
+
+ISSUER_OFFICIAL_PDF_INVENTORY_SCHEMA = (
+    "longworld.issuer-official-pdf-inventory.v1"
+)
+ISSUER_OFFICIAL_PDF_SOURCE_KIND = "issuer_official_pdf"
+MAX_ISSUER_OFFICIAL_PDF_MANIFEST_BYTES = 4_000_000
+SUPPORTED_PARSER = {"name": "pypdf", "version": "6.0.0"}
+
+
+def _literal_file(value: object, suffix: str) -> str:
+    if not isinstance(value, str) or not value or value != PurePath(value).name:
+        raise ProvenanceError("issuer official PDF inventory file is unsafe")
+    if not value.endswith(suffix):
+        raise ProvenanceError("issuer official PDF inventory file type is invalid")
+    return value
+
+
+def _extract(raw: bytes) -> tuple[str, int, int]:
+    if (
+        not raw.startswith(b"%PDF-")
+        or len(raw) > MAX_SOURCE_BYTES
+        or pypdf.__version__ != SUPPORTED_PARSER["version"]
+    ):
+        raise ProvenanceError("issuer official PDF or parser identity is invalid")
+    try:
+        reader = PdfReader(io.BytesIO(raw))
+        if reader.is_encrypted or not reader.pages:
+            raise ProvenanceError("issuer official PDF is not extractable")
+        pages = [page.extract_text() or "" for page in reader.pages]
+    except ProvenanceError:
+        raise
+    except Exception as error:
+        raise ProvenanceError("issuer official PDF is invalid") from error
+    return "\n\n".join(pages), len(pages), sum(bool(page.strip()) for page in pages)
+
+
+def audit_issuer_official_pdf_inventory(
+    payload: Mapping[str, Any], base_directory: Path
+) -> dict[str, Any]:
+    """Replay PDF extraction and return a normalized in-memory adapter payload."""
+    issuer = payload.get("issuer")
+    if (
+        payload.get("schema_version") != ISSUER_OFFICIAL_PDF_INVENTORY_SCHEMA
+        or payload.get("source_status") != "issuer_owned_official_pdf"
+        or payload.get("data_stage") != "source_inventory"
+        or payload.get("hybrid_train_ready") is not False
+        or payload.get("production_eligible") is not False
+        or payload.get("generation_integration") != "disabled"
+        or payload.get("parser") != SUPPORTED_PARSER
+        or not isinstance(issuer, Mapping)
+        or not str(issuer.get("name") or "").strip()
+        or not str(issuer.get("official_host") or "").strip()
+    ):
+        raise ProvenanceError("issuer official PDF inventory contract is invalid")
+    records = payload.get("records")
+    if (
+        not isinstance(records, list)
+        or not records
+        or payload.get("n") != len(records)
+        or len(records) > 32
+    ):
+        raise ProvenanceError("issuer official PDF inventory count is invalid")
+    adapted_records: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    seen_years: set[int] = set()
+    for record in records:
+        if not isinstance(record, Mapping):
+            raise ProvenanceError("issuer official PDF record is invalid")
+        record_id = str(record.get("record_id") or "")
+        source_family = str(record.get("source_family") or "")
+        occurred_at = str(record.get("occurred_at") or "")
+        year = record.get("year")
+        url = str(record.get("url") or "")
+        parsed_url = urlparse(url)
+        if (
+            not record_id
+            or record_id in seen_ids
+            or not source_family
+            or isinstance(year, bool)
+            or not isinstance(year, int)
+            or year in seen_years
+            or occurred_at != f"{year}-12-31"
+            or parsed_url.scheme != "https"
+            or parsed_url.hostname != issuer["official_host"]
+            or record.get("content_type") != "application/pdf"
+        ):
+            raise ProvenanceError("issuer official PDF record identity is invalid")
+        pdf_file = _literal_file(record.get("pdf_file"), ".pdf")
+        text_file = _literal_file(record.get("text_file"), ".txt")
+        pdf_raw = _read_regular_file(base_directory / pdf_file, MAX_SOURCE_BYTES)
+        text_raw = _read_regular_file(base_directory / text_file, MAX_SOURCE_BYTES)
+        if (
+            hashlib.sha256(pdf_raw).hexdigest() != record.get("pdf_sha256")
+            or len(pdf_raw) != record.get("pdf_bytes")
+            or hashlib.sha256(text_raw).hexdigest() != record.get("text_sha256")
+            or len(text_raw) != record.get("text_bytes")
+        ):
+            raise ProvenanceError("issuer official PDF byte receipt is invalid")
+        try:
+            stored_text = text_raw.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise ProvenanceError("issuer official PDF text is not UTF-8") from error
+        text, page_count, nonempty_pages = _extract(pdf_raw)
+        if (
+            text != stored_text
+            or len(text) != record.get("extracted_chars")
+            or page_count != record.get("page_count")
+            or nonempty_pages != record.get("nonempty_pages")
+        ):
+            raise ProvenanceError("issuer official PDF parser receipt is invalid")
+        raw_sections = record.get("sections")
+        if not isinstance(raw_sections, list) or not raw_sections:
+            raise ProvenanceError("issuer official PDF sections are invalid")
+        section_ranges: dict[str, tuple[int, int]] = {}
+        for section in raw_sections:
+            if not isinstance(section, Mapping):
+                raise ProvenanceError("issuer official PDF section is invalid")
+            section_id = str(section.get("section_id") or "")
+            start, end = section.get("char_start"), section.get("char_end")
+            if (
+                not section_id
+                or section_id in section_ranges
+                or isinstance(start, bool)
+                or isinstance(end, bool)
+                or not isinstance(start, int)
+                or not isinstance(end, int)
+                or start < 0
+                or end <= start
+                or end > len(text)
+                or hashlib.sha256(text[start:end].encode()).hexdigest()
+                != section.get("sha256")
+            ):
+                raise ProvenanceError("issuer official PDF section receipt is invalid")
+            section_ranges[section_id] = (start, end)
+        raw_facts = record.get("derived_facts")
+        if not isinstance(raw_facts, list) or not raw_facts:
+            raise ProvenanceError("issuer official PDF facts are invalid")
+        facts: list[dict[str, Any]] = []
+        fact_ids: set[str] = set()
+        for fact in raw_facts:
+            if not isinstance(fact, Mapping):
+                raise ProvenanceError("issuer official PDF fact is invalid")
+            fact_id = str(fact.get("fact_id") or "")
+            section_id = str(fact.get("section_id") or "")
+            start, end = fact.get("evidence_char_start"), fact.get("evidence_char_end")
+            quote = str(fact.get("evidence_quote") or "")
+            value = str(fact.get("value") or "")
+            bounds = section_ranges.get(section_id)
+            if (
+                not fact_id
+                or fact_id in fact_ids
+                or bounds is None
+                or isinstance(start, bool)
+                or isinstance(end, bool)
+                or not isinstance(start, int)
+                or not isinstance(end, int)
+                or not bounds[0] <= start < end <= bounds[1]
+                or text[start:end] != quote
+                or not value
+                or value not in quote
+                or fact.get("text_sha256") != record.get("text_sha256")
+            ):
+                raise ProvenanceError("issuer official PDF fact receipt is invalid")
+            facts.append(dict(fact))
+            fact_ids.add(fact_id)
+        adapted_records.append(
+            {
+                "record_id": record_id,
+                "year": year,
+                "kind": "issuer_official_annual_report",
+                "occurred_at": occurred_at,
+                "source_url": url,
+                "retrieval_url": url,
+                "source_family": source_family,
+                "source_sha256": record["pdf_sha256"],
+                "text_sha256": record["text_sha256"],
+                "provenance_id": f"sha256:{record['pdf_sha256']}",
+                "text": text,
+                "derived_facts": facts,
+                "sections_json": json.dumps(
+                    [dict(section) for section in raw_sections],
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+            }
+        )
+        seen_ids.add(record_id)
+        seen_years.add(year)
+    if [record["year"] for record in adapted_records] != sorted(seen_years):
+        raise ProvenanceError("issuer official PDF records are not ordered by year")
+
+    raw_relations = payload.get("relations")
+    if not isinstance(raw_relations, list) or len(raw_relations) != len(records) - 1:
+        raise ProvenanceError("issuer official PDF relations are invalid")
+    records_by_id = {record["record_id"]: record for record in adapted_records}
+    expected_edges = {
+        (current["record_id"], prior["record_id"])
+        for prior, current in pairwise(adapted_records)
+    }
+    seen_edges: set[tuple[str, str]] = set()
+    adapted_relations: list[dict[str, Any]] = []
+    for relation in raw_relations:
+        if not isinstance(relation, Mapping):
+            raise ProvenanceError("issuer official PDF relation is invalid")
+        source_id = str(relation.get("source_record_id") or "")
+        target_id = str(relation.get("target_record_id") or "")
+        edge = (source_id, target_id)
+        source = records_by_id.get(source_id)
+        target = records_by_id.get(target_id)
+        if (
+            relation.get("kind") != "prior_official_annual_report"
+            or edge not in expected_edges
+            or edge in seen_edges
+            or source is None
+            or target is None
+            or relation.get("relation_id")
+            != f"{source_id}:prior_official:{target_id}"
+        ):
+            raise ProvenanceError("issuer official PDF relation identity is invalid")
+        raw_evidence = relation.get("evidence")
+        if not isinstance(raw_evidence, list) or {
+            item.get("record_id") if isinstance(item, Mapping) else None
+            for item in raw_evidence
+        } != {source_id, target_id}:
+            raise ProvenanceError("issuer official PDF relation evidence is invalid")
+        for item in raw_evidence:
+            assert isinstance(item, Mapping)
+            record = records_by_id[str(item["record_id"])]
+            if item.get("fact_ids") != [
+                fact["fact_id"] for fact in record["derived_facts"]
+            ]:
+                raise ProvenanceError(
+                    "issuer official PDF relation evidence is incomplete"
+                )
+        adapted_relations.append(dict(relation))
+        seen_edges.add(edge)
+    if seen_edges != expected_edges:
+        raise ProvenanceError("issuer official PDF relation sequence is incomplete")
+    adapted = dict(payload)
+    adapted["adapted_records"] = adapted_records
+    adapted["adapted_relations"] = adapted_relations
+    return adapted
