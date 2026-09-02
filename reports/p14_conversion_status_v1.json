@@ -1,0 +1,99 @@
+{
+  "schema_version": "p14-conversion-status-v1",
+  "created_at": "2026-09-02",
+  "release_profile_id": "p13-authentic-six-domain-probe-12-v1",
+  "base_snapshot": {
+    "path": "reports/p13_six_domain_probe_status_v1.json",
+    "sha256": "4894eda663a1075ba93c66f841c88a72d08e76e3cd79c1267c10a1b320f36a27",
+    "worlds": 7,
+    "rows": 63,
+    "actual_context_tokens": 2371273,
+    "quota_countable_worlds": 5
+  },
+  "canonical_additions": [
+    {
+      "domain": "cyber",
+      "world_id": "cyber_cross_vendor_remediation_2018_2025_v1",
+      "rows": 9,
+      "actual_context_tokens": 339546,
+      "bands": ["16k", "32k", "64k"],
+      "views": ["full", "cf", "ordered_artifact_view"],
+      "candidate_path": "data/releases/p13-cyber-cross-vendor-task-views-v2-audit/candidates.jsonl",
+      "candidate_sha256": "068a10daf9e4fbfbc0f59c91b4f2aff6fe043cbbcdef45b514f8bdf4adcfc18d",
+      "ranking_sha256": "6984a340a03610c4f4f7164c9f098054187e355133faa72f852956a3a2e5a25c",
+      "audit_path": "data/releases/p13-cyber-cross-vendor-task-views-v2-audit/audits.jsonl",
+      "audit_sha256": "d64aabeb43804ca02b88f65e84314a3b536b5535b16d88db6daeec32ea25fcce",
+      "audit_manifest_sha256": "88745faa7b59f9aee74f18148f547a72a9f713198c4feb14bcaca162ab14fd08",
+      "answer_program_id": "cyber.cross_cve_remediation_reconstruction.v1",
+      "motif": "nvd_kev_join+vendor_year_aggregation+remediation_window",
+      "unique_executable_proofs": 3,
+      "dense_audit_complete": true,
+      "source_token_measurement_valid": true,
+      "train_ready": false
+    },
+    {
+      "domain": "finance",
+      "world_id": "finance_microsoft_asset_trajectory_2022_2025_v1",
+      "rows": 9,
+      "actual_context_tokens": 337159,
+      "bands": [
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "views": [
+        "full",
+        "cf",
+        "ordered_artifact_view"
+      ],
+      "candidate_path": "data/releases/p14-finance-microsoft-asset-trajectory-task-views-v2/candidates.jsonl",
+      "candidate_sha256": "21b5805e4a27a611d560bddd4ba33e7cbadccb955b0d8b24c4cd48b26170f950",
+      "ranking_sha256": "ea2e6fa6de07913ab5dbb172d032546258a6724814912125578ac562a393bbf6",
+      "audit_path": "data/releases/p14-finance-microsoft-asset-trajectory-task-views-v2/audits.jsonl",
+      "audit_sha256": "4f44dc354dfb06e45f02e16a5df1848bcce2bc2d9d8800f4c3deae59599a95c1",
+      "audit_manifest_sha256": "a2a05d5cdde1c2868c7aea1dcaf452e5122ebb6756da87210c36980ca29e1e85",
+      "answer_program_id": "finance.multi_filing_asset_trajectory.v1",
+      "motif": "multi_filing_asset_and_operating_cash_trajectory+balance_sheet_certification",
+      "unique_executable_proofs": 3,
+      "dense_audit_complete": true,
+      "source_token_measurement_valid": true,
+      "train_ready": false
+    }
+  ],
+  "current_inventory": {
+    "physical_worlds": 9,
+    "quota_countable_worlds": 7,
+    "required_quota_worlds": 12,
+    "rows": 81,
+    "actual_context_tokens": 3047978,
+    "unique_motifs": 7,
+    "unique_executable_proofs": 22,
+    "unique_answer_programs": 7,
+    "unique_semantic_base_tasks": 7,
+    "quota_by_domain": {
+      "company": 0,
+      "researchlab": 0,
+      "codeforge": 1,
+      "finance": 2,
+      "cyber": 2,
+      "macro_economics": 2
+    }
+  },
+  "quota_holes": {
+    "company": 2,
+    "researchlab": 2,
+    "codeforge": 1,
+    "finance": 0
+  },
+  "release_state": {
+    "selection_attempted_against_current_inventory": false,
+    "last_selection_blocker": "insufficient fully audited worlds: 7<12",
+    "selection_run": false,
+    "promotion_run": false,
+    "quality_gate_run": false,
+    "exports_run": false,
+    "train_ready": false,
+    "production_eligible": false,
+    "private_hf_upload_allowed": false
+  }
+}

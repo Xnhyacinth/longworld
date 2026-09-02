@@ -712,3 +712,32 @@ in`; no private-repository or upload claim was made.
   `f6a62f51d9a4eee0d0e047edc0877df5022ce495bfa9d1066a7aae84900cd8aa`.
 - Honest boundary: one source workflow, zero authentic cross-record relations;
   12 worlds stays blocked pending workflow/relation diversity, 48/210 blocked.
+# 2026-09-02 P14 conversion run
+
+- User confirmed all four prior P13 agents ended with no new 9/9 world. Current
+  honest snapshot remains 8 physical / 6 quota / 72 rows and
+  `train_ready=false`; formal P13 training export is zero.
+- Created a persistent goal for authentic long-context data conversion. The
+  new P14 plan replaces the four blocked routes with disjoint Company,
+  ResearchLab, CodeForge, and Finance/integration tracks.
+- Hard admission gates remain unchanged. Verification is narrowed to
+  fail-first tests for changed behavior, candidate-local audits, and one final
+  release-chain run after 12/12 rather than repeated whole-repository suites.
+- Git status required command-local removal of malformed inherited
+  `GIT_CONFIG_COUNT`/`GIT_CONFIG_VALUE_*`; global/user Git configuration was not
+  changed. Existing untracked P13 diagnostic configs are preserved pending
+  ownership reconciliation.
+- Finance P14 added a distinct Microsoft FY2022--FY2025 SEC iXBRL program. The
+  first revenue/assets-only version failed the 32K ordered-view 16K-window gate;
+  operating-cash observations were made answer-bearing rather than weakening
+  the gate. The final histories are 16,119/32,028/64,083 tokens with 8/12/16
+  essential rows and 1/2/3 temporal relations.
+- All nine Finance task views passed independent dense/source-window replay.
+  Candidate/audit/ranking SHA-256 values are recorded in
+  `reports/p14_conversion_status_v1.json`. The honest ledger is now 9 physical
+  / 7 quota / 81 rows / 3,047,978 tokens; Finance is 2/2 and formal export stays
+  zero because the release is still 7/12.
+- ResearchLab Adam has 70,674 de-duplicated natural source tokens but needs a
+  cross-file section view. CodeForge Wasmtime source lineage is valid, but the
+  existing release-summary program remains locally solvable at 8K/16K and is
+  not counted.

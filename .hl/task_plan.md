@@ -34,6 +34,47 @@ upload HF until 12/12.
 | E5c | Company: stop reconstruction retries; scout other program | blocked | four-annual revenue-change 0 rows; 16k ordered 6561<8000; YoY clones |
 | E6 | Record ledger only; no selection/promotion/HF | planned | selection still fail-closed until 12/12 |
 
+## P14 conversion run — 2026-09-02
+
+Goal: convert authentic long-source inventory into complete 16/32/64k ×
+full/CF/ordered worlds without relaxing near-duplicate, exact-band,
+`derived_view_gate`, source-lineage, or truncation-ppm contracts. Prefer new
+entities, executable programs, source relations, repositories, and artifact
+types over retuning blocked P13 candidates.
+
+Assumptions and tradeoffs:
+
+- Four tracks means three disjoint workers plus the root integration track;
+  workers own separate config/report namespaces and must not edit shared core
+  files or `.hl/` unless explicitly reassigned.
+- A physical candidate does not count until all nine cells pass the current
+  pinned audit. Partial 6/9 candidates remain diagnostics.
+- Run targeted fail-first/unit checks only for changed behavior, then the
+  candidate-local audit. Run the full selection/promotion/export chain once,
+  only after inventory reaches 12/12. This reduces redundant verification
+  without weakening any admission gate.
+- Preserve existing untracked P13 diagnostics until ownership is reconciled;
+  do not force-add gitignored generated data.
+
+| Phase | Objective | Status | Validator |
+| ----- | --------- | ------ | --------- |
+| P14.0 | Reconcile dirty tree, current inventory, commands, and dead ends | complete | exact HEAD/status; current pinned audits and 8/6/72 ledger rechecked |
+| P14.1 | Company: new entity plus non-reconstruction executable relation | in_progress | Microsoft staged narrative implementation green; natural 9-cell/profile result pending |
+| P14.2 | ResearchLab: new naturally long paper/revision/benchmark program | in_progress | Adam capacity confirmed; cross-file section adapter remains to implement |
+| P14.3 | CodeForge: new repository/artifact program with natural three-band support | in_progress | Wasmtime provenance green but existing release task has 8K/16K shortcuts; new task type required |
+| P14.4 | Finance/integration: new issuer/program and deterministic inventory rebuild | complete | Microsoft Finance 9/9; ledger now 9 physical / 7 quota / 81 rows |
+| P14.5 | Fill remaining holes, select 12/12, promote, quality-gate, and export | planned | signed receipts; nonzero formal train export; `train_ready=true` |
+| P14.6 | Targeted regression, provenance report, and surgical Git commits | in_progress | Finance focused tests/audit green; integrated tests and scoped commits pending |
+
+Success criterion: at least 12 quota-eligible worlds are fully audited and the
+current profile completes selection, promotion, quality gate, and training
+export with `train_ready=true`. Until then, report exact physical/quota/row
+counts and keep formal training at zero.
+
+Next step: close the Company staged-narrative result, implement the minimal
+ResearchLab cross-file section view, and design a CodeForge patch/review/test
+program that cannot be reconstructed from a local release-state window.
+
 Position: run the first honest 12-world P3 release while keeping synthetic
 executable and real-public provenance distinct. Complexity 10/10 (breadth,
 depth, dependency, uncertainty, validation all 2); mixed routing, at most four

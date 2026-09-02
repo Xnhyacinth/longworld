@@ -1045,3 +1045,29 @@ world contains one Apple filing workflow. Hash/span lineage is real provenance,
 but the causal `reads_section`/`extends` edges are simulated executable logic,
 so `n_real_source_relations=0` is correct. Do not use this slice to claim the
 12-world or production diversity gates are met.
+# 2026-09-02 P14 conversion findings
+
+- The absence of a formal training package is a quota/release-chain failure,
+  not an absence of all source data: the current P13 inventory is 8 physical
+  worlds, 6 quota worlds, 72 rows, and 2,710,819 exact tokens, but selection
+  cannot legally run to completion before 12/12.
+- The four just-finished routes are now negative controls: Megatron lacks
+  enough unique tokens/materialized bands; Company reconstruction lacks
+  ordered 16/32 support; oxc first-1000 CPT exceeds the fixed truncation cap;
+  oxc/ruff CodeForge candidates do not complete nine cells. Further cap tuning
+  or reconstruction retries are lower-value than changing entity and program.
+- Efficient verification can omit unrelated full-suite reruns while retaining
+  every data admission gate: validate new semantics locally, audit all nine
+  cells once, and defer global selection/promotion/export until quota closure.
+- Microsoft issuer GCS manifests bind both raw `source_sha256` and normalized
+  `text_sha256`; SEC iXBRL parsing must verify and consume `text_sha256` while
+  retaining the raw source digest as lineage. Treating the two as identical
+  fails on FY2025 and is incorrect even when earlier filings happen to match.
+- A program can pass remove-one and exact-band checks yet still fail genuine
+  long dependence when ordered essential artifacts fit a shorter contiguous
+  window. Adding answer-bearing operating-cash rows raised the Microsoft
+  essential span enough to pass the unchanged window gate; adding unrelated
+  filler would not have fixed the task.
+- Reusing one source manifest for disjoint task sections may expand programs,
+  but quota accounting must still apply the profile's source-workflow identity.
+  Adapter-local workflow IDs are not evidence of independent provenance.
