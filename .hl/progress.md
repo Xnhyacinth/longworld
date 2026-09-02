@@ -1,5 +1,10 @@
 # Progress
 
+- 2026-09-02 honesty + parallel fill: P13 still `train_ready=false` (formal
+  train export 0). Inventory 8/6 / 72 rows / 2.71M SFT tokens plus 3047 CPT
+  rows / 288M tokens. Four agents running: Megatron ResearchLab, CodeForge
+  world 2 (oxc 32k or ruff), Company program scout (no reconstruction
+  retry), CPT oxc first-1000 (not skip-8000). No selection/HF.
 - 2026-09-02 Cyber cross-CVE v2: 9/9 dense audit complete (near-dup ≤
   0.0009). 16k is 3 CVE units after skipping 4k-leaking 2-unit packs.
   Ledger is 8 physical / 6 quota-countable (Cyber 2/2). `train_ready=false`.
