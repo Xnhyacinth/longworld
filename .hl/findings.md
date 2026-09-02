@@ -2,6 +2,17 @@
 
 ## Retry wave — 2026-09-02 later
 
+MLRC workspace-v2 retry produced 9 rows / 3 slots / full+cf+ordered at
+16/32/64K with `mean_near_dup_sentence_ratio=0.015`. That is a complete
+9-cell ResearchLab candidate, still unranked. AEVB retry is 32/64 only
+and near-dup 0.4586. Oxc CPT skip-8000/250 is within the 200k ppm cap
+(188k) but packed zero rows (elapsed/event minima). GitHub SFT/CPT
+exports need `LONGWORLD_GH_BINARY_SHA256=2fd925d6…7791673`. Apple P12
+SEC bundle is signed by a different probe; live EDGAR fetch is 403.
+
+## Retry wave — 2026-09-02 later
+
+
 Code landed on `worlds`: cross-CVE adapter `83192ce`, oxc license-binding
 `302192b`, Company Apple/Microsoft configs `0d8bac5`. Next countable SFT
 move is ranking the existing Cyber 9-cell projections; CPT retry uses a

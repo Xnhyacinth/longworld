@@ -1,5 +1,14 @@
 # Progress
 
+- 2026-09-02 retry wave (later): MLRC generate retry emitted a **9-cell**
+  three-view world (9 rows, near-dup 0.015). Not yet ranked/audited, so
+  ResearchLab is still 0/2 in the gated ledger. AEVB retry still missing
+  16K (near-dup 0.46). Oxc CPT skip-8000/250 passed truncation (188k ppm)
+  but packed 0 rows; skip-8000/1000 is running with GH pins. CodeForge oxc
+  v9 generate running with GH binary pin. Apple P12 bundle has the wrong
+  producer key; EDGAR four-annual fetch returned HTTP 403 (not retried).
+  Microsoft five-seed generate still running. Cyber 9-cell ranking waits
+  on sentence-transformers==6.0.0. Commits through `aa6ad9d`.
 - 2026-09-02 retry wave: committed adapter/configs on `worlds`
   (`83192ce`, `302192b`, `0d8bac5`). Parallel tracks now running:
   Cyber 9-cell dense rank+audit, oxc CPT skip-2500/400 slice (ppm cap
