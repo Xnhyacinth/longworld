@@ -1157,8 +1157,7 @@ def context_source_relation_count(
         for parent_id in event.causal_inputs
     )
     source_relations = sum(
-        event.type == "arxiv_revision_relation"
-        and all(parent_id in events for parent_id in event.required_inputs)
+        valid_arxiv_revision_relation_event(event, events)
         for event in events.values()
     )
     sec_source_relations = len(

@@ -458,19 +458,26 @@ def _semantic_latex_lines(text: str) -> list[str]:
     )
     for raw_line in text.splitlines():
         line = re.split(r"(?<!\\)%", raw_line, maxsplit=1)[0].strip()
-        normalized = " ".join(line.split())
-        words = re.findall(r"[A-Za-z]{2,}", normalized)
-        if (
-            len(normalized) < 40
-            or len(words) < 7
-            or normalized.startswith(("\\", "%"))
-            or any(character in normalized for character in "{}\\")
-            or normalized[-1:] not in ".!?"
-            or normalized.lower().startswith(boilerplate)
-            or ".tex" in normalized.lower()
-        ):
-            continue
-        candidates.append(normalized)
+        fragments = (
+            re.split(r"(?<=[.!?])\s+", line)
+            if any(character in line for character in "{}\\")
+            else [line]
+        )
+        for fragment in fragments:
+            exact = fragment.strip()
+            normalized = " ".join(exact.split())
+            words = re.findall(r"[A-Za-z]{2,}", normalized)
+            if (
+                len(normalized) < 40
+                or len(words) < 7
+                or normalized.startswith(("\\", "%"))
+                or any(character in normalized for character in "{}\\")
+                or normalized[-1:] not in ".!?"
+                or normalized.lower().startswith(boilerplate)
+                or ".tex" in normalized.lower()
+            ):
+                continue
+            candidates.append(exact)
     return candidates
 
 
@@ -496,14 +503,14 @@ def _revision_added_text_fact(
     candidates: list[tuple[tuple[int, int, int, int], str, str]] = []
     for path in sorted(current_sources):
         for candidate in _semantic_latex_lines(current_sources[path]):
-            normalized = " ".join(candidate.split()).casefold()
+            normalized = " ".join(candidate.split())
             if (
-                normalized in previous
+                normalized.casefold() in previous
                 or current_record_text.count(candidate) != 1
-                or not format_revision_added_delta(candidate)
+                or not format_revision_added_delta(normalized)
             ):
                 continue
-            candidates.append((_semantic_candidate_rank(candidate), path, candidate))
+            candidates.append((_semantic_candidate_rank(normalized), path, candidate))
     if not candidates:
         return None
     _rank, _path, selected = min(

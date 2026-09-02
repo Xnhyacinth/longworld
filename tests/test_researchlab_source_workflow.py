@@ -37,6 +37,7 @@ from longworld.domains.researchlab.simulate import (
     canonical_researchlab_source_event_envelope,
     canonical_researchlab_source_visible_text,
 )
+from scripts.generate import context_source_relation_count
 
 
 def _record(
@@ -605,6 +606,55 @@ def test_real_arxiv_multiband_queries_grow_source_history_and_proof() -> None:
     assert (
         semantic_answer_from_artifacts(world, specs[0], corrupted_include) == "unknown"
     )
+
+
+def test_source_relation_count_uses_the_validated_revision_edge_contract() -> None:
+    workflow, _ = _multiband_workflow()
+    materialized = materialize(
+        7,
+        n_parallel=0,
+        n_pulses=0,
+        domain="researchlab",
+        n_workstreams=0,
+        source_workflows=[workflow],
+        include_program_joins=False,
+    )
+    world = materialized.worlds["focal"]
+    spec = next(
+        query
+        for query in materialized.queries
+        if query.query_type == "real_revision_added_text"
+        and query.preferred_length_buckets == ["32k"]
+    )
+    artifacts = [
+        artifact
+        for artifact in materialized.artifacts["focal"]
+        if artifact.artifact_id in spec.essential_artifact_ids
+    ]
+    relation = next(
+        event
+        for event in world.events
+        if event.id in spec.sufficient_event_ids
+        and event.type == "arxiv_revision_relation"
+    )
+
+    assert context_source_relation_count(world, artifacts, spec=spec) == 1
+
+    invalid_relation = replace(
+        relation,
+        params={
+            **relation.params,
+            "source_record_event_id": relation.params["target_record_event_id"],
+        },
+    )
+    invalid_world = replace(
+        world,
+        events=[
+            invalid_relation if event.id == invalid_relation.id else event
+            for event in world.events
+        ],
+    )
+    assert context_source_relation_count(invalid_world, artifacts, spec=spec) == 0
 
 
 def test_real_arxiv_revision_body_drives_state_answer_and_counterfactual() -> None:

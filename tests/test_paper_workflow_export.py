@@ -68,6 +68,50 @@ def test_revision_fact_export_keeps_unique_semantic_delta_with_a_digit() -> None
     assert fact["evidence_quote"] == added
 
 
+def test_revision_fact_export_preserves_exact_internal_whitespace() -> None:
+    added = (
+        "We report 128k tokens with two  internal spaces in the exact source line."
+    )
+    record_text = json.dumps({"latex_sources": [{"text": added}]})
+
+    fact = _revision_added_text_fact(
+        {"main.tex": "Earlier manuscript text with no long-context result."},
+        {"main.tex": added},
+        current_record_text=record_text,
+    )
+
+    assert fact is not None
+    assert fact["value"] == added
+    assert fact["evidence_quote"] == added
+    start = fact["evidence_char_start"]
+    assert record_text[start : start + len(added)] == added
+
+
+def test_revision_fact_export_selects_plain_sentence_after_inline_macro() -> None:
+    added = (
+        "We evaluate \\ourname on MMLU~\\citep{mmlu}. "
+        "This multiple choice benchmark covers 57 different tasks in mathematics, "
+        "history and law."
+    )
+    expected = (
+        "This multiple choice benchmark covers 57 different tasks in mathematics, "
+        "history and law."
+    )
+    record_text = json.dumps({"latex_sources": [{"text": added}]})
+
+    fact = _revision_added_text_fact(
+        {"main.tex": "Earlier manuscript text with no MMLU benchmark result."},
+        {"main.tex": added},
+        current_record_text=record_text,
+    )
+
+    assert fact is not None
+    assert fact["value"] == expected
+    assert fact["evidence_quote"] == expected
+    start = fact["evidence_char_start"]
+    assert record_text[start : start + len(expected)] == expected
+
+
 def test_revision_fact_export_prefers_funding_disclosure_over_generic_delta() -> None:
     funding = (
         "The authors thank the reviewers for their careful comments. "
