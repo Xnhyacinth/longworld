@@ -2258,6 +2258,122 @@ def test_p13_selection_signs_domain_stratified_world_maps() -> None:
     } == receipt["split_by_world"]
 
 
+def _mixed_product_p13_selection() -> tuple[list[dict], list[dict], dict]:
+    candidates, _audits = _p13_six_domain_selection_inputs()
+    mixed_candidates = []
+    for candidate in candidates:
+        payload = {
+            key: deepcopy(value)
+            for key, value in candidate.items()
+            if key != "attestation"
+        }
+        domain = str(payload["domain"])
+        payload["schema_version"] = f"longworld.{domain}.candidate.v1"
+        payload["data_product"] = f"worldlong_{domain}_candidate_v1"
+        mixed_candidates.append(
+            attach_attestation(payload, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+        )
+    mixed_audits = [_selection_audit(candidate) for candidate in mixed_candidates]
+    selected, receipt = select_release_worlds(
+        mixed_candidates,
+        mixed_audits,
+        "p13-authentic-six-domain-probe-12-v1",
+        candidate_attestation_key=KEY,
+        audit_attestation_key=KEY,
+    )
+    return mixed_candidates, selected, receipt
+
+
+def test_p13_candidate_union_report_supports_mixed_product_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidates, selected, receipt = _mixed_product_p13_selection()
+    candidate_report = promotion_module.create_candidate_union_report(
+        candidates,
+        receipt,
+        report_attestation_key=KEY,
+        candidate_attestation_key=KEY,
+        selection_attestation_key=KEY,
+    )
+    rows = [
+        {
+            **candidate,
+            "data_stage": "train_ready",
+            "split": receipt["split_by_world"][candidate["world_id"]],
+            "promotion": {
+                "candidate_sha256": candidate_sha256(candidate),
+                "dense_audit_sha256": receipt["audit_sha256_by_candidate"][
+                    candidate_sha256(candidate)
+                ],
+                "release_selection_sha256": serialized_row_sha256(receipt),
+                "tokenizer_asset_manifest_sha256": candidate[
+                    "tokenizer_asset_manifest_sha256"
+                ],
+            },
+        }
+        for candidate in selected
+    ]
+    monkeypatch.setattr(promotion_module, "sft_row_errors", lambda *_a, **_k: [])
+
+    report = create_train_ready_report(
+        candidate_report,
+        candidates,
+        rows,
+        KEY,
+        release_selection_receipt=receipt,
+    )
+
+    assert candidate_report["schema_version"] == (
+        "longworld-release-candidate-union-v1"
+    )
+    assert len(candidate_report["candidate_identity_bindings"]) == 6
+    assert report["schema_version"] == "longworld-release-train-ready-report-v1"
+    assert report["data_product"] == "worldlong_release_union_v1"
+    assert report["n_rows"] == 108
+
+
+def test_p13_candidate_union_report_rejects_promoted_product_identity_rewrite(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidates, selected, receipt = _mixed_product_p13_selection()
+    candidate_report = promotion_module.create_candidate_union_report(
+        candidates,
+        receipt,
+        report_attestation_key=KEY,
+        candidate_attestation_key=KEY,
+        selection_attestation_key=KEY,
+    )
+    rows = [
+        {
+            **candidate,
+            "data_stage": "train_ready",
+            "split": receipt["split_by_world"][candidate["world_id"]],
+            "promotion": {
+                "candidate_sha256": candidate_sha256(candidate),
+                "dense_audit_sha256": receipt["audit_sha256_by_candidate"][
+                    candidate_sha256(candidate)
+                ],
+                "release_selection_sha256": serialized_row_sha256(receipt),
+                "tokenizer_asset_manifest_sha256": candidate[
+                    "tokenizer_asset_manifest_sha256"
+                ],
+            },
+        }
+        for candidate in selected
+    ]
+    rows[0]["data_product"] = "rewritten_product"
+    monkeypatch.setattr(promotion_module, "sft_row_errors", lambda *_a, **_k: [])
+
+    with pytest.raises(PromotionError, match="product identity differs from candidate"):
+        create_train_ready_report(
+            candidate_report,
+            candidates,
+            rows,
+            KEY,
+            release_selection_receipt=receipt,
+        )
+
+
 def test_p13_train_ready_report_rechecks_and_signs_domain_view_contract(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

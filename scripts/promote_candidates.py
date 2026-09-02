@@ -26,6 +26,7 @@ from longworld.core.promotion import (
     PromotionError,
     candidate_sha256,
     candidate_structural_preflight,
+    create_candidate_union_report,
     create_dense_audit,
     create_train_ready_report,
     promote_candidate,
@@ -868,6 +869,33 @@ def write_train_ready_report(
     return len(rows)
 
 
+def write_candidate_union_report(
+    candidate_paths: list[Path],
+    release_selection_path: Path,
+    output_path: Path,
+) -> int:
+    report_key = attestation_key_from_env("quality_report")
+    candidate_key = attestation_key_from_env("candidate_row")
+    selection_key = attestation_key_from_env(RELEASE_SELECTION_PURPOSE)
+    if report_key is None or candidate_key is None or selection_key is None:
+        raise ValueError(
+            "report, candidate, and selection attestation keys are required"
+        )
+    candidates = [row for path in candidate_paths for row in _read_jsonl(path)]
+    release_selection = json.loads(release_selection_path.read_text(encoding="utf-8"))
+    if not isinstance(release_selection, dict):
+        raise TypeError("release selection receipt must be a JSON object")
+    report = create_candidate_union_report(
+        candidates,
+        release_selection,
+        report_attestation_key=report_key,
+        candidate_attestation_key=candidate_key,
+        selection_attestation_key=selection_key,
+    )
+    _write_jsonl_atomic(output_path, [report])
+    return len(candidates)
+
+
 def select_worlds(
     candidate_paths: list[Path],
     audit_paths: list[Path],
@@ -1000,6 +1028,14 @@ def main() -> None:
     report.add_argument("--output", type=Path, required=True)
     report.add_argument("--release-selection", type=Path, required=True)
 
+    candidate_union = subparsers.add_parser(
+        "candidate-union",
+        help="bind heterogeneous signed candidates under one selected release",
+    )
+    candidate_union.add_argument("--candidates", type=Path, nargs="+", required=True)
+    candidate_union.add_argument("--release-selection", type=Path, required=True)
+    candidate_union.add_argument("--output", type=Path, required=True)
+
     args = parser.parse_args()
     if args.command == "preflight":
         count = preflight_candidates(
@@ -1046,13 +1082,19 @@ def main() -> None:
             receipt_path=args.receipt,
             predecessor_gate_receipt_path=args.predecessor_gate_receipt,
         )
-    else:
+    elif args.command == "report":
         count = write_train_ready_report(
             args.candidate_report,
             args.candidates,
             args.rows,
             args.output,
             args.release_selection,
+        )
+    else:
+        count = write_candidate_union_report(
+            args.candidates,
+            args.release_selection,
+            args.output,
         )
     output = (
         args.receipt

@@ -117,6 +117,9 @@ PROMOTION_SCHEMA = "train-ready-promotion-v2"
 REAL_REPLAY_BUNDLE_PURPOSE = "episode_replay_bundle"
 QUALITY_REPORT_PURPOSE = "quality_report"
 QUALITY_REPORT_BINDING_REVISION = "longworld-quality-binding-v4"
+CANDIDATE_UNION_REPORT_SCHEMA = "longworld-release-candidate-union-v1"
+TRAIN_READY_UNION_REPORT_SCHEMA = "longworld-release-train-ready-report-v1"
+RELEASE_UNION_DATA_PRODUCT = "worldlong_release_union_v1"
 RELEASE_SELECTION_SCHEMA = "longworld-release-world-selection-v2"
 RELEASE_SELECTION_PURPOSE = "release_world_selection"
 RELEASE_GATE_SCHEMA = "longworld-release-gate-pass-v1"
@@ -387,6 +390,121 @@ def row_digest_set_sha256(row_digests: list[str]) -> str:
     ):
         raise PromotionError("row digest set is malformed or duplicated")
     return hashlib.sha256("\n".join(sorted(row_digests)).encode()).hexdigest()
+
+
+def _candidate_identity_bindings(
+    candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    grouped: defaultdict[tuple[str, bool, str | None], list[str]] = defaultdict(list)
+    for candidate in candidates:
+        schema_version = candidate.get("schema_version")
+        data_product_present = "data_product" in candidate
+        data_product = candidate.get("data_product")
+        if not isinstance(schema_version, str) or not schema_version:
+            raise PromotionError("candidate schema_version is invalid")
+        if data_product_present and not isinstance(data_product, str):
+            raise PromotionError("candidate data_product is invalid")
+        grouped[(schema_version, data_product_present, data_product)].append(
+            serialized_row_sha256(candidate)
+        )
+    return [
+        {
+            "schema_version": schema_version,
+            "data_product_present": data_product_present,
+            "data_product": data_product,
+            "n_rows": len(row_digests),
+            "candidate_row_set_sha256": row_digest_set_sha256(row_digests),
+        }
+        for (
+            schema_version,
+            data_product_present,
+            data_product,
+        ), row_digests in sorted(
+            grouped.items(),
+            key=lambda item: (item[0][0], item[0][1], item[0][2] or ""),
+        )
+    ]
+
+
+def create_candidate_union_report(
+    candidates: list[dict[str, Any]],
+    release_selection_receipt: dict[str, Any],
+    *,
+    report_attestation_key: bytes | None,
+    candidate_attestation_key: bytes | None,
+    selection_attestation_key: bytes | None,
+) -> dict[str, Any]:
+    """Bind heterogeneous signed candidates under one selected release identity."""
+    if (
+        report_attestation_key is None
+        or candidate_attestation_key is None
+        or selection_attestation_key is None
+    ):
+        raise PromotionError("candidate union attestation keys are incomplete")
+    if not candidates:
+        raise PromotionError("candidate union is empty")
+    if any(
+        candidate.get("data_stage") != "candidate"
+        or not verify_attestation(
+            candidate,
+            candidate_attestation_key,
+            purpose=CANDIDATE_ATTESTATION_PURPOSE,
+        )
+        for candidate in candidates
+    ):
+        raise PromotionError("candidate union contains an invalid candidate")
+    candidate_digests = [serialized_row_sha256(row) for row in candidates]
+    candidate_ids = [candidate_sha256(row) for row in candidates]
+    if len(set(candidate_digests)) != len(candidates) or len(set(candidate_ids)) != len(
+        candidates
+    ):
+        raise PromotionError("candidate union contains duplicate candidates")
+    if not verify_attestation(
+        release_selection_receipt,
+        selection_attestation_key,
+        purpose=RELEASE_SELECTION_PURPOSE,
+    ):
+        raise PromotionError("candidate union release selection is invalid")
+    release_profile_id = str(release_selection_receipt.get("release_profile_id") or "")
+    profile = release_profile(release_profile_id)
+    profile_digest = release_profile_sha256(release_profile_id)
+    selected_ids = release_selection_receipt.get("selected_candidate_sha256")
+    if (
+        release_selection_receipt.get("schema_version") != RELEASE_SELECTION_SCHEMA
+        or release_selection_receipt.get("release_profile_sha256") != profile_digest
+        or release_selection_receipt.get("candidate_row_set_sha256")
+        != row_digest_set_sha256(candidate_digests)
+        or not isinstance(selected_ids, list)
+        or not set(selected_ids).issubset(candidate_ids)
+        or release_selection_receipt.get("n_selected_worlds")
+        != profile.expected_promoted_worlds
+    ):
+        raise PromotionError("candidate union release selection binding is invalid")
+    identity_bindings = _candidate_identity_bindings(candidates)
+    worlds = {str(candidate.get("world_id") or "") for candidate in candidates}
+    worlds.discard("")
+    if not worlds:
+        raise PromotionError("candidate union has no world identity")
+    payload: dict[str, Any] = {
+        "schema_version": CANDIDATE_UNION_REPORT_SCHEMA,
+        "data_product": RELEASE_UNION_DATA_PRODUCT,
+        "data_stage": "candidate",
+        "release_profile_id": release_profile_id,
+        "release_profile_sha256": profile_digest,
+        "release_selection_sha256": serialized_row_sha256(release_selection_receipt),
+        "n_worlds": len(worlds),
+        "n_rows": len(candidates),
+        "target_promoted_worlds": profile.expected_promoted_worlds,
+        "candidate_row_set_sha256": row_digest_set_sha256(candidate_digests),
+        "candidate_identity_bindings": identity_bindings,
+        "candidate_identity_bindings_sha256": _canonical_sha256(identity_bindings),
+        "retention": 1.0,
+        "n_clones": 0,
+    }
+    payload.update(local_probe_diagnostic_metadata())
+    return attach_attestation(
+        payload, report_attestation_key, purpose=QUALITY_REPORT_PURPOSE
+    )
 
 
 def candidate_sha256(candidate: dict[str, Any]) -> str:
@@ -2213,13 +2331,42 @@ def create_train_ready_report(
         candidate_digests
     ):
         raise PromotionError("candidate quality report row binding is invalid")
+    is_candidate_union = (
+        candidate_report.get("schema_version") == CANDIDATE_UNION_REPORT_SCHEMA
+    )
+    if is_candidate_union:
+        identity_bindings = _candidate_identity_bindings(candidates)
+        candidate_worlds = {
+            str(candidate.get("world_id") or "") for candidate in candidates
+        }
+        candidate_worlds.discard("")
+        if (
+            candidate_report.get("data_product") != RELEASE_UNION_DATA_PRODUCT
+            or candidate_report.get("candidate_identity_bindings") != identity_bindings
+            or candidate_report.get("candidate_identity_bindings_sha256")
+            != _canonical_sha256(identity_bindings)
+            or int(candidate_report.get("n_worlds") or 0) != len(candidate_worlds)
+            or int(candidate_report.get("target_promoted_worlds") or 0)
+            != release_profile(release_profile_id).expected_promoted_worlds
+            or release_selection_receipt is None
+            or candidate_report.get("release_selection_sha256")
+            != serialized_row_sha256(release_selection_receipt)
+        ):
+            raise PromotionError("candidate union identity binding is invalid")
     for candidate in candidates:
         if (
             not verify_attestation(
                 candidate, candidate_key, purpose=CANDIDATE_ATTESTATION_PURPOSE
             )
-            or candidate.get("schema_version") != candidate_report.get("schema_version")
-            or candidate.get("data_product") != candidate_report.get("data_product")
+            or (
+                not is_candidate_union
+                and (
+                    candidate.get("schema_version")
+                    != candidate_report.get("schema_version")
+                    or candidate.get("data_product")
+                    != candidate_report.get("data_product")
+                )
+            )
             or candidate.get("data_stage") != "candidate"
         ):
             raise PromotionError("candidate product identity is inconsistent")
@@ -2266,6 +2413,9 @@ def create_train_ready_report(
         promoted_candidate_ids
     ).issubset(candidate_ids):
         raise PromotionError("promoted rows do not belong to the candidate report")
+    candidate_by_digest = {
+        candidate_sha256(candidate): candidate for candidate in candidates
+    }
     promoted_task_training_digests: set[str] = set()
     promoted_task_answers_by_prompt: dict[str, str] = {}
     for row, promoted_candidate_id in zip(rows, promoted_candidate_ids, strict=True):
@@ -2374,6 +2524,25 @@ def create_train_ready_report(
                 raise PromotionError(
                     "promoted task semantics differ from release selection"
                 )
+    identity_fields = (
+        "schema_version",
+        "data_product",
+        "world_id",
+        "query_id",
+        "domain",
+        "length_bucket",
+        "view",
+        "content_hash",
+    )
+    if any(
+        any(
+            (field in row) != (field in candidate_by_digest[candidate_id])
+            or row.get(field) != candidate_by_digest[candidate_id].get(field)
+            for field in identity_fields
+        )
+        for row, candidate_id in zip(rows, promoted_candidate_ids, strict=True)
+    ):
+        raise PromotionError("promoted product identity differs from candidate")
     profile = release_profile(release_profile_id)
     missing_required_buckets = _missing_required_exact_length_buckets_by_world(
         rows, profile
@@ -2613,9 +2782,6 @@ def create_train_ready_report(
             for candidate_digest, row in zip(promoted_candidate_ids, rows)
         ):
             raise PromotionError("promoted rows differ from selected dense audits")
-    candidate_by_digest = {
-        candidate_sha256(candidate): candidate for candidate in candidates
-    }
     dossier_candidates: dict[str, dict[str, str]] = {}
     for digest, candidate in candidate_by_digest.items():
         view = str(candidate.get("view") or "")
@@ -2636,7 +2802,7 @@ def create_train_ready_report(
             raise PromotionError(
                 f"counterfactual dossier promotion is asymmetric: {dossier}"
             )
-    if any(
+    if not is_candidate_union and any(
         row.get("schema_version") != candidate_report.get("schema_version")
         or row.get("data_product") != candidate_report.get("data_product")
         for row in rows
@@ -2645,8 +2811,16 @@ def create_train_ready_report(
     if any(row.get("split") not in {"train", "eval"} for row in rows):
         raise PromotionError("promoted rows have an invalid split")
     payload = {
-        "schema_version": str(candidate_report.get("schema_version") or ""),
-        "data_product": str(candidate_report.get("data_product") or ""),
+        "schema_version": (
+            TRAIN_READY_UNION_REPORT_SCHEMA
+            if is_candidate_union
+            else str(candidate_report.get("schema_version") or "")
+        ),
+        "data_product": (
+            RELEASE_UNION_DATA_PRODUCT
+            if is_candidate_union
+            else str(candidate_report.get("data_product") or "")
+        ),
         "data_stage": "train_ready",
         "release_profile_id": release_profile_id,
         "release_profile_sha256": profile_digest,
