@@ -15,7 +15,10 @@ from typing import Any
 
 from longworld.core.attestation import sanitized_attestation_environment
 from longworld.core.domainhistory import (
+    audit_cross_cve_pipeline_candidate,
     audit_kev_pipeline_candidate,
+    replay_cross_cve_pipeline_candidate,
+    replay_cross_cve_pipeline_raw_slice,
     replay_kev_pipeline_candidate,
     replay_kev_pipeline_raw_slice,
 )
@@ -33,6 +36,7 @@ from longworld.core.macrovintage import (
 from longworld.core.pack import SEP
 from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
 from longworld.core.taskreplaysidecar import (
+    CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
     CYBER_KEV_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
@@ -95,7 +99,9 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
         TASK_REPLAY_SIDECAR_SCHEMA_V2,
         TASK_REPLAY_SIDECAR_SCHEMA_V3,
     }
-    if family == CYBER_KEV_TASK_REPLAY_ADAPTER[:2]:
+    if family == CYBER_KEV_TASK_REPLAY_ADAPTER[:2] or family == (
+        CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER[:2]
+    ):
         expected_domain = "cyber"
         expected_view = "ordered_artifact_view"
         expected_composition = "causal_timeline"
@@ -142,6 +148,13 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
         replay_identity_valid = bool(
             isinstance(replay_contract, dict)
             and replay_contract.get("replay_revision") == key[1]
+        )
+    elif family == CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER[:2]:
+        replay_contract = candidate.get("cross_cve_replay_contract")
+        replay_identity_valid = bool(
+            isinstance(replay_contract, dict)
+            and replay_contract.get("adapter_id") == key[0]
+            and replay_contract.get("revision") == key[1]
         )
     elif family == FINANCE_TASK_REPLAY_ADAPTER[:2]:
         replay_contract = candidate.get("finance_replay_contract")
@@ -399,17 +412,62 @@ def _projection_chronology(
                 raise TaskProofError("Macro chronology record type is unsupported")
             order_key = f"{occurred_at}|{kind}|{artifact_id}"
         elif domain == "cyber" and isinstance(value, list):
-            dates = [
-                str((record.get("source_payload") or {}).get("dateAdded") or "")
-                for record in value
-                if isinstance(record, dict)
-                and isinstance(record.get("source_payload"), dict)
-            ]
-            if dates != sorted(dates):
-                raise TaskProofError("Cyber chronology shard is not ordered")
-            start = dates[0] if dates else "0000-00-00"
-            end = dates[-1] if dates else start
-            order_key = f"{start}|{end}|{artifact_id}"
+            if value and isinstance(value[0], dict) and value[0].get(
+                "record_type"
+            ) in {"cyber_source_record", "cyber_source_relation"}:
+                cve_dates: dict[str, str] = {}
+                for _classification, _document, records in parsed:
+                    if not isinstance(records, list):
+                        continue
+                    for record in records:
+                        if (
+                            not isinstance(record, dict)
+                            or record.get("kind") != "cisa_kev_entry"
+                        ):
+                            continue
+                        try:
+                            payload = json.loads(str(record.get("text") or ""))
+                        except json.JSONDecodeError as error:
+                            raise TaskProofError(
+                                "cross-CVE chronology payload is malformed"
+                            ) from error
+                        if not isinstance(payload, dict):
+                            raise TaskProofError(
+                                "cross-CVE chronology payload is malformed"
+                            )
+                        cve_id = str(record.get("cve_id") or "")
+                        date_added = str(payload.get("dateAdded") or "")
+                        if cve_id and date_added:
+                            cve_dates[cve_id] = date_added
+                dates = []
+                kinds = []
+                for record in value:
+                    if not isinstance(record, dict):
+                        raise TaskProofError("cross-CVE chronology record is malformed")
+                    cve_id = str(
+                        record.get("cve_id")
+                        or str(record.get("relation_id") or "").removeprefix(
+                            "cyber:listed-in-kev:"
+                        )
+                    )
+                    kind = str(record.get("kind") or record.get("record_type") or "")
+                    dates.append(cve_dates.get(cve_id, ""))
+                    kinds.append(kind)
+                start = min(dates) if dates and all(dates) else ""
+                kind_key = min(kinds) if kinds else ""
+                order_key = f"{start}|{kind_key}|{artifact_id}"
+            else:
+                dates = [
+                    str((record.get("source_payload") or {}).get("dateAdded") or "")
+                    for record in value
+                    if isinstance(record, dict)
+                    and isinstance(record.get("source_payload"), dict)
+                ]
+                if dates != sorted(dates):
+                    raise TaskProofError("Cyber chronology shard is not ordered")
+                start = dates[0] if dates else "0000-00-00"
+                end = dates[-1] if dates else start
+                order_key = f"{start}|{end}|{artifact_id}"
         else:
             raise TaskProofError("task chronology domain is unsupported")
         if not artifact_id or not order_key.split("|", 1)[0]:
@@ -539,6 +597,92 @@ def canonicalize_kev_projection_candidate(
     return replay_candidate
 
 
+def canonicalize_cross_cve_projection_candidate(
+    candidate: dict[str, Any],
+) -> dict[str, Any]:
+    """Restore date-then-CVE source order without changing view bytes."""
+    if candidate.get("view") == "ordered_artifact_view":
+        return candidate
+    document_context = candidate.get("document_context")
+    classifications = candidate.get("artifact_classification")
+    if not isinstance(document_context, str) or not isinstance(classifications, list):
+        return candidate
+    documents = document_context.split(SEP)
+    if len(documents) != len(classifications):
+        return candidate
+    paired = [
+        (classification, document)
+        for classification, document in zip(classifications, documents, strict=True)
+        if isinstance(classification, dict)
+    ]
+    if len(paired) != len(documents):
+        return candidate
+    cve_dates: dict[str, str] = {}
+    parsed_records: list[list[dict[str, Any]]] = []
+    for _classification, document in paired:
+        records: list[dict[str, Any]] = []
+        for line in document.splitlines():
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                parsed_records.append([])
+                records = []
+                break
+            if not isinstance(record, dict):
+                parsed_records.append([])
+                records = []
+                break
+            records.append(record)
+            if record.get("kind") == "cisa_kev_entry":
+                try:
+                    payload = json.loads(str(record.get("text") or ""))
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(payload, dict):
+                    cve_id = str(record.get("cve_id") or "")
+                    date_added = str(payload.get("dateAdded") or "")
+                    if cve_id and date_added:
+                        cve_dates[cve_id] = date_added
+        parsed_records.append(records)
+
+    def order_key(item: tuple[int, tuple[dict[str, Any], str]]) -> tuple[str, str, str]:
+        index, (classification, _document) = item
+        records = parsed_records[index]
+        cve_ids = []
+        for record in records:
+            cve_ids.append(
+                str(
+                    record.get("cve_id")
+                    or str(record.get("relation_id") or "").removeprefix(
+                        "cyber:listed-in-kev:"
+                    )
+                )
+            )
+        date_added = min(
+            (cve_dates.get(cve_id, "9999-99-99") for cve_id in cve_ids),
+            default="9999-99-99",
+        )
+        return (
+            date_added,
+            min(cve_ids, default=""),
+            str(classification.get("artifact_id") or ""),
+        )
+
+    ordered = [
+        pair
+        for _key, pair in sorted(
+            enumerate(paired),
+            key=lambda item: order_key((item[0], item[1])),
+        )
+    ]
+    replay_candidate = dict(candidate)
+    replay_candidate["artifact_classification"] = [item[0] for item in ordered]
+    replay_candidate["document_context"] = SEP.join(item[1] for item in ordered)
+    return replay_candidate
+
+
 def normalize_projection_candidate_for_adapter(
     candidate: dict[str, Any],
 ) -> dict[str, Any]:
@@ -633,6 +777,10 @@ def _adapter_audit(
             audit = audit_task_view_projection(candidate)
         elif adapter_key == CYBER_KEV_TASK_REPLAY_ADAPTER:
             audit = audit_kev_pipeline_candidate(candidate, token_counter=token_counter)
+        elif adapter_key == CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER:
+            audit = audit_cross_cve_pipeline_candidate(
+                candidate, token_counter=token_counter
+            )
         elif adapter_key == FINANCE_TASK_REPLAY_ADAPTER:
             audit = audit_finance_pipeline_candidate(candidate)
         elif adapter_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
@@ -659,6 +807,12 @@ def _replay(
     if adapter_key[:2] == CYBER_KEV_TASK_REPLAY_ADAPTER[:2]:
         return replay_kev_pipeline_candidate(
             canonicalize_kev_projection_candidate(candidate),
+            evidence_artifact_ids=artifact_ids,
+            counterfactual=counterfactual,
+        )
+    if adapter_key[:2] == CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER[:2]:
+        return replay_cross_cve_pipeline_candidate(
+            canonicalize_cross_cve_projection_candidate(candidate),
             evidence_artifact_ids=artifact_ids,
             counterfactual=counterfactual,
         )
@@ -703,6 +857,13 @@ def _replay_raw_slice(
 ) -> dict[str, Any]:
     if adapter_key[:2] == CYBER_KEV_TASK_REPLAY_ADAPTER[:2]:
         return replay_kev_pipeline_raw_slice(
+            candidate,
+            raw_document_context,
+            left_framed=left_framed,
+            right_framed=right_framed,
+        )
+    if adapter_key[:2] == CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER[:2]:
+        return replay_cross_cve_pipeline_raw_slice(
             candidate,
             raw_document_context,
             left_framed=left_framed,

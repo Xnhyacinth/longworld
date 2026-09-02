@@ -36,6 +36,11 @@ CYBER_KEV_TASK_REPLAY_ADAPTER = (
     "longworld.kev-catalog-history-replay.v1",
     TASK_REPLAY_SIDECAR_SCHEMA,
 )
+CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER = (
+    "cyber.cross_cve_remediation.v1",
+    "longworld.cyber-cross-cve-replay.v1",
+    TASK_REPLAY_SIDECAR_SCHEMA,
+)
 FINANCE_TASK_REPLAY_ADAPTER = (
     "finance.multi_filing.v1",
     "longworld.financial-history-replay.v1",
@@ -51,6 +56,11 @@ CYBER_KEV_TASK_REPLAY_ADAPTER_V2 = (
     CYBER_KEV_TASK_REPLAY_ADAPTER[1],
     TASK_REPLAY_SIDECAR_SCHEMA_V2,
 )
+CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER_V2 = (
+    CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER[0],
+    CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER[1],
+    TASK_REPLAY_SIDECAR_SCHEMA_V2,
+)
 FINANCE_TASK_REPLAY_ADAPTER_V2 = (
     FINANCE_TASK_REPLAY_ADAPTER[0],
     FINANCE_TASK_REPLAY_ADAPTER[1],
@@ -64,6 +74,11 @@ MACRO_VINTAGE_TASK_REPLAY_ADAPTER_V2 = (
 CYBER_KEV_TASK_REPLAY_ADAPTER_V3 = (
     CYBER_KEV_TASK_REPLAY_ADAPTER[0],
     CYBER_KEV_TASK_REPLAY_ADAPTER[1],
+    TASK_REPLAY_SIDECAR_SCHEMA_V3,
+)
+CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER_V3 = (
+    CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER[0],
+    CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER[1],
     TASK_REPLAY_SIDECAR_SCHEMA_V3,
 )
 FINANCE_TASK_REPLAY_ADAPTER_V3 = (
@@ -200,6 +215,19 @@ def _contract(key: TaskReplayRegistryKey) -> TaskReplayAdapterContract:
                 "candidate_content_commitments",
             }
         )
+    elif family == CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER[:2]:
+        payload_fields = frozenset(
+            {
+                "source_manifest_sha256",
+                "fetch_inventory_sha256",
+                "authorization_record_id",
+                "replay_revision",
+                "tokenizer_model_id",
+                "tokenizer_revision",
+                "tokenizer_asset_manifest_sha256",
+                "candidate_content_commitments",
+            }
+        )
     elif family == FINANCE_TASK_REPLAY_ADAPTER[:2]:
         payload_fields = frozenset(
             {
@@ -254,12 +282,15 @@ TASK_REPLAY_ADAPTER_REGISTRY: Mapping[
         key: _contract(key)
         for key in (
             CYBER_KEV_TASK_REPLAY_ADAPTER,
+            CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
             FINANCE_TASK_REPLAY_ADAPTER,
             MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
             CYBER_KEV_TASK_REPLAY_ADAPTER_V2,
+            CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER_V2,
             FINANCE_TASK_REPLAY_ADAPTER_V2,
             MACRO_VINTAGE_TASK_REPLAY_ADAPTER_V2,
             CYBER_KEV_TASK_REPLAY_ADAPTER_V3,
+            CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER_V3,
             FINANCE_TASK_REPLAY_ADAPTER_V3,
             MACRO_VINTAGE_TASK_REPLAY_ADAPTER_V3,
         )

@@ -956,6 +956,496 @@ def audit_cross_cve_remediation_history_candidate(
     }
 
 
+def _cross_cve_pipeline_documents(context: str) -> list[str]:
+    lines = [line for line in str(context).splitlines() if line]
+    if len(lines) < 4:
+        raise ProvenanceError("cross-CVE pipeline requires at least four source lines")
+    for line in lines:
+        record = json.loads(line)
+        if (
+            not isinstance(record, dict)
+            or _canonical_json(record) != line
+            or not _cross_cve_line_id(record)
+        ):
+            raise ProvenanceError("cross-CVE pipeline document line is invalid")
+    return lines
+
+
+def _cross_cve_unknown_replay() -> dict[str, Any]:
+    return {
+        "answer": "unknown",
+        "source_record_ids": [],
+        "source_relation_ids": [],
+        "authentic_source_relation_edges": [],
+        "verified_derived_order_relation_edges": [],
+        "event_count": 0,
+        "strict_support_event_count": 0,
+        "proof_depth": 0,
+        "hop_count": 0,
+    }
+
+
+def replay_cross_cve_pipeline_candidate(
+    candidate: dict[str, Any],
+    *,
+    counterfactual: bool = False,
+    evidence_artifact_ids: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    """Replay one serialized cross-CVE candidate from its document bodies."""
+    try:
+        document_context = candidate.get("document_context")
+        classifications = candidate.get("artifact_classification")
+        if (
+            not isinstance(document_context, str)
+            or not isinstance(classifications, list)
+            or not classifications
+        ):
+            raise ProvenanceError("cross-CVE pipeline artifact pool is missing")
+        documents = document_context.split(SEP)
+        if len(documents) != len(classifications):
+            raise ProvenanceError("cross-CVE pipeline artifact pool is unbound")
+        available_artifact_ids = [
+            str(item.get("artifact_id") or "")
+            for item in classifications
+            if isinstance(item, dict)
+        ]
+        if (
+            len(available_artifact_ids) != len(classifications)
+            or "" in available_artifact_ids
+            or len(available_artifact_ids) != len(set(available_artifact_ids))
+        ):
+            raise ProvenanceError("cross-CVE pipeline artifact identities are invalid")
+        selected_artifact_ids: set[str] | None = None
+        if evidence_artifact_ids is not None:
+            selected_values = list(evidence_artifact_ids)
+            if (
+                isinstance(evidence_artifact_ids, (str, bytes))
+                or any(
+                    not isinstance(value, str) or not value for value in selected_values
+                )
+                or len(selected_values) != len(set(selected_values))
+                or not set(selected_values) <= set(available_artifact_ids)
+            ):
+                raise ProvenanceError(
+                    "cross-CVE pipeline evidence selection is invalid"
+                )
+            selected_artifact_ids = set(selected_values)
+        context_records: list[dict[str, Any]] = []
+        evidence_ids: list[str] = []
+        for document, classification in zip(documents, classifications, strict=True):
+            if not isinstance(classification, dict):
+                raise ProvenanceError("cross-CVE pipeline classification is malformed")
+            artifact_id = str(classification.get("artifact_id") or "")
+            records = []
+            for line in document.splitlines():
+                if not line:
+                    continue
+                record = json.loads(line)
+                if (
+                    not isinstance(record, dict)
+                    or _canonical_json(record) != line
+                    or not _cross_cve_line_id(record)
+                ):
+                    raise ProvenanceError("cross-CVE pipeline document is invalid")
+                records.append(record)
+            context_records.extend(records)
+            if selected_artifact_ids is None or artifact_id in selected_artifact_ids:
+                evidence_ids.extend(_cross_cve_line_id(record) for record in records)
+        task = {
+            "context": "\n".join(_canonical_json(record) for record in context_records),
+            "counterfactual_twin": deepcopy(candidate.get("counterfactual_twin")),
+        }
+        return replay_cross_cve_remediation_history(
+            task,
+            counterfactual=counterfactual,
+            evidence_ids=evidence_ids if selected_artifact_ids is not None else None,
+        )
+    except (KeyError, TypeError, ValueError, ProvenanceError, json.JSONDecodeError):
+        return _cross_cve_unknown_replay()
+
+
+def replay_cross_cve_pipeline_raw_slice(
+    candidate: dict[str, Any],
+    raw_document_context: str,
+    *,
+    left_framed: bool,
+    right_framed: bool,
+    counterfactual: bool = False,
+) -> dict[str, Any]:
+    """Replay only complete, source-bound JSONL records visible in a raw slice."""
+    try:
+        if not isinstance(raw_document_context, str) or not raw_document_context:
+            raise ProvenanceError("cross-CVE raw replay slice is empty")
+        documents = str(candidate.get("document_context") or "").split(SEP)
+        approved_records = {
+            _canonical_json(json.loads(line))
+            for document in documents
+            for line in document.splitlines()
+            if line
+        }
+        parts = raw_document_context.split("\n")
+        records: list[dict[str, Any]] = []
+        for index, line in enumerate(parts):
+            if (index == 0 and not left_framed) or (
+                index == len(parts) - 1 and not right_framed
+            ):
+                continue
+            if not line or line == SEP.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise ProvenanceError(
+                    "cross-CVE raw slice has invalid framed JSON"
+                ) from error
+            if (
+                not isinstance(record, dict)
+                or _canonical_json(record) != line
+                or line not in approved_records
+            ):
+                raise ProvenanceError("cross-CVE raw slice record is not source-bound")
+            records.append(record)
+        if not records:
+            raise ProvenanceError("cross-CVE raw slice has no complete records")
+        replay = replay_cross_cve_remediation_history(
+            {
+                "context": "\n".join(_canonical_json(record) for record in records),
+                "counterfactual_twin": deepcopy(candidate.get("counterfactual_twin")),
+            },
+            counterfactual=counterfactual,
+        )
+        replay["raw_slice_record_count"] = len(records)
+        return replay
+    except (KeyError, TypeError, ValueError, ProvenanceError, json.JSONDecodeError):
+        replay = _cross_cve_unknown_replay()
+        replay["raw_slice_record_count"] = 0
+        return replay
+
+
+def build_cross_cve_pipeline_candidate(
+    history: dict[str, Any],
+    *,
+    token_counter: Callable[[str], int],
+    tokenizer_asset_manifest_sha256: str,
+    candidate_attestation_key: bytes,
+    task_replay_sidecar_binding: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Serialize an audited cross-CVE history for ranking and adapter replay."""
+    history_audit = audit_cross_cve_remediation_history_candidate(
+        history, token_counter=token_counter
+    )
+    if not history_audit or not all(history_audit.values()):
+        raise ProvenanceError("cross-CVE pipeline input failed history audit")
+    if _SHA256.fullmatch(tokenizer_asset_manifest_sha256) is None:
+        raise ProvenanceError("cross-CVE pipeline tokenizer asset digest is invalid")
+    if task_replay_sidecar_binding is not None and (
+        set(task_replay_sidecar_binding)
+        != {
+            "adapter_id",
+            "adapter_revision",
+            "sidecar_schema_version",
+            "sha256",
+        }
+        or task_replay_sidecar_binding.get("adapter_id")
+        != "cyber.cross_cve_remediation.v1"
+        or task_replay_sidecar_binding.get("adapter_revision")
+        != CROSS_CVE_HISTORY_REPLAY_REVISION
+        or task_replay_sidecar_binding.get("sidecar_schema_version")
+        != "longworld.task-replay-sidecar.v1"
+        or _SHA256.fullmatch(str(task_replay_sidecar_binding.get("sha256") or ""))
+        is None
+    ):
+        raise ProvenanceError("cross-CVE task replay sidecar binding is invalid")
+    documents = _cross_cve_pipeline_documents(str(history.get("context") or ""))
+    classifications: list[dict[str, Any]] = []
+    source_ids_by_artifact: dict[str, list[str]] = {}
+    for index, document in enumerate(documents):
+        text_sha256 = _sha256_text(document)
+        artifact_id = (
+            f"{history['world_id']}.cross_cve_{history['length_bucket']}_"
+            f"{index:02d}_{text_sha256[:12]}"
+        )
+        record = json.loads(document)
+        record_id = _cross_cve_line_id(record)
+        source_ids_by_artifact[artifact_id] = [record_id]
+        classifications.append(
+            {
+                "artifact_id": artifact_id,
+                "workflow_id": history["world_id"],
+                "workflow_kind": "real_source_derived",
+                "evidence_role": "causal_gold",
+                "source_origin": "real_derived",
+                "provenance_id": f"sha256:{text_sha256}",
+            }
+        )
+    artifact_ids = [item["artifact_id"] for item in classifications]
+    document_context = SEP.join(documents)
+    question = str(history["question"])
+    context = wrap_prompt(question, document_context, "first")
+    context_tokens = token_counter(context)
+    query_id = (
+        f"{history['world_id']}.cross_cve_remediation_reconstruction:first:spread:"
+        f"{history['length_bucket']}"
+    )
+    source = history.get("source_binding")
+    if not isinstance(source, dict):
+        raise ProvenanceError("cross-CVE pipeline source binding is missing")
+    candidate: dict[str, Any] = {
+        "schema_version": "p3.0",
+        "data_product": "worldlong_cyber_cross_cve_candidate_v1",
+        "data_stage": "candidate",
+        "train_ready": False,
+        "production_eligible": False,
+        "promotion_eligible": False,
+        "complete_world": False,
+        "promoted": False,
+        "generation_integration": "ranker_ready_promotion_adapter_pending",
+        "world_id": history["world_id"],
+        "seed": 0,
+        "domain": "cyber",
+        "workflow_kind": history["workflow_kind"],
+        "query_id": query_id,
+        "query_type": history["query_type"],
+        "query_timing": "first",
+        "position_bucket": "spread",
+        "length_bucket": history["length_bucket"],
+        "question": question,
+        "answer": history["answer"],
+        "cf_answer": history["cf_answer"],
+        "view": "ordered_artifact_view",
+        "context": context,
+        "document_context": document_context,
+        "essential_artifact_ids": artifact_ids,
+        "counterfactual_twin": deepcopy(history["counterfactual_twin"]),
+        "pipeline_capabilities": {
+            "dense_ranking": True,
+            "cyber_strict_replay": True,
+            "generic_strict_replay": False,
+            "generic_promotion": False,
+        },
+        "artifact_classification": classifications,
+        "source_record_ids_by_artifact": source_ids_by_artifact,
+        "workflow_ids": [history["world_id"]],
+        "training_objective": "sft",
+        "composition_method": "causal_timeline",
+        "motif": "nvd_kev_join+vendor_year_aggregation+remediation_window",
+        "base_task_id": _sha256_text(
+            f"{history['world_id']}|{history['answer_program_id']}"
+        )[:20],
+        "semantic_base_task_id": _sha256_text(f"cyber|{history['answer_program_id']}")[
+            :20
+        ],
+        "dossier_id": _sha256_text(
+            _canonical_json(
+                {
+                    "world_id": history["world_id"],
+                    "query_type": history["query_type"],
+                    "artifact_ids": artifact_ids,
+                }
+            )
+        )[:20],
+        "answer_program_id": history["answer_program_id"],
+        "semantic_growth_group_id": history["semantic_growth_group_id"],
+        "source_binding": deepcopy(source),
+        "source_family_ids": [
+            "nvd_cve_api",
+            "cisa_known_exploited_vulnerabilities_catalog",
+        ],
+        "source_record_ids": list(history["source_record_ids"]),
+        "source_relation_ids": list(history["source_relation_ids"]),
+        "authentic_source_relation_edges": deepcopy(
+            history["authentic_source_relation_edges"]
+        ),
+        "verified_derived_order_relation_edges": deepcopy(
+            history["verified_derived_order_relation_edges"]
+        ),
+        "event_count": history["event_count"],
+        "strict_support_event_count": history["strict_support_event_count"],
+        "graph": deepcopy(history["graph"]),
+        "tokenizer_model_id": history["tokenizer_model_id"],
+        "tokenizer_revision": history["tokenizer_revision"],
+        "tokenizer_asset_manifest_sha256": tokenizer_asset_manifest_sha256,
+        "tokenizer_context_tokens": context_tokens,
+        "actual_context_tokens": context_tokens,
+        "band_lower_tokens": history["band_lower_tokens"],
+        "band_upper_tokens": history["band_upper_tokens"],
+        "semantic_tokens": {
+            "internal": context_tokens,
+            "event_bearing": context_tokens,
+            "proof_bearing": context_tokens,
+            "causal_supporting": 0,
+            "generic_background": 0,
+        },
+        "real_source_verified": False,
+        "source_verified_at_materialization": True,
+        "real_source_token_ratio": 1.0,
+        "strict_replay_revision": history["strict_replay_revision"],
+        "cross_cve_replay_contract": {
+            "adapter_id": "cyber.cross_cve_remediation.v1",
+            "revision": CROSS_CVE_HISTORY_REPLAY_REVISION,
+        },
+        "promotion_blocker_code": "missing_domain_replay_adapter:cyber_cross_cve",
+    }
+    if task_replay_sidecar_binding is not None:
+        candidate["task_replay_sidecar"] = deepcopy(task_replay_sidecar_binding)
+        candidate["generation_integration"] = "task_replay_sidecar_bound"
+        candidate["promotion_blocker_code"] = "signed_upstream_proof_gates_pending"
+    audit = audit_cross_cve_pipeline_candidate(candidate, token_counter=token_counter)
+    if not audit or not all(audit.values()):
+        failed = sorted(name for name, passed in audit.items() if not passed)
+        raise ProvenanceError(
+            "cross-CVE pipeline candidate failed executable audit: " + ",".join(failed)
+        )
+    return attach_attestation(
+        candidate, candidate_attestation_key, purpose="candidate_row"
+    )
+
+
+def audit_cross_cve_pipeline_candidate(
+    candidate: dict[str, Any], *, token_counter: Callable[[str], int]
+) -> dict[str, bool]:
+    """Audit standard serialization without claiming shared promotion support."""
+    replay = replay_cross_cve_pipeline_candidate(candidate)
+    cf_replay = replay_cross_cve_pipeline_candidate(candidate, counterfactual=True)
+    classifications = candidate.get("artifact_classification")
+    classifications = classifications if isinstance(classifications, list) else []
+    artifact_ids = [
+        str(item.get("artifact_id") or "")
+        for item in classifications
+        if isinstance(item, dict)
+    ]
+    removals = [
+        replay_cross_cve_pipeline_candidate(
+            candidate,
+            evidence_artifact_ids=[value for value in artifact_ids if value != removed],
+        )["answer"]
+        for removed in artifact_ids
+    ]
+    singles = [
+        replay_cross_cve_pipeline_candidate(
+            candidate, evidence_artifact_ids=[artifact_id]
+        )["answer"]
+        for artifact_id in artifact_ids
+    ]
+    top_three = [
+        replay_cross_cve_pipeline_candidate(
+            candidate, evidence_artifact_ids=list(selected)
+        )["answer"]
+        for selected in combinations(artifact_ids, 3)
+    ]
+    context = candidate.get("document_context")
+    documents = context.split(SEP) if isinstance(context, str) else []
+    source_ids_by_artifact = candidate.get("source_record_ids_by_artifact")
+    source_ids_by_artifact = (
+        source_ids_by_artifact if isinstance(source_ids_by_artifact, dict) else {}
+    )
+    artifact_bindings_valid = len(documents) == len(classifications) and bool(documents)
+    reconstructed_source_ids: list[str] = []
+    reconstructed_relation_ids: list[str] = []
+    if artifact_bindings_valid:
+        try:
+            for document, classification in zip(
+                documents, classifications, strict=True
+            ):
+                if not isinstance(classification, dict):
+                    raise ProvenanceError("classification is malformed")
+                artifact_id = str(classification.get("artifact_id") or "")
+                text_sha256 = _sha256_text(document)
+                record = json.loads(document)
+                record_id = _cross_cve_line_id(record)
+                if record.get("record_type") == "cyber_source_relation":
+                    reconstructed_relation_ids.append(record_id)
+                else:
+                    reconstructed_source_ids.append(record_id)
+                artifact_bindings_valid = artifact_bindings_valid and bool(
+                    artifact_id
+                    and classification.get("provenance_id") == f"sha256:{text_sha256}"
+                    and classification.get("source_origin") == "real_derived"
+                    and classification.get("workflow_kind") == "real_source_derived"
+                    and source_ids_by_artifact.get(artifact_id) == [record_id]
+                )
+        except (TypeError, ValueError, ProvenanceError, json.JSONDecodeError):
+            artifact_bindings_valid = False
+    corrupted = deepcopy(candidate)
+    corrupted_documents = list(documents)
+    corruption_fails = False
+    if corrupted_documents:
+        try:
+            record = json.loads(corrupted_documents[0])
+            if record.get("record_type") == "cyber_source_record":
+                record["text"] += " CORRUPTED"
+                corrupted_documents[0] = _canonical_json(record)
+                corrupted["document_context"] = SEP.join(corrupted_documents)
+                corruption_fails = (
+                    replay_cross_cve_pipeline_candidate(corrupted)["answer"]
+                    == "unknown"
+                )
+        except (TypeError, ValueError, json.JSONDecodeError):
+            corruption_fails = False
+    replay_contract = candidate.get("cross_cve_replay_contract")
+    replay_contract_valid = (
+        isinstance(replay_contract, dict)
+        and replay_contract.get("adapter_id") == "cyber.cross_cve_remediation.v1"
+        and replay_contract.get("revision") == CROSS_CVE_HISTORY_REPLAY_REVISION
+    )
+    declared_tokens = candidate.get("tokenizer_context_tokens")
+    recomputed_tokens = token_counter(str(candidate.get("context") or ""))
+    lower = candidate.get("band_lower_tokens")
+    upper = candidate.get("band_upper_tokens")
+    return {
+        "strict_replay_sufficient": replay["answer"] == candidate.get("answer"),
+        "counterfactual_replay_sufficient": cf_replay["answer"]
+        == candidate.get("cf_answer"),
+        "counterfactual_changes_answer": cf_replay["answer"] != replay["answer"],
+        "remove_one_artifact_fails": bool(removals)
+        and all(answer != candidate.get("answer") for answer in removals),
+        "essential_single_artifact_insufficient": bool(singles)
+        and all(answer != candidate.get("answer") for answer in singles),
+        "every_top_three_insufficient": bool(top_three)
+        and all(answer != candidate.get("answer") for answer in top_three),
+        "semantic_corruption_fails": corruption_fails,
+        "artifact_text_bindings_valid": artifact_bindings_valid,
+        "source_records_reconstructed": sorted(reconstructed_source_ids)
+        == candidate.get("source_record_ids")
+        == replay["source_record_ids"],
+        "source_relations_reconstructed": sorted(reconstructed_relation_ids)
+        == candidate.get("source_relation_ids")
+        == replay["source_relation_ids"],
+        "replay_contract_binding_valid": replay_contract_valid,
+        "exact_token_count_recomputed": isinstance(declared_tokens, int)
+        and not isinstance(declared_tokens, bool)
+        and declared_tokens == recomputed_tokens,
+        "exact_token_band_recomputed": isinstance(lower, int)
+        and isinstance(upper, int)
+        and lower <= recomputed_tokens <= upper,
+        "ranker_contract_shape_valid": bool(
+            candidate.get("data_stage") == "candidate"
+            and candidate.get("training_objective") == "sft"
+            and candidate.get("view") == "ordered_artifact_view"
+            and candidate.get("composition_method") == "causal_timeline"
+            and candidate.get("essential_artifact_ids") == artifact_ids
+            and len(artifact_ids) == len(set(artifact_ids)) >= 4
+            and candidate.get("pipeline_capabilities")
+            == {
+                "dense_ranking": True,
+                "cyber_strict_replay": True,
+                "generic_strict_replay": False,
+                "generic_promotion": False,
+            }
+        ),
+        "non_promoted_boundary": all(
+            candidate.get(field) is False
+            for field in (
+                "train_ready",
+                "production_eligible",
+                "promotion_eligible",
+                "complete_world",
+                "promoted",
+            )
+        ),
+    }
+
+
 def replay_kev_catalog_history(
     task: dict[str, Any],
     *,

@@ -15,6 +15,9 @@ from longworld.core.attestation import (
 from longworld.core.provenance import ProvenanceError
 from longworld.core.record_contract import replay_bundle_binding_valid
 from longworld.core.taskreplaysidecar import (
+    CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
+    CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER_V2,
+    CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER_V3,
     CYBER_KEV_TASK_REPLAY_ADAPTER,
     CYBER_KEV_TASK_REPLAY_ADAPTER_V2,
     CYBER_KEV_TASK_REPLAY_ADAPTER_V3,
@@ -55,6 +58,23 @@ def _signed_sidecar(
             "source_manifest_sha256": "a" * 64,
             "source_response_sha256": "b" * 64,
             "replay_manifest_sha256": "c" * 64,
+            "replay_revision": adapter_revision,
+            "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+            "tokenizer_revision": "d" * 40,
+            "tokenizer_asset_manifest_sha256": "e" * 64,
+            "candidate_content_commitments": [
+                {
+                    "world_id": "test-world",
+                    "length_bucket": "16k",
+                    "content_sha256": "f" * 64,
+                }
+            ],
+        }
+    elif adapter == CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER:
+        replay_payload = {
+            "source_manifest_sha256": "a" * 64,
+            "fetch_inventory_sha256": "b" * 64,
+            "authorization_record_id": "public-cross-cve-test",
             "replay_revision": adapter_revision,
             "tokenizer_model_id": "Qwen/Qwen3.5-4B",
             "tokenizer_revision": "d" * 40,
@@ -158,6 +178,7 @@ def _write_sidecar(
     "adapter",
     (
         CYBER_KEV_TASK_REPLAY_ADAPTER,
+        CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
         FINANCE_TASK_REPLAY_ADAPTER,
         MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     ),
@@ -198,21 +219,24 @@ def test_builder_requires_source_role_identity(
 
 def test_adapter_payload_schemas_are_closed_and_distinct() -> None:
     cyber = _signed_sidecar(CYBER_KEV_TASK_REPLAY_ADAPTER)
+    cross_cve = _signed_sidecar(CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER)
     finance = _signed_sidecar(FINANCE_TASK_REPLAY_ADAPTER)
     macro = _signed_sidecar(MACRO_VINTAGE_TASK_REPLAY_ADAPTER)
     assert (
         len(
             {
                 frozenset(cyber["replay_payload"]),
+                frozenset(cross_cve["replay_payload"]),
                 frozenset(finance["replay_payload"]),
                 frozenset(macro["replay_payload"]),
             }
         )
-        == 3
+        == 4
     )
 
     for adapter, wrong_payload in (
         (CYBER_KEV_TASK_REPLAY_ADAPTER, finance["replay_payload"]),
+        (CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER, cyber["replay_payload"]),
         (FINANCE_TASK_REPLAY_ADAPTER, cyber["replay_payload"]),
         (MACRO_VINTAGE_TASK_REPLAY_ADAPTER, finance["replay_payload"]),
     ):
@@ -267,6 +291,9 @@ def test_registry_is_closed_over_adapter_revision_and_schema(tmp_path: Path) -> 
         CYBER_KEV_TASK_REPLAY_ADAPTER,
         CYBER_KEV_TASK_REPLAY_ADAPTER_V2,
         CYBER_KEV_TASK_REPLAY_ADAPTER_V3,
+        CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
+        CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER_V2,
+        CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER_V3,
         FINANCE_TASK_REPLAY_ADAPTER,
         FINANCE_TASK_REPLAY_ADAPTER_V2,
         FINANCE_TASK_REPLAY_ADAPTER_V3,

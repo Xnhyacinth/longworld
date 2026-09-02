@@ -19,7 +19,9 @@ from longworld.core.attestation import (
     verify_attestation,
 )
 from longworld.core.domainhistory import (
+    audit_cross_cve_pipeline_candidate,
     audit_kev_pipeline_candidate,
+    replay_cross_cve_pipeline_candidate,
     replay_kev_pipeline_candidate,
 )
 from longworld.core.financehistory import (
@@ -59,11 +61,13 @@ from longworld.core.semantic import sentence_near_dup_ratio
 from longworld.core.taskproof import (
     TaskProofError,
     audit_task_view_projection,
+    canonicalize_cross_cve_projection_candidate,
     canonicalize_kev_projection_candidate,
     compute_task_proof,
     normalize_projection_candidate_for_adapter,
 )
 from longworld.core.taskreplaysidecar import (
+    CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
     CYBER_KEV_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
@@ -246,6 +250,25 @@ def _validate_sidecar_payload(
             or replay_manifest.get("replay_revision") != expected["replay_revision"]
         ):
             raise PromotionError("candidate Cyber replay manifest is inconsistent")
+    elif _sidecar_uses(sidecar, CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER):
+        if candidate.get("domain") != "cyber":
+            raise PromotionError("task replay adapter does not match candidate domain")
+        source = candidate.get("source_binding")
+        replay_contract = candidate.get("cross_cve_replay_contract")
+        if not isinstance(source, dict) or not isinstance(replay_contract, dict):
+            raise PromotionError("candidate cross-CVE source binding is missing")
+        expected = {
+            "source_manifest_sha256": source.get("source_manifest_sha256"),
+            "fetch_inventory_sha256": source.get("fetch_inventory_sha256"),
+            "authorization_record_id": source.get("authorization_record_id"),
+            "replay_revision": candidate.get("strict_replay_revision"),
+            **tokenizer_binding,
+        }
+        if (
+            replay_contract.get("adapter_id") != sidecar.adapter_id
+            or replay_contract.get("revision") != expected["replay_revision"]
+        ):
+            raise PromotionError("candidate cross-CVE replay contract is inconsistent")
     elif _sidecar_uses(sidecar, FINANCE_TASK_REPLAY_ADAPTER):
         if candidate.get("domain") != "finance":
             raise PromotionError("task replay adapter does not match candidate domain")
@@ -539,6 +562,10 @@ def _adapter_audit(
                 audit = audit_kev_pipeline_candidate(
                     candidate, token_counter=token_counter
                 )
+            elif _sidecar_uses(sidecar, CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER):
+                audit = audit_cross_cve_pipeline_candidate(
+                    candidate, token_counter=token_counter
+                )
             elif _sidecar_uses(sidecar, FINANCE_TASK_REPLAY_ADAPTER):
                 audit = audit_finance_pipeline_candidate(candidate)
             elif _sidecar_uses(sidecar, MACRO_VINTAGE_TASK_REPLAY_ADAPTER):
@@ -568,6 +595,12 @@ def _replay_selection(
         if _sidecar_uses(sidecar, CYBER_KEV_TASK_REPLAY_ADAPTER):
             return replay_kev_pipeline_candidate(
                 canonicalize_kev_projection_candidate(candidate),
+                counterfactual=counterfactual,
+                evidence_artifact_ids=artifact_ids,
+            )
+        if _sidecar_uses(sidecar, CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER):
+            return replay_cross_cve_pipeline_candidate(
+                canonicalize_cross_cve_projection_candidate(candidate),
                 counterfactual=counterfactual,
                 evidence_artifact_ids=artifact_ids,
             )
@@ -740,7 +773,9 @@ def _task_selection_metrics(
         record_id for endpoints in relation_pairs for record_id in endpoints
     }
     source_records_by_artifact: Mapping[str, Any]
-    if _sidecar_uses(sidecar, CYBER_KEV_TASK_REPLAY_ADAPTER):
+    if _sidecar_uses(sidecar, CYBER_KEV_TASK_REPLAY_ADAPTER) or _sidecar_uses(
+        sidecar, CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER
+    ):
         candidate_source_records = candidate.get("source_record_ids_by_artifact")
         if not isinstance(candidate_source_records, Mapping):
             raise PromotionError("Cyber replay artifact source mapping is missing")
@@ -799,6 +834,8 @@ def _task_selection_metrics(
     replayed_strict_support = replay.get("strict_support_event_count")
     if _sidecar_uses(sidecar, CYBER_KEV_TASK_REPLAY_ADAPTER):
         group_suffix = "kev-catalog-history"
+    elif _sidecar_uses(sidecar, CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER):
+        group_suffix = "cross-cve-remediation"
     elif _sidecar_uses(sidecar, FINANCE_TASK_REPLAY_ADAPTER):
         group_suffix = "multi-filing-finance"
     elif _sidecar_uses(sidecar, MACRO_VINTAGE_TASK_REPLAY_ADAPTER):
@@ -1498,6 +1535,16 @@ def _canonical_task_identifiers(
             "annual_checkpoints",
             "maximum_remediation_window",
         )
+    elif family == CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER[:2]:
+        motif = "nvd_kev_join+vendor_year_aggregation+remediation_window"
+        answer_program_id = "cyber.cross_cve_remediation_reconstruction.v1"
+        program_ops = (
+            "JOIN_NVD_CISA_BY_CVE",
+            "ORDER_DATE_THEN_CVE",
+            "GROUP_VENDOR_AND_YEAR",
+            "COUNT_KNOWN_RANSOMWARE",
+            "SELECT_MAX_REMEDIATION_WINDOW",
+        )
     elif family == MACRO_VINTAGE_TASK_REPLAY_ADAPTER[:2]:
         motif = "revision_path+unchanged_supersession+as_of_reconstruction"
         answer_program_id = "macro.as_of_revision_path.v2"
@@ -1929,6 +1976,139 @@ def _cyber_chronology(
     return sorted(output, key=lambda value: value[0])
 
 
+def _cross_cve_counterfactual_artifacts(
+    candidate: Mapping[str, Any],
+    artifacts: Sequence[tuple[dict[str, Any], str]],
+) -> list[tuple[dict[str, Any], str]]:
+    twin = candidate.get("counterfactual_twin")
+    if (
+        not isinstance(twin, Mapping)
+        or twin.get("provenance_operation") != "replace_due_date"
+        or twin.get("source_origin") != "synthetic_counterfactual"
+    ):
+        raise PromotionError("cross-CVE task counterfactual binding is invalid")
+    changed = 0
+    output: list[tuple[dict[str, Any], str]] = []
+    for classification, document in artifacts:
+        records: list[dict[str, Any]] = []
+        for line in document.splitlines():
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise PromotionError("cross-CVE task artifact is not JSONL") from error
+            if not isinstance(record, dict):
+                raise PromotionError("cross-CVE task artifact is malformed")
+            if (
+                record.get("record_id") == twin.get("record_id")
+                and record.get("kind") == "cisa_kev_entry"
+            ):
+                try:
+                    payload = json.loads(str(record.get("text") or ""))
+                except json.JSONDecodeError as error:
+                    raise PromotionError(
+                        "cross-CVE task counterfactual payload is invalid"
+                    ) from error
+                if (
+                    not isinstance(payload, dict)
+                    or payload.get("dueDate") != twin.get("parent_value")
+                    or not isinstance(twin.get("value"), str)
+                    or twin.get("value") == twin.get("parent_value")
+                ):
+                    raise PromotionError(
+                        "cross-CVE task counterfactual fact is invalid"
+                    )
+                payload["dueDate"] = twin["value"]
+                record = dict(record)
+                record["text"] = json.dumps(
+                    payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+                )
+                record["text_sha256"] = hashlib.sha256(
+                    record["text"].encode()
+                ).hexdigest()
+                changed += 1
+            records.append(record)
+        projected = "\n".join(
+            json.dumps(
+                record,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            for record in records
+        )
+        if projected != document:
+            classification = _counterfactual_classification(
+                candidate,
+                classification,
+                parent_document=document,
+                projected_document=projected,
+            )
+        output.append((classification, projected))
+    if changed != 1:
+        raise PromotionError("cross-CVE task counterfactual target is not unique")
+    return output
+
+
+def _cross_cve_chronology(
+    artifacts: Sequence[tuple[dict[str, Any], str]],
+) -> list[tuple[str, dict[str, Any], str]]:
+    cve_dates: dict[str, str] = {}
+    parsed: list[tuple[dict[str, Any], str, list[dict[str, Any]]]] = []
+    for classification, document in artifacts:
+        records: list[dict[str, Any]] = []
+        for line in document.splitlines():
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise PromotionError(
+                    "cross-CVE chronology artifact is not JSONL"
+                ) from error
+            if not isinstance(record, dict):
+                raise PromotionError("cross-CVE chronology artifact is malformed")
+            records.append(record)
+            if record.get("kind") == "cisa_kev_entry":
+                try:
+                    payload = json.loads(str(record.get("text") or ""))
+                except json.JSONDecodeError as error:
+                    raise PromotionError(
+                        "cross-CVE chronology payload is malformed"
+                    ) from error
+                date_added = (
+                    str(payload.get("dateAdded") or "")
+                    if isinstance(payload, dict)
+                    else ""
+                )
+                cve_id = str(record.get("cve_id") or "")
+                if not date_added or not cve_id:
+                    raise PromotionError("cross-CVE chronology date is missing")
+                cve_dates[cve_id] = date_added
+        parsed.append((classification, document, records))
+    output: list[tuple[str, dict[str, Any], str]] = []
+    for classification, document, records in parsed:
+        dates: list[str] = []
+        cve_ids: list[str] = []
+        for record in records:
+            cve_id = str(
+                record.get("cve_id")
+                or str(record.get("relation_id") or "").removeprefix(
+                    "cyber:listed-in-kev:"
+                )
+            )
+            date_added = cve_dates.get(cve_id, "")
+            if not cve_id or not date_added:
+                raise PromotionError("cross-CVE chronology identity is incomplete")
+            dates.append(date_added)
+            cve_ids.append(cve_id)
+        artifact_id = str(classification.get("artifact_id") or "")
+        if not artifact_id:
+            raise PromotionError("cross-CVE chronology identity is incomplete")
+        start = min(dates)
+        output.append(
+            (f"{start}|{min(cve_ids)}|{artifact_id}", classification, document)
+        )
+    return sorted(output, key=lambda value: value[0])
+
+
 def _macro_counterfactual_artifacts(
     candidate: Mapping[str, Any],
     artifacts: Sequence[tuple[dict[str, Any], str]],
@@ -2084,6 +2264,12 @@ def _task_view_replay(
                 evidence_artifact_ids=artifact_ids,
                 counterfactual=counterfactual,
             )
+        if adapter_key == CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER:
+            return replay_cross_cve_pipeline_candidate(
+                canonicalize_cross_cve_projection_candidate(candidate),
+                evidence_artifact_ids=artifact_ids,
+                counterfactual=counterfactual,
+            )
         if adapter_key == FINANCE_TASK_REPLAY_ADAPTER:
             return replay_finance_pipeline_selection(
                 candidate, artifact_ids, counterfactual=counterfactual
@@ -2113,6 +2299,7 @@ def build_task_candidate_view_projections(
         raise PromotionError("task view projection requires an exact token counter")
     if adapter_key not in {
         CYBER_KEV_TASK_REPLAY_ADAPTER,
+        CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
         FINANCE_TASK_REPLAY_ADAPTER,
         MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     }:
@@ -2138,6 +2325,16 @@ def build_task_candidate_view_projections(
     elif adapter_key == CYBER_KEV_TASK_REPLAY_ADAPTER:
         cf_artifacts = _cyber_counterfactual_artifacts(candidate, artifacts)
         chronology = _cyber_chronology(artifacts)
+        cf_candidate = deepcopy(candidate)
+        cf_candidate["document_context"] = SEP.join(
+            document for _classification, document in cf_artifacts
+        )
+        cf_candidate["artifact_classification"] = [
+            deepcopy(classification) for classification, _document in cf_artifacts
+        ]
+    elif adapter_key == CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER:
+        cf_artifacts = _cross_cve_counterfactual_artifacts(candidate, artifacts)
+        chronology = _cross_cve_chronology(artifacts)
         cf_candidate = deepcopy(candidate)
         cf_candidate["document_context"] = SEP.join(
             document for _classification, document in cf_artifacts
