@@ -781,6 +781,12 @@ in`; no private-repository or upload claim was made.
   adjacent-report relations. Commit `ce5e171` records the task and closeout.
   The honest ledger is now 12 physical / 10 quota / 108 rows / 4,070,381
   tokens; Company is 2/2 and formal export remains zero at 10/12.
+- Sparks section reconciliation is now 9/9 strict-audited under the current
+  trust: 341,709 tokens, exact 16,243/32,338/65,322 per view, 3/5/10 required
+  scientific sections, and one signed v5→v4 relation per row. Commit `24f1c23`
+  records the task and closeout. The honest ledger is now 13 physical / 11
+  quota / 117 rows / 4,412,090 tokens; ResearchLab is 1/2 and formal export
+  remains zero at 11/12.
 - PaLM's failed file-delta/Adam implementation was fully removed before the
   new compiled-content task began. The new 7/14/27-file plan preplays at
   16,182/32,709/64,846 with every selected file bound to one required claim.

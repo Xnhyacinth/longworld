@@ -868,6 +868,10 @@ LLaMA-Factory `B1`–`B5`, `B5w`, `ext_acc`, `ext_longtrace`: `cutoff_len: 26214
   notes are jointly necessary. All nine views passed with 0/1/3 signed adjacent
   report relations after the fixture-signed source was re-attested by the
   current probe source role without changing content hashes.
+- Sparks establishes a reusable but still fail-closed multi-file paper task:
+  complete compiled-reachable sections retain exact scientific claims while
+  comments/format markup are removed with source and compiled hashes. Its
+  3/5/10-section stages passed all nine views with the authentic v5→v4 edge.
 
 # P5 real-source, eval, trust, and audit findings (2026-08-25)
 

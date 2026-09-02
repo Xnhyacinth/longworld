@@ -147,21 +147,51 @@
       "dense_audit_complete": true,
       "source_token_measurement_valid": true,
       "train_ready": false
+    },
+    {
+      "domain": "researchlab",
+      "world_id": "lab142303127-nacrebench-98:focal",
+      "rows": 9,
+      "actual_context_tokens": 341709,
+      "bands": [
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "views": [
+        "full",
+        "cf",
+        "ordered_artifact_view"
+      ],
+      "candidate_path": "data/releases/p14-researchlab-sparks-section-reconciliation-v1-current-trust-candidate/train.jsonl",
+      "candidate_sha256": "27b71d7f129a4bd35e0cb1752481af2862584bd168a86a277ee383fb172ac7f6",
+      "candidate_row_set_sha256": "3b0abcfe647d9528e1ef1e9c9ca014c54cc9636b8b5e6c16dec5c197d89b3f33",
+      "ranking_sha256": "34c09273885053088e68d1a48c4ad05d3c5e9c514f56211725897a210092f542",
+      "audit_path": "reports/p14_researchlab_sparks_section_reconciliation_v1/audit/audits.jsonl",
+      "audit_sha256": "fb13942b38e27b0793546002331a6dc705b4897d8bc5e913a134536894820014",
+      "accepted_sha256": "d88ad9dade12f47682e906d074d3e2205e9c63a39e108ba7649a31df4248ebd6",
+      "source_workflow_bundle_sha256": "97b35381a2dbd429b9a26b46fdd9f59e75042f5d2dfe8ccc4c373c70fee795ec",
+      "answer_program_id": "researchlab.paper_revision_section_reconciliation.v1",
+      "motif": "compiled_scientific_sections+revision_edge+section_claim_reconciliation",
+      "unique_executable_proofs": 3,
+      "dense_audit_complete": true,
+      "source_token_measurement_valid": true,
+      "train_ready": false
     }
   ],
   "current_inventory": {
-    "physical_worlds": 12,
-    "quota_countable_worlds": 10,
+    "physical_worlds": 13,
+    "quota_countable_worlds": 11,
     "required_quota_worlds": 12,
-    "rows": 108,
-    "actual_context_tokens": 4070381,
-    "unique_motifs": 10,
-    "unique_executable_proofs": 31,
-    "unique_answer_programs": 10,
-    "unique_semantic_base_tasks": 10,
+    "rows": 117,
+    "actual_context_tokens": 4412090,
+    "unique_motifs": 11,
+    "unique_executable_proofs": 34,
+    "unique_answer_programs": 11,
+    "unique_semantic_base_tasks": 11,
     "quota_by_domain": {
       "company": 2,
-      "researchlab": 0,
+      "researchlab": 1,
       "codeforge": 2,
       "finance": 2,
       "cyber": 2,
@@ -170,13 +200,13 @@
   },
   "quota_holes": {
     "company": 0,
-    "researchlab": 2,
+    "researchlab": 1,
     "codeforge": 0,
     "finance": 0
   },
   "release_state": {
     "selection_attempted_against_current_inventory": false,
-    "last_selection_blocker": "insufficient fully audited worlds: 10<12",
+    "last_selection_blocker": "insufficient fully audited worlds: 11<12",
     "selection_run": false,
     "promotion_run": false,
     "quality_gate_run": false,

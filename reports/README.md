@@ -5,9 +5,10 @@
 See `p14_conversion_status_20260902.md` and
 `p14_conversion_status_v1.json`. Cyber cross-vendor remediation, Microsoft
 asset/operating-cash trajectory, Wasmtime patch/review/test/release ancestry,
-JPMorgan cross-year risk taxonomy, and Walmart cross-year reconciliation are
-fully audited ninth-cell worlds, bringing the honest candidate ledger to 12
-physical / 10 quota worlds / 108 rows.
+JPMorgan cross-year risk taxonomy, Walmart cross-year reconciliation, and
+Sparks paper revision section reconciliation are fully audited ninth-cell
+worlds, bringing the honest candidate ledger to 13 physical / 11 quota worlds /
+117 rows.
 The formal training package remains
 empty until 12/12; the 2026-09-01 P13 report remains an immutable historical
 snapshot.

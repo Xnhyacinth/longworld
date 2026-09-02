@@ -5,11 +5,12 @@
 P13/P14 当前有可审计的候选库存，但还没有可发布的正式训练包。Cyber
 cross-vendor remediation、Microsoft multi-filing asset/operating-cash
 trajectory、Wasmtime patch/review/test/release ancestry、JPMorgan
-cross-year risk taxonomy 和 Walmart cross-year reconciliation 均已完成
+cross-year risk taxonomy、Walmart cross-year reconciliation 和 Sparks
+paper revision section reconciliation 均已完成
 16/32/64K × full/CF/ordered 的 9-cell dense audit。因此当前账本从 7 物理 /
-5 配额更新为 **12 物理 / 10 配额 / 108 行 / 4,070,381 exact Qwen context
-tokens**。所有行仍为 candidate，统一 selection 尚未在这个 12-physical /
-10-quota 账本上
+5 配额更新为 **13 物理 / 11 配额 / 117 行 / 4,412,090 exact Qwen context
+tokens**。所有行仍为 candidate，统一 selection 尚未在这个 13-physical /
+11-quota 账本上
 重跑；在 12/12 前重跑只会重复 fail-closed。
 
 新增 Cyber world 的候选 SHA 为 `068a10daf9e4fbfbc0f59c91b4f2aff6fe043cbbcdef45b514f8bdf4adcfc18d`，
@@ -48,12 +49,20 @@ capex、ICFR 与 distant segment-note sections，并验证 0/1/3 条 signed 相�
 通过、0 rejected，贡献 338,286 tokens，使 Company 达到 2/2。原 source
 fixture 签名已在内容 hashes 不变的条件下由当前 source role 重签并 replay。
 
+首个 ResearchLab world 使用 *Sparks of Artificial General Intelligence*
+arXiv v1--v5 官方 source history。16/32/64K 程序分别联合 3/5/10 个
+compiled-reachable scientific sections、v5→v4 两端、真实 `revision_of`、
+compiled-source control 与 decision；三档 exact tokens 为
+16,243/32,338/65,322。最终 9/9 strict audit 通过、0 rejected，贡献 341,709
+tokens，使 ResearchLab 达到 1/2。不可见 TeX comments/format markup 的移除有
+source/compiled hashes 可 replay，grounded claims 保持逐字不变。
+
 ## 剩余缺口与 P14 路线
 
 | Domain | 当前/目标 | P14 路线 |
 | --- | ---: | --- |
 | Company | 2/2 | JPMorgan 与 Walmart 均通过；停止扩充配额 |
-| ResearchLab | 0/2 | 换自然长度足够的论文、revision/review/benchmark 程序，不复用 MLRC/AEVB/Megatron 死路 |
+| ResearchLab | 1/2 | Sparks 已通过；继续 Llama 3 v3→v2 scientific section reconciliation |
 | CodeForge | 2/2 | Wasmtime patch/review/test/release ancestry 已补齐；不再扩充配额 |
 | Finance | 2/2 | 已由 Microsoft asset/operating-cash trajectory 补齐；不再扩充配额 |
 

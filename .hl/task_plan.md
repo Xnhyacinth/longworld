@@ -13,12 +13,12 @@ inventory exists but is not a train release.
 
 | Bucket | What it is | Trainable now? |
 | ------ | ---------- | -------------- |
-| P14 SFT inventory | 12 physical / 10 quota / 108 rows / 4,070,381 tokens | No (`train_ready=false`, not selected) |
+| P14 SFT inventory | 13 physical / 11 quota / 117 rows / 4,412,090 tokens | No (`train_ready=false`, not selected) |
 | P13 CPT closure | 3,047 rows / 288,004,845 tokens | No (`train_ready=false`) |
 | HF private | P6 542-row local-engineering SFT | Old package only; not this inventory |
 | P13 formal train | selection + promotion + B-export | 0 until 12/12 audited SFT worlds |
 
-Quota holes: ResearchLab 0/2. Company, Finance, CodeForge, Cyber, and Macro are
+Quota holes: ResearchLab 1/2. Company, Finance, CodeForge, Cyber, and Macro are
 2/2. Do not promote, export B1/B3/B5, or
 upload HF until 12/12.
 
@@ -60,19 +60,19 @@ Assumptions and tradeoffs:
 | ----- | --------- | ------ | --------- |
 | P14.0 | Reconcile dirty tree, current inventory, commands, and dead ends | complete | exact HEAD/status; current pinned audits and 8/6/72 ledger rechecked |
 | P14.1 | Company: new entity plus non-reconstruction executable relation | complete | JPMorgan risk-taxonomy and Walmart reconciliation both 9/9; Company 2/2 |
-| P14.2 | ResearchLab: new naturally long paper/revision/benchmark program | in_progress | PaLM stopped at strict relation overflow; Sparks task and Gopher source active |
+| P14.2 | ResearchLab: new naturally long paper/revision/benchmark program | in_progress | Sparks 9/9; ResearchLab 1/2; Llama 3 TDD active |
 | P14.3 | CodeForge: new repository/artifact program with natural three-band support | complete | Wasmtime patch/review/test/release ancestry 9/9 strict audit; CodeForge 2/2 |
 | P14.4 | Finance/integration: new issuer/program and deterministic inventory rebuild | complete | Microsoft Finance 9/9; Finance 2/2 |
 | P14.5 | Fill remaining holes, select 12/12, promote, quality-gate, and export | planned | signed receipts; nonzero formal train export; `train_ready=true` |
-| P14.6 | Targeted regression, provenance report, and surgical Git commits | in_progress | Finance, CodeForge, JPMorgan, and Walmart committed; ResearchLab tracks isolated |
+| P14.6 | Targeted regression, provenance report, and surgical Git commits | in_progress | Finance, CodeForge, Company, and Sparks committed; Llama 3 isolated |
 
 Success criterion: at least 12 quota-eligible worlds are fully audited and the
 current profile completes selection, promotion, quality gate, and training
 export with `train_ready=true`. Until then, report exact physical/quota/row
 counts and keep formal training at zero.
 
-Next step: finish Sparks and Llama 3 ResearchLab task projections. The honest
-ledger is 12 physical / 10 quota / 108 rows; only ResearchLab quota holes remain.
+Next step: finish the Llama 3 ResearchLab task projection. The honest ledger is
+13 physical / 11 quota / 117 rows; only one ResearchLab quota hole remains.
 
 Position: run the first honest 12-world P3 release while keeping synthetic
 executable and real-public provenance distinct. Complexity 10/10 (breadth,
