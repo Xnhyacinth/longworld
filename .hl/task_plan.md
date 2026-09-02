@@ -14,11 +14,11 @@ B1/B3/B5, or upload HF until 12/12 audited SFT worlds exist.
 | Phase | Objective | Status | Validator |
 | ----- | --------- | ------ | --------- |
 | E0 | Inventory CPT vs SFT and freeze expansion tracks | complete | counts match CURRENT_RELEASE + p13 ledger |
-| E1 | Cyber cross-vendor: history → sidecar → 9-cell three-view | ranking | MiniLM extra installing; 9/9 views on disk |
+| E1 | Cyber cross-vendor: history → sidecar → 9-cell three-view | ranking | MiniLM extra install incomplete; 9/9 views on disk |
 | E2 | Finance world 2: NVIDIA FY2022–FY2025 issuer IR | blocked | challenge page; Apple EDGAR 403; do not retry-hammer |
-| E3 | Company: Microsoft reconstruction across 16/32/64K via FY2021 | in_progress | five-seed v2 generate running; Apple P12 key mismatch |
-| E4 | CPT wave: unused allowlisted git caches (uv, ruff, oxc) | in_progress | skip-8000/250 trunc-ok/0 rows; skip-8000/1000 running |
-| E5 | ResearchLab/CodeForge incomplete cells (AEVB/MLRC/Oxc) | in_progress | MLRC 9-cell near-dup 0.015 (unranked); AEVB 16K+dup; oxc v9 running |
+| E3 | Company: Microsoft reconstruction across 16/32/64K via FY2021 | blocked | five seeds; every world missing 16k+32k ordered |
+| E4 | CPT wave: unused allowlisted git caches (uv, ruff, oxc) | blocked | skip-8000/250 trunc-ok, 0 packed rows |
+| E5 | ResearchLab/CodeForge incomplete cells (AEVB/MLRC/Oxc) | blocked | MLRC CF audit near-dup; oxc 5/9; AEVB 16K+dup |
 | E6 | Record ledger only; no selection/promotion/HF | planned | selection still fail-closed until 12/12 |
 
 Position: run the first honest 12-world P3 release while keeping synthetic
