@@ -1442,7 +1442,7 @@ _ARXIV_32K_FILES = frozenset(
     }
 )
 _ARXIV_TERMINAL_FILES = frozenset({"abstract.tex", "acknowledgements.tex"})
-_ARXIV_TIER_OFFSETS = {"16k": 0, "32k": 365, "64k": 730}
+_ARXIV_TIER_OFFSETS = {"16k": 0, "32k": 365, "64k": 730, "128k": 1095}
 _SPARKS_ACKNOWLEDGMENTS = "\\paragraph{Acknowledgments.}"
 _SPARKS_SECTION_CLAIMS = {
     "contents/1_intro.tex": (
@@ -1521,6 +1521,87 @@ _SPARKS_SECTION_CLAIMS = {
             "urgent."
         ),
     ),
+    "contents/3_code.tex": (
+        "code_scope",
+        (
+            "In this section, we show that \\DV\\ is able to code at a very high "
+            "level, both in terms of writing code from instructions and "
+            "understanding existing code."
+        ),
+    ),
+    "contents/4.2_datasets.tex": (
+        "math_benchmark_scope",
+        (
+            "We now conduct systematic experiments to compare the performance of "
+            "{\\DV}, ChatGPT and Minerva (state-of-the-art LLM for solving math "
+            "questions) on two math data sets which are commonly used as "
+            "benchmarks: GSM8K \\cite{cobbe2021training} and MATH "
+            "\\cite{hendrycksmath2021}."
+        ),
+    ),
+    "contents/4.3_domains.tex": (
+        "mathematical_modeling_scope",
+        (
+            "Mathematical reasoning is more than a skill for solving mathematical "
+            "exercises and problems; it is also a tool for understanding and "
+            "communicating about various contexts and situations."
+        ),
+    ),
+    "contents/4.4_higher.tex": (
+        "higher_math_selection",
+        (
+            "These examples have been intentionally selected to demonstrate the "
+            "model's capabilities, and it is important to note that the model does "
+            "not always succeed with questions of this level of difficulty."
+        ),
+    ),
+    "contents/5.1_affordances.tex": (
+        "tool_use_limitations",
+        (
+            "These weaknesses include (but are not limited to) lack of current "
+            "world knowledge, difficulty with symbolic operations (e.g., math), and "
+            "inability to execute code."
+        ),
+    ),
+    "contents/interpretability.tex": (
+        "explanation_scope",
+        (
+            "The ability to explain one's own behavior is an important aspect of "
+            "intelligence, as it allows for a system to communicate with humans and "
+            "other agents."
+        ),
+    ),
+    "contents/7_discrimination.tex": (
+        "discriminative_scope",
+        (
+            "Discrimination is a component of intelligence that allows an agent to "
+            "make distinctions between different stimuli, concepts, and situations."
+        ),
+    ),
+    "contents/intro_appendix.tex": (
+        "common_sense_grounding",
+        (
+            "One of the challenges of developing AGI is endowing the system with the "
+            "ability to reason with common sense knowledge about the world that we "
+            "humans take for granted."
+        ),
+    ),
+    "contents/code_appendix.tex": (
+        "leetcode_acceptance_limit",
+        (
+            "For each question, LeetCode posts its Acceptance rate in terms of the "
+            "number of accepted submissions over the total number of all submissions."
+        ),
+    ),
+    "contents/math_appendix.tex": (
+        "atomic_calculation_limit",
+        (
+            "These examples highlight a very common issue where performing several "
+            "atomic manipulations in one step of the calculation leads to an error "
+            "(this issue is well-known in the literature and also discussed in "
+            "section \\ref{sec:limitations})."
+        ),
+    ),
 }
 _SPARKS_SECTION_TIERS = {
     "16k": (
@@ -1546,6 +1627,28 @@ _SPARKS_SECTION_TIERS = {
         "contents/reasoninglimitations.tex",
         "contents/societal.tex",
         "contents/conclusion.tex",
+    ),
+    "128k": (
+        "contents/1_intro.tex",
+        "contents/2_see.tex",
+        "contents/3_code.tex",
+        "contents/4.2_datasets.tex",
+        "contents/4.3_domains.tex",
+        "contents/4.4_higher.tex",
+        "contents/4_math.tex",
+        "contents/5.1_affordances.tex",
+        "contents/5.2_interact_environment.tex",
+        "contents/roleplaying.tex",
+        "contents/interpretability.tex",
+        "contents/7_discrimination.tex",
+        "contents/7.1_pii.tex",
+        "contents/7.2_misconceptions.tex",
+        "contents/reasoninglimitations.tex",
+        "contents/societal.tex",
+        "contents/conclusion.tex",
+        "contents/intro_appendix.tex",
+        "contents/code_appendix.tex",
+        "contents/math_appendix.tex",
     ),
 }
 
@@ -2475,7 +2578,7 @@ def _paper_section_reconciliation_records(
         )
     except ValueError:
         return None
-    required_paths = set(program.tiers["64k"])
+    required_paths = set(next(reversed(program.tiers.values())))
     if not required_paths.issubset(reachable_order):
         return None
     for path, (_claim_id, quote) in program.claims.items():
@@ -2534,8 +2637,7 @@ def _paper_section_reconciliation_events(
         record.record_id: index for index, record in enumerate(workflow.records)
     }
     relation_indices = {
-        relation.relation_id: index
-        for index, relation in enumerate(workflow.relations)
+        relation.relation_id: index for index, relation in enumerate(workflow.relations)
     }
     workflow_key = hashlib.sha256(workflow.workflow_id.encode()).hexdigest()[:12]
     graph_sha256 = hashlib.sha256(
@@ -2586,7 +2688,7 @@ def _paper_section_reconciliation_events(
             for event in claim_events
             if event.params["section_claim_id"] == program.relation_claim_id
         )
-        relation_count = {"16k": 0, "32k": 1, "64k": 2}[tier]
+        relation_count = {"16k": 0, "32k": 1, "64k": 2, "128k": 3}[tier]
         source_revision_index = program.revision_ids.index(program.source_revision_id)
         chain_revision_ids = tuple(
             reversed(
@@ -2605,9 +2707,7 @@ def _paper_section_reconciliation_events(
             program.source_revision_id: claim_bodies[program.relation_claim_id]
         }
         endpoint_revision_facts = {
-            program.source_revision_id: claim_revision_facts[
-                program.relation_claim_id
-            ]
+            program.source_revision_id: claim_revision_facts[program.relation_claim_id]
         }
         endpoint_source_facts = {
             program.source_revision_id: claim_source_facts[program.relation_claim_id]
@@ -2671,9 +2771,7 @@ def _paper_section_reconciliation_events(
             )
             events.append(relation_event)
             prior_relation_id = relation_event.id
-        relation_events = [
-            relation_events_by_pair[pair] for pair in relation_pairs
-        ]
+        relation_events = [relation_events_by_pair[pair] for pair in relation_pairs]
         claim_ids = [str(event.params["section_claim_id"]) for event in claim_events]
         compile_context_id = (
             f"{prefix}.arxiv_section_compile_context_{tier}_{workflow_index}"
@@ -2788,9 +2886,7 @@ def _paper_section_reconciliation_events(
                     endpoint_events[revision_id].id: "reads_prior_endpoint"
                     for revision_id in chain_revision_ids[1:]
                 },
-                **{
-                    event.id: "authenticates_revision" for event in relation_events
-                },
+                **{event.id: "authenticates_revision" for event in relation_events},
                 compile_context_id: "reads_compile_receipt",
             },
         )
@@ -2813,9 +2909,7 @@ def _paper_section_reconciliation_events(
                     "source_revision_id": program.source_revision_id,
                     "target_revision_id": program.target_revision_id,
                     "endpoint_event_ids": control.params["endpoint_event_ids"],
-                    "required_relation_ids": control.params[
-                        "required_relation_ids"
-                    ],
+                    "required_relation_ids": control.params["required_relation_ids"],
                     "relation_event_ids": control.params["relation_event_ids"],
                     "revision_edges": control.params["revision_edges"],
                     "required_claim_ids": claim_ids,

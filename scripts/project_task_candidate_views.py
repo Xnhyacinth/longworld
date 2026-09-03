@@ -83,6 +83,17 @@ def _jsonl_bytes(rows: list[dict[str, Any]]) -> bytes:
     return b"".join(_canonical_bytes(row) for row in rows)
 
 
+def _select_length_buckets(
+    rows: list[dict[str, Any]], length_buckets: set[str]
+) -> list[dict[str, Any]]:
+    selected = [
+        row for row in rows if str(row.get("length_bucket") or "") in length_buckets
+    ]
+    if not selected:
+        raise ValueError("no task candidates match the requested length buckets")
+    return selected
+
+
 def _write_resumable(path: Path, content: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -106,7 +117,13 @@ def _write_resumable(path: Path, content: bytes) -> None:
         raise
 
 
-def project(input_path: Path, sidecar_path: Path, output_dir: Path) -> dict[str, Any]:
+def project(
+    input_path: Path,
+    sidecar_path: Path,
+    output_dir: Path,
+    *,
+    length_buckets: set[str] | None = None,
+) -> dict[str, Any]:
     """Verify parent rows and emit independently signed candidate projections."""
     candidate_key = attestation_key_from_env(CANDIDATE_ATTESTATION_PURPOSE)
     source_key = attestation_key_from_env("task_replay_sidecar")
@@ -127,6 +144,8 @@ def project(input_path: Path, sidecar_path: Path, output_dir: Path) -> dict[str,
     )
     token_counter = task_sidecar_token_counter(loaded)
     parents = _read_jsonl(input_path)
+    if length_buckets is not None:
+        parents = _select_length_buckets(parents, length_buckets)
     projected: list[dict[str, Any]] = []
     for parent in parents:
         _validate_candidate_identity(
@@ -168,7 +187,11 @@ def project(input_path: Path, sidecar_path: Path, output_dir: Path) -> dict[str,
     source_commitments.sort(
         key=lambda item: (item["world_id"], item["length_bucket"], item["view"])
     )
-    parent_raw = _read_regular_file(input_path, MAX_INPUT_BYTES)
+    parent_raw = (
+        _jsonl_bytes(parents)
+        if length_buckets is not None
+        else _read_regular_file(input_path, MAX_INPUT_BYTES)
+    )
     parent_digests = sorted(candidate_sha256(parent) for parent in parents)
     parent_commitments = sorted(
         (task_candidate_content_commitment(parent) for parent in parents),
@@ -366,12 +389,23 @@ def main() -> int:
     parser.add_argument("--sidecar", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument(
+        "--length-bucket",
+        action="append",
+        choices=("16k", "32k", "64k", "128k"),
+        help="project only the selected exact length bucket; repeat as needed",
+    )
+    parser.add_argument(
         "--rankings",
         type=Path,
         help="optional signed ranking JSONL for independent dense audits",
     )
     args = parser.parse_args()
-    project(args.candidates, args.sidecar, args.output_dir)
+    project(
+        args.candidates,
+        args.sidecar,
+        args.output_dir,
+        length_buckets=set(args.length_bucket) if args.length_bucket else None,
+    )
     if args.rankings is not None:
         audit_projections(args.output_dir, args.rankings)
     return 0

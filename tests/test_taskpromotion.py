@@ -1485,6 +1485,7 @@ def _assert_standard_training_views(
     assert not _candidate_has_source_bound_proof(only_changed)
     assert all(row["train_ready"] is False for row in views)
     assert all(row["production_eligible"] is False for row in views)
+    assert all(row["evidence_span_tokens"] > 0 for row in views)
     assert all(
         row["promotion_blocker_code"] == "task_view_source_commitment_pending"
         for row in views
@@ -1629,6 +1630,14 @@ def test_macro_task_promotion_materializes_standard_training_views(
         candidate,
         _candidate_task_views(candidate, sidecar, token_counter=_macro_token_count),
     )
+
+
+def test_task_view_projection_filters_parent_length_buckets() -> None:
+    rows = [{"length_bucket": "64k"}, {"length_bucket": "128k"}]
+
+    assert task_view_cli._select_length_buckets(rows, {"128k"}) == [rows[1]]
+    with pytest.raises(ValueError, match="no task candidates match"):
+        task_view_cli._select_length_buckets(rows, {"32k"})
 
 
 def test_task_view_projection_cli_is_deterministic_and_stays_candidate_only(
@@ -1832,6 +1841,60 @@ def test_task_view_projection_cli_is_deterministic_and_stays_candidate_only(
             forged_measurement,
             _ranking(forged_measurement),
             forged_measurement_sidecar,
+            candidate_attestation_key=KEYS["candidate"],
+            ranking_attestation_key=KEYS["ranker"],
+            audit_attestation_key=KEYS["auditor"],
+            source_attestation_key=KEYS["source"],
+        )
+    full_view = next(row for row in projected if row["view"] == "full")
+    forged_difficulty = deepcopy(full_view)
+    forged_difficulty.pop("attestation")
+    forged_difficulty["difficulty"] = {
+        **forged_difficulty["difficulty"],
+        "evidence_span_tokens": 1_000_000_000,
+        "max_evidence_distance": 1_000_000_000,
+    }
+    forged_difficulty["evidence_span_tokens"] = 1_000_000_000
+    forged_difficulty["evidence_distance"] = 1_000_000_000
+    forged_difficulty, forged_difficulty_sidecar = _resign_v3_projection(
+        output_dir, v3_sidecar, full_view, forged_difficulty
+    )
+    with pytest.raises(PromotionError, match="difficulty metadata is invalid"):
+        create_task_dense_audit(
+            forged_difficulty,
+            _ranking(forged_difficulty),
+            forged_difficulty_sidecar,
+            candidate_attestation_key=KEYS["candidate"],
+            ranking_attestation_key=KEYS["ranker"],
+            audit_attestation_key=KEYS["auditor"],
+            source_attestation_key=KEYS["source"],
+        )
+    relabeled = deepcopy(full_view)
+    relabeled.pop("attestation")
+    extra_gold = next(
+        item
+        for item in relabeled["artifact_classification"]
+        if item["artifact_id"] not in relabeled["essential_artifact_ids"]
+    )
+    extra_gold["evidence_role"] = "causal_gold"
+    relabeled_difficulty = taskpromotion_module._task_view_difficulty(
+        question=relabeled["question"],
+        artifacts=taskpromotion_module._task_view_artifacts(relabeled),
+        context=relabeled["context"],
+        token_counter=_test_token_count,
+        proof_depth=relabeled["graph"]["proof_depth"],
+    )
+    relabeled["difficulty"] = relabeled_difficulty
+    relabeled["evidence_span_tokens"] = relabeled_difficulty["evidence_span_tokens"]
+    relabeled["evidence_distance"] = relabeled_difficulty["max_evidence_distance"]
+    relabeled, relabeled_sidecar = _resign_v3_projection(
+        output_dir, v3_sidecar, full_view, relabeled
+    )
+    with pytest.raises(PromotionError, match="causal gold artifacts are invalid"):
+        create_task_dense_audit(
+            relabeled,
+            _ranking(relabeled),
+            relabeled_sidecar,
             candidate_attestation_key=KEYS["candidate"],
             ranking_attestation_key=KEYS["ranker"],
             audit_attestation_key=KEYS["auditor"],

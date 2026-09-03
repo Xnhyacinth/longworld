@@ -430,7 +430,7 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
             for event in world.events
             if event.type == "arxiv_section_reconciliation_decision"
         ),
-        key=lambda event: {"16k": 0, "32k": 1, "64k": 2}[
+        key=lambda event: {"16k": 0, "32k": 1, "64k": 2, "128k": 3}[
             str(event.params["control_tier"])
         ],
     )
@@ -481,9 +481,7 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
             revision_instruction = (
                 f"verify the signed {' ; '.join(revision_edges)} chain and apply"
             )
-            answer_shape = " || ".join(
-                [*revision_edges, "<claim 1>", "..."]
-            )
+            answer_shape = " || ".join([*revision_edges, "<claim 1>", "..."])
         else:
             revision_instruction = "use only the latest signed revision and apply"
             answer_shape = "<claim 1> || ..."
@@ -550,10 +548,7 @@ def build_lab_queries(world: SimulatedWorld) -> list[QuerySpec]:
                 truth_regime="real_source_derived",
                 program_ops=[
                     *({"op": "READ_SECTION_CLAIM"} for _ in range(claim_count)),
-                    *(
-                        {"op": "FOLLOW_REVISION_OF"}
-                        for _ in range(len(revision_edges))
-                    ),
+                    *({"op": "FOLLOW_REVISION_OF"} for _ in range(len(revision_edges))),
                     {"op": "APPLY_COMPILED_SOURCE_CONTROL"},
                     {"op": "RECONCILE_SECTION_CLAIMS"},
                 ],

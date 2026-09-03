@@ -122,6 +122,39 @@ def test_builds_nested_exact_bands_with_real_semantic_growth() -> None:
         assert len(row["source_relation_ids"]) == entry_count * 2 - 1
 
 
+def test_builds_a_fourth_128k_history_from_additional_source_records() -> None:
+    bands = (
+        *_bands(),
+        HistoryBand("128k", 7_000, 9_000),
+    )
+
+    rows = build_kev_catalog_history_candidates(
+        _catalog(30),
+        world_id="cyber-kev-history-128k-test",
+        source_binding={
+            "source_url": "https://www.cisa.gov/kev.json",
+            "observed_at": "2026-08-30T00:00:00Z",
+            "retrieval_sha256": "a" * 64,
+            "signed_manifest_sha256": "b" * 64,
+        },
+        bands=bands,
+        token_counter=len,
+        tokenizer_model_id="Qwen/Qwen3.5-4B",
+        tokenizer_revision="c" * 40,
+    )
+
+    assert [row["length_bucket"] for row in rows] == [
+        "16k",
+        "32k",
+        "64k",
+        "128k",
+    ]
+    assert rows[-1]["context"].startswith(rows[-2]["context"] + "\n")
+    assert set(rows[-2]["source_record_ids"]) < set(rows[-1]["source_record_ids"])
+    assert set(rows[-2]["source_relation_ids"]) < set(rows[-1]["source_relation_ids"])
+    assert audit_cumulative_history(rows) == []
+
+
 def test_replay_reads_context_and_counterfactual_instead_of_declared_answer() -> None:
     row = _build()[0]
     assert replay_kev_catalog_history(row)["answer"] == row["answer"]

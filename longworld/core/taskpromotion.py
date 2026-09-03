@@ -915,6 +915,7 @@ def create_task_dense_audit(
     offset_tokenizer = getattr(token_counter, "offset_tokenizer", None)
     if offset_tokenizer is None:
         raise PromotionError("task promotion requires exact tokenizer offsets")
+    _validate_task_semantic_identifiers(candidate, sidecar)
     adapter_audit = _adapter_audit(candidate, sidecar, token_counter)
     try:
         task_proof = compute_task_proof(
@@ -927,6 +928,7 @@ def create_task_dense_audit(
     selection_metrics = _task_selection_metrics(
         candidate, task_proof, sidecar, token_counter
     )
+    _validate_task_view_difficulty(candidate, token_counter, task_proof)
     task_quality_metadata = _task_quality_metadata(candidate, sidecar, token_counter)
     ranked, model = _validate_external_ranking(
         candidate, external_ranking, ranking_attestation_key
@@ -1141,11 +1143,7 @@ def _task_quality_metadata(
     token_counter: TokenCounter,
 ) -> dict[str, Any]:
     source = _source_metadata(candidate, sidecar)
-    identifiers = _canonical_task_identifiers(candidate, sidecar.registry_key)
-    if candidate.get("task_view_projection") is not None and any(
-        candidate.get(field) != value for field, value in identifiers.items()
-    ):
-        raise PromotionError("task candidate semantic identifiers are not canonical")
+    identifiers = _validate_task_semantic_identifiers(candidate, sidecar)
     real_source_token_ratio = candidate.get("real_source_token_ratio")
     projection = candidate.get("task_view_projection")
     if (
@@ -1203,6 +1201,24 @@ def _task_quality_metadata(
         "hybrid_causal_edges": [],
         "context_source_relation_count": source["context_source_relation_count"],
     }
+
+
+def _validate_task_semantic_identifiers(
+    candidate: dict[str, Any], sidecar: LoadedTaskReplaySidecar
+) -> dict[str, str]:
+    try:
+        identifiers = _canonical_task_identifiers(candidate, sidecar.registry_key)
+    except PromotionError as error:
+        if candidate.get("task_view_projection") is None:
+            raise
+        raise PromotionError(
+            "task candidate semantic identifiers are not canonical"
+        ) from error
+    if candidate.get("task_view_projection") is not None and any(
+        candidate.get(field) != value for field, value in identifiers.items()
+    ):
+        raise PromotionError("task candidate semantic identifiers are not canonical")
+    return identifiers
 
 
 def promote_task_candidate(
@@ -2244,11 +2260,16 @@ def _task_view_difficulty(
     context: str,
     token_counter: TokenCounter,
     proof_depth: int,
+    essential_artifact_ids: set[str] | None = None,
 ) -> dict[str, int]:
     essential_positions = [
         index
         for index, (classification, _document) in enumerate(artifacts)
-        if classification.get("evidence_role") == "causal_gold"
+        if (
+            str(classification.get("artifact_id") or "") in essential_artifact_ids
+            if essential_artifact_ids is not None
+            else classification.get("evidence_role") == "causal_gold"
+        )
     ]
     if not essential_positions:
         raise PromotionError("task view has no causal gold artifacts")
@@ -2265,10 +2286,75 @@ def _task_view_difficulty(
     context_tokens = token_counter(context)
     return {
         "context_tokens": context_tokens,
+        "evidence_span_tokens": end - start,
         "max_evidence_distance": max(end - start, end - query_boundary),
         "proof_depth": proof_depth,
         "state_updates": len(artifacts),
     }
+
+
+def _validate_task_view_difficulty(
+    candidate: dict[str, Any],
+    token_counter: TokenCounter,
+    task_proof: dict[str, Any],
+) -> None:
+    if candidate.get("task_view_projection") is None:
+        return
+    graph = candidate.get("graph")
+    proof_depth = graph.get("proof_depth") if isinstance(graph, Mapping) else None
+    question = candidate.get("question")
+    context = candidate.get("context")
+    receipt = task_proof.get("task_proof_receipt")
+    essential_values = (
+        receipt.get("essential_artifact_ids") if isinstance(receipt, Mapping) else None
+    )
+    if (
+        not isinstance(essential_values, list)
+        or not essential_values
+        or any(not isinstance(value, str) or not value for value in essential_values)
+    ):
+        raise PromotionError("task view causal gold artifacts are invalid")
+    essential_ids = set(essential_values)
+    artifacts = _task_view_artifacts(candidate)
+    causal_gold_ids = {
+        str(classification.get("artifact_id") or "")
+        for classification, _document in artifacts
+        if classification.get("evidence_role") == "causal_gold"
+    }
+    if (
+        isinstance(proof_depth, bool)
+        or not isinstance(proof_depth, int)
+        or not isinstance(question, str)
+        or not question
+        or not isinstance(context, str)
+        or not context
+        or causal_gold_ids != essential_ids
+    ):
+        raise PromotionError("task view causal gold artifacts are invalid")
+    expected = _task_view_difficulty(
+        question=question,
+        artifacts=artifacts,
+        context=context,
+        token_counter=token_counter,
+        proof_depth=proof_depth,
+        essential_artifact_ids=essential_ids,
+    )
+    expected_dependency_class = (
+        "deep_dependency"
+        if proof_depth >= 3
+        else "long_range_retrieval"
+        if expected["max_evidence_distance"] >= 8_000
+        else "local_or_mixed"
+    )
+    if (
+        candidate.get("difficulty") != expected
+        or candidate.get("actual_context_tokens") != expected["context_tokens"]
+        or candidate.get("tokenizer_context_tokens") != expected["context_tokens"]
+        or candidate.get("evidence_span_tokens") != expected["evidence_span_tokens"]
+        or candidate.get("evidence_distance") != expected["max_evidence_distance"]
+        or candidate.get("dependency_class") != expected_dependency_class
+    ):
+        raise PromotionError("task view difficulty metadata is invalid")
 
 
 def _dossier_spread(
@@ -2543,8 +2629,10 @@ def build_task_candidate_view_projections(
             context=context,
             token_counter=token_counter,
             proof_depth=proof_depth,
+            essential_artifact_ids=set(unsigned.get("essential_artifact_ids") or []),
         )
         unsigned["difficulty"] = difficulty
+        unsigned["evidence_span_tokens"] = difficulty["evidence_span_tokens"]
         unsigned["evidence_distance"] = difficulty["max_evidence_distance"]
         unsigned["dependency_class"] = (
             "deep_dependency"

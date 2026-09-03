@@ -803,3 +803,43 @@ in`; no private-repository or upload claim was made.
 - B1/B3/B5/B5w export validation passed: 11 bound outputs, zero contract
   rejects, and 1.34% equal-token spread. Trust remains local-probe and no HF
   publication was attempted.
+
+## 2026-09-03 P15 kickoff
+
+- Live baseline rechecked: P14 promoted-v4 has 90 train / 18 eval rows and
+  4,079,561 exact context tokens; the 126-row inventory is not itself a
+  training set. There are no 128K rows in the formal release.
+- Started three disjoint candidate tracks for Company, ResearchLab, and
+  CodeForge. Root owns profile integration and will run global release gates
+  once candidate-local audits finish, avoiding repeated full-suite/release
+  validation on unchanged P14 data.
+
+## 2026-09-03 P15 128K closure
+
+- Company failed closed at 0 rows; ResearchLab retained three independently
+  audited 128K candidates under a different probe trust; CodeForge uv retained
+  six 64K/128K rows under the active workspace trust.
+- Added an exact 128K CISA KEV tier and six strict-audited 64K/128K task views.
+  The release gate exposed a missing exact evidence-span field in generic task
+  projections; the field is now recomputed from causal-gold artifact positions,
+  and the rebuilt Cyber views pass without weakening lower-band rules.
+- Selection-v5/promoted-v5 passed the original gate but were superseded after
+  independent review found candidate-declared evidence-span metadata was not
+  recomputed by the auditor.
+- Selection-v6/promoted-v6 were then superseded after review showed that a
+  re-signed background artifact could be relabeled causal-gold and enlarge the
+  recomputed span.
+- Final selection-v7 and promoted-v7 contain two worlds and 12 train rows:
+  6×64K / 389,283 tokens and 6×128K / 774,639 tokens. Gate is green with
+  retention 1.0, zero duplicate/conflicting rows, and mean near-dup 0.019975.
+- The auditor now derives span endpoints from the independently replayed
+  essential-artifact receipt, requires exact agreement with the causal-gold
+  labels, recomputes difficulty metadata under the exact tokenizer, and the
+  profile requires both exact 64K and exact 128K.
+- The signed B5 export preserves full/CF/ordered views, contains 12 rows and
+  1,167,816 estimated tokens, and passed manifest validation. The P15 extension
+  is local-probe train-ready but remains production-ineligible.
+- Broad-scenario research and two read-only feasibility agents produced a P16
+  queue led by BEA spreadsheet vintage, GitHub failure recovery, and Microsoft
+  five-year cross-statement programs. Diversity is tracked by executable task
+  topology and oracle, not by relabeling domains.

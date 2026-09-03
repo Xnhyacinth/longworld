@@ -11,13 +11,18 @@ from longworld.core.world import Event, SimulatedWorld
 if TYPE_CHECKING:
     from longworld.domains.company.queries import QuerySpec
 
-_BAND_ORDER = {"16k": 0, "32k": 1, "64k": 2}
+_BAND_ORDER = {"16k": 0, "32k": 1, "64k": 2, "128k": 3}
 _RELEASE_HISTORY_QUERY_TYPES = {
     "version_selection",
     "release_supersession_trace",
 }
 _RELEASE_BAND_CYCLE_COUNT = {"16k": 1, "32k": 2, "64k": 3}
-_PATCH_REVIEW_TEST_BAND_CYCLE_COUNT = {"16k": 1, "32k": 2, "64k": 4}
+_PATCH_REVIEW_TEST_BAND_CYCLE_COUNT = {
+    "16k": 1,
+    "32k": 2,
+    "64k": 4,
+    "128k": 8,
+}
 _REAL_SOURCE_ORIGINS = {"real_public", "real_private_export", "real_derived"}
 _SOURCE_RELATION_KINDS = {"derived_from", "source_context"}
 
@@ -294,7 +299,7 @@ def bind_cumulative_patch_review_test_history(
     for group in groups.values():
         group.sort(key=lambda item: _BAND_ORDER[item.preferred_length_buckets[0]])
         bands = [query.preferred_length_buckets[0] for query in group]
-        if bands != ["16k", "32k", "64k"][: len(group)]:
+        if bands != ["16k", "32k", "64k", "128k"][: len(group)]:
             raise ValueError(
                 "patch-review-test group has a non-cumulative band sequence"
             )

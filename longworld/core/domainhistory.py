@@ -40,7 +40,7 @@ CROSS_CVE_HISTORY_REPLAY_REVISION = "longworld.cyber-cross-cve-replay.v1"
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _CVE_ID = re.compile(r"^CVE-(?:1999|2\d{3})-\d{4,}$")
-_EXPECTED_BANDS = ("16k", "32k", "64k")
+_EXPECTED_BANDS = ("16k", "32k", "64k", "128k")
 _ENTRY_FIELDS = {
     "cveID",
     "vendorProject",
@@ -702,7 +702,9 @@ def _cross_cve_cve_dates(documents: Sequence[str]) -> dict[str, str]:
             continue
         payload = json.loads(str(record.get("text") or ""))
         cve_id = str(record.get("cve_id") or "")
-        date_added = str(payload.get("dateAdded") or "") if isinstance(payload, dict) else ""
+        date_added = (
+            str(payload.get("dateAdded") or "") if isinstance(payload, dict) else ""
+        )
         if cve_id and date_added:
             dates[cve_id] = date_added
     return dates
@@ -741,9 +743,7 @@ def _cross_cve_token_spans(
 ) -> list[tuple[int, int]]:
     spans: list[tuple[int, int]] = []
     for index in range(len(documents)):
-        start = (
-            token_counter(SEP.join(documents[:index]) + SEP) if index else 0
-        )
+        start = token_counter(SEP.join(documents[:index]) + SEP) if index else 0
         end = token_counter(SEP.join(documents[: index + 1]))
         spans.append((start, end))
     return spans
@@ -1715,7 +1715,7 @@ def build_kev_catalog_history_candidates(
         raise ProvenanceError("KEV history source URL is invalid")
     _parse_timestamp(str(source_binding["observed_at"]), "observed_at")
     if [band.name for band in bands] != list(_EXPECTED_BANDS[: len(bands)]):
-        raise ProvenanceError("KEV history bands must be ordered 16k/32k/64k")
+        raise ProvenanceError("KEV history bands must follow the registered order")
 
     entries = _validate_catalog(catalog)
     header = _catalog_header(catalog, str(source_binding["retrieval_sha256"]))
@@ -1932,10 +1932,10 @@ def audit_kev_catalog_history_candidate(task: dict[str, Any]) -> dict[str, bool]
 
 
 def audit_cumulative_history(rows: Sequence[dict[str, Any]]) -> list[str]:
-    """Return stable violations of strict 16/32/64K source-history growth."""
+    """Return stable violations of strict registered-band source-history growth."""
     errors: list[str] = []
     if [row.get("length_bucket") for row in rows] != list(_EXPECTED_BANDS[: len(rows)]):
-        errors.append("bands_not_ordered_16k_32k_64k")
+        errors.append("bands_not_in_registered_order")
         return errors
     for before, after in pairwise(rows):
         label = f"{before['length_bucket']}->{after['length_bucket']}"
@@ -2176,6 +2176,54 @@ def _pipeline_documents(context: str, count: int) -> list[str]:
     return documents
 
 
+def _pipeline_documents_for_windows(
+    history: Mapping[str, Any],
+    *,
+    minimum_count: int,
+    token_counter: Callable[[str], int],
+) -> list[str]:
+    """Use the fewest exact-band shards that expose a real 4K subwindow."""
+    context = str(history.get("context") or "")
+    question = str(history.get("question") or "")
+    lower = history.get("band_lower_tokens")
+    upper = history.get("band_upper_tokens")
+    if (
+        not context
+        or not question
+        or isinstance(lower, bool)
+        or not isinstance(lower, int)
+        or isinstance(upper, bool)
+        or not isinstance(upper, int)
+    ):
+        raise ProvenanceError("KEV pipeline exact-band inputs are invalid")
+    lines = context.splitlines()
+
+    def admissible(documents: list[str]) -> bool:
+        prompt_tokens = token_counter(
+            wrap_prompt(question, SEP.join(documents), "first")
+        )
+        return lower <= prompt_tokens <= upper and any(
+            token_counter(document) <= _RAW_TOKEN_WINDOW for document in documents
+        )
+
+    documents = _pipeline_documents(context, minimum_count)
+    if admissible(documents):
+        return documents
+    for tail_width in range(1, len(lines) - minimum_count + 1):
+        tail = "\n".join(lines[-tail_width:])
+        if token_counter(tail) > _RAW_TOKEN_WINDOW:
+            break
+        documents = [
+            *_pipeline_documents("\n".join(lines[:-tail_width]), minimum_count),
+            tail,
+        ]
+        if admissible(documents):
+            return documents
+    raise ProvenanceError(
+        "KEV pipeline cannot expose a strict 4K window inside the exact band"
+    )
+
+
 def replay_kev_pipeline_candidate(
     candidate: dict[str, Any],
     *,
@@ -2369,7 +2417,11 @@ def build_kev_pipeline_candidate(
     ):
         raise ProvenanceError("KEV task replay sidecar binding is invalid")
 
-    documents = _pipeline_documents(str(history.get("context") or ""), document_shards)
+    documents = _pipeline_documents_for_windows(
+        history,
+        minimum_count=document_shards,
+        token_counter=token_counter,
+    )
     classifications: list[dict[str, Any]] = []
     source_ids_by_artifact: dict[str, list[str]] = {}
     for index, document in enumerate(documents):

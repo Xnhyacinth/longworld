@@ -289,3 +289,56 @@ signed B1/B3/B5/B5w export without claiming production approval.
 | Promote and gate | complete: 108/108 ready, gate errors empty |
 | Export training mixtures | complete: 11 manifest outputs, 1.34% token spread |
 | Production/HF publication | out of scope: independent production trust is still absent |
+
+## P15 128K and semantic-scale expansion — 2026-09-03
+
+Goal: enlarge the current P14 local-probe training release with naturally
+source-bound 128K rows and new independent worlds/tasks. Existing 16K/32K/64K
+rows stay immutable; additions use new configs/output directories and must pass
+the unchanged exact-band, near-duplicate, derived-view, source-lineage,
+truncation, replay, remove-one, and shortcut gates.
+
+Assumptions and routing:
+
+- `.hl/policy.md` remains the control plane; this is research-pipeline work.
+- Complexity is 10/10: breadth 2, depth 2, dependency 2, uncertainty 2,
+  validation 2. Use mixed execution with three disjoint workers plus root
+  integration.
+- Candidate discovery, source acquisition, and local preflight run in parallel;
+  selection/promotion/export remain serial because they bind one immutable row
+  set.
+- Generated JSONL and credentials remain outside Git. Workers do not edit
+  shared `.hl` files or release-profile/promotion code.
+
+| Track | Owner | Files/responsibility | Deliverable and validator | Status |
+| --- | --- | --- | --- | --- |
+| P15.A | Company worker | new `p15_company_*` configs/reports and Company-only adapter/tests if required | JPMorgan/Walmart or a new issuer gains a distinct proof-bearing 128K task; all emitted cells pass candidate-local replay | complete_fail_closed: 0 rows; 88,934 tokens and near-dup 0.2919 |
+| P15.B | ResearchLab worker | new `p15_researchlab_*` configs/reports and ResearchLab-only adapter/tests if required | naturally long paper/revision entity with a new task chain and exact 128K capacity, without copied/padded text | complete_candidate: 3 exact-128K rows under separate probe trust |
+| P15.C | CodeForge worker | new `p15_codeforge_*` configs/reports and CodeForge-only adapter/tests if required | convert disjoint real Git/release history into executable 128K SFT or record an exact fail-closed capacity result | complete_candidate: uv 6/6 at 64K/128K |
+| P15.D | root integration | release profile/config, candidate inventory, selection/promotion/export, `.hl`, status report, Git | at least one independently audited exact-128K world enters a new train-ready local-probe release; otherwise preserve P14 and report blockers exactly | complete: 2 worlds / 12 rows / signed B5 export |
+
+Success is not a nominal `128k` label: every admitted 128K row must contain
+128,000--131,072 exact pinned-tokenizer context tokens, add proof-relevant
+source records/relations beyond 64K, survive raw-window and dense shortcut
+checks, and retain an independently replayable answer/CF. New worlds count only
+after their complete required cell set passes.
+
+## P16 world and trajectory diversity queue — 2026-09-03
+
+World diversity is measured as an executable tuple rather than a domain label:
+`state × entity graph × task program × interaction topology × artifact type × oracle × counterfactual operation`.
+The next capacity probes are ordered by reuse of verified adapters and by
+trajectory difference from the current linear reconciliation tasks.
+
+| Priority | Candidate | Distinct topology and oracle | Immediate action |
+| --- | --- | --- | --- |
+| 1 | BEA workbook vintage 128K | multiple cell-revision trajectories joined by an as-of calculation; workbook/cell replay | run exact-band DP capacity preflight with the existing Macro adapter |
+| 2 | GitHub failure-recovery handoff | failed CI → repair → parallel review/pass → merge/release; checks and ancestry | locate eight real cycles in a new allowlisted repository |
+| 3 | Microsoft five-year cross-statement ledger | per-year multi-table branches → year join → temporal reduction; XBRL-row program | test mandatory-row capacity before extending Finance to 128K |
+| 4 | IETF controlling-requirement resolution | revision graph + published-as + updates/obsoletes; byte-bound standards replay | isolate a unique substantive delta before adding a sidecar adapter |
+| 5 | OpenReview/arXiv evidence reconciliation | review fan-out → response/delta joins → claim ledger | source-capacity and cross-source relation preflight only |
+| 6 | proposal-to-final document disposition | parallel section alignment → retained/modified/removed summary | fetch official full text and prove stable section spans first |
+
+Spreadsheet, agent, retrieval, deep-research, document, and finance worlds are
+admissible only with frozen source/state receipts and deterministic final-state
+or claim-to-span oracles. Free-form model reasoning is never the gold trace.

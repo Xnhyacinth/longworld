@@ -7,7 +7,7 @@ from dataclasses import replace
 from itertools import pairwise
 
 from longworld.core.engine import answer_from_artifacts
-from longworld.core.promotion import _replayed_source_metadata
+from longworld.core.promotion import _replayed_source_metadata, stable_answer_program_id
 from longworld.core.provenance import SourceLineage
 from longworld.core.realworkflow import RealWorkflow, WorkflowRecord
 from longworld.core.taxonomy import SourceOrigin
@@ -211,10 +211,10 @@ def test_patch_review_test_source_relations_match_strict_replay() -> None:
     )
 
 
-def test_patch_review_test_ancestry_grows_one_two_four_release_cycles() -> None:
+def test_patch_review_test_ancestry_grows_one_two_four_eight_release_cycles() -> None:
     base = _patch_review_test_release_workflow()
     workflows: list[RealWorkflow] = []
-    for cycle in range(4):
+    for cycle in range(8):
         suffix = str(cycle + 1)
         records = tuple(
             replace(
@@ -249,7 +249,7 @@ def test_patch_review_test_ancestry_grows_one_two_four_release_cycles() -> None:
             for query in build_code_queries(world)
             if query.query_type == "patch_review_test_ancestry"
         ),
-        key=lambda query: {"16k": 0, "32k": 1, "64k": 2}[
+        key=lambda query: {"16k": 0, "32k": 1, "64k": 2, "128k": 3}[
             query.preferred_length_buckets[0]
         ],
     )
@@ -258,6 +258,7 @@ def test_patch_review_test_ancestry_grows_one_two_four_release_cycles() -> None:
         ["16k"],
         ["32k"],
         ["64k"],
+        ["128k"],
     ]
     assert [
         sum(
@@ -265,8 +266,9 @@ def test_patch_review_test_ancestry_grows_one_two_four_release_cycles() -> None:
             for op in query.program_ops
         )
         for query in queries
-    ] == [1, 2, 4]
-    assert [len(query.answer.split(" | ")) for query in queries] == [1, 2, 4]
+    ] == [1, 2, 4, 8]
+    assert [len(query.answer.split(" | ")) for query in queries] == [1, 2, 4, 8]
+    assert len({stable_answer_program_id(query) for query in queries}) == 4
     for before, after in pairwise(queries):
         assert set(before.essential_event_ids) < set(after.essential_event_ids)
         assert set(before.sufficient_event_ids) < set(after.sufficient_event_ids)

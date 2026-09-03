@@ -176,6 +176,37 @@ def test_p13_authentic_six_domain_profile_is_an_immutable_probe_root() -> None:
     )
 
 
+def test_p15_128k_extension_profile_accepts_two_honest_partial_band_worlds() -> None:
+    profile = release_profile("p15-authentic-128k-extension-probe-2-v1")
+
+    assert profile.environment == "probe"
+    assert profile.predecessor_profile_id is None
+    assert profile.expected_promoted_worlds == 2
+    assert (profile.min_train_worlds, profile.min_eval_worlds) == (2, 0)
+    assert (profile.min_real_train_worlds, profile.min_real_eval_worlds) == (2, 0)
+    assert profile.training_conditions == ("B5",)
+    assert profile.training_length_buckets == ("64k", "128k")
+    assert profile.required_exact_length_buckets == ("64k", "128k")
+    assert profile.required_view_timings == (
+        ("full", "first"),
+        ("cf", "first"),
+        ("ordered_artifact_view", "first"),
+    )
+    assert dict(profile.promoted_domain_world_quotas) == {
+        "codeforge": 1,
+        "cyber": 1,
+    }
+    assert dict(profile.min_real_exact_64k_rows_by_domain) == {
+        "codeforge": 3,
+        "cyber": 3,
+    }
+    assert dict(profile.min_real_exact_64k_worlds_by_domain) == {
+        "codeforge": 1,
+        "cyber": 1,
+    }
+    assert profile.require_all_rows_source_bound is True
+
+
 def test_current_production_profiles_require_source_rich_predecessors() -> None:
     production_48 = release_profile("p10-source-rich-production-48-v1")
     production_210 = release_profile("p10-source-rich-production-210-v1")
@@ -286,7 +317,11 @@ def test_p12_sec_slice_adds_128k_without_changing_historical_training_buckets() 
     assert all(
         candidate.training_length_buckets == ("16k", "32k", "64k")
         for profile_id, candidate in RELEASE_PROFILES.items()
-        if profile_id != profile.profile_id
+        if profile_id
+        not in {
+            profile.profile_id,
+            "p15-authentic-128k-extension-probe-2-v1",
+        }
     )
     assert historical.training_length_buckets == ("16k", "32k", "64k")
     assert profile.training_length_buckets == ("16k", "32k", "64k", "128k")

@@ -1033,8 +1033,8 @@ def _build_real_repo_queries(
                 },
             )
         )
-    patch_cycles = patch_cycles[-4:]
-    for cycle_count in (1, 2, 4):
+    patch_cycles = patch_cycles[-8:]
+    for cycle_count in (1, 2, 4, 8):
         if cycle_count > len(patch_cycles):
             continue
         selected_cycles = patch_cycles[-cycle_count:]
@@ -1049,7 +1049,7 @@ def _build_real_repo_queries(
             str(cycle_release.params["record_key"])
             for cycle_release, _events, _op in selected_cycles
         ]
-        bucket = {1: "16k", 2: "32k", 4: "64k"}[cycle_count]
+        bucket = {1: "16k", 2: "32k", 4: "64k", 8: "128k"}[cycle_count]
         queries.append(
             QuerySpec(
                 query_id=(

@@ -17,6 +17,7 @@ from longworld.core.attestation import (
 from longworld.core.domainhistory import (
     KEV_PIPELINE_REPLAY_MANIFEST_SCHEMA,
     HistoryBand,
+    _pipeline_documents_for_windows,
     audit_kev_pipeline_candidate,
     build_kev_catalog_history_candidates,
     build_kev_pipeline_candidate,
@@ -111,6 +112,28 @@ def _candidate() -> dict[str, Any]:
         candidate_attestation_key=CANDIDATE_KEY,
         document_shards=4,
     )
+
+
+def test_pipeline_sharding_grows_until_a_real_4k_subwindow_exists() -> None:
+    history = {
+        "context": "\n".join("x" * 1_599 for _ in range(80)),
+        "question": "Audit the complete history.",
+        "band_lower_tokens": 128_000,
+        "band_upper_tokens": 131_072,
+    }
+
+    documents = _pipeline_documents_for_windows(
+        history,
+        minimum_count=4,
+        token_counter=len,
+    )
+
+    assert len(documents) == 5
+    assert min(map(len, documents)) <= 4_096
+    prompt = __import__("longworld.core.pack", fromlist=["wrap_prompt"]).wrap_prompt(
+        history["question"], SEP.join(documents), "first"
+    )
+    assert 128_000 <= len(prompt) <= 131_072
 
 
 class _Tokenizer:

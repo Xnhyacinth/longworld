@@ -36,6 +36,7 @@ BUNDLE = (
     / "paper_source_workflow_bundle.p14.sparks-section-reconciliation.signed.json"
 )
 TOKENIZER_REVISION = "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+P14_BUCKETS = {"16k", "32k", "64k"}
 
 
 def _materialized():
@@ -58,6 +59,7 @@ def test_sparks_bundle_materializes_nested_section_reconciliation_queries() -> N
         query
         for query in materialized.queries
         if query.query_type == "paper_revision_section_reconciliation"
+        and query.preferred_length_buckets[0] in P14_BUCKETS
     ]
 
     assert [query.preferred_length_buckets for query in queries] == [
@@ -94,13 +96,14 @@ def test_sparks_bundle_materializes_nested_section_reconciliation_queries() -> N
             for event in relations
         } == tier_edges
         assert any(
-            event.type == "arxiv_section_reconciliation_control"
-            for event in selected
+            event.type == "arxiv_section_reconciliation_control" for event in selected
         )
         claim_events = [
             event for event in selected if event.params.get("section_claim_id")
         ]
-        assert all(event.params.get("source_compile_receipts") for event in claim_events)
+        assert all(
+            event.params.get("source_compile_receipts") for event in claim_events
+        )
         assert all(
             str(event.params["text"]).count(event.params["section_claim_quote"]) == 1
             for event in claim_events
@@ -116,6 +119,7 @@ def test_sparks_revision_proof_grows_only_after_the_single_revision_tier() -> No
         query
         for query in materialized.queries
         if query.query_type == "paper_revision_section_reconciliation"
+        and query.preferred_length_buckets[0] in P14_BUCKETS
     ]
 
     relation_sets = []
@@ -124,9 +128,7 @@ def test_sparks_revision_proof_grows_only_after_the_single_revision_tier() -> No
         relations = [
             event for event in selected if event.type == "arxiv_revision_relation"
         ]
-        relation_sets.append(
-            {str(event.params["relation_id"]) for event in relations}
-        )
+        relation_sets.append({str(event.params["relation_id"]) for event in relations})
     assert [len(relations) for relations in relation_sets] == [0, 1, 2]
     assert relation_sets[0] < relation_sets[1] < relation_sets[2]
     assert [query.proof_depth for query in queries] == [2, 3, 4]
@@ -135,14 +137,16 @@ def test_sparks_revision_proof_grows_only_after_the_single_revision_tier() -> No
     assert queries[2].question.count("revision_of") == 4
 
 
-def test_sparks_reconciliation_requires_every_signed_input_and_changes_under_cf(
-) -> None:
+def test_sparks_reconciliation_requires_every_signed_input_and_changes_under_cf() -> (
+    None
+):
     materialized = _materialized()
     world = materialized.worlds["focal"]
     queries = [
         query
         for query in materialized.queries
         if query.query_type == "paper_revision_section_reconciliation"
+        and query.preferred_length_buckets[0] in P14_BUCKETS
     ]
 
     expected_prefixes = [
@@ -174,9 +178,7 @@ def test_sparks_reconciliation_requires_every_signed_input_and_changes_under_cf(
 def test_sparks_reconciliation_packs_exact_distinct_long_views() -> None:
     materialized = _materialized()
     world = materialized.worlds["focal"]
-    tokenizer = _load_exact_tokenizer(
-        "Qwen/Qwen3.5-4B", TOKENIZER_REVISION, True
-    )
+    tokenizer = _load_exact_tokenizer("Qwen/Qwen3.5-4B", TOKENIZER_REVISION, True)
 
     def count(text: str) -> int:
         return tokenizer_token_count(text, tokenizer)
@@ -190,6 +192,7 @@ def test_sparks_reconciliation_packs_exact_distinct_long_views() -> None:
         query
         for query in materialized.queries
         if query.query_type == "paper_revision_section_reconciliation"
+        and query.preferred_length_buckets[0] in P14_BUCKETS
     ]
     for query in queries:
         bucket = query.preferred_length_buckets[0]

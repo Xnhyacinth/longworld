@@ -1,0 +1,10 @@
+{
+  "schema_version": "longworld.replay-path-registry.v2",
+  "episode_replay_bundles": {
+    "17bd6cccd8abcd929c4b25dde48944ea175c13be689ac67c87a37b243f11bfa6": "configs/p15_codeforge_uv_release_validation_v1_bundle.json"
+  },
+  "source_workflow_bundles": {},
+  "task_replay_sidecars": {
+    "2bdf0f1c3f822420dcec70f3d2f39d507705c3a008b4f2e4738ed95d9d844d1e": "data/releases/p15-cyber-kev-64k-128k-task-views-v6/TASK_REPLAY_SIDECAR_V3.json"
+  }
+}
