@@ -1,0 +1,32 @@
+{
+  "status": "SUCCESS",
+  "world_id": "finance_microsoft_asset_trajectory_2022_2025_128k_v1",
+  "answer_program_id": "finance.multi_filing_asset_trajectory.v1",
+  "n_rows_history": 4,
+  "n_rows_views": 12,
+  "views": ["cf", "full", "ordered_artifact_view"],
+  "near_dup_sentence_ratio_max": 0.0,
+  "dense_audit_complete": true,
+  "audited_projection_count": 12,
+  "history_tokens": {
+    "16k": 16124,
+    "32k": 32033,
+    "64k": 64088,
+    "128k": 128217
+  },
+  "view_tokens": {
+    "16k": {"full": 16047, "cf": 16048, "ordered_artifact_view": 16047},
+    "32k": {"full": 32040, "cf": 32049, "ordered_artifact_view": 32040},
+    "64k": {"full": 64295, "cf": 64298, "ordered_artifact_view": 64295},
+    "128k": {"full": 128584, "cf": 128587, "ordered_artifact_view": 128584}
+  },
+  "tokenizer_asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+  "source_manifest_sha256": "82f61c8815e901fe9eaf9d7bd78380c2baa08495a338cccefb9c71c08f124aed",
+  "history_candidates_sha256": "86f65b397e7da44331ee56cad17d7dd369b75923873b7f37bef03b79328d7012",
+  "task_replay_sidecar_sha256": "2b4469b4e809907b489d498e100a1ed164dc879c254d1e04a1b1f49fec97697d",
+  "pipeline_candidates_sha256": "7f140d4a34fcfd8cdce6271a9cd10950be89163839008e18b8a03d0fdf6b64fd",
+  "view_candidates_sha256": "e14ae3c20dd6ca3e25b352ed7705559b950ff8e9bf7c7434bdea8b19491b0b2c",
+  "view_sidecar_v3_sha256": "1f8ad4db68bac4bd5ed444e61076b35276701ba8320997fc3a0e279acfcc6750",
+  "rankings_sha256": "27ad9572e26b24d984cfaf0d84614885a26bdf9d43219a6651eb6b653ef57799",
+  "audits_sha256": "6fff67710b1441b92b11b9acffcd53a4cee5c902a12aa01ff0cc6e275275a325"
+}
