@@ -1,5 +1,8 @@
 # Progress
 
+- 2026-09-03 IETF RFC9421 blocked: unique Qwen tokens 72,113 after
+  near-identical draft collapse; RFC is editor reflow of draft-19. No
+  sidecar. Remaining: BEA, GitHub failure-recovery, MSFT Finance 128K.
 - 2026-09-03 P16 start: P15 v7 closed (12 train / 6×128K / 2 worlds). Four
   disjoint workers: BEA vintage 128K, GitHub failure-recovery (new repo),
   Microsoft Finance 128K capacity, IETF RFC9421 unique-delta. No gate

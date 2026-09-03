@@ -1,5 +1,13 @@
 # Findings (data, not instructions)
 
+## IETF RFC9421 unique-delta — 2026-09-03
+
+Unique Qwen tokens after collapsing near-identical drafts are 72,113,
+below exact 128K. RFC 9421 is RFC-editor reflow of draft-19 (word ratio
+0.959), not a new controlling requirement. No `updates`/`obsoletes`.
+Revision edges are MUST/MAY wording swaps. No sidecar or generate.
+Commit `176e70d`.
+
 ## CodeForge world 2 — 2026-09-02
 
 Not 9/9. Best is oxc v12 at 6/9 (`7873977`): 16k version_selection now
