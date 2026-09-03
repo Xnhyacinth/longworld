@@ -110,6 +110,14 @@
   `#27766` (`cancelled`). `#26460` is thinner than `#17804`.
 - Do not export a release-cited GitHub PR whose head check-runs lack
   `success` or include blocking conclusions. oxc `#25909` failed that gate.
+- Do not generate pandas #19970 as a 64K/128K regression-bisect world. Its
+  authentic issue/culprit/fix/backport/release chain has only 21,200
+  near-deduplicated Qwen tokens, the reported bisect omits midpoint outcomes,
+  and GitHub exposes no machine check records for the four critical SHAs.
+- Do not expand the Microsoft FY2024/FY2025 segment recast with unrelated
+  notes or raw iXBRL markup. The authentic arithmetic relation has only 3,889
+  eligible deduplicated tokens, leaving 60,111/124,111-token deficits at the
+  exact 64K/128K lower bounds.
 - Do not export dprint `#1215`: `sanitize_public_text` fail-closed on a
   credential-shaped secret. Do not weaken the scanner. `#1207`→`0.56.0`
   exported instead (CI 16 success, ancestry ahead).

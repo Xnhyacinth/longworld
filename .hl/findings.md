@@ -1160,6 +1160,27 @@ so `n_real_source_relations=0` is correct. Do not use this slice to claim the
   caches, and one unreachable file. Packed-view distance still requires
   verification before implementation.
 
+## 2026-09-03 P18 topology findings
+
+- Microsoft FY2024/FY2025 filings contain a genuine presentation recast:
+  every segment revenue and operating-income endpoint changes while the two
+  disclosed totals remain 245,122 and 109,433 million dollars. Exact
+  source/fact/span binding and remove-one-to-unknown semantics make this a
+  viable deterministic oracle component, but its eligible notes and
+  qualifiers retain only 3,889 deduplicated Qwen tokens.
+- Raw iXBRL size is not long-context capacity. The same recast source has
+  193,529 raw HTML tokens but only 4,267 relevant visible tokens before
+  sentence deduplication; counting markup would manufacture length from
+  presentation syntax.
+- A real regression report, named bisect culprit, reviewed fix, maintenance
+  backport, and first containing release still do not make a runnable
+  regression-bisect world. The pandas #19970 chain retains only 21,200 Qwen
+  tokens after near-deduplication, and its public record omits the ordered
+  midpoint pass/fail trace needed to replay first-bad localization.
+- The existing `ci_regression_origin` program is not a substitute: it proves a
+  failed check to same-name recovery path, not ordered narrowing, a first-bad
+  boundary, a distinct repair, or culprit/fix removal counterfactuals.
+
 ## 2026-09-03 P14 closure findings
 
 - A parent directory symlink in a portable task-sidecar registry must be

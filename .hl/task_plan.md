@@ -399,5 +399,5 @@ capacity are measured.
 
 | Track | Ownership | Exit criterion | Status |
 | --- | --- | --- | --- |
-| P18.A SEC restatement | `configs/p18_finance_*`, `reports/p18_finance_*` | locate accession/footnote/restatement graph in existing signed local filings; report 64K/128K unique capacity and exact arithmetic oracle | in_progress |
-| P18.B regression bisect | `configs/p18_codeforge_*`, `reports/p18_codeforge_*` | locate licensed issue/culprit/fix/test/release chain; prove failing/passing endpoints and token histogram distinct from failure-recovery | in_progress |
+| P18.A SEC restatement | `configs/p18_finance_*`, `reports/p18_finance_*` | locate accession/footnote/restatement graph in existing signed local filings; report 64K/128K unique capacity and exact arithmetic oracle | blocked: authentic Microsoft segment recast, but only 3,889 deduplicated tokens |
+| P18.B regression bisect | `configs/p18_codeforge_*`, `reports/p18_codeforge_*` | locate licensed issue/culprit/fix/test/release chain; prove failing/passing endpoints and token histogram distinct from failure-recovery | blocked: pandas chain authentic, but near-dedup capacity 21,200 tokens and no midpoint/check-run oracle |
