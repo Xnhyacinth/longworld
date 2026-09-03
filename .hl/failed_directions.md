@@ -1,5 +1,7 @@
 # Rejected or blocked directions
 
+- Do not mix Microsoft Finance 128K into the P16 v2 probe extension. Its
+  issuer-SEC manifest verifies only under `p12-probe-12-20260829-v1`.
 - Do not pad leftover PRs onto Pulumi failure-recovery to fake 128K.
   Unique tokens are 114833; next unused unique-tag cycles overflow ~170k.
 - Do not rebuild DuckDB 8-PR same-tag FR bundles; they fail duplicate

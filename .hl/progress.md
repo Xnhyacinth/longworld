@@ -1,5 +1,8 @@
 # Progress
 
+- 2026-09-03 P16 BEA local-probe extension is train-ready: 1 world / 12 rows
+  / 3×128K at 128251 tokens, B5 export 12 rows, gate ok, near-dup 0.0.
+  Independent of P15 v7. Finance stays unmixed (different probe). No HF.
 - 2026-09-03 P16 four-track close: BEA 12/12 (128251) and Microsoft Finance
   12/12 (128217) are candidate-local 128K worlds; Pulumi FR blocked at
   114833 unique tokens; RFC9421 blocked at 72113 after reflow collapse.

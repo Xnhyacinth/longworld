@@ -352,7 +352,7 @@ and must not edit `.hl/` or shared release-profile code.
 
 | Track | Owner | Files | Success | Status |
 | --- | --- | --- | --- | --- |
-| P16.1 | Macro worker | `configs/p16_macro_bea_*`, `reports/p16_macro_*` | exact 128K vintage cells from existing BEA xlsx; unique cell-revision join, no padding | complete_candidate: 12/12 dense audit; 128k=128251 |
+| P16.1 | Macro worker | `configs/p16_macro_bea_*`, `reports/p16_macro_*` | exact 128K vintage cells from existing BEA xlsx; unique cell-revision join, no padding | complete: 12/12 train-ready B5; 128k=128251 |
 | P16.2 | CodeForge worker | `configs/p16_codeforge_*`, `reports/p16_codeforge_*` | new allowlisted repo, `failure_recovery_release_trace`, 64K/128K three-view if authentic; not uv/dprint/wasmtime clone | blocked: pulumi 7/7 at 64k three-view; 128k 114833 |
 | P16.3 | Finance worker | `configs/p16_finance_microsoft_*`, `reports/p16_finance_*` | add exact 128K band on existing MSFT issuer-SEC trajectory if unique tokens fill; no EDGAR hammer, no Company reconstruction | complete_candidate: 12/12 dense audit; 128k=128217 |
 | P16.4 | Standards worker | `configs/p16_ietf_*`, `reports/p16_ietf_*` | unique substantive RFC9421 delta preflight; sidecar/generate only if unique tokens fill 128K | blocked: unique tokens 72113; RFC is draft-19 reflow |
