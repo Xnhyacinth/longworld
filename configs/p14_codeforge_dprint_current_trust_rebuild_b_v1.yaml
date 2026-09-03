@@ -1,0 +1,60 @@
+schema_version: p3.0
+data_product: worldlong_p14_codeforge_dprint_current_trust_rebuild_b_v1
+data_stage: candidate
+release_profile_id: p7-github-source-slice-1-v1
+trust_scope: local_probe
+diagnostic_only: true
+trust_valid_for_production: false
+production_eligible: false
+local_probe_trust_isolation: non_independent_local_diagnostic
+required_seed_start: 126
+
+n_worlds: 1
+target_promoted_worlds: 1
+domains: [codeforge]
+domain_world_quotas: { codeforge: 1 }
+n_parallel: 0
+n_pulses: 0
+domain_n_workstreams: { codeforge: 0 }
+include_program_joins: false
+
+n_anchors: 0
+n_source_pack: 0
+extra_filler_worlds: 0
+min_semantic_tokens: 800
+surface_min: 0.82
+keep_one_position: true
+
+real_workflow_bundle: configs/p14_codeforge_dprint_current_trust_rebuild_b_v1_bundle.json
+real_workflow_seeds: [126]
+real_workflow_query_types: [version_selection, release_supersession_trace]
+real_workflow_query_length_buckets:
+  version_selection: [16k]
+  release_supersession_trace: [32k, 64k]
+real_workflow_length_buckets: [16k, 32k, 64k]
+real_workflow_views: [full, cf, ordered_artifact_view]
+
+exact_tokenizer:
+  model_id: Qwen/Qwen3.5-4B
+  revision: a7b0d22b993d71000cf2eadfb37222a67cee521e
+  local_files_only: true
+exact_pack_admission: true
+
+training_objective: sft
+composition_method: causal_timeline
+require_verified_sources: false
+allow_legacy_sources: false
+strict_semantic_verification: true
+strict_cf_replay: true
+require_producer_attestation: true
+
+train_ratio: 1.0
+split_strategy: world
+split_seed: 42
+length_buckets: { "16k": 16000, "32k": 32768, "64k": 65536 }
+eval_length_buckets: {}
+query_timings: [first]
+position_buckets: [middle]
+release_min_evidence_tokens: { "16k": 8000, "32k": 16000, "64k": 22000 }
+min_internal_growth: 4096
+max_generic_growth_share: 0.20
