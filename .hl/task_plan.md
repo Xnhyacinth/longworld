@@ -342,3 +342,23 @@ trajectory difference from the current linear reconciliation tasks.
 Spreadsheet, agent, retrieval, deep-research, document, and finance worlds are
 admissible only with frozen source/state receipts and deterministic final-state
 or claim-to-span oracles. Free-form model reasoning is never the gold trace.
+
+## P16 execution — 2026-09-03
+
+P15 v7 is closed (2 worlds / 12 train / 6×128K). This slice adds new
+executable topologies, not domain-label copies of uv or KEV. Existing P14
+and P15 releases stay immutable. Workers own disjoint `p16_*` configs/reports
+and must not edit `.hl/` or shared release-profile code.
+
+| Track | Owner | Files | Success | Status |
+| --- | --- | --- | --- | --- |
+| P16.1 | Macro worker | `configs/p16_macro_bea_*`, `reports/p16_macro_*` | exact 128K vintage cells from existing BEA xlsx; unique cell-revision join, no padding | running |
+| P16.2 | CodeForge worker | `configs/p16_codeforge_*`, `reports/p16_codeforge_*` | new allowlisted repo, `failure_recovery_release_trace`, 64K/128K three-view if authentic; not uv/dprint/wasmtime clone | running |
+| P16.3 | Finance worker | `configs/p16_finance_microsoft_*`, `reports/p16_finance_*` | add exact 128K band on existing MSFT issuer-SEC trajectory if unique tokens fill; no EDGAR hammer, no Company reconstruction | running |
+| P16.4 | Standards worker | `configs/p16_ietf_*`, `reports/p16_ietf_*` | unique substantive RFC9421 delta preflight; sidecar/generate only if unique tokens fill 128K | running |
+
+Do not weaken exact bands, near-dup 0.25, derived-view, truncation ppm,
+raw-window, or replay. Do not mix probe trusts. Do not promote/HF until a
+complete new world is candidate-local audited. Root records ledger after
+workers write closeouts.
+

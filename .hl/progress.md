@@ -1,5 +1,10 @@
 # Progress
 
+- 2026-09-03 P16 start: P15 v7 closed (12 train / 6×128K / 2 worlds). Four
+  disjoint workers: BEA vintage 128K, GitHub failure-recovery (new repo),
+  Microsoft Finance 128K capacity, IETF RFC9421 unique-delta. No gate
+  weakening. No uv/KEV relabel. No EDGAR hammer. No selection/HF until a
+  new audited world exists.
 - 2026-09-02 parallel fill closed: 0 new 9/9 worlds. CodeForge best oxc
   v12 is 6/9 (16k VS three-view + 64k RST; 32k RST `derived_view_gate`).
   dprint remains CodeForge world 1. Quota still Company 0/2, ResearchLab
