@@ -1,0 +1,113 @@
+{
+  "schema_version": "longworld.p35-healthdata-source-preflight-request.v1",
+  "data_product": "p35_healthdata_fda_faers_case_version_preflight_v1",
+  "authorization": {
+    "record_id": "p35-healthdata-fda-faers-2013q3-preflight-v1",
+    "scope": "one FDA-published, non-cumulative post-2012 FAERS ASCII quarter for rights, privacy, schema, and aggregate-only capacity inspection",
+    "basis": "FDA public quarterly extract plus FDA Website Policies and openFDA CC0 boundary; no formal legal opinion",
+    "reviewed_at": "2026-09-03T00:00:00Z",
+    "allowed_actions": [
+      "fetch_one_official_quarter_to_ephemeral_storage",
+      "inspect_schema_and_relational_integrity",
+      "measure_aggregate_only_token_capacity"
+    ],
+    "prohibited_actions": [
+      "persist_or_commit_raw_case_rows",
+      "persist_or_commit_case_identifiers_or_identifier_hashes",
+      "generate_candidates",
+      "infer_medical_causality_or_risk",
+      "promote_or_count_inventory"
+    ]
+  },
+  "research_question": "Can one frozen public FAERS quarter support a privacy-bounded, non-causal latest-valid-case-version and multi-table foreign-key reconciliation world with authentic 64K/128K dependence?",
+  "source": {
+    "quarter": "2013Q3",
+    "reason": "smallest listed post-2012 case/version ASCII quarter with the seven relational tables required by the topology",
+    "official_page_url": "https://fis.fda.gov/extensions/FPD-QDE-FAERS/FPD-QDE-FAERS.html",
+    "archive_url": "https://fis.fda.gov/content/Exports/faers_ascii_2013q3.zip",
+    "expected_sha256": "e440ac13442f573fdeae216dad5d2ffa5e24fb4815625fb5c0915068c72a7fd5",
+    "expected_archive_bytes": 22767509,
+    "expected_tables": {
+      "DEMO13Q3.txt": ["primaryid", "caseid", "caseversion", "i_f_code", "event_dt", "mfr_dt", "init_fda_dt", "fda_dt", "rept_cod", "mfr_num", "mfr_sndr", "age", "age_cod", "gndr_cod", "e_sub", "wt", "wt_cod", "rept_dt", "to_mfr", "occp_cod", "reporter_country", "occr_country"],
+      "DRUG13Q3.txt": ["primaryid", "caseid", "drug_seq", "role_cod", "drugname", "val_vbm", "route", "dose_vbm", "cum_dose_chr", "cum_dose_unit", "dechal", "rechal", "lot_num", "exp_dt", "nda_num", "dose_amt", "dose_unit", "dose_form", "dose_freq"],
+      "INDI13Q3.txt": ["primaryid", "caseid", "indi_drug_seq", "indi_pt"],
+      "OUTC13Q3.txt": ["primaryid", "caseid", "outc_cod"],
+      "REAC13Q3.txt": ["primaryid", "caseid", "pt"],
+      "RPSR13Q3.txt": ["primaryid", "caseid", "rpsr_cod"],
+      "THER13Q3.txt": ["primaryid", "caseid", "dsg_drug_seq", "start_dt", "end_dt", "dur", "dur_cod"]
+    }
+  },
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "capacity_bands": {
+    "64k": [64000, 65536],
+    "128k": [128000, 131072]
+  },
+  "privacy_policy": {
+    "never_persist": [
+      "primaryid",
+      "caseid",
+      "mfr_num",
+      "mfr_sndr",
+      "event_dt",
+      "mfr_dt",
+      "init_fda_dt",
+      "fda_dt",
+      "rept_dt",
+      "age",
+      "age_cod",
+      "gndr_cod",
+      "wt",
+      "wt_cod",
+      "occp_cod",
+      "reporter_country",
+      "occr_country",
+      "drugname",
+      "val_vbm",
+      "dose_vbm",
+      "cum_dose_chr",
+      "cum_dose_unit",
+      "lot_num",
+      "exp_dt",
+      "nda_num",
+      "dose_amt",
+      "dose_unit",
+      "dose_form",
+      "dose_freq",
+      "indi_pt",
+      "pt",
+      "start_dt",
+      "end_dt",
+      "dur",
+      "dur_cod"
+    ],
+    "structural_fields_allowed_for_preflight": [
+      "caseversion",
+      "i_f_code",
+      "rept_cod",
+      "e_sub",
+      "drug_seq",
+      "role_cod",
+      "route",
+      "dechal",
+      "rechal",
+      "indi_drug_seq",
+      "outc_cod",
+      "rpsr_cod",
+      "dsg_drug_seq"
+    ],
+    "production_join_key": "ephemeral dense ordinal assigned after latest-version selection; original identifiers and mappings remain outside Git and training text"
+  },
+  "constraints": [
+    "the task is relational reconciliation only; no medical causality, incidence, prevalence, comparative safety, or risk conclusion is allowed",
+    "raw archive bytes and raw case rows exist only in process memory or an automatically removed temporary directory",
+    "reports contain only aggregate counts, archive hash, official URLs, schemas, and field-level exclusion rules",
+    "case identifiers and hashes of case identifiers are not reportable",
+    "capacity attributable only to case ordinals or repeated row templates is not unique semantic capacity",
+    "no candidate generation until rights, privacy, schema, unique capacity, deterministic oracle, remove-one, and 4K/8K/16K shortcut gates pass unchanged"
+  ]
+}
