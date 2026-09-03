@@ -140,3 +140,26 @@
   `graph.proof_depth` fall 4→2 and fail `real_proof_depth_growth`. Parent
   later computes from the published prior rung plus _new_ sections only.
   Hybrid signatures on the causal closure are 3/6/8, not 3/5/10.
+- Do not retry GPT-3 (`arXiv:2005.14165`) for a ResearchLab revision world.
+  All four revisions hold ~82K tokens each, but complete adjacent changed-file
+  pairs total only 49,623, below exact 64K. Stable files are not revision
+  evidence, so the route is closed without padding.
+- Do not repair PaLM file-delta 32K by adding receipts. The candidate is 5/9
+  and unpromoted; the smallest authentic addition (`exploring-explanations.tex`,
+  +1,639) lands 33,618, above the exact-32K upper bound. Do not retune or pad.
+  PaLM's separate v5 content task (84.9K recursively reachable TeX) stays open
+  and is not blocked by this file-delta outcome.
+- Do not repair ResearchLab Adam substantive-revision 16K. It stops at 6/9 with
+  the prompt at 14,531 against the immutable 16,000--16,384 band; the next
+  complete answer-relevant section cannot fit without changing the task shape.
+- Do not start the next ResearchLab attempt by re-programming Adam. Require a
+  different paper with natural capacity above 64K and 3--4 substantive public
+  revisions, and demonstrate 16K/32K/64K section capacity with the existing
+  arXiv exporter preflight before writing any new core.
+- Do not restore the Apple disclosure chain or count it toward Company quota.
+  It is 6/9 with 0 rows: 16K evidence distance is 7,548, below 8000, and an 8K
+  contiguous window already reproduced the ordered-view answer. Its program was
+  deliberately removed from `company/{simulate,queries}.py`.
+- Do not substitute issuer-owned IR pages for blocked SEC acquisition. NVIDIA
+  IR stops fail-closed on a challenge page and the AMD multifiling directories
+  hold no source filings, so neither is an attested fallback.
