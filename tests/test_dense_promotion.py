@@ -2222,6 +2222,99 @@ def test_p13_selection_requires_every_selected_row_to_be_source_bound() -> None:
         )
 
 
+def _direct_source_counterfactual_candidate() -> dict[str, Any]:
+    source_binding = {
+        "schema_version": "longworld.source-workflow-bundle.v1",
+        "adapter_revision": "sourceworkflow@1",
+        "sha256": "1" * 64,
+        "binding_digest": "2" * 64,
+    }
+    parent = {
+        "source_origin": "real_derived",
+        "workflow_kind": "hybrid_causal",
+        "workflow_id": "official-reports",
+        "provenance_id": "derived-sha256:" + "3" * 64,
+        "text_sha256": hashlib.sha256(b"factual parent").hexdigest(),
+    }
+    projected = {
+        "source_origin": "synthetic_counterfactual",
+        "workflow_kind": "hybrid_causal",
+        "workflow_id": "official-reports",
+        "provenance_id": "derived-sha256:" + "4" * 64,
+        "provenance_operation": "replace_reported_conclusion",
+        "text_sha256": hashlib.sha256(b"counterfactual document").hexdigest(),
+    }
+    return {
+        "view": "cf",
+        "source_family_ids": ["issuer_official_annual_report_pdf"],
+        "source_workflow_bundle": source_binding,
+        "document_context": SEP.join(["real support", "counterfactual document"]),
+        "artifact_classification": [
+            {
+                "artifact_id": "support",
+                "source_origin": "real_derived",
+                "workflow_kind": "hybrid_causal",
+                "evidence_role": "causal_supporting",
+                "workflow_id": "official-reports",
+                "provenance_id": "derived-sha256:" + "5" * 64,
+            },
+            {
+                "artifact_id": "changed",
+                "source_origin": "synthetic_counterfactual",
+                "workflow_kind": "hybrid_causal",
+                "evidence_role": "causal_gold",
+                "workflow_id": "official-reports",
+                "provenance_id": projected["provenance_id"],
+            },
+        ],
+        "source_counterfactual_binding": {
+            "schema_version": "longworld.source-counterfactual-binding.v1",
+            "artifact_id": "changed",
+            "parent_artifact": parent,
+            "counterfactual_artifact": projected,
+            "source_workflow_bundle": dict(source_binding),
+        },
+    }
+
+
+def test_direct_source_counterfactual_requires_exact_parent_binding() -> None:
+    candidate = _direct_source_counterfactual_candidate()
+
+    assert _candidate_has_source_bound_proof(candidate)
+
+    for field, value in (
+        ("provenance_id", ""),
+        ("text_sha256", "not-a-sha256"),
+        ("source_origin", "synthetic_world"),
+    ):
+        tampered = deepcopy(candidate)
+        tampered["source_counterfactual_binding"]["parent_artifact"][field] = value
+        assert not _candidate_has_source_bound_proof(tampered)
+
+    tampered = deepcopy(candidate)
+    tampered["source_counterfactual_binding"]["source_workflow_bundle"][
+        "binding_digest"
+    ] = "0" * 64
+    assert not _candidate_has_source_bound_proof(tampered)
+
+
+def test_direct_source_counterfactual_requires_auditor_binding_digest() -> None:
+    candidate = _direct_source_counterfactual_candidate()
+    digest = promotion_module._canonical_sha256(
+        candidate["source_counterfactual_binding"]
+    )
+
+    assert promotion_module._audit_source_counterfactual_binding_is_closed(
+        {"source_counterfactual_binding_sha256": digest}, candidate
+    )
+    assert not promotion_module._audit_source_counterfactual_binding_is_closed(
+        {}, candidate
+    )
+    assert not promotion_module._audit_source_counterfactual_binding_is_closed(
+        {"source_counterfactual_binding_sha256": "0" * 64}, candidate
+    )
+
+
 def test_p13_selection_signs_domain_stratified_world_maps() -> None:
     candidates, audits = _p13_six_domain_selection_inputs()
 

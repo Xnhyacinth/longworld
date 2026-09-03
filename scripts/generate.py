@@ -67,6 +67,7 @@ from longworld.core.pack import (
 )
 from longworld.core.promotion import (
     EXACT_TOKEN_BAND_RANGES,
+    build_source_counterfactual_binding,
     exact_token_band_reject_reason,
     row_digest_set_sha256,
     serialized_row_sha256,
@@ -2394,6 +2395,18 @@ def emit_records(
                                 classified_artifacts, classifications
                             )
                         ]
+                        if view_name == "cf" and source_replay_binding is not None:
+                            direct_counterfactual_binding = (
+                                build_source_counterfactual_binding(
+                                    factual_classified,
+                                    classified_artifacts,
+                                    source_replay_binding,
+                                )
+                            )
+                            if direct_counterfactual_binding is not None:
+                                dumped["source_counterfactual_binding"] = (
+                                    direct_counterfactual_binding
+                                )
                         if replay_binding is not None:
                             dumped["episode_replay_bundle"] = dict(replay_binding)
                         if source_replay_binding is not None:

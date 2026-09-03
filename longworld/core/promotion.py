@@ -8,7 +8,7 @@ import json
 import math
 import re
 from collections import Counter, OrderedDict, defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from functools import lru_cache
 from itertools import pairwise
@@ -126,6 +126,7 @@ RELEASE_GATE_SCHEMA = "longworld-release-gate-pass-v1"
 RELEASE_GATE_PURPOSE = "release_gate_pass"
 RELEASE_GATE_REVISION = "longworld-quality-gate-v6"
 TASK_SEMANTIC_COMMITMENT_SCHEMA = "longworld.task-semantic-commitment.v2"
+SOURCE_COUNTERFACTUAL_BINDING_SCHEMA = "longworld.source-counterfactual-binding.v1"
 LEGACY_RELEASE_GATE_REVISION = "longworld-quality-gate-v5"
 _LEGACY_RELEASE_GATE_PROFILE_IDS = frozenset(
     {
@@ -587,6 +588,10 @@ def _counterfactual_parent_source_binding_valid(candidate: dict[str, Any]) -> bo
     if not synthetic:
         return True
     projection = candidate.get("task_view_projection")
+    if projection is None:
+        return len(synthetic) == 1 and _direct_source_counterfactual_binding_valid(
+            candidate, synthetic[0]
+        )
     if (
         candidate.get("view") != "cf"
         or len(synthetic) != 1
@@ -623,6 +628,189 @@ def _counterfactual_parent_source_binding_valid(candidate: dict[str, Any]) -> bo
         and changed.get("counterfactual_parent_sidecar_sha256")
         == projection["parent_task_replay_sidecar"].get("sha256")
     )
+
+
+def _normalized_source_workflow_binding(
+    raw_binding: object,
+) -> dict[str, str] | None:
+    if not isinstance(raw_binding, Mapping):
+        return None
+    binding = {
+        field: str(raw_binding.get(field) or "")
+        for field in (
+            "schema_version",
+            "adapter_revision",
+            "sha256",
+            "binding_digest",
+        )
+    }
+    if (
+        set(raw_binding) != set(binding)
+        or binding["schema_version"] != SOURCE_WORKFLOW_BUNDLE_SCHEMA
+        or binding["adapter_revision"] not in SOURCE_WORKFLOW_ADAPTER_REVISIONS
+        or _SHA256.fullmatch(binding["sha256"]) is None
+        or _SHA256.fullmatch(binding["binding_digest"]) is None
+    ):
+        return None
+    return binding
+
+
+def build_source_counterfactual_binding(
+    factual_artifacts: list[Artifact],
+    counterfactual_artifacts: list[Artifact],
+    source_workflow_binding: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    """Bind one direct source-workflow counterfactual to its factual twin."""
+    source_binding = _normalized_source_workflow_binding(source_workflow_binding)
+    if source_binding is None:
+        raise PromotionError("source counterfactual bundle binding is invalid")
+    factual_by_id = {artifact.artifact_id: artifact for artifact in factual_artifacts}
+    changed = [
+        artifact
+        for artifact in counterfactual_artifacts
+        if artifact_classification(artifact).source_origin.value
+        == "synthetic_counterfactual"
+    ]
+    if not changed:
+        return None
+    if len(changed) != 1:
+        raise PromotionError("source counterfactual must change exactly one artifact")
+    counterfactual = changed[0]
+    parent = factual_by_id.get(counterfactual.artifact_id)
+    if parent is None:
+        raise PromotionError("source counterfactual parent artifact is missing")
+    parent_classification = artifact_classification(parent)
+    counterfactual_classification = artifact_classification(counterfactual)
+    if parent_classification.source_origin.value not in {
+        "real_public",
+        "real_private_export",
+        "real_derived",
+    }:
+        raise PromotionError("source counterfactual parent is not a real source")
+    counterfactual_params = dict((counterfactual.slots or {}).get("params") or {})
+    provenance_operation = str(counterfactual_params.get("provenance_operation") or "")
+    if not provenance_operation or parent.text == counterfactual.text:
+        raise PromotionError("source counterfactual derivation is invalid")
+    return {
+        "schema_version": SOURCE_COUNTERFACTUAL_BINDING_SCHEMA,
+        "artifact_id": counterfactual.artifact_id,
+        "parent_artifact": {
+            "source_origin": parent_classification.source_origin.value,
+            "workflow_kind": parent_classification.workflow_kind.value,
+            "workflow_id": parent_classification.workflow_id,
+            "provenance_id": parent_classification.provenance_id,
+            "text_sha256": hashlib.sha256(parent.text.encode()).hexdigest(),
+        },
+        "counterfactual_artifact": {
+            "source_origin": counterfactual_classification.source_origin.value,
+            "workflow_kind": counterfactual_classification.workflow_kind.value,
+            "workflow_id": counterfactual_classification.workflow_id,
+            "provenance_id": counterfactual_classification.provenance_id,
+            "provenance_operation": provenance_operation,
+            "text_sha256": hashlib.sha256(counterfactual.text.encode()).hexdigest(),
+        },
+        "source_workflow_bundle": source_binding,
+    }
+
+
+def _direct_source_counterfactual_binding_valid(
+    candidate: dict[str, Any], changed: dict[str, Any]
+) -> bool:
+    binding = candidate.get("source_counterfactual_binding")
+    source_binding = _normalized_source_workflow_binding(
+        candidate.get("source_workflow_bundle")
+    )
+    if (
+        candidate.get("view") != "cf"
+        or candidate.get("task_replay_sidecar") is not None
+        or not isinstance(binding, dict)
+        or set(binding)
+        != {
+            "schema_version",
+            "artifact_id",
+            "parent_artifact",
+            "counterfactual_artifact",
+            "source_workflow_bundle",
+        }
+        or binding.get("schema_version") != SOURCE_COUNTERFACTUAL_BINDING_SCHEMA
+        or source_binding is None
+        or binding.get("source_workflow_bundle") != source_binding
+    ):
+        return False
+    parent = binding.get("parent_artifact")
+    counterfactual = binding.get("counterfactual_artifact")
+    documents = candidate.get("document_context")
+    classifications = candidate.get("artifact_classification")
+    if (
+        not isinstance(parent, dict)
+        or set(parent)
+        != {
+            "source_origin",
+            "workflow_kind",
+            "workflow_id",
+            "provenance_id",
+            "text_sha256",
+        }
+        or not isinstance(counterfactual, dict)
+        or set(counterfactual)
+        != {
+            "source_origin",
+            "workflow_kind",
+            "workflow_id",
+            "provenance_id",
+            "provenance_operation",
+            "text_sha256",
+        }
+        or not isinstance(documents, str)
+        or not isinstance(classifications, list)
+    ):
+        return False
+    documents_by_id = {
+        str(classification.get("artifact_id") or ""): document
+        for classification, document in zip(
+            classifications, documents.split(SEP), strict=False
+        )
+        if isinstance(classification, dict)
+    }
+    artifact_id = str(binding.get("artifact_id") or "")
+    projected_document = documents_by_id.get(artifact_id)
+    return bool(
+        len(documents_by_id) == len(classifications)
+        and artifact_id
+        and artifact_id == str(changed.get("artifact_id") or "")
+        and parent.get("source_origin")
+        in {"real_public", "real_private_export", "real_derived"}
+        and str(parent.get("workflow_kind") or "")
+        in {"hybrid_causal", "real_source_derived"}
+        and str(parent.get("workflow_id") or "")
+        == str(changed.get("workflow_id") or "")
+        and str(parent.get("provenance_id") or "")
+        and _SHA256.fullmatch(str(parent.get("text_sha256") or "")) is not None
+        and counterfactual.get("source_origin") == "synthetic_counterfactual"
+        and counterfactual.get("workflow_kind") == changed.get("workflow_kind")
+        and counterfactual.get("workflow_id") == changed.get("workflow_id")
+        and counterfactual.get("provenance_id") == changed.get("provenance_id")
+        and str(counterfactual.get("provenance_operation") or "")
+        and isinstance(projected_document, str)
+        and counterfactual.get("text_sha256")
+        == hashlib.sha256(projected_document.encode()).hexdigest()
+        and counterfactual.get("text_sha256") != parent.get("text_sha256")
+    )
+
+
+def _source_counterfactual_binding_sha256(
+    candidate: Mapping[str, Any],
+) -> str | None:
+    binding = candidate.get("source_counterfactual_binding")
+    return _canonical_sha256(binding) if isinstance(binding, dict) else None
+
+
+def _audit_source_counterfactual_binding_is_closed(
+    audit: Mapping[str, Any], candidate: Mapping[str, Any]
+) -> bool:
+    field = "source_counterfactual_binding_sha256"
+    expected = _source_counterfactual_binding_sha256(candidate)
+    return field not in audit if expected is None else audit.get(field) == expected
 
 
 def _candidate_world_domains(candidates: list[dict[str, Any]]) -> dict[str, str]:
@@ -1249,6 +1437,7 @@ def _selection_audit_matches_candidate(
         and _strict_growth_metrics_are_valid(audit.get("strict_growth_metrics"))
         and _selection_task_proof_is_closed(audit, candidate)
         and _selection_task_semantic_commitment_is_closed(audit, candidate)
+        and _audit_source_counterfactual_binding_is_closed(audit, candidate)
         and (
             str(candidate.get("length_bucket") or "") not in EXACT_TOKEN_BAND_RANGES
             or (
@@ -3168,6 +3357,32 @@ def _reconstruct_candidate(
         cf_artifact_index = {
             artifact.artifact_id: artifact for artifact in cf_artifacts
         }
+    declared_source_counterfactual_binding = candidate.get(
+        "source_counterfactual_binding"
+    )
+    if candidate.get("view") == "cf" and "source_workflow_bundle" in bundle_bindings:
+        scoped_ids = [binding["artifact_id"] for binding in bindings]
+        try:
+            replayed_source_counterfactual_binding = (
+                build_source_counterfactual_binding(
+                    [factual_artifact_index[artifact_id] for artifact_id in scoped_ids],
+                    [cf_artifact_index[artifact_id] for artifact_id in scoped_ids],
+                    bundle_bindings["source_workflow_bundle"],
+                )
+            )
+        except KeyError as error:
+            raise PromotionError(
+                "source counterfactual parent artifact cannot be reconstructed"
+            ) from error
+        if (
+            declared_source_counterfactual_binding
+            != replayed_source_counterfactual_binding
+        ):
+            raise PromotionError(
+                "source counterfactual parent binding does not match replay"
+            )
+    elif declared_source_counterfactual_binding is not None:
+        raise PromotionError("source counterfactual parent binding is out of scope")
     reconstructed: list[Artifact] = []
     serialized_classes = {
         str(item.get("artifact_id") or ""): item
@@ -4231,6 +4446,13 @@ def create_dense_audit(
         payload["tokenizer_asset_manifest_sha256"] = exact_replay[
             "tokenizer_asset_manifest_sha256"
         ]
+    source_counterfactual_binding_sha256 = _source_counterfactual_binding_sha256(
+        candidate
+    )
+    if source_counterfactual_binding_sha256 is not None:
+        payload["source_counterfactual_binding_sha256"] = (
+            source_counterfactual_binding_sha256
+        )
     payload.update(bundle_bindings)
     return attach_attestation(payload, audit_key, purpose=DENSE_AUDIT_PURPOSE)
 
@@ -4289,6 +4511,8 @@ def promote_candidate(
         source_bundle_path,
         source_attestation_key,
     )
+    if not _audit_source_counterfactual_binding_is_closed(dense_audit, candidate):
+        raise PromotionError("dense audit source counterfactual binding mismatch")
     verification, replayed_notes, replay_tokenizer = _independent_verification_replay(
         candidate, world, spec, artifacts, counterpart
     )
