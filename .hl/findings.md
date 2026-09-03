@@ -1112,3 +1112,21 @@ so `n_real_source_relations=0` is correct. Do not use this slice to claim the
   strict 6/11/26-file content plan exists after excluding bibliography,
   caches, and one unreachable file. Packed-view distance still requires
   verification before implementation.
+
+## 2026-09-03 P14 closure findings
+
+- A parent directory symlink in a portable task-sidecar registry must be
+  canonicalized after the registry's relative-path and regular-leaf checks;
+  copying sidecars or weakening the downstream `O_NOFOLLOW` walk hides the
+  actual portability bug.
+- Standard task-view candidates intentionally omit producer proof fields. Task
+  promotion must serialize top-level `hop_count` from the independently
+  replayed candidate graph so the final proof metadata is internally closed.
+- Requiring one unique motif per world was redundant with stricter independent
+  minima for real base tasks, executable proofs, answer programs, and semantic
+  base tasks. Two paper entities and two BEA series honestly share task motifs;
+  entity-specific renaming would overstate diversity.
+- Exact source lineage plus a synthetic CF origin is insufficient by itself.
+  Direct source-workflow CF rows now bind the exact factual parent, transformed
+  child text, provenance operation, and source bundle; the dense audit binds
+  the resulting digest before promotion.

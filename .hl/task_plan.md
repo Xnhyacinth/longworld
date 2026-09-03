@@ -275,3 +275,17 @@ Errors:
 | Failed unseen rerun left prior ready artifacts in place               | 1       | Remove generated split files and manifest before rejecting invalid dossier input                                                 |
 | Wikimedia URL authority and requested-title receipt were forgeable    | 1       | Canonical URL authority; exact-title-only receipt; URL secret scan and negative tests                                            |
 | OpenReview v2 API and forum returned a Cloudflare human challenge     | 1       | Record as a live-source block; implement only against official JSON and never substitute search snippets or bypass the challenge |
+
+## 2026-09-03 P14 authentic six-domain closure
+
+Success criterion: select 12 complete source-bound worlds across six domains,
+promote every selected row, pass the unchanged content gates, and validate a
+signed B1/B3/B5/B5w export without claiming production approval.
+
+| Step | Result |
+| --- | --- |
+| Close Company and ResearchLab quotas | complete: JPMorgan, Walmart, Sparks, Llama 3 are 9/9 |
+| Select 12 worlds | complete: six domains × two worlds, 90 train / 18 eval |
+| Promote and gate | complete: 108/108 ready, gate errors empty |
+| Export training mixtures | complete: 11 manifest outputs, 1.34% token spread |
+| Production/HF publication | out of scope: independent production trust is still absent |

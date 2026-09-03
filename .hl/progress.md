@@ -790,3 +790,16 @@ in`; no private-repository or upload claim was made.
 - PaLM's failed file-delta/Adam implementation was fully removed before the
   new compiled-content task began. The new 7/14/27-file plan preplays at
   16,182/32,709/64,846 with every selected file bound to one required claim.
+
+## 2026-09-03 P14 release closure
+
+- Llama 3 section reconciliation supplied the final ResearchLab quota world;
+  inventory reached 14 physical / 12 quota / 126 candidate rows.
+- Company JPMorgan and Walmart now have cumulative reconciliation computation
+  events with replayed proof depth 3/4/5 and direct source-CF parent bindings.
+- Selection-v4 and promoted-v4 contain 12 worlds and 108 rows (90 train, 18
+  eval; 4,079,561 exact context tokens). The p13 six-domain gate is green with
+  108 promotion-ready rows and no errors.
+- B1/B3/B5/B5w export validation passed: 11 bound outputs, zero contract
+  rejects, and 1.34% equal-token spread. Trust remains local-probe and no HF
+  publication was attempted.

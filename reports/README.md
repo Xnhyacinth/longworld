@@ -3,15 +3,12 @@
 ## P14 authentic-data conversion (2026-09-02)
 
 See `p14_conversion_status_20260902.md` and
-`p14_conversion_status_v1.json`. Cyber cross-vendor remediation, Microsoft
-asset/operating-cash trajectory, Wasmtime patch/review/test/release ancestry,
-JPMorgan cross-year risk taxonomy, Walmart cross-year reconciliation, and
-Sparks paper revision section reconciliation are fully audited ninth-cell
-worlds, bringing the honest candidate ledger to 13 physical / 11 quota worlds /
-117 rows.
-The formal training package remains
-empty until 12/12; the 2026-09-01 P13 report remains an immutable historical
-snapshot.
+`p14_conversion_status_v1.json`. The honest ledger is now 14 physical / 12
+quota worlds / 126 candidate rows. The signed six-domain probe selects 12
+worlds and has 90 train plus 18 eval rows, a green release-gate receipt, and a
+validated B1/B3/B5/B5w LLaMA-Factory export. It is train-ready under local-probe
+trust, not production-eligible; the 2026-09-01 P13 report remains an immutable
+historical snapshot.
 
 ## Qwen3.5-4B MRCR / GraphWalks (2026-09-01)
 
