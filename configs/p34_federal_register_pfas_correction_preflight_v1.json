@@ -1,0 +1,61 @@
+{
+  "schema_version": "longworld.p34-source-preflight-request.v1",
+  "data_product": "p34_federal_register_pfas_correction_preflight_v1",
+  "authorization": {
+    "record_id": "p34-federal-register-pfas-correction-preflight-v1",
+    "scope": "bounded public Federal Register and GovInfo research export for EPA-HQ-OW-2022-0114 through the 2024-06-11 correction",
+    "basis": "official U.S. Government public records; source terms and embedded-material exceptions remain binding",
+    "reviewed_at": "2026-09-03T00:00:00Z",
+    "allowed_actions": [
+      "fetch_federal_register_metadata",
+      "fetch_govinfo_official_pdf",
+      "measure_offline_token_capacity"
+    ]
+  },
+  "research_question": "Can a frozen proposed-rule, final-rule, and correction dossier support a distinct, deterministic 64K/128K claim-source-revision world without padding or duplicate views?",
+  "dossier_id": "EPA-HQ-OW-2022-0114",
+  "regulation_id_number": "2040-AG18",
+  "cutoff": "2024-06-11T23:59:59Z",
+  "documents": [
+    {
+      "role": "proposed_rule",
+      "document_number": "2023-05471",
+      "publication_date": "2023-03-29",
+      "metadata_url": "https://www.federalregister.gov/api/v1/documents/2023-05471.json",
+      "official_pdf_url": "https://www.govinfo.gov/content/pkg/FR-2023-03-29/pdf/2023-05471.pdf"
+    },
+    {
+      "role": "final_rule",
+      "document_number": "2024-07773",
+      "publication_date": "2024-04-26",
+      "metadata_url": "https://www.federalregister.gov/api/v1/documents/2024-07773.json",
+      "official_pdf_url": "https://www.govinfo.gov/content/pkg/FR-2024-04-26/pdf/2024-07773.pdf"
+    },
+    {
+      "role": "correction",
+      "document_number": "2024-12645",
+      "publication_date": "2024-06-11",
+      "metadata_url": "https://www.federalregister.gov/api/v1/documents/2024-12645.json",
+      "official_pdf_url": "https://www.govinfo.gov/content/pkg/FR-2024-06-11/pdf/2024-12645.pdf"
+    }
+  ],
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "capacity_bands": {
+    "64k": [64000, 65536],
+    "128k": [128000, 131072]
+  },
+  "near_duplicate_threshold": 0.9,
+  "constraints": [
+    "official GovInfo PDF bytes are authoritative; FederalRegister.gov metadata is discovery and relation evidence only",
+    "proposal, final, and correction are counted once each; no HTML, XML, PDF, or text rendering duplication",
+    "capacity is measured after page-level exact and 0.90 word-sequence near-duplicate collapse",
+    "official contact blocks and email or telephone strings are excluded from normalized capacity",
+    "no docket comments, confidential business information, incorporated third-party standards, padding, cloning, or label-only world construction",
+    "no candidate generation or promotion before adapter, span-bound oracle, counterfactual, and unchanged historical gates are implemented"
+  ]
+}

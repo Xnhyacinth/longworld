@@ -1,0 +1,353 @@
+{
+  "schema_version": "longworld.p34-federal-register-capacity-preflight.v1",
+  "data_product": "p34_federal_register_pfas_correction_preflight_v1",
+  "verdict": "SOURCE_CAPACITY_PASS_WORLD_BLOCKED_RAW_WINDOW_UNTESTED",
+  "source_capacity_status": "PASS",
+  "world_admission_status": "BLOCKED_RAW_WINDOW_UNTESTED",
+  "do_not_generate": true,
+  "train_ready": false,
+  "production_eligible": false,
+  "research_question": "Can a frozen proposed-rule, final-rule, and correction dossier support a distinct, deterministic 64K/128K claim-source-revision world without padding or duplicate views?",
+  "constraints": [
+    "official GovInfo PDF bytes are authoritative; FederalRegister.gov metadata is discovery and relation evidence only",
+    "proposal, final, and correction are counted once each; no HTML, XML, PDF, or text rendering duplication",
+    "capacity is measured after page-level exact and 0.90 word-sequence near-duplicate collapse",
+    "official contact blocks and email or telephone strings are excluded from normalized capacity",
+    "no docket comments, confidential business information, incorporated third-party standards, padding, cloning, or label-only world construction",
+    "no candidate generation or promotion before adapter, span-bound oracle, counterfactual, and unchanged historical gates are implemented"
+  ],
+  "cutoff": "2024-06-11T23:59:59Z",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true,
+    "add_special_tokens": false,
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb"
+  },
+  "source_receipt": {
+    "config": "configs/p34_federal_register_pfas_correction_preflight_v1.json",
+    "config_sha256": "5376a586f1b2de198df72960e3cef74987cd24be2828c90ac5ad33716ec40409",
+    "retrievals": [
+      {
+        "requested_url": "https://www.federalregister.gov/api/v1/documents/2023-05471.json",
+        "final_url": "https://www.federalregister.gov/api/v1/documents/2023-05471.json",
+        "status": 200,
+        "content_type": "application/json",
+        "content_length_header": "15699",
+        "last_modified": null,
+        "etag": null,
+        "observed_at": "2026-09-03T19:35:43.908746Z",
+        "bytes": 15699,
+        "sha256": "9e1278e48d9d023aa191d277933c3eef3c14f71d07252e9cb76a36dd81c61946",
+        "role": "proposed_rule",
+        "retrieval_file": "sources/research_p34_federal_register_pfas_2023-05471_metadata.json"
+      },
+      {
+        "requested_url": "https://www.govinfo.gov/content/pkg/FR-2023-03-29/pdf/2023-05471.pdf",
+        "final_url": "https://www.govinfo.gov/content/pkg/FR-2023-03-29/pdf/2023-05471.pdf",
+        "status": 200,
+        "content_type": "application/pdf",
+        "content_length_header": "1120455",
+        "last_modified": "Mon, 22 Sep 2025 22:09:05 GMT",
+        "etag": null,
+        "observed_at": "2026-09-03T19:35:45.505491Z",
+        "bytes": 1120455,
+        "sha256": "a04b3621ed894fb6e31a8bb7e08a7bb634acd83f7ae0ec270f56b19b20aa0e3e",
+        "role": "proposed_rule",
+        "retrieval_file": "sources/research_p34_federal_register_pfas_2023-05471.pdf"
+      },
+      {
+        "requested_url": "https://www.federalregister.gov/api/v1/documents/2024-07773.json",
+        "final_url": "https://www.federalregister.gov/api/v1/documents/2024-07773.json",
+        "status": 200,
+        "content_type": "application/json",
+        "content_length_header": "89753",
+        "last_modified": null,
+        "etag": null,
+        "observed_at": "2026-09-03T19:35:47.482151Z",
+        "bytes": 89753,
+        "sha256": "8d9d5c5c27af7cb843792188d53d8c041b25ee7b58ccab1262db6550de9c630d",
+        "role": "final_rule",
+        "retrieval_file": "sources/research_p34_federal_register_pfas_2024-07773_metadata.json"
+      },
+      {
+        "requested_url": "https://www.govinfo.gov/content/pkg/FR-2024-04-26/pdf/2024-07773.pdf",
+        "final_url": "https://www.govinfo.gov/content/pkg/FR-2024-04-26/pdf/2024-07773.pdf",
+        "status": 200,
+        "content_type": "application/pdf",
+        "content_length_header": "8461218",
+        "last_modified": "Mon, 22 Sep 2025 23:48:04 GMT",
+        "etag": null,
+        "observed_at": "2026-09-03T19:35:58.765031Z",
+        "bytes": 8461218,
+        "sha256": "293f7c5ce80e0a4fae83b9c32074b24fd2c25b3c43e048532b9688c9759a7782",
+        "role": "final_rule",
+        "retrieval_file": "sources/research_p34_federal_register_pfas_2024-07773.pdf"
+      },
+      {
+        "requested_url": "https://www.federalregister.gov/api/v1/documents/2024-12645.json",
+        "final_url": "https://www.federalregister.gov/api/v1/documents/2024-12645.json",
+        "status": 200,
+        "content_type": "application/json",
+        "content_length_header": "6339",
+        "last_modified": null,
+        "etag": null,
+        "observed_at": "2026-09-03T19:36:02.767217Z",
+        "bytes": 6339,
+        "sha256": "2bfbcd191a445cc5fd4aa0c3a0298050046765bc85545fcc614a6bdfa21d16c0",
+        "role": "correction",
+        "retrieval_file": "sources/research_p34_federal_register_pfas_2024-12645_metadata.json"
+      },
+      {
+        "requested_url": "https://www.govinfo.gov/content/pkg/FR-2024-06-11/pdf/2024-12645.pdf",
+        "final_url": "https://www.govinfo.gov/content/pkg/FR-2024-06-11/pdf/2024-12645.pdf",
+        "status": 200,
+        "content_type": "application/pdf",
+        "content_length_header": "285619",
+        "last_modified": "Mon, 22 Sep 2025 23:52:52 GMT",
+        "etag": null,
+        "observed_at": "2026-09-03T19:36:03.358417Z",
+        "bytes": 285619,
+        "sha256": "2fdf7cd1234bddfddf8f9c83d58933d3d9300f3d111ba06c4f83a3e5328b0c31",
+        "role": "correction",
+        "retrieval_file": "sources/research_p34_federal_register_pfas_2024-12645.pdf"
+      }
+    ]
+  },
+  "relation_evidence": {
+    "shared_docket_id": "EPA-HQ-OW-2022-0114",
+    "shared_regulation_id_number": "2040-AG18",
+    "chronology": [
+      "2023-05471",
+      "2024-07773",
+      "2024-12645"
+    ],
+    "correction_target_document_number": "2024-07773",
+    "relation_kinds": [
+      "proposed_version_of_rulemaking",
+      "finalizes_proposal",
+      "corrects_final_rule",
+      "supersedes_entry_designation_at_cutoff"
+    ]
+  },
+  "documents": [
+    {
+      "role": "proposed_rule",
+      "document_number": "2023-05471",
+      "publication_date": "2023-03-29",
+      "type": "Proposed Rule",
+      "action": "Preliminary regulatory determination and proposed rule; request for public comment; notice of public hearing.",
+      "docket_ids": [
+        "EPA-HQ-OW-2022-0114",
+        "FRL 8543-01-OW"
+      ],
+      "regulation_id_numbers": [
+        "2040-AG18"
+      ],
+      "effective_on": null,
+      "official_pdf_sha256": "a04b3621ed894fb6e31a8bb7e08a7bb634acd83f7ae0ec270f56b19b20aa0e3e",
+      "official_pdf_bytes": 1120455,
+      "pdf_pages": 117,
+      "selected_pdf_pages": 117,
+      "normalized_pages": 117,
+      "normalized_text_sha256": "5ef256f77d3041c4b960a8e4938af1e0a82134478f157e7a2b0b154567f52a5c",
+      "normalized_qwen_tokens": 183466,
+      "email_redactions": 3,
+      "telephone_redactions": 3
+    },
+    {
+      "role": "final_rule",
+      "document_number": "2024-07773",
+      "publication_date": "2024-04-26",
+      "type": "Rule",
+      "action": "Final rule.",
+      "docket_ids": [
+        "EPA-HQ-OW-2022-0114",
+        "FRL 8543-02-OW"
+      ],
+      "regulation_id_numbers": [
+        "2040-AG18"
+      ],
+      "effective_on": "2024-06-25",
+      "official_pdf_sha256": "293f7c5ce80e0a4fae83b9c32074b24fd2c25b3c43e048532b9688c9759a7782",
+      "official_pdf_bytes": 8461218,
+      "pdf_pages": 226,
+      "selected_pdf_pages": 226,
+      "normalized_pages": 226,
+      "normalized_text_sha256": "69a24a472547098a5650de703407c10aa1509e73789827ee671a4f2bce9fd238",
+      "normalized_qwen_tokens": 290045,
+      "email_redactions": 2,
+      "telephone_redactions": 2
+    },
+    {
+      "role": "correction",
+      "document_number": "2024-12645",
+      "publication_date": "2024-06-11",
+      "type": "Rule",
+      "action": "Final rule; correction.",
+      "docket_ids": [
+        "EPA-HQ-OW-2022-0114",
+        "FRL 8543-04-OW"
+      ],
+      "regulation_id_numbers": [
+        "2040-AG18"
+      ],
+      "effective_on": "2024-06-25",
+      "official_pdf_sha256": "2fdf7cd1234bddfddf8f9c83d58933d3d9300f3d111ba06c4f83a3e5328b0c31",
+      "official_pdf_bytes": 285619,
+      "pdf_pages": 4,
+      "selected_pdf_pages": 4,
+      "normalized_pages": 4,
+      "normalized_text_sha256": "2bf44a32df1edbfc957e90cc13d63ea1e223258ca70814e154e335cf733a1227",
+      "normalized_qwen_tokens": 3822,
+      "email_redactions": 1,
+      "telephone_redactions": 1
+    }
+  ],
+  "capacity": {
+    "raw_page_tokens": 477333,
+    "exact_dedup_page_tokens": 477333,
+    "near_dedup_page_tokens_at_0_90": 473285,
+    "dedup_unit": "official_pdf_page_after_document_boundary_and_contact_exclusion",
+    "same_document_near_duplicate_pairs_included": true,
+    "page_artifact_count": 347,
+    "exact_component_count": 347,
+    "near_dedup_component_count": 343,
+    "exact_duplicate_pair_count": 0,
+    "near_duplicate_pair_count": 4,
+    "fills_64k_unique": true,
+    "fills_128k_unique": true,
+    "gap_over_64k_lower": 409285,
+    "gap_over_128k_lower": 345285,
+    "bands": {
+      "64k": [
+        64000,
+        65536
+      ],
+      "128k": [
+        128000,
+        131072
+      ]
+    },
+    "near_duplicate_pairs": [
+      {
+        "left": "2023-05471:page:84",
+        "right": "2024-07773:page:172",
+        "word_quick_ratio": 0.915977
+      },
+      {
+        "left": "2023-05471:page:100",
+        "right": "2024-07773:page:199",
+        "word_quick_ratio": 0.921053
+      },
+      {
+        "left": "2024-07773:page:136",
+        "right": "2024-07773:page:137",
+        "word_quick_ratio": 0.928058
+      },
+      {
+        "left": "2024-07773:page:179",
+        "right": "2024-07773:page:180",
+        "word_quick_ratio": 0.94332
+      }
+    ],
+    "document_similarity": [
+      {
+        "left": "2023-05471",
+        "right": "2024-07773",
+        "word_quick_ratio": 0.68364
+      },
+      {
+        "left": "2023-05471",
+        "right": "2024-12645",
+        "word_quick_ratio": 0.024682
+      },
+      {
+        "left": "2024-07773",
+        "right": "2024-12645",
+        "word_quick_ratio": 0.016867
+      }
+    ]
+  },
+  "oracle_design": {
+    "status": "PROPOSED_SHORTCUT_PRONE_NOT_ADMITTED",
+    "program_id": "govpolicy.pfas_proposal_final_correction_resolution.v1-proposed",
+    "question_state": {
+      "proposal_mixture_trigger": "one_or_more",
+      "final_mixture_trigger": "two_or_more",
+      "controlling_reference_at_cutoff": "40_CFR_141.61(c)(2)(i)-(vii)",
+      "effective_date": "2029-04-26"
+    },
+    "without_correction": {
+      "controlling_reference_at_cutoff": "40_CFR_141.61(c)(34)-(40)",
+      "status": "obsolete_entry_designation"
+    },
+    "counterfactual_changes_answer": true,
+    "remove_one_contract": {
+      "2023-05471": "proposal mixture trigger becomes unknown",
+      "2024-07773": "final trigger and correction target become ungrounded",
+      "2024-12645": "cutoff-effective entry designation remains obsolete"
+    },
+    "evidence": [
+      {
+        "evidence_id": "proposed_mixture_trigger",
+        "normalized_quote": "any mixture containing one or more of them",
+        "quote_sha256": "2705d8d21b9c2fc26ca60196ba4ca1ddab0f79c3bef24f7771f0da5c1ba0a78b",
+        "source_artifact_id": "2023-05471:page:1"
+      },
+      {
+        "evidence_id": "final_mixture_trigger",
+        "normalized_quote": "any mixture containing two or more of PFHxS, PFNA, HFPO-DA, and PFBS",
+        "quote_sha256": "66debd8277178bf76118120ce0eafd809f772182dbc8965c1e62a43213eab654"
+      },
+      {
+        "evidence_id": "final_obsolete_designation",
+        "normalized_quote": "The effective date for paragraphs (c)(34) through (40) of § 141.61 (listed in table 4 to paragraph (c)) is April 26, 2029.",
+        "quote_sha256": "6449d95f0558a75aeb688d29d05af311ab69527e0012a8b9702f0233684022b0"
+      },
+      {
+        "evidence_id": "corrected_designation",
+        "normalized_quote": "The effective date for § 141.61(c)(2)(i) through (vii) is April 26, 2029.",
+        "quote_sha256": "440026a7607b03948fa7d32c7311a2a83eab24f94e587b014708c67a93d49893"
+      }
+    ]
+  },
+  "world_admission": {
+    "blocked": true,
+    "blocker": "current decisive evidence is short-view sufficient",
+    "raw_window_audit_executed": false,
+    "correction_document_page_sum_tokens": 3822,
+    "decisive_page_artifact_ids": [
+      "2023-05471:page:1",
+      "2024-07773:page:1",
+      "2024-07773:page:213",
+      "2024-12645:page:2"
+    ],
+    "decisive_page_token_upper_sum": 6213,
+    "risk": "the correction document alone contains both obsolete and corrected references below a 4K page-sum budget; all four decisive pages total below 8K, so source capacity does not establish a 64K/128K dependency",
+    "padding_prohibited": true,
+    "next_minimum_oracle_experiment": [
+      "define a multi-output compliance state whose necessary operands occur in naturally separated proposal, final-rule sections/tables, and correction spans",
+      "bind every operand and run independent full/remove-one/without-correction replay before candidate materialization",
+      "run contiguous 4K/8K/16K plus BM25, lexical, and embedding top-k shortcut audits on only the necessary natural artifacts",
+      "reject the dossier if any short view is sufficient; never add unrelated pages to manufacture 64K/128K dependence"
+    ]
+  },
+  "privacy_and_rights": {
+    "authority": "official GovInfo PDFs; FederalRegister.gov metadata is not itself the legal edition",
+    "reuse": "U.S. Government works are generally public domain under 17 U.S.C. 105; embedded copyrighted material remains excluded",
+    "scope_exclusions": [
+      "docket comments",
+      "confidential business information",
+      "incorporated third-party standards",
+      "contact blocks and contact identifiers"
+    ],
+    "formal_legal_review_completed": false
+  },
+  "remaining_gates": [
+    "implement a receipt-bound GovInfo PDF adapter and post-redaction spans",
+    "bind correction operations to exact old and new regulatory spans",
+    "implement independent full/counterfactual/remove-one replay",
+    "materialize natural chunks and pass unchanged exact-band, near-duplicate, derived-view, raw-window, truncation, and dense gates"
+  ]
+}
