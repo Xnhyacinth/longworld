@@ -2095,12 +2095,23 @@ def _jpmorgan_risk_section_ranges(record) -> list[tuple[str, int, int]]:
             raise ProvenanceError("JPMorgan risk heading sequence is invalid")
         heading_starts.append(start + match.start())
         cursor = match.end()
+    year = int(record.attribute("year"))
+    section_chars = {
+        (2022, "CREDIT AND INVESTMENT RISK MANAGEMENT"): 40_000,
+        (2022, "MARKET RISK MANAGEMENT"): 40_000,
+        (2022, "CAPITAL RISK MANAGEMENT"): 35_000,
+        (2023, "LIQUIDITY RISK MANAGEMENT"): 6_000,
+        (2023, "OPERATIONAL RISK MANAGEMENT"): 9_000,
+        (2024, "OPERATIONAL RISK MANAGEMENT"): 11_000,
+        (2024, "ESTIMATIONS AND MODEL RISK MANAGEMENT"): 13_000,
+    }
     return [
         (
             heading,
             heading_start,
             min(
-                heading_start + _JPMORGAN_RISK_SECTION_CHARS,
+                heading_start
+                + section_chars.get((year, heading), _JPMORGAN_RISK_SECTION_CHARS),
                 heading_starts[index + 1] if index + 1 < len(heading_starts) else end,
             ),
         )
@@ -2170,6 +2181,90 @@ def _issuer_official_pdf_relation_events(
     return events
 
 
+def _issuer_official_pdf_reconciliation_events(
+    *,
+    workflow,
+    prefix: str,
+    workflow_index: int,
+    program: str,
+    unit_events: dict[tuple[int, Any], Event],
+    relation_events: list[Event],
+    stages: tuple[tuple[str, str, tuple[tuple[int, Any], ...]], ...],
+) -> list[Event]:
+    """Build a replayable cumulative computation over signed report evidence."""
+    record_year = {
+        str(event.params["record_id"]): int(event.params["report_year"])
+        for event in unit_events.values()
+    }
+    cumulative_unit_ids: list[str] = []
+    cumulative_years: set[int] = set()
+    cumulative_relation_ids: list[str] = []
+    prior_relation_event_ids: set[str] = set()
+    prior: Event | None = None
+    reconciliations: list[Event] = []
+    for tier, stage, additions in stages:
+        added_events = [unit_events[key] for key in additions]
+        cumulative_unit_ids.extend(event.id for event in added_events)
+        cumulative_years.update(
+            int(event.params["report_year"]) for event in added_events
+        )
+        selected_relations = [
+            event
+            for event in relation_events
+            if record_year.get(str(event.params["record_id"])) in cumulative_years
+            and record_year.get(str(event.params["target_record_id"]))
+            in cumulative_years
+        ]
+        new_relations = [
+            event
+            for event in selected_relations
+            if event.id not in prior_relation_event_ids
+        ]
+        cumulative_relation_ids.extend(
+            str(event.params["source_relation_id"]) for event in new_relations
+        )
+        event_id = (
+            f"{prefix}.issuer_official_pdf_reconciliation_"
+            f"{program}_{tier}_{workflow_index}"
+        )
+        parents = [
+            *([prior.id] if prior is not None else []),
+            *(event.id for event in added_events),
+            *(event.id for event in new_relations),
+        ]
+        reconciliation = Event(
+            id=event_id,
+            type="issuer_official_pdf_reconciliation",
+            time=max(
+                event.time
+                for event in [
+                    *([prior] if prior is not None else []),
+                    *added_events,
+                    *new_relations,
+                ]
+            )
+            + timedelta(days=1),
+            params={
+                "workflow_id": workflow.workflow_id,
+                "program": program,
+                "control_tier": tier,
+                "control_stage": stage,
+                "required_unit_event_ids": list(cumulative_unit_ids),
+                "required_relation_ids": list(cumulative_relation_ids),
+                "prerequisite_event_id": prior.id if prior is not None else "",
+                "ground_values": ["cumulative reconciliation replayed", tier],
+            },
+            visibility=[event_id],
+            causal_inputs=parents,
+            required_inputs=parents,
+            relation_kinds={parent: "reconciles_from" for parent in parents},
+        )
+        reconciliations.append(reconciliation)
+        prior = reconciliation
+        prior_relation_event_ids = {event.id for event in selected_relations}
+    return reconciliations
+
+
 def _jpmorgan_risk_taxonomy_events(
     *, workflow, prefix: str, workflow_index: int, record_id_counts: Counter[str]
 ) -> list[Event]:
@@ -2195,7 +2290,7 @@ def _jpmorgan_risk_taxonomy_events(
         for record_index, year in enumerate(years)
         for heading_index in range(len(_JPMORGAN_RISK_HEADINGS))
     }
-    support_id = event_ids[(2024, 5)]
+    support_id = event_ids[(2024, 11)]
     events: list[Event] = []
     for record_index, (record, year) in enumerate(zip(records, years, strict=True)):
         for heading_index, (heading, char_start, char_end) in enumerate(
@@ -2255,18 +2350,70 @@ def _jpmorgan_risk_taxonomy_events(
         record.record_id: event_ids[
             (
                 int(record.attribute("year")),
-                5 if record.attribute("year") == "2024" else 0,
+                5 if record.attribute("year") in {"2022", "2024"} else 0,
             )
         ]
         for record in records
     }
+    relation_events = _issuer_official_pdf_relation_events(
+        workflow=workflow,
+        prefix=prefix,
+        workflow_index=workflow_index,
+        records=records,
+        endpoint_ids=endpoint_ids,
+    )
+    events.extend(relation_events)
     events.extend(
-        _issuer_official_pdf_relation_events(
+        _issuer_official_pdf_reconciliation_events(
             workflow=workflow,
             prefix=prefix,
             workflow_index=workflow_index,
-            records=records,
-            endpoint_ids=endpoint_ids,
+            program="jpmorgan_risk_taxonomy",
+            unit_events={
+                key: next(event for event in events if event.id == event_id)
+                for key, event_id in event_ids.items()
+            },
+            relation_events=relation_events,
+            stages=(
+                (
+                    "16k",
+                    "current",
+                    (
+                        (2024, 11),
+                        (2024, 1),
+                        (2024, 2),
+                        (2024, 3),
+                        (2024, 4),
+                        (2024, 8),
+                        (2024, 9),
+                        (2024, 10),
+                        (2024, 13),
+                        (2024, 14),
+                    ),
+                ),
+                (
+                    "32k",
+                    "transition",
+                    (
+                        (2023, 0),
+                        (2023, 2),
+                        (2023, 3),
+                        (2023, 4),
+                        (2023, 5),
+                        (2023, 6),
+                        (2023, 8),
+                        (2023, 9),
+                        (2023, 10),
+                        (2023, 11),
+                        (2023, 12),
+                    ),
+                ),
+                (
+                    "64k",
+                    "full_chain",
+                    ((2022, 5), (2022, 7), (2022, 2), (2022, 13)),
+                ),
+            ),
         )
     )
     return events
@@ -2344,7 +2491,15 @@ def _walmart_reconciliation_ranges(record) -> list[tuple[str, int, int, list]]:
             != receipt.get("sha256")
         ):
             raise ProvenanceError("Walmart reconciliation section receipt is invalid")
-        start = max(previous_end, receipt_start - 1_000)
+        receipt_aligned = (year, section_id) in {
+            (2022, "segment_note"),
+            (2023, "segment_note"),
+            (2024, "business_segments"),
+        }
+        start = max(
+            previous_end,
+            receipt_start if receipt_aligned else receipt_start - 1_000,
+        )
         end = min(len(record.text), start + _WALMART_SECTION_CHARS[year])
         if end < receipt_end or any(
             not start <= fact.char_start < fact.char_end <= end for fact in facts
@@ -2447,18 +2602,47 @@ def _walmart_reconciliation_events(
                     },
                 )
             )
+    relation_events = _issuer_official_pdf_relation_events(
+        workflow=workflow,
+        prefix=prefix,
+        workflow_index=workflow_index,
+        records=records,
+        endpoint_ids={
+            record.record_id: event_ids[
+                (int(record.attribute("year")), "business_segments")
+            ]
+            for record in records
+        },
+    )
+    events.extend(relation_events)
+    units = {
+        (
+            int(event.params["report_year"]),
+            str(event.params["section_id"]),
+        ): event
+        for event in events
+        if event.type == "walmart_reconciliation_section"
+    }
+    section_ids = tuple(_WALMART_RECONCILIATION_SECTIONS)
     events.extend(
-        _issuer_official_pdf_relation_events(
+        _issuer_official_pdf_reconciliation_events(
             workflow=workflow,
             prefix=prefix,
             workflow_index=workflow_index,
-            records=records,
-            endpoint_ids={
-                record.record_id: event_ids[
-                    (int(record.attribute("year")), "business_segments")
-                ]
-                for record in records
-            },
+            program="walmart_reconciliation",
+            unit_events=units,
+            relation_events=relation_events,
+            stages=(
+                ("16k", "current", tuple((2025, item) for item in section_ids)),
+                ("32k", "transition", tuple((2024, item) for item in section_ids)),
+                (
+                    "64k",
+                    "full_chain",
+                    tuple(
+                        (year, item) for year in (2022, 2023) for item in section_ids
+                    ),
+                ),
+            ),
         )
     )
     return events

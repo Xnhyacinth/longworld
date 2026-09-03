@@ -57,6 +57,7 @@ EVENT_TYPES = [
     "jpmorgan_risk_taxonomy_section",
     "walmart_reconciliation_section",
     "issuer_official_pdf_prior_annual_relation",
+    "issuer_official_pdf_reconciliation",
 ]
 
 ARTIFACT_KEYS_CORE = [

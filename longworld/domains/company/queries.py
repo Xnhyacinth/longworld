@@ -47,6 +47,7 @@ class QuerySpec:
     preferred_length_buckets: list[str] = field(default_factory=list)
     semantic_growth_group: str = ""
     base_task_group: str = ""
+    evidence_order: str = "chronological"
 
 
 def _sim_for(world: SimulatedWorld) -> WorldSimulator:
@@ -72,15 +73,70 @@ def state_from_artifacts(
     )
 
 
+def _issuer_official_pdf_reconciliation_unit_ids(
+    state_values: dict[str, Any], answer_key: str
+) -> list[str] | None:
+    units = {
+        **(state_values.get("jpmorgan_risk_taxonomy_units") or {}),
+        **(state_values.get("walmart_reconciliation_units") or {}),
+    }
+    relations = state_values.get("issuer_official_pdf_relations") or {}
+    reconciliations = state_values.get("issuer_official_pdf_reconciliations") or {}
+    requested_unit_ids: list[str] | None = None
+    current = answer_key
+    visited: set[str] = set()
+    while current:
+        reconciliation = reconciliations.get(current)
+        if current in visited or not isinstance(reconciliation, dict):
+            return None
+        visited.add(current)
+        unit_ids = reconciliation.get("required_unit_event_ids")
+        relation_ids = reconciliation.get("required_relation_ids")
+        if (
+            not isinstance(unit_ids, list)
+            or not unit_ids
+            or any(
+                not isinstance(event_id, str) or event_id not in units
+                for event_id in unit_ids
+            )
+            or not isinstance(relation_ids, list)
+            or any(not isinstance(relation_id, str) for relation_id in relation_ids)
+        ):
+            return None
+        for relation_id in relation_ids:
+            relation = relations.get(relation_id)
+            endpoint_ids = (
+                relation.get("endpoint_event_ids")
+                if isinstance(relation, dict)
+                else None
+            )
+            if (
+                not isinstance(endpoint_ids, list)
+                or not endpoint_ids
+                or any(
+                    not isinstance(endpoint_id, str) or endpoint_id not in units
+                    for endpoint_id in endpoint_ids
+                )
+            ):
+                return None
+        if requested_unit_ids is None:
+            requested_unit_ids = list(unit_ids)
+        current = str(reconciliation.get("prerequisite_event_id") or "")
+    return requested_unit_ids
+
+
 def eval_answer(
     world: SimulatedWorld, spec: QuerySpec, state_values: dict[str, Any]
 ) -> str:
     if spec.query_type.startswith("walmart_reconciliation_"):
         units = state_values.get("walmart_reconciliation_units") or {}
-        if any(event_id not in units for event_id in spec.essential_event_ids):
+        unit_ids = _issuer_official_pdf_reconciliation_unit_ids(
+            state_values, spec.answer_key
+        )
+        if unit_ids is None:
             return "unknown"
         by_year: dict[int, dict[str, dict[str, Any]]] = {}
-        for event_id in spec.essential_event_ids:
+        for event_id in unit_ids:
             unit = units[event_id]
             year = int(unit["report_year"])
             by_year.setdefault(year, {})[str(unit["section_id"])] = unit
@@ -128,10 +184,13 @@ def eval_answer(
         return " | ".join(fields)
     if spec.query_type.startswith("jpmorgan_risk_taxonomy_"):
         units = state_values.get("jpmorgan_risk_taxonomy_units") or {}
-        if any(event_id not in units for event_id in spec.essential_event_ids):
+        unit_ids = _issuer_official_pdf_reconciliation_unit_ids(
+            state_values, spec.answer_key
+        )
+        if unit_ids is None:
             return "unknown"
         selected = sorted(
-            (units[event_id] for event_id in spec.essential_event_ids),
+            (units[event_id] for event_id in unit_ids),
             key=lambda unit: int(unit["source_order"]),
         )
         return " | ".join(
@@ -1299,21 +1358,34 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
         and str(event.params.get("source_family") or "")
         == "walmart_official_annual_report_pdf"
     }
+    walmart_reconciliations = {
+        (str(event.params["control_tier"]), str(event.params["control_stage"])): event
+        for event in world.events
+        if event.type == "issuer_official_pdf_reconciliation"
+        and event.params.get("program") == "walmart_reconciliation"
+    }
     walmart_stages = (
         ("16k", "current", (2025,)),
         ("32k", "transition", (2024, 2025)),
         ("64k", "full_chain", (2022, 2023, 2024, 2025)),
     )
-    if walmart_events and all(
-        (year, section_id) in walmart_events
-        for _, _, years in walmart_stages
-        for year in years
-        for section_id in (
-            "business_segments",
-            "strategy_execution_risk",
-            "capital_expenditures",
-            "icfr_opinion",
-            "segment_note",
+    if (
+        walmart_events
+        and all(
+            (year, section_id) in walmart_events
+            for _, _, years in walmart_stages
+            for year in years
+            for section_id in (
+                "business_segments",
+                "strategy_execution_risk",
+                "capital_expenditures",
+                "icfr_opinion",
+                "segment_note",
+            )
+        )
+        and all(
+            (tier, label) in walmart_reconciliations
+            for tier, label, _ in walmart_stages
         )
     ):
         cf_source = walmart_events[(2025, "icfr_opinion")]
@@ -1370,11 +1442,20 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
             ]
             essential_ids = [event.id for event in essential_events]
             relation_ids = [
-                event.id
+                str(event.params["source_relation_id"])
                 for (source_id, target_id), event in sorted(walmart_relations.items())
                 if int(source_id.rsplit(":", 1)[-1]) in years
                 and int(target_id.rsplit(":", 1)[-1]) in years
             ]
+            reconciliation = walmart_reconciliations[(tier, label)]
+            if set(reconciliation.params.get("required_unit_event_ids") or []) != set(
+                essential_ids
+            ) or set(reconciliation.params.get("required_relation_ids") or []) != set(
+                relation_ids
+            ):
+                continue
+            essential = _required_event_closure(world, reconciliation)
+            essential_ids = [event.id for event in essential]
             queries.append(
                 QuerySpec(
                     query_id=(
@@ -1394,14 +1475,14 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                         "Every requested section is required."
                     ),
                     answer="",
-                    as_of=date(2026, 1, 2),
-                    answer_key="walmart_reconciliation_units",
+                    as_of=reconciliation.time,
+                    answer_key=reconciliation.id,
                     essential_event_ids=essential_ids,
                     essential_artifact_ids=[
                         f"{world.spec['world_id']}.{event_id}"
                         for event_id in essential_ids
                     ],
-                    sufficient_event_ids=[*essential_ids, *relation_ids],
+                    sufficient_event_ids=list(essential_ids),
                     cf_event_id=cf_source.id,
                     cf_param_updates=cf_updates,
                     cf_answer="",
@@ -1411,7 +1492,8 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                         "reconcile segment identity, strategy risk, capex allocation, "
                         "and ICFR; validate adjacent official-report relations"
                     ),
-                    proof_depth=2,
+                    proof_depth=_required_event_proof_depth(essential, reconciliation)
+                    + 1,
                     cf_op="version",
                     motif="company.walmart_segment_strategy_capex_icfr",
                     truth_regime="real_source_derived",
@@ -1432,6 +1514,7 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                     base_task_group=(
                         "walmart_reconciliation:" + str(cf_source.params["workflow_id"])
                     ),
+                    evidence_order="reverse_chronological",
                 )
             )
 
@@ -1447,6 +1530,12 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
         ): event
         for event in world.events
         if event.type == "issuer_official_pdf_prior_annual_relation"
+    }
+    jpmorgan_reconciliations = {
+        (str(event.params["control_tier"]), str(event.params["control_stage"])): event
+        for event in world.events
+        if event.type == "issuer_official_pdf_reconciliation"
+        and event.params.get("program") == "jpmorgan_risk_taxonomy"
     }
     jpmorgan_stages = (
         (
@@ -1486,22 +1575,24 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
             "64k",
             "full_chain",
             (
-                *((2022, index) for index in range(15) if index != 12),
-                (2023, 1),
-                (2023, 7),
-                (2023, 13),
-                (2023, 14),
-                (2024, 0),
-                (2024, 6),
-                (2024, 7),
-                (2024, 12),
+                (2022, 5),
+                (2022, 7),
+                (2022, 2),
+                (2022, 13),
             ),
         ),
     )
-    if jpmorgan_events and all(
-        key in jpmorgan_events
-        for _, _, additions in jpmorgan_stages
-        for key in additions
+    if (
+        jpmorgan_events
+        and all(
+            key in jpmorgan_events
+            for _, _, additions in jpmorgan_stages
+            for key in additions
+        )
+        and all(
+            (tier, label) in jpmorgan_reconciliations
+            for tier, label, _ in jpmorgan_stages
+        )
     ):
         cf_source = jpmorgan_events[(2024, 11)]
         old_heading = str(cf_source.params["heading"])
@@ -1541,16 +1632,24 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                 cumulative.extend(additions)
                 essential_events = [jpmorgan_events[key] for key in cumulative]
                 essential_ids = [event.id for event in essential_events]
-                support_id = jpmorgan_events[(2024, 5)].id
                 stage_years = {year for year, _ in cumulative}
                 relation_ids = [
-                    event.id
+                    str(event.params["source_relation_id"])
                     for (source_id, target_id), event in sorted(
                         issuer_pdf_relations.items()
                     )
                     if int(source_id.rsplit(":", 1)[-1]) in stage_years
                     and int(target_id.rsplit(":", 1)[-1]) in stage_years
                 ]
+                reconciliation = jpmorgan_reconciliations[(tier, label)]
+                if set(
+                    reconciliation.params.get("required_unit_event_ids") or []
+                ) != set(essential_ids) or set(
+                    reconciliation.params.get("required_relation_ids") or []
+                ) != set(relation_ids):
+                    continue
+                essential = _required_event_closure(world, reconciliation)
+                essential_ids = [event.id for event in essential]
                 queries.append(
                     QuerySpec(
                         query_id=(
@@ -1569,18 +1668,14 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                             "requested section is required."
                         ),
                         answer="",
-                        as_of=date(2025, 1, 2),
-                        answer_key="jpmorgan_risk_taxonomy_units",
+                        as_of=reconciliation.time,
+                        answer_key=reconciliation.id,
                         essential_event_ids=essential_ids,
                         essential_artifact_ids=[
                             f"{world.spec['world_id']}.{event_id}"
                             for event_id in essential_ids
                         ],
-                        sufficient_event_ids=[
-                            *essential_ids,
-                            support_id,
-                            *relation_ids,
-                        ],
+                        sufficient_event_ids=list(essential_ids),
                         cf_event_id=cf_source.id,
                         cf_param_updates=cf_updates,
                         cf_answer="",
@@ -1590,7 +1685,10 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                             "report year and source position; format the complete "
                             "cross-year taxonomy"
                         ),
-                        proof_depth=len(essential_ids),
+                        proof_depth=_required_event_proof_depth(
+                            essential, reconciliation
+                        )
+                        + 1,
                         cf_op="version",
                         motif="company.jpmorgan_cross_year_risk_taxonomy",
                         truth_regime="real_source_derived",
@@ -1614,6 +1712,7 @@ def build_queries(world: SimulatedWorld) -> list[QuerySpec]:
                             "jpmorgan_risk_taxonomy:"
                             + str(cf_source.params["workflow_id"])
                         ),
+                        evidence_order="reverse_chronological",
                     )
                 )
 

@@ -386,7 +386,11 @@ def pack_view(
     if len(essential) < len(ess_ids):
         index = {a.artifact_id: a for a in pool}
         essential = [index[i] for i in spec.essential_artifact_ids if i in index]
-    essential.sort(key=lambda a: (a.time, a.artifact_id))
+    essential.sort(
+        key=lambda a: (a.time, a.artifact_id),
+        reverse=getattr(spec, "evidence_order", "chronological")
+        == "reverse_chronological",
+    )
     corridor = sorted(
         (pool_index[artifact_id] for artifact_id in corridor_ids),
         key=lambda artifact: (

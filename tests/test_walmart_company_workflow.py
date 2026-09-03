@@ -6,12 +6,19 @@ from pathlib import Path
 
 from longworld.core.causal import build_causal_graph
 from longworld.core.engine import semantic_answer_from_artifacts
-from longworld.core.graph import random_walk_event_ids, typed_walk_event_ids
+from longworld.core.graph import (
+    proof_depth as replayed_proof_depth,
+)
+from longworld.core.graph import (
+    random_walk_event_ids,
+    typed_walk_event_ids,
+)
 from longworld.core.issuerpdfworkflow import (
     selected_issuer_official_pdf_relation_edges,
 )
 from longworld.core.pack import join_artifacts, pack_view, wrap_prompt
 from longworld.core.render import render_world
+from longworld.core.semantic import sentence_near_dup_ratio
 from longworld.core.sourcebundle import load_source_workflow_bundle
 from longworld.core.views import render_cf_view, split_views
 from longworld.domains.company.queries import (
@@ -64,7 +71,9 @@ def _materialized():
 def test_walmart_reconciliation_has_cumulative_essentials_and_remove_one() -> None:
     world, artifacts, queries = _materialized()
 
-    assert [len(query.essential_event_ids) for query in queries] == [5, 10, 20]
+    assert [len(query.essential_event_ids) for query in queries] == [6, 13, 26]
+    assert [query.proof_depth for query in queries] == [3, 4, 5]
+    assert [replayed_proof_depth(world, query) for query in queries] == [3, 4, 5]
     assert set(queries[0].essential_event_ids) < set(queries[1].essential_event_ids)
     assert set(queries[1].essential_event_ids) < set(queries[2].essential_event_ids)
     for query in queries:
@@ -162,6 +171,7 @@ def test_walmart_reconciliation_packs_exact_distinct_signed_three_views() -> Non
             token_counter=count,
         )
         assert packed.ok, packed.reject_reason
+        assert sentence_near_dup_ratio(packed.artifacts) <= 0.25
         packed_cf = {artifact.artifact_id: artifact for artifact in views["cf"]}
         cf_view = [
             packed_cf.get(artifact.artifact_id, artifact)
@@ -195,6 +205,7 @@ def test_walmart_reconciliation_packs_exact_distinct_signed_three_views() -> Non
         str(event.params["text"])
         for event in world.events
         if event.id in full_chain.essential_event_ids
+        and isinstance(event.params.get("text"), str)
     ]
     raw_body = "\n\n===== DOCUMENT =====\n\n".join(essential_body)
     assert count(raw_body) <= 65_536 - 2_000

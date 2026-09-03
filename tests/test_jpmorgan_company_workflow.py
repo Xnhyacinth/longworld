@@ -7,13 +7,20 @@ from pathlib import Path
 
 from longworld.core.causal import build_causal_graph
 from longworld.core.engine import semantic_answer_from_artifacts
-from longworld.core.graph import random_walk_event_ids, typed_walk_event_ids
+from longworld.core.graph import (
+    proof_depth as replayed_proof_depth,
+)
+from longworld.core.graph import (
+    random_walk_event_ids,
+    typed_walk_event_ids,
+)
 from longworld.core.issuerpdfworkflow import (
     selected_issuer_official_pdf_relation_edges,
 )
 from longworld.core.pack import join_artifacts, pack_view, wrap_prompt
 from longworld.core.promotion import _replayed_source_metadata
 from longworld.core.render import render_world
+from longworld.core.semantic import sentence_near_dup_ratio
 from longworld.core.sourcebundle import load_source_workflow_bundle
 from longworld.core.views import render_cf_view, split_views
 from longworld.domains.company.queries import (
@@ -70,7 +77,9 @@ def test_jpmorgan_risk_taxonomy_has_exact_cumulative_essentials_and_remove_one()
 ):
     world, artifacts, queries = _materialized()
 
-    assert [len(query.essential_artifact_ids) for query in queries] == [10, 21, 43]
+    assert [len(query.essential_artifact_ids) for query in queries] == [11, 25, 31]
+    assert [query.proof_depth for query in queries] == [3, 4, 5]
+    assert [replayed_proof_depth(world, query) for query in queries] == [3, 4, 5]
     assert set(queries[0].essential_event_ids) < set(queries[1].essential_event_ids)
     assert set(queries[1].essential_event_ids) < set(queries[2].essential_event_ids)
     for query in queries:
@@ -162,6 +171,7 @@ def test_jpmorgan_risk_taxonomy_packs_distinct_equal_width_three_views() -> None
             token_counter=count,
         )
         assert packed.ok, packed.reject_reason
+        assert sentence_near_dup_ratio(packed.artifacts) <= 0.25
         packed_cf = {artifact.artifact_id: artifact for artifact in views["cf"]}
         cf_view = [
             packed_cf.get(artifact.artifact_id, artifact)

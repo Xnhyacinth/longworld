@@ -307,6 +307,7 @@ def render_company(sim: SimulatedWorld) -> list[Artifact]:
             "jpmorgan_risk_taxonomy_section",
             "walmart_reconciliation_section",
             "issuer_official_pdf_prior_annual_relation",
+            "issuer_official_pdf_reconciliation",
         }:
             params = event.params
             artifact_id = f"{sim.spec['world_id']}.{event.visibility[0]}"
@@ -337,6 +338,25 @@ def render_company(sim: SimulatedWorld) -> list[Artifact]:
                     "derived-sha256:" + hashlib.sha256(text.encode()).hexdigest()
                 )
                 evidence_role = EvidenceRole.CAUSAL_SUPPORTING
+                real_record = False
+            elif event.type == "issuer_official_pdf_reconciliation":
+                text = (
+                    "Issuer official annual-report reconciliation checkpoint\n"
+                    f"Program: {params['program']}.\n"
+                    f"Control stage: {params['control_stage']}.\n"
+                    f"Control tier: {params['control_tier']}.\n"
+                    "Cumulative signed sections: "
+                    f"{len(params['required_unit_event_ids'])}.\n"
+                    "Cumulative signed annual links: "
+                    f"{len(params['required_relation_ids'])}.\n"
+                    "Status: cumulative reconciliation replayed."
+                )
+                source_origin = SourceOrigin.SYNTHETIC_WORLD
+                workflow_kind = WorkflowKind.HYBRID_CAUSAL
+                provenance_id = (
+                    "derived-sha256:" + hashlib.sha256(text.encode()).hexdigest()
+                )
+                evidence_role = EvidenceRole.CAUSAL_GOLD
                 real_record = False
             elif event.type == "issuer_ir_prior_filing_relation":
                 text = (

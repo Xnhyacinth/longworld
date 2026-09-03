@@ -68,6 +68,7 @@ def init_values(project: dict[str, Any]) -> dict[str, Any]:
         "jpmorgan_risk_taxonomy_units": {},
         "walmart_reconciliation_units": {},
         "issuer_official_pdf_relations": {},
+        "issuer_official_pdf_reconciliations": {},
     }
 
 
@@ -243,6 +244,27 @@ def check_preconditions(state: WorldState, ev: Event) -> tuple[bool, str | None]
         }
         if any(parent_id not in units for parent_id in ev.required_inputs):
             return False, "issuer_official_pdf_relation_endpoint_missing"
+        return True, None
+    if ev.type == "issuer_official_pdf_reconciliation":
+        unit_ids = ev.params.get("required_unit_event_ids")
+        relation_ids = ev.params.get("required_relation_ids")
+        units = {
+            **(state.values.get("jpmorgan_risk_taxonomy_units") or {}),
+            **(state.values.get("walmart_reconciliation_units") or {}),
+        }
+        relations = state.values.get("issuer_official_pdf_relations") or {}
+        if (
+            not isinstance(unit_ids, list)
+            or not unit_ids
+            or any(str(event_id) not in units for event_id in unit_ids)
+            or not isinstance(relation_ids, list)
+            or any(str(relation_id) not in relations for relation_id in relation_ids)
+        ):
+            return False, "issuer_official_pdf_reconciliation_input_missing"
+        prerequisite = str(ev.params.get("prerequisite_event_id") or "")
+        reconciliations = state.values.get("issuer_official_pdf_reconciliations") or {}
+        if prerequisite and prerequisite not in reconciliations:
+            return False, "issuer_official_pdf_reconciliation_prerequisite_missing"
         return True, None
     if ev.type == "issuer_ir_prior_filing_relation":
         metrics = state.values.get("issuer_ir_metrics") or {}
@@ -832,8 +854,22 @@ def apply_event(state: WorldState, ev: Event) -> None:
             "source_record_id": str(p.get("record_id") or ""),
             "target_record_id": str(p.get("target_record_id") or ""),
             "kind": str(p.get("relation_kind") or ""),
+            "endpoint_event_ids": list(ev.required_inputs),
         }
         state.set("issuer_official_pdf_relations", relations, eid, day)
+    elif t == "issuer_official_pdf_reconciliation":
+        reconciliations = dict(
+            state.values.get("issuer_official_pdf_reconciliations") or {}
+        )
+        reconciliations[eid] = {
+            "program": str(p.get("program") or ""),
+            "control_tier": str(p.get("control_tier") or ""),
+            "control_stage": str(p.get("control_stage") or ""),
+            "required_unit_event_ids": list(p.get("required_unit_event_ids") or []),
+            "required_relation_ids": list(p.get("required_relation_ids") or []),
+            "prerequisite_event_id": str(p.get("prerequisite_event_id") or ""),
+        }
+        state.set("issuer_official_pdf_reconciliations", reconciliations, eid, day)
     elif t == "issuer_ir_source_section":
         text = str(p.get("text") or "")
         prefix = "Issuer IR rendered XBRL statement\n"
