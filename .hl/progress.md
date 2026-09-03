@@ -1,5 +1,8 @@
 # Progress
 
+- 2026-09-03 Pulumi failure-recovery blocked at 128K: 7 audited rows, 64K
+  three-view in-band, 128K unique tokens 114833. DuckDB duplicate bodies.
+  Remaining: BEA vintage 128K.
 - 2026-09-03 Microsoft Finance 128K candidate: 12/12 dense audit, history
   128217 tokens, views 128584–128587, near-dup 0.0. `train_ready=false`.
   Commit `5cdb45e` plus adapter/chronology. Remaining: BEA, CodeForge FR.

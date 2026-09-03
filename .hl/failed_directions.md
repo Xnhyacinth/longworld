@@ -1,5 +1,9 @@
 # Rejected or blocked directions
 
+- Do not pad leftover PRs onto Pulumi failure-recovery to fake 128K.
+  Unique tokens are 114833; next unused unique-tag cycles overflow ~170k.
+- Do not rebuild DuckDB 8-PR same-tag FR bundles; they fail duplicate
+  source bodies. Older duckdb tags have no selected pre-merge checks.
 - Do not generate RFC 9421 as a 128K world. Unique tokens are 72,113 after
   draft collapse; counting RFC-editor reflow as extra mass repeats the
   Megatron v1=v2 failure mode.

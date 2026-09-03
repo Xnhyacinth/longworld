@@ -1,0 +1,20 @@
+{
+  "schema_version": "longworld.public-github-export-request.v1",
+  "request_id": "p16-codeforge-pulumi-failure-recovery-v1",
+  "repository": "pulumi/pulumi",
+  "allowlist": "configs/public_repo_allowlist.yaml",
+  "episodes": [
+    {"pull": 22812, "release": "v3.235.0", "role": "failure_recovery_release_cycle"},
+    {"pull": 22862, "release": "v3.237.0", "role": "failure_recovery_release_cycle"},
+    {"pull": 22864, "release": "v3.238.0", "role": "failure_recovery_release_cycle"},
+    {"pull": 23092, "release": "v3.241.0", "role": "failure_recovery_release_cycle"},
+    {"pull": 23245, "release": "v3.242.0", "role": "failure_recovery_release_cycle"},
+    {"pull": 23425, "release": "v3.245.0", "role": "failure_recovery_release_cycle"},
+    {"pull": 23450, "release": "v3.246.0", "role": "failure_recovery_release_cycle"},
+    {"pull": 23831, "release": "v3.252.0", "role": "failure_recovery_release_cycle"}
+  ],
+  "composition": "chronological_causal_union",
+  "synthetic_filler_allowed": false,
+  "random_join_allowed": false,
+  "trust_scope": "local_probe"
+}

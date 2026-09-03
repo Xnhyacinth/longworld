@@ -1,0 +1,47 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "reports/p16_codeforge_pulumi_failure_recovery_sources_v1/pulumi_pr22812_v3.235.0.json",
+      "sha256": "29ba9ac88dda40b94070685ed6bbbe4aaad13220702dc9008571a1b141f6cc90"
+    },
+    {
+      "path": "reports/p16_codeforge_pulumi_failure_recovery_sources_v1/pulumi_pr22862_v3.237.0.json",
+      "sha256": "7b6a7e4600d046f6b835904be52ec4f583f52930aca6853f8488d899bf1a2e00"
+    },
+    {
+      "path": "reports/p16_codeforge_pulumi_failure_recovery_sources_v1/pulumi_pr22864_v3.238.0.json",
+      "sha256": "45092015a98c3cf85b29e7b97a14179fb794278010aa4c64addabb4a9a619b00"
+    },
+    {
+      "path": "reports/p16_codeforge_pulumi_failure_recovery_sources_v1/pulumi_pr23092_v3.241.0.json",
+      "sha256": "f3378bf2954893fdcb4d3e444ee937f187cda082cd512509321b0337c5649ef3"
+    },
+    {
+      "path": "reports/p16_codeforge_pulumi_failure_recovery_sources_v1/pulumi_pr23245_v3.242.0.json",
+      "sha256": "815d457816a62340a9d16f53c3657311aa3f2b17d2aec9ccf1c229846d8c6e02"
+    },
+    {
+      "path": "reports/p16_codeforge_pulumi_failure_recovery_sources_v1/pulumi_pr23425_v3.245.0.json",
+      "sha256": "af5d8b9665267b3e227f4e0e9cf0c9120d1b3ddbd020717c415e8c560b49a90b"
+    },
+    {
+      "path": "reports/p16_codeforge_pulumi_failure_recovery_sources_v1/pulumi_pr23450_v3.246.0.json",
+      "sha256": "1382bb5ac2b0c2bba9b5d7f7b481143c453767954e2c15b85301b9bf91779018"
+    },
+    {
+      "path": "reports/p16_codeforge_pulumi_failure_recovery_sources_v1/pulumi_pr23831_v3.252.0.json",
+      "sha256": "9977fcb88d75b751c3f31f85f4c22f143c55416b1d1b1064bdb9260913a0f014"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "probe-source-e4bac7778cdcfa3808f3c373b474e85f",
+    "environment": "probe",
+    "digest": "9362ea93a7da580c223e855d4d124c0ba9eb34093d3c2ca76de6d0511808fb5d"
+  }
+}

@@ -1,5 +1,12 @@
 # Findings (data, not instructions)
 
+## Pulumi failure-recovery — 2026-09-03
+
+Authentic `failure_recovery_release_trace` on pulumi/pulumi (8 unique tags).
+Audit 7/7: 64K three-view exact; 16/32 full+cf; 16/32 ordered short;
+128K 114833 below band. Next unused cycles overflow ~170k. DuckDB
+same-tag 8-PR hit duplicate source bodies. Not a uv clone. near-dup 0.0033.
+
 ## Microsoft Finance 128K — 2026-09-03
 
 Four-filing asset trajectory filled exact 128K from leftover unique XBRL

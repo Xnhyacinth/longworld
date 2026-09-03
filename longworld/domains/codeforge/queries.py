@@ -8,6 +8,7 @@ from longworld.core.asof import find_event, world_as_of
 from longworld.core.world import Event, SimulatedWorld, WorldSimulator
 from longworld.domains.codeforge.events import apply_event, check_preconditions
 from longworld.domains.codeforge.multiband import (
+    bind_cumulative_failure_recovery_history,
     bind_cumulative_patch_review_test_history,
     bind_cumulative_release_history,
 )
@@ -282,6 +283,74 @@ def eval_answer(
             return "unknown"
         return f"{tag} :: {commit} :: {license_id}"
     if spec.query_type == "failure_recovery_release_trace":
+        recovery_ops = [
+            op
+            for op in spec.program_ops
+            if op.get("op") == "JOIN_FAILURE_RECOVERY_RELEASE"
+        ]
+        if recovery_ops:
+            selections: list[str] = []
+            for op in recovery_ops:
+                fail_ci_key = str(op["fail_ci_record_key"])
+                broken_key = str(op["broken_commit_record_key"])
+                repair_key = str(op["repair_commit_record_key"])
+                review_key = str(op["review_record_key"])
+                pass_ci_key = str(op["pass_ci_record_key"])
+                merge_key = str(op["merge_record_key"])
+                release_key = str(op["release_record_key"])
+                release_prefix = f"real:release:{release_key}"
+                broken_sha = state_values.get(f"repo:{broken_key}:commit")
+                fail_commit = state_values.get(f"repo:{fail_ci_key}:resolved:commit")
+                fail_test = state_values.get(f"repo:{fail_ci_key}:test")
+                fail_result = state_values.get(f"repo:{fail_ci_key}:result")
+                repair_sha = state_values.get(f"repo:{repair_key}:commit")
+                review = state_values.get(f"real:review:{review_key}:decision")
+                pass_test = state_values.get(f"repo:{pass_ci_key}:test")
+                pass_result = state_values.get(f"repo:{pass_ci_key}:result")
+                pass_commit = state_values.get(f"repo:{pass_ci_key}:resolved:commit")
+                merge_head = state_values.get(
+                    f"real:patch_review_merge:{merge_key}:head_commit"
+                )
+                tag = state_values.get(f"{release_prefix}:tag")
+                merge_sha = state_values.get(
+                    f"{release_prefix}:ancestry:merge_commit_sha"
+                )
+                tag_sha = state_values.get(f"{release_prefix}:ancestry:tag_commit_sha")
+                compare_status = state_values.get(
+                    f"{release_prefix}:ancestry:compare_status"
+                )
+                if (
+                    not all(
+                        (
+                            broken_sha,
+                            fail_commit,
+                            fail_test,
+                            repair_sha,
+                            pass_test,
+                            pass_commit,
+                            merge_head,
+                            tag,
+                            merge_sha,
+                            tag_sha,
+                        )
+                    )
+                    or fail_result != "failed"
+                    or pass_result not in {"passed", "failed"}
+                    or review not in {"approved", "rejected"}
+                    or compare_status not in {"ahead", "identical"}
+                    or broken_sha != fail_commit
+                    or repair_sha != pass_commit
+                    or repair_sha != merge_head
+                    or fail_test != pass_test
+                    or broken_sha == repair_sha
+                ):
+                    return "unknown"
+                selections.append(
+                    f"tag={tag};broken={broken_sha};fail={fail_test}:{fail_result};"
+                    f"repair={repair_sha};review={review};"
+                    f"test={pass_test}:{pass_result};ancestry={merge_sha}->{tag_sha}"
+                )
+            return " | ".join(selections) if selections else "unknown"
         broken = state_values.get("broken_hash")
         flake = state_values.get("flake_token")
         failure = state_values.get("fail_token")
@@ -580,7 +649,8 @@ def build_code_queries(world: SimulatedWorld) -> list[QuerySpec]:
         preferred_length_buckets=["32k", "64k"],
         semantic_growth_group="codeforge_failure_recovery_release",
     )
-    queries.append(q_failure_recovery)
+    if not p.get("real_workflow_ids"):
+        queries.append(q_failure_recovery)
 
     q_cf = QuerySpec(
         query_id=f"{qid}:counterfactual",
@@ -857,7 +927,12 @@ def build_code_queries(world: SimulatedWorld) -> list[QuerySpec]:
             "ci_regression_origin",
             "license_compatibility",
             "cross_repo_release_dependency",
-        }:
+        } or (
+            q.query_type == "failure_recovery_release_trace"
+            and any(
+                op.get("op") == "JOIN_FAILURE_RECOVERY_RELEASE" for op in q.program_ops
+            )
+        ):
             _minimize_real_semantic_proof(world, q)
             from longworld.core.graph import proof_depth as replayed_proof_depth
 
@@ -865,6 +940,7 @@ def build_code_queries(world: SimulatedWorld) -> list[QuerySpec]:
         out.append(q)
     bind_cumulative_release_history(world, out)
     bind_cumulative_patch_review_test_history(world, out)
+    bind_cumulative_failure_recovery_history(world, out)
     return out
 
 
@@ -961,6 +1037,7 @@ def _build_real_repo_queries(
         ]
     event_by_id = {event.id: event for event in world.events}
     patch_cycles: list[tuple[Event, list[Event], dict[str, Any]]] = []
+    recovery_cycles: list[tuple[Event, list[Event], dict[str, Any]]] = []
     for selected_release in sorted(releases, key=lambda event: (event.time, event.id)):
         ancestry = dict(selected_release.params.get("release_ancestry") or {})
         if not ancestry:
@@ -1019,6 +1096,71 @@ def _build_real_repo_queries(
             continue
         selected_events = [patch, review, ci, merge, selected_release]
         release_key = str(selected_release.params["record_key"])
+        workflow_id = selected_release.params.get("workflow_id")
+        recovered_choices: list[tuple[Event, Event, Event]] = []
+        for pass_ci in passed_ci:
+            test_name = pass_ci.params.get("test")
+            if pass_ci.params.get("commit") != patch_commit or not test_name:
+                continue
+            for event in world.events:
+                if (
+                    not _repo_kind(event, "ci_run")
+                    or event.params.get("workflow_id") != workflow_id
+                    or event.params.get("result") != "failed"
+                    or event.params.get("test") != test_name
+                    or not event.params.get("commit")
+                    or event.params.get("commit") == patch_commit
+                    or int(event.params.get("source_order") or 0)
+                    >= int(pass_ci.params.get("source_order") or 0)
+                ):
+                    continue
+                broken_commit = next(
+                    (
+                        event_by_id[parent_id]
+                        for parent_id in event.causal_inputs
+                        if parent_id in event_by_id
+                        and _repo_kind(event_by_id[parent_id], "commit")
+                        and event_by_id[parent_id].params.get("commit")
+                        == event.params.get("commit")
+                    ),
+                    None,
+                )
+                if broken_commit is not None:
+                    recovered_choices.append((event, broken_commit, pass_ci))
+        if recovered_choices:
+            fail_ci, broken_commit, pass_ci = max(
+                recovered_choices,
+                key=lambda item: (
+                    int(item[2].params.get("source_order") or 0)
+                    - int(item[0].params.get("source_order") or 0),
+                    len(str(item[0].params.get("body_text") or "")),
+                    item[0].id,
+                ),
+            )
+            recovery_cycles.append(
+                (
+                    selected_release,
+                    [
+                        broken_commit,
+                        fail_ci,
+                        patch,
+                        review,
+                        pass_ci,
+                        merge,
+                        selected_release,
+                    ],
+                    {
+                        "op": "JOIN_FAILURE_RECOVERY_RELEASE",
+                        "fail_ci_record_key": fail_ci.params["record_key"],
+                        "broken_commit_record_key": broken_commit.params["record_key"],
+                        "repair_commit_record_key": patch.params["record_key"],
+                        "review_record_key": review.params["record_key"],
+                        "pass_ci_record_key": pass_ci.params["record_key"],
+                        "merge_record_key": merge.params["record_key"],
+                        "release_record_key": release_key,
+                    },
+                )
+            )
         patch_cycles.append(
             (
                 selected_release,
@@ -1100,6 +1242,78 @@ def _build_real_repo_queries(
                 semantic_growth_group=(
                     f"{selected_release.params.get('source_url') or repo}|"
                     "patch_review_test_ancestry"
+                ),
+            )
+        )
+    recovery_cycles = recovery_cycles[-8:]
+    for cycle_count in (1, 2, 4, 8):
+        if cycle_count > len(recovery_cycles):
+            continue
+        selected_cycles = recovery_cycles[-cycle_count:]
+        selected_events = [
+            event
+            for _release, cycle_events, _op in selected_cycles
+            for event in cycle_events
+        ]
+        selected_release = selected_cycles[-1][0]
+        selected_pass_ci = selected_cycles[-1][1][4]
+        release_keys = [
+            str(cycle_release.params["record_key"])
+            for cycle_release, _events, _op in selected_cycles
+        ]
+        bucket = {1: "16k", 2: "32k", 4: "64k", 8: "128k"}[cycle_count]
+        queries.append(
+            QuerySpec(
+                query_id=(
+                    f"{qid}:failure_recovery_release_trace:{cycle_count}_cycles:"
+                    f"{selected_release.params['record_id']}"
+                ),
+                query_type="failure_recovery_release_trace",
+                question=(
+                    f"For the latest {cycle_count} real {repo} failure-recovery "
+                    f"release cycle{'s' if cycle_count != 1 else ''}, reconstruct "
+                    "each source-linked proof from the failing CI commit through the "
+                    "repair commit, the approved review, the recovered same-name "
+                    "pre-merge test, and the verified merge-to-tag ancestry. Report "
+                    "cycles chronologically as "
+                    "`tag=...;broken=SHA;fail=name:failed;repair=SHA;review=approved;"
+                    "test=name:result;ancestry=merge_sha->tag_sha`, separated by ` | `."
+                ),
+                answer="",
+                as_of=world_as_of(world),
+                answer_key="|".join(release_keys),
+                essential_event_ids=[event.id for event in selected_events],
+                essential_artifact_ids=[
+                    _event_artifact_id(world, event) for event in selected_events
+                ],
+                sufficient_event_ids=[event.id for event in selected_events],
+                cf_event_id=selected_pass_ci.id,
+                cf_param_updates={"result": "failed"},
+                cf_answer="",
+                invariance_event_id=invariance_event.id,
+                invariance_param_updates={"quoted_hash": "fffffff"},
+                gold_expression=(
+                    "FOLLOW(failed_ci, repair_commit, approved_review, "
+                    "same_name_recovery, verified_release_ancestry) then "
+                    "FORMAT(failure_recovery_release_trace)"
+                ),
+                proof_depth=6 + cycle_count,
+                cf_op="test_result",
+                motif="failure_recovery_release_trace",
+                topology_id=instance_topology(
+                    "code.real_failure_recovery_release_trace",
+                    *[
+                        cycle_release.params["record_id"]
+                        for cycle_release, _events, _op in selected_cycles
+                    ],
+                ),
+                domain="codeforge",
+                truth_regime="real_workflow_hybrid_executable",
+                program_ops=[op for _release, _events, op in selected_cycles],
+                preferred_length_buckets=[bucket],
+                semantic_growth_group=(
+                    f"{selected_release.params.get('source_url') or repo}|"
+                    "failure_recovery_release_trace"
                 ),
             )
         )

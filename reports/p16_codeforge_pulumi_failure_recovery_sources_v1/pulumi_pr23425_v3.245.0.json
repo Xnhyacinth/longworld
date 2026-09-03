@@ -1,0 +1,882 @@
+{
+  "schema_version": "longworld.git-workflow.v1",
+  "repository_url": "https://github.com/pulumi/pulumi",
+  "source_origin": "real_public",
+  "revision": "d6021091d65f4f098afbd6956460cd2100bc0be8",
+  "license": "Apache-2.0",
+  "exported_at": "2026-09-03T07:56:33.504179Z",
+  "authorization": {
+    "record_id": "PUBLIC-GITHUB-TERMS-2026-08",
+    "scope": "read-only workflow export",
+    "basis": "public repository under recorded license",
+    "reviewed_at": "2026-08-27T06:20:00Z"
+  },
+  "public_policy": {
+    "record_id": "PUBLIC-GITHUB-TERMS-2026-08",
+    "sha256": "dd39cfef6803b01b08cc476acef805265a7f10d62378889e1d56cb8603cb4c60"
+  },
+  "source_client": {
+    "path": "/usr/bin/gh",
+    "sha256": "2fd925d68889746976958342fb749bf102bc7dc8bcba3abfa533a80ad7791673"
+  },
+  "privacy_review": {
+    "emails": "redacted",
+    "secrets": "fail_closed",
+    "scanner": "longworld-public-secret-patterns",
+    "scanner_revision": "v2"
+  },
+  "records": [
+    {
+      "id": "license:f433b1a53f5b830a205fd2df78e2b34974656c7b",
+      "kind": "license",
+      "occurred_at": "2023-03-01T16:43:41Z",
+      "text": "Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an example is provided in the Appendix below).\n\n      \"Derivative Works\" shall mean any work, whether in Source or Object\n      form, that is based on (or derived from) the Work and for which the\n      editorial revisions, annotations, elaborations, or other modifications\n      represent, as a whole, an original work of authorship. For the purposes\n      of this License, Derivative Works shall not include works that remain\n      separable from, or merely link (or bind by name) to the interfaces of,\n      the Work and Derivative Works thereof.\n\n      \"Contribution\" shall mean any work of authorship, including\n      the original version of the Work and any modifications or additions\n      to that Work or Derivative Works thereof, that is intentionally\n      submitted to Licensor for inclusion in the Work by the copyright owner\n      or by an individual or Legal Entity authorized to submit on behalf of\n      the copyright owner. For the purposes of this definition, \"submitted\"\n      means any form of electronic, verbal, or written communication sent\n      to the Licensor or its representatives, including but not limited to\n      communication on electronic mailing lists, source code control systems,\n      and issue tracking systems that are managed by, or on behalf of, the\n      Licensor for the purpose of discussing and improving the Work, but\n      excluding communication that is conspicuously marked or otherwise\n      designated in writing by the copyright owner as \"Not a Contribution.\"\n\n      \"Contributor\" shall mean Licensor and any individual or Legal Entity\n      on behalf of whom a Contribution has been received by Licensor and\n      subsequently incorporated within the Work.\n\n   2. Grant of Copyright License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      copyright license to reproduce, prepare Derivative Works of,\n      publicly display, publicly perform, sublicense, and distribute the\n      Work and such Derivative Works in Source or Object form.\n\n   3. Grant of Patent License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      (except as stated in this section) patent license to make, have made,\n      use, offer to sell, sell, import, and otherwise transfer the Work,\n      where such license applies only to those patent claims licensable\n      by such Contributor that are necessarily infringed by their\n      Contribution(s) alone or by combination of their Contribution(s)\n      with the Work to which such Contribution(s) was submitted. If You\n      institute patent litigation against any entity (including a\n      cross-claim or counterclaim in a lawsuit) alleging that the Work\n      or a Contribution incorporated within the Work constitutes direct\n      or contributory patent infringement, then any patent licenses\n      granted to You under this License for that Work shall terminate\n      as of the date such litigation is filed.\n\n   4. Redistribution. You may reproduce and distribute copies of the\n      Work or Derivative Works thereof in any medium, with or without\n      modifications, and in Source or Object form, provided that You\n      meet the following conditions:\n\n      (a) You must give any other recipients of the Work or\n          Derivative Works a copy of this License; and\n\n      (b) You must cause any modified files to carry prominent notices\n          stating that You changed the files; and\n\n      (c) You must retain, in the Source form of any Derivative Works\n          that You distribute, all copyright, patent, trademark, and\n          attribution notices from the Source form of the Work,\n          excluding those notices that do not pertain to any part of\n          the Derivative Works; and\n\n      (d) If the Work includes a \"NOTICE\" text file as part of its\n          distribution, then any Derivative Works that You distribute must\n          include a readable copy of the attribution notices contained\n          within such NOTICE file, excluding those notices that do not\n          pertain to any part of the Derivative Works, in at least one\n          of the following places: within a NOTICE text file distributed\n          as part of the Derivative Works; within the Source form or\n          documentation, if provided along with the Derivative Works; or,\n          within a display generated by the Derivative Works, if and\n          wherever such third-party notices normally appear. The contents\n          of the NOTICE file are for informational purposes only and\n          do not modify the License. You may add Your own attribution\n          notices within Derivative Works that You distribute, alongside\n          or as an addendum to the NOTICE text from the Work, provided\n          that such additional attribution notices cannot be construed\n          as modifying the License.\n\n      You may add Your own copyright statement to Your modifications and\n      may provide additional or different license terms and conditions\n      for use, reproduction, or distribution of Your modifications, or\n      for any such Derivative Works as a whole, provided Your use,\n      reproduction, and distribution of the Work otherwise complies with\n      the conditions stated in this License.\n\n   5. Submission of Contributions. Unless You explicitly state otherwise,\n      any Contribution intentionally submitted for inclusion in the Work\n      by You to the Licensor shall be under the terms and conditions of\n      this License, without any additional terms or conditions.\n      Notwithstanding the above, nothing herein shall supersede or modify\n      the terms of any separate license agreement you may have executed\n      with Licensor regarding such Contributions.\n\n   6. Trademarks. This License does not grant permission to use the trade\n      names, trademarks, service marks, or product names of the Licensor,\n      except as required for reasonable and customary use in describing the\n      origin of the Work and reproducing the content of the NOTICE file.\n\n   7. Disclaimer of Warranty. Unless required by applicable law or\n      agreed to in writing, Licensor provides the Work (and each\n      Contributor provides its Contributions) on an \"AS IS\" BASIS,\n      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or\n      implied, including, without limitation, any warranties or conditions\n      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A\n      PARTICULAR PURPOSE. You are solely responsible for determining the\n      appropriateness of using or redistributing the Work and assume any\n      risks associated with Your exercise of permissions under this License.\n\n   8. Limitation of Liability. In no event and under no legal theory,\n      whether in tort (including negligence), contract, or otherwise,\n      unless required by applicable law (such as deliberate and grossly\n      negligent acts) or agreed to in writing, shall any Contributor be\n      liable to You for damages, including any direct, indirect, special,\n      incidental, or consequential damages of any character arising as a\n      result of this License or out of the use or inability to use the\n      Work (including but not limited to damages for loss of goodwill,\n      work stoppage, computer failure or malfunction, or any and all\n      other commercial damages or losses), even if such Contributor\n      has been advised of the possibility of such damages.\n\n   9. Accepting Warranty or Additional Liability. While redistributing\n      the Work or Derivative Works thereof, You may choose to offer,\n      and charge a fee for, acceptance of support, warranty, indemnity,\n      or other liability obligations and/or rights consistent with this\n      License. However, in accepting such obligations, You may act only\n      on Your own behalf and on Your sole responsibility, not on behalf\n      of any other Contributor, and only if You agree to indemnify,\n      defend, and hold each Contributor harmless for any liability\n      incurred by, or claims asserted against, such Contributor by reason\n      of your accepting any such warranty or additional liability.\n\n   END OF TERMS AND CONDITIONS",
+      "links": [],
+      "attributes": {
+        "spdx_id": "Apache-2.0"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/contents/LICENSE?ref=f6eec786573197409567ef6420e754707894eae1"
+    },
+    {
+      "id": "commit:4534bff842edb56ec327f9f76b5df1b347ff331e",
+      "kind": "commit",
+      "occurred_at": "2026-06-03T12:58:03Z",
+      "text": "commit 4534bff842edb56ec327f9f76b5df1b347ff331e\nSupport up/down arrows for prompt history in pulumi neo\n\nUp/down recall previously submitted prompts when the cursor is on the\nedge line of the input, mirroring shell history. Mid-buffer the keys\nstill move the cursor between lines. No footer hint is added.\n\nFixes #23395\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <[redacted-email]>\n\ndiff -- changelog/pending/cli-neo-improvement-20260603-000000.yaml\n@@ -0,0 +1,6 @@\n+component: cli/neo\n+kind: improvement\n+body: Support up/down arrows to scroll through prompt history in `pulumi neo`\n+time: 2026-06-03T00:00:00.000000+00:00\n+custom:\n+    PR: \"\"\n\ndiff -- pkg/cmd/pulumi/neo/tui.go\n@@ -311,6 +311,19 @@ type Model struct {\n \ttoolHistory   []toolCallRecord\n \toverlayActive bool\n \toverlay       overlayModel\n+\t// history holds the prompts the user has submitted this session, oldest\n+\t// first, recalled with the up/down arrows. There is intentionally no\n+\t// footer hint for it — the affordance mirrors shell history and is\n+\t// meant to be discovered by muscle memory.\n+\thistory []string\n+\t// historyIdx is the cursor into history during up/down navigation. It\n+\t// equals len(history) when not navigating, i.e. the user is editing the\n+\t// live draft; stepping back with Up walks it down toward the oldest entry.\n+\thistoryIdx int\n+\t// historyDraft stashes the in-progress draft when history navigation\n+\t// begins, so pressing Down past the newest entry restores what the user\n+\t// had typed rather than leaving a recalled prompt behind.\n+\thistoryDraft string\n }\n \n var (\n@@ -383,6 +396,42 @@ func nextPermissionMode(m client.NeoPermissionMode) client.NeoPermissionMode {\n \treturn client.NeoPermissionModeReadOnly\n }\n \n+// historyPrev steps to an older prompt. It returns true when it handled the\n+// key (so the caller swallows it). The first step out of the live draft\n+// stashes that draft in historyDraft so a later Down can restore it.\n+func (m *Model) historyPrev() bool {\n+\tif len(m.history) == 0 {\n+\t\treturn false\n+\t}\n+\tif m.historyIdx == 0 {\n+\t\treturn true // already at the oldest entry; pin here\n+\t}\n+\tif m.historyIdx == len(m.history) {\n+\t\tm.historyDraft = m.textInput.Value()\n+\t}\n+\tm.historyIdx--\n+\tm.textInput.SetValue(m.history[m.historyIdx])\n+\tm.textInput.MoveToEnd()\n+\treturn true\n+}\n+\n+// historyNext steps toward newer prompts; past the newest it restores the\n+// saved draft. It returns false when not currently navigating so Down falls\n+// through to the textarea's own cursor movement.\n+func (m *Model) historyNext() bool {\n+\tif m.historyIdx >= len(m.history) {\n+\t\treturn false\n+\t}\n+\tm.historyIdx++\n+\tif m.historyIdx == len(m.history) {\n+\t\tm.textInput.SetValue(m.historyDraft)\n+\t} else {\n+\t\tm.textInput.SetValue(m.history[m.historyIdx])\n+\t}\n+\tm.textInput.MoveToEnd()\n+\treturn true\n+}\n+\n // renderIndented word-wraps content (ANSI-safe) to termWidth minus the\n // 2-space transcript gutter, or returns un-wrapped if the width is too\n // small to wrap into. URLs in the post-wrap output are wrapped in OSC 8\n@@ -804,6 +853,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {\n \t\t\t\t\t// UIUserMessage handler to avoid duplicates.\n \t\t\t\t\tuserCmd := m.appendUserMessageBlock(text)\n \t\t\t\t\tm.pendingUserEchoes = append(m.pendingUserEchoes, text)\n+\t\t\t\t\t// Record the prompt for up/down history recall. Skip a\n+\t\t\t\t\t// consecutive duplicate so mashing the same message\n+\t\t\t\t\t// doesn't bloat the history.\n+\t\t\t\t\tif n := len(m.history); n == 0 || m.history[n-1] != text {\n+\t\t\t\t\t\tm.history = append(m.history, text)\n+\t\t\t\t\t}\n+\t\t\t\t\tm.historyIdx = len(m.history)\n+\t\t\t\t\tm.historyDraft = \"\"\n \t\t\t\t\t// Freeze the plan-mode affordance: planMode has now been\n \t\t\t\t\t// committed to the dispatcher and any later Shift+Tab\n \t\t\t\t\t// would be a no-op on the server.\n@@ -814,6 +871,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {\n \t\t\treturn m, nil\n \t\t}\n \n+\t\t// Up/Down recall prompt history when the cursor sits on the edge line\n+\t\t// of the input — mirroring shell history. Mid-buffer they fall through\n+\t\t// to the textarea's line movement. No footer hint is shown, by design.\n+\t\tif keyStr == \"up\" && m.textInput.Line() == 0 {\n+\t\t\tif m.historyPrev() {\n+\t\t\t\treturn m, nil\n+\t\t\t}\n+\t\t}\n+\t\tif keyStr == \"down\" && m.textInput.Line() == m.textInput.LineCount()-1 {\n+\t\t\tif m.historyNext() {\n+\t\t\t\treturn m, nil\n+\t\t\t}\n+\t\t}\n+\n \t\t// Pass to text input for typing. The terminal's own scrollback is\n \t\t// what the user uses to look back, so pgup/pgdn aren't forwarded.\n \t\tvar tiCmd tea.Cmd\n\ndiff -- pkg/cmd/pulumi/neo/tui_test.go\n@@ -3053,3 +3053,112 @@ func TestRenderApprovalAuto_VerbVariants(t *testing.T) {\n \t\t})\n \t}\n }\n+\n+// submitPrompt types text into the model and presses Enter, returning the\n+// resulting model. The OutCh must be buffered enough for the test's sends.\n+func submitPrompt(t *testing.T, m Model, text string) Model {\n+\tt.Helper()\n+\tm.textInput.SetValue(text)\n+\tupdated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})\n+\tm = updated.(Model)\n+\t// Submitting puts the model in the busy state; clear it as the agent does\n+\t// at the end of its turn so a follow-up submit isn't swallowed.\n+\tupdated, _ = m.Update(UITaskIdle{})\n+\treturn updated.(Model)\n+}\n+\n+func TestModel_PromptHistory_RecallAfterSubmit(t *testing.T) {\n+\tt.Parallel()\n+\n+\toutCh := make(chan outboundEvent, 4)\n+\tm := NewModel(ModelConfig{OutCh: outCh})\n+\tm = submitPrompt(t, m, \"first\")\n+\tm = submitPrompt(t, m, \"second\")\n+\trequire.Empty(t, m.textInput.Value(), \"input clears after submit\")\n+\n+\t// Up recalls the newest, then the older.\n+\tupdated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyUp})\n+\tm = updated.(Model)\n+\tassert.Equal(t, \"second\", m.textInput.Value())\n+\n+\tupdated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})\n+\tm = updated.(Model)\n+\tassert.Equal(t, \"first\", m.textInput.Value())\n+\n+\t// Up at the oldest entry pins there.\n+\tupdated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})\n+\tm = updated.(Model)\n+\tassert.Equal(t, \"first\", m.textInput.Value())\n+\n+\t// Down walks back toward newer prompts, then past the newest to the\n+\t// (empty) draft.\n+\tupdated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})\n+\tm = updated.(Model)\n+\tassert.Equal(t, \"second\", m.textInput.Value())\n+\n+\tupdated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})\n+\tm = updated.(Model)\n+\tassert.Empty(t, m.textInput.Value(), \"Down past newest restores the empty draft\")\n+}\n+\n+func TestModel_PromptHistory_PreservesDraft(t *testing.T) {\n+\tt.Parallel()\n+\n+\toutCh := make(chan outboundEvent, 4)\n+\tm := NewModel(ModelConfig{OutCh: outCh})\n+\tm = submitPrompt(t, m, \"sent\")\n+\n+\t// Type an unsent draft, recall history with Up, then Down past the newest\n+\t// must restore the draft rather than leave the recalled prompt behind.\n+\tm.textInput.SetValue(\"draft in progress\")\n+\tupdated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyUp})\n+\tm = updated.(Model)\n+\tassert.Equal(t, \"sent\", m.textInput.Value())\n+\n+\tupdated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})\n+\tm = updated.(Model)\n+\tassert.Equal(t, \"draft in progress\", m.textInput.Value())\n+}\n+\n+func TestModel_PromptHistory_DedupesConsecutive(t *testing.T) {\n+\tt.Parallel()\n+\n+\toutCh := make(chan outboundEvent, 4)\n+\tm := NewModel(ModelConfig{OutCh: outCh})\n+\tm = submitPrompt(t, m, \"same\")\n+\tm = submitPrompt(t, m, \"same\")\n+\n+\tassert.Equal(t, []string{\"same\"}, m.history,\n+\t\t\"consecutive duplicate prompts collapse to one history entry\")\n+}\n+\n+func TestModel_PromptHistory_MidBufferUpDoesNotRecall(t *testing.T) {\n+\tt.Parallel()\n+\n+\t// With the cursor on a middle line of a multi-line draft, Up must move the\n+\t// cursor (textarea default) rather than recall history.\n+\toutCh := make(chan outboundEvent, 4)\n+\tm := NewModel(ModelConfig{OutCh: outCh})\n+\tm = submitPrompt(t, m, \"history entry\")\n+\n+\tm.textInput.SetValue(\"line1\\nline2\\nline3\")\n+\tm.textInput.MoveToEnd()\n+\tm.textInput.CursorUp() // now on the middle line\n+\trequire.NotEqual(t, 0, m.textInput.Line(), \"cursor must not be on the first line\")\n+\n+\tupdated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyUp})\n+\tm = updated.(Model)\n+\tassert.Equal(t, \"line1\\nline2\\nline3\", m.textInput.Value(),\n+\t\t\"Up mid-buffer must not recall history\")\n+}\n+\n+func TestModel_PromptHistory_NoFooterHint(t *testing.T) {\n+\tt.Parallel()\n+\n+\t// Per the issue, the shortcut is intentionally undocumented in the footer.\n+\tm := NewModel(ModelConfig{})\n+\tview := m.viewString()\n+\tassert.NotContains(t, view, \"history\")\n+\tassert.NotContains(t, view, \"↑\")\n+\tassert.NotContains(t, view, \"↓\")\n+}",
+      "links": [
+        "license:f433b1a53f5b830a205fd2df78e2b34974656c7b"
+      ],
+      "attributes": {
+        "sha": "4534bff842edb56ec327f9f76b5df1b347ff331e",
+        "redactions": [
+          "email"
+        ]
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/commits/4534bff842edb56ec327f9f76b5df1b347ff331e"
+    },
+    {
+      "id": "pull_request:23425",
+      "kind": "pull_request",
+      "occurred_at": "2026-06-03T12:58:15Z",
+      "text": "Pull request #23425: Support up/down arrows for prompt history in `pulumi neo`\n\nUp/down arrows now scroll through previously submitted prompts in `pulumi neo`, when the cursor is on the edge line of the input. Mid-buffer they still move the cursor between lines. No footer hint is added.\n\nFixes #23395\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+      "links": [
+        "commit:4534bff842edb56ec327f9f76b5df1b347ff331e"
+      ],
+      "attributes": {
+        "number": 23425,
+        "head_sha": "c25307df5b5659475256de0114a94dddfece475e"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/pulls/23425"
+    },
+    {
+      "id": "ci:79299405981",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T12:58:22Z",
+      "text": "CI check Maintainer comment for 4534bff842edb56ec327f9f76b5df1b347ff331e\nrun_id=79299405981 status=completed conclusion=skipped",
+      "links": [
+        "commit:4534bff842edb56ec327f9f76b5df1b347ff331e"
+      ],
+      "attributes": {
+        "head_sha": "4534bff842edb56ec327f9f76b5df1b347ff331e",
+        "name": "Maintainer comment",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-03T12:58:22Z",
+        "completed_at": "2026-06-03T12:58:22Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299405981"
+    },
+    {
+      "id": "commit:835576808089f8d3f17bb9961d1360fc846236f3",
+      "kind": "commit",
+      "occurred_at": "2026-06-03T12:58:23Z",
+      "text": "commit 835576808089f8d3f17bb9961d1360fc846236f3\nAdd PR number to changelog entry\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <[redacted-email]>\n\ndiff -- changelog/pending/cli-neo-improvement-20260603-000000.yaml\n@@ -3,4 +3,4 @@ kind: improvement\n body: Support up/down arrows to scroll through prompt history in `pulumi neo`\n time: 2026-06-03T00:00:00.000000+00:00\n custom:\n-    PR: \"\"\n+    PR: \"23425\"",
+      "links": [
+        "license:f433b1a53f5b830a205fd2df78e2b34974656c7b"
+      ],
+      "attributes": {
+        "sha": "835576808089f8d3f17bb9961d1360fc846236f3",
+        "redactions": [
+          "email"
+        ]
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/commits/835576808089f8d3f17bb9961d1360fc846236f3"
+    },
+    {
+      "id": "ci:79299437446",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T12:58:31Z",
+      "text": "CI check Maintainer comment for 835576808089f8d3f17bb9961d1360fc846236f3\nrun_id=79299437446 status=completed conclusion=skipped",
+      "links": [
+        "commit:835576808089f8d3f17bb9961d1360fc846236f3"
+      ],
+      "attributes": {
+        "head_sha": "835576808089f8d3f17bb9961d1360fc846236f3",
+        "name": "Maintainer comment",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-03T12:58:32Z",
+        "completed_at": "2026-06-03T12:58:31Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299437446"
+    },
+    {
+      "id": "ci:79299408201",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T12:58:37Z",
+      "text": "CI check version-set for 4534bff842edb56ec327f9f76b5df1b347ff331e\nrun_id=79299408201 status=completed conclusion=cancelled",
+      "links": [
+        "commit:4534bff842edb56ec327f9f76b5df1b347ff331e"
+      ],
+      "attributes": {
+        "head_sha": "4534bff842edb56ec327f9f76b5df1b347ff331e",
+        "name": "version-set",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-06-03T12:58:26Z",
+        "completed_at": "2026-06-03T12:58:37Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299408201"
+    },
+    {
+      "id": "ci:79299408326",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T12:58:37Z",
+      "text": "CI check info / gather for 4534bff842edb56ec327f9f76b5df1b347ff331e\nrun_id=79299408326 status=completed conclusion=cancelled",
+      "links": [
+        "commit:4534bff842edb56ec327f9f76b5df1b347ff331e"
+      ],
+      "attributes": {
+        "head_sha": "4534bff842edb56ec327f9f76b5df1b347ff331e",
+        "name": "info / gather",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-06-03T12:58:26Z",
+        "completed_at": "2026-06-03T12:58:37Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299408326"
+    },
+    {
+      "id": "ci:79299457313",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T12:58:37Z",
+      "text": "CI check build CLI for 4534bff842edb56ec327f9f76b5df1b347ff331e\nrun_id=79299457313 status=completed conclusion=skipped",
+      "links": [
+        "commit:4534bff842edb56ec327f9f76b5df1b347ff331e"
+      ],
+      "attributes": {
+        "head_sha": "4534bff842edb56ec327f9f76b5df1b347ff331e",
+        "name": "build CLI",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-03T12:58:38Z",
+        "completed_at": "2026-06-03T12:58:37Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299457313"
+    },
+    {
+      "id": "ci:79299457516",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T12:58:37Z",
+      "text": "CI check Neo unit tests for 4534bff842edb56ec327f9f76b5df1b347ff331e\nrun_id=79299457516 status=completed conclusion=skipped",
+      "links": [
+        "commit:4534bff842edb56ec327f9f76b5df1b347ff331e"
+      ],
+      "attributes": {
+        "head_sha": "4534bff842edb56ec327f9f76b5df1b347ff331e",
+        "name": "Neo unit tests",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-03T12:58:38Z",
+        "completed_at": "2026-06-03T12:58:37Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299457516"
+    },
+    {
+      "id": "ci:79299457576",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T12:58:37Z",
+      "text": "CI check Lint for 4534bff842edb56ec327f9f76b5df1b347ff331e\nrun_id=79299457576 status=completed conclusion=skipped",
+      "links": [
+        "commit:4534bff842edb56ec327f9f76b5df1b347ff331e"
+      ],
+      "attributes": {
+        "head_sha": "4534bff842edb56ec327f9f76b5df1b347ff331e",
+        "name": "Lint",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-03T12:58:38Z",
+        "completed_at": "2026-06-03T12:58:37Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299457576"
+    },
+    {
+      "id": "ci:79299457178",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T12:58:45Z",
+      "text": "CI check ci-ok for 4534bff842edb56ec327f9f76b5df1b347ff331e\nrun_id=79299457178 status=completed conclusion=failure",
+      "links": [
+        "commit:4534bff842edb56ec327f9f76b5df1b347ff331e"
+      ],
+      "attributes": {
+        "head_sha": "4534bff842edb56ec327f9f76b5df1b347ff331e",
+        "name": "ci-ok",
+        "status": "completed",
+        "conclusion": "failure",
+        "started_at": "2026-06-03T12:58:41Z",
+        "completed_at": "2026-06-03T12:58:45Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299457178"
+    },
+    {
+      "id": "ci:79299485167",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T12:59:17Z",
+      "text": "CI check info / gather for 835576808089f8d3f17bb9961d1360fc846236f3\nrun_id=79299485167 status=completed conclusion=success",
+      "links": [
+        "commit:835576808089f8d3f17bb9961d1360fc846236f3"
+      ],
+      "attributes": {
+        "head_sha": "835576808089f8d3f17bb9961d1360fc846236f3",
+        "name": "info / gather",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T12:58:49Z",
+        "completed_at": "2026-06-03T12:59:17Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299485167"
+    },
+    {
+      "id": "ci:79299485264",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T12:59:27Z",
+      "text": "CI check version-set for 835576808089f8d3f17bb9961d1360fc846236f3\nrun_id=79299485264 status=completed conclusion=success",
+      "links": [
+        "commit:835576808089f8d3f17bb9961d1360fc846236f3"
+      ],
+      "attributes": {
+        "head_sha": "835576808089f8d3f17bb9961d1360fc846236f3",
+        "name": "version-set",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T12:58:51Z",
+        "completed_at": "2026-06-03T12:59:27Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299485264"
+    },
+    {
+      "id": "ci:79299630578",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:00:00Z",
+      "text": "CI check Lint / Lint changelog entries for 835576808089f8d3f17bb9961d1360fc846236f3\nrun_id=79299630578 status=completed conclusion=success",
+      "links": [
+        "commit:835576808089f8d3f17bb9961d1360fc846236f3"
+      ],
+      "attributes": {
+        "head_sha": "835576808089f8d3f17bb9961d1360fc846236f3",
+        "name": "Lint / Lint changelog entries",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T12:59:31Z",
+        "completed_at": "2026-06-03T13:00:00Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299630578"
+    },
+    {
+      "id": "ci:79299630517",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:00:02Z",
+      "text": "CI check Lint / Lint GHA for 835576808089f8d3f17bb9961d1360fc846236f3\nrun_id=79299630517 status=completed conclusion=success",
+      "links": [
+        "commit:835576808089f8d3f17bb9961d1360fc846236f3"
+      ],
+      "attributes": {
+        "head_sha": "835576808089f8d3f17bb9961d1360fc846236f3",
+        "name": "Lint / Lint GHA",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T12:59:31Z",
+        "completed_at": "2026-06-03T13:00:02Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299630517"
+    },
+    {
+      "id": "ci:79299630545",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:00:02Z",
+      "text": "CI check Lint / Generate Go SDK for 835576808089f8d3f17bb9961d1360fc846236f3\nrun_id=79299630545 status=completed conclusion=success",
+      "links": [
+        "commit:835576808089f8d3f17bb9961d1360fc846236f3"
+      ],
+      "attributes": {
+        "head_sha": "835576808089f8d3f17bb9961d1360fc846236f3",
+        "name": "Lint / Generate Go SDK",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T12:59:32Z",
+        "completed_at": "2026-06-03T13:00:02Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299630545"
+    },
+    {
+      "id": "ci:79299630581",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:00:19Z",
+      "text": "CI check Lint / Lint Protobufs for 835576808089f8d3f17bb9961d1360fc846236f3\nrun_id=79299630581 status=completed conclusion=success",
+      "links": [
+        "commit:835576808089f8d3f17bb9961d1360fc846236f3"
+      ],
+      "attributes": {
+        "head_sha": "835576808089f8d3f17bb9961d1360fc846236f3",
+        "name": "Lint / Lint Protobufs",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T12:59:31Z",
+        "completed_at": "2026-06-03T13:00:19Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299630581"
+    },
+    {
+      "id": "ci:79299630557",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:00:32Z",
+      "text": "CI check Lint / Lint pulumi.json for 835576808089f8d3f17bb9961d1360fc846236f3\nrun_id=79299630557 status=completed conclusion=success",
+      "links": [
+        "commit:835576808089f8d3f17bb9961d1360fc846236f3"
+      ],
+      "attributes": {
+        "head_sha": "835576808089f8d3f17bb9961d1360fc846236f3",
+        "name": "Lint / Lint pulumi.json",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T12:59:32Z",
+        "completed_at": "2026-06-03T13:00:32Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299630557"
+    },
+    {
+      "id": "ci:79299630669",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:00:42Z",
+      "text": "CI check Lint / go mod tidy for 835576808089f8d3f17bb9961d1360fc846236f3\nrun_id=79299630669 status=completed conclusion=success",
+      "links": [
+        "commit:835576808089f8d3f17bb9961d1360fc846236f3"
+      ],
+      "attributes": {
+        "head_sha": "835576808089f8d3f17bb9961d1360fc846236f3",
+        "name": "Lint / go mod tidy",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T12:59:31Z",
+        "completed_at": "2026-06-03T13:00:42Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299630669"
+    },
+    {
+      "id": "ci:79299630445",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:01:03Z",
+      "text": "CI check build CLI / linux-amd64 for 835576808089f8d3f17bb9961d1360fc846236f3\nrun_id=79299630445 status=completed conclusion=success",
+      "links": [
+        "commit:835576808089f8d3f17bb9961d1360fc846236f3"
+      ],
+      "attributes": {
+        "head_sha": "835576808089f8d3f17bb9961d1360fc846236f3",
+        "name": "build CLI / linux-amd64",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T12:59:31Z",
+        "completed_at": "2026-06-03T13:01:03Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299630445"
+    },
+    {
+      "id": "ci:79299630550",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:01:16Z",
+      "text": "CI check Lint / Lint SDKs for 835576808089f8d3f17bb9961d1360fc846236f3\nrun_id=79299630550 status=completed conclusion=success",
+      "links": [
+        "commit:835576808089f8d3f17bb9961d1360fc846236f3"
+      ],
+      "attributes": {
+        "head_sha": "835576808089f8d3f17bb9961d1360fc846236f3",
+        "name": "Lint / Lint SDKs",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T12:59:31Z",
+        "completed_at": "2026-06-03T13:01:16Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299630550"
+    },
+    {
+      "id": "ci:79299630525",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:08:06Z",
+      "text": "CI check Neo unit tests / neo unit tests for 835576808089f8d3f17bb9961d1360fc846236f3\nrun_id=79299630525 status=completed conclusion=success",
+      "links": [
+        "commit:835576808089f8d3f17bb9961d1360fc846236f3"
+      ],
+      "attributes": {
+        "head_sha": "835576808089f8d3f17bb9961d1360fc846236f3",
+        "name": "Neo unit tests / neo unit tests",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T12:59:32Z",
+        "completed_at": "2026-06-03T13:08:06Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299630525"
+    },
+    {
+      "id": "ci:79299630511",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:08:28Z",
+      "text": "CI check Lint / Lint Go for 835576808089f8d3f17bb9961d1360fc846236f3\nrun_id=79299630511 status=completed conclusion=success",
+      "links": [
+        "commit:835576808089f8d3f17bb9961d1360fc846236f3"
+      ],
+      "attributes": {
+        "head_sha": "835576808089f8d3f17bb9961d1360fc846236f3",
+        "name": "Lint / Lint Go",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T12:59:33Z",
+        "completed_at": "2026-06-03T13:08:28Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79299630511"
+    },
+    {
+      "id": "ci:79301409365",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:08:35Z",
+      "text": "CI check ci-ok for 835576808089f8d3f17bb9961d1360fc846236f3\nrun_id=79301409365 status=completed conclusion=success",
+      "links": [
+        "commit:835576808089f8d3f17bb9961d1360fc846236f3"
+      ],
+      "attributes": {
+        "head_sha": "835576808089f8d3f17bb9961d1360fc846236f3",
+        "name": "ci-ok",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T13:08:32Z",
+        "completed_at": "2026-06-03T13:08:35Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79301409365"
+    },
+    {
+      "id": "commit:c25307df5b5659475256de0114a94dddfece475e",
+      "kind": "commit",
+      "occurred_at": "2026-06-03T13:21:56Z",
+      "text": "commit c25307df5b5659475256de0114a94dddfece475e\nSimplify prompt-history code after review\n\nExtract recallInput helper for the repeated SetValue+MoveToEnd, and add a\npressKey test helper to cut the updated/cast boilerplate.\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <[redacted-email]>\n\ndiff -- pkg/cmd/pulumi/neo/tui.go\n@@ -396,6 +396,13 @@ func nextPermissionMode(m client.NeoPermissionMode) client.NeoPermissionMode {\n \treturn client.NeoPermissionModeReadOnly\n }\n \n+// recallInput replaces the textarea contents with a recalled prompt and parks\n+// the cursor at the end, ready to edit or resend.\n+func (m *Model) recallInput(s string) {\n+\tm.textInput.SetValue(s)\n+\tm.textInput.MoveToEnd()\n+}\n+\n // historyPrev steps to an older prompt. It returns true when it handled the\n // key (so the caller swallows it). The first step out of the live draft\n // stashes that draft in historyDraft so a later Down can restore it.\n@@ -410,8 +417,7 @@ func (m *Model) historyPrev() bool {\n \t\tm.historyDraft = m.textInput.Value()\n \t}\n \tm.historyIdx--\n-\tm.textInput.SetValue(m.history[m.historyIdx])\n-\tm.textInput.MoveToEnd()\n+\tm.recallInput(m.history[m.historyIdx])\n \treturn true\n }\n \n@@ -424,11 +430,10 @@ func (m *Model) historyNext() bool {\n \t}\n \tm.historyIdx++\n \tif m.historyIdx == len(m.history) {\n-\t\tm.textInput.SetValue(m.historyDraft)\n+\t\tm.recallInput(m.historyDraft)\n \t} else {\n-\t\tm.textInput.SetValue(m.history[m.historyIdx])\n+\t\tm.recallInput(m.history[m.historyIdx])\n \t}\n-\tm.textInput.MoveToEnd()\n \treturn true\n }\n \n\ndiff -- pkg/cmd/pulumi/neo/tui_test.go\n@@ -3059,11 +3059,17 @@ func TestRenderApprovalAuto_VerbVariants(t *testing.T) {\n func submitPrompt(t *testing.T, m Model, text string) Model {\n \tt.Helper()\n \tm.textInput.SetValue(text)\n-\tupdated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})\n-\tm = updated.(Model)\n+\tm = pressKey(t, m, tea.KeyEnter)\n \t// Submitting puts the model in the busy state; clear it as the agent does\n \t// at the end of its turn so a follow-up submit isn't swallowed.\n-\tupdated, _ = m.Update(UITaskIdle{})\n+\tupdated, _ := m.Update(UITaskIdle{})\n+\treturn updated.(Model)\n+}\n+\n+// pressKey feeds a single keypress to the model and returns the updated model.\n+func pressKey(t *testing.T, m Model, code rune) Model {\n+\tt.Helper()\n+\tupdated, _ := m.Update(tea.KeyPressMsg{Code: code})\n \treturn updated.(Model)\n }\n \n@@ -3077,27 +3083,22 @@ func TestModel_PromptHistory_RecallAfterSubmit(t *testing.T) {\n \trequire.Empty(t, m.textInput.Value(), \"input clears after submit\")\n \n \t// Up recalls the newest, then the older.\n-\tupdated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyUp})\n-\tm = updated.(Model)\n+\tm = pressKey(t, m, tea.KeyUp)\n \tassert.Equal(t, \"second\", m.textInput.Value())\n \n-\tupdated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})\n-\tm = updated.(Model)\n+\tm = pressKey(t, m, tea.KeyUp)\n \tassert.Equal(t, \"first\", m.textInput.Value())\n \n \t// Up at the oldest entry pins there.\n-\tupdated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})\n-\tm = updated.(Model)\n+\tm = pressKey(t, m, tea.KeyUp)\n \tassert.Equal(t, \"first\", m.textInput.Value())\n \n \t// Down walks back toward newer prompts, then past the newest to the\n \t// (empty) draft.\n-\tupdated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})\n-\tm = updated.(Model)\n+\tm = pressKey(t, m, tea.KeyDown)\n \tassert.Equal(t, \"second\", m.textInput.Value())\n \n-\tupdated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})\n-\tm = updated.(Model)\n+\tm = pressKey(t, m, tea.KeyDown)\n \tassert.Empty(t, m.textInput.Value(), \"Down past newest restores the empty draft\")\n }\n \n@@ -3111,12 +3112,10 @@ func TestModel_PromptHistory_PreservesDraft(t *testing.T) {\n \t// Type an unsent draft, recall history with Up, then Down past the newest\n \t// must restore the draft rather than leave the recalled prompt behind.\n \tm.textInput.SetValue(\"draft in progress\")\n-\tupdated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyUp})\n-\tm = updated.(Model)\n+\tm = pressKey(t, m, tea.KeyUp)\n \tassert.Equal(t, \"sent\", m.textInput.Value())\n \n-\tupdated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})\n-\tm = updated.(Model)\n+\tm = pressKey(t, m, tea.KeyDown)\n \tassert.Equal(t, \"draft in progress\", m.textInput.Value())\n }",
+      "links": [
+        "license:f433b1a53f5b830a205fd2df78e2b34974656c7b"
+      ],
+      "attributes": {
+        "sha": "c25307df5b5659475256de0114a94dddfece475e",
+        "redactions": [
+          "email"
+        ]
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/commits/c25307df5b5659475256de0114a94dddfece475e"
+    },
+    {
+      "id": "ci:79304108363",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:22:07Z",
+      "text": "CI check Maintainer comment for c25307df5b5659475256de0114a94dddfece475e\nrun_id=79304108363 status=completed conclusion=skipped",
+      "links": [
+        "commit:c25307df5b5659475256de0114a94dddfece475e"
+      ],
+      "attributes": {
+        "head_sha": "c25307df5b5659475256de0114a94dddfece475e",
+        "name": "Maintainer comment",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-03T13:22:07Z",
+        "completed_at": "2026-06-03T13:22:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79304108363"
+    },
+    {
+      "id": "ci:79304114475",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:22:41Z",
+      "text": "CI check info / gather for c25307df5b5659475256de0114a94dddfece475e\nrun_id=79304114475 status=completed conclusion=success",
+      "links": [
+        "commit:c25307df5b5659475256de0114a94dddfece475e"
+      ],
+      "attributes": {
+        "head_sha": "c25307df5b5659475256de0114a94dddfece475e",
+        "name": "info / gather",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T13:22:12Z",
+        "completed_at": "2026-06-03T13:22:41Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79304114475"
+    },
+    {
+      "id": "ci:79304114213",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:22:43Z",
+      "text": "CI check version-set for c25307df5b5659475256de0114a94dddfece475e\nrun_id=79304114213 status=completed conclusion=success",
+      "links": [
+        "commit:c25307df5b5659475256de0114a94dddfece475e"
+      ],
+      "attributes": {
+        "head_sha": "c25307df5b5659475256de0114a94dddfece475e",
+        "name": "version-set",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T13:22:13Z",
+        "completed_at": "2026-06-03T13:22:43Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79304114213"
+    },
+    {
+      "id": "ci:79304231716",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:23:17Z",
+      "text": "CI check Lint / Lint changelog entries for c25307df5b5659475256de0114a94dddfece475e\nrun_id=79304231716 status=completed conclusion=success",
+      "links": [
+        "commit:c25307df5b5659475256de0114a94dddfece475e"
+      ],
+      "attributes": {
+        "head_sha": "c25307df5b5659475256de0114a94dddfece475e",
+        "name": "Lint / Lint changelog entries",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T13:22:46Z",
+        "completed_at": "2026-06-03T13:23:17Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79304231716"
+    },
+    {
+      "id": "ci:79304231873",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:23:17Z",
+      "text": "CI check Lint / Generate Go SDK for c25307df5b5659475256de0114a94dddfece475e\nrun_id=79304231873 status=completed conclusion=success",
+      "links": [
+        "commit:c25307df5b5659475256de0114a94dddfece475e"
+      ],
+      "attributes": {
+        "head_sha": "c25307df5b5659475256de0114a94dddfece475e",
+        "name": "Lint / Generate Go SDK",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T13:22:46Z",
+        "completed_at": "2026-06-03T13:23:17Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79304231873"
+    },
+    {
+      "id": "ci:79304231812",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:23:26Z",
+      "text": "CI check Lint / Lint GHA for c25307df5b5659475256de0114a94dddfece475e\nrun_id=79304231812 status=completed conclusion=success",
+      "links": [
+        "commit:c25307df5b5659475256de0114a94dddfece475e"
+      ],
+      "attributes": {
+        "head_sha": "c25307df5b5659475256de0114a94dddfece475e",
+        "name": "Lint / Lint GHA",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T13:22:47Z",
+        "completed_at": "2026-06-03T13:23:26Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79304231812"
+    },
+    {
+      "id": "ci:79304231818",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:23:29Z",
+      "text": "CI check Lint / Lint Protobufs for c25307df5b5659475256de0114a94dddfece475e\nrun_id=79304231818 status=completed conclusion=success",
+      "links": [
+        "commit:c25307df5b5659475256de0114a94dddfece475e"
+      ],
+      "attributes": {
+        "head_sha": "c25307df5b5659475256de0114a94dddfece475e",
+        "name": "Lint / Lint Protobufs",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T13:22:46Z",
+        "completed_at": "2026-06-03T13:23:29Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79304231818"
+    },
+    {
+      "id": "ci:79304231776",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:23:40Z",
+      "text": "CI check Lint / Lint pulumi.json for c25307df5b5659475256de0114a94dddfece475e\nrun_id=79304231776 status=completed conclusion=success",
+      "links": [
+        "commit:c25307df5b5659475256de0114a94dddfece475e"
+      ],
+      "attributes": {
+        "head_sha": "c25307df5b5659475256de0114a94dddfece475e",
+        "name": "Lint / Lint pulumi.json",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T13:22:47Z",
+        "completed_at": "2026-06-03T13:23:40Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79304231776"
+    },
+    {
+      "id": "ci:79304231778",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:24:18Z",
+      "text": "CI check build CLI / linux-amd64 for c25307df5b5659475256de0114a94dddfece475e\nrun_id=79304231778 status=completed conclusion=success",
+      "links": [
+        "commit:c25307df5b5659475256de0114a94dddfece475e"
+      ],
+      "attributes": {
+        "head_sha": "c25307df5b5659475256de0114a94dddfece475e",
+        "name": "build CLI / linux-amd64",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T13:22:46Z",
+        "completed_at": "2026-06-03T13:24:18Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79304231778"
+    },
+    {
+      "id": "ci:79304231817",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:24:35Z",
+      "text": "CI check Lint / go mod tidy for c25307df5b5659475256de0114a94dddfece475e\nrun_id=79304231817 status=completed conclusion=success",
+      "links": [
+        "commit:c25307df5b5659475256de0114a94dddfece475e"
+      ],
+      "attributes": {
+        "head_sha": "c25307df5b5659475256de0114a94dddfece475e",
+        "name": "Lint / go mod tidy",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T13:22:47Z",
+        "completed_at": "2026-06-03T13:24:35Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79304231817"
+    },
+    {
+      "id": "ci:79304231933",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:25:12Z",
+      "text": "CI check Lint / Lint SDKs for c25307df5b5659475256de0114a94dddfece475e\nrun_id=79304231933 status=completed conclusion=success",
+      "links": [
+        "commit:c25307df5b5659475256de0114a94dddfece475e"
+      ],
+      "attributes": {
+        "head_sha": "c25307df5b5659475256de0114a94dddfece475e",
+        "name": "Lint / Lint SDKs",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T13:22:47Z",
+        "completed_at": "2026-06-03T13:25:12Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79304231933"
+    },
+    {
+      "id": "ci:79304231875",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:30:24Z",
+      "text": "CI check Neo unit tests / neo unit tests for c25307df5b5659475256de0114a94dddfece475e\nrun_id=79304231875 status=completed conclusion=success",
+      "links": [
+        "commit:c25307df5b5659475256de0114a94dddfece475e"
+      ],
+      "attributes": {
+        "head_sha": "c25307df5b5659475256de0114a94dddfece475e",
+        "name": "Neo unit tests / neo unit tests",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T13:22:46Z",
+        "completed_at": "2026-06-03T13:30:24Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79304231875"
+    },
+    {
+      "id": "ci:79304231760",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:31:40Z",
+      "text": "CI check Lint / Lint Go for c25307df5b5659475256de0114a94dddfece475e\nrun_id=79304231760 status=completed conclusion=success",
+      "links": [
+        "commit:c25307df5b5659475256de0114a94dddfece475e"
+      ],
+      "attributes": {
+        "head_sha": "c25307df5b5659475256de0114a94dddfece475e",
+        "name": "Lint / Lint Go",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T13:22:46Z",
+        "completed_at": "2026-06-03T13:31:40Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79304231760"
+    },
+    {
+      "id": "ci:79306080682",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-03T13:31:47Z",
+      "text": "CI check ci-ok for c25307df5b5659475256de0114a94dddfece475e\nrun_id=79306080682 status=completed conclusion=success",
+      "links": [
+        "commit:c25307df5b5659475256de0114a94dddfece475e"
+      ],
+      "attributes": {
+        "head_sha": "c25307df5b5659475256de0114a94dddfece475e",
+        "name": "ci-ok",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-03T13:31:44Z",
+        "completed_at": "2026-06-03T13:31:47Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/check-runs/79306080682"
+    },
+    {
+      "id": "review:4422425515",
+      "kind": "review",
+      "occurred_at": "2026-06-03T20:17:58Z",
+      "text": "review_id=4422425515 state=APPROVED\nWorks well!",
+      "links": [
+        "pull_request:23425",
+        "commit:c25307df5b5659475256de0114a94dddfece475e"
+      ],
+      "attributes": {
+        "state": "APPROVED"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/pulls/23425/reviews/4422425515"
+    },
+    {
+      "id": "merge:23425",
+      "kind": "merge",
+      "occurred_at": "2026-06-03T21:26:18Z",
+      "text": "Merged pull request #23425 from validated head commit c25307df5b5659475256de0114a94dddfece475e.",
+      "links": [
+        "pull_request:23425",
+        "commit:c25307df5b5659475256de0114a94dddfece475e",
+        "license:f433b1a53f5b830a205fd2df78e2b34974656c7b",
+        "review:4422425515"
+      ],
+      "attributes": {
+        "commit": "c25307df5b5659475256de0114a94dddfece475e",
+        "merge_commit_sha": "d6021091d65f4f098afbd6956460cd2100bc0be8"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/pulls/23425"
+    },
+    {
+      "id": "release:v3.245.0",
+      "kind": "release",
+      "occurred_at": "2026-06-04T08:53:06Z",
+      "text": "Release v3.245.0\n\n## 3.245.0 (2026-06-04)\r\n\r\n### Improvements\r\n\r\n- [backend/diy] Update gocloud.dev to 0.46 and aws sdk to v2 [#23421](https://github.com/pulumi/pulumi/pull/23421)\r\n- [cli] Show download and unpack progress when installing provider plugins [#https://github.com/pulumi/pulumi/issues/23408](https://github.com/pulumi/pulumi/pull/https://github.com/pulumi/pulumi/issues/23408)\r\n- [cli/do] Expose the selected stack's organization and short name to PCL input files when running `pulumi do` inside a project\r\n- [cli/do] Suggest similar tokens when an unknown token is passed to `pulumi do` [#23341](https://github.com/pulumi/pulumi/pull/23341)\r\n- [cli/neo] Support up/down arrows to scroll through prompt history in `pulumi neo` [#23425](https://github.com/pulumi/pulumi/pull/23425)\r\n- [cli/stack] Remame `pulumi stack init` to `new` [#23422](https://github.com/pulumi/pulumi/pull/23422)\r\n\r\n### Bug Fixes\r\n\r\n- [engine] Download the HCL language runtime on demand instead of bundling it [#23356](https://github.com/pulumi/pulumi/pull/23356)\r\n- [sdk/nodejs] Fix mergeOptions dropping onError hooks from ResourceOptions in the Node.js SDK\r\n- [cli/auth] Delete shared temporary agent credentials when logging out\r\n\r\n### Miscellaneous\r\n\r\n- [sdk/go] Remove \"name\" from plugin loading functions and require \"Type\" on Configure & DiffConfig calls [#23363](https://github.com/pulumi/pulumi/pull/23363)",
+      "links": [
+        "pull_request:23425",
+        "merge:23425",
+        "ci:79304231873",
+        "ci:79304231812",
+        "ci:79304231760",
+        "ci:79304231818",
+        "ci:79304231933",
+        "ci:79304231716",
+        "ci:79304231776",
+        "ci:79304231817",
+        "ci:79304108363",
+        "ci:79304231875",
+        "ci:79304231778",
+        "ci:79306080682",
+        "ci:79304114475",
+        "ci:79304114213"
+      ],
+      "attributes": {
+        "tag": "v3.245.0",
+        "target_commitish": "d6021091d65f4f098afbd6956460cd2100bc0be8",
+        "tag_commit_sha": "d6021091d65f4f098afbd6956460cd2100bc0be8",
+        "merge_commit_sha": "d6021091d65f4f098afbd6956460cd2100bc0be8",
+        "ancestry_verified": true,
+        "compare_status": "identical",
+        "compare_base_sha": "d6021091d65f4f098afbd6956460cd2100bc0be8",
+        "compare_head_sha": "d6021091d65f4f098afbd6956460cd2100bc0be8",
+        "compare_endpoint": "https://api.github.com/repos/pulumi/pulumi/compare/d6021091d65f4f098afbd6956460cd2100bc0be8...d6021091d65f4f098afbd6956460cd2100bc0be8",
+        "compare_response_sha256": "b7188966378d5ad43cb1e56aa715f561fed7f28330ec630dda0dc2eaba98c8d5",
+        "ci_evidence_scope": "observed_selected_final_pre_merge_check_runs",
+        "required_check_policy_verified": false,
+        "required_check_policy_requirement": "external_signed_policy_required_for_production_eligibility"
+      },
+      "source_pointer": "https://api.github.com/repos/pulumi/pulumi/releases/331003920"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "git_workflow",
+    "role": "source",
+    "key_id": "probe-source-e4bac7778cdcfa3808f3c373b474e85f",
+    "environment": "probe",
+    "digest": "41ed48fd27e291137acd6ed32ac4c0a25ee9e05ccb815867e48b33a333880b00"
+  }
+}
