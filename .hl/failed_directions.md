@@ -1,5 +1,8 @@
 # Rejected or blocked directions
 
+- Do not generate RFC 9421 as a 128K world. Unique tokens are 72,113 after
+  draft collapse; counting RFC-editor reflow as extra mass repeats the
+  Megatron v1=v2 failure mode.
 - Do not retry oxc leftover-PR stuffing (v10–v11, v13–v17) or ruff
   v1/v2/v4 for a second 9/9 world. 32k RST still has a 16k window over
   both mapping cores; fatter 0.147.0 overflows exact-32k.
