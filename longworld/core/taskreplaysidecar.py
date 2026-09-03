@@ -51,6 +51,21 @@ MACRO_VINTAGE_TASK_REPLAY_ADAPTER = (
     "longworld.macro-vintage-replay.v1",
     TASK_REPLAY_SIDECAR_SCHEMA,
 )
+IETF_OAUTH_TASK_REPLAY_ADAPTER = (
+    "standards.ietf_oauth_requirement.v1",
+    "longworld.ietf-oauth-cross-spec-replay.v1",
+    TASK_REPLAY_SIDECAR_SCHEMA,
+)
+ELIFE_REVIEW_REVISION_TASK_REPLAY_ADAPTER = (
+    "researchlab.elife_review_revision.v1",
+    "longworld.elife-review-revision-replay.v1",
+    TASK_REPLAY_SIDECAR_SCHEMA,
+)
+IETF_OAUTH_TASK_REPLAY_ADAPTER_V3 = (
+    IETF_OAUTH_TASK_REPLAY_ADAPTER[0],
+    IETF_OAUTH_TASK_REPLAY_ADAPTER[1],
+    TASK_REPLAY_SIDECAR_SCHEMA_V3,
+)
 CYBER_KEV_TASK_REPLAY_ADAPTER_V2 = (
     CYBER_KEV_TASK_REPLAY_ADAPTER[0],
     CYBER_KEV_TASK_REPLAY_ADAPTER[1],
@@ -257,6 +272,38 @@ def _contract(key: TaskReplayRegistryKey) -> TaskReplayAdapterContract:
                 "candidate_content_commitments",
             }
         )
+    elif family == IETF_OAUTH_TASK_REPLAY_ADAPTER[:2]:
+        payload_fields = frozenset(
+            {
+                "source_manifest_sha256",
+                "fetch_inventory_sha256",
+                "authorization_record_id",
+                "ietf_requirement_task",
+                "task_sha256",
+                "replay_revision",
+                "tokenizer_model_id",
+                "tokenizer_revision",
+                "tokenizer_asset_manifest_sha256",
+                "candidate_content_commitments",
+            }
+        )
+    elif family == ELIFE_REVIEW_REVISION_TASK_REPLAY_ADAPTER[:2]:
+        payload_fields = frozenset(
+            {
+                "source_inventory_sha256",
+                "authorization_record_id",
+                "source_record_bindings",
+                "email_redaction_receipt",
+                "relation_kinds",
+                "elife_review_revision_task",
+                "task_sha256",
+                "replay_revision",
+                "tokenizer_model_id",
+                "tokenizer_revision",
+                "tokenizer_asset_manifest_sha256",
+                "candidate_content_commitments",
+            }
+        )
     else:
         raise ProvenanceError("task replay adapter contract is not registered")
     if key[2] == TASK_REPLAY_SIDECAR_SCHEMA_V3:
@@ -285,6 +332,8 @@ TASK_REPLAY_ADAPTER_REGISTRY: Mapping[
             CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
             FINANCE_TASK_REPLAY_ADAPTER,
             MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
+            IETF_OAUTH_TASK_REPLAY_ADAPTER,
+            ELIFE_REVIEW_REVISION_TASK_REPLAY_ADAPTER,
             CYBER_KEV_TASK_REPLAY_ADAPTER_V2,
             CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER_V2,
             FINANCE_TASK_REPLAY_ADAPTER_V2,
@@ -293,9 +342,129 @@ TASK_REPLAY_ADAPTER_REGISTRY: Mapping[
             CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER_V3,
             FINANCE_TASK_REPLAY_ADAPTER_V3,
             MACRO_VINTAGE_TASK_REPLAY_ADAPTER_V3,
+            IETF_OAUTH_TASK_REPLAY_ADAPTER_V3,
         )
     }
 )
+
+
+def _verify_elife_replay_payload(replay_payload: dict[str, Any]) -> None:
+    bindings = replay_payload.get("source_record_bindings")
+    if (
+        not isinstance(bindings, list)
+        or len(bindings) != 2
+        or any(
+            not isinstance(item, dict)
+            or set(item)
+            != {
+                "record_id",
+                "raw_source_sha256",
+                "redacted_text_sha256",
+                "email_redaction_count",
+            }
+            or not _is_sha256(item.get("raw_source_sha256"))
+            or not _is_sha256(item.get("redacted_text_sha256"))
+            or item.get("raw_source_sha256") == item.get("redacted_text_sha256")
+            or isinstance(item.get("email_redaction_count"), bool)
+            or not isinstance(item.get("email_redaction_count"), int)
+            or item["email_redaction_count"] < 1
+            for item in bindings
+        )
+        or [item["record_id"] for item in bindings]
+        != ["elife:94586:v1", "elife:94586:v2"]
+    ):
+        raise ProvenanceError("eLife task replay source bindings are invalid")
+    receipt = replay_payload.get("email_redaction_receipt")
+    if (
+        not isinstance(receipt, dict)
+        or receipt
+        != {
+            "replacement": "[redacted-email]",
+            "total": sum(item["email_redaction_count"] for item in bindings),
+        }
+        or receipt["total"] != 6
+    ):
+        raise ProvenanceError("eLife task replay redaction receipt is invalid")
+    if replay_payload.get("relation_kinds") != [
+        "implements_revision_delta",
+        "requests_revision",
+        "responds_to_review",
+        "revision_of",
+    ]:
+        raise ProvenanceError("eLife task replay relation kinds are invalid")
+    task = replay_payload.get("elife_review_revision_task")
+    if (
+        not isinstance(task, dict)
+        or set(task)
+        != {
+            "program_id",
+            "answer",
+            "essential_evidence_ids",
+            "witness",
+            "model_written_gold",
+        }
+        or task.get("program_id")
+        != "researchlab.review_response_revision_claim_disposition.v1"
+        or task.get("answer") != "VERIFIED_IMPLEMENTED"
+        or task.get("essential_evidence_ids")
+        != [
+            "appendix_APP9",
+            "appendix_table_tbl3",
+            "body_figure_fig5",
+            "controlling_review",
+            "direct_author_response",
+        ]
+        or task.get("model_written_gold") is not False
+        or replay_payload.get("task_sha256")
+        != hashlib.sha256(
+            json.dumps(
+                task, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ).encode()
+        ).hexdigest()
+    ):
+        raise ProvenanceError("eLife task replay task binding is invalid")
+    witness = task.get("witness")
+    evidence = witness.get("evidence") if isinstance(witness, dict) else None
+    expected_evidence_ids = {
+        "appendix_APP9",
+        "appendix_table_tbl3",
+        "body_figure_fig5",
+        "controlling_review",
+        "direct_author_response",
+        "v1_version_doi",
+        "v2_version_doi",
+    }
+    bindings_by_id = {item["record_id"]: item for item in bindings}
+    if not isinstance(evidence, dict) or set(evidence) != expected_evidence_ids:
+        raise ProvenanceError("eLife task replay evidence set is invalid")
+    for evidence_id, item in evidence.items():
+        if not isinstance(item, dict) or set(item) != {
+            "evidence_id",
+            "record_id",
+            "evidence_quote",
+            "evidence_char_start",
+            "evidence_char_end",
+            "source_sha256",
+            "text_sha256",
+        }:
+            raise ProvenanceError("eLife task replay evidence binding is invalid")
+        record = bindings_by_id.get(str(item.get("record_id") or ""))
+        quote = item.get("evidence_quote")
+        start = item.get("evidence_char_start")
+        end = item.get("evidence_char_end")
+        if (
+            item.get("evidence_id") != evidence_id
+            or record is None
+            or not isinstance(quote, str)
+            or not quote
+            or not isinstance(start, int)
+            or not isinstance(end, int)
+            or start < 0
+            or end != start + len(quote)
+            or item.get("source_sha256") != record["raw_source_sha256"]
+            or item.get("text_sha256") != record["redacted_text_sha256"]
+        ):
+            raise ProvenanceError("eLife task replay evidence binding is invalid")
 
 
 def _verify_replay_payload(
@@ -314,6 +483,8 @@ def _verify_replay_payload(
         "workflow_manifest_sha256",
         "raw_source_sha256",
         "fetch_inventory_sha256",
+        "task_sha256",
+        "source_inventory_sha256",
     }
     if any(
         field in replay_payload and not _is_sha256(replay_payload[field])
@@ -365,9 +536,12 @@ def _verify_replay_payload(
         raise ProvenanceError("task replay sidecar content commitments are invalid")
     if contract.sidecar_schema_version == TASK_REPLAY_SIDECAR_SCHEMA_V3:
         _verify_v3_derivation_payload(replay_payload, contract)
+    if contract.adapter_id == ELIFE_REVIEW_REVISION_TASK_REPLAY_ADAPTER[0]:
+        _verify_elife_replay_payload(replay_payload)
     tokenizer_revision = replay_payload.get("tokenizer_revision")
     source_families = replay_payload.get("source_families")
     fetch_receipt = replay_payload.get("fetch_receipt")
+    ietf_task = replay_payload.get("ietf_requirement_task")
     retrieval = (
         fetch_receipt.get("retrieval") if isinstance(fetch_receipt, dict) else None
     )
@@ -376,6 +550,33 @@ def _verify_replay_payload(
         or len(tokenizer_revision) != 40
         or any(character not in "0123456789abcdef" for character in tokenizer_revision)
         or replay_payload.get("replay_revision") != contract.adapter_revision
+        or (
+            contract.adapter_id == IETF_OAUTH_TASK_REPLAY_ADAPTER[0]
+            and (
+                not isinstance(ietf_task, dict)
+                or ietf_task.get("schema_version")
+                != "longworld.ietf-cross-spec-requirement-task.v1"
+                or replay_payload.get("task_sha256")
+                != hashlib.sha256(
+                    json.dumps(
+                        ietf_task,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ).encode()
+                ).hexdigest()
+                or replay_payload.get("source_manifest_sha256")
+                != ietf_task.get("source_manifest_sha256")
+                or replay_payload.get("fetch_inventory_sha256")
+                != (ietf_task.get("source_manifest") or {}).get(
+                    "fetch_inventory_sha256"
+                )
+                or replay_payload.get("authorization_record_id")
+                != (
+                    (ietf_task.get("source_manifest") or {}).get("authorization") or {}
+                ).get("record_id")
+            )
+        )
         or (
             contract.adapter_id == MACRO_VINTAGE_TASK_REPLAY_ADAPTER[0]
             and (
@@ -413,6 +614,17 @@ def _verify_replay_payload(
                 *(
                     ("authorization_record_id",)
                     if contract.adapter_id == MACRO_VINTAGE_TASK_REPLAY_ADAPTER[0]
+                    else ()
+                ),
+                *(
+                    ("authorization_record_id",)
+                    if contract.adapter_id == IETF_OAUTH_TASK_REPLAY_ADAPTER[0]
+                    else ()
+                ),
+                *(
+                    ("authorization_record_id",)
+                    if contract.adapter_id
+                    == ELIFE_REVIEW_REVISION_TASK_REPLAY_ADAPTER[0]
                     else ()
                 ),
             )

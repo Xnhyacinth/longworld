@@ -65,11 +65,13 @@ from longworld.core.taskproof import (
     canonicalize_kev_projection_candidate,
     compute_task_proof,
     normalize_projection_candidate_for_adapter,
+    replay_ietf_cross_spec_candidate,
 )
 from longworld.core.taskreplaysidecar import (
     CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
     CYBER_KEV_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
+    IETF_OAUTH_TASK_REPLAY_ADAPTER,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     SOURCE_TOKEN_MEASUREMENT_BASIS,
     SOURCE_TOKEN_MEASUREMENT_RECEIPT_SCHEMA,
@@ -306,6 +308,33 @@ def _validate_sidecar_payload(
             "fetch_receipt": fetch_receipt,
             "source_families": source.get("source_families"),
             "authorization_record_id": source.get("authorization_record_id"),
+            "replay_revision": candidate.get("strict_replay_revision"),
+            **tokenizer_binding,
+        }
+    elif _sidecar_uses(sidecar, IETF_OAUTH_TASK_REPLAY_ADAPTER):
+        if candidate.get("domain") != "standards":
+            raise PromotionError("task replay adapter does not match candidate domain")
+        source = candidate.get("source_binding")
+        task = candidate.get("ietf_requirement_task")
+        manifest = task.get("source_manifest") if isinstance(task, dict) else None
+        authorization = (
+            manifest.get("authorization") if isinstance(manifest, dict) else None
+        )
+        if (
+            not isinstance(source, dict)
+            or not isinstance(task, dict)
+            or not isinstance(manifest, dict)
+            or not isinstance(authorization, dict)
+            or source.get("signed_manifest_sha256")
+            != task.get("source_manifest_sha256")
+        ):
+            raise PromotionError("candidate IETF source binding is missing")
+        expected = {
+            "source_manifest_sha256": task.get("source_manifest_sha256"),
+            "fetch_inventory_sha256": manifest.get("fetch_inventory_sha256"),
+            "authorization_record_id": authorization.get("record_id"),
+            "ietf_requirement_task": task,
+            "task_sha256": _canonical_sha256(task),
             "replay_revision": candidate.get("strict_replay_revision"),
             **tokenizer_binding,
         }
@@ -635,6 +664,17 @@ def _replay_selection(
                 artifact_ids,
                 counterfactual=counterfactual,
             )
+        if _sidecar_uses(sidecar, IETF_OAUTH_TASK_REPLAY_ADAPTER):
+            materialized = any(
+                isinstance(classification, Mapping)
+                and classification.get("source_origin") == "synthetic_counterfactual"
+                for classification in candidate.get("artifact_classification") or []
+            )
+            return replay_ietf_cross_spec_candidate(
+                candidate,
+                artifact_ids,
+                counterfactual=counterfactual != materialized,
+            )
     raise PromotionError("task replay adapter is not registered for promotion")
 
 
@@ -773,12 +813,14 @@ def _task_selection_metrics(
         record_id for endpoints in relation_pairs for record_id in endpoints
     }
     source_records_by_artifact: Mapping[str, Any]
-    if _sidecar_uses(sidecar, CYBER_KEV_TASK_REPLAY_ADAPTER) or _sidecar_uses(
-        sidecar, CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER
+    if (
+        _sidecar_uses(sidecar, CYBER_KEV_TASK_REPLAY_ADAPTER)
+        or _sidecar_uses(sidecar, CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER)
+        or _sidecar_uses(sidecar, IETF_OAUTH_TASK_REPLAY_ADAPTER)
     ):
         candidate_source_records = candidate.get("source_record_ids_by_artifact")
         if not isinstance(candidate_source_records, Mapping):
-            raise PromotionError("Cyber replay artifact source mapping is missing")
+            raise PromotionError("task replay artifact source mapping is missing")
         source_records_by_artifact = candidate_source_records
     elif _sidecar_uses(sidecar, FINANCE_TASK_REPLAY_ADAPTER) or _sidecar_uses(
         sidecar, MACRO_VINTAGE_TASK_REPLAY_ADAPTER
@@ -840,6 +882,8 @@ def _task_selection_metrics(
         group_suffix = "multi-filing-finance"
     elif _sidecar_uses(sidecar, MACRO_VINTAGE_TASK_REPLAY_ADAPTER):
         group_suffix = "macro-vintage-history"
+    elif _sidecar_uses(sidecar, IETF_OAUTH_TASK_REPLAY_ADAPTER):
+        group_suffix = "ietf-oauth-cross-spec"
     else:  # pragma: no cover - sidecar loading rejects this first
         raise PromotionError("task replay adapter is not registered for promotion")
     candidate_graph = candidate.get("graph")
@@ -1611,6 +1655,21 @@ def _canonical_task_identifiers(
             "trace_changed_and_unchanged_revisions",
             "compute_cumulative_revision_delta",
         )
+    elif family == IETF_OAUTH_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("ietf_requirement_task")
+        if (
+            not isinstance(task, Mapping)
+            or task.get("answer_program_id") != "ietf.oauth_effective_requirement.v1"
+            or candidate.get("answer_program_id") != task.get("answer_program_id")
+        ):
+            raise PromotionError("IETF answer program is unsupported")
+        motif = "cross_spec_update+dependency_closure+requirement_resolution"
+        answer_program_id = "ietf.oauth_effective_requirement.v1"
+        program_ops = (
+            "select_cutoff_sources",
+            "resolve_update_and_reference_relations",
+            "evaluate_fixed_requirement_branches",
+        )
     else:
         raise PromotionError("task semantic identifier adapter is unsupported")
     semantic_base_task_id = _canonical_sha256(
@@ -1740,11 +1799,65 @@ def _source_token_measurement_receipt(
         str(classification.get("artifact_id") or ""): (classification, document)
         for classification, document in projected_artifacts
     }
-    if len(projected_by_id) != len(projected_artifacts) or set(projected_by_id) != {
+    parent_ids = {
         str(classification.get("artifact_id") or "")
         for classification, _document in parent_artifacts
-    }:
+    }
+    omitted_ids = parent_ids - set(projected_by_id)
+    if (
+        len(projected_by_id) != len(projected_artifacts)
+        or not set(projected_by_id).issubset(parent_ids)
+        or (
+            omitted_ids
+            and (
+                projected.get("view") != "cf"
+                or not isinstance(projected.get("ietf_requirement_task"), Mapping)
+                or len(omitted_ids) != 1
+                or omitted_ids
+                & set(projected.get("source_record_ids_by_artifact") or {})
+                or omitted_ids & set(projected.get("essential_artifact_ids") or [])
+            )
+        )
+    ):
         raise PromotionError("task projected source-token artifacts are unbound")
+    if omitted_ids:
+        omitted_id = next(iter(omitted_ids))
+        omitted = next(
+            (
+                (classification, document)
+                for classification, document in parent_artifacts
+                if classification.get("artifact_id") == omitted_id
+            ),
+            None,
+        )
+        twin = parent.get("counterfactual_twin")
+        if not isinstance(omitted, tuple) or not isinstance(twin, Mapping):
+            raise PromotionError("task projected source-token omission is invalid")
+        classification, document = omitted
+        source_start = classification.get("source_char_start")
+        source_end = classification.get("source_char_end")
+        char_start = twin.get("char_start")
+        char_end = twin.get("char_end")
+        replacement = twin.get("value")
+        if (
+            not isinstance(source_start, int)
+            or not isinstance(source_end, int)
+            or not isinstance(char_start, int)
+            or not isinstance(char_end, int)
+            or not isinstance(replacement, str)
+            or not source_start <= char_start < char_end <= source_end
+            or (
+                document[: char_start - source_start]
+                + replacement
+                + document[char_end - source_start :]
+            ).strip()
+        ):
+            raise PromotionError("task projected source-token omission is invalid")
+        parent_artifacts = [
+            artifact
+            for artifact in parent_artifacts
+            if artifact[0].get("artifact_id") != omitted_id
+        ]
     contributions: list[dict[str, Any]] = []
     previous_tokens = 0
     retained_tokens = 0
@@ -1785,9 +1898,9 @@ def _source_token_measurement_receipt(
     parent_tokens = previous_tokens
     view = projected.get("view")
     retained_range_valid = (
-        0 < retained_tokens < parent_tokens
-        if view == "cf"
-        else retained_tokens == parent_tokens
+        retained_tokens == parent_tokens
+        if omitted_ids or view != "cf"
+        else 0 < retained_tokens < parent_tokens
     )
     if parent_tokens < 1 or not retained_range_valid:
         raise PromotionError("task parent source-token measurement is invalid")
@@ -2259,6 +2372,170 @@ def _macro_chronology(
     return sorted(output, key=lambda value: value[0])
 
 
+def _ietf_counterfactual_artifacts(
+    candidate: Mapping[str, Any],
+    artifacts: Sequence[tuple[dict[str, Any], str]],
+) -> list[tuple[dict[str, Any], str]]:
+    twin = candidate.get("counterfactual_twin")
+    task = candidate.get("ietf_requirement_task")
+    source_records = candidate.get("source_record_ids_by_artifact")
+    if (
+        not isinstance(twin, Mapping)
+        or twin.get("provenance_operation") != "exclude_exact_source_span"
+        or twin.get("source_origin") != "synthetic_counterfactual"
+        or not isinstance(task, Mapping)
+        or twin.get("source_manifest_sha256") != task.get("source_manifest_sha256")
+        or not isinstance(source_records, Mapping)
+    ):
+        raise PromotionError("IETF task counterfactual binding is invalid")
+    manifest = task.get("source_manifest")
+    manifest_records = manifest.get("records") if isinstance(manifest, Mapping) else None
+    parent_value = twin.get("parent_value")
+    replacement = twin.get("value")
+    char_start = twin.get("char_start")
+    char_end = twin.get("char_end")
+    byte_start = twin.get("byte_start")
+    byte_end = twin.get("byte_end")
+    if (
+        not isinstance(parent_value, str)
+        or not isinstance(replacement, str)
+        or not isinstance(char_start, int)
+        or not isinstance(char_end, int)
+        or not isinstance(byte_start, int)
+        or not isinstance(byte_end, int)
+        or len(parent_value) != len(replacement)
+        or parent_value == replacement
+        or not isinstance(manifest_records, list)
+    ):
+        raise PromotionError("IETF task counterfactual span is invalid")
+    target_record_id = str(twin.get("record_id") or "")
+    matching_records = [
+        record
+        for record in manifest_records
+        if isinstance(record, Mapping) and record.get("record_id") == target_record_id
+    ]
+    if len(matching_records) != 1:
+        raise PromotionError("IETF task counterfactual source record is not unique")
+    source_record = matching_records[0]
+    source_text = str(source_record.get("text") or "")
+    source_child = source_text[:char_start] + replacement + source_text[char_end:]
+    if (
+        source_text[char_start:char_end] != parent_value
+        or source_text.encode()[byte_start:byte_end] != parent_value.encode()
+        or hashlib.sha256(source_text.encode()).hexdigest()
+        != twin.get("parent_text_sha256")
+        or source_record.get("source_sha256") != twin.get("parent_source_sha256")
+        or hashlib.sha256(source_child.encode()).hexdigest() != twin.get("text_sha256")
+    ):
+        raise PromotionError("IETF task counterfactual parent bytes are invalid")
+    containing: list[tuple[str, int, int]] = []
+    for classification, _document in artifacts:
+        artifact_id = str(classification.get("artifact_id") or "")
+        record_ids = source_records.get(artifact_id)
+        source_start = classification.get("source_char_start")
+        source_end = classification.get("source_char_end")
+        if (
+            record_ids == [target_record_id]
+            and classification.get("source_record_id") == target_record_id
+            and isinstance(source_start, int)
+            and not isinstance(source_start, bool)
+            and isinstance(source_end, int)
+            and not isinstance(source_end, bool)
+            and source_start <= char_start
+            and char_end <= source_end
+        ):
+            containing.append((artifact_id, source_start, source_end))
+    if len(containing) != 1:
+        raise PromotionError("IETF task counterfactual target is not unique")
+    target_artifact_id, source_start, source_end = containing[0]
+    local_char_start = char_start - source_start
+    local_char_end = char_end - source_start
+    changed = 0
+    output: list[tuple[dict[str, Any], str]] = []
+    for classification, document in artifacts:
+        artifact_id = str(classification.get("artifact_id") or "")
+        projected = document
+        if artifact_id == target_artifact_id:
+            local_byte_start = len(document[:local_char_start].encode())
+            local_byte_end = local_byte_start + len(parent_value.encode())
+            if (
+                source_end > len(source_text)
+                or document != source_text[source_start:source_end]
+                or document[local_char_start:local_char_end] != parent_value
+                or document.encode()[local_byte_start:local_byte_end]
+                != parent_value.encode()
+            ):
+                raise PromotionError(
+                    "IETF task counterfactual parent bytes are invalid"
+                )
+            projected = (
+                document[:local_char_start]
+                + replacement
+                + document[local_char_end:]
+            )
+            child_sha256 = hashlib.sha256(projected.encode()).hexdigest()
+            if (
+                projected.encode()[local_byte_start:local_byte_end]
+                != replacement.encode()
+                or projected != source_child[source_start:source_end]
+            ):
+                raise PromotionError("IETF task counterfactual child bytes are invalid")
+            changed += 1
+            if not projected.strip():
+                continue
+            classification = _counterfactual_classification(
+                candidate,
+                classification,
+                parent_document=document,
+                projected_document=projected,
+            )
+            classification.update(
+                {
+                    "counterfactual_child_text_sha256": child_sha256,
+                    "counterfactual_operation_source_char_start": char_start,
+                    "counterfactual_operation_source_char_end": char_end,
+                    "counterfactual_operation_local_char_start": local_char_start,
+                    "counterfactual_operation_local_char_end": local_char_end,
+                    "counterfactual_operation_local_byte_start": local_byte_start,
+                    "counterfactual_operation_local_byte_end": local_byte_end,
+                }
+            )
+        output.append((classification, projected))
+    if changed != 1:
+        raise PromotionError("IETF task counterfactual target is not unique")
+    return output
+
+
+def _ietf_chronology(
+    candidate: Mapping[str, Any],
+    artifacts: Sequence[tuple[dict[str, Any], str]],
+) -> list[tuple[str, dict[str, Any], str]]:
+    task = candidate.get("ietf_requirement_task")
+    source_records = candidate.get("source_record_ids_by_artifact")
+    manifest = task.get("source_manifest") if isinstance(task, Mapping) else None
+    records = manifest.get("records") if isinstance(manifest, Mapping) else None
+    if not isinstance(source_records, Mapping) or not isinstance(records, list):
+        raise PromotionError("IETF task chronology binding is missing")
+    occurred_at_by_record = {
+        str(record.get("record_id") or ""): str(record.get("occurred_at") or "")
+        for record in records
+        if isinstance(record, Mapping)
+    }
+    output: list[tuple[str, dict[str, Any], str]] = []
+    for classification, document in artifacts:
+        artifact_id = str(classification.get("artifact_id") or "")
+        record_ids = source_records.get(artifact_id)
+        dates = (
+            [occurred_at_by_record.get(str(record_id), "") for record_id in record_ids]
+            if isinstance(record_ids, list)
+            else []
+        )
+        if not artifact_id or not dates or any(not date for date in dates):
+            raise PromotionError("IETF task chronology identity is incomplete")
+        output.append((f"{min(dates)}|{artifact_id}", classification, document))
+    return sorted(output, key=lambda value: value[0])
+
+
 def _task_view_difficulty(
     *,
     question: str,
@@ -2414,6 +2691,17 @@ def _task_view_replay(
                 artifact_ids,
                 counterfactual=counterfactual,
             )
+        if adapter_key == IETF_OAUTH_TASK_REPLAY_ADAPTER:
+            materialized = any(
+                isinstance(classification, Mapping)
+                and classification.get("source_origin") == "synthetic_counterfactual"
+                for classification in candidate.get("artifact_classification") or []
+            )
+            return replay_ietf_cross_spec_candidate(
+                candidate,
+                artifact_ids,
+                counterfactual=counterfactual or materialized,
+            )
     raise PromotionError("standard task views are not implemented for adapter")
 
 
@@ -2436,6 +2724,7 @@ def build_task_candidate_view_projections(
         CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
         FINANCE_TASK_REPLAY_ADAPTER,
         MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
+        IETF_OAUTH_TASK_REPLAY_ADAPTER,
     }:
         raise PromotionError("standard task views are not implemented for adapter")
     artifacts = _task_view_artifacts(candidate)
@@ -2486,9 +2775,47 @@ def build_task_candidate_view_projections(
         cf_candidate["artifact_classification"] = [
             deepcopy(classification) for classification, _document in cf_artifacts
         ]
+    elif adapter_key == IETF_OAUTH_TASK_REPLAY_ADAPTER:
+        cf_artifacts = _ietf_counterfactual_artifacts(candidate, artifacts)
+        chronology = _ietf_chronology(candidate, artifacts)
+        cf_candidate = deepcopy(candidate)
+        cf_ids = {
+            str(classification.get("artifact_id") or "")
+            for classification, _document in cf_artifacts
+        }
+        omitted_ids = set(all_ids) - cf_ids
+        if len(omitted_ids) > 1:
+            raise PromotionError("IETF task counterfactual omission is invalid")
+        cf_candidate["document_context"] = SEP.join(
+            document for _classification, document in cf_artifacts
+        )
+        cf_candidate["artifact_classification"] = [
+            deepcopy(classification) for classification, _document in cf_artifacts
+        ]
+        cf_candidate["source_record_ids_by_artifact"] = {
+            artifact_id: deepcopy(record_ids)
+            for artifact_id, record_ids in candidate[
+                "source_record_ids_by_artifact"
+            ].items()
+            if artifact_id in cf_ids
+        }
+        cf_candidate["essential_artifact_ids"] = [
+            artifact_id
+            for artifact_id in candidate.get("essential_artifact_ids") or []
+            if artifact_id in cf_ids
+        ]
     else:
         raise PromotionError("standard task views are not implemented for adapter")
-    materialized_cf = _task_view_replay(cf_candidate, adapter_key, all_ids)
+    materialized_ids = [
+        str(classification.get("artifact_id") or "")
+        for classification, _document in cf_artifacts
+    ]
+    materialized_cf = _task_view_replay(
+        cf_candidate,
+        adapter_key,
+        materialized_ids,
+        counterfactual=adapter_key == IETF_OAUTH_TASK_REPLAY_ADAPTER,
+    )
     if materialized_cf.get("answer") != candidate.get("cf_answer"):
         raise PromotionError("materialized task counterfactual replay does not match")
     ordered_artifacts = [
@@ -2502,6 +2829,7 @@ def build_task_candidate_view_projections(
     cf_artifacts = [
         cf_by_id[str(classification.get("artifact_id") or "")]
         for classification, _document in full_artifacts
+        if str(classification.get("artifact_id") or "") in cf_by_id
     ]
     if [value[0]["artifact_id"] for value in full_artifacts] == [
         value[0]["artifact_id"] for value in ordered_artifacts
@@ -2551,6 +2879,13 @@ def build_task_candidate_view_projections(
         )
         unsigned["cf_answer"] = candidate["cf_answer"]
         if view == "cf":
+            if adapter_key == IETF_OAUTH_TASK_REPLAY_ADAPTER:
+                unsigned["source_record_ids_by_artifact"] = deepcopy(
+                    cf_candidate["source_record_ids_by_artifact"]
+                )
+                unsigned["essential_artifact_ids"] = deepcopy(
+                    cf_candidate["essential_artifact_ids"]
+                )
             twin = deepcopy(candidate.get("counterfactual_twin"))
             if not isinstance(twin, dict):
                 raise PromotionError("task counterfactual twin is missing")
@@ -2658,9 +2993,22 @@ def build_task_candidate_view_projections(
             if view == "ordered_artifact_view"
             else []
         )
-        parent_view_artifacts = (
-            ordered_artifacts if view == "ordered_artifact_view" else full_artifacts
-        )
+        if view == "ordered_artifact_view":
+            parent_view_artifacts = ordered_artifacts
+        elif view == "cf" and adapter_key == IETF_OAUTH_TASK_REPLAY_ADAPTER:
+            parent_by_id = {
+                str(classification.get("artifact_id") or ""): (
+                    classification,
+                    document,
+                )
+                for classification, document in full_artifacts
+            }
+            parent_view_artifacts = [
+                parent_by_id[str(classification.get("artifact_id") or "")]
+                for classification, _document in view_artifacts
+            ]
+        else:
+            parent_view_artifacts = full_artifacts
         projection = {
             "schema_version": TASK_VIEW_PROJECTION_SCHEMA,
             "derivation_revision": TASK_VIEW_DERIVATION_REVISION,

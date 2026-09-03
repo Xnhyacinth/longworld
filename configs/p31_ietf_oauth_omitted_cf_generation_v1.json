@@ -1,0 +1,42 @@
+{
+  "schema_version": "longworld.ietf-oauth-generation-config.v1",
+  "source_inventory_dir": "data/source_inventory/p20_ietf_oauth_cross_spec_requirement_v1",
+  "fetch_inventory_file": "ietf_fetch_inventory.json",
+  "fetch_inventory_sha256": "bb428790b2d0dd8c53d64244cf8bd770ab9ddaf9081c0518bf7696fab2f1d0d8",
+  "manifest_generated_at": "2026-09-03T18:00:00Z",
+  "predecessor_report_manifest_sha256": "a7e5528d3220c2aa8663c024c6206ed019adfe7ef90ed3f62fd55a1b4bdc1427",
+  "predecessor_report_task_sha256": "a4797942d0579dea1e911f2e11edbaf5dd8ca24772731011c6b0cecee1a7a8ea",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "length_buckets": {
+    "64k": [64000, 65536],
+    "128k": [128000, 131072]
+  },
+  "packing": {
+    "target_margin_tokens": 512,
+    "unit_boundary": "source_blank_line_or_form_feed_plus_authenticated_evidence_span",
+    "chunked_record_ids": ["ietf:rfc:6749", "ietf:rfc:9700"],
+    "chunk_max_tokens": 1058,
+    "span_id_width": 7,
+    "isolate_evidence_ids": ["bearer_current"],
+    "rfc9700_operation": "omit_fully_excluded_bearer_current_chunk",
+    "published_draft_policy": "identity_paragraph_only",
+    "padding": false,
+    "cloned_artifacts": false,
+    "synthetic_filler": false
+  },
+  "workflow_id": "p31-ietf-oauth-omitted-cf-v1",
+  "dense_model": {
+    "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+  },
+  "output_dir": "data/candidates/p31_ietf_oauth_omitted_cf_v1",
+  "do_not_select": true,
+  "do_not_promote": true,
+  "do_not_count": true
+}

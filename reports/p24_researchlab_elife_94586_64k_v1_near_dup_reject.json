@@ -1,0 +1,19 @@
+{
+  "schema_version": "longworld.elife-review-revision-materialization-reject.v1",
+  "data_product": "p24_researchlab_elife_94586_64k_materialization_v1",
+  "output_dir": "data/candidates/p24_researchlab_elife_94586_64k_v1",
+  "parents_sha256": "244e9fffbdaa8e6886773fccdb9266848aec3af7f7287d4ecbd7e5bf5ac16603",
+  "sidecar_sha256": "5ba0d25adb0701a6ba1178d89dd4e8e7f783434a7e007f53abeed205872b4f3f",
+  "generation_receipt_sha256": "3d5eb02f1618d04613d440c456c6bb0721375048edf9b6c7d0f03b617c4bd548",
+  "prompt_tokens": 64512,
+  "artifact_count": 369,
+  "near_dedup_threshold": 0.9,
+  "near_dedup_representatives": 368,
+  "near_duplicate_pairs": 1,
+  "near_dedup_component_ledger_sha256": "be823cc4a962570f1476766ea2b8868ebe08714f3ac594115f05caf7ac02c0da",
+  "accepted": false,
+  "train_ready": false,
+  "production_eligible": false,
+  "reject_reason": "final_pack_near_duplicate:1",
+  "successor_config": "configs/p24_researchlab_elife_94586_64k_materialization_v2.json"
+}

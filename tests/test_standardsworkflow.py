@@ -359,6 +359,66 @@ def test_rfc_target_closure_allows_published_target_overlap() -> None:
     )
 
 
+def test_accepts_rfc_first_page_identity_with_repeated_page_headers(
+    tmp_path: Path,
+) -> None:
+    inventory, _path = _inventory(tmp_path)
+    retrieval = next(
+        item
+        for item in inventory["fetch_receipt"]["retrievals"]
+        if item["retrieval_file"] == "rfc7777.txt"
+    )
+    body = (
+        b"Internet Engineering Task Force (IETF) Example Editor\n"
+        b"Request for Comments: 7777 Example Publisher\n"
+        b"Category: Standards Track\nJanuary 2020\n\n"
+        b"Example standard.\n\f\n"
+        b"RFC 7777 Example standard January 2020\n\n"
+        b"References\n\n      RFC 7777\n\f\n"
+        b"RFC 7777 Example standard January 2020\n\n      RFC 7777\n"
+    )
+    (tmp_path / "rfc7777.txt").write_bytes(body)
+    retrieval["sha256"] = hashlib.sha256(body).hexdigest()
+
+    manifest = build_ietf_workflow_from_fetch_inventory(
+        inventory,
+        tmp_path,
+        generated_at="2026-08-29T02:00:00Z",
+        fetch_inventory_sha256="a" * 64,
+    )
+
+    record = next(
+        item for item in manifest["records"] if item["record_id"] == "ietf:rfc:7777"
+    )
+    identity = next(item for item in record["facts"] if item["fact_id"] == "rfc_number")
+    assert identity["evidence_quote"] == (
+        "Request for Comments: 7777 Example Publisher"
+    )
+
+
+def test_rejects_rfc_body_with_only_paginated_identity(tmp_path: Path) -> None:
+    inventory, _path = _inventory(tmp_path)
+    retrieval = next(
+        item
+        for item in inventory["fetch_receipt"]["retrievals"]
+        if item["retrieval_file"] == "rfc7777.txt"
+    )
+    body = (
+        b"Unrelated cover page\nJanuary 2020\n\f\n"
+        b"RFC 7777 Example standard January 2020\n"
+    )
+    (tmp_path / "rfc7777.txt").write_bytes(body)
+    retrieval["sha256"] = hashlib.sha256(body).hexdigest()
+
+    with pytest.raises(ProvenanceError, match="body does not uniquely bind"):
+        build_ietf_workflow_from_fetch_inventory(
+            inventory,
+            tmp_path,
+            generated_at="2026-08-29T02:00:00Z",
+            fetch_inventory_sha256="a" * 64,
+        )
+
+
 def test_rejects_nonmonotonic_retrieval_observations(tmp_path: Path) -> None:
     inventory, _path = _inventory(tmp_path)
     retrievals = inventory["fetch_receipt"]["retrievals"]

@@ -1,0 +1,44 @@
+{
+  "schema_version": "longworld.elife-review-revision-materialization-config.v1",
+  "source_inventory": "data/source_inventories/p21-researchlab-elife-94586-review-revision-64k-v1/source_inventory.json",
+  "source_inventory_sha256": "c7a1959d34b757053640f5f122a249f13180d00bed24fcb6badf8378fdd43ff5",
+  "world_id": "elife-94586-review-response-revision-v1",
+  "query_id": "elife-94586-review-response-revision-v1:64k",
+  "workflow_id": "p24-researchlab-elife-94586-review-revision-v1",
+  "task_question": "Did eLife 94586 version 2 implement the version 1 review request for a detailed bacteria-to-yeast-and-cancer generalization by adding Figure 5, Appendix 9, and Appendix Table 3? Return exactly VERIFIED_IMPLEMENTED only when the review, direct author response, and all three revision objects are present; otherwise return the deterministic missing-evidence disposition.",
+  "length_bucket": "64k",
+  "exact_token_band": [
+    64000,
+    65536
+  ],
+  "target_prompt_tokens": 64512,
+  "minimum_block_chars": 80,
+  "near_duplicate_threshold": 0.9,
+  "expected_near_dedup_tokens": 76142,
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "packing_policy": {
+    "allowed_units": [
+      "referee-report paragraph",
+      "direct author-response paragraph",
+      "v1-to-v2 changed semantic block",
+      "task evidence exact source span"
+    ],
+    "nonessential_evidence_role": "natural_background",
+    "unchanged_body_padding": false,
+    "duplicate_text": false,
+    "synthetic_filler": false,
+    "derived_view": false,
+    "attempt_128k": false
+  },
+  "output_dir": "data/candidates/p24_researchlab_elife_94586_64k_v1",
+  "do_not_project": true,
+  "do_not_select": true,
+  "do_not_promote": true,
+  "do_not_count": true
+}

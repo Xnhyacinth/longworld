@@ -125,6 +125,7 @@ def project(
     length_buckets: set[str] | None = None,
 ) -> dict[str, Any]:
     """Verify parent rows and emit independently signed candidate projections."""
+    sidecar_path = sidecar_path.resolve()
     candidate_key = attestation_key_from_env(CANDIDATE_ATTESTATION_PURPOSE)
     source_key = attestation_key_from_env("task_replay_sidecar")
     if candidate_key is None or source_key is None:
@@ -315,6 +316,7 @@ def project(
 
 def audit_projections(output_dir: Path, ranking_path: Path) -> dict[str, Any]:
     """Replay one independently signed dense ranking for every projection."""
+    output_dir = output_dir.resolve()
     candidate_key = attestation_key_from_env(CANDIDATE_ATTESTATION_PURPOSE)
     ranking_key = attestation_key_from_env(DENSE_RANKING_PURPOSE)
     audit_key = attestation_key_from_env(DENSE_AUDIT_PURPOSE)

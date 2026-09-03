@@ -1181,6 +1181,61 @@ so `n_real_source_relations=0` is correct. Do not use this slice to claim the
   failed check to same-name recovery path, not ordered narrowing, a first-bad
   boundary, a distinct repair, or culprit/fix removal counterfactuals.
 
+## 2026-09-03 P19 source-first findings
+
+- The OAuth cross-specification graph is the first new P18/P19 topology with
+  natural 128K capacity: RFC 6749/6750/6819/7636/8414/9207 plus RFC 9700 retain
+  140,405 Qwen tokens after collapsing the draft-29/RFC 9700 `published_as`
+  identity. This is capacity evidence only; packing and all admission gates
+  remain unrun.
+- RFC 9700 supports a deterministic six-field compliance vector and remove-one
+  transitions, but the current adapter cannot ingest RFC 6750 because repeated
+  page headers produce five RFC-identity matches. Dependency relation closure
+  and a cross-specification DAG task compiler are also absent.
+- OpenReview access failure must leave capacity undefined, not zero. The live
+  official notes endpoint returned a human-verification challenge and the
+  repository fetcher published no partial inventory; tokenizing a standalone
+  arXiv paper would measure the wrong operator.
+
+## 2026-09-03 P20-P23 implementation findings
+
+- The OAuth source graph now has a deterministic six-field task, byte-bound
+  dependency relations, a first-page RFC identity rule, source-attested replay
+  sidecars, materialized full/cf/ordered projections, and a dense proof path.
+  Counterfactual bytes exclude the exact authenticated RFC 9700 update span;
+  derived order binds source timestamps and real relation identifiers.
+- eLife 94586 is a useful 64K-only world rather than a failed 128K world. Its
+  v1/v2 pool retains 76,142 near-deduplicated tokens and an exact 65,536-token
+  witness; strict replay and review/response/three-delta remove-one audits pass.
+- Public email redaction is compatible with exact provenance when raw hashes
+  remain lineage-only, clean text gets an independent hash, and all evidence
+  spans are recomputed and replayed against the redacted text. The eLife source
+  workflow binds six redactions and four authentic relation kinds.
+
+## 2026-09-03 P24-P34 candidate and domain findings
+
+- IETF whole-artifact omission is not an admissible counterfactual shortcut:
+  once the child artifact is absent, the CF row cannot replay back to the
+  factual parent. Keeping one non-empty, source-contiguous RFC 9700 artifact
+  that covers both `metadata_current` and `bearer_current` preserves exact-span
+  editing and makes removal independently answer-changing.
+- Source-span metadata is not provenance unless the artifact bytes equal the
+  signed manifest slice. P33 now verifies every IETF artifact byte against that
+  slice and accepts a synthetic child only for the exact task-bound operation.
+- A declared dependency edge must bind its unique Datatracker supporting fact;
+  endpoint records and an in-range quote alone cannot authenticate whether the
+  relation is normative or informative.
+- The final P33 world has six strict-audited full/CF/ordered rows at exact 64K
+  and 128K. All raw 4K/8K/16K views are insufficient, but the rows remain
+  candidate-only until selection, promotion, release gate, and B5 complete.
+- eLife 94586 materializes one 64,512-token parent with 367 unique natural
+  artifacts after rejecting a duplicate-bearing predecessor. Five are causal
+  gold and 362 are explicitly natural background; projection is still needed
+  before its long-dependency claim can be admitted.
+- EPA PFAS proposal/final/correction PDFs retain 473,285 page-level near-dedup
+  tokens, yet the currently decisive four pages total at most 6,213 tokens.
+  Authentic source capacity therefore does not rescue a short-view oracle.
+
 ## 2026-09-03 P14 closure findings
 
 - A parent directory symlink in a portable task-sidecar registry must be

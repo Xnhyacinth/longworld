@@ -379,7 +379,7 @@ owns Git commits.
 
 | Track | Ownership | Deliverable | Success criterion | Status |
 | --- | --- | --- | --- | --- |
-| P17.A existing-world batch | `configs/p17_macro_*`, `reports/p17_macro_*` | additional BEA workbook entities/vintages using the verified cell-revision adapter, with new query IDs and proof-bearing relations | at least one new complete 16/32/64/128K three-view world, or an exact capacity rejection ledger | in_progress |
+| P17.A existing-world batch | `configs/p17_macro_*`, `reports/p17_macro_*` | additional BEA workbook entities/vintages using the verified cell-revision adapter, with new query IDs and proof-bearing relations | at least one new complete 16/32/64/128K three-view world, or an exact capacity rejection ledger | promotion_in_progress: dense 12/12, near-dup max 0, selection 12; B5 replay pending |
 | P17.B new CodeForge chain | `configs/p17_codeforge_*`, `reports/p17_codeforge_*` | a new repository/entity with authentic failure→repair→check/review→merge/release cycles | exact 64K plus 128K only when unique source mass supports it; every emitted cell passes replay and shortcut gates | complete: Transformers 6/6 train-ready, 3×64K + 3×128K |
 | P17.C new-domain research | `sources/research_p17_*`, `reports/p17_domain_design_*` | current primary-source study and executable design matrix for software, spreadsheet, agent interaction, retrieval/deep research, documents, and finance | rank only designs with obtainable authentic artifacts, deterministic oracle, counterfactual operation, and plausible 64K/128K unique capacity | complete: 26 primary URLs, six executable designs ranked |
 | P17.D root integration | release inventory/profile, gate execution, `.hl`, Git | reconcile P14/P15/P16/P17 without mixing trust scopes or duplicating semantic tasks | nonzero newly train-ready rows with exact bucket distribution; otherwise preserve prior releases and name the measured capacity blocker | complete: Finance 12 + CodeForge 6 train-ready; separate probe products |
@@ -401,3 +401,26 @@ capacity are measured.
 | --- | --- | --- | --- |
 | P18.A SEC restatement | `configs/p18_finance_*`, `reports/p18_finance_*` | locate accession/footnote/restatement graph in existing signed local filings; report 64K/128K unique capacity and exact arithmetic oracle | blocked: authentic Microsoft segment recast, but only 3,889 deduplicated tokens |
 | P18.B regression bisect | `configs/p18_codeforge_*`, `reports/p18_codeforge_*` | locate licensed issue/culprit/fix/test/release chain; prove failing/passing endpoints and token histogram distinct from failure-recovery | blocked: pandas chain authentic, but near-dedup capacity 21,200 tokens and no midpoint/check-run oracle |
+
+## P19/P20 executable-topology conversion — 2026-09-03
+
+P19 repeats the source/capacity/oracle preflight before any expensive
+generation. P20 implements only the one new topology whose authentic source
+pool clears both length bands, while an independent source-only track searches
+for an accessible substitute for the OpenReview-challenged forum.
+
+| Track | Ownership | Exit criterion | Status |
+| --- | --- | --- | --- |
+| P19.A IETF cross-spec | `configs/p19_ietf_*`, `reports/p19_ietf_*` | official update/dependency graph, deterministic requirement vector, remove-one replay, unique 64K/128K capacity | capacity_passed_generation_blocked: 140,405 unique tokens; adapter/compiler gaps |
+| P19.B review-response-revision | `configs/p19_researchlab_*`, `reports/p19_researchlab_*` | immutable review/response/artifact-version records and measurable 64K/128K capacity | blocked_access: official OpenReview API returned challenge; capacity undefined |
+| P20.A IETF implementation | IETF source workflow/compiler and focused tests plus `p20_ietf_*` artifacts | vertical-slice RED/GREEN for paginated RFC identity, dependency relations, six-field resolver, then candidate-local audit if complete | complete_source_task: 44 focused tests; task strict/remove-one green |
+| P20.B review-source alternative | `configs/p20_researchlab_*`, `reports/p20_researchlab_*`, `sources/p20_researchlab_*` | one official retrievable review-response-revision chain or exact fail-closed ledger | complete_preflight: eLife 94586 has 64K capacity, 128K blocked |
+| P21.A IETF sidecar | IETF replay registry and focused sidecar tests | exact-byte build/serialize/bind/load/replay without unsupported adapter fallbacks | complete: 21 focused tests; source-attested v1 sidecar |
+| P21.B eLife 64K source task | eLife document workflow and focused tests | official v1/v2 review-response-delta task with deterministic strict/remove-one audit | complete: 64K witness; 62 regressions; privacy adapter required |
+| P22.A/P23.A IETF projection+dense | IETF task projection/proof/promotion dispatch and focused tests | materialized byte-bound CF, v3 sidecar, verified order edges, public dense audit | complete: 51 projection plus 1 dense focused tests; generation not yet run |
+| P22.B eLife privacy/source adapter | eLife document/source workflow and focused tests | redact 6 emails with raw/text hash separation and bind four real relation kinds | complete: 99 regressions; source workflow green |
+| P24.A-P33 IETF generation | `configs/p24_ietf_*` through `p33_ietf_*`, ignored generated data | exact 64K/128K full/cf/ordered projections and one candidate-local dense audit | complete_candidate: P33 6/6 strict audits; 64K/128K; promotion pending |
+| P24.B eLife materialization | `configs/p24_researchlab_*`, `reports/p24_researchlab_*`, ignored generated data | exact 64K authentic review-response-revision parent without near-duplicate artifacts | complete_parent: 64,512 tokens, 367/367 representatives, projection pending |
+| P34 new-domain preflight | `configs/p34_*`, `reports/p34_*`, `sources/research_p34_*` | compare structured-data, interaction, and retrieval/correction topologies; measure the strongest source | complete_fail_closed: PFAS has 473,285 near-dedup tokens but current oracle is sub-8K shortcut-prone |
+| P35 HealthData preflight | `configs/p35_*`, `reports/p35_*`, `sources/research_p35_*` | rights/privacy/schema admission before aggregate-only FAERS case-version capacity measurement | in_progress; raw cases and identifiers forbidden from Git |
+| P36 IETF promotion | `configs/p36_ietf_*`, `reports/p36_ietf_*`, separate local-probe release | select/promote/gate/B5 the six P33 audited rows without changing quota or trust contracts | in_progress; contributes zero inventory until B5 gate is green |
