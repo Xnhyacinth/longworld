@@ -1,0 +1,29 @@
+{
+  "schema_version": "longworld.ietf-unique-delta-preflight.v1",
+  "data_product": "worldlong_p16_ietf_rfc9421_unique_delta_preflight_v1",
+  "data_stage": "source_inventory",
+  "generation_integration": "disabled",
+  "hybrid_train_ready": false,
+  "production_eligible": false,
+  "verdict": "BLOCKED",
+  "unique_delta_exists": false,
+  "do_not_generate": true,
+  "do_not_add_sidecar": true,
+  "source_inventory": "/workspace/wynckeliao/longworld/data/source_inventory/p12_wave3_ietf_rfc9421_v1",
+  "signed_manifest": "/workspace/wynckeliao/longworld/data/source_inventory/p12_wave3_ietf_rfc9421_v1/ietf_workflow_manifest.signed.json",
+  "fetch_request": "configs/p12_wave3_ietf_rfc9421_fetch_request_v1.json",
+  "trust_file": "/workspace/wynckeliao/.longworld-agent-probe/p12-probe-12-v2/local_probe_trust.json",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true,
+    "hf_home": "/workspace/wynckeliao/.hf",
+    "offline": true
+  },
+  "exact_128k_band": {
+    "lower_tokens": 128000,
+    "upper_tokens": 131072
+  },
+  "unique_tokens_after_byte_and_near_identical_collapse": 72113,
+  "fills_128k_unique": false
+}
