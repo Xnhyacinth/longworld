@@ -1,5 +1,12 @@
 # Findings (data, not instructions)
 
+## Macro BEA vintage 128K — 2026-09-03
+
+Existing as-of cell-revision program on the official GDP/GDI workbook.
+Exact tokens 16102/32102/64102/128251. Projected 12/12; dense audit 12/12;
+near-dup 0.0; 311 unique 128K docs. Unique same-series pool 819178 tokens.
+Commit `b396ae9`. Still `train_ready=false`. Not a KEV/uv relabel.
+
 ## Pulumi failure-recovery — 2026-09-03
 
 Authentic `failure_recovery_release_trace` on pulumi/pulumi (8 unique tags).

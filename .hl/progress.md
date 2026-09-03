@@ -1,5 +1,10 @@
 # Progress
 
+- 2026-09-03 P16 four-track close: BEA 12/12 (128251) and Microsoft Finance
+  12/12 (128217) are candidate-local 128K worlds; Pulumi FR blocked at
+  114833 unique tokens; RFC9421 blocked at 72113 after reflow collapse.
+  Formal train set remains P15 v7. No selection/HF. Next is a shared
+  64K+128K profile, not leftover-PR or RFC padding.
 - 2026-09-03 Pulumi failure-recovery blocked at 128K: 7 audited rows, 64K
   three-view in-band, 128K unique tokens 114833. DuckDB duplicate bodies.
   Remaining: BEA vintage 128K.
