@@ -233,6 +233,111 @@ def test_builds_distinct_multi_filing_asset_trajectory_program() -> None:
         assert all(audit_financial_history_candidate(row).values())
 
 
+def _filings_with_128k_tables() -> tuple[FinancialFiling, ...]:
+    filings: list[FinancialFiling] = []
+    for filing in _filings():
+        extra_rows = list(filing.rows)
+        year = filing.report_date[:4]
+        for extra_index, role in enumerate(("product_revenue", "service_revenue")):
+            markers = financehistory._SEMANTIC_ROLE_MARKERS[role]
+            quote = f"{400 + extra_index:,}"
+            prefix = f"{markers[0]} | {markers[1]} | fiscal {year} | "
+            text = prefix + quote + " | " + (f"mix table {year} {role} " * 12)
+            start = 50_000 + extra_index * 2_000
+            extra_rows.append(
+                FinancialSourceRow(
+                    record_id=f"{filing.record_id}:mix:{role}",
+                    filing_record_id=filing.record_id,
+                    report_date=filing.report_date,
+                    source_url=filing.source_url,
+                    source_sha256=filing.source_sha256,
+                    section=f"mix-table-{role}",
+                    source_char_start=start,
+                    source_char_end=start + len(text),
+                    source_text=text,
+                    facts=(
+                        FinancialFact(
+                            role=role,
+                            evidence_quote=quote,
+                            relative_start=len(prefix),
+                        ),
+                    ),
+                )
+            )
+        for support_index in range(36):
+            text = f"extra unique table {year} {support_index} | " + (
+                f"branch cell {year}-{support_index} " * 18
+            )
+            start = 60_000 + support_index * 1_500
+            extra_rows.append(
+                FinancialSourceRow(
+                    record_id=f"{filing.record_id}:extra:{support_index}",
+                    filing_record_id=filing.record_id,
+                    report_date=filing.report_date,
+                    source_url=filing.source_url,
+                    source_sha256=filing.source_sha256,
+                    section=f"extra-table-{support_index // 6}",
+                    source_char_start=start,
+                    source_char_end=start + len(text),
+                    source_text=text,
+                    facts=(),
+                )
+            )
+        filings.append(
+            FinancialFiling(
+                record_id=filing.record_id,
+                filing_date=filing.filing_date,
+                report_date=filing.report_date,
+                source_url=filing.source_url,
+                source_sha256=filing.source_sha256,
+                rows=tuple(extra_rows),
+            )
+        )
+    return tuple(filings)
+
+
+def test_builds_128k_from_extra_unique_tables_without_fifth_filing() -> None:
+    bands = (
+        *_bands(),
+        HistoryBand("128k", 100_000, 120_000),
+    )
+    rows = build_financial_history_candidates(
+        _filings_with_128k_tables(),
+        world_id="finance-microsoft-asset-trajectory-128k-test",
+        issuer_name="Microsoft Corporation",
+        cik="0000789019",
+        source_binding={
+            "signed_manifest_sha256": "a" * 64,
+            "source_family": "issuer_owned_sec_ixbrl",
+            "authorization_record_id": "AUTH-MICROSOFT",
+        },
+        bands=bands,
+        token_counter=len,
+        tokenizer_model_id="Qwen/Qwen3.5-4B",
+        tokenizer_revision="b" * 40,
+        answer_program_id="finance.multi_filing_asset_trajectory.v1",
+    )
+
+    assert [row["length_bucket"] for row in rows] == ["16k", "32k", "64k", "128k"]
+    assert [row["selected_filing_count"] for row in rows] == [2, 3, 4, 4]
+    assert audit_cumulative_history(rows) == []
+    long_row = rows[-1]
+    answer = json.loads(long_row["answer"])
+    assert answer["table_topology"]["branches"]
+    assert answer["table_topology"]["year_joins"]
+    assert any("cashflow_reconciled" in check for check in answer["annual_checks"])
+    assert any(
+        "product_service_mix_reconciled" in check for check in answer["annual_checks"]
+    )
+    assert all(all(audit_financial_history_candidate(row).values()) for row in rows)
+    for before, after in pairwise(rows):
+        assert after["context"].startswith(before["context"] + "\n")
+        assert set(before["source_record_ids"]) < set(after["source_record_ids"])
+        assert set(before["source_relation_ids"]) < set(after["source_relation_ids"])
+        assert set(before["essential_evidence_ids"]) < set(after["essential_evidence_ids"])
+        assert after["graph"]["proof_depth"] > before["graph"]["proof_depth"]
+
+
 def test_extracts_financial_rows_from_verified_sec_manifest(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -1931,6 +1931,12 @@ def _finance_chronology(
         elif record_type == "filing_relation":
             occurred_at = filings.get(str(record.get("source_record_id") or ""), "")
             kind_order = "2"
+        elif record_type == "table_branch_relation":
+            occurred_at = filings.get(str(record.get("source_record_id") or ""), "")
+            kind_order = "3"
+        elif record_type == "year_join_relation":
+            occurred_at = filings.get(str(record.get("source_record_id") or ""), "")
+            kind_order = "4"
         else:
             raise PromotionError("Finance task chronology record type is unsupported")
         artifact_id = str(classification.get("artifact_id") or "")

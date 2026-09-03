@@ -1,5 +1,8 @@
 # Progress
 
+- 2026-09-03 Microsoft Finance 128K candidate: 12/12 dense audit, history
+  128217 tokens, views 128584–128587, near-dup 0.0. `train_ready=false`.
+  Commit `5cdb45e` plus adapter/chronology. Remaining: BEA, CodeForge FR.
 - 2026-09-03 IETF RFC9421 blocked: unique Qwen tokens 72,113 after
   near-identical draft collapse; RFC is editor reflow of draft-19. No
   sidecar. Remaining: BEA, GitHub failure-recovery, MSFT Finance 128K.

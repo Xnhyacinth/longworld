@@ -1,5 +1,13 @@
 # Findings (data, not instructions)
 
+## Microsoft Finance 128K — 2026-09-03
+
+Four-filing asset trajectory filled exact 128K from leftover unique XBRL
+tables (110 source records, 45 essentials, proof depth 16). History 128217;
+views 128584/128587/128584. Dense audit 12/12. near-dup 0.0. Still
+`train_ready=false`. No Amazon clone, no EDGAR fetch, no reconstruction.
+Config/reports `5cdb45e`.
+
 ## IETF RFC9421 unique-delta — 2026-09-03
 
 Unique Qwen tokens after collapsing near-identical drafts are 72,113,

@@ -18,7 +18,11 @@ from itertools import pairwise
 from typing import Any
 from urllib.parse import urlparse
 
-from longworld.core.domainhistory import HistoryBand, audit_cumulative_history
+from longworld.core.domainhistory import (
+    HistoryBand,
+    _EXPECTED_BANDS,
+    audit_cumulative_history,
+)
 from longworld.core.filingworkflow import ISSUER_GCS_MERGED_COMPONENT_REVISION_V2
 from longworld.core.issuerfilingworkflow import parse_issuer_ir_rendered_metrics
 from longworld.core.pack import SEP
@@ -32,7 +36,6 @@ _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _ROW = re.compile(r"<tr\b[^>]*>.*?</tr>", re.IGNORECASE | re.DOTALL)
 _NUMBER = re.compile(r"^\(?\$?[ \t]*[0-9][0-9,]*\)?$")
-_EXPECTED_BANDS = ("16k", "32k", "64k")
 _CORE_ROLES = frozenset(
     {
         "revenue",
@@ -77,12 +80,24 @@ _SEMANTIC_ROLE_MARKERS = {
         "defref_us-gaap_CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
         "Net increase (decrease) in cash",
     ),
+    "product_revenue": ("product_revenue", "Product"),
+    "service_revenue": ("service_revenue", "Service"),
 }
 _SEC_SEMANTIC_ROLE_MARKERS = {
     "revenue": ("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",),
     "assets": ("us-gaap:Assets",),
     "liabilities_and_equity": ("us-gaap:LiabilitiesAndStockholdersEquity",),
     "cash_from_operations": ("us-gaap:NetCashProvidedByUsedInOperatingActivities",),
+    "cash_from_investing": ("us-gaap:NetCashProvidedByUsedInInvestingActivities",),
+    "cash_from_financing": ("us-gaap:NetCashProvidedByUsedInFinancingActivities",),
+    "cash_fx_effect": (
+        "us-gaap:EffectOfExchangeRateOnCashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsIncludingDisposalGroupAndDiscontinuedOperations",
+    ),
+    "cash_period_change": (
+        "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+    ),
+    "product_revenue": ("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",),
+    "service_revenue": ("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",),
 }
 _SEC_FINANCIAL_ROLE_MAP = {
     "total_revenue": "revenue",
@@ -90,6 +105,18 @@ _SEC_FINANCIAL_ROLE_MAP = {
     "liabilities_and_equity": "liabilities_and_equity",
     "cfo": "cash_from_operations",
 }
+_SEC_OPTIONAL_TABLE_ROLE_MAP = {
+    "cfi": "cash_from_investing",
+    "cff": "cash_from_financing",
+    "fx": "cash_fx_effect",
+    "delta_cash": "cash_period_change",
+    "product_revenue": "product_revenue",
+    "service_revenue": "service_revenue",
+}
+_TABLE_ROLE_PREFIXES = ("category_", "geo_", "prior_geo_")
+_RELATION_RECORD_TYPES = frozenset(
+    {"filing_relation", "table_branch_relation", "year_join_relation"}
+)
 _DEFAULT_ANSWER_PROGRAM_ID = "finance.multi_filing_reconstruction.v1"
 _ANSWER_PROGRAMS = {
     _DEFAULT_ANSWER_PROGRAM_ID: {
@@ -232,6 +259,89 @@ def _relation_record(
         "target_record_id": prior.record_id,
         "relation_provenance": "verified_derived_temporal_same_issuer",
     }
+
+
+def _table_branch_record(filing: FinancialFiling, section: str) -> dict[str, Any]:
+    return {
+        "record_type": "table_branch_relation",
+        "relation_id": f"{filing.record_id}:table-branch:{section}",
+        "kind": "per_year_table_branch",
+        "source_record_id": filing.record_id,
+        "target_record_id": f"{filing.record_id}:table:{section}",
+        "section": section,
+        "relation_provenance": "verified_derived_intra_year_table_branch",
+    }
+
+
+def _year_join_record(
+    filing: FinancialFiling, sections: Sequence[str]
+) -> dict[str, Any]:
+    joined = tuple(sorted(sections))
+    return {
+        "record_type": "year_join_relation",
+        "relation_id": f"{filing.record_id}:year-join",
+        "kind": "per_year_table_join",
+        "source_record_id": filing.record_id,
+        "target_record_id": filing.record_id,
+        "joined_sections": list(joined),
+        "relation_provenance": "verified_derived_intra_year_table_join",
+    }
+
+
+def _is_128k_table_role(role: str, base_roles: set[str]) -> bool:
+    return role not in base_roles and (
+        role in _SEC_OPTIONAL_TABLE_ROLE_MAP.values()
+        or role.startswith(_TABLE_ROLE_PREFIXES)
+    )
+
+
+def _band_active_roles(
+    answer_program_id: str, band_name: str, filings: Sequence[FinancialFiling]
+) -> set[str]:
+    roles = set(_ANSWER_PROGRAMS[answer_program_id]["roles"])
+    if (
+        answer_program_id != "finance.multi_filing_asset_trajectory.v1"
+        or band_name != "128k"
+    ):
+        return roles
+    extras: set[str] = set()
+    for filing in filings:
+        for row in filing.rows:
+            extras.update(
+                fact.role
+                for fact in row.facts
+                if _is_128k_table_role(fact.role, roles)
+            )
+    return roles | extras
+
+
+def _sec_role_facts(program: Any) -> dict[str, Any]:
+    role_facts = {
+        output_role: program.roles[program_role]
+        for program_role, output_role in _SEC_FINANCIAL_ROLE_MAP.items()
+        if program_role in program.roles
+    }
+    for program_role, output_role in _SEC_OPTIONAL_TABLE_ROLE_MAP.items():
+        fact = program.roles.get(program_role)
+        if fact is not None:
+            role_facts[output_role] = fact
+    for program_role, fact in program.roles.items():
+        if program_role.startswith(_TABLE_ROLE_PREFIXES):
+            role_facts[program_role] = fact
+    return role_facts
+
+
+def _role_marker_options(role: str) -> tuple[tuple[str, ...], ...]:
+    options: list[tuple[str, ...]] = []
+    if role in _SEMANTIC_ROLE_MARKERS:
+        options.append(_SEMANTIC_ROLE_MARKERS[role])
+    if role in _SEC_SEMANTIC_ROLE_MARKERS:
+        options.append(_SEC_SEMANTIC_ROLE_MARKERS[role])
+    if role.startswith(_TABLE_ROLE_PREFIXES):
+        options.append(
+            ("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",)
+        )
+    return tuple(options)
 
 
 def _context(records: Sequence[dict[str, Any]]) -> str:
@@ -436,10 +546,7 @@ def extract_sec_financial_filings(
             report_date=report_date,
             parser_revision=ISSUER_GCS_MERGED_COMPONENT_REVISION_V2,
         )
-        role_facts = {
-            output_role: program.roles[program_role]
-            for program_role, output_role in _SEC_FINANCIAL_ROLE_MAP.items()
-        }
+        role_facts = _sec_role_facts(program)
         source_rows: list[FinancialSourceRow] = []
         mapped_roles: set[str] = set()
         for section in sorted(program.sections, key=lambda item: item.char_start):
@@ -479,7 +586,7 @@ def extract_sec_financial_filings(
                         facts=facts,
                     )
                 )
-        if mapped_roles != set(_SEC_FINANCIAL_ROLE_MAP.values()):
+        if not set(_SEC_FINANCIAL_ROLE_MAP.values()) <= mapped_roles:
             raise ProvenanceError("issuer SEC core financial facts do not map to rows")
         filings.append(
             FinancialFiling(
@@ -603,6 +710,7 @@ def _answer(
     filing_chain: Sequence[str],
     *,
     answer_program_id: str,
+    table_topology: dict[str, Any] | None = None,
 ) -> str:
     filing_order = {filing_id: index for index, filing_id in enumerate(filing_chain)}
     ledger = sorted(
@@ -639,7 +747,10 @@ def _answer(
             "cash_period_change",
         }
         if (
-            answer_program_id == _DEFAULT_ANSWER_PROGRAM_ID
+            (
+                answer_program_id == _DEFAULT_ANSWER_PROGRAM_ID
+                or table_topology is not None
+            )
             and cash_roles <= values.keys()
         ):
             check["cashflow_reconciled"] = (
@@ -649,6 +760,28 @@ def _answer(
                     if role != "cash_period_change"
                 )
                 == values["cash_period_change"]
+            )
+        if {"product_revenue", "service_revenue", "revenue"} <= values.keys():
+            check["product_service_mix_reconciled"] = (
+                int(values["product_revenue"]) + int(values["service_revenue"])
+                == int(values["revenue"])
+            )
+        category_roles = sorted(
+            role for role in values if role.startswith("category_")
+        )
+        if category_roles and "revenue" in values:
+            check["category_mix_reconciled"] = (
+                sum(int(values[role]) for role in category_roles)
+                == int(values["revenue"])
+            )
+        geo_roles = sorted(
+            role
+            for role in values
+            if role.startswith("geo_") and not role.startswith("prior_geo_")
+        )
+        if geo_roles and "revenue" in values:
+            check["geo_mix_reconciled"] = (
+                sum(int(values[role]) for role in geo_roles) == int(values["revenue"])
             )
         annual_checks.append(check)
     revenue = [
@@ -668,6 +801,19 @@ def _answer(
         "cross_filing_revenue_trajectory": trajectory,
         "filing_chain": list(filing_chain),
     }
+    if table_topology is not None:
+        answer["table_topology"] = table_topology
+        base_roles = set(_ANSWER_PROGRAMS[answer_program_id]["roles"])
+        answer["extra_table_facts"] = [
+            {
+                "report_date": fact["report_date"],
+                "role": fact["role"],
+                "value": fact["value"],
+                "record_id": fact["record_id"],
+            }
+            for fact in ledger
+            if fact["role"] not in base_roles
+        ]
     if answer_program_id == "finance.multi_filing_asset_trajectory.v1":
         answer["annual_observations"] = [
             {
@@ -741,6 +887,24 @@ def replay_financial_history(
         ):
             raise ProvenanceError("financial history answer program is unbound")
         active_roles = set(_ANSWER_PROGRAMS[answer_program_id]["roles"])
+        base_roles = set(active_roles)
+        has_table_topology = any(
+            record.get("record_type") in {"table_branch_relation", "year_join_relation"}
+            for record in records
+        )
+        if (
+            answer_program_id == "finance.multi_filing_asset_trajectory.v1"
+            and (task.get("length_bucket") == "128k" or has_table_topology)
+        ):
+            for record in records:
+                if record.get("record_type") != "financial_source_row":
+                    continue
+                for fact in record.get("facts") or []:
+                    if not isinstance(fact, dict):
+                        continue
+                    role = str(fact.get("role") or "")
+                    if _is_128k_table_role(role, base_roles):
+                        active_roles.add(role)
         for record in records:
             if record.get("record_type") != "financial_source_row":
                 continue
@@ -790,18 +954,12 @@ def replay_financial_history(
                     continue
                 start = fact.get("relative_start")
                 quote = fact.get("evidence_quote")
-                marker_options = (
-                    _SEMANTIC_ROLE_MARKERS[role],
-                    *(
-                        (_SEC_SEMANTIC_ROLE_MARKERS[role],)
-                        if role in _SEC_SEMANTIC_ROLE_MARKERS
-                        else ()
-                    ),
-                )
+                marker_options = _role_marker_options(role)
                 if (
                     not isinstance(start, int)
                     or not isinstance(quote, str)
                     or source_text[start : start + len(quote)] != quote
+                    or not marker_options
                     or not any(
                         all(marker in source_text for marker in markers)
                         for markers in marker_options
@@ -836,6 +994,91 @@ def replay_financial_history(
             and relation.get("target_record_id") in selected_filing_ids
         ]
         filing_chain = _filing_chain(selected_filing_ids, selected_relations)
+        extra_fact_rows = [
+            record
+            for record in row_records
+            if record["source_record_id"] in essential_ids
+            and any(
+                isinstance(fact, dict)
+                and _is_128k_table_role(str(fact.get("role") or ""), base_roles)
+                for fact in record.get("facts") or []
+            )
+        ]
+        table_branch_records = [
+            record
+            for record in records
+            if record.get("record_type") == "table_branch_relation"
+            and record.get("source_record_id") in selected_filing_ids
+            and record.get("kind") == "per_year_table_branch"
+            and record.get("relation_provenance")
+            == "verified_derived_intra_year_table_branch"
+        ]
+        year_join_records = [
+            record
+            for record in records
+            if record.get("record_type") == "year_join_relation"
+            and record.get("source_record_id") in selected_filing_ids
+            and record.get("kind") == "per_year_table_join"
+            and record.get("relation_provenance")
+            == "verified_derived_intra_year_table_join"
+        ]
+        extra_sections_by_filing: dict[str, set[str]] = {}
+        for record in extra_fact_rows:
+            extra_sections_by_filing.setdefault(
+                str(record["filing_record_id"]), set()
+            ).add(str(record["section"]))
+        branch_sections_by_filing: dict[str, set[str]] = {}
+        for record in table_branch_records:
+            filing_id = str(record["source_record_id"])
+            section = str(record.get("section") or "")
+            relation_id = str(record.get("relation_id") or "")
+            if (
+                not section
+                or relation_id != f"{filing_id}:table-branch:{section}"
+                or record.get("target_record_id") != f"{filing_id}:table:{section}"
+            ):
+                raise ProvenanceError("financial table branch relation is invalid")
+            branch_sections_by_filing.setdefault(filing_id, set()).add(section)
+        join_sections_by_filing: dict[str, tuple[str, ...]] = {}
+        for record in year_join_records:
+            filing_id = str(record["source_record_id"])
+            relation_id = str(record.get("relation_id") or "")
+            joined = record.get("joined_sections")
+            if (
+                relation_id != f"{filing_id}:year-join"
+                or record.get("target_record_id") != filing_id
+                or not isinstance(joined, list)
+                or [str(item) for item in joined] != sorted(str(item) for item in joined)
+                or filing_id in join_sections_by_filing
+            ):
+                raise ProvenanceError("financial year join relation is invalid")
+            join_sections_by_filing[filing_id] = tuple(str(item) for item in joined)
+        if extra_sections_by_filing:
+            if (
+                set(extra_sections_by_filing) != set(branch_sections_by_filing)
+                or set(extra_sections_by_filing) != set(join_sections_by_filing)
+            ):
+                raise ProvenanceError("financial table topology does not cover extra tables")
+            for filing_id, sections in extra_sections_by_filing.items():
+                if (
+                    sections != branch_sections_by_filing[filing_id]
+                    or tuple(sorted(sections)) != join_sections_by_filing[filing_id]
+                ):
+                    raise ProvenanceError(
+                        "financial table topology does not match extra tables"
+                    )
+        elif table_branch_records or year_join_records:
+            raise ProvenanceError("financial table topology has no extra table facts")
+        table_topology = None
+        if extra_sections_by_filing:
+            table_topology = {
+                "branches": sorted(
+                    str(record["relation_id"]) for record in table_branch_records
+                ),
+                "year_joins": sorted(
+                    str(record["relation_id"]) for record in year_join_records
+                ),
+            }
         containment_edges = [
             [
                 str(record["filing_record_id"]),
@@ -846,12 +1089,25 @@ def replay_financial_history(
             if record["source_record_id"] in essential_ids
         ]
         derived_edges = [
-            [
-                str(relation["source_record_id"]),
-                str(relation["target_record_id"]),
-                str(relation["relation_id"]),
-            ]
-            for relation in selected_relations
+            *[
+                [
+                    str(relation["source_record_id"]),
+                    str(relation["target_record_id"]),
+                    str(relation["relation_id"]),
+                ]
+                for relation in selected_relations
+            ],
+            *[
+                [
+                    str(record["source_record_id"]),
+                    str(record["target_record_id"]),
+                    str(record["relation_id"]),
+                ]
+                for record in sorted(
+                    (*table_branch_records, *year_join_records),
+                    key=lambda item: str(item.get("relation_id") or ""),
+                )
+            ],
         ]
         source_record_ids = [
             *sorted(selected_filing_ids),
@@ -866,6 +1122,7 @@ def replay_financial_history(
                 fact_ledger,
                 filing_chain,
                 answer_program_id=answer_program_id,
+                table_topology=table_topology,
             ),
             "source_record_ids": source_record_ids,
             "source_relation_ids": relation_ids,
@@ -907,7 +1164,10 @@ def _replacement_quote(value: str) -> str:
 
 
 def _candidate_rows(
-    filings: Sequence[FinancialFiling], selected_ids: set[str], used_ids: set[str]
+    filings: Sequence[FinancialFiling],
+    selected_ids: set[str],
+    used_ids: set[str],
+    active_roles: set[str],
 ) -> list[FinancialSourceRow]:
     rows = [
         row
@@ -915,6 +1175,10 @@ def _candidate_rows(
         if filing.record_id in selected_ids
         for row in filing.rows
         if row.record_id not in used_ids
+        and (
+            not row.facts
+            or any(fact.role in active_roles for fact in row.facts)
+        )
     ]
     return sorted(
         rows,
@@ -940,7 +1204,7 @@ def build_financial_history_candidates(
     tokenizer_revision: str,
     answer_program_id: str = _DEFAULT_ANSWER_PROGRAM_ID,
 ) -> list[dict[str, Any]]:
-    """Build exact nested 16/32/64K histories from distinct filing rows."""
+    """Build exact nested 16/32/64/128K histories from distinct filing rows."""
     _validate_source_rows(filings)
     if (
         not world_id
@@ -952,7 +1216,6 @@ def build_financial_history_candidates(
         or [band.name for band in bands] != list(_EXPECTED_BANDS[: len(bands)])
     ):
         raise ProvenanceError("financial history materialization identity is invalid")
-    active_roles = set(_ANSWER_PROGRAMS[answer_program_id]["roles"])
     if (
         set(source_binding)
         != {
@@ -981,8 +1244,11 @@ def build_financial_history_candidates(
     selected_filing_ids: set[str] = set()
     output: list[dict[str, Any]] = []
     for band_index, band in enumerate(bands):
+        band_roles = _band_active_roles(answer_program_id, band.name, filings)
         required_filing_count = min(len(filings), band_index + 2)
-        if required_filing_count < band_index + 2:
+        if required_filing_count < 2 or (
+            band.name != "128k" and required_filing_count < band_index + 2
+        ):
             raise ProvenanceError(f"cannot fill exact {band.name}: too few filings")
         newly_selected = filings[:required_filing_count]
         for filing_index, filing in enumerate(newly_selected):
@@ -998,19 +1264,77 @@ def build_financial_history_candidates(
                 row
                 for row in filing.rows
                 if row.facts
-                and any(fact.role in active_roles for fact in row.facts)
+                and any(fact.role in band_roles for fact in row.facts)
                 and row.record_id not in used_row_ids
             ]
             for row in mandatory:
                 records.append(_row_record(row))
                 used_row_ids.add(row.record_id)
+        extra_sections_by_filing: dict[str, set[str]] = {}
+        if band.name == "128k":
+            base_roles = set(_ANSWER_PROGRAMS[answer_program_id]["roles"])
+            extra_rows = sorted(
+                (
+                    row
+                    for filing in newly_selected
+                    for row in filing.rows
+                    if row.record_id not in used_row_ids
+                    and any(
+                        _is_128k_table_role(fact.role, base_roles)
+                        and fact.role in band_roles
+                        for fact in row.facts
+                    )
+                ),
+                key=lambda row: (
+                    row.report_date,
+                    row.section,
+                    row.source_char_start,
+                    row.record_id,
+                ),
+            )
+            context = _context(records)
+            tokens = token_counter(context)
+            topology_headroom = 4_096
+            for row in extra_rows:
+                candidate_records = [*records, _row_record(row)]
+                candidate_context = _context(candidate_records)
+                candidate_tokens = token_counter(candidate_context)
+                if candidate_tokens + topology_headroom <= band.upper_tokens:
+                    records = candidate_records
+                    context = candidate_context
+                    tokens = candidate_tokens
+                    used_row_ids.add(row.record_id)
+                    extra_sections_by_filing.setdefault(row.filing_record_id, set()).add(
+                        row.section
+                    )
+                if tokens >= band.lower_tokens:
+                    break
+            if not extra_sections_by_filing:
+                raise ProvenanceError(
+                    f"cannot fill exact {band.name}: no unique extra table facts"
+                )
+            topology_records = []
+            filing_by_id = {filing.record_id: filing for filing in newly_selected}
+            for filing_id, sections in extra_sections_by_filing.items():
+                filing = filing_by_id[filing_id]
+                for section in sorted(sections):
+                    topology_records.append(_table_branch_record(filing, section))
+                topology_records.append(_year_join_record(filing, sections))
+            records = [*records, *topology_records]
         context = _context(records)
         tokens = token_counter(context)
         if tokens > band.upper_tokens:
             raise ProvenanceError(
                 f"cannot fill exact {band.name}: mandatory history is {tokens} tokens"
             )
-        for row in _candidate_rows(filings, selected_filing_ids, used_row_ids):
+        fill_roles = (
+            set(_ANSWER_PROGRAMS[answer_program_id]["roles"])
+            if band.name == "128k"
+            else band_roles
+        )
+        for row in _candidate_rows(
+            filings, selected_filing_ids, used_row_ids, fill_roles
+        ):
             candidate_records = [*records, _row_record(row)]
             candidate_context = _context(candidate_records)
             candidate_tokens = token_counter(candidate_context)
@@ -1151,7 +1475,7 @@ def build_financial_history_candidates(
 
 
 def _pipeline_artifact_id(record: dict[str, Any]) -> str:
-    if record.get("record_type") == "filing_relation":
+    if record.get("record_type") in _RELATION_RECORD_TYPES:
         value = record.get("relation_id")
     else:
         value = record.get("source_record_id")
@@ -1224,7 +1548,7 @@ def build_finance_pipeline_candidate(
     relation_ids = {
         _pipeline_artifact_id(record)
         for record in artifact_records
-        if record.get("record_type") == "filing_relation"
+        if record.get("record_type") in _RELATION_RECORD_TYPES
     }
     essential_rows = set(task.get("essential_evidence_ids") or [])
     essential_ids = [
@@ -1258,7 +1582,7 @@ def build_finance_pipeline_candidate(
             source_origin = "real_public"
             provenance_id = "source-sha256:" + str(record.get("source_sha256") or "")
             source_urls.add(str(record.get("source_url") or ""))
-        elif record_type == "filing_relation":
+        elif record_type in _RELATION_RECORD_TYPES:
             source_origin = "real_derived"
             provenance_id = "derived-relation-sha256:" + _sha256_text(
                 _canonical_json(record)
@@ -1744,7 +2068,7 @@ def audit_financial_history_candidate(task: dict[str, Any]) -> dict[str, bool]:
         relation_ids = [
             str(record["relation_id"])
             for record in records
-            if record.get("record_type") == "filing_relation"
+            if record.get("record_type") in _RELATION_RECORD_TYPES
         ]
         for relation_id in relation_ids:
             relation_removed = deepcopy(task)

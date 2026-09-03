@@ -397,6 +397,16 @@ def _projection_chronology(
                     filings.get(str(value.get("source_record_id") or ""), ""),
                     "2",
                 )
+            elif record_type == "table_branch_relation":
+                occurred_at, kind = (
+                    filings.get(str(value.get("source_record_id") or ""), ""),
+                    "3",
+                )
+            elif record_type == "year_join_relation":
+                occurred_at, kind = (
+                    filings.get(str(value.get("source_record_id") or ""), ""),
+                    "4",
+                )
             else:
                 raise TaskProofError("Finance chronology record type is unsupported")
             order_key = f"{occurred_at}|{kind}|{artifact_id}"

@@ -191,7 +191,7 @@ def prepare(input_path: Path, output_dir: Path) -> dict[str, Any]:
         "rows": len(candidates),
         "by_length": {
             bucket: sum(row.get("length_bucket") == bucket for row in candidates)
-            for bucket in ("16k", "32k", "64k")
+            for bucket in ("16k", "32k", "64k", "128k")
         },
         "context_tokens": sum(
             int(row["tokenizer_context_tokens"]) for row in candidates
