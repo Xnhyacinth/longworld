@@ -1,5 +1,8 @@
 # LongWorld must-not-break gates
 
+- Public GitHub replay must receive the exact signed source-client and policy
+  SHA allowlist through the isolated child environment; missing pins fail
+  closed and are never repaired by re-signing source artifacts.
 - Never count candidate/view/length multiplication as semantic scale.
 - Never label synthetic executable workflows as authentic source rows.
 - Real-source answers must fail when an essential body span is corrupted or

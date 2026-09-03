@@ -1,5 +1,15 @@
 # Progress
 
+- 2026-09-03 P17 converted two independent candidates into train-ready local-
+  probe products: Microsoft Finance 12 rows (3 each at 16/32/64/128K) and
+  Transformers CodeForge 6 rows (3 each at 64/128K). Both gates and B5
+  manifests are green. P17 adds 18 train rows / 1,309,015 exact context
+  tokens / 6×128K. Current signed inventory is 132 train + 18 eval rows,
+  7,274,169 exact tokens, and 15×128K train rows. No HF.
+- 2026-09-03 P17 diversity research recorded 26 primary URLs and six ranked
+  executable designs. Entity copies on an existing operator count as volume,
+  not semantic topology. BEA GDI 2005Q1 source/capacity/preflight/ranking is
+  green but its 12-view strict replay remains pending and is not counted.
 - 2026-09-03 P16 BEA local-probe extension is train-ready: 1 world / 12 rows
   / 3×128K at 128251 tokens, B5 export 12 rows, gate ok, near-dup 0.0.
   Independent of P15 v7. Finance stays unmixed (different probe). No HF.

@@ -362,3 +362,42 @@ raw-window, or replay. Do not mix probe trusts. Do not promote/HF until a
 complete new world is candidate-local audited. Root records ledger after
 workers write closeouts.
 
+## P17 parallel volume and diversity run — 2026-09-03
+
+Goal: grow the number of authentic, long-context-dependent training examples
+along two simultaneous axes: (1) generate and filter additional executable
+tasks over already verified source workflows; (2) discover and preflight new
+domains, entities, artifact types, interaction topologies, and deterministic
+oracles. Row multiplication by view/length alone does not count as scale.
+
+Complexity is 10/10 (breadth, depth, dependency, uncertainty, validation all
+2), so `.hl/policy.md` routes this as mixed execution with three disjoint
+workers plus root integration. Workers use separate `p17_*` config/report/source
+namespaces, do not edit shared core or `.hl`, and do not commit from the shared
+worktree. Root reconciles candidates, runs the one necessary gate chain, and
+owns Git commits.
+
+| Track | Ownership | Deliverable | Success criterion | Status |
+| --- | --- | --- | --- | --- |
+| P17.A existing-world batch | `configs/p17_macro_*`, `reports/p17_macro_*` | additional BEA workbook entities/vintages using the verified cell-revision adapter, with new query IDs and proof-bearing relations | at least one new complete 16/32/64/128K three-view world, or an exact capacity rejection ledger | in_progress |
+| P17.B new CodeForge chain | `configs/p17_codeforge_*`, `reports/p17_codeforge_*` | a new repository/entity with authentic failure→repair→check/review→merge/release cycles | exact 64K plus 128K only when unique source mass supports it; every emitted cell passes replay and shortcut gates | complete: Transformers 6/6 train-ready, 3×64K + 3×128K |
+| P17.C new-domain research | `sources/research_p17_*`, `reports/p17_domain_design_*` | current primary-source study and executable design matrix for software, spreadsheet, agent interaction, retrieval/deep research, documents, and finance | rank only designs with obtainable authentic artifacts, deterministic oracle, counterfactual operation, and plausible 64K/128K unique capacity | complete: 26 primary URLs, six executable designs ranked |
+| P17.D root integration | release inventory/profile, gate execution, `.hl`, Git | reconcile P14/P15/P16/P17 without mixing trust scopes or duplicating semantic tasks | nonzero newly train-ready rows with exact bucket distribution; otherwise preserve prior releases and name the measured capacity blocker | complete: Finance 12 + CodeForge 6 train-ready; separate probe products |
+
+Verification is staged to reduce redundant work without weakening admission:
+source/capacity preflight first, candidate-local generation and dense audit
+second, and selection/promotion/export once per compatible row set only after a
+new complete world exists. Production approval and HF upload remain out of
+scope unless an independent trust receipt exists.
+
+## P18 next-topology capacity preflight — 2026-09-03
+
+While P17.A finishes strict replay, two disjoint source-first probes test the
+highest-ranked new transition/oracle programs. Neither may generate SFT until
+the authentic relation, executable oracle, remove-one flip, and unique-token
+capacity are measured.
+
+| Track | Ownership | Exit criterion | Status |
+| --- | --- | --- | --- |
+| P18.A SEC restatement | `configs/p18_finance_*`, `reports/p18_finance_*` | locate accession/footnote/restatement graph in existing signed local filings; report 64K/128K unique capacity and exact arithmetic oracle | in_progress |
+| P18.B regression bisect | `configs/p18_codeforge_*`, `reports/p18_codeforge_*` | locate licensed issue/culprit/fix/test/release chain; prove failing/passing endpoints and token histogram distinct from failure-recovery | in_progress |

@@ -1,0 +1,47 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr40744_v4.57.0.json",
+      "sha256": "ef089162f4e70694367679a93282643b69307335240aa62135ebc245559f8dc1"
+    },
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr45921_v5.9.0.json",
+      "sha256": "fde48892f9f9146576f51f94dd1e1d07f1fb28cb1239c8ac9e3e3abb4b75fe6b"
+    },
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr46142_v5.10.1.json",
+      "sha256": "2faade63aff90132e9eef7ac91864ed7d7b59f3f6e054d7682601fcfc1cdcdd1"
+    },
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr44907_v5.12.0.json",
+      "sha256": "d383dd741ddd1aa5596d07bf7639c3635f50385099e9e28bd6e98cdbad7a1d36"
+    },
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr46830_v5.13.0.json",
+      "sha256": "7547382c55d150a2193a492ade468aaeef9838b6a5291056f75ccc5a9124bfd2"
+    },
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr46965_v5.14.0.json",
+      "sha256": "891b9d99c921f8c8f55a61fbecd770e2cf6d415d39ae2d872d48bdd268d2944e"
+    },
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr47727_v5.15.0.json",
+      "sha256": "ac39bc1fe22a7f40c5bef757e3e543eaa0889d7fa074520293331a0aa8174ea5"
+    },
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr48023_v5.16.0.json",
+      "sha256": "7a1053ffaccd2e4006a53407274f87210877954f637b5de27b6c65fd0f88ec0c"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "probe-source-e4bac7778cdcfa3808f3c373b474e85f",
+    "environment": "probe",
+    "digest": "e4e52ceaf645c87f32cbdb23afae18249ba79205e74a1a1a201672b80b2c119e"
+  }
+}

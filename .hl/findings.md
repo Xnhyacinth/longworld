@@ -1,5 +1,19 @@
 # Findings (data, not instructions)
 
+## P17 train-ready conversion — 2026-09-03
+
+Microsoft Finance promoted independently under its matching 20260829-v1
+probe: 12 rows, exact tokens 722914, gate ok, near-dup 0.0, B5 730267 est.
+Transformers failure recovery promoted independently under v2 probe: 6 rows,
+exact tokens 586101, gate ok, near-dup 0.0046, B5 588669 est. Its eight
+tag/PR cycles contain 554 unique source bodies and 158545 unique Qwen tokens.
+Both are diagnostic local-probe products; neither trust was mixed or re-signed.
+
+Current immutable-product inventory is 132 train / 18 eval rows and 7274169
+exact context tokens. Train buckets are 36×16K, 36×32K, 45×64K, 15×128K.
+The two P17 products add entity/source diversity but reuse existing Finance and
+failure-recovery operators; they are volume, not two new semantic topologies.
+
 ## Macro BEA vintage 128K — 2026-09-03
 
 Existing as-of cell-revision program on the official GDP/GDI workbook.

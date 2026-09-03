@@ -1,5 +1,18 @@
 # Summary — P7 source-rich integration
 
+## P17 current conversion — 2026-09-03
+
+P17 adds two signed, independent local-probe training products: Microsoft
+Finance 12 rows across 16/32/64/128K and Transformers CodeForge 6 rows across
+64/128K. Together they add 18 rows, 1,309,015 exact context tokens, and six
+128K rows. The current immutable-product inventory is 132 train + 18 eval rows,
+7,274,169 exact tokens, with 15 train rows at 128K. These are diagnostic,
+production-ineligible products and were not merged across trust roots. New-
+domain research ranks SEC restatement, regression bisect, regulatory
+correction, cross-spec propagation, native multi-sheet repair, and authentic
+handoff/rollback programs; entity copies on existing operators count only as
+volume.
+
 ## Superseding status — 2026-08-29
 
 The canonical current truth is `docs/CURRENT_RELEASE.md`. All P7 “green” slice

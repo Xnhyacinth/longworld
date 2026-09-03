@@ -1,6 +1,6 @@
 # Current release status
 
-Last updated: 2026-09-01
+Last updated: 2026-09-03
 
 This file is the canonical publication-status summary. Historical receipts and
 `.hl/` logs remain useful for reproducibility, but they do not override this
@@ -8,6 +8,29 @@ status. The canonical project root is `/workspace/wynckeliao/longworld`;
 project code, source inventory, generated data, release receipts, reports, and
 durable progress records must live there. Tool caches may be reconstructed
 outside the repository, and credentials must remain outside Git.
+
+## 2026-09-03 train-ready local-probe inventory
+
+The current content-gated SFT inventory consists of five immutable signed
+products: P14 six-domain, P15 CodeForge/Cyber 128K, P16 Macro 128K, P17
+Microsoft Finance 128K, and P17 Transformers CodeForge 128K. Together they
+contain **132 train rows / 6,592,137 exact Qwen context tokens** and **18 eval
+rows / 682,032 tokens**. Total local inventory is **150 rows / 7,274,169
+tokens** across 15 unique world IDs and six domains.
+
+Train length distribution is 36×16K, 36×32K, 45×64K, and **15×128K**. The two
+P17 products added 18 train rows / 1,309,015 exact tokens, including six 128K
+rows. Their release gates and signed B5 manifests pass with no duplicate drops
+or contract rejects. These products use separate local-probe trust roots and
+must not be represented as a single signed release. They are valid for local
+diagnostic training, but remain `production_eligible=false`; no new HF upload
+was performed.
+
+P17 also has a second BEA entity in strict replay and an executable six-domain
+design queue. Pending candidates do not count in the numbers above. Details and
+the diversity accounting are in
+`reports/p17_training_conversion_closeout_20260903.md` and
+`reports/p17_domain_design_matrix_20260903.md`.
 
 ## Published private dataset
 

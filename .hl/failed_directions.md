@@ -1,5 +1,9 @@
 # Rejected or blocked directions
 
+- Do not replay public GitHub episode bundles without their signed client and
+  public-policy SHA pins, and do not re-sign exports to bypass a pin mismatch.
+  The P17 Transformers promotion correctly failed closed until the original
+  pins were explicitly propagated into the isolated probe process.
 - Do not mix Microsoft Finance 128K into the P16 v2 probe extension. Its
   issuer-SEC manifest verifies only under `p12-probe-12-20260829-v1`.
 - Do not pad leftover PRs onto Pulumi failure-recovery to fake 128K.

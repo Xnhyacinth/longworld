@@ -1,0 +1,1323 @@
+{
+  "schema_version": "longworld.git-workflow.v1",
+  "repository_url": "https://github.com/huggingface/transformers",
+  "source_origin": "real_public",
+  "revision": "6c85f42d40054eab16b9ae27ecf614c636526c04",
+  "license": "Apache-2.0",
+  "exported_at": "2026-09-03T16:15:02.038412Z",
+  "authorization": {
+    "record_id": "PUBLIC-GITHUB-TERMS-2026-08",
+    "scope": "read-only workflow export",
+    "basis": "public repository under recorded license",
+    "reviewed_at": "2026-08-30T00:00:00Z"
+  },
+  "public_policy": {
+    "record_id": "PUBLIC-GITHUB-TERMS-2026-08",
+    "sha256": "dd39cfef6803b01b08cc476acef805265a7f10d62378889e1d56cb8603cb4c60"
+  },
+  "source_client": {
+    "path": "/usr/bin/gh",
+    "sha256": "2fd925d68889746976958342fb749bf102bc7dc8bcba3abfa533a80ad7791673"
+  },
+  "privacy_review": {
+    "emails": "redacted",
+    "secrets": "fail_closed",
+    "scanner": "longworld-public-secret-patterns",
+    "scanner_revision": "v2"
+  },
+  "records": [
+    {
+      "id": "license:68b7d66c97d66c58de883ed0c451af2b3183e6f3",
+      "kind": "license",
+      "occurred_at": "2020-12-07T23:36:34Z",
+      "text": "Copyright 2018- The Hugging Face team. All rights reserved.\n\n                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an example is provided in the Appendix below).\n\n      \"Derivative Works\" shall mean any work, whether in Source or Object\n      form, that is based on (or derived from) the Work and for which the\n      editorial revisions, annotations, elaborations, or other modifications\n      represent, as a whole, an original work of authorship. For the purposes\n      of this License, Derivative Works shall not include works that remain\n      separable from, or merely link (or bind by name) to the interfaces of,\n      the Work and Derivative Works thereof.\n\n      \"Contribution\" shall mean any work of authorship, including\n      the original version of the Work and any modifications or additions\n      to that Work or Derivative Works thereof, that is intentionally\n      submitted to Licensor for inclusion in the Work by the copyright owner\n      or by an individual or Legal Entity authorized to submit on behalf of\n      the copyright owner. For the purposes of this definition, \"submitted\"\n      means any form of electronic, verbal, or written communication sent\n      to the Licensor or its representatives, including but not limited to\n      communication on electronic mailing lists, source code control systems,\n      and issue tracking systems that are managed by, or on behalf of, the\n      Licensor for the purpose of discussing and improving the Work, but\n      excluding communication that is conspicuously marked or otherwise\n      designated in writing by the copyright owner as \"Not a Contribution.\"\n\n      \"Contributor\" shall mean Licensor and any individual or Legal Entity\n      on behalf of whom a Contribution has been received by Licensor and\n      subsequently incorporated within the Work.\n\n   2. Grant of Copyright License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      copyright license to reproduce, prepare Derivative Works of,\n      publicly display, publicly perform, sublicense, and distribute the\n      Work and such Derivative Works in Source or Object form.\n\n   3. Grant of Patent License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      (except as stated in this section) patent license to make, have made,\n      use, offer to sell, sell, import, and otherwise transfer the Work,\n      where such license applies only to those patent claims licensable\n      by such Contributor that are necessarily infringed by their\n      Contribution(s) alone or by combination of their Contribution(s)\n      with the Work to which such Contribution(s) was submitted. If You\n      institute patent litigation against any entity (including a\n      cross-claim or counterclaim in a lawsuit) alleging that the Work\n      or a Contribution incorporated within the Work constitutes direct\n      or contributory patent infringement, then any patent licenses\n      granted to You under this License for that Work shall terminate\n      as of the date such litigation is filed.\n\n   4. Redistribution. You may reproduce and distribute copies of the\n      Work or Derivative Works thereof in any medium, with or without\n      modifications, and in Source or Object form, provided that You\n      meet the following conditions:\n\n      (a) You must give any other recipients of the Work or\n          Derivative Works a copy of this License; and\n\n      (b) You must cause any modified files to carry prominent notices\n          stating that You changed the files; and\n\n      (c) You must retain, in the Source form of any Derivative Works\n          that You distribute, all copyright, patent, trademark, and\n          attribution notices from the Source form of the Work,\n          excluding those notices that do not pertain to any part of\n          the Derivative Works; and\n\n      (d) If the Work includes a \"NOTICE\" text file as part of its\n          distribution, then any Derivative Works that You distribute must\n          include a readable copy of the attribution notices contained\n          within such NOTICE file, excluding those notices that do not\n          pertain to any part of the Derivative Works, in at least one\n          of the following places: within a NOTICE text file distributed\n          as part of the Derivative Works; within the Source form or\n          documentation, if provided along with the Derivative Works; or,\n          within a display generated by the Derivative Works, if and\n          wherever such third-party notices normally appear. The contents\n          of the NOTICE file are for informational purposes only and\n          do not modify the License. You may add Your own attribution\n          notices within Derivative Works that You distribute, alongside\n          or as an addendum to the NOTICE text from the Work, provided\n          that such additional attribution notices cannot be construed\n          as modifying the License.\n\n      You may add Your own copyright statement to Your modifications and\n      may provide additional or different license terms and conditions\n      for use, reproduction, or distribution of Your modifications, or\n      for any such Derivative Works as a whole, provided Your use,\n      reproduction, and distribution of the Work otherwise complies with\n      the conditions stated in this License.\n\n   5. Submission of Contributions. Unless You explicitly state otherwise,\n      any Contribution intentionally submitted for inclusion in the Work\n      by You to the Licensor shall be under the terms and conditions of\n      this License, without any additional terms or conditions.\n      Notwithstanding the above, nothing herein shall supersede or modify\n      the terms of any separate license agreement you may have executed\n      with Licensor regarding such Contributions.\n\n   6. Trademarks. This License does not grant permission to use the trade\n      names, trademarks, service marks, or product names of the Licensor,\n      except as required for reasonable and customary use in describing the\n      origin of the Work and reproducing the content of the NOTICE file.\n\n   7. Disclaimer of Warranty. Unless required by applicable law or\n      agreed to in writing, Licensor provides the Work (and each\n      Contributor provides its Contributions) on an \"AS IS\" BASIS,\n      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or\n      implied, including, without limitation, any warranties or conditions\n      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A\n      PARTICULAR PURPOSE. You are solely responsible for determining the\n      appropriateness of using or redistributing the Work and assume any\n      risks associated with Your exercise of permissions under this License.\n\n   8. Limitation of Liability. In no event and under no legal theory,\n      whether in tort (including negligence), contract, or otherwise,\n      unless required by applicable law (such as deliberate and grossly\n      negligent acts) or agreed to in writing, shall any Contributor be\n      liable to You for damages, including any direct, indirect, special,\n      incidental, or consequential damages of any character arising as a\n      result of this License or out of the use or inability to use the\n      Work (including but not limited to damages for loss of goodwill,\n      work stoppage, computer failure or malfunction, or any and all\n      other commercial damages or losses), even if such Contributor\n      has been advised of the possibility of such damages.\n\n   9. Accepting Warranty or Additional Liability. While redistributing\n      the Work or Derivative Works thereof, You may choose to offer,\n      and charge a fee for, acceptance of support, warranty, indemnity,\n      or other liability obligations and/or rights consistent with this\n      License. However, in accepting such obligations, You may act only\n      on Your own behalf and on Your sole responsibility, not on behalf\n      of any other Contributor, and only if You agree to indemnify,\n      defend, and hold each Contributor harmless for any liability\n      incurred by, or claims asserted against, such Contributor by reason\n      of your accepting any such warranty or additional liability.\n\n   END OF TERMS AND CONDITIONS\n\n   APPENDIX: How to apply the Apache License to your work.\n\n      To apply the Apache License to your work, attach the following\n      boilerplate notice, with the fields enclosed by brackets \"[]\"\n      replaced with your own identifying information. (Don't include\n      the brackets!)  The text should be enclosed in the appropriate\n      comment syntax for the file format. We also recommend that a\n      file or class name and description of purpose be included on the\n      same \"printed page\" as the copyright notice for easier\n      identification within third-party archives.\n\n   Copyright [yyyy] [name of copyright owner]\n\n   Licensed under the Apache License, Version 2.0 (the \"License\");\n   you may not use this file except in compliance with the License.\n   You may obtain a copy of the License at\n\n       http://www.apache.org/licenses/LICENSE-2.0\n\n   Unless required by applicable law or agreed to in writing, software\n   distributed under the License is distributed on an \"AS IS\" BASIS,\n   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n   See the License for the specific language governing permissions and\n   limitations under the License.",
+      "links": [],
+      "attributes": {
+        "spdx_id": "Apache-2.0"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/contents/LICENSE?ref=dc9179e1e92b85176cc1228b69ddc21c27b757ea"
+    },
+    {
+      "id": "commit:2c60842a95d588de006c818ea72e1fd1724b919c",
+      "kind": "commit",
+      "occurred_at": "2026-03-21T05:49:06Z",
+      "text": "commit 2c60842a95d588de006c818ea72e1fd1724b919c\nRemove unnecessary `expand_as` in `get_placeholder_mask` across all VLMs\n\nThe placeholder mask was being expanded from (B, S, 1) to (B, S, H) via\n`.expand_as(inputs_embeds)` before being passed to `masked_scatter`. Since\n`masked_scatter` natively supports broadcasting, this expansion materializes\na large boolean tensor unnecessarily.\n\nChanges:\n- Remove `.expand_as(inputs_embeds)` from mask creation, keeping masks as\n  (B, S, 1) and relying on `masked_scatter`/`torch.where` broadcasting\n- Replace `inputs_embeds[mask].numel() == features.numel()` validation with\n  equivalent arithmetic `n_tokens * hidden_dim == features.numel()`, which\n  avoids data-dependent boolean indexing and is more torch.compile-friendly\n\n71 files changed (GitHub commit API summary):\nexamples/modular-transformers/modeling_new_task_model.py status=modified additions=3 deletions=5 changes=8 sha=a53755d1e2f0a9194532cdeeecba23ee4c114e54\nsrc/transformers/integrations/tensor_parallel.py status=modified additions=2 deletions=2 changes=4 sha=d6339b3bd2c6b5fea734a35a647716e34dd64849\nsrc/transformers/models/aria/modeling_aria.py status=modified additions=2 deletions=2 changes=4 sha=f0858a6ec249a2f96dc65460d0b8470789fdc5b2\nsrc/transformers/models/aya_vision/modeling_aya_vision.py status=modified additions=2 deletions=2 changes=4 sha=f74f1a85677a6ce82355e340e32092eaae2021cd\nsrc/transformers/models/blip_2/modeling_blip_2.py status=modified additions=3 deletions=3 changes=6 sha=2d325e48106a89bba1858dba545ff2f81df4e75a\nsrc/transformers/models/chameleon/modeling_chameleon.py status=modified additions=2 deletions=2 changes=4 sha=c78602881a507b281e7041ddc637574c04c7aa8a\nsrc/transformers/models/cohere2_vision/modeling_cohere2_vision.py status=modified additions=2 deletions=2 changes=4 sha=a93f60689f337326d9fcb4d6663035690067965e\nsrc/transformers/models/colqwen2/modeling_colqwen2.py status=modified additions=1 deletions=3 changes=4 sha=60c4c0f5d5593ff389c600f4e37f8ddb6f7f281e\nsrc/transformers/models/colqwen2/modular_colqwen2.py status=modified additions=1 deletions=3 changes=4 sha=6b6b96faf12b040e411daef89bbd78274927c43a\nsrc/transformers/models/deepseek_vl/modeling_deepseek_vl.py status=modified additions=2 deletions=2 changes=4 sha=ca2dbdb1ea8bb0b27d77b6b69aea9dc617f2a131\nsrc/transformers/models/deepseek_vl_hybrid/modeling_deepseek_vl_hybrid.py status=modified additions=3 deletions=3 changes=6 sha=d5f7058458dd253c25cf0820fa6c70ede4736ca7\nsrc/transformers/models/deepseek_vl_hybrid/modular_deepseek_vl_hybrid.py status=modified additions=1 deletions=1 changes=2 sha=e187e91ceaf6aa168805e8c2fbfac2e67a1f9325\nsrc/transformers/models/emu3/modeling_emu3.py status=modified additions=2 deletions=2 changes=4 sha=7d9a0b0e18f635838e93e8d11ac36825db4cdfb4\nsrc/transformers/models/emu3/modular_emu3.py status=modified additions=2 deletions=2 changes=4 sha=e37ce1eb337f1ba17c400d80721fb2560a39d2ae\nsrc/transformers/models/ernie4_5_vl_moe/modeling_ernie4_5_vl_moe.py status=modified additions=4 deletions=4 changes=8 sha=cf4c455b1a21286ea763a8acbe50552514bb6150\nsrc/transformers/models/fast_vlm/modeling_fast_vlm.py status=modified additions=2 deletions=2 changes=4 sha=53ff29d5b5580d8bcd3d703078ea893d3d1b9294\nsrc/transformers/models/florence2/modeling_florence2.py status=modified additions=2 deletions=2 changes=4 sha=6abd07dddca23af7a1ff8baef7f337d305ab9d72\nsrc/transformers/models/fuyu/modeling_fuyu.py status=modified additions=2 deletions=2 changes=4 sha=e38b4a099ea8a5ea1fa0d8252548427271dad109\nsrc/transformers/models/gemma3/modeling_gemma3.py status=modified additions=2 deletions=2 changes=4 sha=c0a88fba00cdff7db794e535f22973725b29fe9a\nsrc/transformers/models/gemma3n/modeling_gemma3n.py status=modified additions=6 deletions=6 changes=12 sha=f650f87305805d5475771dd4c99ae57c8fb4dc39\nsrc/transformers/models/gemma3n/modular_gemma3n.py status=modified additions=6 deletions=6 changes=12 sha=e210db4b474b91a60e515601fcf5ca80d185e54c\nsrc/transformers/models/glm46v/modeling_glm46v.py status=modified additions=4 deletions=4 changes=8 sha=d495c9dfd7114bc423c39e749504b190c3a10ce7\nsrc/transformers/models/glm4v/modeling_glm4v.py status=modified additions=4 deletions=4 changes=8 sha=bc929b12bb0c92caa892e9be690f047930fa6911\nsrc/transformers/models/glm4v/modular_glm4v.py status=modified additions=4 deletions=4 changes=8 sha=286a4c55e27d584f5e691e0d1dab98b94c77fa65\nsrc/transformers/models/glm4v_moe/modeling_glm4v_moe.py status=modified additions=4 deletions=4 changes=8 sha=7e518f4d3f700f087550af39236f609716d181a1\nsrc/transformers/models/glm_ocr/modeling_glm_ocr.py status=modified additions=4 deletions=4 changes=8 sha=4dc4cd8f0152f0353d96bff6a9723068fb5c6b99\nsrc/transformers/models/got_ocr2/modeling_got_ocr2.py status=modified additions=2 deletions=2 changes=4 sha=2eaad185933cde5def3143c6f8a74cbd070f1c4a\nsrc/transformers/models/higgs_audio_v2/modeling_higgs_audio_v2.py status=modified additions=1 deletions=1 changes=2 sha=eec49fca3f070b31acc99d9a7586dc984df8d79d\nsrc/transformers/models/higgs_audio_v2/modular_higgs_audio_v2.py status=modified additions=1 deletions=1 changes=2 sha=df7cde6638ad94e5f084c2e06ba1280bfa70fabf\nsrc/transformers/models/idefics2/modeling_idefics2.py status=modified additions=1 deletions=1 changes=2 sha=6554d860cc0d6dee66296d60bef8e378edb3283f\nsrc/transformers/models/idefics3/modeling_idefics3.py status=modified additions=1 deletions=1 changes=2 sha=4b38ccb37a716c6d481647a48861ea34e9045518\nsrc/transformers/models/instructblip/modeling_instructblip.py status=modified additions=2 deletions=2 changes=4 sha=1faaa9f536ba3abb279e6cb5b0fb4f0269f18936\nsrc/transformers/models/instructblipvideo/modeling_instructblipvideo.py status=modified additions=3 deletions=3 changes=6 sha=955794db2b0b4c853ce26fd46a19ac45ca7b26ea\nsrc/transformers/models/instructblipvideo/modular_instructblipvideo.py status=modified additions=2 deletions=2 changes=4 sha=f8ac671dd99b265f5a45d0149fbe310d6e5d7323\nsrc/transformers/models/internvl/modeling_internvl.py status=modified additions=2 deletions=2 changes=4 sha=7c61c4eee2b8b9565c6bf174530ae380d39b5f3e\nsrc/transformers/models/janus/modeling_janus.py status=modified additions=2 deletions=2 changes=4 sha=8b317fd370586730ed479f437c44a56e931ee53d\nsrc/transformers/models/janus/modular_janus.py status=modified additions=2 deletions=2 changes=4 sha=cff76c5a9d592464305ab184caf4463070fed191\nsrc/transformers/models/lfm2_vl/modeling_lfm2_vl.py status=modified additions=2 deletions=2 changes=4 sha=f4934a4aba83efaea6b121e9c15cc10a0d877129\nsrc/transformers/models/lfm2_vl/modular_lfm2_vl.py status=modified additions=2 deletions=2 changes=4 sha=efd966886e64f600de57150bb0dc5d907b278114\nsrc/transformers/models/lighton_ocr/modeling_lighton_ocr.py status=modified additions=2 deletions=2 changes=4 sha=110aa0bf00484eb1988dc3f5b9e5db12d2ccabdf\nsrc/transformers/models/llama4/modeling_llama4.py status=modified additions=2 deletions=2 changes=4 sha=fb6a5ef22ce568bcac2de78cf7d997d3f54f7568\nsrc/transformers/models/llava/modeling_llava.py status=modified additions=2 deletions=2 changes=4 sha=05022ed70af0a65bbe628c4cb08f01806f7cb413\nsrc/transformers/models/llava_next/modeling_llava_next.py status=modified additions=2 deletions=2 changes=4 sha=4606ec2b7380cfe09522dc2d5c15214496fe47c0\nsrc/transformers/models/llava_next_video/modeling_llava_next_video.py status=modified additions=4 deletions=4 changes=8 sha=f573d956fe835a4142dc5c3c14782ee02d5efa71\nsrc/transformers/models/llava_next_video/modular_llava_next_video.py status=modified additions=4 deletions=4 changes=8 sha=0a329d7ec3903cde7e3337c065966732bfca8694\nsrc/transformers/models/llava_onevision/modeling_llava_onevision.py status=modified additions=4 deletions=4 changes=8 sha=98fae70c96c13fffdc1a4f1c8dc8a66295e1a48a\nsrc/transformers/models/mistral3/modeling_mistral3.py status=modified additions=2 deletions=2 changes=4 sha=9887c1b9f6e42a70476ff7df22099f4ba8272d37\nsrc/transformers/models/ovis2/modeling_ovis2.py status=modified additions=3 deletions=7 changes=10 sha=1b716d3fe10393ca46a7346bc850471492414068\nsrc/transformers/models/ovis2/modular_ovis2.py status=modified additions=1 deletions=5 changes=6 sha=8790edf6b9a610394a9fb467ada9626d8f7fd185\nsrc/transformers/models/paddleocr_vl/modeling_paddleocr_vl.py status=modified additions=2 deletions=2 changes=4 sha=c879dd63e4aa59b75c82e7e73a84f7f8b94c0090\nsrc/transformers/models/paddleocr_vl/modular_paddleocr_vl.py status=modified additions=2 deletions=2 changes=4 sha=09deca722ced83ced94f17771b3e3e650b48a1f6\nsrc/transformers/models/paligemma/modeling_paligemma.py status=modified additions=4 deletions=6 changes=10 sha=0eab46d0047631a559b75f65107dda3ba5a3ce84\nsrc/transformers/models/perception_lm/modeling_perception_lm.py status=modified additions=4 deletions=4 changes=8 sha=958e6d2fc041f2350904916e92ea695d58a8ec1e\nsrc/transformers/models/perception_lm/modular_perception_lm.py status=modified additions=4 deletions=4 changes=8 sha=89f09232c296e4168078e12f4d0c720e41d0b909\nsrc/transformers/models/pi0/modeling_pi0.py status=modified additions=1 deletions=4 changes=5 sha=b023015b8d892fcd9bbd5bf95778c1f075cb8ff4\nsrc/transformers/models/pi0/modular_pi0.py status=modified additions=1 deletions=4 changes=5 sha=651117e8fbc2b7baadd8eeceb93ec139ff820690\nsrc/transformers/models/qwen2_5_omni/modeling_qwen2_5_omni.py status=modified additions=8 deletions=8 changes=16 sha=b8494ce744c1cbc178ff4f8751515541e427a4e2\nsrc/transformers/models/qwen2_5_omni/modular_qwen2_5_omni.py status=modified additions=8 deletions=8 changes=16 sha=7e6904f3cc737b7336e15a404763bb0d73766f72\nsrc/transformers/models/qwen2_5_vl/modeling_qwen2_5_vl.py status=modified additions=4 deletions=4 changes=8 sha=5f38a08863948d19dc510ad8769b14486bb65f40\nsrc/transformers/models/qwen2_audio/modeling_qwen2_audio.py status=modified additions=1 deletions=1 changes=2 sha=61d076bf62387d7928b8b2c69d3c93f792433470\nsrc/transformers/models/qwen2_vl/modeling_qwen2_vl.py status=modified additions=4 deletions=4 changes=8 sha=df4e4f82a7a895e4efab31b6c59e52ca01fb3f5f\nsrc/transformers/models/qwen3_5/modeling_qwen3_5.py status=modified additions=4 deletions=4 changes=8 sha=01ff430fce4ade1329a154b1d2e77300ffcc29ac\nsrc/transformers/models/qwen3_5_moe/modeling_qwen3_5_moe.py status=modified additions=4 deletions=4 changes=8 sha=571129da28f0d86680c7d6ceae734f7444bb1a37\nsrc/transformers/models/qwen3_omni_moe/modeling_qwen3_omni_moe.py status=modified additions=5 deletions=5 changes=10 sha=9ca4dc169a414a4ae2a65c19ab117bdbf6f6cccf\nsrc/transformers/models/qwen3_vl/modeling_qwen3_vl.py status=modified additions=4 deletions=4 changes=8 sha=6a0bfb6ba3b9e074abce6a9588043e4739552826\nsrc/transformers/models/qwen3_vl_moe/modeling_qwen3_vl_moe.py status=modified additions=4 deletions=4 changes=8 sha=0fa0f1c5b6d3d3881e6047eded4c17af9428ec54\nsrc/transformers/models/t5gemma2/modeling_t5gemma2.py status=modified additions=2 deletions=2 changes=4 sha=18b9699236544db90cc4a13cb697a67da06a930f\nsrc/transformers/models/t5gemma2/modular_t5gemma2.py status=modified additions=2 deletions=2 changes=4 sha=e4e7590e48293e4a1cbdecfe52afcd64bdd93b66\nsrc/transformers/models/video_llama_3/modeling_video_llama_3.py status=modified additions=4 deletions=4 changes=8 sha=f40fcf4274175db78d0a972ec3ddcef855e6d98b\nsrc/transformers/models/video_llava/modeling_video_llava.py status=modified additions=4 deletions=4 changes=8 sha=a1cf18804ca75b4ce51425ca1f9ab5e3bfb63f87\nsrc/transformers/models/vipllava/modeling_vipllava.py status=modified additions=2 deletions=2 changes=4 sha=14dc0966783cca7e388a97b867450bce2f47552c",
+      "links": [
+        "license:68b7d66c97d66c58de883ed0c451af2b3183e6f3"
+      ],
+      "attributes": {
+        "sha": "2c60842a95d588de006c818ea72e1fd1724b919c"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/commits/2c60842a95d588de006c818ea72e1fd1724b919c"
+    },
+    {
+      "id": "pull_request:44907",
+      "kind": "pull_request",
+      "occurred_at": "2026-03-21T06:07:35Z",
+      "text": "Pull request #44907: Remove unnecessary expand_as in get_placeholder_mask across VLMs\n\nFixes #44906\n\n## Summary\n\n- Remove `.expand_as(inputs_embeds)` from placeholder mask creation in `get_placeholder_mask` and equivalent inline patterns across all VLM models. `masked_scatter` natively broadcasts `(B, S, 1)` → `(B, S, H)`, making the expansion unnecessary.\n- Replace `inputs_embeds[special_image_mask].numel() == image_features.numel()` validation with equivalent arithmetic `n_tokens * inputs_embeds.shape[-1] == image_features.numel()`, which avoids data-dependent boolean indexing and is more `torch.compile`-friendly.\n- 71 files changed across llava, qwen2_vl, paligemma, gemma3n, chameleon, video_llava, idefics2/3, instructblip, blip_2, and many more.\n\n## How this was developed\n\nThe core fix was first implemented and verified on `llava/modeling_llava.py`, then expanded to all other models following the same pattern using [Claude Code](https://claude.com/claude-code). Each file was reviewed to ensure the transformation was appropriate — files with genuinely different `expand_as` usage (e.g., `pe_audio` where the mask is later `.reshape()`-ed) were left unchanged.\n\n## Test plan\n\n- [x] Correctness verified: `masked_scatter` with broadcast `(B,S,1)` mask produces identical results to expanded `(B,S,H)` mask\n- [x] `pytest tests/models/llava/test_modeling_llava.py -x -v -k \"not slow\"` — 136 passed\n- [x] `pytest tests/models/qwen2_vl/test_modeling_qwen2_vl.py -x -v -k \"not slow\"` — 137 passed\n- [x] `pytest tests/models/paligemma/test_modeling_paligemma.py -x -v -k \"not slow\"` — 124 passed\n- [x] `ruff check` — all checks passed\n- [x] `check_modular_conversion.py --fix_and_overwrite` — all generated files consistent\n- [x] No duplicate PRs found (`gh pr list --search \"expand_as placeholder mask\"` / `\"get_placeholder_mask\"`)\n\nThis PR uses AI assistance (Claude Code). I have reviewed all changes and validated the behavior end-to-end.",
+      "links": [
+        "commit:2c60842a95d588de006c818ea72e1fd1724b919c"
+      ],
+      "attributes": {
+        "number": 44907,
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/pulls/44907"
+    },
+    {
+      "id": "ci:68001707235",
+      "kind": "ci_run",
+      "occurred_at": "2026-03-21T06:07:46Z",
+      "text": "CI check Get PR number / Get PR number for 2c60842a95d588de006c818ea72e1fd1724b919c\nrun_id=68001707235 status=completed conclusion=success",
+      "links": [
+        "commit:2c60842a95d588de006c818ea72e1fd1724b919c"
+      ],
+      "attributes": {
+        "head_sha": "2c60842a95d588de006c818ea72e1fd1724b919c",
+        "name": "Get PR number / Get PR number",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-03-21T06:07:43Z",
+        "completed_at": "2026-03-21T06:07:46Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/68001707235"
+    },
+    {
+      "id": "ci:68001713304",
+      "kind": "ci_run",
+      "occurred_at": "2026-03-21T06:07:55Z",
+      "text": "CI check Get PR commit SHA / Get PR commit SHA better for 2c60842a95d588de006c818ea72e1fd1724b919c\nrun_id=68001713304 status=completed conclusion=success",
+      "links": [
+        "commit:2c60842a95d588de006c818ea72e1fd1724b919c"
+      ],
+      "attributes": {
+        "head_sha": "2c60842a95d588de006c818ea72e1fd1724b919c",
+        "name": "Get PR commit SHA / Get PR commit SHA better",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-03-21T06:07:51Z",
+        "completed_at": "2026-03-21T06:07:55Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/68001713304"
+    },
+    {
+      "id": "ci:68001719515",
+      "kind": "ci_run",
+      "occurred_at": "2026-03-21T06:08:31Z",
+      "text": "CI check Get test files to run for 2c60842a95d588de006c818ea72e1fd1724b919c\nrun_id=68001719515 status=completed conclusion=success",
+      "links": [
+        "commit:2c60842a95d588de006c818ea72e1fd1724b919c"
+      ],
+      "attributes": {
+        "head_sha": "2c60842a95d588de006c818ea72e1fd1724b919c",
+        "name": "Get test files to run",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-03-21T06:07:59Z",
+        "completed_at": "2026-03-21T06:08:31Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/68001719515"
+    },
+    {
+      "id": "ci:68001742410",
+      "kind": "ci_run",
+      "occurred_at": "2026-03-21T06:08:39Z",
+      "text": "CI check Send a comment to suggest jobs to run for 2c60842a95d588de006c818ea72e1fd1724b919c\nrun_id=68001742410 status=completed conclusion=success",
+      "links": [
+        "commit:2c60842a95d588de006c818ea72e1fd1724b919c"
+      ],
+      "attributes": {
+        "head_sha": "2c60842a95d588de006c818ea72e1fd1724b919c",
+        "name": "Send a comment to suggest jobs to run",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-03-21T06:08:36Z",
+        "completed_at": "2026-03-21T06:08:39Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/68001742410"
+    },
+    {
+      "id": "ci:68001751602",
+      "kind": "ci_run",
+      "occurred_at": "2026-03-21T06:08:43Z",
+      "text": "CI check run_tests for 2c60842a95d588de006c818ea72e1fd1724b919c\nrun_id=68001751602 status=completed conclusion=cancelled",
+      "links": [
+        "commit:2c60842a95d588de006c818ea72e1fd1724b919c"
+      ],
+      "attributes": {
+        "head_sha": "2c60842a95d588de006c818ea72e1fd1724b919c",
+        "name": "run_tests",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-03-21T06:08:44Z",
+        "completed_at": "2026-03-21T06:08:43Z",
+        "app_id": 18001,
+        "app_slug": "circleci-checks"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/68001751602"
+    },
+    {
+      "id": "ci:68001707183",
+      "kind": "ci_run",
+      "occurred_at": "2026-03-21T06:08:44Z",
+      "text": "CI check setup_and_quality for 2c60842a95d588de006c818ea72e1fd1724b919c\nrun_id=68001707183 status=completed conclusion=cancelled",
+      "links": [
+        "commit:2c60842a95d588de006c818ea72e1fd1724b919c"
+      ],
+      "attributes": {
+        "head_sha": "2c60842a95d588de006c818ea72e1fd1724b919c",
+        "name": "setup_and_quality",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-03-21T06:07:38Z",
+        "completed_at": "2026-03-21T06:08:44Z",
+        "app_id": 18001,
+        "app_slug": "circleci-checks"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/68001707183"
+    },
+    {
+      "id": "commit:ac13017cce9d64b862d30b3c732ba35ac2ece924",
+      "kind": "commit",
+      "occurred_at": "2026-03-21T06:09:34Z",
+      "text": "commit ac13017cce9d64b862d30b3c732ba35ac2ece924\nFix ruff formatting in examples/modular-transformers\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <[redacted-email]>\n\ndiff -- examples/modular-transformers/modeling_new_task_model.py\n@@ -173,8 +173,8 @@ def create_causal_mask_mapping(\n     # from `forward` call. If users run a `forward` call, we have no option to infer `is_first_iteration` because users may be\n     # running generation with custom loop. Thus we need to infer it in a `non-perfect` way\n     # NOTE: Determining prefill in that case requires checking data values, which is not compile-compatible.\n-    is_first_iteration = (\n-        is_first_iteration or (past_key_values is None or not past_key_values.is_initialized or pixel_values is not None)\n+    is_first_iteration = is_first_iteration or (\n+        past_key_values is None or not past_key_values.is_initialized or pixel_values is not None\n     )\n \n     if is_first_iteration or not kwargs.get(\"use_cache\", True):",
+      "links": [
+        "license:68b7d66c97d66c58de883ed0c451af2b3183e6f3"
+      ],
+      "attributes": {
+        "sha": "ac13017cce9d64b862d30b3c732ba35ac2ece924",
+        "redactions": [
+          "email"
+        ]
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/commits/ac13017cce9d64b862d30b3c732ba35ac2ece924"
+    },
+    {
+      "id": "ci:68001789101",
+      "kind": "ci_run",
+      "occurred_at": "2026-03-21T06:09:46Z",
+      "text": "CI check Get PR number / Get PR number for ac13017cce9d64b862d30b3c732ba35ac2ece924\nrun_id=68001789101 status=completed conclusion=success",
+      "links": [
+        "commit:ac13017cce9d64b862d30b3c732ba35ac2ece924"
+      ],
+      "attributes": {
+        "head_sha": "ac13017cce9d64b862d30b3c732ba35ac2ece924",
+        "name": "Get PR number / Get PR number",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-03-21T06:09:43Z",
+        "completed_at": "2026-03-21T06:09:46Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/68001789101"
+    },
+    {
+      "id": "ci:68001793159",
+      "kind": "ci_run",
+      "occurred_at": "2026-03-21T06:09:57Z",
+      "text": "CI check Get PR commit SHA / Get PR commit SHA better for ac13017cce9d64b862d30b3c732ba35ac2ece924\nrun_id=68001793159 status=completed conclusion=success",
+      "links": [
+        "commit:ac13017cce9d64b862d30b3c732ba35ac2ece924"
+      ],
+      "attributes": {
+        "head_sha": "ac13017cce9d64b862d30b3c732ba35ac2ece924",
+        "name": "Get PR commit SHA / Get PR commit SHA better",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-03-21T06:09:51Z",
+        "completed_at": "2026-03-21T06:09:57Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/68001793159"
+    },
+    {
+      "id": "ci:68001707193",
+      "kind": "ci_run",
+      "occurred_at": "2026-03-21T06:10:04Z",
+      "text": "CI check comment for 2c60842a95d588de006c818ea72e1fd1724b919c\nrun_id=68001707193 status=completed conclusion=success",
+      "links": [
+        "commit:2c60842a95d588de006c818ea72e1fd1724b919c"
+      ],
+      "attributes": {
+        "head_sha": "2c60842a95d588de006c818ea72e1fd1724b919c",
+        "name": "comment",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-03-21T06:07:43Z",
+        "completed_at": "2026-03-21T06:10:04Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/68001707193"
+    },
+    {
+      "id": "ci:68001801862",
+      "kind": "ci_run",
+      "occurred_at": "2026-03-21T06:10:33Z",
+      "text": "CI check Get test files to run for ac13017cce9d64b862d30b3c732ba35ac2ece924\nrun_id=68001801862 status=completed conclusion=success",
+      "links": [
+        "commit:ac13017cce9d64b862d30b3c732ba35ac2ece924"
+      ],
+      "attributes": {
+        "head_sha": "ac13017cce9d64b862d30b3c732ba35ac2ece924",
+        "name": "Get test files to run",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-03-21T06:10:01Z",
+        "completed_at": "2026-03-21T06:10:33Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/68001801862"
+    },
+    {
+      "id": "ci:68001834164",
+      "kind": "ci_run",
+      "occurred_at": "2026-03-21T06:10:44Z",
+      "text": "CI check Send a comment to suggest jobs to run for ac13017cce9d64b862d30b3c732ba35ac2ece924\nrun_id=68001834164 status=completed conclusion=success",
+      "links": [
+        "commit:ac13017cce9d64b862d30b3c732ba35ac2ece924"
+      ],
+      "attributes": {
+        "head_sha": "ac13017cce9d64b862d30b3c732ba35ac2ece924",
+        "name": "Send a comment to suggest jobs to run",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-03-21T06:10:39Z",
+        "completed_at": "2026-03-21T06:10:44Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/68001834164"
+    },
+    {
+      "id": "ci:68001788882",
+      "kind": "ci_run",
+      "occurred_at": "2026-03-21T06:16:07Z",
+      "text": "CI check setup_and_quality for ac13017cce9d64b862d30b3c732ba35ac2ece924\nrun_id=68001788882 status=completed conclusion=success",
+      "links": [
+        "commit:ac13017cce9d64b862d30b3c732ba35ac2ece924"
+      ],
+      "attributes": {
+        "head_sha": "ac13017cce9d64b862d30b3c732ba35ac2ece924",
+        "name": "setup_and_quality",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-03-21T06:09:40Z",
+        "completed_at": "2026-03-21T06:16:07Z",
+        "app_id": 18001,
+        "app_slug": "circleci-checks"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/68001788882"
+    },
+    {
+      "id": "ci:68001831585",
+      "kind": "ci_run",
+      "occurred_at": "2026-03-21T06:21:15Z",
+      "text": "CI check run_tests for ac13017cce9d64b862d30b3c732ba35ac2ece924\nrun_id=68001831585 status=completed conclusion=success",
+      "links": [
+        "commit:ac13017cce9d64b862d30b3c732ba35ac2ece924"
+      ],
+      "attributes": {
+        "head_sha": "ac13017cce9d64b862d30b3c732ba35ac2ece924",
+        "name": "run_tests",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-03-21T06:10:30Z",
+        "completed_at": "2026-03-21T06:21:15Z",
+        "app_id": 18001,
+        "app_slug": "circleci-checks"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/68001831585"
+    },
+    {
+      "id": "ci:68001789109",
+      "kind": "ci_run",
+      "occurred_at": "2026-03-21T06:21:34Z",
+      "text": "CI check comment for ac13017cce9d64b862d30b3c732ba35ac2ece924\nrun_id=68001789109 status=completed conclusion=success",
+      "links": [
+        "commit:ac13017cce9d64b862d30b3c732ba35ac2ece924"
+      ],
+      "attributes": {
+        "head_sha": "ac13017cce9d64b862d30b3c732ba35ac2ece924",
+        "name": "comment",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-03-21T06:09:43Z",
+        "completed_at": "2026-03-21T06:21:34Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/68001789109"
+    },
+    {
+      "id": "review:4457037207",
+      "kind": "review",
+      "occurred_at": "2026-06-09T09:02:33Z",
+      "text": "review_id=4457037207 state=APPROVED\nNice, can you resolve conflicts, then I will trigger integration tests",
+      "links": [
+        "pull_request:44907",
+        "commit:ac13017cce9d64b862d30b3c732ba35ac2ece924"
+      ],
+      "attributes": {
+        "state": "APPROVED"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/pulls/44907/reviews/4457037207"
+    },
+    {
+      "id": "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+      "kind": "commit",
+      "occurred_at": "2026-06-11T08:51:26Z",
+      "text": "commit 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nMerge branch 'main' into remove-expand-as-placeholder-mask\n\n300 files changed (GitHub commit API summary):\n.ai/AGENTS.md status=modified additions=3 deletions=3 changes=6 sha=c570fc820451ca6f07c19bef3756fc05aec153fb\n.circleci/config.yml status=modified additions=26 deletions=26 changes=52 sha=aab5108fda06c634be8fa86260ddab089506f1bd\n.circleci/create_circleci_config.py status=modified additions=150 deletions=76 changes=226 sha=de0646af2dbf4d191ed22be6ed3cb4845ea74808\n.github/PULL_REQUEST_TEMPLATE.md status=modified additions=15 deletions=0 changes=15 sha=37fcea5ca3d2515ba8059d7bc0378258522abe49\n.github/conda/meta.yaml status=modified additions=2 deletions=2 changes=4 sha=3f6eee840e357fdbd5687ff0355ec7b0c96acd02\n.github/dependabot.yml status=added additions=11 deletions=0 changes=11 sha=15f7bdd7916ac5fca2274ad5d1239bafe0f0f5a2\n.github/workflows/add-model-like.yml status=modified additions=8 deletions=3 changes=11 sha=89c92793eb03a2ef4af98e1f5b8c471fe288d38f\n.github/workflows/anti-slop.yml status=added additions=68 deletions=0 changes=68 sha=63551eedf3e192f5a7fb56795ca50b022353efe5\n.github/workflows/assign-reviewers.yml status=modified additions=8 deletions=3 changes=11 sha=3a34dd151170e106645fc370174548d09ec674e1\n.github/workflows/benchmark.yml status=modified additions=6 deletions=2 changes=8 sha=146d6735b823a75d2889272f887b2615fe9a3774\n.github/workflows/benchmark_v2.yml status=modified additions=41 deletions=7 changes=48 sha=26b8ff6b81522e3e76273d7b435bd41cdb62f7f7\n.github/workflows/benchmark_v2_a10_caller.yml status=modified additions=3 deletions=0 changes=3 sha=ff50ef35fa5f505d3071e4c543f1d75bbfb136a3\n.github/workflows/benchmark_v2_mi325_caller.yml status=modified additions=3 deletions=0 changes=3 sha=8b7f483ef61ccbced59aed8dc8392123e79a3489\n.github/workflows/build-ci-docker-images.yml status=modified additions=13 deletions=6 changes=19 sha=e6dd244d2352ea05ce9f43609e9c0fd73b96bf9c\n.github/workflows/build-docker-images.yml status=modified additions=53 deletions=36 changes=89 sha=2ea78e84a4e88c19e41b71fc355acaa6265154fb\n.github/workflows/build-nightly-ci-docker-images.yml status=modified additions=15 deletions=8 changes=23 sha=19ba6b0595a8271dbb8d69ccc7ec37c6ff46ff6a\n.github/workflows/build-past-ci-docker-images.yml status=modified additions=15 deletions=8 changes=23 sha=71c15a5dc3f8237c5b58322cedbf7ea86aa51a71\n.github/workflows/build_documentation.yml status=modified additions=6 deletions=3 changes=9 sha=125c417fb0df17a99df9f8ae15b6b7980d8dcae9\n.github/workflows/build_pr_documentation.yml status=modified additions=4 deletions=1 changes=5 sha=f97367d5ec624371465e7a53613cafc01c32a7e4\n.github/workflows/check-workflow-permissions.yml status=modified additions=4 deletions=1 changes=5 sha=70a2940b89ae030c13629b620d1d9641ab7cbd1b\n.github/workflows/check_failed_tests.yml status=modified additions=142 deletions=43 changes=185 sha=040d8c562d7b452c9e581c3c729d15e78d868819\n.github/workflows/check_tiny_models.yml status=modified additions=25 deletions=44 changes=69 sha=67da78756ea650c7944df7236cb40b748c33f0d9\n.github/workflows/circleci-failure-summary-comment.yml status=modified additions=30 deletions=12 changes=42 sha=262325693898d161b96c3f167565d52cdaba2f2c\n.github/workflows/codeql.yml status=modified additions=4 deletions=1 changes=5 sha=61a30fd50ce3d8d4b437a1e99fb486b483634cca\n.github/workflows/collated-reports.yml status=modified additions=18 deletions=9 changes=27 sha=c28a9bc44a23959b8b6d09a17a710a1b7337696c\n.github/workflows/dependents-smoke-test.yml status=added additions=57 deletions=0 changes=57 sha=e65dad58dc2e95e9a93d265404737b4bab4fbae6\n.github/workflows/doctest_job.yml status=modified additions=10 deletions=5 changes=15 sha=d22eca04d72b346e32118c5da45f312e4e73f70e\n.github/workflows/doctests.yml status=modified additions=8 deletions=3 changes=11 sha=0ad9e43475ddc9046c9686f0da7c1a15abc023fd\n.github/workflows/extras-smoke-test.yml status=modified additions=25 deletions=12 changes=37 sha=74008aa9c5a55cb6dbe62360d5911c9b30a28f3c\n.github/workflows/get-pr-info.yml status=modified additions=13 deletions=6 changes=19 sha=d2ac95d528ef1240d3dcd3d65a5febcc22355e5e\n.github/workflows/get-pr-number.yml status=modified additions=3 deletions=0 changes=3 sha=eca10435fc31eaa84a01501211f6b1be59427adb\n.github/workflows/model_jobs.yml status=modified additions=5 deletions=2 changes=7 sha=cc58cefca84081962d0c0e20e54431028d6ab270\n.github/workflows/model_jobs_intel_gaudi.yml status=modified additions=41 deletions=18 changes=59 sha=9edcdfd5e2613e69363e0e60e747ceeaab421a6d\n.github/workflows/new_model_pr_merged_notification.yml status=modified additions=7 deletions=3 changes=10 sha=5d8293baeb7060ccbf19709be4090e4a6256d2f8\n.github/workflows/pr-ci-caller.yml status=added additions=43 deletions=0 changes=43 sha=46a1c7c8d35dbae2e2808db6f07dfe0b77c49fd5\n.github/workflows/pr-ci-post-dashboard-link.yml status=added additions=88 deletions=0 changes=88 sha=b892a3c3876d301237a136e044d847c28fa20ea0\n.github/workflows/pr-ci-security-gate.yml status=added additions=47 deletions=0 changes=47 sha=52a70da736bc3a31c2bbd99f17106bbb9cd94556\n.github/workflows/pr-repo-consistency-bot.yml status=modified additions=71 deletions=45 changes=116 sha=af8a2f2e91e2d8944fee85eb3bc13274a37f4aa7\n.github/workflows/pr_build_doc_with_comment.yml status=modified additions=11 deletions=7 changes=18 sha=d58602be41148d6fc0ee418277f2e5c994859737\n.github/workflows/pr_slow_ci_suggestion.yml status=modified additions=55 deletions=33 changes=88 sha=7bef7e8b9ef8227f9a5efd5bfacfec1dc1f7469b\n.github/workflows/push-important-models.yml status=modified additions=7 deletions=2 changes=9 sha=3aa6f717a3e9b9b883cc0b16a7333a31043bdcf8\n.github/workflows/release-conda.yml status=modified additions=7 deletions=2 changes=9 sha=e8e72aaa9700e8a711186138cd95d8bd83340a16\n.github/workflows/release.yml status=modified additions=18 deletions=6 changes=24 sha=22eb789d180a542df89905c4dcb884e2f64d4630\n.github/workflows/self-comment-ci.yml status=modified additions=6 deletions=4 changes=10 sha=104b23d090f004dcd79bbcf923e23f8948d0ec33\n.github/workflows/self-nightly-caller.yml status=modified additions=9 deletions=3 changes=12 sha=d700d1171d5881156ac2e7fc3a0ae1a394be3325\n.github/workflows/self-nightly-past-ci-caller.yml status=modified additions=102 deletions=99 changes=201 sha=ea7dd24c332b9c4bedd5b70f0df60d9a90f1ac07\n.github/workflows/self-past-caller.yml status=modified additions=3 deletions=0 changes=3 sha=4e9e8c0429d31ca944d1ac1eb4fd9336aa3b65e3\n.github/workflows/self-scheduled-amd-caller.yml status=modified additions=3 deletions=0 changes=3 sha=1e9e8df2f4d1fd143e78dae1847f4882b0dcc55b\n.github/workflows/self-scheduled-amd-mi250-caller.yml status=modified additions=7 deletions=4 changes=11 sha=ac68be46b2d6e02af33f49ab66cfde3ec863cf6e\n.github/workflows/self-scheduled-amd-mi325-caller.yml status=modified additions=5 deletions=0 changes=5 sha=77e84f8a79a6ea52efd8bbde9e7bd47d5e41e4ba\n.github/workflows/self-scheduled-amd-mi355-caller.yml status=modified additions=7 deletions=4 changes=11 sha=3a03cf9946a57832e08642e4f8c42909426c78e5\n.github/workflows/self-scheduled-caller.yml status=modified additions=4 deletions=1 changes=5 sha=ba34398694a9b9bc89a7175a61229b5d2880ff00\n.github/workflows/self-scheduled-flash-attn-caller.yml status=modified additions=9 deletions=3 changes=12 sha=ac3b3583db6294f95ce08ebe108cb80205ee0c7e\n.github/workflows/self-scheduled-intel-gaudi.yml status=modified additions=29 deletions=20 changes=49 sha=50d660c7866a812b2e3fbe1fd559a27b07cf09a8\n.github/workflows/self-scheduled-intel-gaudi3-caller.yml status=modified additions=3 deletions=0 changes=3 sha=b6b4a564cee03bb08a865b053bd9f663609c5a63\n.github/workflows/self-scheduled.yml status=modified additions=16 deletions=8 changes=24 sha=115130d0e8e4d97470543833d792fe7dd5436ea9\n.github/workflows/slack-report.yml status=modified additions=21 deletions=4 changes=25 sha=73b44c35f083058bd2a8770166dbd447484a81c9\n.github/workflows/ssh-runner.yml status=modified additions=5 deletions=28 changes=33 sha=78ec4c12fba3d81b5eef24de882d8b85d871b756\n.github/workflows/stale.yml status=modified additions=7 deletions=2 changes=9 sha=ac202fa416c890cb39ad3ed876ef799d5c2fc399\n.github/workflows/trl-ci-bot.yml status=modified additions=15 deletions=8 changes=23 sha=194a12066c83b85400858bca33550b37314cf8a7\n.github/workflows/trufflehog.yml status=modified additions=3 deletions=2 changes=5 sha=0031c8784e5647b999d25e14111e702b48b74a25\n.github/workflows/update_metdata.yml status=modified additions=10 deletions=3 changes=13 sha=745906fbe5a0965951face42b392437af111c4e2\n.github/workflows/upload_pr_documentation.yml status=modified additions=4 deletions=1 changes=5 sha=b2763986a9b9cd874ba82e83020949dcd5ef4b53\n.gitignore status=modified additions=2 deletions=2 changes=4 sha=903efc854eef91fddd24887e1831506f27ba2c57\nCITATION.cff status=modified additions=1 deletions=1 changes=2 sha=166accc514f38771de994330fe61dd33244e5dbb\nCONTRIBUTING.md status=modified additions=168 deletions=458 changes=626 sha=5b74c3559385529b49a3a90bca6c38a48de1710d\nMIGRATION_GUIDE_V5.md status=modified additions=96 deletions=38 changes=134 sha=88927f26efe6eb6409aaa83a8d678dd5e608b207\nMakefile status=modified additions=51 deletions=60 changes=111 sha=c10e05fd993967f8aae09bacd75e31367ee27131\nREADME.md status=modified additions=7 deletions=6 changes=13 sha=71a6d3d3f7d321418f75beec9e8410ac460af8b0\nbenchmark_v2/benchmark_scripts/continuous_batching_overall.py status=modified additions=465 deletions=55 changes=520 sha=f90ea7edbfa8f5b27dacd73d5a72b7e228b41ce5\nconftest.py status=modified additions=23 deletions=0 changes=23 sha=3970d3ffee9bf5d326127bb29cad2e46a847080f\ndocker/consistency.dockerfile status=modified additions=1 deletions=1 changes=2 sha=37e4b8e41f9c666ae95ecd228a7347584f27b0a0\ndocker/custom-tokenizers.dockerfile status=modified additions=1 deletions=1 changes=2 sha=f688fa34cc02ed1672871aabbc73b22b2b27f4ec\ndocker/examples-torch.dockerfile status=modified additions=1 deletions=1 changes=2 sha=bbc1fe78020ae95d1297ce641b2bd7b404b23fbc\ndocker/exotic-models.dockerfile status=modified additions=1 deletions=1 changes=2 sha=97ed36a8d2d932acd963a03883e09373b93bed1f\ndocker/pipeline-torch.dockerfile status=modified additions=1 deletions=1 changes=2 sha=96da01f31123d05d1d0b07501f70ed804eb1f129\ndocker/quality.dockerfile status=modified additions=1 deletions=1 changes=2 sha=c2cc6c87e730ebbb5fefd06ddd26c088dbafbf56\ndocker/torch-light.dockerfile status=modified additions=1 deletions=1 changes=2 sha=36cc359b23d72687414fa4c64ee2bc432bed0f96\ndocker/transformers-all-latest-gpu/Dockerfile status=modified additions=5 deletions=2 changes=7 sha=bd3de7b27311707bb15b45d9d81c10a1339e1a4f\ndocker/transformers-doc-builder/Dockerfile status=modified additions=6 deletions=2 changes=8 sha=94983c7a43b5ffd3259d0b24eb6fe5900a7ba455\ndocker/transformers-pytorch-amd-gpu/Dockerfile status=modified additions=22 deletions=11 changes=33 sha=4fdfde3dd415c258fd29c47ec9abfc8d3dc4908d\ndocker/transformers-pytorch-deepspeed-latest-gpu/Dockerfile status=modified additions=5 deletions=0 changes=5 sha=e78d7faf1db1115b3f9c1d033b77451a16c9bbaf\ndocker/transformers-pytorch-deepspeed-nightly-gpu/Dockerfile status=modified additions=5 deletions=0 changes=5 sha=5e35d639ab499ab2a8ad1ac156895a31020bb60e\ndocs/README.md status=modified additions=94 deletions=296 changes=390 sha=974515e3a09cf9cce65fc20babe48c0ce5261268\ndocs/source/en/_redirects.yml status=modified additions=2 deletions=0 changes=2 sha=c95556bb970f7e22c09f0a3fba24c62561b0221a\ndocs/source/en/_toctree.yml status=modified additions=142 deletions=25 changes=167 sha=3c776a0c8d3ca6ea51d31e6aa25e512177378166\ndocs/source/en/add_audio_processing_components.md status=added additions=103 deletions=0 changes=103 sha=353fa3bc58936626d5a563f6c16806e82632314b\ndocs/source/en/add_new_model.md status=modified additions=3 deletions=18 changes=21 sha=a99e47a76223502b73e594a101e72e460e113204\ndocs/source/en/add_vision_processing_components.md status=added additions=233 deletions=0 changes=233 sha=96e12c3ba33254c5d6d316240e4c00ce77c44106\ndocs/source/en/attention_interface.md status=modified additions=158 deletions=9 changes=167 sha=af422a99f528e06360bff58052aaeed1c55f39a1\ndocs/source/en/auto_docstring.md status=modified additions=204 deletions=126 changes=330 sha=54d68062376c024361ffd08b79d7f95f750d9bd6\ndocs/source/en/chat_extras.md status=modified additions=6 deletions=2 changes=8 sha=49709fd8495a4dc01328c703d4479aac9a74d31d\ndocs/source/en/chat_response_parsing.md status=added additions=235 deletions=0 changes=235 sha=709eafc9cfb508816ad23794dd656a44e7f0f392\ndocs/source/en/chat_templating.md status=modified additions=13 deletions=0 changes=13 sha=6f895ce6f1810b36b7926c9d980d27bff8078164\ndocs/source/en/chat_templating_multimodal.md status=modified additions=1 deletions=1 changes=2 sha=689c353b1fa9e19938927a5143590153377b58f0\ndocs/source/en/continuous_batching.md status=modified additions=307 deletions=78 changes=385 sha=d07ff096d907849abae3cb9055d9ee849c12beb4\ndocs/source/en/continuous_batching_architecture.md status=added additions=180 deletions=0 changes=180 sha=ee729ce117a8aadeb29a9480a1fb0027dde42873\ndocs/source/en/debugging.md status=modified additions=225 deletions=164 changes=389 sha=27f1221ed993bb6387ef6b72b1989ab78adf104d\ndocs/source/en/deepspeed.md status=modified additions=174 deletions=995 changes=1169 sha=df6233600f0a3d1a1381b6d48976874fafbb39f1\ndocs/source/en/deepspeed_alst.md status=added additions=159 deletions=0 changes=159 sha=820592fb66808597027a959d9d579c45390e033a\ndocs/source/en/experts_interface.md status=modified additions=107 deletions=21 changes=128 sha=1618c202cd1efc11752c414da9797593b87226bc\ndocs/source/en/fusion_mapping.md status=added additions=99 deletions=0 changes=99 sha=2e4fd57305beaef9bd177887bfed8f73d1f18e72\ndocs/source/en/grad_accumulation.md status=added additions=65 deletions=0 changes=65 sha=e08aea0ee67e10613e06ae850c340dcb777317eb\ndocs/source/en/grad_checkpointing.md status=added additions=50 deletions=0 changes=50 sha=f29d8ef793345a3a9114d40f78adcfdaa3b41a93\ndocs/source/en/hpo_train.md status=modified additions=56 deletions=69 changes=125 sha=b1a657c16435d30eba8476985040116ae0798a0d\ndocs/source/en/image_processors.md status=modified additions=2 deletions=1 changes=3 sha=a109bd9250a14778cab25599df7cfc7b7ded21fa\ndocs/source/en/internal/generation_utils.md status=modified additions=2 deletions=0 changes=2 sha=3ffb05e5fc2895dc3cda733db41dece31f013e69\ndocs/source/en/internal/rope_utils.md status=modified additions=2 deletions=2 changes=4 sha=797bd2bc8ea8a7f154d388d23a5fc989cb328390\ndocs/source/en/kernels.md status=added additions=82 deletions=0 changes=82 sha=57ca55c1a95cce81eaabe6ba23ab7b054bba7c45\ndocs/source/en/kv_cache.md status=modified additions=2 deletions=2 changes=4 sha=8b5da7577629668dfc183c53ba1ed8602bf2f300\ndocs/source/en/main_classes/continuous_batching.md status=added additions=33 deletions=0 changes=33 sha=d59370f69cea1bc066e48f56e3f48a06b63bd9ed\ndocs/source/en/main_classes/image_processor.md status=modified additions=1 deletions=1 changes=2 sha=02a3698a78327c5a78140c675d3d2a1c64087189\ndocs/source/en/main_classes/peft.md status=modified additions=3 deletions=1 changes=4 sha=174e9d6e5e1b86efd51ba61f524881760e5c30d8\ndocs/source/en/main_classes/processors.md status=modified additions=6 deletions=0 changes=6 sha=584d5f91789348f87aaffb65a6886265a8888295\ndocs/source/en/mixed_precision_training.md status=added additions=69 deletions=0 changes=69 sha=474b708aca810a0c260a26f1604b68f802737991\ndocs/source/en/model_doc/afmoe.md status=modified additions=8 deletions=9 changes=17 sha=46634655251436ffd156c0307002451331a7ae70\ndocs/source/en/model_doc/aimv2.md status=modified additions=9 deletions=5 changes=14 sha=c6c07c7e36fe078a512c9a302d431045fd733c4f\ndocs/source/en/model_doc/albert.md status=modified additions=6 deletions=6 changes=12 sha=be7c33f3d82373a2dca19b38e314193db8d8ca4f\ndocs/source/en/model_doc/align.md status=modified additions=10 deletions=10 changes=20 sha=c8131874d9812b3818b2558775fb2ca34e0dff00\ndocs/source/en/model_doc/altclip.md status=modified additions=9 deletions=12 changes=21 sha=51dece8c857474924c2667d11971b3525c0f4e8d\ndocs/source/en/model_doc/apertus.md status=modified additions=6 deletions=9 changes=15 sha=05e0f1e31a2e6621158c11c68b9c2cc5adb1eaa5\ndocs/source/en/model_doc/arcee.md status=modified additions=8 deletions=9 changes=17 sha=47d6fb05a59cdfe121c6c003ff37bb01dae6fbe5\ndocs/source/en/model_doc/aria.md status=modified additions=11 deletions=11 changes=22 sha=bdd9f55509b3bb1a82afee0ba616bc7ed8b9feb0\ndocs/source/en/model_doc/audio-spectrogram-transformer.md status=modified additions=5 deletions=4 changes=9 sha=19b251657e6d2ea3491d3dae1f5aa789c40feb50\ndocs/source/en/model_doc/audioflamingo3.md status=modified additions=26 deletions=16 changes=42 sha=aba0b8120c343845aa6bf741fb08cc7975ac1ab9\ndocs/source/en/model_doc/auto.md status=modified additions=22 deletions=1 changes=23 sha=f740359ce41cdc4521973a87cd74bb37f02d33c1\ndocs/source/en/model_doc/autoformer.md status=modified additions=1 deletions=4 changes=5 sha=85d5ffef024ace45cdf28fb140134f3f0d319f18\ndocs/source/en/model_doc/aya_vision.md status=modified additions=11 deletions=17 changes=28 sha=8fb7c86e0eafaedab33671f44a9624ecd16911e5\ndocs/source/en/model_doc/bamba.md status=modified additions=5 deletions=7 changes=12 sha=c2910cb6a23f80b39e6545c48f9e06a52e69ea39\ndocs/source/en/model_doc/bark.md status=modified additions=30 deletions=34 changes=64 sha=2585db4e15acd6bbae62c06dd4f5ca6ac6ec2256\ndocs/source/en/model_doc/bart.md status=modified additions=8 deletions=10 changes=18 sha=b3ee9dddc69366621185e3e713aad2c54bb225b3\ndocs/source/en/model_doc/barthez.md status=modified additions=6 deletions=11 changes=17 sha=b062d2ab72c311acd72c58d20aac59de8974e465\ndocs/source/en/model_doc/bartpho.md status=modified additions=3 deletions=10 changes=13 sha=e761eb35156ab1be14cd3590d7d6ae0d2b789fcd\ndocs/source/en/model_doc/beit.md status=modified additions=5 deletions=4 changes=9 sha=62a7ea4ad4fc41ea1531a9873596403ad4e439ab\ndocs/source/en/model_doc/bert-generation.md status=modified additions=9 deletions=12 changes=21 sha=938d3ad0e6f76f4ed44afe19e7b35298b8ab551f\ndocs/source/en/model_doc/bert-japanese.md status=modified additions=17 deletions=20 changes=37 sha=6d485d035caabfaa4551a96cb1d7defccc98587b\ndocs/source/en/model_doc/bert.md status=modified additions=6 deletions=7 changes=13 sha=e9d6dd383e02ed11335b94887d2e36a042aef636\ndocs/source/en/model_doc/bertweet.md status=modified additions=6 deletions=10 changes=16 sha=7ac75ffafe51f0518449f9371ab24906081dd1fa\ndocs/source/en/model_doc/big_bird.md status=modified additions=6 deletions=6 changes=12 sha=b43f34365254d8cd40028dc6cc0db62526dcfad5\ndocs/source/en/model_doc/bigbird_pegasus.md status=modified additions=8 deletions=13 changes=21 sha=e03d332de514b3dbc84b46e5253f8f35d1000dd0\ndocs/source/en/model_doc/biogpt.md status=modified additions=12 deletions=20 changes=32 sha=8b3ff3014d5082f1ba40f6a079221b3a6c20d34d\ndocs/source/en/model_doc/bit.md status=modified additions=1 deletions=4 changes=5 sha=140e5000a9fec1322648fe4115125a47b72accbf\ndocs/source/en/model_doc/bitnet.md status=modified additions=3 deletions=4 changes=7 sha=5e475b0db79d1c96a95cb848fbedf4bbe4398cbd\ndocs/source/en/model_doc/blenderbot-small.md status=modified additions=1 deletions=2 changes=3 sha=61e35ac908eeb55cc908c8dfc2e75886a5adefda\ndocs/source/en/model_doc/blenderbot.md status=modified additions=11 deletions=11 changes=22 sha=ad03bdf9d49fb582d308f89b6e8e6974e5bf09d2\ndocs/source/en/model_doc/blip-2.md status=modified additions=1 deletions=4 changes=5 sha=840ffdf7c606efa799d05060a5a31cd1f502cb78\ndocs/source/en/model_doc/blip.md status=modified additions=5 deletions=10 changes=15 sha=b6b7b955c09977a4d9848b6039004140806d946f\ndocs/source/en/model_doc/bloom.md status=modified additions=1 deletions=4 changes=5 sha=63945adf6b43060fc689e2ced2b8e2a4bd3e6dfa\ndocs/source/en/model_doc/blt.md status=modified additions=3 deletions=6 changes=9 sha=8ac73362edc7dd98607d9d428072d022b5680032\ndocs/source/en/model_doc/bridgetower.md status=modified additions=55 deletions=54 changes=109 sha=851843279d8c7c30331f6faca4140f5bff7b4938\ndocs/source/en/model_doc/bros.md status=modified additions=1 deletions=4 changes=5 sha=46ec58e6c1ae313646ec6c090468f45c30c7fb4a\ndocs/source/en/model_doc/byt5.md status=modified additions=5 deletions=12 changes=17 sha=9a938e0b67d47dc35491679135835a7b533644b5\ndocs/source/en/model_doc/camembert.md status=modified additions=11 deletions=8 changes=19 sha=ca11219bb6145f16dabd4d7f04367772b8b7e066\ndocs/source/en/model_doc/canine.md status=modified additions=8 deletions=11 changes=19 sha=d204d71a2ef37baa178b086367508554db7fd4c0\ndocs/source/en/model_doc/chameleon.md status=modified additions=17 deletions=15 changes=32 sha=075ba55d07789cc0b3086823cd256803278b2756\ndocs/source/en/model_doc/chinese_clip.md status=modified additions=30 deletions=31 changes=61 sha=16a3e7166ee98409bec528a8f0c4c48c5d13b0b4\ndocs/source/en/model_doc/chmv2.md status=modified additions=6 deletions=6 changes=12 sha=6e086ca94bfa21731a932d3d2824e17be8fb630a\ndocs/source/en/model_doc/clap.md status=modified additions=5 deletions=8 changes=13 sha=4bbfd0f7f3b95772068efcdc3e8fba57b9610422\ndocs/source/en/model_doc/clip.md status=modified additions=9 deletions=10 changes=19 sha=4b7cd1cbfef281767c93f0eada2b6174c5b441ca\ndocs/source/en/model_doc/clipseg.md status=modified additions=1 deletions=4 changes=5 sha=b3a089e617a2d9324a24ce599b2b0f7717ebd7b1\ndocs/source/en/model_doc/clvp.md status=modified additions=16 deletions=17 changes=33 sha=abd9b433432d472601f783ab268c897a8e2127f1\ndocs/source/en/model_doc/code_llama.md status=modified additions=13 deletions=18 changes=31 sha=4029cdc22a4e1d2a0619fcf27f43b476566d6a16\ndocs/source/en/model_doc/codegen.md status=modified additions=9 deletions=11 changes=20 sha=1e443a2517629691fcdf3f7981b9fb3fb1418ac7\ndocs/source/en/model_doc/cohere.md status=modified additions=10 deletions=11 changes=21 sha=5c5412fb8c978f6661fca6cb9a099e47a8dd7810\ndocs/source/en/model_doc/cohere2.md status=modified additions=6 deletions=10 changes=16 sha=b2961ca86c81c206c64e2b7fee8894146d952706\ndocs/source/en/model_doc/cohere2_moe.md status=added additions=32 deletions=0 changes=32 sha=3662ed7f33a9d8b4700588550be50ec2ae99ec65\ndocs/source/en/model_doc/cohere2_vision.md status=modified additions=5 deletions=5 changes=10 sha=6ead8ac8ce89d22a9c42bcd9e5e3a20be034c07f\ndocs/source/en/model_doc/cohere_asr.md status=added additions=154 deletions=0 changes=154 sha=9dad5b679517419098fb2faafa3532c69a1901e6\ndocs/source/en/model_doc/colmodernvbert.md status=modified additions=6 deletions=5 changes=11 sha=9d5ad00d2ae638b91096db3839c498084f3694db\ndocs/source/en/model_doc/colpali.md status=modified additions=1 deletions=7 changes=8 sha=e57cfc2daec354d03b321e0535658f352b1dd244\ndocs/source/en/model_doc/colqwen2.md status=modified additions=4 deletions=12 changes=16 sha=814651747ab16cb9d45db832acf32d9b70340618\ndocs/source/en/model_doc/conditional_detr.md status=modified additions=1 deletions=4 changes=5 sha=3a43fd271b0ffc92a18ecde914ab92b916bc4caf\ndocs/source/en/model_doc/convbert.md status=modified additions=1 deletions=4 changes=5 sha=a6656f8339a529e3573f69a169c3a634f7d0bc6a\ndocs/source/en/model_doc/convnext.md status=modified additions=1 deletions=4 changes=5 sha=d44e008c0e9de3d1335c87151f0fa7638113b654\ndocs/source/en/model_doc/convnextv2.md status=modified additions=1 deletions=4 changes=5 sha=aca833c19f652c9ff2421ca6ea11eccf87da2b7b\ndocs/source/en/model_doc/cosmos3_omni.md status=added additions=83 deletions=0 changes=83 sha=a970749a5f478b027ab9975d7bc7c591cddcc86f\ndocs/source/en/model_doc/cpm.md status=modified additions=1 deletions=4 changes=5 sha=6ee4013a9dfe468c555e15ad5ea8f3b4bbbc9646\ndocs/source/en/model_doc/cpmant.md status=modified additions=5 deletions=7 changes=12 sha=b91ffa04833c3d98884a9820593cb8005fa4a757\ndocs/source/en/model_doc/csm.md status=modified additions=28 deletions=31 changes=59 sha=88535a4f8290edbd5a1aa15b47105b3d32a14655\ndocs/source/en/model_doc/ctrl.md status=modified additions=1 deletions=4 changes=5 sha=7f3bed3157ba6102ebc06012aa3223a4868d7eee\ndocs/source/en/model_doc/cvt.md status=modified additions=8 deletions=13 changes=21 sha=e8d5764ed46f8226382b3a3fdd022ece17674bc9\ndocs/source/en/model_doc/cwm.md status=modified additions=2 deletions=2 changes=4 sha=ea47a8860d3fea3ff6aabb6776eb3b485c5eafbf\ndocs/source/en/model_doc/d_fine.md status=modified additions=19 deletions=17 changes=36 sha=307137546a12e232066c22db9fdbba1d6b32e81b\ndocs/source/en/model_doc/dab-detr.md status=modified additions=19 deletions=19 changes=38 sha=0669e0033ac3ce9bb5327524089be80d93b28c62\ndocs/source/en/model_doc/dac.md status=modified additions=21 deletions=21 changes=42 sha=7ce8f7524c24f75ef4533a2bfcdb65b68c9af4bf\ndocs/source/en/model_doc/data2vec.md status=modified additions=5 deletions=4 changes=9 sha=0edcd07a21556cb5e02ef4e94cc87f7152d0db69\ndocs/source/en/model_doc/dbrx.md status=modified additions=10 deletions=11 changes=21 sha=d665ae9ed0e1fb601d79200da6d20ed3a6aaf9e1\ndocs/source/en/model_doc/deberta-v2.md status=modified additions=7 deletions=10 changes=17 sha=73bac2aefa99acd788f567dec454351d306e80c3\ndocs/source/en/model_doc/deberta.md status=modified additions=6 deletions=10 changes=16 sha=b50efe9311b9d15cd9d44dc8c7c68d2a3447ef98\ndocs/source/en/model_doc/decision_transformer.md status=modified additions=1 deletions=4 changes=5 sha=e24ab787eb726b0413c3a870bcac308b8165240c\ndocs/source/en/model_doc/deepseek_ocr2.md status=added additions=116 deletions=0 changes=116 sha=f43537a83dabf593c5a52bec0642b525cd012e76\ndocs/source/en/model_doc/deepseek_v2.md status=modified additions=1 deletions=1 changes=2 sha=c2e3700a1fd5b289d496da109cbd056410e27339\ndocs/source/en/model_doc/deepseek_v3.md status=modified additions=8 deletions=3 changes=11 sha=9c4facfaefb658509a563a91b1a4279b132e4828\ndocs/source/en/model_doc/deepseek_v32.md status=added additions=100 deletions=0 changes=100 sha=b499e22bd4beee1dc0d0424c31e0d536f242ad2f\ndocs/source/en/model_doc/deepseek_v4.md status=added additions=159 deletions=0 changes=159 sha=34f46e67213d7a8e5b55cad3e58c71f64b65e7d8\ndocs/source/en/model_doc/deepseek_vl.md status=modified additions=8 deletions=13 changes=21 sha=5565c223f01f3a6208c4d1e33a3a38dd37fe924e\ndocs/source/en/model_doc/deepseek_vl_hybrid.md status=modified additions=8 deletions=13 changes=21 sha=b5c025bb05638214203ef8d14500f2965758902b\ndocs/source/en/model_doc/deformable_detr.md status=modified additions=10 deletions=13 changes=23 sha=35538b5b7177d44b28f5c5f75673f0edca381b5e\ndocs/source/en/model_doc/deimv2.md status=added additions=65 deletions=0 changes=65 sha=3d3afc6ab723ac7772f4890c4d0afaac933273cb\ndocs/source/en/model_doc/deit.md status=modified additions=5 deletions=4 changes=9 sha=aa442abb069133dc6134e10342c0150b367172e3\ndocs/source/en/model_doc/deplot.md status=modified additions=7 deletions=7 changes=14 sha=2189fad4a25436e2440f4f2c5c789a94fd6b8c4e\ndocs/source/en/model_doc/depth_anything.md status=modified additions=10 deletions=14 changes=24 sha=1684017d21542e7f2d3dbaa8cb4877d08a57b113\ndocs/source/en/model_doc/depth_anything_v2.md status=modified additions=42 deletions=39 changes=81 sha=e25797d31d04b366f437367164a8484bd58c5aa8\ndocs/source/en/model_doc/depth_pro.md status=modified additions=45 deletions=41 changes=86 sha=d94bf768949e653952ca833776faf3e2916e9d0c\ndocs/source/en/model_doc/detr.md status=modified additions=13 deletions=14 changes=27 sha=5744ca46cabc65a3df3cf0a8c78d59648cc4418a\ndocs/source/en/model_doc/dia.md status=modified additions=14 deletions=17 changes=31 sha=a4d23aea7cde7912a0e7ba17577aa730e911c8d7\ndocs/source/en/model_doc/dialogpt.md status=modified additions=1 deletions=4 changes=5 sha=959f4b10f3ba7f4175d674c09c40b3896552c2d1\ndocs/source/en/model_doc/diffllama.md status=modified additions=1 deletions=2 changes=3 sha=ebf29441fc583734a7e38f582e0ea4fce3178d40\ndocs/source/en/model_doc/diffusion_gemma.md status=added additions=148 deletions=0 changes=148 sha=1f580b059adfa375a766f00ecd10c7e60e8b2721\ndocs/source/en/model_doc/dinat.md status=modified additions=1 deletions=4 changes=5 sha=1194536078b607f221a6493e01a1f9bde6122cb4\ndocs/source/en/model_doc/dinov2.md status=modified additions=18 deletions=18 changes=36 sha=836a55f5c18fe373f32557d405740058759f3d73\ndocs/source/en/model_doc/dinov2_with_registers.md status=modified additions=1 deletions=2 changes=3 sha=51e694df8808ecd81fe999b9d332e69f2d090a56\ndocs/source/en/model_doc/dinov3.md status=modified additions=11 deletions=12 changes=23 sha=e8b1ef24a040d4d50d96dc75aac6cb9bffebbd0e\ndocs/source/en/model_doc/distilbert.md status=modified additions=6 deletions=7 changes=13 sha=b6cefa4a98a48b3d7543ef9e61b39cd3ece2e9f3\ndocs/source/en/model_doc/dit.md status=modified additions=8 deletions=12 changes=20 sha=d117cd81806c1243e3932fda916144a4c85da0ed\ndocs/source/en/model_doc/doge.md status=modified additions=14 deletions=12 changes=26 sha=1ce4d1a688627cf78ab2c498f1d92daec2ef8ee7\ndocs/source/en/model_doc/donut.md status=modified additions=85 deletions=94 changes=179 sha=fd182799c485b927e0e4d1c553d324fc3f5c213f\ndocs/source/en/model_doc/dots1.md status=modified additions=5 deletions=7 changes=12 sha=38166abbc4b836257069a74618ecd826557ed66c\ndocs/source/en/model_doc/dpr.md status=modified additions=1 deletions=2 changes=3 sha=f41e960f2a2e3aa69e09eb19588775fe5e11ffb0\ndocs/source/en/model_doc/dpt.md status=modified additions=2 deletions=2 changes=4 sha=0d69d43be47d58ba469b23faa9b3b1c53235ff23\ndocs/source/en/model_doc/edgetam.md status=modified additions=149 deletions=153 changes=302 sha=14dae34d9b2e2e55dd7c6f1a69481f8f188ee58c\ndocs/source/en/model_doc/edgetam_video.md status=modified additions=177 deletions=183 changes=360 sha=0d907a03b45854cdfa5cfde09a5741e4dced053d\ndocs/source/en/model_doc/efficientloftr.md status=modified additions=12 deletions=9 changes=21 sha=3e93a2dfd112740508fe0b7f9f295682db42915e\ndocs/source/en/model_doc/efficientnet.md status=modified additions=1 deletions=4 changes=5 sha=dfe1b2bc6c3722c0a6ea2bb76adaed8db6d858db\ndocs/source/en/model_doc/electra.md status=modified additions=9 deletions=10 changes=19 sha=1d75f40df092689c64b20f1e73e9a9ab795326d9\ndocs/source/en/model_doc/emu3.md status=modified additions=11 deletions=11 changes=22 sha=e1d75bb6d86d428ba79a5c5b96fb19c91317d736\ndocs/source/en/model_doc/encodec.md status=modified additions=19 deletions=19 changes=38 sha=0c57f017029ef9a80a8e51b675b8c580b66085eb\ndocs/source/en/model_doc/encoder-decoder.md status=modified additions=30 deletions=27 changes=57 sha=3fefcdac917a29ea9c686daced250758de827c7c\ndocs/source/en/model_doc/eomt.md status=modified additions=7 deletions=10 changes=17 sha=037a48c7656a9fc144dedee591c7a55b3e27ac28\ndocs/source/en/model_doc/eomt_dinov3.md status=modified additions=15 deletions=16 changes=31 sha=ece19d9f1a94ac1db9b51038fdfdc42b8444744a\ndocs/source/en/model_doc/ernie.md status=modified additions=6 deletions=4 changes=10 sha=04bed2b43391c82bf54a9f595381f0ab9146ef1b\ndocs/source/en/model_doc/ernie4_5.md status=modified additions=3 deletions=5 changes=8 sha=a10232890ffa9ddb5562fad49329001944428701\ndocs/source/en/model_doc/ernie4_5_moe.md status=modified additions=8 deletions=11 changes=19 sha=12dfb82dd775796976429a14eefe0e63a80ff146\ndocs/source/en/model_doc/ernie4_5_vl_moe.md status=modified additions=6 deletions=6 changes=12 sha=b4d7d1980e2a1dddb25148e410354a70701e4a3f\ndocs/source/en/model_doc/esm.md status=modified additions=1 deletions=4 changes=5 sha=1827f5cd9a186f8c1dd7579773b07aeb304a9f35\ndocs/source/en/model_doc/eurobert.md status=modified additions=6 deletions=7 changes=13 sha=5ffe01f4bbc724e7310d6afb60e7d2839d319710\ndocs/source/en/model_doc/evolla.md status=modified additions=3 deletions=3 changes=6 sha=fef9b91766d228060c07fe195713990a2a0527d8\ndocs/source/en/model_doc/exaone4.md status=modified additions=3 deletions=1 changes=4 sha=2b92c1076af35484229a1d8e2b53bab79931ab79\ndocs/source/en/model_doc/exaone4_5.md status=added additions=120 deletions=0 changes=120 sha=871b01cf70487561c0f72df5c060ebbe0b06c6f7\ndocs/source/en/model_doc/exaone_moe.md status=modified additions=3 deletions=1 changes=4 sha=2ab770e216d0426c66716c836c36863171f0be9f\ndocs/source/en/model_doc/falcon.md status=modified additions=8 deletions=13 changes=21 sha=a5a7c0095b7763cbd56866484195875b26779c73\ndocs/source/en/model_doc/falcon3.md status=modified additions=1 deletions=4 changes=5 sha=7e565922b7298269367896824103c239899737cd\ndocs/source/en/model_doc/falcon_h1.md status=modified additions=4 deletions=3 changes=7 sha=67be1a80138c580d59299ad5da38ed9964cf1800\ndocs/source/en/model_doc/falcon_mamba.md status=modified additions=8 deletions=24 changes=32 sha=94965d2d36bcaedc079c3472cadff7982b423e58\ndocs/source/en/model_doc/fast_vlm.md status=modified additions=9 deletions=7 changes=16 sha=ebd2843f221ebbbcb32a9af06064362536dd5028\ndocs/source/en/model_doc/fastspeech2_conformer.md status=modified additions=13 deletions=11 changes=24 sha=9d8c0fd9a9b70988cfecab8c15e4820713afe1d2\ndocs/source/en/model_doc/flan-t5.md status=modified additions=8 deletions=10 changes=18 sha=ad530b3fbf37398d4f3465f0b61351967ad67d57\ndocs/source/en/model_doc/flan-ul2.md status=modified additions=0 deletions=0 changes=0 sha=4a669cdd6f8d82a145ca56b956da382c67961322\ndocs/source/en/model_doc/flaubert.md status=modified additions=1 deletions=4 changes=5 sha=43edc963fc82c5868d4ad089deda503b69196751\ndocs/source/en/model_doc/flava.md status=modified additions=1 deletions=4 changes=5 sha=bc116a01f268c3cbfad7287a7c772238e5ec2149\ndocs/source/en/model_doc/flex_olmo.md status=modified additions=7 deletions=13 changes=20 sha=7ddb53d889cc51cf534fd9b9be217eee8fbdf930\ndocs/source/en/model_doc/florence2.md status=modified additions=12 deletions=14 changes=26 sha=8fc68495ee7de1a07d06c376949be3b673e0eed2\ndocs/source/en/model_doc/fnet.md status=modified additions=1 deletions=4 changes=5 sha=924d2d0ae9ea13b050a492ab36576db2df0356a7\ndocs/source/en/model_doc/focalnet.md status=modified additions=1 deletions=4 changes=5 sha=f6c8366e9bdbd06abace80df2351e46745d647f7\ndocs/source/en/model_doc/fsmt.md status=modified additions=1 deletions=1 changes=2 sha=8ccaa2d67772c6857c487d0c1256cdfcc01f4ac8\ndocs/source/en/model_doc/funnel.md status=modified additions=1 deletions=4 changes=5 sha=412f8845d994fabfb4eaf0dccb1dff331228a93a\ndocs/source/en/model_doc/fuyu.md status=modified additions=8 deletions=10 changes=18 sha=df6757cfc4f9d370d97fb1016e2fe60fba91cb6d\ndocs/source/en/model_doc/gemma.md status=modified additions=12 deletions=16 changes=28 sha=cc75be0b4aa66007d2f1f0afdb2beaf9ff22a9e2\ndocs/source/en/model_doc/gemma2.md status=modified additions=8 deletions=11 changes=19 sha=da00276ecde6000a78209c900d8ef92af622b06f\ndocs/source/en/model_doc/gemma3.md status=modified additions=10 deletions=14 changes=24 sha=a01fb1db439adbd488f27d3fec843318c80ae117\ndocs/source/en/model_doc/gemma3n.md status=modified additions=5 deletions=8 changes=13 sha=d8e600c2a4ea898ba77574538f47e6a34c9bc5b7\ndocs/source/en/model_doc/gemma4.md status=added additions=310 deletions=0 changes=310 sha=582831442098c67006aae041c5914dc829c7ece5\ndocs/source/en/model_doc/gemma4_assistant.md status=added additions=125 deletions=0 changes=125 sha=375117e630b9505944c3a056dd9c5cbafccd7d06\ndocs/source/en/model_doc/gemma4_unified.md status=added additions=262 deletions=0 changes=262 sha=1fd20205cdd1255cbb7adc1a154ef014a0f7ef3e\ndocs/source/en/model_doc/gemma4_unified_assistant.md status=added additions=123 deletions=0 changes=123 sha=a8bae26c9251c36c8c4ca0e9d26fa54b498850fe\ndocs/source/en/model_doc/git.md status=modified additions=1 deletions=4 changes=5 sha=ef52cf2bcd46910dc354cc3c44aede86aa7b3d25\ndocs/source/en/model_doc/glm.md status=modified additions=12 deletions=14 changes=26 sha=bd00f719392846112a7a9ef70e606209dfa91118\ndocs/source/en/model_doc/glm4.md status=modified additions=1 deletions=1 changes=2 sha=2335f75d10b0d813b73928002667db4815937268\ndocs/source/en/model_doc/glm46v.md status=modified additions=1 deletions=1 changes=2 sha=0ff39cad95010dd7b9b0a60bc08738a8b30b0738\ndocs/source/en/model_doc/glm4_moe.md status=modified additions=1 deletions=1 changes=2 sha=092420bc05526a2b58d96f53e7bd75a80d139ba0\ndocs/source/en/model_doc/glm4_moe_lite.md status=modified additions=5 deletions=7 changes=12 sha=83f7717d4b7c3039feab4b312f924e6545d2faa9\ndocs/source/en/model_doc/glm4v.md status=modified additions=8 deletions=13 changes=21 sha=bc6330e8d965f27edcd684fb434352a25e3e0523\ndocs/source/en/model_doc/glm4v_moe.md status=modified additions=1 deletions=1 changes=2 sha=942c691f08d21295f33b5acfb7a9c0dc18376eb3\ndocs/source/en/model_doc/glm_image.md status=modified additions=4 deletions=4 changes=8 sha=503d4a7cb069c5addc99fbf838fd8df70cea437b\ndocs/source/en/model_doc/glm_moe_dsa.md status=modified additions=8 deletions=7 changes=15 sha=96e799a90107aee30d6656b97629618ff7e5f7fd\ndocs/source/en/model_doc/glm_ocr.md status=modified additions=7 deletions=8 changes=15 sha=32562caf70dc6fea366b33a064ad6ed68335691d\ndocs/source/en/model_doc/glmasr.md status=modified additions=90 deletions=22 changes=112 sha=48e3b7ffbbbd7497a9802943417e53fa7ee846b6\ndocs/source/en/model_doc/glmga.md status=added additions=62 deletions=0 changes=62 sha=5c0aee3feb3d825ce4c3c9c6856f5b3392db2965\ndocs/source/en/model_doc/glpn.md status=modified additions=1 deletions=4 changes=5 sha=cb4fafb15af978539c1ba5924bad1c8747183592\ndocs/source/en/model_doc/got_ocr2.md status=modified additions=141 deletions=156 changes=297 sha=e810655bf744e464737cf2b9643835e364271a1f\ndocs/source/en/model_doc/gpt-sw3.md status=modified additions=7 deletions=10 changes=17 sha=847a1cb6b60ea8687478a85892c297c2c226db53\ndocs/source/en/model_doc/gpt2.md status=modified additions=10 deletions=11 changes=21 sha=e51141e3106ee37db50051eb470dca8780434262\ndocs/source/en/model_doc/gpt_bigcode.md status=modified additions=10 deletions=13 changes=23 sha=ee02c9108cb36601b3688d49094c2610ce85fe4f\ndocs/source/en/model_doc/gpt_neo.md status=modified additions=9 deletions=10 changes=19 sha=3afd46d937cd797872e9a07df2d198b0a4a49213\ndocs/source/en/model_doc/gpt_neox.md status=modified additions=21 deletions=18 changes=39 sha=b76af91ba307ed50aab1402d78a7d0da13308080\ndocs/source/en/model_doc/gpt_neox_japanese.md status=modified additions=12 deletions=10 changes=22 sha=e4564c959ef24130bbc7e6014e20760974bf0a6d\ndocs/source/en/model_doc/gpt_oss.md status=modified additions=5 deletions=7 changes=12 sha=e90f4da965968e64bd9047d9fb27b1b978529a08\ndocs/source/en/model_doc/gptj.md status=modified additions=53 deletions=56 changes=109 sha=12616f81afaabcd4f5cd37efad064909a70dc4c7\ndocs/source/en/model_doc/granite.md status=modified additions=6 deletions=10 changes=16 sha=66f4f2e8206ff7630261ed829b4485d159817114\ndocs/source/en/model_doc/granite4_vision.md status=added additions=184 deletions=0 changes=184 sha=e65b7a777784c875ae9c703b34aac1f67228b792\ndocs/source/en/model_doc/granite_speech.md status=modified additions=15 deletions=13 changes=28 sha=442fe974d2cc3ffab470e6aa0c773c4543195ee6\ndocs/source/en/model_doc/granite_speech_plus.md status=added additions=155 deletions=0 changes=155 sha=49a1defa707d7fe5baa511f30ffd3795056cbcb7\ndocs/source/en/model_doc/granitemoe.md status=modified additions=3 deletions=4 changes=7 sha=0974e9815ec073d8d24cf4587bd2ba1f063bb3e3\ndocs/source/en/model_doc/granitemoehybrid.md status=modified additions=3 deletions=2 changes=5 sha=e327d4ed8283bf696c71e3a0986e917cf9c6e7a1\ndocs/source/en/model_doc/granitemoeshared.md status=modified additions=3 deletions=3 changes=6 sha=3c27a840527042b91d5de35d729f98eba5b05b08\ndocs/source/en/model_doc/granitevision.md status=modified additions=3 deletions=5 changes=8 sha=22ecacc077d3c16585c3afd8b7d86af07e4bb68d\ndocs/source/en/model_doc/grounding-dino.md status=modified additions=26 deletions=31 changes=57 sha=0009fec922095eceb090288f7642616cdfb72567\ndocs/source/en/model_doc/groupvit.md status=modified additions=1 deletions=4 changes=5 sha=0108f66150d0d8aa9f5eec851ad3d1d09bc9717b\ndocs/source/en/model_doc/helium.md status=modified additions=10 deletions=10 changes=20 sha=846364763b75c5543524ddac33b42b233c3d6ac5\ndocs/source/en/model_doc/herbert.md status=modified additions=12 deletions=14 changes=26 sha=7e77029f8650eae6a8369e81adce22dd30bed9aa",
+      "links": [
+        "license:68b7d66c97d66c58de883ed0c451af2b3183e6f3"
+      ],
+      "attributes": {
+        "sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/commits/930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+    },
+    {
+      "id": "ci:80757947573",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T08:51:42Z",
+      "text": "CI check security-check for 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nrun_id=80757947573 status=completed conclusion=success",
+      "links": [
+        "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      ],
+      "attributes": {
+        "head_sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+        "name": "security-check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T08:51:39Z",
+        "completed_at": "2026-06-11T08:51:42Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80757947573"
+    },
+    {
+      "id": "ci:80757950014",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T08:51:48Z",
+      "text": "CI check Get PR number / Get PR number for 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nrun_id=80757950014 status=completed conclusion=success",
+      "links": [
+        "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      ],
+      "attributes": {
+        "head_sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+        "name": "Get PR number / Get PR number",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T08:51:39Z",
+        "completed_at": "2026-06-11T08:51:48Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80757950014"
+    },
+    {
+      "id": "ci:80757974610",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T08:51:51Z",
+      "text": "CI check approve-pr-ci for 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nrun_id=80757974610 status=completed conclusion=success",
+      "links": [
+        "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      ],
+      "attributes": {
+        "head_sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+        "name": "approve-pr-ci",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T08:51:47Z",
+        "completed_at": "2026-06-11T08:51:51Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80757974610"
+    },
+    {
+      "id": "ci:80758008188",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T08:51:53Z",
+      "text": "CI check pr-ci for 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nrun_id=80758008188 status=completed conclusion=skipped",
+      "links": [
+        "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      ],
+      "attributes": {
+        "head_sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+        "name": "pr-ci",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-11T08:51:54Z",
+        "completed_at": "2026-06-11T08:51:53Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80758008188"
+    },
+    {
+      "id": "ci:80757991758",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T08:52:01Z",
+      "text": "CI check Get PR commit SHA / Get PR commit SHA better for 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nrun_id=80757991758 status=completed conclusion=success",
+      "links": [
+        "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      ],
+      "attributes": {
+        "head_sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+        "name": "Get PR commit SHA / Get PR commit SHA better",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T08:51:52Z",
+        "completed_at": "2026-06-11T08:52:01Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80757991758"
+    },
+    {
+      "id": "ci:80758006988",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T08:52:01Z",
+      "text": "CI check debug-conditions for 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nrun_id=80758006988 status=completed conclusion=success",
+      "links": [
+        "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      ],
+      "attributes": {
+        "head_sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+        "name": "debug-conditions",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T08:51:58Z",
+        "completed_at": "2026-06-11T08:52:01Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80758006988"
+    },
+    {
+      "id": "ci:80758065988",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T08:52:07Z",
+      "text": "CI check Benchmark for 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nrun_id=80758065988 status=completed conclusion=skipped",
+      "links": [
+        "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      ],
+      "attributes": {
+        "head_sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+        "name": "Benchmark",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-11T08:52:12Z",
+        "completed_at": "2026-06-11T08:52:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80758065988"
+    },
+    {
+      "id": "ci:80758052645",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T08:52:08Z",
+      "text": "CI check skip_merge_queue for 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nrun_id=80758052645 status=completed conclusion=skipped",
+      "links": [
+        "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      ],
+      "attributes": {
+        "head_sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+        "name": "skip_merge_queue",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-11T08:52:08Z",
+        "completed_at": "2026-06-11T08:52:08Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80758052645"
+    },
+    {
+      "id": "ci:80758030030",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T08:52:45Z",
+      "text": "CI check Get test files to run for 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nrun_id=80758030030 status=completed conclusion=success",
+      "links": [
+        "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      ],
+      "attributes": {
+        "head_sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+        "name": "Get test files to run",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T08:52:05Z",
+        "completed_at": "2026-06-11T08:52:45Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80758030030"
+    },
+    {
+      "id": "ci:80758168080",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T08:52:53Z",
+      "text": "CI check Send a comment to suggest jobs to run for 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nrun_id=80758168080 status=completed conclusion=success",
+      "links": [
+        "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      ],
+      "attributes": {
+        "head_sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+        "name": "Send a comment to suggest jobs to run",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T08:52:48Z",
+        "completed_at": "2026-06-11T08:52:53Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80758168080"
+    },
+    {
+      "id": "ci:80757937701",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T08:54:37Z",
+      "text": "CI check setup_and_quality for 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nrun_id=80757937701 status=completed conclusion=failure",
+      "links": [
+        "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      ],
+      "attributes": {
+        "head_sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+        "name": "setup_and_quality",
+        "status": "completed",
+        "conclusion": "failure",
+        "started_at": "2026-06-11T08:51:31Z",
+        "completed_at": "2026-06-11T08:54:37Z",
+        "app_id": 18001,
+        "app_slug": "circleci-checks"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80757937701"
+    },
+    {
+      "id": "ci:80758051911",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T09:00:56Z",
+      "text": "CI check build / build_pr_documentation for 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nrun_id=80758051911 status=completed conclusion=success",
+      "links": [
+        "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      ],
+      "attributes": {
+        "head_sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+        "name": "build / build_pr_documentation",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T08:52:11Z",
+        "completed_at": "2026-06-11T09:00:56Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80758051911"
+    },
+    {
+      "id": "ci:80759718928",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T09:01:01Z",
+      "text": "CI check doc_build_status_check for 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nrun_id=80759718928 status=completed conclusion=success",
+      "links": [
+        "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      ],
+      "attributes": {
+        "head_sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+        "name": "doc_build_status_check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T09:00:58Z",
+        "completed_at": "2026-06-11T09:01:01Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80759718928"
+    },
+    {
+      "id": "ci:80758187960",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T09:09:23Z",
+      "text": "CI check run_tests for 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nrun_id=80758187960 status=completed conclusion=success",
+      "links": [
+        "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      ],
+      "attributes": {
+        "head_sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+        "name": "run_tests",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T08:52:52Z",
+        "completed_at": "2026-06-11T09:09:23Z",
+        "app_id": 18001,
+        "app_slug": "circleci-checks"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80758187960"
+    },
+    {
+      "id": "ci:80757947900",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T09:09:45Z",
+      "text": "CI check comment for 930efcc5d04752a7fc61e81a7ecce750f22a99b7\nrun_id=80757947900 status=completed conclusion=success",
+      "links": [
+        "commit:930efcc5d04752a7fc61e81a7ecce750f22a99b7"
+      ],
+      "attributes": {
+        "head_sha": "930efcc5d04752a7fc61e81a7ecce750f22a99b7",
+        "name": "comment",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T08:51:39Z",
+        "completed_at": "2026-06-11T09:09:45Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80757947900"
+    },
+    {
+      "id": "commit:32019f0038b9c7153482a5b929f08c23d3e428d4",
+      "kind": "commit",
+      "occurred_at": "2026-06-11T11:34:51Z",
+      "text": "commit 32019f0038b9c7153482a5b929f08c23d3e428d4\nApply repo consistency fixes\n\ndiff -- src/transformers/models/colqwen2/modeling_colqwen2.py\n@@ -165,9 +165,7 @@ def forward(\n \n             if pixel_values is not None:\n                 image_embeds = self.vlm.visual(pixel_values, grid_thw=image_grid_thw, return_dict=True).pooler_output\n-                image_mask = (\n-                    (input_ids == self.config.vlm_config.image_token_id).unsqueeze(-1)\n-                )\n+                image_mask = (input_ids == self.config.vlm_config.image_token_id).unsqueeze(-1)\n                 image_embeds = image_embeds.to(inputs_embeds.device, inputs_embeds.dtype)\n                 inputs_embeds = inputs_embeds.masked_scatter(image_mask, image_embeds)\n \n\ndiff -- src/transformers/models/colqwen2/modular_colqwen2.py\n@@ -304,9 +304,7 @@ def forward(\n \n             if pixel_values is not None:\n                 image_embeds = self.vlm.visual(pixel_values, grid_thw=image_grid_thw, return_dict=True).pooler_output\n-                image_mask = (\n-                    (input_ids == self.config.vlm_config.image_token_id).unsqueeze(-1)\n-                )\n+                image_mask = (input_ids == self.config.vlm_config.image_token_id).unsqueeze(-1)\n                 image_embeds = image_embeds.to(inputs_embeds.device, inputs_embeds.dtype)\n                 inputs_embeds = inputs_embeds.masked_scatter(image_mask, image_embeds)\n \n\ndiff -- src/transformers/models/cosmos3_omni/modeling_cosmos3_omni.py\n@@ -341,18 +341,18 @@ def get_placeholder_mask(\n             special_video_mask = input_ids == self.config.video_token_id\n \n         n_image_tokens = special_image_mask.sum()\n-        special_image_mask = special_image_mask.unsqueeze(-1).expand_as(inputs_embeds).to(inputs_embeds.device)\n+        special_image_mask = special_image_mask.unsqueeze(-1).to(inputs_embeds.device)\n         if image_features is not None:\n             torch_compilable_check(\n-                inputs_embeds[special_image_mask].numel() == image_features.numel(),\n+                n_image_tokens * inputs_embeds.shape[-1] == image_features.numel(),\n                 f\"Image features and image tokens do not match, tokens: {n_image_tokens}, features: {image_features.shape[0]}\",\n             )\n \n         n_video_tokens = special_video_mask.sum()\n-        special_video_mask = special_video_mask.unsqueeze(-1).expand_as(inputs_embeds).to(inputs_embeds.device)\n+        special_video_mask = special_video_mask.unsqueeze(-1).to(inputs_embeds.device)\n         if video_features is not None:\n             torch_compilable_check(\n-                inputs_embeds[special_video_mask].numel() == video_features.numel(),\n+                n_video_tokens * inputs_embeds.shape[-1] == video_features.numel(),\n                 f\"Video features and video tokens do not match, tokens: {n_video_tokens}, features: {video_features.shape[0]}\",\n             )\n         return special_image_mask, special_video_mask\n\ndiff -- src/transformers/models/deepseek_ocr2/modeling_deepseek_ocr2.py\n@@ -1507,9 +1507,9 @@ def get_placeholder_mask(\n             special_image_mask = input_ids == self.config.image_token_id\n \n         n_image_tokens = special_image_mask.sum()\n-        special_image_mask = special_image_mask.unsqueeze(-1).expand_as(inputs_embeds).to(inputs_embeds.device)\n+        special_image_mask = special_image_mask.unsqueeze(-1).to(inputs_embeds.device)\n         torch_compilable_check(\n-            inputs_embeds[special_image_mask].numel() == image_features.numel(),\n+            n_image_tokens * inputs_embeds.shape[-1] == image_features.numel(),\n             f\"Image features and image tokens do not match, tokens: {n_image_tokens}, features: {image_features.shape[0]}\",\n         )\n         return special_image_mask\n\ndiff -- src/transformers/models/exaone4_5/modeling_exaone4_5.py\n@@ -690,18 +690,18 @@ def get_placeholder_mask(\n             special_video_mask = input_ids == self.config.video_token_id\n \n         n_image_tokens = special_image_mask.sum()\n-        special_image_mask = special_image_mask.unsqueeze(-1).expand_as(inputs_embeds).to(inputs_embeds.device)\n+        special_image_mask = special_image_mask.unsqueeze(-1).to(inputs_embeds.device)\n         if image_features is not None:\n             torch_compilable_check(\n-                inputs_embeds[special_image_mask].numel() == image_features.numel(),\n+                n_image_tokens * inputs_embeds.shape[-1] == image_features.numel(),\n                 f\"Image features and image tokens do not match, tokens: {n_image_tokens}, features: {image_features.shape[0]}\",\n             )\n \n         n_video_tokens = special_video_mask.sum()\n-        special_video_mask = special_video_mask.unsqueeze(-1).expand_as(inputs_embeds).to(inputs_embeds.device)\n+        special_video_mask = special_video_mask.unsqueeze(-1).to(inputs_embeds.device)\n         if video_features is not None:\n             torch_compilable_check(\n-                inputs_embeds[special_video_mask].numel() == video_features.numel(),\n+                n_video_tokens * inputs_embeds.shape[-1] == video_features.numel(),\n                 f\"Video features and video tokens do not match, tokens: {n_video_tokens}, features: {video_features.shape[0]}\",\n             )\n         return special_image_mask, special_video_mask\n\ndiff -- src/transformers/models/granite4_vision/modeling_granite4_vision.py\n@@ -949,9 +949,9 @@ def get_placeholder_mask(\n             special_image_mask = input_ids == self.config.image_token_id\n \n         n_image_tokens = special_image_mask.sum()\n-        special_image_mask = special_image_mask.unsqueeze(-1).expand_as(inputs_embeds).to(inputs_embeds.device)\n+        special_image_mask = special_image_mask.unsqueeze(-1).to(inputs_embeds.device)\n         torch_compilable_check(\n-            inputs_embeds[special_image_mask].numel() == image_features.numel(),\n+            n_image_tokens * inputs_embeds.shape[-1] == image_features.numel(),\n             f\"Image features and image tokens do not match, tokens: {n_image_tokens}, features: {image_features.shape[0]}\",\n         )\n         return special_image_mask\n\ndiff -- src/transformers/models/qianfan_ocr/modeling_qianfan_ocr.py\n@@ -599,9 +599,9 @@ def get_placeholder_mask(\n \n         n_image_tokens = special_image_mask.sum()\n         n_image_features = image_features.shape[0] * image_features.shape[1]\n-        special_image_mask = special_image_mask.unsqueeze(-1).expand_as(inputs_embeds).to(inputs_embeds.device)\n+        special_image_mask = special_image_mask.unsqueeze(-1).to(inputs_embeds.device)\n         torch_compilable_check(\n-            inputs_embeds[special_image_mask].numel() == image_features.numel(),\n+            n_image_tokens * inputs_embeds.shape[-1] == image_features.numel(),\n             f\"Image features and image tokens do not match, tokens: {n_image_tokens}, features: {n_image_features}\",\n         )\n         return special_image_mask",
+      "links": [
+        "license:68b7d66c97d66c58de883ed0c451af2b3183e6f3"
+      ],
+      "attributes": {
+        "sha": "32019f0038b9c7153482a5b929f08c23d3e428d4"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/commits/32019f0038b9c7153482a5b929f08c23d3e428d4"
+    },
+    {
+      "id": "ci:80787471239",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:35:06Z",
+      "text": "CI check Get PR number / Get PR number for 32019f0038b9c7153482a5b929f08c23d3e428d4\nrun_id=80787471239 status=completed conclusion=success",
+      "links": [
+        "commit:32019f0038b9c7153482a5b929f08c23d3e428d4"
+      ],
+      "attributes": {
+        "head_sha": "32019f0038b9c7153482a5b929f08c23d3e428d4",
+        "name": "Get PR number / Get PR number",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:35:02Z",
+        "completed_at": "2026-06-11T11:35:06Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80787471239"
+    },
+    {
+      "id": "ci:80787495294",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:35:19Z",
+      "text": "CI check Get PR commit SHA / Get PR commit SHA better for 32019f0038b9c7153482a5b929f08c23d3e428d4\nrun_id=80787495294 status=completed conclusion=success",
+      "links": [
+        "commit:32019f0038b9c7153482a5b929f08c23d3e428d4"
+      ],
+      "attributes": {
+        "head_sha": "32019f0038b9c7153482a5b929f08c23d3e428d4",
+        "name": "Get PR commit SHA / Get PR commit SHA better",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:35:12Z",
+        "completed_at": "2026-06-11T11:35:19Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80787495294"
+    },
+    {
+      "id": "ci:80787470933",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:35:21Z",
+      "text": "CI check security-check for 32019f0038b9c7153482a5b929f08c23d3e428d4\nrun_id=80787470933 status=completed conclusion=success",
+      "links": [
+        "commit:32019f0038b9c7153482a5b929f08c23d3e428d4"
+      ],
+      "attributes": {
+        "head_sha": "32019f0038b9c7153482a5b929f08c23d3e428d4",
+        "name": "security-check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:35:01Z",
+        "completed_at": "2026-06-11T11:35:21Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80787470933"
+    },
+    {
+      "id": "ci:80787540471",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:35:30Z",
+      "text": "CI check approve-pr-ci for 32019f0038b9c7153482a5b929f08c23d3e428d4\nrun_id=80787540471 status=completed conclusion=success",
+      "links": [
+        "commit:32019f0038b9c7153482a5b929f08c23d3e428d4"
+      ],
+      "attributes": {
+        "head_sha": "32019f0038b9c7153482a5b929f08c23d3e428d4",
+        "name": "approve-pr-ci",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:35:27Z",
+        "completed_at": "2026-06-11T11:35:30Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80787540471"
+    },
+    {
+      "id": "ci:80787572887",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:35:32Z",
+      "text": "CI check pr-ci for 32019f0038b9c7153482a5b929f08c23d3e428d4\nrun_id=80787572887 status=completed conclusion=skipped",
+      "links": [
+        "commit:32019f0038b9c7153482a5b929f08c23d3e428d4"
+      ],
+      "attributes": {
+        "head_sha": "32019f0038b9c7153482a5b929f08c23d3e428d4",
+        "name": "pr-ci",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-11T11:35:32Z",
+        "completed_at": "2026-06-11T11:35:32Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80787572887"
+    },
+    {
+      "id": "ci:80787571967",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:35:39Z",
+      "text": "CI check debug-conditions for 32019f0038b9c7153482a5b929f08c23d3e428d4\nrun_id=80787571967 status=completed conclusion=success",
+      "links": [
+        "commit:32019f0038b9c7153482a5b929f08c23d3e428d4"
+      ],
+      "attributes": {
+        "head_sha": "32019f0038b9c7153482a5b929f08c23d3e428d4",
+        "name": "debug-conditions",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:35:37Z",
+        "completed_at": "2026-06-11T11:35:39Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80787571967"
+    },
+    {
+      "id": "ci:80787533313",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:35:56Z",
+      "text": "CI check Get test files to run for 32019f0038b9c7153482a5b929f08c23d3e428d4\nrun_id=80787533313 status=completed conclusion=success",
+      "links": [
+        "commit:32019f0038b9c7153482a5b929f08c23d3e428d4"
+      ],
+      "attributes": {
+        "head_sha": "32019f0038b9c7153482a5b929f08c23d3e428d4",
+        "name": "Get test files to run",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:35:22Z",
+        "completed_at": "2026-06-11T11:35:56Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80787533313"
+    },
+    {
+      "id": "ci:80787642786",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:36:07Z",
+      "text": "CI check Send a comment to suggest jobs to run for 32019f0038b9c7153482a5b929f08c23d3e428d4\nrun_id=80787642786 status=completed conclusion=success",
+      "links": [
+        "commit:32019f0038b9c7153482a5b929f08c23d3e428d4"
+      ],
+      "attributes": {
+        "head_sha": "32019f0038b9c7153482a5b929f08c23d3e428d4",
+        "name": "Send a comment to suggest jobs to run",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:36:02Z",
+        "completed_at": "2026-06-11T11:36:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80787642786"
+    },
+    {
+      "id": "ci:80787464777",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:42:31Z",
+      "text": "CI check setup_and_quality for 32019f0038b9c7153482a5b929f08c23d3e428d4\nrun_id=80787464777 status=completed conclusion=success",
+      "links": [
+        "commit:32019f0038b9c7153482a5b929f08c23d3e428d4"
+      ],
+      "attributes": {
+        "head_sha": "32019f0038b9c7153482a5b929f08c23d3e428d4",
+        "name": "setup_and_quality",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:34:56Z",
+        "completed_at": "2026-06-11T11:42:31Z",
+        "app_id": 18001,
+        "app_slug": "circleci-checks"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80787464777"
+    },
+    {
+      "id": "ci:80787714012",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:47:59Z",
+      "text": "CI check run_tests for 32019f0038b9c7153482a5b929f08c23d3e428d4\nrun_id=80787714012 status=completed conclusion=failure",
+      "links": [
+        "commit:32019f0038b9c7153482a5b929f08c23d3e428d4"
+      ],
+      "attributes": {
+        "head_sha": "32019f0038b9c7153482a5b929f08c23d3e428d4",
+        "name": "run_tests",
+        "status": "completed",
+        "conclusion": "failure",
+        "started_at": "2026-06-11T11:36:20Z",
+        "completed_at": "2026-06-11T11:47:59Z",
+        "app_id": 18001,
+        "app_slug": "circleci-checks"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80787714012"
+    },
+    {
+      "id": "ci:80787471193",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:48:17Z",
+      "text": "CI check comment for 32019f0038b9c7153482a5b929f08c23d3e428d4\nrun_id=80787471193 status=completed conclusion=success",
+      "links": [
+        "commit:32019f0038b9c7153482a5b929f08c23d3e428d4"
+      ],
+      "attributes": {
+        "head_sha": "32019f0038b9c7153482a5b929f08c23d3e428d4",
+        "name": "comment",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:35:01Z",
+        "completed_at": "2026-06-11T11:48:17Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80787471193"
+    },
+    {
+      "id": "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e",
+      "kind": "commit",
+      "occurred_at": "2026-06-11T11:49:02Z",
+      "text": "commit cbc0d82202ea1447a024793279252fc9ff97ab0e\nfix granite vision\n\ndiff -- src/transformers/models/granite4_vision/modeling_granite4_vision.py\n@@ -620,7 +620,9 @@ def forward(\n             if deepstack_features is not None and layer_idx in deepstack_features:\n                 features = deepstack_features[layer_idx].to(hidden_states.device, hidden_states.dtype)\n                 mask = vision_mask.to(hidden_states.device)\n-                hidden_states = hidden_states.masked_scatter(mask, (hidden_states[mask] + features.flatten()).view(-1))\n+                hidden_states = hidden_states.masked_scatter(\n+                    mask, (hidden_states[mask.squeeze(-1)] + features).view(-1)\n+                )\n \n             hidden_states = decoder_layer(\n                 hidden_states,\n\ndiff -- src/transformers/models/granite4_vision/modular_granite4_vision.py\n@@ -427,7 +427,9 @@ def forward(\n             if deepstack_features is not None and layer_idx in deepstack_features:\n                 features = deepstack_features[layer_idx].to(hidden_states.device, hidden_states.dtype)\n                 mask = vision_mask.to(hidden_states.device)\n-                hidden_states = hidden_states.masked_scatter(mask, (hidden_states[mask] + features.flatten()).view(-1))\n+                hidden_states = hidden_states.masked_scatter(\n+                    mask, (hidden_states[mask.squeeze(-1)] + features).view(-1)\n+                )\n \n             hidden_states = decoder_layer(\n                 hidden_states,",
+      "links": [
+        "license:68b7d66c97d66c58de883ed0c451af2b3183e6f3"
+      ],
+      "attributes": {
+        "sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/commits/cbc0d82202ea1447a024793279252fc9ff97ab0e"
+    },
+    {
+      "id": "ci:80789987539",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:49:20Z",
+      "text": "CI check Get PR number / Get PR number for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80789987539 status=completed conclusion=success",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "Get PR number / Get PR number",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:49:16Z",
+        "completed_at": "2026-06-11T11:49:20Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80789987539"
+    },
+    {
+      "id": "ci:80790019133",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:49:32Z",
+      "text": "CI check Get PR commit SHA / Get PR commit SHA better for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80790019133 status=completed conclusion=success",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "Get PR commit SHA / Get PR commit SHA better",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:49:26Z",
+        "completed_at": "2026-06-11T11:49:32Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80790019133"
+    },
+    {
+      "id": "ci:80789987534",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:49:34Z",
+      "text": "CI check security-gate / security-check for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80789987534 status=completed conclusion=success",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "security-gate / security-check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:49:16Z",
+        "completed_at": "2026-06-11T11:49:34Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80789987534"
+    },
+    {
+      "id": "ci:80790059236",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:49:41Z",
+      "text": "CI check security-gate / approve-pr-ci for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80790059236 status=completed conclusion=success",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "security-gate / approve-pr-ci",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:49:36Z",
+        "completed_at": "2026-06-11T11:49:41Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80790059236"
+    },
+    {
+      "id": "ci:80790085392",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:49:42Z",
+      "text": "CI check pr-ci for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80790085392 status=completed conclusion=skipped",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "pr-ci",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-11T11:49:43Z",
+        "completed_at": "2026-06-11T11:49:42Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80790085392"
+    },
+    {
+      "id": "ci:80790084815",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:49:49Z",
+      "text": "CI check debug-conditions for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80790084815 status=completed conclusion=success",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "debug-conditions",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:49:46Z",
+        "completed_at": "2026-06-11T11:49:49Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80790084815"
+    },
+    {
+      "id": "ci:80790053739",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:50:13Z",
+      "text": "CI check Get test files to run for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80790053739 status=completed conclusion=success",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "Get test files to run",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:49:36Z",
+        "completed_at": "2026-06-11T11:50:13Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80790053739"
+    },
+    {
+      "id": "ci:80790177851",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:50:14Z",
+      "text": "CI check skip_merge_queue for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80790177851 status=completed conclusion=skipped",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "skip_merge_queue",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-11T11:50:14Z",
+        "completed_at": "2026-06-11T11:50:14Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80790177851"
+    },
+    {
+      "id": "ci:80790181204",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:50:15Z",
+      "text": "CI check Benchmark for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80790181204 status=completed conclusion=skipped",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "Benchmark",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-11T11:50:15Z",
+        "completed_at": "2026-06-11T11:50:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80790181204"
+    },
+    {
+      "id": "ci:80790174080",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:50:20Z",
+      "text": "CI check Send a comment to suggest jobs to run for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80790174080 status=completed conclusion=success",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "Send a comment to suggest jobs to run",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:50:16Z",
+        "completed_at": "2026-06-11T11:50:20Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80790174080"
+    },
+    {
+      "id": "ci:80789984105",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:55:28Z",
+      "text": "CI check setup_and_quality for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80789984105 status=completed conclusion=success",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "setup_and_quality",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:49:09Z",
+        "completed_at": "2026-06-11T11:55:28Z",
+        "app_id": 18001,
+        "app_slug": "circleci-checks"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80789984105"
+    },
+    {
+      "id": "ci:80790177070",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:59:40Z",
+      "text": "CI check build / build_pr_documentation for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80790177070 status=completed conclusion=success",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "build / build_pr_documentation",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:50:28Z",
+        "completed_at": "2026-06-11T11:59:40Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80790177070"
+    },
+    {
+      "id": "ci:80791884270",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T11:59:49Z",
+      "text": "CI check doc_build_status_check for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80791884270 status=completed conclusion=success",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "doc_build_status_check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:59:45Z",
+        "completed_at": "2026-06-11T11:59:49Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80791884270"
+    },
+    {
+      "id": "ci:80790196220",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T12:02:19Z",
+      "text": "CI check run_tests for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80790196220 status=completed conclusion=failure",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "run_tests",
+        "status": "completed",
+        "conclusion": "failure",
+        "started_at": "2026-06-11T11:50:20Z",
+        "completed_at": "2026-06-11T12:02:19Z",
+        "app_id": 18001,
+        "app_slug": "circleci-checks"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80790196220"
+    },
+    {
+      "id": "ci:80789987462",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T12:02:28Z",
+      "text": "CI check comment for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80789987462 status=completed conclusion=success",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "comment",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T11:49:16Z",
+        "completed_at": "2026-06-11T12:02:28Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80789987462"
+    },
+    {
+      "id": "ci:80807522504",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-11T13:31:19Z",
+      "text": "CI check run_tests for cbc0d82202ea1447a024793279252fc9ff97ab0e\nrun_id=80807522504 status=completed conclusion=success",
+      "links": [
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e"
+      ],
+      "attributes": {
+        "head_sha": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "name": "run_tests",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-11T13:17:58Z",
+        "completed_at": "2026-06-11T13:31:19Z",
+        "app_id": 18001,
+        "app_slug": "circleci-checks"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/check-runs/80807522504"
+    },
+    {
+      "id": "merge:44907",
+      "kind": "merge",
+      "occurred_at": "2026-06-11T13:45:05Z",
+      "text": "Merged pull request #44907 from validated head commit cbc0d82202ea1447a024793279252fc9ff97ab0e.",
+      "links": [
+        "pull_request:44907",
+        "commit:cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "license:68b7d66c97d66c58de883ed0c451af2b3183e6f3",
+        "review:4457037207"
+      ],
+      "attributes": {
+        "commit": "cbc0d82202ea1447a024793279252fc9ff97ab0e",
+        "merge_commit_sha": "6c85f42d40054eab16b9ae27ecf614c636526c04"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/pulls/44907"
+    },
+    {
+      "id": "release:v5.12.0",
+      "kind": "release",
+      "occurred_at": "2026-06-12T14:39:40Z",
+      "text": "Release v5.12.0\n\n# Release v5.12.0\r\n\r\n\r\n## New Model additions\r\n\r\n### MiniMax-M3-VL\r\n\r\n<img width=\"886\" height=\"583\" alt=\"image\" src=\"https://github.com/user-attachments/assets/ae9dd96f-6877-4531-a06b-a756686f24e5\" />\r\n\r\nMiniMax-M3-VL is the vision-language member of the MiniMax-M3 family that pairs a CLIP-style vision tower with 3D rotary position embeddings with the MiniMax-M3 text backbone. It uses a mixed dense/sparse Mixture-of-Experts decoder with SwiGLU-OAI gated experts and a lightning indexer for block-sparse attention. The model processes images through a Conv3d patch embedding system and includes specialized components for efficient multimodal understanding and generation.\r\n\r\n**Links:** [Documentation](https://huggingface.co/docs/transformers/main/en/model_doc/minimax_m3_vl)\r\n* Add minimax m3vl (#46600) by @ArthurZucker in [#46600](https://github.com/huggingface/transformers/pull/46600)\r\n\r\n\r\n### PP-OCRv6: update documentation and slow tests (#46576)\r\n\r\n<img width=\"3840\" height=\"1494\" alt=\"image\" src=\"https://github.com/user-attachments/assets/e62284ec-78bf-49cb-8aa2-deccc665372f\" />\r\n\r\nThe official weights for PP-OCRv6 are out: PP-OCRv6 is a lightweight OCR system that combines architectural innovation with data-centric optimization. It redesigns the backbone, detection neck, and recognition neck around a unified MetaFormer-style building block with structural reparameterization. Three model tiers (medium, small, tiny) share the same block primitives, covering deployment scenarios from server to edge.\r\n\r\n* PP-OCRv6: update documentation and slow tests (#46576) by @ zhang-prog\r\n\r\n\r\n### Add Parakeet-RNNT (#46331)\r\n\r\nParakeetForRNNT: a Fast Conformer Encoder + an RNN-T (RNN Transducer) decoder\r\n\r\n- RNN-T Decoder: Standard neural transducer:\r\n    - LSTM prediction network maintains language context across token predictions.\r\n       - Joint network combines encoder and decoder outputs.\r\n       - Greedy transducer decoding for inference: a blank emission advances the encoder frame by one, a non-blank emission stays on the same frame.\r\n\r\n* Add Parakeet-RNNT (#46331) by @eustlb\r\n\r\n\r\n## Bugfixes and improvements\r\n\r\n* [CI] don't export OTELs within the tests (#46602) by @tarekziade in [#46602]\r\n* [CI] capture checkers output in OTEL (#46601) by @tarekziade in [#46601]\r\n* Lfm2: thread `seq_idx` through ShortConv for packed/varlen inputs (#46588) by @ChangyiYang in [#46588]\r\n* put output_hidden_states into filter_output_hidden_states (#46422) by @molbap in [#46422]\r\n* a11 for checkers (#46599) by @tarekziade in [#46599]\r\n* Fix stop string matching for byte-fragment tokens (#46530) by @Incheonkirin in [#46530]\r\n* [DiffusionGemma] better docs and links (#46569) by @gante in [#46569]\r\n* Require `trust_remote_code` to run a local-directory `custom_generate` (#46483) by @LinZiyuu in [#46483]\r\n* Fix torchaudio version not tied to torch version in docker file  (#46594) by @ydshieh in [#46594]\r\n* [CI] Enable PR CI for all fork PRs via security gate (#46591) by @ydshieh in [#46591]\r\n* [CB] [Minor] Add parameter to tune default compile level (#46533) by @remi-or in [#46533]\r\n* Make DiffusionGemma trainable (#46568) by @kashif in [#46568]\r\n* docs: 🌐 add Turkish translation for README file (#46312) by @onuralpszr in [#46312]\r\n* fix-trainer-tests (#46541) by @SunMarc in [#46541]\r\n* Remove unnecessary expand_as in get_placeholder_mask across VLMs (#44907) by @syncdoth in [#44907]\r\n* [CI] Catch all shell/process execution issues in security gate via Bandit JSON report (#46560) by @ydshieh in [#46560]\r\n* Honor a concrete dtype in AutoModel for composite checkpoints (#46514) by @qflen in [#46514]\r\n* [CI] Implement real security check in PR CI security gate (#46557) by @ydshieh in [#46557]\r\n* [CI] Add 60s delay in security gate for flow observation (#46555) by @ydshieh in [#46555]\r\n* [TBC] [CI] Auto-approve PR CI for fork PRs via security gate (#46553) by @ydshieh in [#46553]\r\n* [CI] fix and make less flaky (#46543) by @zucchini-nlp in [#46543]\r\n* Fix hf_hub_download not placing file in current dir for url_to_local_path (#46545) by @ydshieh in [#46545]\r\n\r\n## Significant community contributions\r\n\r\nThe following contributors have made significant changes to the library over the last release:\r\n\r\n* @ArthurZucker\r\n    * Add minimax m3vl (#46600)\r\n* @eustlb\r\n    * Add Parakeet-RNNT (#46331)",
+      "links": [
+        "pull_request:44907",
+        "merge:44907",
+        "ci:80790181204",
+        "ci:80790019133",
+        "ci:80789987539",
+        "ci:80790053739",
+        "ci:80790174080",
+        "ci:80790177070",
+        "ci:80789987462",
+        "ci:80790084815",
+        "ci:80791884270",
+        "ci:80790085392",
+        "ci:80790059236",
+        "ci:80789987534",
+        "ci:80790177851",
+        "ci:80807522504",
+        "ci:80789984105"
+      ],
+      "attributes": {
+        "tag": "v5.12.0",
+        "target_commitish": "main",
+        "tag_commit_sha": "e0e7504bca2bfd1b85bb0eedb148f7b250226f06",
+        "merge_commit_sha": "6c85f42d40054eab16b9ae27ecf614c636526c04",
+        "ancestry_verified": true,
+        "compare_status": "ahead",
+        "compare_base_sha": "6c85f42d40054eab16b9ae27ecf614c636526c04",
+        "compare_head_sha": "e0e7504bca2bfd1b85bb0eedb148f7b250226f06",
+        "compare_endpoint": "https://api.github.com/repos/huggingface/transformers/compare/6c85f42d40054eab16b9ae27ecf614c636526c04...e0e7504bca2bfd1b85bb0eedb148f7b250226f06",
+        "compare_response_sha256": "f696e21826c746f0618c5294dfd467e4c8bb31a843ff663db79f528028a656d6",
+        "ci_evidence_scope": "observed_selected_final_pre_merge_check_runs",
+        "required_check_policy_verified": false,
+        "required_check_policy_requirement": "external_signed_policy_required_for_production_eligibility"
+      },
+      "source_pointer": "https://api.github.com/repos/huggingface/transformers/releases/338627913"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "git_workflow",
+    "role": "source",
+    "key_id": "probe-source-e4bac7778cdcfa3808f3c373b474e85f",
+    "environment": "probe",
+    "digest": "7ba560112c300993f085dbfe13eb95cee29b2ed8f2d8d65df05ad302440ee6b6"
+  }
+}
