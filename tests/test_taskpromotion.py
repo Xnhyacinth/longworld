@@ -1926,6 +1926,7 @@ def test_task_view_projection_cli_is_deterministic_and_stays_candidate_only(
     assert promoted["promotion"]["task_candidate_content_commitment"]["view"] == (
         "full"
     )
+    assert promoted["hop_count"] == promoted["graph"]["hop_count"]
     renamed = deepcopy(full)
     renamed.pop("attestation")
     for field in (
@@ -2278,5 +2279,6 @@ def test_macro_task_promotion_honors_signed_world_selection(
     assert promoted["view"] == "ordered_release_timeline"
     assert promoted["composition_method"] == "as_of_revision_workflow"
     assert promoted["train_ready"] is True
+    assert promoted["hop_count"] == promoted["graph"]["hop_count"]
     assert promoted["trust_scope"] == "local_probe"
     assert Verification.model_validate(promoted["verification"]).all_green()

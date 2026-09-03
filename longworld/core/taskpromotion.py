@@ -1348,6 +1348,7 @@ def promote_task_candidate(
         "n_essential_events": growth["graph"]["n_essential_events"],
         "n_essential_artifacts": growth["graph"]["n_essential_artifacts"],
     }
+    promoted["hop_count"] = int(candidate_graph["hop_count"])
     promoted["task_proof_receipt"] = task_proof["task_proof_receipt"]
     promoted["verification"] = task_proof["verification"]
     promoted["view_verification"] = task_proof["view_verification"]

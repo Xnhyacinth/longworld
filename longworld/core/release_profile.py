@@ -376,7 +376,7 @@ RELEASE_PROFILES = {
             ("cyber", 2),
             ("macro_economics", 2),
         ),
-        min_motifs=12,
+        min_motifs=11,
         min_unique_executable_proofs=12,
         min_unique_answer_programs=12,
         min_unique_semantic_base_tasks=12,

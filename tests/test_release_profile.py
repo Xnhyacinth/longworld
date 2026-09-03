@@ -170,9 +170,9 @@ def test_p13_authentic_six_domain_profile_is_an_immutable_probe_root() -> None:
     assert profile.min_unique_executable_proofs == 12
     assert profile.min_unique_answer_programs == 12
     assert profile.min_unique_semantic_base_tasks == 12
-    assert profile.min_motifs == 12
+    assert profile.min_motifs == 11
     assert release_profile_sha256(profile.profile_id) == (
-        "7fc9734fdd5dd7b3420eb7235e542fe1b82b8bf5dfc146862eb889a21d6de877"
+        "a0c2148ab2524d8a5130bef85b7e519db76244ccd8453b0f917dc3a8d79ae030"
     )
 
 

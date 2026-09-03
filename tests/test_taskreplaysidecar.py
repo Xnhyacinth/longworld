@@ -493,3 +493,33 @@ def test_replay_registry_v2_routes_portable_task_sidecar_binding(
     candidate["source_workflow_bundle"] = {"sha256": "a" * 64}
     with pytest.raises(Exception, match="cannot bind two"):
         _candidate_replay_paths(candidate, None, None, registry)
+
+
+def test_replay_registry_v2_canonicalizes_task_sidecar_parent_symlink(
+    tmp_path: Path,
+) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from promote_candidates import _load_replay_registry
+
+    real_directory = tmp_path / "real"
+    real_directory.mkdir()
+    sidecar_path = real_directory / "replay.json"
+    sidecar_path.write_text("{}", encoding="utf-8")
+    (tmp_path / "linked").symlink_to(real_directory, target_is_directory=True)
+    digest = "a" * 64
+    registry_path = tmp_path / "registry.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.replay-path-registry.v2",
+                "episode_replay_bundles": {},
+                "source_workflow_bundles": {},
+                "task_replay_sidecars": {digest: "linked/replay.json"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    registry = _load_replay_registry(registry_path)
+
+    assert registry["task_replay_sidecars"][digest] == sidecar_path.resolve()

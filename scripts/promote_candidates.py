@@ -288,7 +288,11 @@ def _load_replay_registry(path: Path) -> dict[str, dict[str, Path]]:
                 candidate = path.parent / candidate
             if candidate.is_symlink() or not candidate.is_file():
                 raise ValueError(f"replay registry {field} path is invalid")
-            resolved[digest] = candidate.absolute()
+            resolved[digest] = (
+                candidate.resolve(strict=True)
+                if field == "task_replay_sidecars"
+                else candidate.absolute()
+            )
         registry[field] = resolved
     return registry
 
