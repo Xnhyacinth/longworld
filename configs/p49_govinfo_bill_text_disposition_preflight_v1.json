@@ -1,0 +1,183 @@
+{
+  "schema_version": "longworld.p49-govinfo-bill-text-disposition-preflight.v1",
+  "data_product": "p49_govinfo_bill_text_disposition_preflight_v1",
+  "authorization": {
+    "record_id": "p49-govinfo-bill-text-disposition-preflight-v1",
+    "scope": "two official 118th-Congress bill-status records and their EAS, EAH, ENR, and Public Law XML texts, inspected ephemerally for lifecycle topology, section dispositions, and aggregate-only capacity",
+    "basis": "each selected GovInfo XML text contains an explicit 17 USC 105 public-domain statement; GovInfo warns that third-party material in government publications may remain copyrighted",
+    "reviewed_at": "2026-09-04T00:00:00Z",
+    "allowed_actions": [
+      "fetch_frozen_official_xml_to_process_memory",
+      "verify_bill_status_action_and_text_version_relations",
+      "measure_section_dispositions_and_aggregate_only_qwen_capacity"
+    ],
+    "prohibited_actions": [
+      "persist_or_commit_raw_bill_or_status_xml",
+      "generate_candidates",
+      "promote_or_count_inventory"
+    ]
+  },
+  "research_question": "Can official GovInfo bill-status actions and four-stage bill texts support deterministic retained/modified/removed section tasks with near-deduplicated exact 32K, 64K, and 128K capacity?",
+  "official_pages": {
+    "congressional_bills_help": "https://www.govinfo.gov/help/bills",
+    "bill_status_help": "https://www.govinfo.gov/help/bill-status",
+    "bill_status_resources": "https://www.govinfo.gov/bulkdata/BILLSTATUS/resources",
+    "public_domain_policy": "https://www.govinfo.gov/about/policies#copyright"
+  },
+  "public_domain_text": "Pursuant to Title 17 Section 105 of the United States Code, this file is not subject to copyright protection and is in the public domain.",
+  "chains": [
+    {
+      "bill_id": "118-HR-815",
+      "law_number": "118-50",
+      "status_source": {
+        "url": "https://www.govinfo.gov/bulkdata/BILLSTATUS/118/hr/BILLSTATUS-118hr815.xml",
+        "expected_bytes": 1110644,
+        "expected_sha256": "41fbdbabe08dc06e609c56b117aa3d7c31844f0277bf7ac7270602aa6f99b6b2"
+      },
+      "stages": [
+        {
+          "stage": "eas",
+          "official_type": "Engrossed Amendment Senate",
+          "date": "2024-02-13",
+          "url": "https://www.govinfo.gov/content/pkg/BILLS-118hr815eas/xml/BILLS-118hr815eas.xml",
+          "expected_bytes": 145614,
+          "expected_sha256": "9a7ef67bcdce847f6f354a9c7e28df495e11fc938ddd80f83925b60de0f2631a"
+        },
+        {
+          "stage": "eah",
+          "official_type": "Engrossed Amendment House",
+          "date": "2024-04-20",
+          "url": "https://www.govinfo.gov/content/pkg/BILLS-118hr815eah/xml/BILLS-118hr815eah.xml",
+          "expected_bytes": 492555,
+          "expected_sha256": "f8656c3c1bfe96a228a50a81d8913177addd984dd91cf8e45d0253c355704a21"
+        },
+        {
+          "stage": "enr",
+          "official_type": "Enrolled Bill",
+          "date": "2024-04-23",
+          "url": "https://www.govinfo.gov/content/pkg/BILLS-118hr815enr/xml/BILLS-118hr815enr.xml",
+          "expected_bytes": 491950,
+          "expected_sha256": "06d095fd27b2f6ea27612e01aae48d2b61c93352f6a4060aa4bfe7cd3cabbfc7"
+        },
+        {
+          "stage": "law",
+          "official_type": "Public Law",
+          "date": "2024-04-24",
+          "url": "https://www.govinfo.gov/content/pkg/PLAW-118publ50/uslm/PLAW-118publ50.xml",
+          "expected_bytes": 772982,
+          "expected_sha256": "9bbe459e967a14803435bd970e0e27fcb2767caf4b73a23e041b8459d506d28a"
+        }
+      ],
+      "action_edges": [
+        {
+          "from": "eas",
+          "to": "eah",
+          "date": "2024-04-20",
+          "required_text": "House agree with an amendment to the Senate amendment"
+        },
+        {
+          "from": "eah",
+          "to": "enr",
+          "date": "2024-04-23",
+          "required_text": "Senate agreed to the House amendment to the Senate amendment to H.R. 815"
+        },
+        {
+          "from": "enr",
+          "to": "law",
+          "date": "2024-04-24",
+          "required_text": "Became Public Law No: 118-50"
+        }
+      ]
+    },
+    {
+      "bill_id": "118-HR-4366",
+      "law_number": "118-42",
+      "status_source": {
+        "url": "https://www.govinfo.gov/bulkdata/BILLSTATUS/118/hr/BILLSTATUS-118hr4366.xml",
+        "expected_bytes": 1459193,
+        "expected_sha256": "4133df177ede5fd7b4ee70df83c1fe9d55fe1b9d5df8c9bd98fffc337a5225b3"
+      },
+      "stages": [
+        {
+          "stage": "eas",
+          "official_type": "Engrossed Amendment Senate",
+          "date": "2023-11-01",
+          "url": "https://www.govinfo.gov/content/pkg/BILLS-118hr4366eas/xml/BILLS-118hr4366eas.xml",
+          "expected_bytes": 835739,
+          "expected_sha256": "7f5136031fbdc527798988b2527c9f2125a6c5f8901b44f58fd68c2a336ac80a"
+        },
+        {
+          "stage": "eah",
+          "official_type": "Engrossed Amendment House",
+          "date": "2024-03-06",
+          "url": "https://www.govinfo.gov/content/pkg/BILLS-118hr4366eah/xml/BILLS-118hr4366eah.xml",
+          "expected_bytes": 1840855,
+          "expected_sha256": "9b470b0e42d91b2f580f8b9314a2fb88a062df3654665aa6401200ee49f6af24"
+        },
+        {
+          "stage": "enr",
+          "official_type": "Enrolled Bill",
+          "date": "2024-03-08",
+          "url": "https://www.govinfo.gov/content/pkg/BILLS-118hr4366enr/xml/BILLS-118hr4366enr.xml",
+          "expected_bytes": 1839030,
+          "expected_sha256": "63ae3f506d9e06145b3713736e8c3122e90fe1261abcc8a67b19ab726e14cdb9"
+        },
+        {
+          "stage": "law",
+          "official_type": "Public Law",
+          "date": "2024-03-09",
+          "url": "https://www.govinfo.gov/content/pkg/PLAW-118publ42/uslm/PLAW-118publ42.xml",
+          "expected_bytes": 2586115,
+          "expected_sha256": "563491684e2c60d3f80b6cc642c2bc92b9c91b08cbbcc5270de22d436ae80ddf"
+        }
+      ],
+      "action_edges": [
+        {
+          "from": "eas",
+          "to": "eah",
+          "date": "2024-03-06",
+          "required_text": "House agreed to the Senate amendment with an amendment"
+        },
+        {
+          "from": "eah",
+          "to": "enr",
+          "date": "2024-03-08",
+          "required_text": "Senate agreed to the House amendment to Senate amendment"
+        },
+        {
+          "from": "enr",
+          "to": "law",
+          "date": "2024-03-09",
+          "required_text": "Became Public Law No: 118-42"
+        }
+      ]
+    }
+  ],
+  "section_oracle": {
+    "structural_ancestors": ["division", "title", "subtitle", "chapter", "subchapter", "part", "subpart"],
+    "presentation_only_tags": ["note", "page", "sidenote", "sourceCredit"],
+    "near_duplicate_word_shingle_size": 5,
+    "near_duplicate_jaccard_threshold": 0.9,
+    "minimum_section_characters": 80
+  },
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "capacity_bands": {
+    "32k": [32000, 32768],
+    "64k": [64000, 65536],
+    "128k": [128000, 131072]
+  },
+  "constraints": [
+    "version and action relations must be present in the frozen official Bill Status XML; a filename sequence alone is insufficient",
+    "a section key uses normalized hierarchy and section numbers; duplicate structural keys are ambiguous and excluded from the disposition oracle",
+    "retained means exact normalized text or five-word-shingle Jaccard at least 0.90 under the same unambiguous structural key; lower similarity is modified, and missing keys are removed or added",
+    "page markers, sidenotes, source credits, and notes are excluded before section comparison so schema-conversion presentation artifacts do not create capacity",
+    "global near-duplicate collapse at the same 0.90 threshold precedes capacity counting and compares sections across and within all selected stages",
+    "no raw XML, padding, cloned section, repeated enrolled/final text, or split/truncated section may add capacity",
+    "capacity is preflight evidence only; no candidate generation before independent source freeze, formal near-duplicate, exact-band, derived-view, truncation, source-lineage, shortcut, counterfactual, and remove-one gates pass unchanged"
+  ]
+}
