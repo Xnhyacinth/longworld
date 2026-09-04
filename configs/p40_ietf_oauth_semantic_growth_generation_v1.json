@@ -37,6 +37,11 @@
         "ietf:draft:draft-ietf-oauth-security-topics-29",
         "ietf:rfc:6749",
         "ietf:rfc:6750",
+        "ietf:rfc:6819",
+        "ietf:rfc:7636",
+        "ietf:rfc:8414",
+        "ietf:rfc:8705",
+        "ietf:rfc:9207",
         "ietf:rfc:9700"
       ],
       "64k": [
@@ -46,6 +51,8 @@
         "ietf:rfc:6819",
         "ietf:rfc:7636",
         "ietf:rfc:8414",
+        "ietf:rfc:8705",
+        "ietf:rfc:9101",
         "ietf:rfc:9207",
         "ietf:rfc:9700"
       ],
@@ -80,12 +87,15 @@
       "ietf:rfc:9700"
     ],
     "chunk_max_tokens": 1265,
+    "isolate_evidence_ids": [
+      "redirect_baseline"
+    ],
     "support_priority_record_ids": [
       "ietf:rfc:9700"
     ],
     "span_id_width": 7,
-    "counterfactual_companion_evidence_id": "metadata_current",
-    "rfc9700_operation": "exclude_authenticated_bearer_current_span_from_nonempty_companion_chunk",
+    "counterfactual_companion_evidence_id": "",
+    "rfc9700_operation": "exclude_authenticated_bearer_current_span_from_natural_nonempty_chunk",
     "published_draft_policy": "identity_paragraph_only",
     "padding": false,
     "cloned_artifacts": false,
@@ -96,7 +106,7 @@
     "model_id": "sentence-transformers/all-MiniLM-L6-v2",
     "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
   },
-  "output_dir": "data/candidates/p40_ietf_oauth_semantic_growth_v4",
+  "output_dir": "data/candidates/p40_ietf_oauth_semantic_growth_v11",
   "do_not_select": true,
   "do_not_promote": true,
   "do_not_count": true

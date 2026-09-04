@@ -47,6 +47,29 @@ CANDIDATE_KEY = b"ietf-projection-candidate-key-32-bytes-minimum"
 SOURCE_KEY = b"ietf-projection-source-key-32-bytes-minimum"
 
 
+def test_p40_32k_pack_includes_late_cross_specification_anchors() -> None:
+    config = json.loads(
+        Path("configs/p40_ietf_oauth_semantic_growth_generation_v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    records_by_bucket = config["packing"]["record_ids_by_bucket"]
+
+    assert "ietf:rfc:6819" in records_by_bucket["32k"]
+    assert "ietf:rfc:7636" in records_by_bucket["32k"]
+    assert "ietf:rfc:8414" in records_by_bucket["32k"]
+    assert "ietf:rfc:8705" in records_by_bucket["32k"]
+    assert "ietf:rfc:9207" in records_by_bucket["32k"]
+    assert "ietf:rfc:9101" in records_by_bucket["64k"]
+    assert set(records_by_bucket["32k"]) < set(records_by_bucket["64k"])
+    assert set(records_by_bucket["64k"]) < set(records_by_bucket["128k"])
+    assert config["packing"]["counterfactual_companion_evidence_id"] == ""
+    assert config["packing"]["rfc9700_operation"] == (
+        "exclude_authenticated_bearer_current_span_from_natural_nonempty_chunk"
+    )
+    assert config["packing"]["isolate_evidence_ids"] == ["redirect_baseline"]
+
+
 class _RepeatedCharacterOffsets:
     def __init__(self, counter) -> None:
         self._counter = counter
