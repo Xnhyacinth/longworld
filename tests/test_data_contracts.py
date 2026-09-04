@@ -1366,6 +1366,21 @@ def test_sharegpt_export_rejects_an_orphaned_cf_dossier(tmp_path: Path) -> None:
         validate_export_twins([row], "B3")
 
 
+def test_sharegpt_export_allows_task_rows_without_query_type() -> None:
+    row = to_sharegpt(
+        {
+            "world_id": "ietf-world",
+            "query_id": "ietf-world:q",
+            "view": "full",
+            "query_timing": "late",
+            "context": "records",
+            "answer": "answer",
+        }
+    )
+
+    assert row["query_type"] is None
+
+
 def test_release_export_uses_only_executable_long_views() -> None:
     assert COND_VIEWS == {
         "B1": {"full"},

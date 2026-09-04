@@ -186,7 +186,7 @@ def to_sharegpt(row: dict, *, sample_weight: int = 1) -> dict:
         "query_id": row["query_id"],
         "dossier_id": row.get("dossier_id"),
         "view": row["view"],
-        "query_type": row["query_type"],
+        "query_type": row.get("query_type"),
         "query_timing": row["query_timing"],
         "length_bucket": row.get("length_bucket"),
         "evidence_distance": (
