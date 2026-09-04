@@ -1,0 +1,141 @@
+{
+  "schema_version": "longworld.p50-treasurydirect-auction-reopening-preflight-request.v1",
+  "data_product": "p50_treasurydirect_auction_reopening_preflight_v1",
+  "authorization": {
+    "record_id": "p50-treasurydirect-auction-reopening-preflight-v1",
+    "scope": "official TreasuryDirect auction results from 1998-07-27 through 2024-12-31, grouped ephemerally by CUSIP and projected without identifiers",
+    "basis": "TreasuryDirect Web API terms permit services that search, display, analyze, and retrieve Fiscal Service data, but neither those terms nor the general site terms explicitly authorize redistribution as model-training data; all conversion therefore remains fail closed",
+    "reviewed_at": "2026-09-04T00:00:00Z",
+    "allowed_actions": [
+      "fetch_the_configured_official_snapshot_into_memory_or_tmp_storage",
+      "use_cusip_only_as_an_ephemeral_grouping_key",
+      "inspect_only_configured_auction_and_aggregate_fields",
+      "persist_aggregate_counts_hashes_urls_schema_names_and_exclusion_rules"
+    ],
+    "prohibited_actions": [
+      "persist_or_commit_raw_auction_rows_or_cusip_values",
+      "treat_public_access_as_training_redistribution_permission",
+      "use_cusip_filenames_timestamps_or_identifiers_as_token_capacity",
+      "generate_candidates",
+      "promote_or_count_inventory"
+    ]
+  },
+  "research_question": "Can a frozen official TreasuryDirect snapshot support a deterministic CUSIP-to-auction-to-issue-and-settlement-to-reopening task with source-authentic 32K, 64K, and 128K unique-token capacity after identifier removal and aggressive coarsening?",
+  "snapshot": {
+    "start_date": "1998-07-27",
+    "end_date": "2024-12-31",
+    "date_field_name": "auctionDate",
+    "url": "https://www.treasurydirect.gov/TA_WS/securities/search?format=json&startDate=1998-07-27&endDate=2024-12-31&dateFieldName=auctionDate&pageNum=1&pageSize=2000",
+    "expected_bytes": 25263804,
+    "expected_sha256": "21239f0c6d4f042ebbe0890cab82cce38080bc3c0713ead97f2a9974a8a56008",
+    "expected_rows": 7337,
+    "expected_field_count": 120
+  },
+  "official_sources": {
+    "auction_query": "https://www.treasurydirect.gov/auctions/auction-query/",
+    "auction_query_help": "https://www.treasurydirect.gov/auctions/auction-query/auction-query-help/",
+    "how_auctions_work": "https://www.treasurydirect.gov/auctions/how-auctions-work/",
+    "reopenings": "https://www.treasurydirect.gov/auctions/reopenings/",
+    "pricing": "https://www.treasurydirect.gov/marketable-securities/understanding-pricing/",
+    "auction_regulations": "https://www.treasurydirect.gov/laws-and-regulations/auction-regulations-uoc/",
+    "auction_regulations_pdf": "https://www.treasurydirect.gov/files/laws-and-regulations/auction-regulations-uoc/31-cfr-part-356.pdf",
+    "api_change_notice": "https://www.treasurydirect.gov/files/auction/auction-file-&-api-specification-changes.pdf",
+    "api_terms": "https://www.treasurydirect.gov/legal-information/developers/web-api-terms/",
+    "site_terms": "https://www.treasurydirect.gov/legal-information/terms/",
+    "privacy": "https://www.treasurydirect.gov/legal-information/privacy/"
+  },
+  "required_fields": [
+    "cusip",
+    "securityType",
+    "securityTerm",
+    "originalSecurityTerm",
+    "reopening",
+    "announcementDate",
+    "auctionDate",
+    "issueDate",
+    "originalIssueDate",
+    "maturityDate",
+    "interestRate",
+    "spread",
+    "floatingRate",
+    "tips",
+    "highDiscountRate",
+    "highPrice",
+    "pricePer100",
+    "offeringAmount",
+    "totalTendered",
+    "totalAccepted"
+  ],
+  "projection": {
+    "chain_fields": [
+      "securityType",
+      "originalSecurityTerm",
+      "maturityDate",
+      "originalIssueDate",
+      "interestRate",
+      "spread",
+      "interestPaymentFrequency",
+      "floatingRate",
+      "tips",
+      "cashManagementBillCMB"
+    ],
+    "event_fields": [
+      "reopening",
+      "announcementDate",
+      "auctionDate",
+      "issueDate",
+      "securityTerm",
+      "datedDate",
+      "backDated",
+      "backDatedDate",
+      "highDiscountRate",
+      "highInvestmentRate",
+      "highYield",
+      "highDiscountMargin",
+      "highPrice",
+      "pricePer100",
+      "accruedInterestPer100",
+      "accruedInterestPer1000",
+      "adjustedAccruedInterestPer1000",
+      "offeringAmount",
+      "totalTendered",
+      "totalAccepted",
+      "competitiveTendered",
+      "competitiveAccepted",
+      "noncompetitiveAccepted",
+      "directBidderAccepted",
+      "indirectBidderAccepted",
+      "primaryDealerAccepted",
+      "somaAccepted",
+      "fimaNoncompetitiveAccepted",
+      "bidToCoverRatio"
+    ]
+  },
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "capacity_bands": {
+    "32k": [32000, 32768],
+    "64k": [64000, 65536],
+    "128k": [128000, 131072]
+  },
+  "privacy_and_identifier_exclusions": [
+    "cusip announcedCusip originalCusip corpusCusip and TINT or TIIN CUSIPs",
+    "announcement and result PDF or XML filenames",
+    "updatedTimestamp and other ingestion metadata",
+    "customer bidder account payment routing and contact data",
+    "free text or external descriptions not required by the oracle"
+  ],
+  "constraints": [
+    "a complete chain has exactly one reopening=No row and at least one reopening=Yes row under one ephemeral CUSIP",
+    "issueDate is the auction settlement event date; the API does not expose a separate settlementDate field",
+    "bill highDiscountRate-to-price replay uses the official face-value discount formula and actual issue-to-maturity days",
+    "identifier-free and aggressively coarsened capacity is only an upper bound until formal near-duplicate and exact-band packing audits run",
+    "CUSIP retrieval must not make the gold solvable inside unchanged 4K 8K or 16K windows",
+    "no padding cloning candidate generation promotion or inventory counting",
+    "no rights near-duplicate exact-band derived-view truncation source-lineage remove-one or shortcut gate may be relaxed"
+  ]
+}

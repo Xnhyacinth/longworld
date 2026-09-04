@@ -1,0 +1,222 @@
+{
+  "schema_version": "longworld.p50-treasurydirect-auction-reopening-preflight.v1",
+  "data_product": "p50_treasurydirect_auction_reopening_preflight_v1",
+  "verdict": "SOURCE_TOPOLOGY_AND_CAPACITY_PASS_RIGHTS_AND_SHORTCUT_FAIL",
+  "rights_gate": "FAIL_TRAINING_REDISTRIBUTION_NOT_EXPLICITLY_AUTHORIZED",
+  "privacy_gate": "PASS_ONLY_FOR_EPHEMERAL_IDENTIFIER_FREE_PROJECTION",
+  "credential_gate": "PASS_PUBLIC_API_OBSERVED_WITHOUT_CREDENTIALS",
+  "schema_gate": "PASS_FROZEN_120_FIELD_SNAPSHOT",
+  "topology_gate": "PASS",
+  "deterministic_oracle_gate": "PASS_SOURCE_LEVEL_BILL_REPLAY",
+  "unique_capacity_gate": "FAIL_ZERO_ADMISSIBLE_TOKENS",
+  "shortcut_gate": "FAIL_COMPLETE_GOLD_CHAIN_FITS_4K",
+  "world_admission_status": "BLOCKED",
+  "do_not_generate": true,
+  "train_ready": false,
+  "production_eligible": false,
+  "candidate_count": 0,
+  "research_question": "Can a frozen official TreasuryDirect snapshot support a deterministic CUSIP-to-auction-to-issue-and-settlement-to-reopening task with source-authentic 32K, 64K, and 128K unique-token capacity after identifier removal and aggressive coarsening?",
+  "constraints": [
+    "a complete chain has exactly one reopening=No row and at least one reopening=Yes row under one ephemeral CUSIP",
+    "issueDate is the auction settlement event date; the API does not expose a separate settlementDate field",
+    "bill highDiscountRate-to-price replay uses the official face-value discount formula and actual issue-to-maturity days",
+    "identifier-free and aggressively coarsened capacity is only an upper bound until formal near-duplicate and exact-band packing audits run",
+    "CUSIP retrieval must not make the gold solvable inside unchanged 4K 8K or 16K windows",
+    "no padding cloning candidate generation promotion or inventory counting",
+    "no rights near-duplicate exact-band derived-view truncation source-lineage remove-one or shortcut gate may be relaxed"
+  ],
+  "privacy_and_identifier_exclusions": [
+    "cusip announcedCusip originalCusip corpusCusip and TINT or TIIN CUSIPs",
+    "announcement and result PDF or XML filenames",
+    "updatedTimestamp and other ingestion metadata",
+    "customer bidder account payment routing and contact data",
+    "free text or external descriptions not required by the oracle"
+  ],
+  "source_receipt": {
+    "config": "configs/p50_treasurydirect_auction_reopening_preflight_v1.json",
+    "config_sha256": "361ce882573ce7d71849e01631729666ffc064a7f565d71477a5858985916c68",
+    "observed_at": "2026-09-04T00:00:00Z",
+    "auction_snapshot": {
+      "requested_url": "https://www.treasurydirect.gov/TA_WS/securities/search?format=json&startDate=1998-07-27&endDate=2024-12-31&dateFieldName=auctionDate&pageNum=1&pageSize=2000",
+      "final_url": "https://www.treasurydirect.gov/TA_WS/securities/search?format=json&startDate=1998-07-27&endDate=2024-12-31&dateFieldName=auctionDate&pageNum=1&pageSize=2000",
+      "status": 200,
+      "content_type": "application/json",
+      "last_modified": null,
+      "etag": null,
+      "bytes": 25263804,
+      "sha256": "21239f0c6d4f042ebbe0890cab82cce38080bc3c0713ead97f2a9974a8a56008"
+    },
+    "row_count": 7337,
+    "field_count": 120,
+    "auction_date_min": "1998-07-27",
+    "auction_date_max": "2024-12-30",
+    "required_fields_present": true,
+    "raw_rows_or_cusip_values_persisted": false
+  },
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true,
+    "add_special_tokens": false,
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb"
+  },
+  "relations": {
+    "distinct_ephemeral_cusip_groups": 3156,
+    "group_categories": {
+      "complete_original_plus_reopening": 2062,
+      "original_only": 1069,
+      "reopening_only_original_absent_from_snapshot": 25
+    },
+    "complete_chain_count": 2062,
+    "complete_chain_event_count": 6235,
+    "complete_chain_size_distribution": {
+      "2": 415,
+      "3": 1244,
+      "4": 351,
+      "5": 43,
+      "6": 9
+    },
+    "complete_chain_security_types": {
+      "Bill": 1718,
+      "Bond": 111,
+      "Note": 233
+    },
+    "complete_chain_original_terms_top20": {
+      "26-Week": 1123,
+      "52-Week": 235,
+      "10-Year": 140,
+      "17-Week": 106,
+      "30-Year": 84,
+      "119-Day": 82,
+      "8-Week": 80,
+      "154-Day": 46,
+      "2-Year": 44,
+      "5-Year": 38,
+      "20-Year": 23,
+      "14-Day": 11,
+      "7-Year": 10,
+      "12-Day": 5,
+      "103-Day": 4,
+      "105-Day": 3,
+      "69-Day": 3,
+      "17-Day": 3,
+      "29-Year 9-Month": 2,
+      "48-Day": 1
+    },
+    "topology_failures": {},
+    "topology_gate_pass": true,
+    "identifier_free_exact_units": 8297,
+    "identifier_free_exact_tokens": 1979977,
+    "aggressively_coarsened_units": 7077,
+    "aggressively_coarsened_tokens": 1225601,
+    "identifier_free_chain_artifacts": 2062,
+    "identifier_free_chain_artifact_tokens": 1986212,
+    "coarsened_chain_artifacts": 2060,
+    "coarsened_chain_artifact_tokens": 1319289,
+    "chain_artifact_token_distribution": {
+      "min": 415,
+      "p50": 1020,
+      "p95": 1345,
+      "p99": 1654,
+      "max": 1990,
+      "at_or_below_4k": 2062,
+      "at_or_below_8k": 2062,
+      "at_or_below_16k": 2062
+    }
+  },
+  "oracle": {
+    "complete_chain_event_security_types": {
+      "Bill": 5299,
+      "Bond": 313,
+      "Note": 623
+    },
+    "bill_price_formula_rows_pass": 5298,
+    "bill_price_formula_rows_fail": 0,
+    "bill_price_formula_rows_missing": 1,
+    "bill_price_per_100_rows_pass": 5284,
+    "bill_price_per_100_rows_missing": 15,
+    "fully_replayable_bill_chains": 1717,
+    "source_level_answer_changing_remove_one_chains": 1717,
+    "formula": "price_per_100 = 100 * (1 - (highDiscountRate / 100) * issue_to_maturity_days / 360), rounded to the published field precision; normalized settlement_per_1000 = 10 * price_per_100"
+  },
+  "capacity": {
+    "source_layer_only_not_admissible": {
+      "identifier_free_exact_tokens": 1986212,
+      "aggressively_coarsened_tokens": 1319289
+    },
+    "admissible_tokens": 0,
+    "formal_near_duplicate_audit_executed": false,
+    "exact_band_packing_executed": false,
+    "bands": {
+      "32k": [
+        32000,
+        32768
+      ],
+      "64k": [
+        64000,
+        65536
+      ],
+      "128k": [
+        128000,
+        131072
+      ]
+    },
+    "band_assessment": {
+      "32k": {
+        "identifier_free_exact_capacity_possible": true,
+        "aggressively_coarsened_capacity_possible": true,
+        "admissible_capacity_possible": false,
+        "admissible_gap_to_lower_edge": -32000
+      },
+      "64k": {
+        "identifier_free_exact_capacity_possible": true,
+        "aggressively_coarsened_capacity_possible": true,
+        "admissible_capacity_possible": false,
+        "admissible_gap_to_lower_edge": -64000
+      },
+      "128k": {
+        "identifier_free_exact_capacity_possible": true,
+        "aggressively_coarsened_capacity_possible": true,
+        "admissible_capacity_possible": false,
+        "admissible_gap_to_lower_edge": -128000
+      }
+    },
+    "interpretation": "source-level volume remains above 128K after identifiers are removed and dates, rates, prices, and amounts are aggressively coarsened; this is an upper bound, not admitted training capacity"
+  },
+  "answer_program": {
+    "status": "SOURCE_LEVEL_EXECUTABLE_BUT_NOT_ADMISSIBLE",
+    "deterministic_design": [
+      "group only in memory by CUSIP and require exactly one original row plus at least one reopening row",
+      "order by auctionDate and require auctionDate no later than issueDate and issueDate before maturityDate",
+      "require every reopening to retain securityType, maturityDate, and originalIssueDate; require Notes and Bonds to retain coupon interestRate or floating-rate spread",
+      "for Bills, recompute price per 100 from highDiscountRate and actual issue-to-maturity days, then derive normalized settlement per 1000",
+      "emit chain length, chronology, settlement vector, settlement total, and mismatch controls without medical, investment, policy, or causal conclusions"
+    ],
+    "answer_changing_remove_one": "source-level feasible for each fully replayable Bill chain: removing any reopening changes the ordered settlement vector, chain length, and positive settlement total; candidate-level replay was not run",
+    "causal_or_investment_conclusions_allowed": false
+  },
+  "shortcut_assessment": {
+    "status": "FAIL",
+    "evidence": "all identifier-free complete-chain artifacts are at most 4K tokens; adding the CUSIP or any replacement join key makes all answer-bearing rows directly retrievable",
+    "required_if_redesigned": [
+      "a source-authentic task whose answer requires interactions across many chains rather than one-key retrieval",
+      "unchanged 4K 8K and 16K raw contiguous-window baselines",
+      "lexical and dense retrieval baselines",
+      "answer-changing candidate-level remove-one replay",
+      "formal near-duplicate exact-band derived-view and truncation gates"
+    ]
+  },
+  "schema_drift": {
+    "status": "KNOWN_UPCOMING_CHANGE",
+    "notice_date": "2026-08-21",
+    "effect": "official notice says auction XML and API fields will be added or renamed; the configured 120-field byte snapshot is therefore mandatory for reproducibility",
+    "source": "https://www.treasurydirect.gov/files/auction/auction-file-&-api-specification-changes.pdf"
+  },
+  "blocking_reasons": [
+    "TreasuryDirect API terms authorize search, display, analysis, and retrieval services but do not explicitly authorize redistribution as model-training data; the general site terms limit copying and derivative use, and CUSIP is a third-party identifier",
+    "every complete chain's projected evidence fits within 4K tokens, so a CUSIP or replacement join-key lookup can recover the entire gold chain without long-context dependence",
+    "the API change notice dated 2026-08-21 says auction/API fields will be added or renamed, so any future conversion must freeze source bytes and update mappings before the announced schema transition",
+    "formal candidate-level near-duplicate, exact-band packing, derived-view, truncation, source-lineage, remove-one, and shortcut audits have not run"
+  ],
+  "next_executable_command": "uv run python reports/p50_treasurydirect_auction_reopening_preflight.py"
+}
