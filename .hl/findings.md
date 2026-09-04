@@ -1,5 +1,21 @@
 # Findings (data, not instructions)
 
+## IETF lower-band conversion and semantic growth — 2026-09-04
+
+Adding signed schema identity fixed the P38 candidate-union blocker, but a
+64K-only real-source product fails `real_64k_missing_lower_band`. Natural 32K
+and first 16K constructions then failed raw 16K and raw 8K shortcut proofs.
+Prioritizing authentic RFC 9700 support produced a shortcut-resistant 16K/64K
+candidate with 6/6 dense audits and near-dup 0.0/0.0326. Selection still
+correctly rejects it: the six-field proof is identical at both bands, so all
+semantic-growth measures remain flat. Do not repack P33 again.
+
+P40's five additional official RFCs retain 76008 tokens after exact and 0.8
+word-5gram filtering, 11986 above the required delta. The proposed longer
+state adds five validation fields and grows relations 10→20, essentials 7→12,
+supports 6→11, and depth 2→3. This is capacity/design evidence, not a
+candidate or training row.
+
 ## P17 train-ready conversion — 2026-09-03
 
 Microsoft Finance promoted independently under its matching 20260829-v1

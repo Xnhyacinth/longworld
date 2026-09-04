@@ -1,6 +1,6 @@
 # Current release status
 
-Last updated: 2026-09-03
+Last updated: 2026-09-04
 
 This file is the canonical publication-status summary. Historical receipts and
 `.hl/` logs remain useful for reproducibility, but they do not override this
@@ -31,6 +31,25 @@ design queue. Pending candidates do not count in the numbers above. Details and
 the diversity accounting are in
 `reports/p17_training_conversion_closeout_20260903.md` and
 `reports/p17_domain_design_matrix_20260903.md`.
+
+## 2026-09-04 IETF conversion and semantic-growth checkpoint
+
+The formal counts above are unchanged. Rebuilding P33 with a fixed signed
+candidate schema produced six audited exact 64K/128K views. A 64K-only release
+passed selection, strict promotion, and candidate-union reporting, but the
+quality gate rejected it for missing a valid lower band. A later natural
+16K/64K construction passed dense audit 6/6 at 16,246--16,277 and
+64,387--64,418 tokens, then selection rejected it because relations, essential
+events, strict supports, proof depth, and event-bearing tokens did not grow.
+Neither attempt has a release gate receipt or B5 manifest.
+
+P40 separately establishes source capacity for a different IETF task: five
+additional official RFCs retain 76,008 tokens after unchanged near-duplicate
+filtering and can support a proposed 10→20 relation, 7→12 essential-event,
+6→11 strict-support, depth-2→3 graph. This is a source-first design only; no P40
+candidate, promotion, or inventory row exists yet. See
+`reports/p43_ietf_oauth_lower_band_conversion_blocker_20260904.md` and
+`reports/p40_ietf_oauth_semantic_growth_preflight_20260904.md`.
 
 ## Published private dataset
 

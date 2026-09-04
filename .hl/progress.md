@@ -1,5 +1,13 @@
 # Progress
 
+- 2026-09-04 P38/P43 IETF conversion remains blocked with zero formal rows.
+  Schema-fixed P33 rebuilt and audited 6/6; the 64K-only chain reached strict
+  promotion but failed the existing lower-band quality gate. A natural
+  16K/64K successor audited 6/6 at 16246--16277 and 64387--64418 tokens but
+  selection rejected unchanged proof topology (relations 10→10, essentials
+  7→7, supports 6→6, depth 2→2). P40 source-first growth is feasible: five
+  new RFCs retain 76008 unique tokens and propose 10→20 relations. Inventory
+  stays 132 train + 18 eval; no B5/HF.
 - 2026-09-03 P17 converted two independent candidates into train-ready local-
   probe products: Microsoft Finance 12 rows (3 each at 16/32/64/128K) and
   Transformers CodeForge 6 rows (3 each at 64/128K). Both gates and B5

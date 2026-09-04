@@ -1,5 +1,14 @@
 # Summary — P7 source-rich integration
 
+## P40/P43 current checkpoint — 2026-09-04
+
+No new IETF row is train-ready. P43's natural 16K/64K successor passes six
+dense audits but fails cumulative semantic growth at selection; P38's promoted
+64K-only rows failed the lower-band quality gate. Formal inventory remains 132
+train + 18 eval rows and 7,274,169 exact tokens. P40 establishes enough
+official-source capacity for a genuinely larger OAuth graph, but its five new
+answer-changing fields are not implemented or generated yet.
+
 ## P17 current conversion — 2026-09-03
 
 P17 adds two signed, independent local-probe training products: Microsoft
