@@ -23,6 +23,10 @@ from longworld.core.attestation import (
     canonical_attested_payload,
     verify_attestation,
 )
+from longworld.core.govinfodisposition import (
+    GovInfoDispositionError,
+    verify_govinfo_replay_payload,
+)
 from longworld.core.provenance import ProvenanceError
 
 TASK_REPLAY_SIDECAR_SCHEMA = "longworld.task-replay-sidecar.v1"
@@ -61,9 +65,19 @@ ELIFE_REVIEW_REVISION_TASK_REPLAY_ADAPTER = (
     "longworld.elife-review-revision-replay.v1",
     TASK_REPLAY_SIDECAR_SCHEMA,
 )
+GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER = (
+    "government.govinfo_bill_disposition.v1",
+    "longworld.govinfo-bill-disposition-replay.v1",
+    TASK_REPLAY_SIDECAR_SCHEMA,
+)
 IETF_OAUTH_TASK_REPLAY_ADAPTER_V3 = (
     IETF_OAUTH_TASK_REPLAY_ADAPTER[0],
     IETF_OAUTH_TASK_REPLAY_ADAPTER[1],
+    TASK_REPLAY_SIDECAR_SCHEMA_V3,
+)
+GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER_V3 = (
+    GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[0],
+    GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[1],
     TASK_REPLAY_SIDECAR_SCHEMA_V3,
 )
 CYBER_KEV_TASK_REPLAY_ADAPTER_V2 = (
@@ -304,6 +318,23 @@ def _contract(key: TaskReplayRegistryKey) -> TaskReplayAdapterContract:
                 "candidate_content_commitments",
             }
         )
+    elif family == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]:
+        payload_fields = frozenset(
+            {
+                "source_receipt_raw_utf8",
+                "source_receipt_sha256",
+                "source_bundle_sha256",
+                "preflight_config_sha256",
+                "authorization_record_id",
+                "govinfo_disposition_task",
+                "task_sha256",
+                "replay_revision",
+                "tokenizer_model_id",
+                "tokenizer_revision",
+                "tokenizer_asset_manifest_sha256",
+                "candidate_content_commitments",
+            }
+        )
     else:
         raise ProvenanceError("task replay adapter contract is not registered")
     if key[2] == TASK_REPLAY_SIDECAR_SCHEMA_V3:
@@ -334,6 +365,7 @@ TASK_REPLAY_ADAPTER_REGISTRY: Mapping[
             MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
             IETF_OAUTH_TASK_REPLAY_ADAPTER,
             ELIFE_REVIEW_REVISION_TASK_REPLAY_ADAPTER,
+            GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
             CYBER_KEV_TASK_REPLAY_ADAPTER_V2,
             CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER_V2,
             FINANCE_TASK_REPLAY_ADAPTER_V2,
@@ -343,6 +375,7 @@ TASK_REPLAY_ADAPTER_REGISTRY: Mapping[
             FINANCE_TASK_REPLAY_ADAPTER_V3,
             MACRO_VINTAGE_TASK_REPLAY_ADAPTER_V3,
             IETF_OAUTH_TASK_REPLAY_ADAPTER_V3,
+            GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER_V3,
         )
     }
 )
@@ -485,6 +518,9 @@ def _verify_replay_payload(
         "fetch_inventory_sha256",
         "task_sha256",
         "source_inventory_sha256",
+        "source_receipt_sha256",
+        "source_bundle_sha256",
+        "preflight_config_sha256",
     }
     if any(
         field in replay_payload and not _is_sha256(replay_payload[field])
@@ -538,6 +574,11 @@ def _verify_replay_payload(
         _verify_v3_derivation_payload(replay_payload, contract)
     if contract.adapter_id == ELIFE_REVIEW_REVISION_TASK_REPLAY_ADAPTER[0]:
         _verify_elife_replay_payload(replay_payload)
+    if contract.adapter_id == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[0]:
+        try:
+            verify_govinfo_replay_payload(replay_payload)
+        except GovInfoDispositionError as error:
+            raise ProvenanceError("GovInfo task replay payload is invalid") from error
     tokenizer_revision = replay_payload.get("tokenizer_revision")
     source_families = replay_payload.get("source_families")
     fetch_receipt = replay_payload.get("fetch_receipt")
@@ -629,6 +670,11 @@ def _verify_replay_payload(
                     ("authorization_record_id",)
                     if contract.adapter_id
                     == ELIFE_REVIEW_REVISION_TASK_REPLAY_ADAPTER[0]
+                    else ()
+                ),
+                *(
+                    ("authorization_record_id",)
+                    if contract.adapter_id == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[0]
                     else ()
                 ),
             )

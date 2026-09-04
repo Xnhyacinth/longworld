@@ -6,6 +6,11 @@ from copy import deepcopy
 
 import pytest
 
+from longworld.core.attestation import (
+    ATTESTATION_ENVIRONMENT_ENV,
+    ROLE_KEY_ENVS,
+    ROLE_KEY_ID_ENVS,
+)
 from longworld.core.govinfodisposition import (
     GOVINFO_DISPOSITION_TASK_SCHEMA,
     GovInfoDispositionError,
@@ -17,6 +22,19 @@ from longworld.core.govinfodisposition import (
     verify_govinfo_replay_payload,
 )
 from longworld.core.pack import SEP, wrap_prompt
+from longworld.core.provenance import ProvenanceError
+from longworld.core.taskpromotion import (
+    _canonical_task_identifiers,
+    _task_view_replay,
+    build_task_candidate_view_projections,
+)
+from longworld.core.taskproof import _adapter_key, _projection_chronology
+from longworld.core.taskreplaysidecar import (
+    GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
+    GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER_V3,
+    TASK_REPLAY_ADAPTER_REGISTRY,
+    build_task_replay_sidecar,
+)
 
 
 def _canonical_sha256(value: object) -> str:
@@ -353,3 +371,203 @@ def test_candidate_source_binding_rejects_unlisted_derivative_hash() -> None:
     candidate["artifact_classification"][0]["source_sha256"] = "f" * 64
     with pytest.raises(GovInfoDispositionError, match="artifact source"):
         validate_govinfo_candidate_source_binding(candidate, payload)
+
+
+def _registered_candidate() -> dict[str, object]:
+    candidate = _candidate()
+    ids = [item["artifact_id"] for item in candidate["artifact_classification"]]
+    candidate.update(
+        {
+            "answer": replay_govinfo_disposition(candidate, ids)["answer"],
+            "cf_answer": replay_govinfo_disposition(
+                candidate, ids, counterfactual=True
+            )["answer"],
+            "composition_method": "same_case_dossier",
+            "data_stage": "candidate",
+            "domain": "government_legislation",
+            "length_bucket": "32k",
+            "strict_replay_revision": GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[1],
+            "tokenizer_asset_manifest_sha256": "6" * 64,
+            "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+            "tokenizer_revision": "7" * 40,
+            "training_objective": "sft",
+            "view": "full",
+        }
+    )
+    candidate["task_replay_sidecar"] = {
+        "adapter_id": GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[0],
+        "adapter_revision": GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[1],
+        "sidecar_schema_version": GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[2],
+        "sha256": "8" * 64,
+    }
+    return candidate
+
+
+def test_registered_dispatch_replays_identity_and_chronology() -> None:
+    candidate = _registered_candidate()
+    ids = [item["artifact_id"] for item in candidate["artifact_classification"]]
+    documents = str(candidate["document_context"]).split(SEP)
+
+    assert _adapter_key(candidate) == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER
+    assert (
+        _task_view_replay(candidate, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER, ids)[
+            "answer"
+        ]
+        == candidate["answer"]
+    )
+    assert (
+        _task_view_replay(
+            candidate,
+            GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
+            ids,
+            counterfactual=True,
+        )["answer"]
+        == candidate["cf_answer"]
+    )
+    assert (
+        _canonical_task_identifiers(candidate, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER)[
+            "answer_program_id"
+        ]
+        == candidate["answer_program_id"]
+    )
+    chronology = _projection_chronology(
+        candidate, candidate["artifact_classification"], documents
+    )
+    assert [item["artifact_id"] for item in chronology] == [
+        "source-a",
+        "source-b",
+        "relation",
+        "target-a",
+        "target-b",
+    ]
+
+
+def test_registered_parent_projects_three_distinct_source_bound_views(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(ROLE_KEY_ENVS["candidate"], "c" * 32)
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["candidate"], "p52-candidate-test")
+    candidate = _registered_candidate()
+    candidate.update(
+        {
+            "actual_context_tokens": 32_100,
+            "dossier_id": "govinfo-projection-test",
+            "essential_artifact_ids": [
+                item["artifact_id"] for item in candidate["artifact_classification"]
+            ],
+            "graph": {"hop_count": 2, "proof_depth": 2},
+            "query_id": "govinfo-test:32k",
+            "real_source_token_ratio": 0.9,
+            "tokenizer_context_tokens": 32_100,
+            "world_id": "govinfo-test",
+        }
+    )
+    candidate["source_record_ids_by_artifact"] = {
+        item["artifact_id"]: [item["artifact_id"]]
+        for item in candidate["artifact_classification"]
+    }
+
+    def token_counter(text: str) -> int:
+        return 32_000 + min(700, len(text) // 10)
+
+    projected = build_task_candidate_view_projections(
+        candidate,
+        adapter_key=GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
+        token_counter=token_counter,
+        candidate_attestation_key=b"c" * 32,
+    )
+
+    assert {item["view"] for item in projected} == {
+        "full",
+        "cf",
+        "ordered_artifact_view",
+    }
+    assert len({item["document_context"] for item in projected}) == 3
+    cf = next(item for item in projected if item["view"] == "cf")
+    assert cf["answer"] == candidate["cf_answer"]
+    assert cf["cf_answer"] == candidate["answer"]
+    assert (
+        sum(
+            item["source_origin"] == "synthetic_counterfactual"
+            for item in cf["artifact_classification"]
+        )
+        == 1
+    )
+
+
+def test_registered_sidecar_contract_is_closed_and_task_hash_bound(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    monkeypatch.setenv(ROLE_KEY_ENVS["source"], "s" * 32)
+    monkeypatch.setenv(ROLE_KEY_ID_ENVS["source"], "p52-registered-source-test")
+    task = deepcopy(_candidate()["govinfo_disposition_task"])
+    sources = [
+        {
+            "bytes": 10,
+            "raw_xml_persisted": False,
+            "sha256": "1" * 64,
+            "url": "https://www.govinfo.gov/source.xml",
+        }
+    ]
+    source_bundle_sha256 = hashlib.sha256(
+        f"{sources[0]['url']}:{sources[0]['sha256']}\n".encode()
+    ).hexdigest()
+    receipt = {
+        "authorization": {"record_id": "p52-registered-test"},
+        "data_stage": "source_inventory",
+        "preflight_config_sha256": "2" * 64,
+        "production_eligible": False,
+        "raw_xml_persisted": False,
+        "schema_version": "longworld.p52-govinfo-source-receipt.v1",
+        "source_bundle_sha256": source_bundle_sha256,
+        "source_count": 1,
+        "sources": sources,
+        "train_ready": False,
+    }
+    receipt_raw = (
+        json.dumps(receipt, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        + "\n"
+    )
+    task["source_receipt_sha256"] = hashlib.sha256(receipt_raw.encode()).hexdigest()
+    payload = {
+        "authorization_record_id": "p52-registered-test",
+        "candidate_content_commitments": [
+            {
+                "content_sha256": "3" * 64,
+                "length_bucket": "32k",
+                "world_id": "govinfo-test",
+            }
+        ],
+        "govinfo_disposition_task": task,
+        "preflight_config_sha256": receipt["preflight_config_sha256"],
+        "replay_revision": GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[1],
+        "source_bundle_sha256": source_bundle_sha256,
+        "source_receipt_raw_utf8": receipt_raw,
+        "source_receipt_sha256": task["source_receipt_sha256"],
+        "task_sha256": _canonical_sha256(task),
+        "tokenizer_asset_manifest_sha256": "4" * 64,
+        "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+        "tokenizer_revision": "5" * 40,
+    }
+
+    assert GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER in TASK_REPLAY_ADAPTER_REGISTRY
+    assert GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER_V3 in TASK_REPLAY_ADAPTER_REGISTRY
+    sidecar = build_task_replay_sidecar(
+        adapter_id=GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[0],
+        adapter_revision=GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[1],
+        replay_payload=payload,
+        source_attestation_key=b"s" * 32,
+    )
+    assert sidecar["replay_payload"] == payload
+
+    forged = deepcopy(payload)
+    forged["task_sha256"] = "f" * 64
+    with pytest.raises(ProvenanceError, match="GovInfo task replay payload"):
+        build_task_replay_sidecar(
+            adapter_id=GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[0],
+            adapter_revision=GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[1],
+            replay_payload=forged,
+            source_attestation_key=b"s" * 32,
+        )

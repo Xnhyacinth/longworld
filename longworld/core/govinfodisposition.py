@@ -597,6 +597,9 @@ def materialize_govinfo_counterfactual(
                     "counterfactual_parent_sidecar_sha256": str(
                         sidecar.get("sha256") or ""
                     ),
+                    "derived_text_sha256": hashlib.sha256(
+                        document.encode()
+                    ).hexdigest(),
                     "provenance_id": "counterfactual-projection-sha256:"
                     + hashlib.sha256(document.encode()).hexdigest(),
                 }

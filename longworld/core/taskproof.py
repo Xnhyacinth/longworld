@@ -27,6 +27,14 @@ from longworld.core.financehistory import (
     replay_finance_pipeline_raw_slice,
     replay_finance_pipeline_selection,
 )
+from longworld.core.govinfodisposition import (
+    GOVINFO_DISPOSITION_ANSWER_PROGRAM,
+    GOVINFO_DISPOSITION_TASK_SCHEMA,
+    audit_govinfo_disposition_candidate,
+    govinfo_chronology,
+    replay_govinfo_disposition,
+    replay_govinfo_disposition_raw_slice,
+)
 from longworld.core.macrovintage import (
     MACRO_VINTAGE_PIPELINE_CANDIDATE_SCHEMA,
     audit_macro_vintage_pipeline_candidate,
@@ -43,6 +51,7 @@ from longworld.core.taskreplaysidecar import (
     CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
     CYBER_KEV_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
+    GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
     IETF_OAUTH_TASK_REPLAY_ADAPTER,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     SOURCE_TOKEN_MEASUREMENT_BASIS,
@@ -458,6 +467,10 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
         expected_domain = "standards"
         expected_view = "full"
         expected_composition = "same_case_dossier"
+    elif family == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]:
+        expected_domain = "government_legislation"
+        expected_view = "full"
+        expected_composition = "same_case_dossier"
     else:  # pragma: no cover - the closed registry is checked first
         raise TaskProofError("candidate task replay adapter is unsupported")
     if candidate.get("domain") != expected_domain:
@@ -512,7 +525,7 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
         replay_identity_valid = (
             candidate.get("schema_version") == MACRO_VINTAGE_PIPELINE_CANDIDATE_SCHEMA
         )
-    else:
+    elif family == IETF_OAUTH_TASK_REPLAY_ADAPTER[:2]:
         task = candidate.get("ietf_requirement_task")
         ietf_task_programs = {
             "longworld.ietf-cross-spec-requirement-task.v1": (
@@ -526,6 +539,14 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
             isinstance(task, dict)
             and task.get("answer_program_id")
             == ietf_task_programs.get(str(task.get("schema_version") or ""))
+            and candidate.get("answer_program_id") == task.get("answer_program_id")
+        )
+    else:
+        task = candidate.get("govinfo_disposition_task")
+        replay_identity_valid = bool(
+            isinstance(task, dict)
+            and task.get("schema_version") == GOVINFO_DISPOSITION_TASK_SCHEMA
+            and task.get("answer_program_id") == GOVINFO_DISPOSITION_ANSWER_PROGRAM
             and candidate.get("answer_program_id") == task.get("answer_program_id")
         )
     if not replay_identity_valid:
@@ -737,6 +758,19 @@ def _projection_chronology(
     documents: list[str],
 ) -> list[dict[str, str]]:
     domain = str(candidate.get("domain") or "")
+    if domain == "government_legislation":
+        return [
+            {"artifact_id": item[1]["artifact_id"], "order_key": item[0]}
+            for item in govinfo_chronology(
+                [
+                    (classification, document)
+                    for classification, document in zip(
+                        classifications, documents, strict=True
+                    )
+                    if isinstance(classification, Mapping)
+                ]
+            )
+        ]
     if domain == "standards":
         task = candidate.get("ietf_requirement_task")
         manifest = task.get("source_manifest") if isinstance(task, dict) else None
@@ -1220,6 +1254,8 @@ def _adapter_audit(
             audit = audit_finance_pipeline_candidate(candidate)
         elif adapter_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
             audit = audit_macro_vintage_pipeline_candidate(candidate)
+        elif adapter_key == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER:
+            audit = audit_govinfo_disposition_candidate(candidate)
         else:  # pragma: no cover - the closed registry is checked first
             raise TaskProofError("task replay adapter is unsupported")
     except TaskProofError:
@@ -1290,6 +1326,10 @@ def _replay(
             artifact_ids,
             counterfactual=counterfactual != materialized,
         )
+    if adapter_key[:2] == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]:
+        return replay_govinfo_disposition(
+            candidate, artifact_ids, counterfactual=counterfactual
+        )
     raise TaskProofError("task replay adapter is unsupported")
 
 
@@ -1347,6 +1387,13 @@ def _replay_raw_slice(
         )
     if adapter_key[:2] == IETF_OAUTH_TASK_REPLAY_ADAPTER[:2]:
         return replay_ietf_cross_spec_raw_slice(
+            candidate,
+            raw_document_context,
+            left_framed=left_framed,
+            right_framed=right_framed,
+        )
+    if adapter_key[:2] == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]:
+        return replay_govinfo_disposition_raw_slice(
             candidate,
             raw_document_context,
             left_framed=left_framed,
@@ -2058,6 +2105,7 @@ def compute_task_proof(
             expected_total_tokens=document_context_tokens,
             records_are_artifacts=(
                 adapter_key[:2] == IETF_OAUTH_TASK_REPLAY_ADAPTER[:2]
+                or adapter_key[:2] == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]
             ),
         )
         if not has_raw_window_evidence:

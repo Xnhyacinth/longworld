@@ -25,6 +25,8 @@ from longworld.core.taskreplaysidecar import (
     FINANCE_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER_V2,
     FINANCE_TASK_REPLAY_ADAPTER_V3,
+    GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
+    GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER_V3,
     IETF_OAUTH_TASK_REPLAY_ADAPTER,
     IETF_OAUTH_TASK_REPLAY_ADAPTER_V3,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
@@ -306,6 +308,8 @@ def test_registry_is_closed_over_adapter_revision_and_schema(tmp_path: Path) -> 
         IETF_OAUTH_TASK_REPLAY_ADAPTER,
         IETF_OAUTH_TASK_REPLAY_ADAPTER_V3,
         ELIFE_REVIEW_REVISION_TASK_REPLAY_ADAPTER,
+        GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
+        GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER_V3,
     }
     binding, _ = _write_sidecar(tmp_path, adapter=FINANCE_TASK_REPLAY_ADAPTER)
     binding["adapter_revision"] = "longworld.financial-history-replay.v999"

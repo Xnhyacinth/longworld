@@ -28,6 +28,15 @@ from longworld.core.financehistory import (
     audit_finance_pipeline_candidate,
     replay_finance_pipeline_selection,
 )
+from longworld.core.govinfodisposition import (
+    GOVINFO_DISPOSITION_ANSWER_PROGRAM,
+    GOVINFO_DISPOSITION_TASK_SCHEMA,
+    audit_govinfo_disposition_candidate,
+    govinfo_chronology,
+    materialize_govinfo_counterfactual,
+    replay_govinfo_disposition,
+    validate_govinfo_candidate_source_binding,
+)
 from longworld.core.macrovintage import (
     audit_macro_vintage_pipeline_candidate,
     replay_macro_vintage_pipeline_selection,
@@ -74,6 +83,7 @@ from longworld.core.taskreplaysidecar import (
     CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
     CYBER_KEV_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
+    GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
     IETF_OAUTH_TASK_REPLAY_ADAPTER,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     SOURCE_TOKEN_MEASUREMENT_BASIS,
@@ -341,6 +351,30 @@ def _validate_sidecar_payload(
             "replay_revision": candidate.get("strict_replay_revision"),
             **tokenizer_binding,
         }
+    elif _sidecar_uses(sidecar, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER):
+        if candidate.get("domain") != "government_legislation":
+            raise PromotionError("task replay adapter does not match candidate domain")
+        task = candidate.get("govinfo_disposition_task")
+        source = candidate.get("source_binding")
+        if not isinstance(source, dict):
+            raise PromotionError("candidate GovInfo source binding is missing")
+        expected = {
+            "source_receipt_raw_utf8": payload.get("source_receipt_raw_utf8"),
+            "source_receipt_sha256": source.get("source_receipt_sha256"),
+            "source_bundle_sha256": source.get("source_bundle_sha256"),
+            "preflight_config_sha256": source.get("preflight_config_sha256"),
+            "authorization_record_id": source.get("authorization_record_id"),
+            "govinfo_disposition_task": task,
+            "task_sha256": _canonical_sha256(task),
+            "replay_revision": candidate.get("strict_replay_revision"),
+            **tokenizer_binding,
+        }
+        try:
+            validate_govinfo_candidate_source_binding(candidate, payload)
+        except ValueError as error:
+            raise PromotionError(
+                "candidate GovInfo source binding is invalid"
+            ) from error
     else:
         raise PromotionError("task replay adapter is not registered for promotion")
     if (
@@ -602,6 +636,8 @@ def _adapter_audit(
                 audit = audit_finance_pipeline_candidate(candidate)
             elif _sidecar_uses(sidecar, MACRO_VINTAGE_TASK_REPLAY_ADAPTER):
                 audit = audit_macro_vintage_pipeline_candidate(candidate)
+            elif _sidecar_uses(sidecar, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER):
+                audit = audit_govinfo_disposition_candidate(candidate)
             else:
                 raise PromotionError(
                     "task replay adapter is not registered for promotion"
@@ -677,6 +713,10 @@ def _replay_selection(
                 candidate,
                 artifact_ids,
                 counterfactual=counterfactual != materialized,
+            )
+        if _sidecar_uses(sidecar, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER):
+            return replay_govinfo_disposition(
+                candidate, artifact_ids, counterfactual=counterfactual
             )
     raise PromotionError("task replay adapter is not registered for promotion")
 
@@ -773,6 +813,7 @@ def _task_selection_metrics(
         _sidecar_uses(sidecar, CYBER_KEV_TASK_REPLAY_ADAPTER)
         or _sidecar_uses(sidecar, CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER)
         or _sidecar_uses(sidecar, IETF_OAUTH_TASK_REPLAY_ADAPTER)
+        or _sidecar_uses(sidecar, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER)
     ):
         candidate_source_records = candidate.get("source_record_ids_by_artifact")
         if not isinstance(candidate_source_records, Mapping):
@@ -840,6 +881,8 @@ def _task_selection_metrics(
         group_suffix = "macro-vintage-history"
     elif _sidecar_uses(sidecar, IETF_OAUTH_TASK_REPLAY_ADAPTER):
         group_suffix = "ietf-oauth-cross-spec"
+    elif _sidecar_uses(sidecar, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER):
+        group_suffix = "govinfo-bill-disposition"
     else:  # pragma: no cover - sidecar loading rejects this first
         raise PromotionError("task replay adapter is not registered for promotion")
     candidate_graph = candidate.get("graph")
@@ -1654,6 +1697,23 @@ def _canonical_task_identifiers(
             raise PromotionError("IETF answer program is unsupported")
         motif, program_ops = selected_program
         answer_program_id = str(task["answer_program_id"])
+    elif family == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("govinfo_disposition_task")
+        if (
+            not isinstance(task, Mapping)
+            or task.get("schema_version") != GOVINFO_DISPOSITION_TASK_SCHEMA
+            or task.get("answer_program_id") != GOVINFO_DISPOSITION_ANSWER_PROGRAM
+            or candidate.get("answer_program_id") != task.get("answer_program_id")
+        ):
+            raise PromotionError("GovInfo answer program is unsupported")
+        motif = "authenticated_transition+cross_schema_section_comparison"
+        answer_program_id = GOVINFO_DISPOSITION_ANSWER_PROGRAM
+        program_ops = (
+            "select_authenticated_bill_transition",
+            "join_whole_sections_by_structural_key",
+            "canonicalize_presentation_free_body",
+            "classify_source_text_disposition",
+        )
     else:
         raise PromotionError("task semantic identifier adapter is unsupported")
     semantic_base_task_id = _canonical_sha256(
@@ -2691,6 +2751,10 @@ def _task_view_replay(
                 artifact_ids,
                 counterfactual=counterfactual or materialized,
             )
+        if adapter_key == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER:
+            return replay_govinfo_disposition(
+                candidate, artifact_ids, counterfactual=counterfactual
+            )
     raise PromotionError("standard task views are not implemented for adapter")
 
 
@@ -2746,6 +2810,7 @@ def build_task_candidate_view_projections(
         FINANCE_TASK_REPLAY_ADAPTER,
         MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
         IETF_OAUTH_TASK_REPLAY_ADAPTER,
+        GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
     }:
         raise PromotionError("standard task views are not implemented for adapter")
     artifacts = _task_view_artifacts(candidate)
@@ -2825,6 +2890,21 @@ def build_task_candidate_view_projections(
             for artifact_id in candidate.get("essential_artifact_ids") or []
             if artifact_id in cf_ids
         ]
+    elif adapter_key == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER:
+        cf_artifacts = materialize_govinfo_counterfactual(candidate, artifacts)
+        chronology = govinfo_chronology(artifacts)
+        cf_candidate = deepcopy(candidate)
+        cf_candidate["document_context"] = SEP.join(
+            document for _classification, document in cf_artifacts
+        )
+        cf_candidate["artifact_classification"] = [
+            deepcopy(classification) for classification, _document in cf_artifacts
+        ]
+        cf_candidate["context"] = wrap_prompt(
+            str(candidate.get("question") or ""),
+            str(cf_candidate["document_context"]),
+            "first",
+        )
     else:
         raise PromotionError("standard task views are not implemented for adapter")
     materialized_ids = [
