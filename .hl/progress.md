@@ -883,3 +883,23 @@ in`; no private-repository or upload claim was made.
   queue led by BEA spreadsheet vintage, GitHub failure recovery, and Microsoft
   five-year cross-statement programs. Diversity is tracked by executable task
   topology and oracle, not by relabeling domains.
+
+## 2026-09-04 P40 IETF closure
+
+- V14 projected 9 source-bound candidates at exact 32K/64K/128K with
+  full/CF/ordered views; all four replay directions and structural preflight
+  passed.
+- The complete dense audit ran once and accepted 9/9. Candidate/audit digests
+  match, dense/BM25/TF-IDF top-3 are insufficient, every 4K/8K/16K raw window
+  is insufficient, and maximum near-duplicate ratio is 0.0399.
+- Selection, candidate-union, source-bound promotion, train-ready reporting,
+  and quality gate completed. The promoted product has 9 train / 0 eval rows,
+  682,458 exact tokens, retention 1.0, and `production_eligible=false`.
+- B5 export produced 9 examples / 683,635 estimated tokens with zero duplicate
+  drops or contract rejects. Deterministic manifest validation returned
+  `ok=true` for 9 source rows and 4 outputs.
+- TDD fixed the exporter and deterministic validator to preserve optional task
+  `query_type` as null. Commits: `0748d29`, `a38e3e0`, `eb5c8c1`, `8fd28db`.
+- Six independent local-probe products now total 141 train rows / 7,274,595
+  exact tokens: 36×16K, 39×32K, 48×64K, and 18×128K. Production/KMS-qualified
+  inventory remains zero; no HF upload was attempted.

@@ -424,4 +424,17 @@ for an accessible substitute for the OpenReview-challenged forum.
 | P34 new-domain preflight | `configs/p34_*`, `reports/p34_*`, `sources/research_p34_*` | compare structured-data, interaction, and retrieval/correction topologies; measure the strongest source | complete_fail_closed: PFAS has 473,285 near-dedup tokens but current oracle is sub-8K shortcut-prone |
 | P35 HealthData preflight | `configs/p35_*`, `reports/p35_*`, `sources/research_p35_*` | rights/privacy/schema admission before aggregate-only FAERS case-version capacity measurement | complete_fail_closed: 185569 cases but zero multi-version cases; topology absent, raw rows excluded |
 | P36-P43 IETF conversion | `configs/p36_ietf_*`, `configs/p43_ietf_*`, `reports/p36_*`, `reports/p38_*`, `reports/p43_*` | select/promote/gate/B5 an authentic cumulative IETF world without changing proof gates | blocked_current_task: schema fixed and 16K/64K audit 6/6, but proof topology is flat and selection rejects |
-| P40 IETF semantic growth | `configs/p40_ietf_*`, `reports/p40_ietf_*`, `sources/research_p40_*` | add answer-changing RFC validation fields so the longer state grows relations, events, supports, and depth | complete_preflight: 76008 unique tokens, candidate implementation pending |
+| P40 IETF semantic growth | `configs/p40_ietf_*`, `reports/p40_ietf_*`, `sources/research_p40_*` | add answer-changing RFC validation fields so the longer state grows relations, events, and supports | complete: v14 9/9 promoted; 682458 exact tokens; signed B5 and manifest green |
+
+## P40 conversion closure and next-world queue — 2026-09-04
+
+P40 v14 is complete as one independently signed local-probe product. It adds 9
+train rows across 32K/64K/128K and full/CF/ordered views. Production trust and
+HF publication remain out of scope.
+
+| Track | Current state | Next admissible action |
+| --- | --- | --- |
+| P40 IETF | complete: audit, selection, promotion, quality, B5, manifest | preserve immutable product; optimize proof reuse only with equivalent signed verification |
+| P50 Treasury | fail-closed: 1,717 replayable bill chains, all gold chains ≤4K | change task/entity; do not pad auction text |
+| P52 GovInfo | adapter registered; old direct-view candidates not promotable | rebuild three authentic full parents, then project and run shared proof |
+| P53 OSV | independent candidate track | admit only a stable source-bound result from its own closeout |

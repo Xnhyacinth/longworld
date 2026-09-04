@@ -1252,6 +1252,25 @@ so `n_real_source_relations=0` is correct. Do not use this slice to claim the
   tokens, yet the currently decisive four pages total at most 6,213 tokens.
   Authentic source capacity therefore does not rescue a short-view oracle.
 
+## 2026-09-04 P40 conversion findings
+
+- A materialized counterfactual artifact must remain in the independently
+  minimal evidence set; source authenticity alone does not make the edit
+  answer-causal.
+- Ordered-window failures should be repaired with a later answer-bearing source
+  fact. RFC 9700 reverse-proxy sanitization creates real cross-window dependence;
+  moving or adding background would only game the layout.
+- P40 v14 passes all nine shared proofs with exact 32K/64K/128K views. Essential
+  artifacts grow 13→14→17, authentic relations 11→12→15, and strict supports
+  8→9→12; graph depth honestly stays 2.
+- Generic training exporters must treat legacy descriptive `query_type` as
+  optional for registered task rows. Both writer and deterministic validator
+  must preserve the same `null` projection; inferring it from motif would create
+  metadata not present in the promoted source.
+- Manifest path identity resolves the repository `data` symlink to the physical
+  LongWorld data root. Validators must receive the bound physical path rather
+  than a lexical symlink alias.
+
 ## 2026-09-03 P14 closure findings
 
 - A parent directory symlink in a portable task-sidecar registry must be
