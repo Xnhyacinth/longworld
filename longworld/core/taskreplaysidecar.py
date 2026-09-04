@@ -558,6 +558,7 @@ def _verify_replay_payload(
                 not in {
                     "longworld.ietf-cross-spec-requirement-task.v1",
                     "longworld.ietf-cross-spec-growth-requirement-task.v1",
+                    "longworld.ietf-cross-spec-growth-requirement-task.v2",
                 }
                 or replay_payload.get("task_sha256")
                 != hashlib.sha256(

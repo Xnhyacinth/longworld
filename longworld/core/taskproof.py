@@ -518,8 +518,8 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
             "longworld.ietf-cross-spec-requirement-task.v1": (
                 "ietf.oauth_effective_requirement.v1"
             ),
-            "longworld.ietf-cross-spec-growth-requirement-task.v1": (
-                "ietf.oauth_effective_requirement.v2"
+            "longworld.ietf-cross-spec-growth-requirement-task.v2": (
+                "ietf.oauth_effective_requirement.v3"
             ),
         }
         replay_identity_valid = bool(

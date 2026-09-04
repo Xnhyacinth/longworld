@@ -425,11 +425,16 @@ def build(config_path: Path) -> dict[str, Any]:
     task_variant = config.get("task_variant", "base_v1")
     if task_variant == "base_v1":
         task = build_ietf_cross_spec_requirement_task(manifest)
-    elif task_variant == "semantic_growth_v2":
+    elif task_variant == "semantic_growth_v3":
         task = build_ietf_cross_spec_growth_requirement_task(manifest)
     else:
         raise ValueError("IETF generation task variant is invalid")
-    materialized = materialize_ietf_cross_spec_counterfactual(task)
+    materialized = materialize_ietf_cross_spec_counterfactual(
+        task,
+        evidence_id=str(
+            config["packing"].get("counterfactual_evidence_id") or "bearer_current"
+        ),
+    )
 
     source_key = attestation_key_from_env("task_replay_sidecar")
     candidate_key = attestation_key_from_env(CANDIDATE_ATTESTATION_PURPOSE)

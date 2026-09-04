@@ -63,9 +63,12 @@ def test_p40_32k_pack_includes_late_cross_specification_anchors() -> None:
     assert "ietf:rfc:9101" in records_by_bucket["64k"]
     assert set(records_by_bucket["32k"]) < set(records_by_bucket["64k"])
     assert set(records_by_bucket["64k"]) < set(records_by_bucket["128k"])
-    assert config["packing"]["counterfactual_companion_evidence_id"] == ""
+    assert config["packing"]["counterfactual_companion_evidence_id"] == (
+        "metadata_current"
+    )
+    assert config["packing"]["counterfactual_evidence_id"] == "bearer_current"
     assert config["packing"]["rfc9700_operation"] == (
-        "exclude_authenticated_bearer_current_span_from_natural_nonempty_chunk"
+        "exclude_authenticated_bearer_current_span_from_nonempty_companion_chunk"
     )
     assert config["packing"]["isolate_evidence_ids"] == ["redirect_baseline"]
 
@@ -124,6 +127,18 @@ def test_materializes_byte_bound_rfc9700_bearer_requirement_exclusion(
         **task["answer"],
         "bearer_transport": "URI_QUERY_DISCOURAGED_OR_CONDITIONAL",
     }
+
+
+def test_materializes_configured_rfc9700_requirement_exclusion(tmp_path) -> None:
+    task = build_ietf_cross_spec_requirement_task(_oauth_manifest(tmp_path))
+
+    materialized = materialize_ietf_cross_spec_counterfactual(
+        task, evidence_id="pkce_current"
+    )
+
+    twin = materialized["counterfactual_twin"]
+    assert twin["evidence_id"] == "pkce_current"
+    assert materialized["answer"] == {**task["answer"], "pkce": "UNKNOWN"}
 
 
 def test_replays_ietf_answer_from_selected_source_artifacts(tmp_path) -> None:
@@ -219,7 +234,9 @@ def test_growth_replay_derives_depth_from_relation_graph(tmp_path) -> None:
     assert base_only["hop_count"] == 2
 
 
-def test_growth_replay_supports_nested_two_six_eleven_field_states(tmp_path) -> None:
+def test_growth_replay_supports_nested_three_seven_twelve_field_states(
+    tmp_path,
+) -> None:
     task = build_ietf_cross_spec_growth_requirement_task(
         _oauth_manifest(tmp_path, semantic_growth=True)
     )
@@ -266,13 +283,13 @@ def test_growth_replay_supports_nested_two_six_eleven_field_states(tmp_path) -> 
     six = json.loads(
         replay_ietf_cross_spec_candidate(candidate, sorted(six_field_ids))["answer"]
     )
-    eleven = json.loads(
+    twelve = json.loads(
         replay_ietf_cross_spec_candidate(candidate, artifact_ids)["answer"]
     )
 
-    assert sum(value != "UNKNOWN" for value in two.values()) == 2
-    assert sum(value != "UNKNOWN" for value in six.values()) == 6
-    assert sum(value != "UNKNOWN" for value in eleven.values()) == 11
+    assert sum(value != "UNKNOWN" for value in two.values()) == 3
+    assert sum(value != "UNKNOWN" for value in six.values()) == 7
+    assert sum(value != "UNKNOWN" for value in twelve.values()) == 12
 
 
 def test_p28_partial_window_does_not_grant_whole_ietf_record(tmp_path) -> None:
@@ -976,7 +993,7 @@ def test_ietf_generator_signs_fixed_candidate_schema_version(
             "asset_manifest_sha256": "d" * 64,
         },
         "length_buckets": {"64k": [64_000, 65_536]},
-        "task_variant": "semantic_growth_v2",
+        "task_variant": "semantic_growth_v3",
         "packing": {"target_margin_tokens": 0},
         "output_dir": str(output_dir),
     }

@@ -149,6 +149,9 @@ def _oauth_manifest(
             "When an OAuth client can interact with more than one authorization\n"
             "   server, a defense against mix-up attacks (see Section 4.4) is\n"
             "   REQUIRED.\n"
+            "A reverse proxy MUST therefore sanitize any inbound requests to\n"
+            "   ensure the authenticity and integrity of all header values relevant\n"
+            "   for the security of the application servers.\n"
         ),
     }
     if semantic_growth:
@@ -283,14 +286,14 @@ def test_cross_spec_requirement_task_replays_six_fields_and_remove_one(
     }
 
 
-def test_cross_spec_growth_task_replays_eleven_fields_and_remove_one(
+def test_cross_spec_growth_task_replays_twelve_fields_and_remove_one(
     tmp_path: Path,
 ) -> None:
     task = build_ietf_cross_spec_growth_requirement_task(
         _oauth_manifest(tmp_path, semantic_growth=True)
     )
 
-    assert task["answer_program_id"] == "ietf.oauth_effective_requirement.v2"
+    assert task["answer_program_id"] == "ietf.oauth_effective_requirement.v3"
     assert '"jar_signature_valid":false' in task["question"]
     assert '"dpop_proof_validation"' in task["question"]
     assert 'the string "UNKNOWN" only for a field' in task["question"]
@@ -303,10 +306,11 @@ def test_cross_spec_growth_task_replays_eleven_fields_and_remove_one(
             "par_request_uri_validation": "PASS_SINGLE_USE_BOUND_UNEXPIRED",
             "rar_authorization_details_validation": "FAIL_INVALID_AUTHORIZATION_DETAILS",
             "dpop_proof_validation": "PASS_DPOP_BOUND",
+            "reverse_proxy_header_sanitization": "PASS_SANITIZED_HEADERS",
         }
         == task["answer"]
     )
-    assert len(task["answer"]) == 11
+    assert len(task["answer"]) == 12
     assert replay_ietf_cross_spec_requirement_task(task) == task["answer"]
     assert audit_ietf_cross_spec_requirement_task(task) == {
         "strict_replay": True,

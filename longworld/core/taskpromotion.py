@@ -1632,7 +1632,7 @@ def _canonical_task_identifiers(
                     "evaluate_fixed_requirement_branches",
                 ),
             ),
-            "ietf.oauth_effective_requirement.v2": (
+            "ietf.oauth_effective_requirement.v3": (
                 "nested_cross_spec_growth+dependency_closure+requirement_resolution",
                 (
                     "select_cutoff_sources",

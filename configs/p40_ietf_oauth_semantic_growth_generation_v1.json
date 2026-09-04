@@ -13,7 +13,7 @@
     "local_files_only": true,
     "add_special_tokens": false
   },
-  "task_variant": "semantic_growth_v2",
+  "task_variant": "semantic_growth_v3",
   "world_id": "ietf-oauth-cross-spec-semantic-growth-v1",
   "length_buckets": {
     "32k": [
@@ -94,8 +94,9 @@
       "ietf:rfc:9700"
     ],
     "span_id_width": 7,
-    "counterfactual_companion_evidence_id": "",
-    "rfc9700_operation": "exclude_authenticated_bearer_current_span_from_natural_nonempty_chunk",
+    "counterfactual_companion_evidence_id": "metadata_current",
+    "counterfactual_evidence_id": "bearer_current",
+    "rfc9700_operation": "exclude_authenticated_bearer_current_span_from_nonempty_companion_chunk",
     "published_draft_policy": "identity_paragraph_only",
     "padding": false,
     "cloned_artifacts": false,
@@ -106,7 +107,7 @@
     "model_id": "sentence-transformers/all-MiniLM-L6-v2",
     "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
   },
-  "output_dir": "data/candidates/p40_ietf_oauth_semantic_growth_v11",
+  "output_dir": "data/candidates/p40_ietf_oauth_semantic_growth_v14",
   "do_not_select": true,
   "do_not_promote": true,
   "do_not_count": true

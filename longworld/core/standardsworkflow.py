@@ -2289,7 +2289,7 @@ IETF_CROSS_SPEC_REQUIREMENT_TASK_SCHEMA = (
     "longworld.ietf-cross-spec-requirement-task.v1"
 )
 IETF_CROSS_SPEC_GROWTH_REQUIREMENT_TASK_SCHEMA = (
-    "longworld.ietf-cross-spec-growth-requirement-task.v1"
+    "longworld.ietf-cross-spec-growth-requirement-task.v2"
 )
 _OAUTH_REQUIREMENT_ANSWERS = {
     "redirect_match": "FAIL_EXACT_REQUIRED",
@@ -2456,6 +2456,7 @@ _OAUTH_GROWTH_REQUIREMENT_ANSWERS = {
     "par_request_uri_validation": "PASS_SINGLE_USE_BOUND_UNEXPIRED",
     "rar_authorization_details_validation": "FAIL_INVALID_AUTHORIZATION_DETAILS",
     "dpop_proof_validation": "PASS_DPOP_BOUND",
+    "reverse_proxy_header_sanitization": "PASS_SANITIZED_HEADERS",
 }
 _OAUTH_GROWTH_REQUIREMENT_CODEBOOK = {
     "mtls_certificate_bound_access": {
@@ -2478,6 +2479,10 @@ _OAUTH_GROWTH_REQUIREMENT_CODEBOOK = {
         "code": "PASS_DPOP_BOUND",
         "meaning": "accept because all required DPoP checks and token binding pass",
     },
+    "reverse_proxy_header_sanitization": {
+        "code": "PASS_SANITIZED_HEADERS",
+        "meaning": "accept security-relevant proxy headers only after inbound request sanitization",
+    },
 }
 _OAUTH_GROWTH_REQUIREMENT_SCENARIO = {
     **_OAUTH_REQUIREMENT_SCENARIO,
@@ -2486,6 +2491,7 @@ _OAUTH_GROWTH_REQUIREMENT_SCENARIO = {
     "par_request_uri_single_use_bound_unexpired": True,
     "rar_known_type_contains_unknown_field": True,
     "dpop_all_required_checks_pass": True,
+    "reverse_proxy_sanitizes_security_headers": True,
 }
 _OAUTH_GROWTH_REQUIREMENT_EVIDENCE = {
     "mtls_certificate_bound_access_current": (
@@ -2533,6 +2539,14 @@ _OAUTH_GROWTH_REQUIREMENT_EVIDENCE = {
             r"be performed in any order)\."
         ),
     ),
+    "reverse_proxy_header_sanitization_current": (
+        9700,
+        (
+            r"A reverse proxy MUST therefore sanitize any inbound requests to\s+"
+            r"ensure the authenticity and integrity of all header values relevant\s+"
+            r"for the security of the application servers\."
+        ),
+    ),
 }
 _OAUTH_GROWTH_REQUIREMENT_BRANCHES = {
     "mtls_certificate_bound_access": (
@@ -2564,6 +2578,12 @@ _OAUTH_GROWTH_REQUIREMENT_BRANCHES = {
         "dpop_proof_validation_current",
         "informative_reference",
         9449,
+    ),
+    "reverse_proxy_header_sanitization": (
+        "reverse_proxy_header_sanitization_current",
+        "reverse_proxy_header_sanitization_current",
+        "normative_reference",
+        6749,
     ),
 }
 
@@ -2759,7 +2779,7 @@ def build_ietf_cross_spec_growth_requirement_task(
     task = {
         "schema_version": IETF_CROSS_SPEC_GROWTH_REQUIREMENT_TASK_SCHEMA,
         "query_type": "cross_spec_requirement_resolution",
-        "answer_program_id": "ietf.oauth_effective_requirement.v2",
+        "answer_program_id": "ietf.oauth_effective_requirement.v3",
         "question": _oauth_requirement_question(
             _OAUTH_GROWTH_REQUIREMENT_SCENARIO,
             {
@@ -2820,7 +2840,7 @@ def replay_ietf_cross_spec_requirement_task(
         answers = _OAUTH_REQUIREMENT_ANSWERS
         expected_numbers = {6749, 6750, 6819, 7636, 8414, 9207, 9700}
     elif schema_version == IETF_CROSS_SPEC_GROWTH_REQUIREMENT_TASK_SCHEMA:
-        answer_program_id = "ietf.oauth_effective_requirement.v2"
+        answer_program_id = "ietf.oauth_effective_requirement.v3"
         question = _oauth_requirement_question(
             _OAUTH_GROWTH_REQUIREMENT_SCENARIO,
             {
@@ -2998,6 +3018,8 @@ def audit_ietf_cross_spec_requirement_task(task: dict[str, Any]) -> dict[str, bo
 
 def materialize_ietf_cross_spec_counterfactual(
     task: dict[str, Any],
+    *,
+    evidence_id: str = "bearer_current",
 ) -> dict[str, Any]:
     """Exclude one byte-bound RFC 9700 requirement without invented text."""
     replay_ietf_cross_spec_requirement_task(task)
@@ -3007,10 +3029,16 @@ def materialize_ietf_cross_spec_counterfactual(
     )
     parent = str(record["text"])
     evidence = next(
-        item
-        for item in task["evidence_items"]
-        if item.get("evidence_id") == "bearer_current"
+        (
+            item
+            for item in task["evidence_items"]
+            if item.get("evidence_id") == evidence_id
+            and item.get("record_id") == record["record_id"]
+        ),
+        None,
     )
+    if not isinstance(evidence, dict):
+        raise ProvenanceError("IETF counterfactual requirement is invalid")
     parent_value = str(evidence["evidence_quote"])
     char_start = int(evidence["char_start"])
     char_end = int(evidence["char_end"])
