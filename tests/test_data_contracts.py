@@ -1765,7 +1765,9 @@ def test_required_view_coverage_rejects_missing_profile_cell(monkeypatch) -> Non
         for view, _timing in profile.required_view_timings
         if (bucket, view) != ("32k", "cf")
     ]
-    monkeypatch.setattr(quality_gate, "_has_exact_band_metadata", lambda *_a, **_k: True)
+    monkeypatch.setattr(
+        quality_gate, "_has_exact_band_metadata", lambda *_a, **_k: True
+    )
 
     errors = quality_gate._required_view_coverage_errors(profile, rows)
 

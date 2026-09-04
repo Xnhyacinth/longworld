@@ -789,9 +789,7 @@ def test_natural_packer_skips_one_support_unit_that_overshoots_exact_band() -> N
     text = essential + oversized + fitting
     question = "Q"
     lower = len(
-        render_ietf_cross_spec_prompt(
-            question, SEP.join((essential, fitting)), "first"
-        )
+        render_ietf_cross_spec_prompt(question, SEP.join((essential, fitting)), "first")
     )
     task = {
         "question": question,
@@ -912,9 +910,7 @@ def test_natural_packer_can_freeze_a_nested_record_subset() -> None:
         ],
     }
     target = len(
-        render_ietf_cross_spec_prompt(
-            "Q", SEP.join(("E1\n\n", "a" * 20)), "first"
-        )
+        render_ietf_cross_spec_prompt("Q", SEP.join(("E1\n\n", "a" * 20)), "first")
     )
 
     artifacts, tokens = _artifacts_for_bucket(

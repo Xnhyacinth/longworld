@@ -500,11 +500,15 @@ def _required_view_coverage_errors(
             str(row.get("view") or ""),
             str(row.get("query_timing") or ""),
         )
-        if world_id and cell in required and _has_exact_band_metadata(
-            row,
-            expected_model_id=profile.tokenizer_model_id,
-            expected_revision=profile.tokenizer_revision,
-            expected_asset_manifest_sha256=profile.tokenizer_asset_manifest_sha256,
+        if (
+            world_id
+            and cell in required
+            and _has_exact_band_metadata(
+                row,
+                expected_model_id=profile.tokenizer_model_id,
+                expected_revision=profile.tokenizer_revision,
+                expected_asset_manifest_sha256=profile.tokenizer_asset_manifest_sha256,
+            )
         ):
             observed[world_id].add(cell)
     return [
