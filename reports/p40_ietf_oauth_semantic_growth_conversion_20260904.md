@@ -72,6 +72,8 @@ and `8fd28db` (deterministic task-row validation).
 
 This is a sixth independently signed local-probe product, not a unified release
 or production/KMS approval. No HF upload was performed. P52 GovInfo must rebuild
-fresh parent rows and pass the same shared proof; P53 OSV remains a separate
-candidate track. Future runtime work may verify and reuse the signed audit proof
-receipt during promotion, but may not cache or skip any trust-boundary check.
+fresh parent rows and pass the same shared proof. P53 OSV is only an uncommitted
+geometry diagnostic because its inherited authorization prohibits generation
+and its custom shortcut checks are not shared proof. Future runtime work may
+verify and reuse the signed audit proof receipt during promotion, but may not
+cache or skip any trust-boundary check.

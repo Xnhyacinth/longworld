@@ -1270,6 +1270,14 @@ so `n_real_source_relations=0` is correct. Do not use this slice to claim the
 - Manifest path identity resolves the repository `data` symlink to the physical
   LongWorld data root. Validators must receive the bound physical path rather
   than a lexical symlink alias.
+- P53 OSV's current local artifacts are geometry diagnostics, not audited
+  candidates. They reuse a P51 authorization that explicitly prohibited
+  generation and persisted patch/release data; a new authorization record is
+  required before rebuilding.
+- Declaring essential IDs and returning `unknown` whenever one is absent makes
+  leave-one and dense-subset tests tautological. Likewise, checking only that
+  the total essential span exceeds 16K is not an exhaustive raw-window replay.
+  P53 must adopt shared proof semantics before any 9/9 claim or Git commit.
 
 ## 2026-09-03 P14 closure findings
 

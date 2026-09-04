@@ -437,4 +437,4 @@ HF publication remain out of scope.
 | P40 IETF | complete: audit, selection, promotion, quality, B5, manifest | preserve immutable product; optimize proof reuse only with equivalent signed verification |
 | P50 Treasury | fail-closed: 1,717 replayable bill chains, all gold chains ≤4K | change task/entity; do not pad auction text |
 | P52 GovInfo | adapter registered; old direct-view candidates not promotable | rebuild three authentic full parents, then project and run shared proof |
-| P53 OSV | independent candidate track | admit only a stable source-bound result from its own closeout |
+| P53 OSV | blocked diagnostic: inherited authorization prohibits generation; shortcut audit is non-exhaustive | create a distinct authorized source contract, remove task-declared essential-ID tautology, and use shared raw-window replay before candidate claims |

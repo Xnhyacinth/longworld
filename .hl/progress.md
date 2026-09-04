@@ -903,3 +903,7 @@ in`; no private-repository or upload claim was made.
 - Six independent local-probe products now total 141 train rows / 7,274,595
   exact tokens: 36×16K, 39×32K, 48×64K, and 18×128K. Production/KMS-qualified
   inventory remains zero; no HF upload was attempted.
+- P53 OSV local outputs were independently reviewed and deliberately left
+  uncommitted. Two focused tests and hashes reproduce, but authorization is
+  invalid for generation and its custom essential-ID/span audit cannot support
+  shared remove-one or exhaustive raw-window claims. Inventory delta remains 0.

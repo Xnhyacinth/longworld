@@ -55,7 +55,10 @@ lacked a valid lower band, and the 16K/64K construction lacked semantic growth.
 P50 Treasury remains capacity-blocked at sub-4K gold chains. P52 GovInfo now
 has a registered source-bound replay adapter, but its old nine candidates are
 not promotable and must be rebuilt from three authentic full parents before
-shared proof. None of these partial tracks contributes inventory rows.
+shared proof. P53 OSV remains an uncommitted geometry diagnostic: it reused a
+P51 authorization that prohibited generation, and its custom essential-ID and
+span checks are not exhaustive shared remove-one/raw-window proofs. None of
+these partial tracks contributes inventory rows.
 
 ## Published private dataset
 
