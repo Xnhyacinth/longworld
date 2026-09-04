@@ -1,0 +1,80 @@
+{
+  "schema_version": "longworld.p46-ofgem-workbook-preflight-request.v1",
+  "data_product": "p46_ofgem_price_cap_workbook_preflight_v1",
+  "authorization": {
+    "record_id": "p46-ofgem-price-cap-workbook-preflight-v1",
+    "scope": "three official Ofgem pre-levelised energy price cap workbooks spanning 2024, 2025, and 2026, for aggregate-only OOXML safety, formula-topology, and capacity inspection",
+    "basis": "Ofgem-published Crown copyright material is reusable under the Open Government Licence unless otherwise indicated; this is a technical preflight, not a legal opinion",
+    "reviewed_at": "2026-09-04T00:00:00Z",
+    "allowed_actions": [
+      "fetch_official_workbooks_to_ephemeral_tmp_storage",
+      "inspect_ooxml_safety_and_formula_topology",
+      "measure_aggregate_only_qwen_capacity"
+    ],
+    "prohibited_actions": [
+      "persist_or_commit_raw_workbooks",
+      "persist_document_author_or_last_modified_by_metadata",
+      "persist_external_relationship_targets",
+      "generate_candidates",
+      "promote_or_count_inventory"
+    ]
+  },
+  "research_question": "Can three official Ofgem pre-levelised price-cap workbooks support a source-authentic, formula-DAG task with exact 32K, 64K, and 128K contexts after formula-template deduplication and deterministic recalculation checks?",
+  "official_pages": {
+    "price_cap_levels": "https://www.ofgem.gov.uk/energy-regulation/domestic-and-non-domestic/energy-pricing-rules/energy-price-cap/energy-price-cap-default-tariff-levels",
+    "copyright": "https://www.ofgem.gov.uk/c-ofgem-2026",
+    "open_government_licence": "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/"
+  },
+  "workbooks": [
+    {
+      "period": "2024Q4",
+      "url": "https://www.ofgem.gov.uk/sites/default/files/2024-08/Default_tariff_cap_level_v1.23.xlsx",
+      "expected_bytes": 4236086,
+      "expected_sha256": "b4aa5e7b1504d706e5297ad525857dde2a586db5a981b79fa63f85b575c8f267",
+      "expected_sheet_count": 38,
+      "expected_defined_name_count": 1558
+    },
+    {
+      "period": "2025Q4",
+      "url": "https://www.ofgem.gov.uk/sites/default/files/2025-08/energy-price-cap-levels-pre-levelised-rates-model.xlsx",
+      "expected_bytes": 5040045,
+      "expected_sha256": "d0cf3749e43081bec2f6503b3440a884044208703cd2f0ec53801f4da2d73957",
+      "expected_sheet_count": 41,
+      "expected_defined_name_count": 1560
+    },
+    {
+      "period": "2026Q3",
+      "url": "https://www.ofgem.gov.uk/sites/default/files/2026-05/Energy-price-cap-levels-pre-levelised-rates-model-v1.30-July-September-2026.xlsx",
+      "expected_bytes": 5240596,
+      "expected_sha256": "f5b5c04a48b130ccf654ee9e7bfe81620e2fe85e0837004007fa36476c6b1a9e",
+      "expected_sheet_count": 41,
+      "expected_defined_name_count": 1560
+    }
+  ],
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "capacity_bands": {
+    "32k": [32000, 32768],
+    "64k": [64000, 65536],
+    "128k": [128000, 131072]
+  },
+  "archive_limits": {
+    "max_member_count": 2000,
+    "max_total_uncompressed_bytes": 536870912,
+    "max_single_member_bytes": 134217728,
+    "max_compression_ratio": 1000.0
+  },
+  "constraints": [
+    "document properties, comments, people metadata, images, and external relationship targets are never training text",
+    "formula-template capacity replaces A1-style cell coordinates and removes cached values from formula units while preserving sheet names, operators, functions, and literal constants",
+    "cached values from unavailable external workbooks are boundary observations, not independently recomputed ground truth",
+    "embedded Internal Only print-header markers are excluded from capacity and require an explicit rights review before any derived training-text redistribution",
+    "no candidate generation until a network-disabled deterministic oracle validates an explicitly self-contained formula subgraph in both openpyxl and LibreOffice",
+    "no capacity claim may count repeated copied formula templates as unique semantic content",
+    "no near-duplicate, exact-band, derived-view, truncation, source-lineage, or remove-one gate may be relaxed"
+  ]
+}
