@@ -13,6 +13,7 @@ from longworld.core.govinfodisposition import (
     materialize_govinfo_counterfactual,
     replay_govinfo_disposition,
     replay_govinfo_disposition_raw_slice,
+    validate_govinfo_candidate_source_binding,
     verify_govinfo_replay_payload,
 )
 from longworld.core.pack import SEP, wrap_prompt
@@ -104,7 +105,7 @@ def _candidate() -> dict[str, object]:
         for artifact_id, document in zip(ids, documents, strict=True)
     ]
     question = (
-        "Return D01 and D02 as JSON. Codebook: R retained; M modified; U unknown."
+        "Return D01 and D02 as JSON. Codebook: R=retained; M=modified; U=unknown."
     )
     document_context = SEP.join(documents)
     requests = [
@@ -280,3 +281,75 @@ def test_sidecar_payload_verifier_binds_exact_source_receipt_and_task() -> None:
     forged["govinfo_disposition_task"]["oracle_threshold"] = 0.8
     with pytest.raises(GovInfoDispositionError, match="task digest"):
         verify_govinfo_replay_payload(forged)
+
+
+def test_candidate_source_binding_rejects_unlisted_derivative_hash() -> None:
+    candidate = _candidate()
+    for classification, document in zip(
+        candidate["artifact_classification"],
+        str(candidate["document_context"]).split(SEP),
+        strict=True,
+    ):
+        value = json.loads(document)
+        source_sha = value.get("status_source_sha256") or value.get("source_sha256")
+        classification.update(
+            {
+                "derived_text_sha256": hashlib.sha256(document.encode()).hexdigest(),
+                "source_record_id": classification["artifact_id"],
+                "source_sha256": source_sha,
+                "source_url": f"https://www.govinfo.gov/{source_sha[0]}",
+            }
+        )
+    candidate["source_record_ids_by_artifact"] = {
+        item["artifact_id"]: [item["source_record_id"]]
+        for item in candidate["artifact_classification"]
+    }
+    sources = [
+        {
+            "bytes": 1,
+            "raw_xml_persisted": False,
+            "sha256": value * 64,
+            "url": f"https://www.govinfo.gov/{value}",
+        }
+        for value in "123"
+    ]
+    source_bundle_sha256 = hashlib.sha256(
+        (
+            "\n".join(f"{item['url']}:{item['sha256']}" for item in sources) + "\n"
+        ).encode()
+    ).hexdigest()
+    receipt = {
+        "authorization": {"record_id": "p52-govinfo-bill-disposition-candidate-v1"},
+        "data_stage": "source_inventory",
+        "preflight_config_sha256": "6" * 64,
+        "production_eligible": False,
+        "raw_xml_persisted": False,
+        "schema_version": "longworld.p52-govinfo-source-receipt.v1",
+        "source_bundle_sha256": source_bundle_sha256,
+        "source_count": len(sources),
+        "sources": sources,
+        "train_ready": False,
+    }
+    receipt_raw = (
+        json.dumps(receipt, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        + "\n"
+    )
+    receipt_sha256 = hashlib.sha256(receipt_raw.encode()).hexdigest()
+    candidate["govinfo_disposition_task"]["source_receipt_sha256"] = receipt_sha256
+    candidate["source_binding"] = {
+        "authorization_record_id": receipt["authorization"]["record_id"],
+        "preflight_config_sha256": receipt["preflight_config_sha256"],
+        "source_bundle_sha256": source_bundle_sha256,
+        "source_receipt_sha256": receipt_sha256,
+    }
+    payload = {
+        **candidate["source_binding"],
+        "govinfo_disposition_task": candidate["govinfo_disposition_task"],
+        "source_receipt_raw_utf8": receipt_raw,
+        "task_sha256": _canonical_sha256(candidate["govinfo_disposition_task"]),
+    }
+
+    validate_govinfo_candidate_source_binding(candidate, payload)
+    candidate["artifact_classification"][0]["source_sha256"] = "f" * 64
+    with pytest.raises(GovInfoDispositionError, match="artifact source"):
+        validate_govinfo_candidate_source_binding(candidate, payload)

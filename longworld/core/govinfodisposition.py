@@ -182,6 +182,63 @@ def verify_govinfo_replay_payload(payload: Mapping[str, Any]) -> None:
         raise GovInfoDispositionError("GovInfo source bundle digest is invalid")
 
 
+def validate_govinfo_candidate_source_binding(
+    candidate: Mapping[str, Any], payload: Mapping[str, Any]
+) -> None:
+    """Bind every persisted GovInfo derivative to the signed frozen inventory."""
+    verify_govinfo_replay_payload(payload)
+    task = _candidate_task(candidate)
+    if task != payload.get("govinfo_disposition_task"):
+        raise GovInfoDispositionError("GovInfo candidate task differs from sidecar")
+    source_binding = candidate.get("source_binding")
+    expected_binding = {
+        "source_receipt_sha256": payload.get("source_receipt_sha256"),
+        "source_bundle_sha256": payload.get("source_bundle_sha256"),
+        "authorization_record_id": payload.get("authorization_record_id"),
+        "preflight_config_sha256": payload.get("preflight_config_sha256"),
+    }
+    if source_binding != expected_binding:
+        raise GovInfoDispositionError("GovInfo candidate source binding is invalid")
+    receipt = json.loads(str(payload["source_receipt_raw_utf8"]))
+    source_identities = {
+        (str(source["url"]), str(source["sha256"])) for source in receipt["sources"]
+    }
+    _ordered_ids, documents, classifications = _artifact_documents(candidate)
+    for artifact_id, classification in classifications.items():
+        value = documents[artifact_id]
+        identity = (
+            str(classification.get("source_url") or ""),
+            str(classification.get("source_sha256") or ""),
+        )
+        document_sha = (
+            value.get("status_source_sha256")
+            if value.get("artifact_type") == "govinfo_transition"
+            else value.get("source_sha256")
+        )
+        if (
+            identity not in source_identities
+            or document_sha != identity[1]
+            or classification.get("derived_text_sha256")
+            != hashlib.sha256(_canonical_json(value).encode()).hexdigest()
+        ):
+            raise GovInfoDispositionError(
+                "GovInfo candidate artifact source binding is invalid"
+            )
+    question = str(candidate.get("question") or "")
+    if (
+        any(
+            request["code"] not in question
+            for request in candidate["requested_dispositions"]
+        )
+        or "R=retained" not in question
+        or "M=modified" not in question
+        or "U=unknown" not in question
+    ):
+        raise GovInfoDispositionError(
+            "GovInfo candidate question codebook is incomplete"
+        )
+
+
 def _artifact_documents(
     candidate: Mapping[str, Any],
 ) -> tuple[list[str], dict[str, dict[str, Any]], dict[str, Mapping[str, Any]]]:
