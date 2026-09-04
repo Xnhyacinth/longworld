@@ -11,6 +11,7 @@ from longworld.core.provenance import ProvenanceError
 from longworld.core.sourceworkflow import STANDARDS_SOURCE_KIND, adapt_source_manifest
 from longworld.core.standardsworkflow import (
     audit_ietf_cross_spec_requirement_task,
+    build_ietf_cross_spec_growth_requirement_task,
     build_ietf_cross_spec_requirement_task,
     build_ietf_workflow_from_fetch_inventory,
     replay_ietf_cross_spec_requirement_task,
@@ -18,11 +19,28 @@ from longworld.core.standardsworkflow import (
 from tests.test_standardsworkflow import _inventory
 
 
-def _oauth_manifest(tmp_path: Path) -> dict[str, object]:
+def _oauth_manifest(
+    tmp_path: Path, *, semantic_growth: bool = False
+) -> dict[str, object]:
     inventory, _path = _inventory(tmp_path)
     request_path = tmp_path / str(inventory["request_file"])
     request = json.loads(request_path.read_text())
     numbers = [6749, 6750, 6819, 7636, 8414, 9207, 9700]
+    if semantic_growth:
+        numbers = [
+            6749,
+            6750,
+            6819,
+            7636,
+            8414,
+            8705,
+            9101,
+            9126,
+            9207,
+            9396,
+            9449,
+            9700,
+        ]
     request["rfc_numbers"] = numbers
     request_raw = (json.dumps(request, sort_keys=True) + "\n").encode()
     request_path.write_bytes(request_raw)
@@ -31,23 +49,34 @@ def _oauth_manifest(tmp_path: Path) -> dict[str, object]:
     receipt = inventory["fetch_receipt"]
     receipt["request_sha256"] = request_sha256
 
+    relation_targets = [
+        ("refnorm", 6749),
+        ("refnorm", 6750),
+        ("refnorm", 6819),
+        ("refinfo", 7636),
+        ("refnorm", 8414),
+        ("refinfo", 9207),
+    ]
+    if semantic_growth:
+        relation_targets.extend(
+            [
+                ("refnorm", 8705),
+                ("refinfo", 9101),
+                ("refinfo", 9126),
+                ("refinfo", 9396),
+                ("refinfo", 9449),
+            ]
+        )
+    relation_targets.append(("became_rfc", 9700))
     relations = {
-        "meta": {"total_count": 7},
+        "meta": {"total_count": len(relation_targets)},
         "objects": [
             {
                 "relationship": f"/api/v1/name/docrelationshipname/{kind}/",
                 "source": "/api/v1/doc/document/draft-ietf-demo/",
                 "target": f"/api/v1/doc/document/rfc{number}/",
             }
-            for kind, number in [
-                ("refnorm", 6749),
-                ("refnorm", 6750),
-                ("refnorm", 6819),
-                ("refinfo", 7636),
-                ("refnorm", 8414),
-                ("refinfo", 9207),
-                ("became_rfc", 9700),
-            ]
+            for kind, number in relation_targets
         ],
     }
     relation_raw = json.dumps(relations, sort_keys=True).encode()
@@ -122,6 +151,43 @@ def _oauth_manifest(tmp_path: Path) -> dict[str, object]:
             "   REQUIRED.\n"
         ),
     }
+    if semantic_growth:
+        bodies.update(
+            {
+                8705: (
+                    "RFC 8705\nMay 2020\n"
+                    "The protected resource MUST obtain the client certificate and "
+                    "MUST verify that the certificate matches the certificate "
+                    "associated with the access token. If they do not match, the "
+                    "request MUST be rejected with HTTP 401 and invalid_token.\n"
+                ),
+                9101: (
+                    "RFC 9101\nAugust 2021\n"
+                    "The authorization server MUST validate the signature of the "
+                    "JWS-signed Request Object using a key associated with the client. "
+                    "If signature validation fails, it MUST return an "
+                    "invalid_request_object error.\n"
+                ),
+                9126: (
+                    "RFC 9126\nSeptember 2021\n"
+                    "The request_uri is single-use, has a positive expires_in, MUST "
+                    "be unpredictable, and MUST be bound to the client that posted "
+                    "the authorization request.\n"
+                ),
+                9396: (
+                    "RFC 9396\nMay 2023\n"
+                    "The AS MUST refuse unknown authorization details types and abort "
+                    "with invalid_authorization_details for unknown fields, wrong "
+                    "field types, fields with invalid values, or missing required fields.\n"
+                ),
+                9449: (
+                    "RFC 9449\nNovember 2023\n"
+                    "To validate a DPoP proof, the server MUST verify the JWT claims, "
+                    "typ, alg, signature, public jwk, htm, htu, nonce, creation time, "
+                    "ath, and the access-token-bound public key.\n"
+                ),
+            }
+        )
     retained = [item for item in receipt["retrievals"] if item["kind"] != "rfc"]
     for number, body in bodies.items():
         raw = body.encode()
@@ -203,6 +269,7 @@ def test_cross_spec_requirement_task_replays_six_fields_and_remove_one(
         "metadata_issuer": "PASS_EXACT_MATCH",
         "multi_as_issuer": "PASS_MATCHED",
     }
+    assert all(value in task["question"] for value in task["answer"].values())
     assert replay_ietf_cross_spec_requirement_task(task) == task["answer"]
     wrong_scenario = deepcopy(task)
     wrong_scenario["scenario"]["pkce_method"] = "plain"
@@ -214,6 +281,66 @@ def test_cross_spec_requirement_task_replays_six_fields_and_remove_one(
         "remove_one_evidence_fails": True,
         "remove_one_relation_fails": True,
     }
+
+
+def test_cross_spec_growth_task_replays_eleven_fields_and_remove_one(
+    tmp_path: Path,
+) -> None:
+    task = build_ietf_cross_spec_growth_requirement_task(
+        _oauth_manifest(tmp_path, semantic_growth=True)
+    )
+
+    assert task["answer_program_id"] == "ietf.oauth_effective_requirement.v2"
+    assert '"jar_signature_valid":false' in task["question"]
+    assert '"dpop_proof_validation"' in task["question"]
+    assert 'the string "UNKNOWN" only for a field' in task["question"]
+    assert all(value in task["question"] for value in task["answer"].values())
+    assert (
+        task["answer"]
+        | {
+            "mtls_certificate_bound_access": "PASS_CERT_MATCH",
+            "jar_request_object_validation": "FAIL_INVALID_REQUEST_OBJECT",
+            "par_request_uri_validation": "PASS_SINGLE_USE_BOUND_UNEXPIRED",
+            "rar_authorization_details_validation": "FAIL_INVALID_AUTHORIZATION_DETAILS",
+            "dpop_proof_validation": "PASS_DPOP_BOUND",
+        }
+        == task["answer"]
+    )
+    assert len(task["answer"]) == 11
+    assert replay_ietf_cross_spec_requirement_task(task) == task["answer"]
+    assert audit_ietf_cross_spec_requirement_task(task) == {
+        "strict_replay": True,
+        "remove_one_evidence_fails": True,
+        "remove_one_relation_fails": True,
+    }
+
+
+@pytest.mark.parametrize("semantic_growth", [False, True])
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("question", "Resolve a different OAuth scenario."),
+        ("answer", {}),
+        ("essential_evidence_ids", ["redirect_current"]),
+        ("essential_relation_ids", []),
+    ],
+)
+def test_cross_spec_task_binds_canonical_dispatch_contract(
+    tmp_path: Path,
+    semantic_growth: bool,
+    field: str,
+    replacement: object,
+) -> None:
+    manifest = _oauth_manifest(tmp_path, semantic_growth=semantic_growth)
+    task = (
+        build_ietf_cross_spec_growth_requirement_task(manifest)
+        if semantic_growth
+        else build_ietf_cross_spec_requirement_task(manifest)
+    )
+    task[field] = replacement
+
+    with pytest.raises(ProvenanceError, match="task contract"):
+        replay_ietf_cross_spec_requirement_task(task)
 
 
 @pytest.mark.parametrize("tamper", ["remove", "mismatch"])

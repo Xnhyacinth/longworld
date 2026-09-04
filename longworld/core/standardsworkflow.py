@@ -32,6 +32,7 @@ from longworld.core.provenance import (
 from longworld.core.publicscan import (
     PUBLIC_SCANNER,
     PUBLIC_SCANNER_REVISION,
+    SECRET_PATTERNS,
     sanitize_public_text,
     validate_sanitized_public_payload,
 )
@@ -86,18 +87,18 @@ def _regular_bytes(base: Path, filename: object, digest: object) -> bytes:
 
 def _clean(
     raw: bytes, *, approved_private_key_digests: frozenset[str]
-) -> tuple[str, str, int, int, frozenset[str]]:
+) -> tuple[str, str, int, int, int, frozenset[str]]:
     try:
         text = raw.decode("utf-8-sig")
     except UnicodeDecodeError as error:
         raise ProvenanceError("IETF source is not UTF-8") from error
-    observed_private_key_digests: set[str] = set()
+    observed_test_vector_digests: set[str] = set()
 
     def redact_approved_private_key(match: re.Match[str]) -> str:
         digest = hashlib.sha256(match.group(0).encode()).hexdigest()
         if digest not in approved_private_key_digests:
             raise ProvenanceError("IETF private-key test vector is not digest-approved")
-        observed_private_key_digests.add(digest)
+        observed_test_vector_digests.add(digest)
         return "[redacted-public-standards-private-key-test-vector]"
 
     without_private_keys, private_key_count = _PRIVATE_KEY_BLOCK.subn(
@@ -107,8 +108,26 @@ def _clean(
         raise ProvenanceError(
             "IETF private-key boundary is incomplete or not digest-approved"
         )
+
+    credential_test_vector_count = 0
+    without_credential_vectors = without_private_keys
+    for pattern in SECRET_PATTERNS:
+
+        def redact_approved_credential(match: re.Match[str]) -> str:
+            digest = hashlib.sha256(match.group(0).encode()).hexdigest()
+            if digest not in approved_private_key_digests:
+                raise ProvenanceError(
+                    "IETF credential-shaped test vector is not digest-approved"
+                )
+            observed_test_vector_digests.add(digest)
+            return "[redacted-public-standards-credential-test-vector]"
+
+        without_credential_vectors, count = pattern.subn(
+            redact_approved_credential, without_credential_vectors
+        )
+        credential_test_vector_count += count
     try:
-        clean, redactions = sanitize_public_text(without_private_keys)
+        clean, redactions = sanitize_public_text(without_credential_vectors)
     except ValueError as error:
         raise ProvenanceError("IETF source failed the public scanner") from error
     return (
@@ -116,7 +135,8 @@ def _clean(
         clean,
         len(redactions),
         private_key_count,
-        frozenset(observed_private_key_digests),
+        credential_test_vector_count,
+        frozenset(observed_test_vector_digests),
     )
 
 
@@ -161,6 +181,7 @@ def _record(
     clean_text: str,
     email_count: int,
     private_key_count: int,
+    credential_test_vector_count: int,
     temporal_semantics: str = "source_event_time",
 ) -> dict[str, Any]:
     _parse_timestamp(occurred_at, "IETF record occurred_at")
@@ -183,8 +204,11 @@ def _record(
             "emails": "redacted",
             "email_redaction_count": email_count,
             "private_key_redaction_count": private_key_count,
+            "credential_test_vector_redaction_count": credential_test_vector_count,
             "secrets": (
-                "redacted_then_scanned" if private_key_count else "fail_closed"
+                "redacted_then_scanned"
+                if private_key_count or credential_test_vector_count
+                else "fail_closed"
             ),
             "private_key_redaction_policy": "exact_sha256_allowlist",
             "scanner": PUBLIC_SCANNER,
@@ -611,16 +635,17 @@ def build_ietf_workflow_from_fetch_inventory(
     approved_private_key_digests = frozenset(
         request["approved_public_test_vector_sha256"]
     )
-    observed_private_key_digests: set[str] = set()
+    observed_test_vector_digests: set[str] = set()
     for retrieval, raw in retrievals:
         (
             raw_text,
             clean_text,
             email_count,
             private_key_count,
-            private_key_digests,
+            credential_test_vector_count,
+            test_vector_digests,
         ) = _clean(raw, approved_private_key_digests=approved_private_key_digests)
-        observed_private_key_digests.update(private_key_digests)
+        observed_test_vector_digests.update(test_vector_digests)
         url = retrieval["requested_url"]
         if retrieval["kind"] == "datatracker_document":
             try:
@@ -658,6 +683,7 @@ def build_ietf_workflow_from_fetch_inventory(
                 clean_text=clean_text,
                 email_count=email_count,
                 private_key_count=private_key_count,
+                credential_test_vector_count=credential_test_vector_count,
             )
             record.update(
                 {
@@ -764,6 +790,7 @@ def build_ietf_workflow_from_fetch_inventory(
                 clean_text=clean_text,
                 email_count=email_count,
                 private_key_count=private_key_count,
+                credential_test_vector_count=credential_test_vector_count,
                 temporal_semantics="retrieval_observation_only",
             )
             record.update({"draft_name": name, "rfc_number": number})
@@ -800,6 +827,7 @@ def build_ietf_workflow_from_fetch_inventory(
                 clean_text=clean_text,
                 email_count=email_count,
                 private_key_count=private_key_count,
+                credential_test_vector_count=credential_test_vector_count,
             )
             record.update({"draft_name": name, "revision": revision})
             drafts[(name, revision)] = record
@@ -874,6 +902,7 @@ def build_ietf_workflow_from_fetch_inventory(
                 clean_text=clean_text,
                 email_count=email_count,
                 private_key_count=private_key_count,
+                credential_test_vector_count=credential_test_vector_count,
             )
             record["rfc_number"] = number
             record["draft_references"] = draft_identities
@@ -888,8 +917,8 @@ def build_ietf_workflow_from_fetch_inventory(
         else:
             records.append(record)
 
-    if observed_private_key_digests != approved_private_key_digests:
-        raise ProvenanceError("IETF approved private-key test vectors are not exact")
+    if observed_test_vector_digests != approved_private_key_digests:
+        raise ProvenanceError("IETF approved public test vectors are not exact")
 
     relations: list[dict[str, Any]] = []
     for draft in request["drafts"]:
@@ -2259,6 +2288,9 @@ def audit_ietf_normative_change_task(
 IETF_CROSS_SPEC_REQUIREMENT_TASK_SCHEMA = (
     "longworld.ietf-cross-spec-requirement-task.v1"
 )
+IETF_CROSS_SPEC_GROWTH_REQUIREMENT_TASK_SCHEMA = (
+    "longworld.ietf-cross-spec-growth-requirement-task.v1"
+)
 _OAUTH_REQUIREMENT_ANSWERS = {
     "redirect_match": "FAIL_EXACT_REQUIRED",
     "bearer_transport": "FAIL_URI_QUERY_PROHIBITED",
@@ -2266,6 +2298,32 @@ _OAUTH_REQUIREMENT_ANSWERS = {
     "pkce": "PASS_S256",
     "metadata_issuer": "PASS_EXACT_MATCH",
     "multi_as_issuer": "PASS_MATCHED",
+}
+_OAUTH_REQUIREMENT_CODEBOOK = {
+    "redirect_match": {
+        "code": "FAIL_EXACT_REQUIRED",
+        "meaning": "reject because the redirect URI is not an exact registered match",
+    },
+    "bearer_transport": {
+        "code": "FAIL_URI_QUERY_PROHIBITED",
+        "meaning": "reject because the access token is passed in a URI query parameter",
+    },
+    "refresh_protection": {
+        "code": "PASS_ROTATION",
+        "meaning": "accept because refresh-token rotation provides replay detection",
+    },
+    "pkce": {
+        "code": "PASS_S256",
+        "meaning": "accept because the public client uses PKCE with S256",
+    },
+    "metadata_issuer": {
+        "code": "PASS_EXACT_MATCH",
+        "meaning": "accept because the metadata issuer exactly matches the request prefix",
+    },
+    "multi_as_issuer": {
+        "code": "PASS_MATCHED",
+        "meaning": "accept because the response issuer matches the expected issuer",
+    },
 }
 _OAUTH_BEARER_BASELINE_ANSWER = "URI_QUERY_DISCOURAGED_OR_CONDITIONAL"
 _OAUTH_REQUIREMENT_SCENARIO = {
@@ -2392,6 +2450,155 @@ _OAUTH_REQUIREMENT_BRANCHES = {
         9207,
     ),
 }
+_OAUTH_GROWTH_REQUIREMENT_ANSWERS = {
+    "mtls_certificate_bound_access": "PASS_CERT_MATCH",
+    "jar_request_object_validation": "FAIL_INVALID_REQUEST_OBJECT",
+    "par_request_uri_validation": "PASS_SINGLE_USE_BOUND_UNEXPIRED",
+    "rar_authorization_details_validation": "FAIL_INVALID_AUTHORIZATION_DETAILS",
+    "dpop_proof_validation": "PASS_DPOP_BOUND",
+}
+_OAUTH_GROWTH_REQUIREMENT_CODEBOOK = {
+    "mtls_certificate_bound_access": {
+        "code": "PASS_CERT_MATCH",
+        "meaning": "accept because the presented certificate matches the token binding",
+    },
+    "jar_request_object_validation": {
+        "code": "FAIL_INVALID_REQUEST_OBJECT",
+        "meaning": "reject because the signed request object has an invalid signature",
+    },
+    "par_request_uri_validation": {
+        "code": "PASS_SINGLE_USE_BOUND_UNEXPIRED",
+        "meaning": "accept because request_uri is single-use, client-bound, and unexpired",
+    },
+    "rar_authorization_details_validation": {
+        "code": "FAIL_INVALID_AUTHORIZATION_DETAILS",
+        "meaning": "reject because a known authorization-details type has an unknown field",
+    },
+    "dpop_proof_validation": {
+        "code": "PASS_DPOP_BOUND",
+        "meaning": "accept because all required DPoP checks and token binding pass",
+    },
+}
+_OAUTH_GROWTH_REQUIREMENT_SCENARIO = {
+    **_OAUTH_REQUIREMENT_SCENARIO,
+    "mtls_certificate_matches_token_binding": True,
+    "jar_signature_valid": False,
+    "par_request_uri_single_use_bound_unexpired": True,
+    "rar_known_type_contains_unknown_field": True,
+    "dpop_all_required_checks_pass": True,
+}
+_OAUTH_GROWTH_REQUIREMENT_EVIDENCE = {
+    "mtls_certificate_bound_access_current": (
+        8705,
+        (
+            r"The protected resource MUST obtain.*?MUST verify\s+"
+            r"that the certificate matches the certificate associated with the\s+"
+            r"access token\..*?(?:HTTP 401 status\s+code and the \"invalid_token\" "
+            r"error code|HTTP 401 and invalid_token)\."
+        ),
+    ),
+    "jar_request_object_validation_current": (
+        9101,
+        (
+            r"The authorization server MUST validate the signature of the\s+"
+            r"JWS-?\s*signed.*?Request Object.*?\..*?If .*?signature\s+"
+            r"validation fails,.*?invalid_request_object(?:\" error to the client "
+            r"in response to the\s+authorization request| error)\."
+        ),
+    ),
+    "par_request_uri_validation_current": (
+        9126,
+        (
+            r"(?:This URI is (?:a )?single-use reference|The request_uri is single-use)"
+            r".*?(?:expires_in|positive expires_in).*?MUST.*?"
+            r"(?:be unpredictable|computationally infeasible to predict or guess a "
+            r"valid value).*?"
+            r"MUST be bound to the client that posted the\s+authorization request\."
+        ),
+    ),
+    "rar_authorization_details_validation_current": (
+        9396,
+        (
+            r"The AS MUST refuse.*?(?:unknown authorization details type|unknown "
+            r"authorization details types).*?(?:invalid_authorization_details|"
+            r"missing required\s+fields).*?(?:missing required fields|fields with "
+            r"invalid values).*?\."
+        ),
+    ),
+    "dpop_proof_validation_current": (
+        9449,
+        (
+            r"To validate a DPoP proof, the (?:receiving )?server MUST "
+            r"(?:ensure|verify).*?(?:access-token-bound public key|These checks may "
+            r"be performed in any order)\."
+        ),
+    ),
+}
+_OAUTH_GROWTH_REQUIREMENT_BRANCHES = {
+    "mtls_certificate_bound_access": (
+        "mtls_certificate_bound_access_current",
+        "mtls_certificate_bound_access_current",
+        "normative_reference",
+        8705,
+    ),
+    "jar_request_object_validation": (
+        "jar_request_object_validation_current",
+        "jar_request_object_validation_current",
+        "informative_reference",
+        9101,
+    ),
+    "par_request_uri_validation": (
+        "par_request_uri_validation_current",
+        "par_request_uri_validation_current",
+        "informative_reference",
+        9126,
+    ),
+    "rar_authorization_details_validation": (
+        "rar_authorization_details_validation_current",
+        "rar_authorization_details_validation_current",
+        "informative_reference",
+        9396,
+    ),
+    "dpop_proof_validation": (
+        "dpop_proof_validation_current",
+        "dpop_proof_validation_current",
+        "informative_reference",
+        9449,
+    ),
+}
+
+
+def _oauth_requirement_question(
+    scenario: dict[str, Any], codebook: dict[str, dict[str, str]]
+) -> str:
+    return (
+        "Resolve the effective OAuth requirements at 2025-01-31T00:00:00Z for "
+        "this scenario (canonical JSON): "
+        + json.dumps(scenario, sort_keys=True, separators=(",", ":"))
+        + ". Return exactly one JSON object with these keys in this order: "
+        + json.dumps(tuple(codebook), separators=(",", ":"))
+        + ". Use this exact per-field output codebook (canonical JSON): "
+        + json.dumps(codebook, sort_keys=True, separators=(",", ":"))
+        + ". Resolve each field independently from the supplied RFC graph; use "
+        'the string "UNKNOWN" only for a field whose required evidence or relation '
+        "is absent."
+    )
+
+
+def render_ietf_cross_spec_prompt(question: str, context: str, timing: str) -> str:
+    """Render the partial-resolution task without whole-answer abstention."""
+    instruction = (
+        "Answer using only the documents and the scenario in the question. Return "
+        'exactly the requested JSON object; use "UNKNOWN" only per unresolved field.'
+    )
+    if timing == "first":
+        return f"Question:\n{question}\n\nContext (internal records):\n{context}\n\n{instruction}"
+    if timing == "late":
+        return (
+            f"Context (internal records):\n{context}\n\nQuestion:\n{question}\n\n"
+            f"{instruction}"
+        )
+    raise ValueError("IETF cross-spec prompt timing is invalid")
 
 
 def _canonical_sha256(value: object) -> str:
@@ -2402,7 +2609,11 @@ def _canonical_sha256(value: object) -> str:
     ).hexdigest()
 
 
-def _oauth_rfc_records(manifest: dict[str, Any]) -> dict[int, dict[str, Any]]:
+def _oauth_rfc_records(
+    manifest: dict[str, Any],
+    *,
+    expected_numbers: set[int] | None = None,
+) -> dict[int, dict[str, Any]]:
     records: dict[int, dict[str, Any]] = {}
     for record in manifest["records"]:
         number = record.get("rfc_number")
@@ -2410,7 +2621,7 @@ def _oauth_rfc_records(manifest: dict[str, Any]) -> dict[int, dict[str, Any]]:
             if number in records:
                 raise ProvenanceError("IETF OAuth RFC identity is duplicated")
             records[number] = record
-    expected = {6749, 6750, 6819, 7636, 8414, 9207, 9700}
+    expected = expected_numbers or {6749, 6750, 6819, 7636, 8414, 9207, 9700}
     if set(records) != expected:
         raise ProvenanceError("IETF OAuth RFC graph is incomplete")
     return records
@@ -2480,9 +2691,8 @@ def build_ietf_cross_spec_requirement_task(
         "schema_version": IETF_CROSS_SPEC_REQUIREMENT_TASK_SCHEMA,
         "query_type": "cross_spec_requirement_resolution",
         "answer_program_id": "ietf.oauth_effective_requirement.v1",
-        "question": (
-            "Resolve the six effective OAuth requirements for the fixed public "
-            "authorization-code client scenario at 2025-01-31T00:00:00Z."
+        "question": _oauth_requirement_question(
+            _OAUTH_REQUIREMENT_SCENARIO, _OAUTH_REQUIREMENT_CODEBOOK
         ),
         "cutoff": "2025-01-31T00:00:00Z",
         "scenario": dict(_OAUTH_REQUIREMENT_SCENARIO),
@@ -2495,6 +2705,82 @@ def build_ietf_cross_spec_requirement_task(
             *(relation["relation_id"] for relation in requirement_relations),
         ],
         "answer": dict(_OAUTH_REQUIREMENT_ANSWERS),
+    }
+    replay_ietf_cross_spec_requirement_task(task)
+    return task
+
+
+def build_ietf_cross_spec_growth_requirement_task(
+    manifest: dict[str, Any],
+) -> dict[str, Any]:
+    """Compile the fixed eleven-field OAuth semantic-growth resolver."""
+    audit_ietf_workflow_manifest(manifest)
+    evidence_specs = {
+        **_OAUTH_REQUIREMENT_EVIDENCE,
+        **_OAUTH_GROWTH_REQUIREMENT_EVIDENCE,
+    }
+    branches = {
+        **_OAUTH_REQUIREMENT_BRANCHES,
+        **_OAUTH_GROWTH_REQUIREMENT_BRANCHES,
+    }
+    records = _oauth_rfc_records(
+        manifest,
+        expected_numbers={
+            6749,
+            6750,
+            6819,
+            7636,
+            8414,
+            8705,
+            9101,
+            9126,
+            9207,
+            9396,
+            9449,
+            9700,
+        },
+    )
+    evidence = [
+        _oauth_requirement_evidence(records, evidence_id, specification)
+        for evidence_id, specification in evidence_specs.items()
+    ]
+    requirement_relations = [
+        _oauth_requirement_relation(manifest, kind=kind, target_number=target_number)
+        for _field, (_current, _baseline, kind, target_number) in branches.items()
+    ]
+    publication = [
+        relation
+        for relation in manifest["relations"]
+        if relation.get("kind") == "published_as"
+        and relation.get("target_record_id") == "ietf:rfc:9700"
+    ]
+    if len(publication) != 1:
+        raise ProvenanceError("IETF OAuth publication relation is not unique")
+    task = {
+        "schema_version": IETF_CROSS_SPEC_GROWTH_REQUIREMENT_TASK_SCHEMA,
+        "query_type": "cross_spec_requirement_resolution",
+        "answer_program_id": "ietf.oauth_effective_requirement.v2",
+        "question": _oauth_requirement_question(
+            _OAUTH_GROWTH_REQUIREMENT_SCENARIO,
+            {
+                **_OAUTH_REQUIREMENT_CODEBOOK,
+                **_OAUTH_GROWTH_REQUIREMENT_CODEBOOK,
+            },
+        ),
+        "cutoff": "2025-01-31T00:00:00Z",
+        "scenario": dict(_OAUTH_GROWTH_REQUIREMENT_SCENARIO),
+        "source_manifest": deepcopy(manifest),
+        "source_manifest_sha256": _canonical_sha256(manifest),
+        "evidence_items": evidence,
+        "essential_evidence_ids": list(evidence_specs),
+        "essential_relation_ids": [
+            publication[0]["relation_id"],
+            *(relation["relation_id"] for relation in requirement_relations),
+        ],
+        "answer": {
+            **_OAUTH_REQUIREMENT_ANSWERS,
+            **_OAUTH_GROWTH_REQUIREMENT_ANSWERS,
+        },
     }
     replay_ietf_cross_spec_requirement_task(task)
     return task
@@ -2521,14 +2807,72 @@ def replay_ietf_cross_spec_requirement_task(
         "essential_relation_ids",
         "answer",
     }
+    schema_version = task.get("schema_version") if isinstance(task, dict) else None
+    if schema_version == IETF_CROSS_SPEC_REQUIREMENT_TASK_SCHEMA:
+        answer_program_id = "ietf.oauth_effective_requirement.v1"
+        question = _oauth_requirement_question(
+            _OAUTH_REQUIREMENT_SCENARIO, _OAUTH_REQUIREMENT_CODEBOOK
+        )
+        scenario = _OAUTH_REQUIREMENT_SCENARIO
+        codebook = _OAUTH_REQUIREMENT_CODEBOOK
+        evidence_specs = _OAUTH_REQUIREMENT_EVIDENCE
+        branches = _OAUTH_REQUIREMENT_BRANCHES
+        answers = _OAUTH_REQUIREMENT_ANSWERS
+        expected_numbers = {6749, 6750, 6819, 7636, 8414, 9207, 9700}
+    elif schema_version == IETF_CROSS_SPEC_GROWTH_REQUIREMENT_TASK_SCHEMA:
+        answer_program_id = "ietf.oauth_effective_requirement.v2"
+        question = _oauth_requirement_question(
+            _OAUTH_GROWTH_REQUIREMENT_SCENARIO,
+            {
+                **_OAUTH_REQUIREMENT_CODEBOOK,
+                **_OAUTH_GROWTH_REQUIREMENT_CODEBOOK,
+            },
+        )
+        scenario = _OAUTH_GROWTH_REQUIREMENT_SCENARIO
+        codebook = {
+            **_OAUTH_REQUIREMENT_CODEBOOK,
+            **_OAUTH_GROWTH_REQUIREMENT_CODEBOOK,
+        }
+        evidence_specs = {
+            **_OAUTH_REQUIREMENT_EVIDENCE,
+            **_OAUTH_GROWTH_REQUIREMENT_EVIDENCE,
+        }
+        branches = {
+            **_OAUTH_REQUIREMENT_BRANCHES,
+            **_OAUTH_GROWTH_REQUIREMENT_BRANCHES,
+        }
+        answers = {
+            **_OAUTH_REQUIREMENT_ANSWERS,
+            **_OAUTH_GROWTH_REQUIREMENT_ANSWERS,
+        }
+        expected_numbers = {
+            6749,
+            6750,
+            6819,
+            7636,
+            8414,
+            8705,
+            9101,
+            9126,
+            9207,
+            9396,
+            9449,
+            9700,
+        }
+    else:
+        raise ProvenanceError("IETF cross-spec task contract is invalid")
+    if {field: value["code"] for field, value in codebook.items()} != answers:
+        raise ProvenanceError("IETF cross-spec output codebook is inconsistent")
     if (
         not isinstance(task, dict)
         or set(task) != required_fields
-        or task.get("schema_version") != IETF_CROSS_SPEC_REQUIREMENT_TASK_SCHEMA
         or task.get("query_type") != "cross_spec_requirement_resolution"
-        or task.get("answer_program_id") != "ietf.oauth_effective_requirement.v1"
+        or task.get("answer_program_id") != answer_program_id
+        or task.get("question") != question
         or task.get("cutoff") != "2025-01-31T00:00:00Z"
-        or task.get("scenario") != _OAUTH_REQUIREMENT_SCENARIO
+        or task.get("scenario") != scenario
+        or task.get("essential_evidence_ids") != list(evidence_specs)
+        or task.get("answer") != answers
     ):
         raise ProvenanceError("IETF cross-spec task contract is invalid")
     manifest = task.get("source_manifest")
@@ -2537,7 +2881,7 @@ def replay_ietf_cross_spec_requirement_task(
     audit_ietf_workflow_manifest(manifest)
     if task.get("source_manifest_sha256") != _canonical_sha256(manifest):
         raise ProvenanceError("IETF cross-spec source manifest binding is invalid")
-    records = _oauth_rfc_records(manifest)
+    records = _oauth_rfc_records(manifest, expected_numbers=expected_numbers)
     raw_evidence = task.get("evidence_items")
     if not isinstance(raw_evidence, list):
         raise ProvenanceError("IETF cross-spec evidence is invalid")
@@ -2546,11 +2890,9 @@ def replay_ietf_cross_spec_requirement_task(
         for item in raw_evidence
         if isinstance(item, dict)
     }
-    if set(items) != set(_OAUTH_REQUIREMENT_EVIDENCE) or len(items) != len(
-        raw_evidence
-    ):
+    if set(items) != set(evidence_specs) or len(items) != len(raw_evidence):
         raise ProvenanceError("IETF cross-spec evidence identity is invalid")
-    for evidence_id, specification in _OAUTH_REQUIREMENT_EVIDENCE.items():
+    for evidence_id, specification in evidence_specs.items():
         expected = _oauth_requirement_evidence(records, evidence_id, specification)
         if items[evidence_id] != expected:
             raise ProvenanceError("IETF cross-spec evidence binding is invalid")
@@ -2587,13 +2929,24 @@ def replay_ietf_cross_spec_requirement_task(
         if relation.get("kind") == "published_as"
         and relation.get("target_record_id") == "ietf:rfc:9700"
     )
+    expected_essential_relations = [
+        publication["relation_id"],
+        *(
+            _oauth_requirement_relation(
+                manifest, kind=kind, target_number=target_number
+            )["relation_id"]
+            for _field, (_current, _baseline, kind, target_number) in branches.items()
+        ),
+    ]
+    if essential_relations != expected_essential_relations:
+        raise ProvenanceError("IETF cross-spec task contract is invalid")
     result: dict[str, str] = {}
     for field, (
         current,
         baseline,
         kind,
         target_number,
-    ) in _OAUTH_REQUIREMENT_BRANCHES.items():
+    ) in branches.items():
         relation = _oauth_requirement_relation(
             manifest, kind=kind, target_number=target_number
         )
@@ -2602,7 +2955,7 @@ def replay_ietf_cross_spec_requirement_task(
             and relation["relation_id"] in selected_relations
         )
         if {current, baseline}.issubset(selected_evidence) and relations_present:
-            result[field] = _OAUTH_REQUIREMENT_ANSWERS[field]
+            result[field] = answers[field]
         elif (
             field == "bearer_transport"
             and current not in selected_evidence

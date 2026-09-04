@@ -1125,7 +1125,11 @@ def _cumulative_history_violations_by_world(
             for index, metric_name in enumerate(metric_names):
                 before_max = max(value[index] for value in before_metrics if value)
                 after_min = min(value[index] for value in after_metrics if value)
-                if after_min <= before_max:
+                if (
+                    after_min < before_max
+                    if metric_name == "proof_depth"
+                    else after_min <= before_max
+                ):
                     violations[world_id].add(
                         f"{label}:{metric_name}_not_growing={before_max}->{after_min}"
                     )

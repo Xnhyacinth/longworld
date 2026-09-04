@@ -616,6 +616,42 @@ RELEASE_PROFILES = {
         min_eval_domains=0,
         require_all_rows_source_bound=True,
     ),
+    "p40-ietf-oauth-semantic-growth-probe-1-v1": _profile(
+        profile_id="p40-ietf-oauth-semantic-growth-probe-1-v1",
+        environment="probe",
+        expected_promoted_worlds=1,
+        min_source_families=1,
+        min_real_base_tasks=1,
+        min_real_source_relations=1,
+        min_real_64k_rows=3,
+        min_train_worlds=1,
+        min_eval_worlds=0,
+        min_real_train_worlds=1,
+        min_real_eval_worlds=0,
+        predecessor_profile_id=None,
+        min_domains=1,
+        promoted_domain_world_quotas=(("standards", 1),),
+        min_exact_64k_rows_by_domain=(("standards", 3),),
+        min_unique_real_source_workflows=1,
+        min_real_exact_64k_rows_by_domain=(("standards", 3),),
+        min_real_exact_64k_worlds_by_domain=(("standards", 1),),
+        min_motifs=1,
+        min_unique_executable_proofs=3,
+        min_unique_answer_programs=1,
+        min_unique_semantic_base_tasks=1,
+        bind_tokenizer_assets=True,
+        training_conditions=("B5",),
+        training_length_buckets=("32k", "64k", "128k"),
+        required_exact_length_buckets=("32k", "64k", "128k"),
+        required_view_timings=(
+            ("full", "first"),
+            ("cf", "first"),
+            ("ordered_artifact_view", "first"),
+        ),
+        min_train_worlds_by_domain=(("standards", 1),),
+        min_eval_domains=0,
+        require_all_rows_source_bound=True,
+    ),
     "p7-sec-source-slice-1-v1": _profile(
         profile_id="p7-sec-source-slice-1-v1",
         environment="probe",
@@ -910,6 +946,7 @@ RELATION_PROVENANCE_SPLIT_PROFILE_IDS = frozenset(
         "p17-codeforge-128k-extension-probe-1-v1",
         "p38-ietf-oauth-64k-extension-probe-1-v1",
         "p43-ietf-oauth-16k-64k-extension-probe-1-v1",
+        "p40-ietf-oauth-semantic-growth-probe-1-v1",
     }
 )
 SUBSTANTIAL_REAL_PROOF_GROWTH_PROFILE_IDS = RELATION_PROVENANCE_SPLIT_PROFILE_IDS
@@ -926,6 +963,7 @@ CURRENT_RELEASE_GATE_ONLY_PROFILE_IDS = frozenset(
         "p17-codeforge-128k-extension-probe-1-v1",
         "p38-ietf-oauth-64k-extension-probe-1-v1",
         "p43-ietf-oauth-16k-64k-extension-probe-1-v1",
+        "p40-ietf-oauth-semantic-growth-probe-1-v1",
     }
 )
 

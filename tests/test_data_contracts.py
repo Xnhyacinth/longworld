@@ -1752,6 +1752,77 @@ def test_quality_gate_uses_pinned_tokens_for_real_64k_semantic_growth() -> None:
     assert any("real_64k_missing_lower_band" in error for error in result["errors"])
 
 
+def test_required_view_coverage_rejects_missing_profile_cell(monkeypatch) -> None:
+    profile = release_profile("p40-ietf-oauth-semantic-growth-probe-1-v1")
+    rows = [
+        {
+            "world_id": "ietf-world",
+            "length_bucket": bucket,
+            "view": view,
+            "query_timing": "first",
+        }
+        for bucket in profile.required_exact_length_buckets
+        for view, _timing in profile.required_view_timings
+        if (bucket, view) != ("32k", "cf")
+    ]
+    monkeypatch.setattr(quality_gate, "_has_exact_band_metadata", lambda *_a, **_k: True)
+
+    errors = quality_gate._required_view_coverage_errors(profile, rows)
+
+    assert errors == ["release_required_view_coverage:ietf-world:missing=32k:cf/first"]
+
+
+def test_real_relation_growth_requires_strict_nested_history() -> None:
+    base = {
+        "world_id": "ietf-world",
+        "base_task_id": "ietf-task",
+        "semantic_growth_group_id": "ietf-growth",
+        "query_timing": "first",
+        "view": "full",
+        "split": "train",
+        "real_source_verified": True,
+    }
+    before = {
+        **base,
+        "length_bucket": "32k",
+        "actual_context_tokens": 32_100,
+        "strict_support_event_count": 2,
+        "graph": {"proof_depth": 2},
+        "semantic_tokens": {
+            "internal": 20_000,
+            "proof_bearing": 5_000,
+            "causal_supporting": 1_000,
+            "generic_background": 0,
+        },
+        "authentic_source_relation_edges": [
+            {"parent_record_id": "draft", "child_record_id": "rfc9700"}
+        ],
+    }
+    after = {
+        **base,
+        "length_bucket": "64k",
+        "actual_context_tokens": 64_100,
+        "strict_support_event_count": 6,
+        "graph": {"proof_depth": 2},
+        "semantic_tokens": {
+            "internal": 50_000,
+            "proof_bearing": 10_000,
+            "causal_supporting": 2_000,
+            "generic_background": 0,
+        },
+        "authentic_source_relation_edges": [
+            {"parent_record_id": "draft", "child_record_id": "replacement"},
+            {"parent_record_id": "rfc9700", "child_record_id": "rfc8414"},
+        ],
+    }
+
+    errors = quality_gate._semantic_growth_errors(
+        [before, after], min_internal_growth=4_096, max_generic_growth_share=0.3
+    )
+
+    assert any("real_causal_history_not_nested" in error for error in errors)
+
+
 def test_128k_semantic_density_uses_exact_not_estimated_total() -> None:
     row = {
         "base_task_id": "exact-128-density",
@@ -2051,8 +2122,8 @@ def test_real_band_growth_requires_more_replayed_causal_history() -> None:
 
     higher["authentic_source_relation_edges"] = [{"id": index} for index in range(8)]
     higher["strict_support_event_count"] = 9
-    higher["difficulty"] = {"proof_depth": 7}
-    higher["graph"] = {"proof_depth": 7, "hop_count": 7}
+    higher["difficulty"] = {"proof_depth": 3}
+    higher["graph"] = {"proof_depth": 3, "hop_count": 3}
     result = evaluate_quality(
         {"retention": 0.5, "n_worlds": 1},
         [lower, higher],
@@ -2065,6 +2136,7 @@ def test_real_band_growth_requires_more_replayed_causal_history() -> None:
     )
 
     assert not any("real_causal_history_growth" in error for error in result["errors"])
+    assert not any("real_proof_depth_growth" in error for error in result["errors"])
     assert any("real_proof_token_growth" in error for error in result["errors"])
 
     higher["semantic_tokens"] = {
@@ -3442,6 +3514,14 @@ def test_semantic_growth_uses_replayed_graph_depth_not_difficulty_copy() -> None
         max_generic_growth_share=0.2,
     )
 
+    assert not any(error.startswith("real_proof_depth_growth:") for error in errors)
+
+    higher["graph"] = {"proof_depth": 2, "hop_count": 2}
+    errors = quality_gate._semantic_growth_errors(
+        [lower, higher],
+        min_internal_growth=1,
+        max_generic_growth_share=0.2,
+    )
     assert any(error.startswith("real_proof_depth_growth:") for error in errors)
 
 

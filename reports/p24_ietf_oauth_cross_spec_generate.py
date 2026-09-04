@@ -12,12 +12,14 @@ from pathlib import Path
 from typing import Any
 
 from longworld.core.attestation import attach_attestation, attestation_key_from_env
-from longworld.core.pack import SEP, wrap_prompt
+from longworld.core.pack import SEP
 from longworld.core.promotion import CANDIDATE_ATTESTATION_PURPOSE
 from longworld.core.standardsworkflow import (
+    build_ietf_cross_spec_growth_requirement_task,
     build_ietf_cross_spec_requirement_task,
     build_ietf_workflow_from_fetch_inventory,
     materialize_ietf_cross_spec_counterfactual,
+    render_ietf_cross_spec_prompt,
 )
 from longworld.core.taskpromotion import task_sidecar_token_counter
 from longworld.core.taskproof import replay_ietf_cross_spec_candidate
@@ -95,14 +97,14 @@ def _chunk_source_units(
     token_counter,
     max_tokens: int,
 ) -> list[tuple[int, int]]:
-    units = _source_units(text)
-    boundaries = {end for _start, end in units[:-1]}
-    if any(
-        int(item["char_start"]) < boundary < int(item["char_end"])
-        for item in evidence
-        for boundary in boundaries
-    ):
-        raise ValueError("an authenticated evidence span crosses a natural boundary")
+    units: list[tuple[int, int]] = []
+    for start, end in _source_units(text):
+        if units and any(
+            int(item["char_start"]) < start < int(item["char_end"]) for item in evidence
+        ):
+            units[-1] = units[-1][0], end
+        else:
+            units.append((start, end))
     chunks: list[tuple[int, int]] = []
     start, end = units[0]
     for unit_start, unit_end in units[1:]:
@@ -226,8 +228,19 @@ def _artifacts_for_bucket(
     isolate_evidence_ids: frozenset[str] = frozenset(),
     counterfactual_companion_evidence_id: str = "",
     support_priority_record_ids: tuple[str, ...] = (),
+    allowed_record_ids: frozenset[str] | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
-    records = list(task["source_manifest"]["records"])
+    manifest_records = list(task["source_manifest"]["records"])
+    manifest_record_ids = {str(record["record_id"]) for record in manifest_records}
+    if allowed_record_ids is not None and (
+        not allowed_record_ids or not allowed_record_ids.issubset(manifest_record_ids)
+    ):
+        raise ValueError("allowed IETF record ids are invalid")
+    records = [
+        record
+        for record in manifest_records
+        if allowed_record_ids is None or record["record_id"] in allowed_record_ids
+    ]
     by_id = {record["record_id"]: record for record in records}
     spans_by_record: dict[str, list[tuple[int, int, bool]]] = {}
     support_units: list[tuple[str, int, int]] = []
@@ -356,7 +369,9 @@ def _artifacts_for_bucket(
         selected_units[:] = units
         artifacts = materialize()
         tokens = token_counter(
-            wrap_prompt(question, SEP.join(x["text"] for x in artifacts), "first")
+            render_ietf_cross_spec_prompt(
+                question, SEP.join(x["text"] for x in artifacts), "first"
+            )
         )
         return artifacts, tokens
 
@@ -407,7 +422,13 @@ def build(config_path: Path) -> dict[str, Any]:
         generated_at=config["manifest_generated_at"],
         fetch_inventory_sha256=config["fetch_inventory_sha256"],
     )
-    task = build_ietf_cross_spec_requirement_task(manifest)
+    task_variant = config.get("task_variant", "base_v1")
+    if task_variant == "base_v1":
+        task = build_ietf_cross_spec_requirement_task(manifest)
+    elif task_variant == "semantic_growth_v2":
+        task = build_ietf_cross_spec_growth_requirement_task(manifest)
+    else:
+        raise ValueError("IETF generation task variant is invalid")
     materialized = materialize_ietf_cross_spec_counterfactual(task)
 
     source_key = attestation_key_from_env("task_replay_sidecar")
@@ -460,6 +481,9 @@ def build(config_path: Path) -> dict[str, Any]:
     unsigned: list[dict[str, Any]] = []
     packs: dict[str, dict[str, Any]] = {}
     for bucket, (lower, upper) in config["length_buckets"].items():
+        configured_record_ids = (
+            config["packing"].get("record_ids_by_bucket") or {}
+        ).get(bucket)
         artifacts, observed_tokens = _artifacts_for_bucket(
             task,
             token_counter,
@@ -480,6 +504,11 @@ def build(config_path: Path) -> dict[str, Any]:
             ),
             support_priority_record_ids=tuple(
                 config["packing"].get("support_priority_record_ids") or []
+            ),
+            allowed_record_ids=(
+                frozenset(configured_record_ids)
+                if configured_record_ids is not None
+                else None
             ),
         )
         classifications = [
@@ -510,8 +539,10 @@ def build(config_path: Path) -> dict[str, Any]:
         question = str(task["question"])
         candidate: dict[str, Any] = {
             "schema_version": "longworld.ietf-oauth-generation-candidate.v1",
-            "world_id": "ietf-oauth-cross-spec-requirement-v1",
-            "query_id": f"ietf-oauth-cross-spec-requirement-v1:{bucket}",
+            "world_id": config.get("world_id", "ietf-oauth-cross-spec-requirement-v1"),
+            "query_id": (
+                f"{config.get('world_id', 'ietf-oauth-cross-spec-requirement-v1')}:{bucket}"
+            ),
             "domain": "standards",
             "data_stage": "candidate",
             "training_objective": "sft",
@@ -520,12 +551,12 @@ def build(config_path: Path) -> dict[str, Any]:
             "composition_method": "same_case_dossier",
             "query_timing": "first",
             "question": question,
-            "answer": json.dumps(task["answer"], sort_keys=True, separators=(",", ":")),
-            "cf_answer": json.dumps(
-                materialized["answer"], sort_keys=True, separators=(",", ":")
-            ),
+            "answer": "",
+            "cf_answer": "",
             "document_context": document_context,
-            "context": wrap_prompt(question, document_context, "first"),
+            "context": render_ietf_cross_spec_prompt(
+                question, document_context, "first"
+            ),
             "artifact_classification": classifications,
             "source_record_ids_by_artifact": source_map,
             "essential_artifact_ids": essential_ids,
@@ -555,6 +586,41 @@ def build(config_path: Path) -> dict[str, Any]:
             "promoted": False,
         }
         replay = replay_ietf_cross_spec_candidate(candidate, list(source_map))
+        counterfactual_replay = replay_ietf_cross_spec_candidate(
+            candidate, list(source_map), counterfactual=True
+        )
+        candidate["answer"] = replay["answer"]
+        candidate["cf_answer"] = counterfactual_replay["answer"]
+        essential_ids = list(source_map)
+        for artifact_id in list(essential_ids):
+            reduced_ids = [item for item in essential_ids if item != artifact_id]
+            if (
+                replay_ietf_cross_spec_candidate(candidate, reduced_ids)["answer"]
+                == candidate["answer"]
+            ):
+                essential_ids = reduced_ids
+        if replay_ietf_cross_spec_candidate(candidate, essential_ids)[
+            "answer"
+        ] != candidate["answer"] or any(
+            replay_ietf_cross_spec_candidate(
+                candidate,
+                [item for item in essential_ids if item != removed],
+            )["answer"]
+            == candidate["answer"]
+            for removed in essential_ids
+        ):
+            raise ValueError("IETF essential artifact minimization failed")
+        candidate["essential_artifact_ids"] = essential_ids
+        for classification in classifications:
+            classification["evidence_role"] = (
+                "causal_gold"
+                if classification["artifact_id"] in essential_ids
+                else "causal_supporting"
+            )
+        candidate["graph"] = {
+            "proof_depth": replay["proof_depth"],
+            "hop_count": replay["hop_count"],
+        }
         for field in (
             "source_record_ids",
             "source_relation_ids",

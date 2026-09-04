@@ -555,7 +555,10 @@ def _verify_replay_payload(
             and (
                 not isinstance(ietf_task, dict)
                 or ietf_task.get("schema_version")
-                != "longworld.ietf-cross-spec-requirement-task.v1"
+                not in {
+                    "longworld.ietf-cross-spec-requirement-task.v1",
+                    "longworld.ietf-cross-spec-growth-requirement-task.v1",
+                }
                 or replay_payload.get("task_sha256")
                 != hashlib.sha256(
                     json.dumps(

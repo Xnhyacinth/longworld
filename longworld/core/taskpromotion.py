@@ -56,8 +56,10 @@ from longworld.core.record_contract import (
     exact_token_metadata_valid,
     sft_row_errors,
 )
+from longworld.core.release_profile import release_profile_sha256
 from longworld.core.render import Artifact
 from longworld.core.semantic import sentence_near_dup_ratio
+from longworld.core.standardsworkflow import render_ietf_cross_spec_prompt
 from longworld.core.taskproof import (
     TaskProofError,
     audit_task_view_projection,
@@ -65,6 +67,7 @@ from longworld.core.taskproof import (
     canonicalize_kev_projection_candidate,
     compute_task_proof,
     normalize_projection_candidate_for_adapter,
+    relation_endpoints,
     replay_ietf_cross_spec_candidate,
 )
 from longworld.core.taskreplaysidecar import (
@@ -697,53 +700,6 @@ def _artifact_bindings(candidate: dict[str, Any]) -> dict[str, str]:
     return bindings
 
 
-def _relation_endpoints(relation: object) -> tuple[str, str] | None:
-    if isinstance(relation, Mapping):
-        parent = relation.get("parent_record_id")
-        child = relation.get("child_record_id")
-        if isinstance(parent, str) and parent and isinstance(child, str) and child:
-            return parent, child
-    if (
-        isinstance(relation, Sequence)
-        and not isinstance(relation, (str, bytes))
-        and len(relation) >= 2
-        and isinstance(relation[0], str)
-        and isinstance(relation[1], str)
-        and relation[0]
-        and relation[1]
-    ):
-        return relation[0], relation[1]
-    return None
-
-
-def _relation_proof_depth(relations: Sequence[object]) -> int:
-    adjacency: dict[str, set[str]] = {}
-    nodes: set[str] = set()
-    for relation in relations:
-        endpoints = _relation_endpoints(relation)
-        if endpoints is None:
-            raise PromotionError("task replay relation edge is malformed")
-        parent, child = endpoints
-        nodes.update((parent, child))
-        adjacency.setdefault(parent, set()).add(child)
-
-    visiting: set[str] = set()
-    memo: dict[str, int] = {}
-
-    def depth(node: str) -> int:
-        if node in memo:
-            return memo[node]
-        if node in visiting:
-            raise PromotionError("task replay relation graph contains a cycle")
-        visiting.add(node)
-        value = max((1 + depth(child) for child in adjacency.get(node, ())), default=0)
-        visiting.remove(node)
-        memo[node] = value
-        return value
-
-    return max(2, max((depth(node) for node in nodes), default=0))
-
-
 def _task_selection_metrics(
     candidate: dict[str, Any],
     task_proof: dict[str, Any],
@@ -795,8 +751,8 @@ def _task_selection_metrics(
         derived = replay.get("verified_derived_relation_edges")
     if not isinstance(authentic, list) or not isinstance(derived, list):
         raise PromotionError("task replay source relations are missing")
-    authentic_endpoints = [_relation_endpoints(relation) for relation in authentic]
-    derived_endpoints = [_relation_endpoints(relation) for relation in derived]
+    authentic_endpoints = [relation_endpoints(relation) for relation in authentic]
+    derived_endpoints = [relation_endpoints(relation) for relation in derived]
     if any(
         endpoints is None for endpoints in (*authentic_endpoints, *derived_endpoints)
     ):
@@ -1361,8 +1317,18 @@ def promote_task_candidate(
             if isinstance(split_by_world, dict)
             else None
         )
+        selection_profile_id = str(
+            release_selection_receipt.get("release_profile_id") or ""
+        )
+        try:
+            selection_profile_sha256 = release_profile_sha256(selection_profile_id)
+        except ValueError:
+            selection_profile_sha256 = ""
         if (
             release_selection_receipt.get("schema_version") != RELEASE_SELECTION_SCHEMA
+            or not selection_profile_sha256
+            or release_selection_receipt.get("release_profile_sha256")
+            != selection_profile_sha256
             or not isinstance(release_selected_ids, list)
             or digest not in release_selected_ids
             or not isinstance(audit_sha256_by_candidate, dict)
@@ -1657,19 +1623,37 @@ def _canonical_task_identifiers(
         )
     elif family == IETF_OAUTH_TASK_REPLAY_ADAPTER[:2]:
         task = candidate.get("ietf_requirement_task")
+        ietf_programs = {
+            "ietf.oauth_effective_requirement.v1": (
+                "cross_spec_update+dependency_closure+requirement_resolution",
+                (
+                    "select_cutoff_sources",
+                    "resolve_update_and_reference_relations",
+                    "evaluate_fixed_requirement_branches",
+                ),
+            ),
+            "ietf.oauth_effective_requirement.v2": (
+                "nested_cross_spec_growth+dependency_closure+requirement_resolution",
+                (
+                    "select_cutoff_sources",
+                    "resolve_update_and_reference_relations",
+                    "evaluate_nested_requirement_branches",
+                ),
+            ),
+        }
+        selected_program = (
+            ietf_programs.get(str(task.get("answer_program_id") or ""))
+            if isinstance(task, Mapping)
+            else None
+        )
         if (
             not isinstance(task, Mapping)
-            or task.get("answer_program_id") != "ietf.oauth_effective_requirement.v1"
+            or selected_program is None
             or candidate.get("answer_program_id") != task.get("answer_program_id")
         ):
             raise PromotionError("IETF answer program is unsupported")
-        motif = "cross_spec_update+dependency_closure+requirement_resolution"
-        answer_program_id = "ietf.oauth_effective_requirement.v1"
-        program_ops = (
-            "select_cutoff_sources",
-            "resolve_update_and_reference_relations",
-            "evaluate_fixed_requirement_branches",
-        )
+        motif, program_ops = selected_program
+        answer_program_id = str(task["answer_program_id"])
     else:
         raise PromotionError("task semantic identifier adapter is unsupported")
     semantic_base_task_id = _canonical_sha256(
@@ -1907,7 +1891,12 @@ def _source_token_measurement_receipt(
     projected_context = str(projected.get("document_context") or "")
     question = str(projected.get("question") or "")
     timing = str(projected.get("query_timing") or "")
-    rendered_prompt = wrap_prompt(question, projected_context, timing)
+    renderer = (
+        render_ietf_cross_spec_prompt
+        if isinstance(projected.get("ietf_requirement_task"), Mapping)
+        else wrap_prompt
+    )
+    rendered_prompt = renderer(question, projected_context, timing)
     if rendered_prompt != projected.get("context"):
         raise PromotionError("task projected prompt is not canonically rendered")
     without_real_context = SEP.join(
@@ -1915,7 +1904,7 @@ def _source_token_measurement_receipt(
         for classification, document in projected_artifacts
         if classification.get("source_origin") not in _REAL_SOURCE_ORIGINS
     )
-    without_real_prompt = wrap_prompt(question, without_real_context, timing)
+    without_real_prompt = renderer(question, without_real_context, timing)
     final_prompt_tokens = token_counter(rendered_prompt)
     without_real_prompt_tokens = token_counter(without_real_prompt)
     source_tokens = final_prompt_tokens - without_real_prompt_tokens
@@ -2389,7 +2378,9 @@ def _ietf_counterfactual_artifacts(
     ):
         raise PromotionError("IETF task counterfactual binding is invalid")
     manifest = task.get("source_manifest")
-    manifest_records = manifest.get("records") if isinstance(manifest, Mapping) else None
+    manifest_records = (
+        manifest.get("records") if isinstance(manifest, Mapping) else None
+    )
     parent_value = twin.get("parent_value")
     replacement = twin.get("value")
     char_start = twin.get("char_start")
@@ -2469,9 +2460,7 @@ def _ietf_counterfactual_artifacts(
                     "IETF task counterfactual parent bytes are invalid"
                 )
             projected = (
-                document[:local_char_start]
-                + replacement
-                + document[local_char_end:]
+                document[:local_char_start] + replacement + document[local_char_end:]
             )
             child_sha256 = hashlib.sha256(projected.encode()).hexdigest()
             if (
@@ -2705,6 +2694,38 @@ def _task_view_replay(
     raise PromotionError("standard task views are not implemented for adapter")
 
 
+def _minimal_ietf_view_essential_ids(
+    candidate: dict[str, Any],
+    adapter_key: tuple[str, str, str],
+    artifact_ids: list[str],
+    expected_answer: object,
+) -> list[str]:
+    essential_ids = list(artifact_ids)
+    for artifact_id in list(essential_ids):
+        reduced_ids = [item for item in essential_ids if item != artifact_id]
+        if (
+            _task_view_replay(candidate, adapter_key, reduced_ids).get("answer")
+            == expected_answer
+        ):
+            essential_ids = reduced_ids
+    if (
+        not essential_ids
+        or _task_view_replay(candidate, adapter_key, essential_ids).get("answer")
+        != expected_answer
+        or any(
+            _task_view_replay(
+                candidate,
+                adapter_key,
+                [item for item in essential_ids if item != removed],
+            ).get("answer")
+            == expected_answer
+            for removed in essential_ids
+        )
+    ):
+        raise PromotionError("IETF task view essential artifact minimization failed")
+    return essential_ids
+
+
 def build_task_candidate_view_projections(
     candidate: dict[str, Any],
     *,
@@ -2857,7 +2878,11 @@ def build_task_candidate_view_projections(
             document for _classification, document in view_artifacts
         )
         question = str(candidate["question"])
-        context = wrap_prompt(question, document_context, "first")
+        context = (
+            render_ietf_cross_spec_prompt(question, document_context, "first")
+            if adapter_key == IETF_OAUTH_TASK_REPLAY_ADAPTER
+            else wrap_prompt(question, document_context, "first")
+        )
         context_tokens = token_counter(context)
         reject_reason = exact_token_band_reject_reason(
             str(candidate.get("length_bucket") or ""), context_tokens
@@ -2900,12 +2925,6 @@ def build_task_candidate_view_projections(
         unsigned["artifact_classification"] = [
             deepcopy(classification) for classification, _document in view_artifacts
         ]
-        source_token_measurement_receipt = _source_token_measurement_receipt(
-            candidate, unsigned, token_counter
-        )
-        unsigned["real_source_token_ratio"] = source_token_measurement_receipt[
-            "real_source_token_ratio"
-        ]
         replay_candidate = deepcopy(unsigned)
         if adapter_key[:2] == FINANCE_TASK_REPLAY_ADAPTER[:2]:
             replay_candidate["context"] = "\n".join(
@@ -2921,6 +2940,27 @@ def build_task_candidate_view_projections(
         view_replay = _task_view_replay(replay_candidate, adapter_key, view_ids)
         if view_replay.get("answer") != unsigned["answer"]:
             raise PromotionError("task view factual replay does not match answer")
+        if adapter_key == IETF_OAUTH_TASK_REPLAY_ADAPTER:
+            essential_ids = _minimal_ietf_view_essential_ids(
+                replay_candidate, adapter_key, view_ids, unsigned["answer"]
+            )
+            unsigned["essential_artifact_ids"] = essential_ids
+            for classification in unsigned["artifact_classification"]:
+                if classification.get("evidence_role") in {
+                    "causal_gold",
+                    "causal_supporting",
+                }:
+                    classification["evidence_role"] = (
+                        "causal_gold"
+                        if classification.get("artifact_id") in essential_ids
+                        else "causal_supporting"
+                    )
+        source_token_measurement_receipt = _source_token_measurement_receipt(
+            candidate, unsigned, token_counter
+        )
+        unsigned["real_source_token_ratio"] = source_token_measurement_receipt[
+            "real_source_token_ratio"
+        ]
         for field in (
             "source_record_ids",
             "source_relation_ids",

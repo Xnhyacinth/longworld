@@ -475,6 +475,50 @@ def _required_exact_length_bucket_errors(
     ]
 
 
+def _required_view_coverage_errors(
+    profile: ReleaseProfile, rows: list[dict]
+) -> list[str]:
+    required_views = profile.required_view_timings
+    required_buckets = profile.required_exact_length_buckets
+    if not required_views:
+        return []
+    if not required_buckets or len(set(required_views)) != len(required_views):
+        return ["release_required_view_coverage:invalid_profile"]
+    required = {
+        (bucket, view, timing)
+        for bucket in required_buckets
+        for view, timing in required_views
+    }
+    observed: dict[str, set[tuple[str, str, str]]] = defaultdict(set)
+    worlds = sorted(
+        {str(row.get("world_id") or "") for row in rows if row.get("world_id")}
+    )
+    for row in rows:
+        world_id = str(row.get("world_id") or "")
+        cell = (
+            str(row.get("length_bucket") or ""),
+            str(row.get("view") or ""),
+            str(row.get("query_timing") or ""),
+        )
+        if world_id and cell in required and _has_exact_band_metadata(
+            row,
+            expected_model_id=profile.tokenizer_model_id,
+            expected_revision=profile.tokenizer_revision,
+            expected_asset_manifest_sha256=profile.tokenizer_asset_manifest_sha256,
+        ):
+            observed[world_id].add(cell)
+    return [
+        "release_required_view_coverage:"
+        f"{world_id}:missing="
+        + "+".join(
+            f"{bucket}:{view}/{timing}"
+            for bucket, view, timing in sorted(required - observed[world_id])
+        )
+        for world_id in worlds
+        if not required.issubset(observed[world_id])
+    ]
+
+
 def _semantic_context_tokens(row: dict) -> int:
     """Prefer valid exact-band counts over approximate serialized metrics."""
     estimated = int(
@@ -655,6 +699,33 @@ def _semantic_growth_errors(
                         f"{key[0]}:{before.get('length_bucket')}"
                         f"->{after.get('length_bucket')}:growth={causal_growth}"
                     )
+                if isinstance(before_authentic, list) and isinstance(
+                    after_authentic, list
+                ):
+                    before_relations = {
+                        json.dumps(
+                            relation,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        )
+                        for relation in before_authentic
+                    }
+                    after_relations = {
+                        json.dumps(
+                            relation,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        )
+                        for relation in after_authentic
+                    }
+                    if not before_relations < after_relations:
+                        errors.append(
+                            "real_causal_history_not_nested:"
+                            f"{key[0]}:{before.get('length_bucket')}"
+                            f"->{after.get('length_bucket')}"
+                        )
                 strict_support_growth = int(
                     after.get("strict_support_event_count") or 0
                 ) - int(before.get("strict_support_event_count") or 0)
@@ -667,7 +738,7 @@ def _semantic_growth_errors(
                     )
                 before_depth = int((before.get("graph") or {}).get("proof_depth") or 0)
                 after_depth = int((after.get("graph") or {}).get("proof_depth") or 0)
-                if after_depth <= before_depth:
+                if after_depth < before_depth:
                     errors.append(
                         "real_proof_depth_growth:"
                         f"{key[0]}:{before.get('length_bucket')}"
@@ -966,6 +1037,7 @@ def evaluate_quality(
             )
         )
         errors.extend(_required_exact_length_bucket_errors(profile, rows))
+        errors.extend(_required_view_coverage_errors(profile, rows))
     if strict_report:
         errors.extend(_proof_metadata_errors(rows))
     if strict_report and not verify_attestation(

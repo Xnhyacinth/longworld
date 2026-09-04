@@ -8,7 +8,7 @@ import math
 import re
 from bisect import bisect_left, bisect_right
 from collections import Counter
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from itertools import pairwise
 from typing import Any
@@ -33,9 +33,12 @@ from longworld.core.macrovintage import (
     replay_macro_vintage_pipeline_raw_slice,
     replay_macro_vintage_pipeline_selection,
 )
-from longworld.core.pack import SEP
+from longworld.core.pack import SEP, wrap_prompt
 from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
-from longworld.core.standardsworkflow import replay_ietf_cross_spec_requirement_task
+from longworld.core.standardsworkflow import (
+    render_ietf_cross_spec_prompt,
+    replay_ietf_cross_spec_requirement_task,
+)
 from longworld.core.taskreplaysidecar import (
     CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
     CYBER_KEV_TASK_REPLAY_ADAPTER,
@@ -64,6 +67,53 @@ class TaskProofError(ValueError):
     """A task candidate lacks one or more independently replayed proof gates."""
 
 
+def relation_endpoints(relation: object) -> tuple[str, str] | None:
+    if isinstance(relation, Mapping):
+        parent = relation.get("parent_record_id")
+        child = relation.get("child_record_id")
+        if isinstance(parent, str) and parent and isinstance(child, str) and child:
+            return parent, child
+    if (
+        isinstance(relation, Sequence)
+        and not isinstance(relation, (str, bytes))
+        and len(relation) >= 2
+        and isinstance(relation[0], str)
+        and relation[0]
+        and isinstance(relation[1], str)
+        and relation[1]
+    ):
+        return relation[0], relation[1]
+    return None
+
+
+def relation_proof_depth(relations: Sequence[object]) -> int:
+    adjacency: dict[str, set[str]] = {}
+    nodes: set[str] = set()
+    for relation in relations:
+        endpoints = relation_endpoints(relation)
+        if endpoints is None:
+            raise TaskProofError("task replay relation edge is malformed")
+        parent, child = endpoints
+        nodes.update((parent, child))
+        adjacency.setdefault(parent, set()).add(child)
+
+    visiting: set[str] = set()
+    memo: dict[str, int] = {}
+
+    def depth(node: str) -> int:
+        if node in memo:
+            return memo[node]
+        if node in visiting:
+            raise TaskProofError("task replay relation graph contains a cycle")
+        visiting.add(node)
+        value = max((1 + depth(child) for child in adjacency.get(node, ())), default=0)
+        visiting.remove(node)
+        memo[node] = value
+        return value
+
+    return max(2, max((depth(node) for node in nodes), default=0))
+
+
 def replay_ietf_cross_spec_candidate(
     candidate: dict[str, Any],
     evidence_artifact_ids: Sequence[str],
@@ -80,6 +130,8 @@ def replay_ietf_cross_spec_candidate(
         or not isinstance(classifications, list)
     ):
         raise TaskProofError("IETF task replay contract is missing")
+    if candidate.get("question") != task.get("question"):
+        raise TaskProofError("candidate question is not bound to the IETF task")
     classification_by_artifact = {
         str(item.get("artifact_id") or ""): item
         for item in classifications
@@ -147,9 +199,15 @@ def replay_ietf_cross_spec_candidate(
                 ),
                 None,
             )
-            evidence_start = evidence.get("char_start") if isinstance(evidence, dict) else None
-            evidence_end = evidence.get("char_end") if isinstance(evidence, dict) else None
-            parent_value = evidence.get("evidence_quote") if isinstance(evidence, dict) else None
+            evidence_start = (
+                evidence.get("char_start") if isinstance(evidence, dict) else None
+            )
+            evidence_end = (
+                evidence.get("char_end") if isinstance(evidence, dict) else None
+            )
+            parent_value = (
+                evidence.get("evidence_quote") if isinstance(evidence, dict) else None
+            )
             if (
                 not isinstance(twin, dict)
                 or twin.get("provenance_operation") != "exclude_exact_source_span"
@@ -270,6 +328,15 @@ def replay_ietf_cross_spec_candidate(
             if relation_id in relation_ids
         ],
     )
+    proof_depth = relation_proof_depth(
+        [
+            {
+                "parent_record_id": relation["source_record_id"],
+                "child_record_id": relation["target_record_id"],
+            }
+            for relation in relations
+        ]
+    )
     return {
         "answer": json.dumps(answer, sort_keys=True, separators=(",", ":")),
         "source_record_ids": sorted(selected_records),
@@ -287,8 +354,8 @@ def replay_ietf_cross_spec_candidate(
         "strict_support_event_count": len(
             [value for value in answer.values() if value != "UNKNOWN"]
         ),
-        "proof_depth": 2,
-        "hop_count": 2,
+        "proof_depth": proof_depth,
+        "hop_count": proof_depth,
     }
 
 
@@ -372,8 +439,9 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
         TASK_REPLAY_SIDECAR_SCHEMA_V2,
         TASK_REPLAY_SIDECAR_SCHEMA_V3,
     }
-    if family == CYBER_KEV_TASK_REPLAY_ADAPTER[:2] or family == (
-        CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER[:2]
+    if (
+        family == CYBER_KEV_TASK_REPLAY_ADAPTER[:2]
+        or family == (CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER[:2])
     ):
         expected_domain = "cyber"
         expected_view = "ordered_artifact_view"
@@ -446,11 +514,18 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
         )
     else:
         task = candidate.get("ietf_requirement_task")
+        ietf_task_programs = {
+            "longworld.ietf-cross-spec-requirement-task.v1": (
+                "ietf.oauth_effective_requirement.v1"
+            ),
+            "longworld.ietf-cross-spec-growth-requirement-task.v1": (
+                "ietf.oauth_effective_requirement.v2"
+            ),
+        }
         replay_identity_valid = bool(
             isinstance(task, dict)
-            and task.get("schema_version")
-            == "longworld.ietf-cross-spec-requirement-task.v1"
-            and task.get("answer_program_id") == "ietf.oauth_effective_requirement.v1"
+            and task.get("answer_program_id")
+            == ietf_task_programs.get(str(task.get("schema_version") or ""))
             and candidate.get("answer_program_id") == task.get("answer_program_id")
         )
     if not replay_identity_valid:
@@ -520,6 +595,19 @@ def audit_task_view_projection(candidate: dict[str, Any]) -> dict[str, bool]:
     source_token_measurement_valid = _source_token_measurement_valid(
         candidate, projection
     )
+    question = candidate.get("question")
+    query_timing = candidate.get("query_timing")
+    renderer = (
+        render_ietf_cross_spec_prompt
+        if isinstance(candidate.get("ietf_requirement_task"), dict)
+        else wrap_prompt
+    )
+    serialized_context_valid = bool(
+        isinstance(question, str)
+        and query_timing in {"first", "late"}
+        and candidate.get("context")
+        == renderer(question, document_context, str(query_timing))
+    )
     checks = {
         "projection_document_digest_valid": projection.get("document_context_sha256")
         == hashlib.sha256(document_context.encode()).hexdigest(),
@@ -527,6 +615,7 @@ def audit_task_view_projection(candidate: dict[str, Any]) -> dict[str, bool]:
         "projection_chronology_valid": chronology_valid,
         "counterfactual_parent_binding_valid": parent_binding_valid,
         "source_token_measurement_valid": source_token_measurement_valid,
+        "serialized_context_valid": serialized_context_valid,
         "projection_candidate_only": all(
             candidate.get(field) is False
             for field in ("train_ready", "production_eligible", "promoted")
@@ -756,9 +845,12 @@ def _projection_chronology(
                 raise TaskProofError("Macro chronology record type is unsupported")
             order_key = f"{occurred_at}|{kind}|{artifact_id}"
         elif domain == "cyber" and isinstance(value, list):
-            if value and isinstance(value[0], dict) and value[0].get(
-                "record_type"
-            ) in {"cyber_source_record", "cyber_source_relation"}:
+            if (
+                value
+                and isinstance(value[0], dict)
+                and value[0].get("record_type")
+                in {"cyber_source_record", "cyber_source_relation"}
+            ):
                 cve_dates: dict[str, str] = {}
                 for _classification, _document, records in parsed:
                     if not isinstance(records, list):

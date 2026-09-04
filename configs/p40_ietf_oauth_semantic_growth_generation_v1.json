@@ -1,0 +1,103 @@
+{
+  "schema_version": "longworld.ietf-oauth-generation-config.v1",
+  "source_inventory_dir": "data/source_inventory/p40_ietf_oauth_semantic_growth_redacted_v2",
+  "fetch_inventory_file": "ietf_fetch_inventory.json",
+  "fetch_inventory_sha256": "0428589a76ad922f6e9e92753a8f5c810b35cffcbd093900dc2d9f2c1bc29b52",
+  "manifest_generated_at": "2026-09-04T10:20:00Z",
+  "predecessor_report_manifest_sha256": "7e6897d77f241212e548224c459693804ce6dc6f670b0f2e0f06bbf63de0f9d1",
+  "predecessor_report_task_sha256": "d01ef3f41249f9fb3fbe8cd8313bd2df3d44c9490ccecadac6299c42c551c840",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "task_variant": "semantic_growth_v2",
+  "world_id": "ietf-oauth-cross-spec-semantic-growth-v1",
+  "length_buckets": {
+    "32k": [
+      32000,
+      32768
+    ],
+    "64k": [
+      64000,
+      65536
+    ],
+    "128k": [
+      128000,
+      131072
+    ]
+  },
+  "packing": {
+    "target_margin_tokens": 512,
+    "unit_boundary": "source_blank_line_or_form_feed_with_contiguous_counterfactual_coarsening",
+    "record_ids_by_bucket": {
+      "32k": [
+        "ietf:draft:draft-ietf-oauth-security-topics-29",
+        "ietf:rfc:6749",
+        "ietf:rfc:6750",
+        "ietf:rfc:9700"
+      ],
+      "64k": [
+        "ietf:draft:draft-ietf-oauth-security-topics-29",
+        "ietf:rfc:6749",
+        "ietf:rfc:6750",
+        "ietf:rfc:6819",
+        "ietf:rfc:7636",
+        "ietf:rfc:8414",
+        "ietf:rfc:9207",
+        "ietf:rfc:9700"
+      ],
+      "128k": [
+        "ietf:draft:draft-ietf-oauth-security-topics-29",
+        "ietf:rfc:6749",
+        "ietf:rfc:6750",
+        "ietf:rfc:6819",
+        "ietf:rfc:7636",
+        "ietf:rfc:8414",
+        "ietf:rfc:8705",
+        "ietf:rfc:9101",
+        "ietf:rfc:9126",
+        "ietf:rfc:9207",
+        "ietf:rfc:9396",
+        "ietf:rfc:9449",
+        "ietf:rfc:9700"
+      ]
+    },
+    "chunked_record_ids": [
+      "ietf:rfc:6749",
+      "ietf:rfc:6750",
+      "ietf:rfc:6819",
+      "ietf:rfc:7636",
+      "ietf:rfc:8414",
+      "ietf:rfc:8705",
+      "ietf:rfc:9101",
+      "ietf:rfc:9126",
+      "ietf:rfc:9207",
+      "ietf:rfc:9396",
+      "ietf:rfc:9449",
+      "ietf:rfc:9700"
+    ],
+    "chunk_max_tokens": 1265,
+    "support_priority_record_ids": [
+      "ietf:rfc:9700"
+    ],
+    "span_id_width": 7,
+    "counterfactual_companion_evidence_id": "metadata_current",
+    "rfc9700_operation": "exclude_authenticated_bearer_current_span_from_nonempty_companion_chunk",
+    "published_draft_policy": "identity_paragraph_only",
+    "padding": false,
+    "cloned_artifacts": false,
+    "synthetic_filler": false
+  },
+  "workflow_id": "p40-ietf-oauth-semantic-growth-v1",
+  "dense_model": {
+    "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+  },
+  "output_dir": "data/candidates/p40_ietf_oauth_semantic_growth_v4",
+  "do_not_select": true,
+  "do_not_promote": true,
+  "do_not_count": true
+}

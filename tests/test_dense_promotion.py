@@ -5714,7 +5714,7 @@ def test_candidate_structural_preflight_rejects_non_growing_real_history() -> No
     assert any("strict_support_not_growing" in item for item in violations)
     assert any("essential_events_not_growing" in item for item in violations)
     assert any("authentic_relations_not_growing" in item for item in violations)
-    assert any("proof_depth_not_growing" in item for item in violations)
+    assert not any("proof_depth_not_growing" in item for item in violations)
 
 
 def test_candidate_structural_preflight_requires_event_bearing_to_grow_independently() -> (
@@ -5874,7 +5874,7 @@ def test_candidate_structural_preflight_accepts_growing_real_history() -> None:
             "graph": {
                 **dict(candidate.get("graph") or {}),
                 "n_essential_events": 2 * level,
-                "proof_depth": level + 1,
+                "proof_depth": 2,
             },
         }
         resigned.append(
@@ -5889,6 +5889,27 @@ def test_candidate_structural_preflight_accepts_growing_real_history() -> None:
 
     assert accepted == resigned
     assert rejects == []
+
+    shallower = []
+    for candidate in resigned:
+        payload = {
+            key: value for key, value in candidate.items() if key != "attestation"
+        }
+        if candidate["length_bucket"] == "64k":
+            payload["graph"] = {**payload["graph"], "proof_depth": 1}
+        shallower.append(
+            attach_attestation(payload, KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE)
+        )
+    accepted, rejects = candidate_structural_preflight(
+        shallower,
+        "p12-wiki-source-slice-1-v1",
+        candidate_attestation_key=KEY,
+    )
+    assert accepted == []
+    assert any(
+        "proof_depth_not_growing" in violation
+        for violation in rejects[0]["cumulative_history_violations"]
+    )
 
 
 def test_candidate_structural_preflight_includes_real_source_derived_lower_band() -> (

@@ -351,6 +351,37 @@ def test_rejects_unapproved_complete_private_key_block(label: str) -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "vector",
+    [
+        b"Bearer abcdefghijklmnopqrstuvwxyz1234567890ABCDEFG",
+        b"DPoP Kz~8mXK1EalYznwH-LC-1fBAo.4Ljp~zsPE_NeO.gxU",
+    ],
+)
+def test_redacts_digest_approved_credential_shaped_public_test_vector(
+    vector: bytes,
+) -> None:
+    digest = hashlib.sha256(vector).hexdigest()
+
+    (
+        _raw_text,
+        clean_text,
+        email_count,
+        private_key_count,
+        credential_test_vector_count,
+        observed_digests,
+    ) = _clean(
+        vector,
+        approved_private_key_digests=frozenset({digest}),
+    )
+
+    assert clean_text == "[redacted-public-standards-credential-test-vector]"
+    assert email_count == 0
+    assert private_key_count == 0
+    assert credential_test_vector_count == 1
+    assert observed_digests == frozenset({digest})
+
+
 def test_rfc_target_closure_allows_published_target_overlap() -> None:
     _validate_rfc_target_closure(
         requested={1000, 2000},

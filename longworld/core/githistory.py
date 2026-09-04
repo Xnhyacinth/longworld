@@ -309,7 +309,11 @@ def _git_object_sha1(object_type: str, content: bytes) -> str:
 
 def _git_proof_public_metadata_review(
     objects: Mapping[str, tuple[str, bytes]],
+    *,
+    scanner_revision: str = PUBLIC_SCANNER_REVISION,
 ) -> dict[str, Any]:
+    if scanner_revision not in {"v2", PUBLIC_SCANNER_REVISION}:
+        raise ValueError("Git proof public scanner revision is invalid")
     message_email_count = 0
     header_email_count = 0
     message_decode_replacement_count = 0
@@ -381,7 +385,7 @@ def _git_proof_public_metadata_review(
         "tree_count": tree_count,
         "blob_count": blob_count,
         "scanner": PUBLIC_SCANNER,
-        "scanner_revision": PUBLIC_SCANNER_REVISION,
+        "scanner_revision": scanner_revision,
     }
 
 
@@ -423,14 +427,16 @@ def validate_git_object_proof_public_export_governance(
 
     # Reuse the generic authorization/policy/client gates without widening its
     # redacted-email contract for any other source family.
-    from longworld.core.realworkflow import _validate_public_export_governance
+    from longworld.core import realworkflow
 
     generic_payload = dict(payload)
     generic_payload["privacy_review"] = {
         **privacy_review,
         "emails": "redacted",
+        "scanner": realworkflow.PUBLIC_SCANNER,
+        "scanner_revision": realworkflow.PUBLIC_SCANNER_REVISION,
     }
-    _validate_public_export_governance(generic_payload)
+    realworkflow._validate_public_export_governance(generic_payload)
 
 
 def _batch_git_objects(
@@ -842,8 +848,14 @@ def verify_git_object_path_proof(
         objects[object_id] = (str(object_type), content)
     if proof.get("total_raw_bytes") != total_raw_bytes:
         raise ValueError("Git object path proof byte count is invalid")
-    if proof.get("public_metadata_review") != _git_proof_public_metadata_review(
-        objects
+    public_metadata_review = proof.get("public_metadata_review")
+    proof_scanner_revision = (
+        public_metadata_review.get("scanner_revision")
+        if isinstance(public_metadata_review, dict)
+        else ""
+    )
+    if public_metadata_review != _git_proof_public_metadata_review(
+        objects, scanner_revision=str(proof_scanner_revision)
     ):
         raise ValueError("Git object path proof public metadata review is invalid")
     observed_blobs: set[str] = set()
@@ -1088,8 +1100,14 @@ def verify_git_object_path_absence_proof(
         or total > _MAX_GIT_PROOF_RAW_BYTES
     ):
         raise ValueError("Git object absence proof size is invalid")
-    if proof.get("public_metadata_review") != _git_proof_public_metadata_review(
-        objects
+    public_metadata_review = proof.get("public_metadata_review")
+    proof_scanner_revision = (
+        public_metadata_review.get("scanner_revision")
+        if isinstance(public_metadata_review, dict)
+        else ""
+    )
+    if public_metadata_review != _git_proof_public_metadata_review(
+        objects, scanner_revision=str(proof_scanner_revision)
     ):
         raise ValueError("Git object absence proof public metadata review is invalid")
     commit = objects.get(expected_commit_revision)

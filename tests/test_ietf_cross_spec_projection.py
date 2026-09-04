@@ -16,11 +16,13 @@ from longworld.core.attestation import (
     attach_attestation,
     verify_attestation,
 )
-from longworld.core.pack import SEP, wrap_prompt
+from longworld.core.pack import SEP
 from longworld.core.promotion import CANDIDATE_ATTESTATION_PURPOSE
 from longworld.core.standardsworkflow import (
+    build_ietf_cross_spec_growth_requirement_task,
     build_ietf_cross_spec_requirement_task,
     materialize_ietf_cross_spec_counterfactual,
+    render_ietf_cross_spec_prompt,
 )
 from longworld.core.taskpromotion import build_task_candidate_view_projections
 from longworld.core.taskproof import (
@@ -35,7 +37,10 @@ from longworld.core.taskreplaysidecar import (
     task_candidate_content_commitment,
     task_replay_sidecar_binding,
 )
-from reports.p24_ietf_oauth_cross_spec_generate import _artifacts_for_bucket
+from reports.p24_ietf_oauth_cross_spec_generate import (
+    _artifacts_for_bucket,
+    _chunk_source_units,
+)
 from tests.test_ietf_cross_spec_requirement import _oauth_manifest
 
 CANDIDATE_KEY = b"ietf-projection-candidate-key-32-bytes-minimum"
@@ -104,6 +109,7 @@ def test_replays_ietf_answer_from_selected_source_artifacts(tmp_path) -> None:
     artifact_ids = [record["record_id"] for record in records]
     candidate = {
         "ietf_requirement_task": task,
+        "question": task["question"],
         "source_record_ids_by_artifact": {
             artifact_id: [artifact_id] for artifact_id in artifact_ids
         },
@@ -130,12 +136,129 @@ def test_replays_ietf_answer_from_selected_source_artifacts(tmp_path) -> None:
     assert without_update["answer"] != expected
 
 
+def test_rejects_candidate_question_not_bound_to_ietf_task(tmp_path) -> None:
+    candidate, _token_counter = _projection_candidate(tmp_path)
+    candidate["question"] = "Resolve a different OAuth scenario."
+
+    with pytest.raises(TaskProofError, match="question"):
+        replay_ietf_cross_spec_candidate(
+            candidate, list(candidate["source_record_ids_by_artifact"])
+        )
+
+
+def test_growth_replay_derives_depth_from_relation_graph(tmp_path) -> None:
+    task = build_ietf_cross_spec_growth_requirement_task(
+        _oauth_manifest(tmp_path, semantic_growth=True)
+    )
+    records = task["source_manifest"]["records"]
+    artifact_ids = [record["record_id"] for record in records]
+    candidate = {
+        "ietf_requirement_task": task,
+        "question": task["question"],
+        "source_record_ids_by_artifact": {
+            artifact_id: [artifact_id] for artifact_id in artifact_ids
+        },
+        "artifact_classification": [
+            {
+                "artifact_id": record["record_id"],
+                "source_record_id": record["record_id"],
+                "source_char_start": 0,
+                "source_char_end": len(record["text"]),
+            }
+            for record in records
+        ],
+        "document_context": SEP.join(record["text"] for record in records),
+    }
+
+    full = replay_ietf_cross_spec_candidate(candidate, artifact_ids)
+    base_only = replay_ietf_cross_spec_candidate(
+        candidate,
+        [
+            artifact_id
+            for artifact_id in artifact_ids
+            if artifact_id
+            not in {
+                "ietf:rfc:8705",
+                "ietf:rfc:9101",
+                "ietf:rfc:9126",
+                "ietf:rfc:9396",
+                "ietf:rfc:9449",
+            }
+        ],
+    )
+
+    assert len(full["authentic_source_relation_edges"]) > len(
+        base_only["authentic_source_relation_edges"]
+    )
+    assert full["proof_depth"] == 2
+    assert full["hop_count"] == 2
+    assert base_only["proof_depth"] == 2
+    assert base_only["hop_count"] == 2
+
+
+def test_growth_replay_supports_nested_two_six_eleven_field_states(tmp_path) -> None:
+    task = build_ietf_cross_spec_growth_requirement_task(
+        _oauth_manifest(tmp_path, semantic_growth=True)
+    )
+    records = task["source_manifest"]["records"]
+    artifact_ids = [record["record_id"] for record in records]
+    candidate = {
+        "ietf_requirement_task": task,
+        "question": task["question"],
+        "source_record_ids_by_artifact": {
+            artifact_id: [artifact_id] for artifact_id in artifact_ids
+        },
+        "artifact_classification": [
+            {
+                "artifact_id": record["record_id"],
+                "source_record_id": record["record_id"],
+                "source_char_start": 0,
+                "source_char_end": len(record["text"]),
+            }
+            for record in records
+        ],
+        "document_context": SEP.join(record["text"] for record in records),
+    }
+    draft_id = next(
+        relation["source_record_id"]
+        for relation in task["source_manifest"]["relations"]
+        if relation["kind"] == "published_as"
+    )
+    two_field_ids = {
+        draft_id,
+        "ietf:rfc:6749",
+        "ietf:rfc:6750",
+        "ietf:rfc:9700",
+    }
+    six_field_ids = two_field_ids | {
+        "ietf:rfc:6819",
+        "ietf:rfc:7636",
+        "ietf:rfc:8414",
+        "ietf:rfc:9207",
+    }
+
+    two = json.loads(
+        replay_ietf_cross_spec_candidate(candidate, sorted(two_field_ids))["answer"]
+    )
+    six = json.loads(
+        replay_ietf_cross_spec_candidate(candidate, sorted(six_field_ids))["answer"]
+    )
+    eleven = json.loads(
+        replay_ietf_cross_spec_candidate(candidate, artifact_ids)["answer"]
+    )
+
+    assert sum(value != "UNKNOWN" for value in two.values()) == 2
+    assert sum(value != "UNKNOWN" for value in six.values()) == 6
+    assert sum(value != "UNKNOWN" for value in eleven.values()) == 11
+
+
 def test_p28_partial_window_does_not_grant_whole_ietf_record(tmp_path) -> None:
     task = build_ietf_cross_spec_requirement_task(_oauth_manifest(tmp_path))
     records = task["source_manifest"]["records"]
     artifact_ids = [record["record_id"] for record in records]
     candidate = {
         "ietf_requirement_task": task,
+        "question": task["question"],
         "source_record_ids_by_artifact": {
             record["record_id"]: [record["record_id"]] for record in records
         },
@@ -195,6 +318,7 @@ def test_replays_ietf_answer_only_from_complete_raw_artifacts(tmp_path) -> None:
     records = task["source_manifest"]["records"]
     candidate = {
         "ietf_requirement_task": task,
+        "question": task["question"],
         "source_record_ids_by_artifact": {
             record["record_id"]: [record["record_id"]] for record in records
         },
@@ -246,8 +370,8 @@ def _projection_candidate(tmp_path: Path):
         for endpoint in (relation["source_record_id"], relation["target_record_id"])
     }
     document_context = SEP.join(record["text"] for record in records)
-    question = "Resolve the six OAuth deployment requirements from the RFC graph."
-    context = wrap_prompt(question, document_context, "first")
+    question = str(task["question"])
+    context = render_ietf_cross_spec_prompt(question, document_context, "first")
     assert len(context) * 5 > 16_000
 
     candidate = {
@@ -327,6 +451,9 @@ def test_projects_source_bound_ietf_full_cf_and_ordered_views(tmp_path) -> None:
 
     by_view = {view["view"]: view for view in views}
     assert set(by_view) == {"full", "cf", "ordered_artifact_view"}
+    assert '"jar_signature_valid":false' not in by_view["full"]["context"]
+    assert 'the string "UNKNOWN" only for a field' in by_view["full"]["context"]
+    assert "reply exactly: unanswerable" not in by_view["full"]["context"]
     assert by_view["cf"]["document_context"] != by_view["full"]["document_context"]
     assert by_view["cf"]["answer"] == candidate["cf_answer"]
     assert by_view["cf"]["strict_support_event_count"] == 6
@@ -345,6 +472,14 @@ def test_projects_source_bound_ietf_full_cf_and_ordered_views(tmp_path) -> None:
     )
     assert by_view["full"]["answer"] == candidate["answer"]
     assert all(audit_task_view_projection(by_view["ordered_artifact_view"]).values())
+
+    context_tamper = deepcopy(by_view["full"])
+    context_tamper["context"] = context_tamper["context"].replace(
+        "Question:\n", "QUESTION:\n", 1
+    )
+    assert len(context_tamper["context"]) == len(by_view["full"]["context"])
+    with pytest.raises(TaskProofError, match="serialized_context_valid"):
+        audit_task_view_projection(context_tamper)
 
 
 def test_projects_counterfactual_into_unique_source_span_chunk(tmp_path) -> None:
@@ -414,7 +549,7 @@ def test_projects_counterfactual_into_unique_source_span_chunk(tmp_path) -> None
             *old_documents[record_index + 1 :],
         ]
     )
-    candidate["context"] = wrap_prompt(
+    candidate["context"] = render_ietf_cross_spec_prompt(
         candidate["question"], candidate["document_context"], "first"
     )
     candidate["source_record_ids_by_artifact"].pop(record_id)
@@ -510,7 +645,7 @@ def test_omits_fully_excluded_ietf_counterfactual_chunk(tmp_path) -> None:
             *documents[record_index + 1 :],
         ]
     )
-    candidate["context"] = wrap_prompt(
+    candidate["context"] = render_ietf_cross_spec_prompt(
         candidate["question"], candidate["document_context"], "first"
     )
     parent_context_length = len(candidate["context"])
@@ -635,13 +770,29 @@ def test_coarsens_bearer_with_contiguous_independent_requirement() -> None:
     assert artifact["text"].replace("bearer-current", " ").strip()
 
 
+def test_chunker_keeps_cross_paragraph_evidence_in_one_natural_chunk() -> None:
+    text = "before\n\nproof part one\n\nproof part two\n\nafter"
+    start = text.index("proof part one")
+    end = text.index("\n\nafter")
+    evidence = [{"char_start": start, "char_end": end}]
+
+    chunks = _chunk_source_units(text, evidence, len, 40)
+
+    assert sum(left <= start and end <= right for left, right in chunks) == 1
+    assert all(len(text[left:right]) <= 40 for left, right in chunks)
+
+
 def test_natural_packer_skips_one_support_unit_that_overshoots_exact_band() -> None:
     essential = "EVIDENCE00\n\n"
     oversized = "x" * 35 + "\n\n"
     fitting = "y" * 5
     text = essential + oversized + fitting
     question = "Q"
-    lower = len(wrap_prompt(question, SEP.join((essential, fitting)), "first"))
+    lower = len(
+        render_ietf_cross_spec_prompt(
+            question, SEP.join((essential, fitting)), "first"
+        )
+    )
     task = {
         "question": question,
         "source_manifest": {
@@ -706,7 +857,11 @@ def test_natural_packer_can_prioritize_support_from_controlling_record() -> None
             }
         )
     question = "Q"
-    lower = len(wrap_prompt(question, SEP.join(("E0\n\n", "E1\n\n", "b" * 5)), "first"))
+    lower = len(
+        render_ietf_cross_spec_prompt(
+            question, SEP.join(("E0\n\n", "E1\n\n", "b" * 5)), "first"
+        )
+    )
 
     artifacts, tokens = _artifacts_for_bucket(
         {
@@ -732,6 +887,50 @@ def test_natural_packer_can_prioritize_support_from_controlling_record() -> None
     ]
 
 
+def test_natural_packer_can_freeze_a_nested_record_subset() -> None:
+    records = [
+        {
+            "record_id": f"ietf:rfc:{number}",
+            "text": f"E{number}\n\n" + character * 20,
+            "source_sha256": hashlib.sha256(character.encode()).hexdigest(),
+            "source_url": f"https://www.rfc-editor.org/rfc/rfc{number}.txt",
+            "occurred_at": f"2025-01-0{number}T00:00:00Z",
+        }
+        for number, character in ((1, "a"), (2, "b"))
+    ]
+    task = {
+        "question": "Q",
+        "source_manifest": {"records": records},
+        "evidence_items": [
+            {
+                "evidence_id": f"fixture-{number}",
+                "record_id": f"ietf:rfc:{number}",
+                "char_start": 0,
+                "char_end": 2,
+            }
+            for number in (1, 2)
+        ],
+    }
+    target = len(
+        render_ietf_cross_spec_prompt(
+            "Q", SEP.join(("E1\n\n", "a" * 20)), "first"
+        )
+    )
+
+    artifacts, tokens = _artifacts_for_bucket(
+        task,
+        len,
+        "fixture",
+        target,
+        target,
+        0,
+        allowed_record_ids=frozenset({"ietf:rfc:1"}),
+    )
+
+    assert tokens == target
+    assert {artifact["record_id"] for artifact in artifacts} == {"ietf:rfc:1"}
+
+
 def test_ietf_generator_signs_fixed_candidate_schema_version(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -739,7 +938,7 @@ def test_ietf_generator_signs_fixed_candidate_schema_version(
     for role, key in (("candidate", CANDIDATE_KEY), ("source", SOURCE_KEY)):
         monkeypatch.setenv(ROLE_KEY_ENVS[role], key.decode())
         monkeypatch.setenv(ROLE_KEY_ID_ENVS[role], f"probe-ietf-generator-{role}-v1")
-    manifest = _oauth_manifest(tmp_path)
+    manifest = _oauth_manifest(tmp_path, semantic_growth=True)
     source_dir = tmp_path / "source"
     source_dir.mkdir()
     inventory_raw = b"{}\n"
@@ -758,6 +957,7 @@ def test_ietf_generator_signs_fixed_candidate_schema_version(
             "asset_manifest_sha256": "d" * 64,
         },
         "length_buckets": {"64k": [64_000, 65_536]},
+        "task_variant": "semantic_growth_v2",
         "packing": {"target_margin_tokens": 0},
         "output_dir": str(output_dir),
     }
@@ -772,14 +972,39 @@ def test_ietf_generator_signs_fixed_candidate_schema_version(
 
     def artifacts_for_bucket(task, *_args, **_kwargs):
         artifacts = []
-        for record in task["source_manifest"]["records"]:
-            text = record["text"]
+        records = {
+            record["record_id"]: record for record in task["source_manifest"]["records"]
+        }
+        selected_evidence = [
+            item
+            for item in task["evidence_items"]
+            if item["record_id"] in {"ietf:rfc:6749", "ietf:rfc:6750", "ietf:rfc:9700"}
+        ]
+        draft = records["ietf:draft:draft-ietf-demo-01"]
+        artifacts.append(
+            {
+                "artifact_id": draft["record_id"],
+                "record_id": draft["record_id"],
+                "char_start": 0,
+                "char_end": len(draft["text"]),
+                "text": draft["text"],
+                "text_sha256": hashlib.sha256(draft["text"].encode()).hexdigest(),
+                "source_sha256": draft["source_sha256"],
+                "source_url": draft["source_url"],
+                "essential": True,
+            }
+        )
+        for item in selected_evidence:
+            record = records[item["record_id"]]
+            start = item["char_start"]
+            end = item["char_end"]
+            text = record["text"][start:end]
             artifacts.append(
                 {
-                    "artifact_id": record["record_id"],
+                    "artifact_id": f"{record['record_id']}:{item['evidence_id']}",
                     "record_id": record["record_id"],
-                    "char_start": 0,
-                    "char_end": len(text),
+                    "char_start": start,
+                    "char_end": end,
                     "text": text,
                     "text_sha256": hashlib.sha256(text.encode()).hexdigest(),
                     "source_sha256": record["source_sha256"],
@@ -804,6 +1029,33 @@ def test_ietf_generator_signs_fixed_candidate_schema_version(
     assert verify_attestation(
         candidate, CANDIDATE_KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
     )
+    assert candidate["essential_artifact_ids"]
+    assert all(
+        replay_ietf_cross_spec_candidate(
+            candidate,
+            [
+                artifact_id
+                for artifact_id in candidate["essential_artifact_ids"]
+                if artifact_id != removed
+            ],
+        )["answer"]
+        != candidate["answer"]
+        for removed in candidate["essential_artifact_ids"]
+    )
+    assert all(
+        item["evidence_role"]
+        == (
+            "causal_gold"
+            if item["artifact_id"] in candidate["essential_artifact_ids"]
+            else "causal_supporting"
+        )
+        for item in candidate["artifact_classification"]
+    )
+    by_id = {item["artifact_id"]: item for item in candidate["artifact_classification"]}
+    assert by_id["ietf:rfc:9700:metadata_current"]["evidence_role"] == (
+        "causal_supporting"
+    )
+    assert by_id["ietf:rfc:9700:bearer_current"]["evidence_role"] == "causal_gold"
 
 
 def test_public_projection_serializes_source_bound_ietf_v3_sidecar(
