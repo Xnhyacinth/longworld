@@ -225,6 +225,7 @@ def _artifacts_for_bucket(
     span_id_width: int = 0,
     isolate_evidence_ids: frozenset[str] = frozenset(),
     counterfactual_companion_evidence_id: str = "",
+    support_priority_record_ids: tuple[str, ...] = (),
 ) -> tuple[list[dict[str, Any]], int]:
     records = list(task["source_manifest"]["records"])
     by_id = {record["record_id"]: record for record in records}
@@ -284,6 +285,16 @@ def _artifacts_for_bucket(
             if end <= essential_start or start >= essential_end
         )
 
+    if len(set(support_priority_record_ids)) != len(support_priority_record_ids) or any(
+        not record_id or record_id not in by_id
+        for record_id in support_priority_record_ids
+    ):
+        raise ValueError("support priority record ids are invalid")
+    priority = {
+        record_id: index for index, record_id in enumerate(support_priority_record_ids)
+    }
+    support_units.sort(key=lambda item: priority.get(item[0], len(priority)))
+
     selected_units: list[tuple[str, int, int]] = []
     target = lower + margin
 
@@ -339,13 +350,18 @@ def _artifacts_for_bucket(
 
     question = str(task["question"])
 
-    def measure(prefix_size: int) -> tuple[list[dict[str, Any]], int]:
-        selected_units[:] = support_units[:prefix_size]
+    def measure_units(
+        units: list[tuple[str, int, int]],
+    ) -> tuple[list[dict[str, Any]], int]:
+        selected_units[:] = units
         artifacts = materialize()
         tokens = token_counter(
             wrap_prompt(question, SEP.join(x["text"] for x in artifacts), "first")
         )
         return artifacts, tokens
+
+    def measure(prefix_size: int) -> tuple[list[dict[str, Any]], int]:
+        return measure_units(support_units[:prefix_size])
 
     left, right = 0, len(support_units)
     while left < right:
@@ -356,6 +372,18 @@ def _artifacts_for_bucket(
         else:
             right = middle
     artifacts, tokens = measure(left)
+    if tokens > upper and left:
+        fallback_units = support_units[: left - 1]
+        artifacts, tokens = measure_units(fallback_units)
+        for unit in support_units[left - 1 :]:
+            candidate_units = [*fallback_units, unit]
+            candidate_artifacts, candidate_tokens = measure_units(candidate_units)
+            if candidate_tokens > upper:
+                continue
+            fallback_units = candidate_units
+            artifacts, tokens = candidate_artifacts, candidate_tokens
+            if tokens >= target:
+                break
     if not lower <= tokens <= upper:
         raise ValueError(
             f"{bucket} natural exact-band blocker: observed={tokens}, band={lower}-{upper}"
@@ -450,6 +478,9 @@ def build(config_path: Path) -> dict[str, Any]:
             counterfactual_companion_evidence_id=str(
                 config["packing"].get("counterfactual_companion_evidence_id") or ""
             ),
+            support_priority_record_ids=tuple(
+                config["packing"].get("support_priority_record_ids") or []
+            ),
         )
         classifications = [
             {
@@ -478,6 +509,7 @@ def build(config_path: Path) -> dict[str, Any]:
         document_context = SEP.join(item["text"] for item in artifacts)
         question = str(task["question"])
         candidate: dict[str, Any] = {
+            "schema_version": "longworld.ietf-oauth-generation-candidate.v1",
             "world_id": "ietf-oauth-cross-spec-requirement-v1",
             "query_id": f"ietf-oauth-cross-spec-requirement-v1:{bucket}",
             "domain": "standards",

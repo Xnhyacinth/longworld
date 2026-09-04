@@ -293,6 +293,16 @@ def project(
     }
     candidate_bytes = _jsonl_bytes(projected)
     commitment_bytes = _canonical_bytes(commitment_input)
+    replay_registry_bytes = _canonical_bytes(
+        {
+            "schema_version": "longworld.replay-path-registry.v2",
+            "episode_replay_bundles": {},
+            "source_workflow_bundles": {},
+            "task_replay_sidecars": {
+                v3_binding["sha256"]: "TASK_REPLAY_SIDECAR_V3.json"
+            },
+        }
+    )
     manifest = {
         "schema_version": MANIFEST_SCHEMA,
         "input_candidate_count": len(parents),
@@ -308,6 +318,7 @@ def project(
         "rebuilt_sidecar_sha256": v3_binding["sha256"],
     }
     _write_resumable(output_dir / "TASK_REPLAY_SIDECAR_V3.json", v3_sidecar_bytes)
+    _write_resumable(output_dir / "REPLAY_PATH_REGISTRY.json", replay_registry_bytes)
     _write_resumable(output_dir / "candidates.jsonl", candidate_bytes)
     _write_resumable(output_dir / "SOURCE_COMMITMENT_INPUT.json", commitment_bytes)
     _write_resumable(output_dir / "MANIFEST.json", _canonical_bytes(manifest))

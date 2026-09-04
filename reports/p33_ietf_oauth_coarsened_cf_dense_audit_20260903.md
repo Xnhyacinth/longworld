@@ -7,6 +7,11 @@ OAuth world and completed projection, pinned dense ranking, and dense audit for
 all six full/counterfactual/ordered views. The dense audit manifest reports
 `audited_projection_count=6` and `dense_audit_complete=true`.
 
+On 2026-09-04 the chain was rebuilt from the authenticated parents after the
+generator began assigning the fixed candidate schema before signing. All six
+rows were re-signed, re-ranked, and re-audited; the hashes below supersede the
+earlier schema-less candidate-local build.
+
 This is not a training inventory or promotion result. Every artifact remains
 `data_stage=candidate`, `train_ready=false`, `production_eligible=false`,
 `selected=false`, and `promoted=false`. No row was selected, promoted, counted,
@@ -94,14 +99,15 @@ receipts report `remove_one_fails=true`, `full_counterfactual_sufficient=true`,
 ## Candidate-local hashes
 
 - config: `d18280e66c4f6e7fc3b39e3c42168d37dda8847b0b914615058f79889c1f5f67`
-- generation receipt: `2afe543196262e397a625802c200638486fee3f5b5a4e84f99c538b2121b32a4`
-- parents: `8b1400fccf629e0356217acf8e7d0b82ca9b6ede6354f6d83dd907b77e1be426`
-- v1 task sidecar: `754635a20530f0ff1cb8cacce58ea3e2f2d4cf708736900056917da042d49e0f`
-- projected candidates: `9ef1d5a5a12209fcd03fe08880b61e5a61f06bf20983601f1f3606c2615ffa0a`
-- v3 task sidecar: `223d1d44dfafc425c306f73e781e910c313e2d875a32626222d299950a7bd4de`
-- dense rankings: `d0ac0b62d5b10d458e5cb915063236b68b1df6d3a1ca367158a71f4e1afc7f20`
-- dense audits: `6ea9394ea45374cc41a66ce595f7ef69636d119cbc6c22f456647d40c6adc082`
-- audit manifest: `c3b1594b33c1a5fbfae790a3743355197e81d02b9526d1dcf3086d5c157520a8`
+- generation receipt: `7db8a877bc21a3bdabe5fc2728babf46434265baaea40aa766c99cc35d33f5dc`
+- parents: `9428059458088087220892507ff75ec5321b903c6bc53ccdfeab7635e5c96a58`
+- v1 task sidecar: `a59941da5fa2d98409808b60b184899c07bca48ee7894156a3b73d41e183397f`
+- projected candidates: `a3041604db36a1836758c087bd26ba58a3a49df34e26990b055931f157a94602`
+- v3 task sidecar: `871b606a16ada0317631acad31db0a9568e4c4bde44d870d7ecabdb172106d5f`
+- replay registry: `38c5047a408ef2911b1356412a5fa5e893048e73a41324f734468fe0a6c5d1ae`
+- dense rankings: `1afe60279bc0be321084d8dac26315b1658ec22b3b67c6e3391cd358a40ff913`
+- dense audits: `4db8e7254744d88ca871f612bff4ad77b5a494c1bf418505e03e8066797aeaa3`
+- audit manifest: `84ad90d59f912455d771c80a37091f9415b43b3bb1b6f61419c9930a893a8569`
 
 Candidate-local generated files are under
 `data/candidates/p33_ietf_oauth_coarsened_cf_v1/` and remain ignored by Git.

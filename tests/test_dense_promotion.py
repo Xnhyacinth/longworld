@@ -57,6 +57,7 @@ from longworld.core.promotion import (
     _replayed_quality_metrics,
     _resolved_local_tokenizer_revision,
     _synthetic_replay_materialization,
+    _task_sidecar_matches_candidate,
     candidate_sha256,
     candidate_structural_preflight,
     create_dense_audit,
@@ -84,7 +85,11 @@ from longworld.core.semantic import (
 )
 from longworld.core.sourcebundle import LoadedSourceWorkflowBundle
 from longworld.core.taskproof import TASK_PROOF_RECEIPT_SCHEMA
-from longworld.core.taskreplaysidecar import task_candidate_content_commitment
+from longworld.core.taskreplaysidecar import (
+    IETF_OAUTH_TASK_REPLAY_ADAPTER_V3,
+    TASK_VIEW_DERIVATION_REVISION,
+    task_candidate_content_commitment,
+)
 from longworld.core.taxonomy import (
     EvidenceRole,
     SourceOrigin,
@@ -5189,6 +5194,36 @@ def test_task_growth_preflight_rejects_sidecar_for_wrong_domain() -> None:
             "p12-wiki-source-slice-1-v1",
             candidate_attestation_key=KEY,
         )
+
+
+def test_ietf_v3_projection_binding_accepts_only_standards_domain() -> None:
+    adapter_id, adapter_revision, sidecar_schema_version = (
+        IETF_OAUTH_TASK_REPLAY_ADAPTER_V3
+    )
+    binding = {
+        "adapter_id": adapter_id,
+        "adapter_revision": adapter_revision,
+        "sidecar_schema_version": sidecar_schema_version,
+        "sha256": "f" * 64,
+    }
+    candidate = {
+        "domain": "standards",
+        "view": "cf",
+        "composition_method": "counterfactual_twin",
+        "strict_replay_revision": adapter_revision,
+        "dossier_id": "ietf-oauth-dossier",
+        "task_view_projection": {
+            "schema_version": "longworld.task-view-projection.v1",
+            "derivation_revision": TASK_VIEW_DERIVATION_REVISION,
+            "view": "cf",
+            "dossier_id": "ietf-oauth-dossier",
+        },
+    }
+
+    assert _task_sidecar_matches_candidate(candidate, binding)
+    assert not _task_sidecar_matches_candidate(
+        {**candidate, "domain": "finance"}, binding
+    )
 
 
 def _duplicate_task_content_identity_candidates() -> tuple[dict, dict]:

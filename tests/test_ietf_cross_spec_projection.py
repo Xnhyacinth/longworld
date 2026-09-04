@@ -7,12 +7,14 @@ from pathlib import Path
 
 import pytest
 
+import reports.p24_ietf_oauth_cross_spec_generate as ietf_generator
 import scripts.project_task_candidate_views as task_view_cli
 from longworld.core.attestation import (
     ATTESTATION_ENVIRONMENT_ENV,
     ROLE_KEY_ENVS,
     ROLE_KEY_ID_ENVS,
     attach_attestation,
+    verify_attestation,
 )
 from longworld.core.pack import SEP, wrap_prompt
 from longworld.core.promotion import CANDIDATE_ATTESTATION_PURPOSE
@@ -633,6 +635,177 @@ def test_coarsens_bearer_with_contiguous_independent_requirement() -> None:
     assert artifact["text"].replace("bearer-current", " ").strip()
 
 
+def test_natural_packer_skips_one_support_unit_that_overshoots_exact_band() -> None:
+    essential = "EVIDENCE00\n\n"
+    oversized = "x" * 35 + "\n\n"
+    fitting = "y" * 5
+    text = essential + oversized + fitting
+    question = "Q"
+    lower = len(wrap_prompt(question, SEP.join((essential, fitting)), "first"))
+    task = {
+        "question": question,
+        "source_manifest": {
+            "records": [
+                {
+                    "record_id": "ietf:rfc:test",
+                    "text": text,
+                    "source_sha256": hashlib.sha256(text.encode()).hexdigest(),
+                    "source_url": "https://www.rfc-editor.org/rfc/rfctest.txt",
+                    "occurred_at": "2025-01-01T00:00:00Z",
+                }
+            ]
+        },
+        "evidence_items": [
+            {
+                "evidence_id": "fixture",
+                "record_id": "ietf:rfc:test",
+                "char_start": 0,
+                "char_end": len("EVIDENCE00"),
+            }
+        ],
+    }
+
+    artifacts, tokens = _artifacts_for_bucket(
+        task,
+        len,
+        "fixture",
+        lower,
+        lower,
+        0,
+        chunked_record_ids=frozenset({"ietf:rfc:test"}),
+        chunk_max_tokens=len(oversized),
+    )
+
+    assert tokens == lower
+    assert [artifact["text"] for artifact in artifacts] == [essential, fitting]
+
+
+def test_natural_packer_can_prioritize_support_from_controlling_record() -> None:
+    records = []
+    evidence = []
+    for index, (record_id, support) in enumerate(
+        (("ietf:rfc:early", "a" * 5), ("ietf:rfc:control", "b" * 5))
+    ):
+        essential = f"E{index}\n\n"
+        text = essential + support
+        records.append(
+            {
+                "record_id": record_id,
+                "text": text,
+                "source_sha256": hashlib.sha256(text.encode()).hexdigest(),
+                "source_url": f"https://www.rfc-editor.org/rfc/{index}.txt",
+                "occurred_at": f"2025-01-0{index + 1}T00:00:00Z",
+            }
+        )
+        evidence.append(
+            {
+                "evidence_id": f"fixture-{index}",
+                "record_id": record_id,
+                "char_start": 0,
+                "char_end": 2,
+            }
+        )
+    question = "Q"
+    lower = len(wrap_prompt(question, SEP.join(("E0\n\n", "E1\n\n", "b" * 5)), "first"))
+
+    artifacts, tokens = _artifacts_for_bucket(
+        {
+            "question": question,
+            "source_manifest": {"records": records},
+            "evidence_items": evidence,
+        },
+        len,
+        "fixture",
+        lower,
+        lower,
+        0,
+        chunked_record_ids=frozenset(record["record_id"] for record in records),
+        chunk_max_tokens=5,
+        support_priority_record_ids=("ietf:rfc:control",),
+    )
+
+    assert tokens == lower
+    assert [artifact["text"] for artifact in artifacts] == [
+        "E0\n\n",
+        "E1\n\n",
+        "b" * 5,
+    ]
+
+
+def test_ietf_generator_signs_fixed_candidate_schema_version(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(ATTESTATION_ENVIRONMENT_ENV, "probe")
+    for role, key in (("candidate", CANDIDATE_KEY), ("source", SOURCE_KEY)):
+        monkeypatch.setenv(ROLE_KEY_ENVS[role], key.decode())
+        monkeypatch.setenv(ROLE_KEY_ID_ENVS[role], f"probe-ietf-generator-{role}-v1")
+    manifest = _oauth_manifest(tmp_path)
+    source_dir = tmp_path / "source"
+    source_dir.mkdir()
+    inventory_raw = b"{}\n"
+    (source_dir / "ietf_fetch_inventory.json").write_bytes(inventory_raw)
+    output_dir = tmp_path / "generated"
+    config = {
+        "source_inventory_dir": str(source_dir),
+        "fetch_inventory_file": "ietf_fetch_inventory.json",
+        "fetch_inventory_sha256": hashlib.sha256(inventory_raw).hexdigest(),
+        "manifest_generated_at": "2026-09-03T18:00:00Z",
+        "predecessor_report_manifest_sha256": "a" * 64,
+        "predecessor_report_task_sha256": "b" * 64,
+        "tokenizer": {
+            "model_id": "test-tokenizer",
+            "revision": "c" * 40,
+            "asset_manifest_sha256": "d" * 64,
+        },
+        "length_buckets": {"64k": [64_000, 65_536]},
+        "packing": {"target_margin_tokens": 0},
+        "output_dir": str(output_dir),
+    }
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(config))
+    monkeypatch.setattr(
+        ietf_generator,
+        "build_ietf_workflow_from_fetch_inventory",
+        lambda *_args, **_kwargs: manifest,
+    )
+    monkeypatch.setattr(ietf_generator, "task_sidecar_token_counter", lambda _: len)
+
+    def artifacts_for_bucket(task, *_args, **_kwargs):
+        artifacts = []
+        for record in task["source_manifest"]["records"]:
+            text = record["text"]
+            artifacts.append(
+                {
+                    "artifact_id": record["record_id"],
+                    "record_id": record["record_id"],
+                    "char_start": 0,
+                    "char_end": len(text),
+                    "text": text,
+                    "text_sha256": hashlib.sha256(text.encode()).hexdigest(),
+                    "source_sha256": record["source_sha256"],
+                    "source_url": record["source_url"],
+                    "essential": True,
+                }
+            )
+        return artifacts, 64_000
+
+    monkeypatch.setattr(ietf_generator, "_artifacts_for_bucket", artifacts_for_bucket)
+
+    ietf_generator.build(config_path)
+
+    [candidate] = [
+        json.loads(line)
+        for line in (output_dir / "parents.jsonl").read_text().splitlines()
+        if line.strip()
+    ]
+    assert candidate["schema_version"] == (
+        "longworld.ietf-oauth-generation-candidate.v1"
+    )
+    assert verify_attestation(
+        candidate, CANDIDATE_KEY, purpose=CANDIDATE_ATTESTATION_PURPOSE
+    )
+
+
 def test_public_projection_serializes_source_bound_ietf_v3_sidecar(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -717,6 +890,17 @@ def test_public_projection_serializes_source_bound_ietf_v3_sidecar(
     assert manifest["projection_candidate_count"] == 3
     assert manifest["dense_audit_complete"] is False
     assert (relative_root / "projected/TASK_REPLAY_SIDECAR_V3.json").is_file()
+    replay_registry = json.loads(
+        (relative_root / "projected/REPLAY_PATH_REGISTRY.json").read_text()
+    )
+    assert replay_registry == {
+        "schema_version": "longworld.replay-path-registry.v2",
+        "episode_replay_bundles": {},
+        "source_workflow_bundles": {},
+        "task_replay_sidecars": {
+            manifest["rebuilt_sidecar_sha256"]: "TASK_REPLAY_SIDECAR_V3.json"
+        },
+    }
     with pytest.raises(ValueError, match="task candidate input is not"):
         task_view_cli.audit_projections(
             relative_root / "projected", relative_root / "missing-rankings.jsonl"
