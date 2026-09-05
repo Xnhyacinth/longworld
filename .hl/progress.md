@@ -907,3 +907,20 @@ in`; no private-repository or upload claim was made.
   uncommitted. Two focused tests and hashes reproduce, but authorization is
   invalid for generation and its custom essential-ID/span audit cannot support
   shared remove-one or exhaustive raw-window claims. Inventory delta remains 0.
+
+## 2026-09-05 scale-out kickoff
+
+- Re-audited the current boundary at 141 local-probe train rows / 7,274,595
+  exact tokens, including 18×128K; production/KMS-qualified inventory remains
+  zero.
+- Started three disjoint tracks: authentic-parent rebuild for P52 GovInfo,
+  formula-DAG feasibility for P46 Ofgem workbooks, and P54 comparison of new
+  official multi-document lifecycle sources. Root retains shared-gate,
+  inventory, `.hl`, and release-document ownership.
+- Success is measured by executable task/proof diversity and fully verified
+  train-ready rows, not candidate count, entity copies, or nominal source
+  length. Failed capacity/shortcut probes remain useful rejection evidence.
+- Reverted `d9c80b4` with `11c5d66` after confirming that the former P53
+  candidate commit contradicted its authorization and overstated custom
+  shortcut checks as shared audit evidence. The revert preserves history and
+  restores the documented zero-inventory boundary for P53.

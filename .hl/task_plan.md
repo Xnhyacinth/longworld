@@ -438,3 +438,19 @@ HF publication remain out of scope.
 | P50 Treasury | fail-closed: 1,717 replayable bill chains, all gold chains ≤4K | change task/entity; do not pad auction text |
 | P52 GovInfo | adapter registered; old direct-view candidates not promotable | rebuild three authentic full parents, then project and run shared proof |
 | P53 OSV | blocked diagnostic: inherited authorization prohibits generation; shortcut audit is non-exhaustive | create a distinct authorized source contract, remove task-declared essential-ID tautology, and use shared raw-window replay before candidate claims |
+
+## P54 scale-out run charter — 2026-09-05
+
+Assumptions: `.hl/policy.md` is the control plane; this is research-pipeline
+work rather than one-shot reporting; independent delegation reduces cycle time
+because P52, P46, and new-source discovery have disjoint files and evidence.
+Complexity is high (breadth 2, depth 2, dependency 1, uncertainty 2,
+validation 2; total 9/10), so execution is mixed: parallel source/world work,
+then centralized shared-gate review and inventory binding.
+
+| Unit | Owner and files | Deliverable | Admission rule |
+| --- | --- | --- | --- |
+| P52 GovInfo conversion | P52 agent; `configs/p52_*`, `reports/p52_*`, `tests/test_p52_*`, `sources/research_p52_*` | three authentic full parents before task-view projection | no inventory until shared replay, dense/raw-window, selection, promotion, quality, and export all pass |
+| P46 Ofgem spreadsheet world | P46 agent; `configs/p46_*`, `reports/p46_*`, `tests/test_p46_*`, `sources/research_p46_*` | executable cross-sheet/cross-workbook formula-DAG parent or quantified rejection | formula volume alone is not proof; answer must change under source-bound remove-one/CF replay |
+| P54 new official workflow | P54 agent; `configs/p54_*`, `reports/p54_*`, `tests/test_p54_*`, `sources/research_p54_*` | compare at least three official lifecycle sources and preflight the strongest | rights, immutable retrieval, natural unique capacity, and non-shortcut oracle must pass before candidates |
+| Integration and inventory | root; shared gates plus `.hl`/release documentation only | verified delta, rejection ledger, and layered Git history | preserve exact-band, near-dup, lineage, derived-view, truncation, and production trust boundaries |
