@@ -1,0 +1,43 @@
+{
+  "schema_version": "longworld.p46-ofgem-formula-dependency-gate-config.v1",
+  "data_product": "p46_ofgem_formula_dependency_gate_v1",
+  "predecessor": {
+    "commit": "6b2beb4",
+    "config_path": "configs/p46_ofgem_price_cap_workbook_preflight_v1.json",
+    "config_sha256": "fa6d7a9e4b5221da9328cb86f611eb8c9bab452fd7a3a0e9f280832b50a6c3c0",
+    "report_path": "reports/p46_ofgem_price_cap_workbook_preflight_v1.json",
+    "report_sha256": "903b84d139cb30f698a4ad3c33af745f679530bb8be0ef1ce0d249defbd948f3"
+  },
+  "authorization_record_id": "p46-ofgem-price-cap-workbook-preflight-v1",
+  "mode": "persisted_aggregate_evidence_only",
+  "external_retrieval_performed": false,
+  "capacity_bands": {
+    "32k": [32000, 32768],
+    "64k": [64000, 65536],
+    "128k": [128000, 131072]
+  },
+  "dependency_requirements": {
+    "require_cell_level_formula_closure": true,
+    "require_cross_sheet_edges": true,
+    "require_cross_workbook_relation": true,
+    "require_answer_change_on_new_workbook": true,
+    "require_remove_one_failure": true,
+    "require_openpyxl_replay": true,
+    "require_libreoffice_replay": true,
+    "require_two_identical_libreoffice_exports": true,
+    "require_explicit_rights_clearance_for_internal_only_marker": true
+  },
+  "unchanged_gates": {
+    "near_duplicate_word_shingle_jaccard": 0.9,
+    "raw_window_tokens": [4096, 8192, 16384],
+    "truncation_ppm_max": 200000,
+    "exact_band_required": true,
+    "derived_view_gate_required": true
+  },
+  "release_boundary": {
+    "candidate_count": 0,
+    "train_ready": false,
+    "production_eligible": false,
+    "inventory_delta": 0
+  }
+}

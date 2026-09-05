@@ -1,0 +1,148 @@
+{
+  "accepted_rows": 0,
+  "answer_dependency_capacity": {
+    "authenticated_dependency_edge_count": 0,
+    "exact_band_capacity": {
+      "128k": false,
+      "32k": false,
+      "64k": false
+    },
+    "reason": "no persisted cell-level closure, output receipt, or cross-engine replay exists",
+    "replayable_output_count": 0,
+    "unique_qwen_tokens": 0
+  },
+  "blockers": [
+    "authorization_prohibits_candidate_generation",
+    "cell_level_dependency_closures_not_persisted",
+    "cross_engine_oracle_unavailable",
+    "cross_workbook_answer_change_not_demonstrated",
+    "internal_only_marker_rights_clearance_missing",
+    "output_cell_coordinates_and_cached_values_not_persisted",
+    "stale_external_state_exclusion_not_replayed"
+  ],
+  "candidate_count": 0,
+  "data_product": "p46_ofgem_formula_dependency_gate_v1",
+  "evaluation_mode": "persisted_aggregate_evidence_only",
+  "external_retrieval_performed": false,
+  "generated_rows": 0,
+  "inventory_delta": 0,
+  "near_duplicate_audit": {
+    "candidate_near_duplicate_gate_run": false,
+    "cross_workbook_template_reuse_ratio": 0.576018,
+    "formula_instance_reduction_ratio_by_workbook": {
+      "2024Q4": 0.940427,
+      "2025Q4": 0.946644,
+      "2026Q3": 0.943572
+    },
+    "reason": "candidate count is zero"
+  },
+  "next_entity": {
+    "proposal": "Ofgem quarterly default-tariff-cap public level tables and decision-publication chain",
+    "selection_contract": "use only an official Ofgem HTML, CSV, or accessible annex with explicit public reuse status, dated revisions, stable row keys, and directly stated final cap values; exclude any attachment carrying an unresolved Internal Only marker",
+    "task_shape": "quarter-to-quarter retained/changed/new region-payment-method cap rows with deterministic value-delta and publication-date oracle"
+  },
+  "oracle": {
+    "executable_parent_compiler_replay_built": false,
+    "libreoffice_available": false,
+    "openpyxl_available": false,
+    "reason": "building an executable parent from aggregate counts would invent missing formulas and source bindings"
+  },
+  "predecessor": {
+    "commit": "6b2beb4",
+    "config_path": "configs/p46_ofgem_price_cap_workbook_preflight_v1.json",
+    "config_sha256": "fa6d7a9e4b5221da9328cb86f611eb8c9bab452fd7a3a0e9f280832b50a6c3c0",
+    "report_path": "reports/p46_ofgem_price_cap_workbook_preflight_v1.json",
+    "report_sha256": "903b84d139cb30f698a4ad3c33af745f679530bb8be0ef1ce0d249defbd948f3"
+  },
+  "production_eligible": false,
+  "raw_template_capacity": {
+    "capacity_is_preflight_only": true,
+    "cross_version_exact_deduplicated_qwen_tokens": 14714242,
+    "cross_version_exact_deduplicated_unit_count": 254586,
+    "cross_version_template_deduplicated_qwen_tokens": 469328,
+    "cross_version_template_deduplicated_unit_count": 18224,
+    "exact_band_capacity": {
+      "128k": true,
+      "32k": true,
+      "64k": true
+    }
+  },
+  "rejected_rows": 0,
+  "schema_version": "longworld.p46-ofgem-formula-dependency-gate-report.v1",
+  "shortcut_audit": {
+    "audited_output_count": 0,
+    "raw_window_tokens": [
+      4096,
+      8192,
+      16384
+    ],
+    "reason": "the aggregate preflight retains neither output-cell coordinates nor cached output values; no raw-window answer comparison is possible",
+    "status": "not_auditable_fail_closed"
+  },
+  "source_boundary": {
+    "broken_defined_name_count_by_workbook": {
+      "2024Q4": 1112,
+      "2025Q4": 1112,
+      "2026Q3": 1112
+    },
+    "external_relationship_target_count_by_workbook": {
+      "2024Q4": 11,
+      "2025Q4": 11,
+      "2026Q3": 12
+    },
+    "internal_only_marker_part_count_by_workbook": {
+      "2024Q4": 39,
+      "2025Q4": 40,
+      "2026Q3": 40
+    },
+    "raw_workbooks_persisted": false
+  },
+  "topology": {
+    "cell_level_formula_closure_count": 0,
+    "cross_workbook_template_instance_count": 42983,
+    "cross_workbook_template_reuse_ratio": 0.576018,
+    "cross_workbook_unique_template_count": 18224,
+    "formula_cell_count": 481336,
+    "interpretation": "sheet-level reference counts show convergence into two calculators and one output sheet, but do not bind any output cell to a complete dependency closure",
+    "materialized_source_sheets_per_workbook": {
+      "2024Q4": [
+        "3a DF",
+        "3e NC-Elec",
+        "3f NC-Gas",
+        "3g CPIH",
+        "3k EBIT"
+      ],
+      "2025Q4": [
+        "3a DF",
+        "3e NC-Elec",
+        "3f NC-Gas",
+        "3g CPIH",
+        "3k EBIT",
+        "3n DRC"
+      ],
+      "2026Q3": [
+        "3a DF",
+        "3e NC-Elec",
+        "3f NC-Gas",
+        "3g CPIH",
+        "3k EBIT",
+        "3n DRC"
+      ]
+    },
+    "nominal_branch_count": 12,
+    "replayable_cross_sheet_closure_count": 0,
+    "replayable_cross_workbook_relation_count": 0,
+    "terminal_output_sheets": [
+      "1a Default tariff cap"
+    ],
+    "unique_calculator_targets_per_workbook": {
+      "2024Q4": 2,
+      "2025Q4": 2,
+      "2026Q3": 2
+    },
+    "unique_terminal_output_sheet_count": 1,
+    "workbook_count": 3
+  },
+  "train_ready": false,
+  "verdict": "FAIL_CLOSED_ZERO_CANDIDATES"
+}
