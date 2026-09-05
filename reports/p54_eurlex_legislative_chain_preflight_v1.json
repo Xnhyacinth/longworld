@@ -1,0 +1,329 @@
+{
+  "candidate_generation_gate": {
+    "aggregate_capacity_exact_all_bands": true,
+    "artifact_aligned_shortcuts_insufficient": true,
+    "eligible_for_candidate_generation": false,
+    "next_step": "implement a registered source-span replay adapter and exhaustive pinned-token raw-window audit before materializing any candidate",
+    "raw_token_shortcuts_audited": false,
+    "shared_task_replay_adapter_registered": false
+  },
+  "capacity": {
+    "corrigendum_whole_document_tokens": 1549,
+    "exact_band_task_pack_preflight": {
+      "128k": {
+        "artifact_aligned_shortcut_preflight": {
+          "all_insufficient": true,
+          "proof_mode": "monotone_maximal_complete_artifact_regex_oracle_replay",
+          "windows": {
+            "16384": {
+              "checked_artifact_windows": 2372,
+              "insufficient": true,
+              "witness_artifact_ids": []
+            },
+            "4096": {
+              "checked_artifact_windows": 2372,
+              "insufficient": true,
+              "witness_artifact_ids": []
+            },
+            "8192": {
+              "checked_artifact_windows": 2372,
+              "insufficient": true,
+              "witness_artifact_ids": []
+            }
+          }
+        },
+        "artifact_count": 2372,
+        "artifact_ids_sha256": "b0908c9a60ad236cd8f1a87fd46d5bfae00319030fd9fb3111c3fa7c3a354129",
+        "cloned_artifacts": 0,
+        "deficit_tokens": 0,
+        "essential_artifact_count": 5,
+        "feasible": true,
+        "padding_tokens": 0,
+        "raw_token_window_audit": "NOT_RUN_REQUIRED_BEFORE_CANDIDATE_GENERATION",
+        "shortcut_artifact_order": {
+          "basis": "predeclared_source_order_then_natural_block_ordinal",
+          "source_order": [
+            "metadata",
+            "proposal",
+            "position",
+            "act",
+            "corrigendum"
+          ]
+        },
+        "source_tokens": 128424,
+        "split_or_truncated_artifacts": 0
+      },
+      "32k": {
+        "artifact_aligned_shortcut_preflight": {
+          "all_insufficient": true,
+          "proof_mode": "monotone_maximal_complete_artifact_regex_oracle_replay",
+          "windows": {
+            "16384": {
+              "checked_artifact_windows": 541,
+              "insufficient": true,
+              "witness_artifact_ids": []
+            },
+            "4096": {
+              "checked_artifact_windows": 541,
+              "insufficient": true,
+              "witness_artifact_ids": []
+            },
+            "8192": {
+              "checked_artifact_windows": 541,
+              "insufficient": true,
+              "witness_artifact_ids": []
+            }
+          }
+        },
+        "artifact_count": 541,
+        "artifact_ids_sha256": "8f7822b4a0e6d1508b6966a8344727ce87de15b77abc244a47de2f3efffdec52",
+        "cloned_artifacts": 0,
+        "deficit_tokens": 0,
+        "essential_artifact_count": 5,
+        "feasible": true,
+        "padding_tokens": 0,
+        "raw_token_window_audit": "NOT_RUN_REQUIRED_BEFORE_CANDIDATE_GENERATION",
+        "shortcut_artifact_order": {
+          "basis": "predeclared_source_order_then_natural_block_ordinal",
+          "source_order": [
+            "metadata",
+            "proposal",
+            "position",
+            "act",
+            "corrigendum"
+          ]
+        },
+        "source_tokens": 32309,
+        "split_or_truncated_artifacts": 0
+      },
+      "64k": {
+        "artifact_aligned_shortcut_preflight": {
+          "all_insufficient": true,
+          "proof_mode": "monotone_maximal_complete_artifact_regex_oracle_replay",
+          "windows": {
+            "16384": {
+              "checked_artifact_windows": 1135,
+              "insufficient": true,
+              "witness_artifact_ids": []
+            },
+            "4096": {
+              "checked_artifact_windows": 1135,
+              "insufficient": true,
+              "witness_artifact_ids": []
+            },
+            "8192": {
+              "checked_artifact_windows": 1135,
+              "insufficient": true,
+              "witness_artifact_ids": []
+            }
+          }
+        },
+        "artifact_count": 1135,
+        "artifact_ids_sha256": "709bcb032f691ced5ee64a35471354cf29d19fd92d3d6a34cb2396ce37d4636e",
+        "cloned_artifacts": 0,
+        "deficit_tokens": 0,
+        "essential_artifact_count": 5,
+        "feasible": true,
+        "padding_tokens": 0,
+        "raw_token_window_audit": "NOT_RUN_REQUIRED_BEFORE_CANDIDATE_GENERATION",
+        "shortcut_artifact_order": {
+          "basis": "predeclared_source_order_then_natural_block_ordinal",
+          "source_order": [
+            "metadata",
+            "proposal",
+            "position",
+            "act",
+            "corrigendum"
+          ]
+        },
+        "source_tokens": 64317,
+        "split_or_truncated_artifacts": 0
+      }
+    },
+    "metadata_projection_tokens": 473,
+    "near_deduplicated_authentic_source_tokens": 224955,
+    "oracle_overlap_background_units_excluded": 3
+  },
+  "config_sha256": "4c8074570a3c77e25c876d28d7c5109c154b792e33cd82dafa10a45b8ec58fda",
+  "data_product": "p54_eurlex_mdr_legislative_chain_preflight_v1",
+  "normalization": {
+    "length_filtered_block_count": 1468,
+    "near_deduplicated_block_count_before_length_filter": 5627,
+    "near_duplicate_jaccard_threshold": 0.9,
+    "near_duplicate_removed_count": 1602,
+    "near_duplicate_word_shingle_size": 5,
+    "retained_block_count_after_length_filter": 4159,
+    "semantic_block_count": 7229,
+    "split_or_truncated_artifacts": 0,
+    "whole_semantic_blocks_only": true
+  },
+  "observed_at": "2026-09-05T14:42:30Z",
+  "oracle_preflight": {
+    "answer": "2012/0266/COD -> 52012PC0542 -> 52014AP0266 -> 32017R0745 -> 32017R0745R(01); corrections=14",
+    "correction_count_derived_from_source": 14,
+    "full_minimal_replay": {
+      "answer": "2012/0266/COD -> 52012PC0542 -> 52014AP0266 -> 32017R0745 -> 32017R0745R(01); corrections=14",
+      "correction_count": 14,
+      "matched_roles": {
+        "act": true,
+        "corrigendum": true,
+        "metadata_relation": true,
+        "position": true,
+        "proposal": true
+      },
+      "status": "PASS"
+    },
+    "minimal_evidence_pass": true,
+    "question_only_answer_available": false,
+    "remove_one_status": {
+      "act:block:00004": "UNKNOWN",
+      "corrigendum:whole-document": "UNKNOWN",
+      "metadata:selected-chain": "UNKNOWN",
+      "position:block:00033": "UNKNOWN",
+      "proposal:block:00001": "UNKNOWN"
+    }
+  },
+  "rights_and_privacy": {
+    "attribution_required": true,
+    "editorial_content_used": false,
+    "legal_documents_reuse_basis": "Decision 2011/833/EU",
+    "legal_opinion": false,
+    "technical_rights_preflight": "PASS",
+    "third_party_exclusions_must_be_reviewed": true
+  },
+  "schema_version": "longworld.p54-eurlex-legislative-chain-preflight-report.v1",
+  "selected_chain": {
+    "adopted_act_celex": "32017R0745",
+    "answer": "2012/0266/COD -> 52012PC0542 -> 52014AP0266 -> 32017R0745 -> 32017R0745R(01); corrections=14",
+    "corrigendum_celex": "32017R0745R(01)",
+    "expected_correction_count": 14,
+    "position_celex": "52014AP0266",
+    "procedure_id": "2012/0266/COD",
+    "proposal_celex": "52012PC0542"
+  },
+  "selected_world": {
+    "domain": "public_law",
+    "entity_types": [
+      "legislative_procedure",
+      "commission_proposal",
+      "parliament_first_reading_position",
+      "adopted_regulation",
+      "corrigendum"
+    ],
+    "operators": [
+      "FOLLOW_DOSSIER_MEMBERSHIP",
+      "ORDER_LEGISLATIVE_STAGES",
+      "RESOLVE_ADOPTED_ACT",
+      "APPLY_CORRIGENDUM_LOCATIONS",
+      "COUNT_EXPLICIT_CORRECTIONS"
+    ],
+    "relation_types": [
+      "part_of_procedure",
+      "first_reading_position_for",
+      "adopted_as",
+      "corrected_by"
+    ],
+    "world_id": "p54-eurlex-mdr-legislative-evolution-v1"
+  },
+  "source_receipt": {
+    "bundle_sha256": "68d950d4e1d6699c897a4b45b1761bf6a778c2f10dfc76ee7fc764f1ba6d4640",
+    "raw_source_persisted": false,
+    "source_count": 6,
+    "sources": [
+      {
+        "bytes": 500720,
+        "final_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:52012PC0542",
+        "raw_source_persisted": false,
+        "sha256": "324d7104f7e21e6df7d2c28d66428ac302ea35f2cb0a30345a546092b9683dcd",
+        "source_id": "proposal",
+        "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:52012PC0542"
+      },
+      {
+        "bytes": 1209684,
+        "final_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:52014AP0266",
+        "raw_source_persisted": false,
+        "sha256": "f9b43d0f3cb0f5197b1b75ba4661014e828e0183216c0317d5e9c13f79991906",
+        "source_id": "position",
+        "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:52014AP0266"
+      },
+      {
+        "bytes": 1709984,
+        "final_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32017R0745",
+        "raw_source_persisted": false,
+        "sha256": "3ed27dd77a9614fb00350c3031321a43cd3ce62143e9571690d3e219104546a5",
+        "source_id": "act",
+        "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32017R0745"
+      },
+      {
+        "bytes": 20990,
+        "final_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32017R0745R%2801%29",
+        "raw_source_persisted": false,
+        "sha256": "2f94f5313e3a2928fae84f660d8ea5922bbe230f644ea345c9a5ea4ebaa21fe1",
+        "source_id": "corrigendum",
+        "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32017R0745R%2801%29"
+      },
+      {
+        "bytes": 1988977,
+        "final_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/XML/?uri=CELEX:32017R0745",
+        "raw_source_persisted": false,
+        "sha256": "6828cefc760cf398c4517a01d76b20bb5f05144455c59f6298c5bd1e0404b99b",
+        "source_id": "metadata",
+        "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/XML/?uri=CELEX:32017R0745"
+      },
+      {
+        "bytes": 50410,
+        "final_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32011D0833",
+        "raw_source_persisted": false,
+        "sha256": "ee6bd2e5bbb4eedc1f2e8118df6a372465e0ab18abc52f6ccfef9d73df5fb370",
+        "source_id": "rights",
+        "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32011D0833"
+      }
+    ],
+    "total_bytes": 5480765
+  },
+  "verdict": {
+    "artifact_aligned_shortcut_preflight": "PASS",
+    "candidate_count": 0,
+    "do_not_generate": true,
+    "formal_candidate_gates": "NOT_RUN",
+    "inventory_delta": 0,
+    "minimal_evidence_oracle_preflight": "PASS",
+    "near_deduplicated_32k_64k_128k_capacity_preflight": "PASS",
+    "official_multidocument_topology": "PASS",
+    "technical_rights_preflight": "PASS",
+    "train_ready": false
+  },
+  "workflow_comparison": [
+    {
+      "access_verdict": "PARTIAL",
+      "blocker": "CAROL and docket discovery are interactive front ends; no anonymous, documented, bounded API was verified for reproducible cross-object enumeration",
+      "official_entrypoints": [
+        "https://data.ntsb.gov/carol-main-public/basic-search",
+        "https://data.ntsb.gov/Docket/Forms/searchdocket",
+        "https://www.ntsb.gov/investigations/AccidentReports",
+        "https://www.ntsb.gov/investigations/Pages/safety-recommendations.aspx"
+      ],
+      "workflow": "NTSB investigation -> docket -> final report -> safety recommendation"
+    },
+    {
+      "access_verdict": "PARTIAL",
+      "blocker": "the anonymous recall JSON API succeeded, but the document and bulk-download pages returned HTTP 403, so chronology/remedy/amendment document enumeration was not frozen",
+      "official_entrypoints": [
+        "https://api.nhtsa.gov/recalls/recallsByVehicle",
+        "https://www.nhtsa.gov/nhtsa-datasets-and-apis",
+        "https://www.nhtsa.gov/file-downloads?p=nhtsa/downloads/Recalls/"
+      ],
+      "workflow": "NHTSA recall -> manufacturer chronology -> remedy -> amendment"
+    },
+    {
+      "access_verdict": "PASS",
+      "blocker": null,
+      "official_entrypoints": [
+        "https://eur-lex.europa.eu/content/help/data-reuse/webservice.html",
+        "https://publications.europa.eu/webapi/rdf/sparql",
+        "https://eur-lex.europa.eu/content/help/data-reuse/reuse-contents-eurlex-details.html?locale=en"
+      ],
+      "workflow": "EUR-Lex proposal -> first-reading position -> adopted act -> corrigendum"
+    }
+  ]
+}

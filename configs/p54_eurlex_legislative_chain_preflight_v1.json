@@ -1,0 +1,205 @@
+{
+  "schema_version": "longworld.p54-eurlex-legislative-chain-preflight.v1",
+  "data_product": "p54_eurlex_mdr_legislative_chain_preflight_v1",
+  "authorization": {
+    "record_id": "p54-eurlex-mdr-legislative-chain-preflight-v1",
+    "scope": "anonymous retrieval of six hash-pinned public EUR-Lex resources for aggregate-only source, topology, rights, exact-band and shortcut feasibility measurement",
+    "basis": "EUR-Lex states that its legal documents may be reused for commercial or non-commercial purposes unless otherwise specified under Decision 2011/833/EU; source attribution and exclusions remain mandatory",
+    "reviewed_at": "2026-09-05T14:42:30Z",
+    "allowed_actions": [
+      "fetch_hash_pinned_public_sources_to_process_memory",
+      "extract_normalized_semantic_blocks_with_source_receipts",
+      "measure_aggregate_only_qwen_capacity",
+      "measure_candidate_geometry_without_materializing_candidates"
+    ],
+    "prohibited_actions": [
+      "generate_candidates",
+      "select_or_promote_rows",
+      "count_training_inventory",
+      "persist_fetched_legal_document_bodies"
+    ]
+  },
+  "world": {
+    "domain": "public_law",
+    "world_id": "p54-eurlex-mdr-legislative-evolution-v1",
+    "entity_types": [
+      "legislative_procedure",
+      "commission_proposal",
+      "parliament_first_reading_position",
+      "adopted_regulation",
+      "corrigendum"
+    ],
+    "relation_types": [
+      "part_of_procedure",
+      "first_reading_position_for",
+      "adopted_as",
+      "corrected_by"
+    ],
+    "operators": [
+      "FOLLOW_DOSSIER_MEMBERSHIP",
+      "ORDER_LEGISLATIVE_STAGES",
+      "RESOLVE_ADOPTED_ACT",
+      "APPLY_CORRIGENDUM_LOCATIONS",
+      "COUNT_EXPLICIT_CORRECTIONS"
+    ]
+  },
+  "workflow_comparison": [
+    {
+      "workflow": "NTSB investigation -> docket -> final report -> safety recommendation",
+      "official_entrypoints": [
+        "https://data.ntsb.gov/carol-main-public/basic-search",
+        "https://data.ntsb.gov/Docket/Forms/searchdocket",
+        "https://www.ntsb.gov/investigations/AccidentReports",
+        "https://www.ntsb.gov/investigations/Pages/safety-recommendations.aspx"
+      ],
+      "access_verdict": "PARTIAL",
+      "blocker": "CAROL and docket discovery are interactive front ends; no anonymous, documented, bounded API was verified for reproducible cross-object enumeration"
+    },
+    {
+      "workflow": "NHTSA recall -> manufacturer chronology -> remedy -> amendment",
+      "official_entrypoints": [
+        "https://api.nhtsa.gov/recalls/recallsByVehicle",
+        "https://www.nhtsa.gov/nhtsa-datasets-and-apis",
+        "https://www.nhtsa.gov/file-downloads?p=nhtsa/downloads/Recalls/"
+      ],
+      "access_verdict": "PARTIAL",
+      "blocker": "the anonymous recall JSON API succeeded, but the document and bulk-download pages returned HTTP 403, so chronology/remedy/amendment document enumeration was not frozen"
+    },
+    {
+      "workflow": "EUR-Lex proposal -> first-reading position -> adopted act -> corrigendum",
+      "official_entrypoints": [
+        "https://eur-lex.europa.eu/content/help/data-reuse/webservice.html",
+        "https://publications.europa.eu/webapi/rdf/sparql",
+        "https://eur-lex.europa.eu/content/help/data-reuse/reuse-contents-eurlex-details.html?locale=en"
+      ],
+      "access_verdict": "PASS",
+      "blocker": null
+    }
+  ],
+  "selected_chain": {
+    "procedure_id": "2012/0266/COD",
+    "proposal_celex": "52012PC0542",
+    "position_celex": "52014AP0266",
+    "adopted_act_celex": "32017R0745",
+    "corrigendum_celex": "32017R0745R(01)",
+    "expected_correction_count": 14,
+    "answer": "2012/0266/COD -> 52012PC0542 -> 52014AP0266 -> 32017R0745 -> 32017R0745R(01); corrections=14"
+  },
+  "sources": [
+    {
+      "source_id": "proposal",
+      "role": "capacity_and_oracle",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:52012PC0542",
+      "expected_bytes": 500720,
+      "expected_sha256": "324d7104f7e21e6df7d2c28d66428ac302ea35f2cb0a30345a546092b9683dcd",
+      "max_bytes": 600000
+    },
+    {
+      "source_id": "position",
+      "role": "capacity_and_oracle",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:52014AP0266",
+      "expected_bytes": 1209684,
+      "expected_sha256": "f9b43d0f3cb0f5197b1b75ba4661014e828e0183216c0317d5e9c13f79991906",
+      "max_bytes": 1400000
+    },
+    {
+      "source_id": "act",
+      "role": "capacity_and_oracle",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32017R0745",
+      "expected_bytes": 1709984,
+      "expected_sha256": "3ed27dd77a9614fb00350c3031321a43cd3ce62143e9571690d3e219104546a5",
+      "max_bytes": 1900000
+    },
+    {
+      "source_id": "corrigendum",
+      "role": "capacity_and_oracle",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32017R0745R%2801%29",
+      "expected_bytes": 20990,
+      "expected_sha256": "2f94f5313e3a2928fae84f660d8ea5922bbe230f644ea345c9a5ea4ebaa21fe1",
+      "max_bytes": 50000
+    },
+    {
+      "source_id": "metadata",
+      "role": "topology_only",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/XML/?uri=CELEX:32017R0745",
+      "expected_bytes": 1988977,
+      "expected_sha256": "6828cefc760cf398c4517a01d76b20bb5f05144455c59f6298c5bd1e0404b99b",
+      "max_bytes": 2200000
+    },
+    {
+      "source_id": "rights",
+      "role": "rights_only",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32011D0833",
+      "expected_bytes": 50410,
+      "expected_sha256": "ee6bd2e5bbb4eedc1f2e8118df6a372465e0ab18abc52f6ccfef9d73df5fb370",
+      "max_bytes": 70000
+    }
+  ],
+  "oracle_rules": {
+    "proposal": {
+      "source_id": "proposal",
+      "pattern": "Proposal for a REGULATION.*2012/0266 \\(COD\\)"
+    },
+    "position": {
+      "source_id": "position",
+      "pattern": "Position of the European Parliament adopted at first reading on 2 April 2014"
+    },
+    "act": {
+      "source_id": "act",
+      "pattern": "REGULATION \\(EU\\) 2017/745 OF THE EUROPEAN PARLIAMENT AND OF THE COUNCIL"
+    },
+    "corrigendum": {
+      "source_id": "corrigendum",
+      "pattern": "Corrigendum to Regulation \\(EU\\) 2017/745"
+    },
+    "metadata_relation": {
+      "source_id": "metadata",
+      "pattern": "52012PC0542.*52014AP0266.*32017R0745R\\(01\\)"
+    }
+  },
+  "normalization": {
+    "minimum_oracle_block_characters": 20,
+    "minimum_background_block_characters": 80,
+    "near_duplicate_word_shingle_size": 5,
+    "near_duplicate_jaccard_threshold": 0.9,
+    "preserve_whole_semantic_blocks": true,
+    "persist_raw_sources": false
+  },
+  "length_buckets": {
+    "32k": [32000, 32768],
+    "64k": [64000, 65536],
+    "128k": [128000, 131072]
+  },
+  "packing": {
+    "target_margin_tokens": 256,
+    "padding": false,
+    "cloned_artifacts": false,
+    "split_artifacts": false,
+    "truncated_artifacts": false
+  },
+  "shortcut_preflight": {
+    "authentic_source_order": [
+      "metadata",
+      "proposal",
+      "position",
+      "act",
+      "corrigendum"
+    ],
+    "artifact_aligned_windows": [4096, 8192, 16384],
+    "raw_token_windows_required_before_candidate_generation": true
+  },
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "release_boundary": {
+    "data_stage": "aggregate_preflight",
+    "candidate_count": 0,
+    "train_ready": false,
+    "production_eligible": false,
+    "inventory_delta": 0
+  }
+}
