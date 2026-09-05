@@ -29,6 +29,7 @@ from longworld.core.attestation import (
 from longworld.core.govinfodisposition import (
     GOVINFO_DISPOSITION_ANSWER_PROGRAM,
     GOVINFO_DISPOSITION_TASK_SCHEMA,
+    materialize_govinfo_counterfactual,
     replay_govinfo_disposition,
     validate_govinfo_task,
 )
@@ -874,6 +875,44 @@ def _view_entries(
     return _ordered(by_id.values(), view)
 
 
+def _registered_cf_entries(
+    entries: Iterable[Mapping[str, Any]], *, cf_target_id: str, cf_source_id: str
+) -> list[dict[str, Any]]:
+    ordered = _ordered(entries, "cf")
+    by_id = {str(entry["artifact_id"]): entry for entry in ordered}
+    source = json.loads(str(by_id[cf_source_id]["document"]))
+    target = json.loads(str(by_id[cf_target_id]["document"]))
+    candidate = {
+        "counterfactual_twin": {
+            "provenance_operation": "replace_target_with_authenticated_source_body",
+            "source_artifact_id": cf_source_id,
+            "target_artifact_id": cf_target_id,
+            "parent_value": {
+                "source_text": target["source_text"],
+                "oracle_text": target["oracle_text"],
+            },
+            "value": {
+                "source_text": source["source_text"],
+                "oracle_text": source["oracle_text"],
+            },
+        },
+        "source_binding": {"source_receipt_sha256": "0" * 64},
+        "task_replay_sidecar": {"sha256": "0" * 64},
+    }
+    materialized = materialize_govinfo_counterfactual(
+        candidate,
+        [(dict(entry["classification"]), str(entry["document"])) for entry in ordered],
+    )
+    return [
+        {
+            "artifact_id": classification["artifact_id"],
+            "classification": classification,
+            "document": document,
+        }
+        for classification, document in materialized
+    ]
+
+
 def _context(question: str, entries: Sequence[Mapping[str, Any]]) -> tuple[str, str]:
     document_context = SEP.join(str(entry["document"]) for entry in entries)
     return document_context, wrap_prompt(question, document_context, "first")
@@ -965,6 +1004,7 @@ def _pack_bucket(
     *,
     bucket: str,
     prior_ids: set[str],
+    registered_counterfactual: bool = False,
 ) -> tuple[dict[str, dict[str, Any]], str, list[dict[str, str]], list[str], str, str]:
     count = int(config["requested_key_count_by_bucket"][bucket])
     question, requests = _question(config, count)
@@ -991,12 +1031,19 @@ def _pack_bucket(
     def counts(values: Mapping[str, Mapping[str, Any]]) -> dict[str, int]:
         result = {}
         for view in config["views"]:
-            entries = _view_entries(
-                values.values(),
-                view,
-                cf_target_id=cf_target_id,
-                cf_source_id=cf_source_id,
-            )
+            if view == "cf" and registered_counterfactual:
+                entries = _registered_cf_entries(
+                    values.values(),
+                    cf_target_id=cf_target_id,
+                    cf_source_id=cf_source_id,
+                )
+            else:
+                entries = _view_entries(
+                    values.values(),
+                    view,
+                    cf_target_id=cf_target_id,
+                    cf_source_id=cf_source_id,
+                )
             _document_context, prompt = _context(question, entries)
             result[str(view)] = _token_count(tokenizer, prompt)
         return result
@@ -1311,7 +1358,14 @@ def build_registered_parents(
     pack_receipts: dict[str, Any] = {}
     for bucket in ("32k", "64k", "128k"):
         entries, question, requests, essential_ids, cf_source_id, cf_target_id = (
-            _pack_bucket(config, state, tokenizer, bucket=bucket, prior_ids=prior_ids)
+            _pack_bucket(
+                config,
+                state,
+                tokenizer,
+                bucket=bucket,
+                prior_ids=prior_ids,
+                registered_counterfactual=True,
+            )
         )
         prior_ids = set(entries)
         source_candidate = _build_candidate(

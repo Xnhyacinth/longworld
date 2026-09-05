@@ -57,7 +57,7 @@ any parent because the real counterfactual replacement changed length too much:
 
 ```text
 32k exact natural pack unavailable:
-{'full': 32621, 'cf': 31088, 'ordered_artifact_view': 32621}, band=32000-32768
+{'full': 32621, 'cf': 31000, 'ordered_artifact_view': 32621}, band=32000-32768
 ```
 
 This attempt emitted zero candidates. No padding, cloning, splitting,
@@ -73,15 +73,18 @@ Key hashes:
 - projected candidates: `49c6ebc4ee993aac7f91779b16e2573c0bf78f9ca70bc93ae578f43cc4cfe49c`;
 - projected v3 sidecar: `3294e746acf527d50c6b7f0379eacb5fd83d739885cceb8a76f5a3186d81a2fd`;
 - dense rankings: `53f335c38b2fe2b3797564328da8bfbce1e4187ae4bd0d696d5f27bfca23975a`;
-- structural-span blocker: `34b0dee4b2ed299d2712d69b88b9b9708790b0ca057a791f7b195ff9b950f064`.
+- structural-span blocker: `6f4c07a5b99c0319cf066aea57bd7dea3e254663a3b6dc62317195fa165ca380`.
 
 ## Blockers
 
 P52 currently has a two-sided data-geometry blocker. The first authentic task
 fits all exact bands but is answerable inside one 8K contiguous artifact window.
-The agreed structurally wider task avoids relying on that clustered pair but
-cannot place its factual and real-text counterfactual views in the same exact
-32K band without prohibited padding, truncation, or background manipulation.
+Under the predeclared A/I/138 + F/II/219 keys and current deterministic
+whole-section greedy packer, the agreed structurally wider task does not place
+its factual and real-text counterfactual views in the same exact 32K band.
+Padding, truncation, and background manipulation remain prohibited; this one
+failed packing result is not a proof that every structural-key combination is
+impossible.
 
 Therefore `train_ready=false`, promoted rows = 0, B5 rows = 0, 128K promoted
 rows = 0, and inventory delta = 0. A future attempt needs a different authentic

@@ -79,10 +79,10 @@
       "division:f/title:ii/section:219"
     ],
     "candidate_count": 0,
-    "blocker_file_sha256": "34b0dee4b2ed299d2712d69b88b9b9708790b0ca057a791f7b195ff9b950f064",
+    "blocker_file_sha256": "6f4c07a5b99c0319cf066aea57bd7dea3e254663a3b6dc62317195fa165ca380",
     "observed_32k_context_tokens": {
       "full": 32621,
-      "cf": 31088,
+      "cf": 31000,
       "ordered_artifact_view": 32621
     },
     "blocker": "32k exact natural pack unavailable"
