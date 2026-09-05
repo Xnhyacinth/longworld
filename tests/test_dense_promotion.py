@@ -86,6 +86,7 @@ from longworld.core.semantic import (
 from longworld.core.sourcebundle import LoadedSourceWorkflowBundle
 from longworld.core.taskproof import TASK_PROOF_RECEIPT_SCHEMA
 from longworld.core.taskreplaysidecar import (
+    GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER_V3,
     IETF_OAUTH_TASK_REPLAY_ADAPTER_V3,
     TASK_VIEW_DERIVATION_REVISION,
     task_candidate_content_commitment,
@@ -5223,6 +5224,36 @@ def test_ietf_v3_projection_binding_accepts_only_standards_domain() -> None:
     assert _task_sidecar_matches_candidate(candidate, binding)
     assert not _task_sidecar_matches_candidate(
         {**candidate, "domain": "finance"}, binding
+    )
+
+
+def test_govinfo_v3_projection_binding_accepts_only_legislation_domain() -> None:
+    adapter_id, adapter_revision, sidecar_schema_version = (
+        GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER_V3
+    )
+    binding = {
+        "adapter_id": adapter_id,
+        "adapter_revision": adapter_revision,
+        "sidecar_schema_version": sidecar_schema_version,
+        "sha256": "f" * 64,
+    }
+    candidate = {
+        "domain": "government_legislation",
+        "view": "full",
+        "composition_method": "same_case_dossier",
+        "strict_replay_revision": adapter_revision,
+        "dossier_id": "govinfo-bill-dossier",
+        "task_view_projection": {
+            "schema_version": "longworld.task-view-projection.v1",
+            "derivation_revision": TASK_VIEW_DERIVATION_REVISION,
+            "view": "full",
+            "dossier_id": "govinfo-bill-dossier",
+        },
+    }
+
+    assert _task_sidecar_matches_candidate(candidate, binding)
+    assert not _task_sidecar_matches_candidate(
+        {**candidate, "domain": "standards"}, binding
     )
 
 
