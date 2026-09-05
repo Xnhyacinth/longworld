@@ -924,3 +924,49 @@ in`; no private-repository or upload claim was made.
   candidate commit contradicted its authorization and overstated custom
   shortcut checks as shared audit evidence. The revert preserves history and
   restores the documented zero-inventory boundary for P53.
+- P46 finished at commit `c93efcf`: raw formula-template capacity passes all
+  requested bands, but executable answer-dependent capacity is zero, so it
+  generated no candidate and ran no unnecessary dense/promotion stages.
+  Independent review returned PASS with no blocking or actionable correctness
+  finding; the next Ofgem entity is an explicitly reusable public cap-level
+  table plus dated decision chain.
+- P52 rebuilt three authentic parents and projected nine exact 32K/64K/128K
+  views. Shared preflight initially rejected the registered GovInfo v3 sidecar
+  because promotion's domain map omitted its adapter. RED→GREEN commit
+  `769e635` adds the one missing mapping; valid and wrong-domain tests pass.
+- P52 shared preflight and ranking subsequently passed 9/9, but the first 32K
+  ordered dense audit failed because an 8K raw window at artifacts 38:47
+  retrieves every required answer unit. Inventory remains zero while one
+  authentic, structurally separated key combination is tested without moving
+  background or changing the gate.
+- P52's sole structural-span variant rebuilt from source but failed exact 32K
+  before signing (`full=32621`, corrected shared `cf=31000`, `ordered=32621`).
+  Commit `af86d64` preserves the authentic-parent builder and both blocker
+  receipts. No third key combination, dense audit, promotion, or B5 run was
+  attempted; inventory delta is zero.
+- Independent P52 review reproduced the 8K shared-artifact blocker and v2
+  byte-identical exact-band blocker, then requested owner-level wrapper tests.
+  Added a fresh-state three-band nested-pack/sidecar/signing regression and a
+  fixed-counter v2 fail-closed regression; P52 plus adapter suite passes 13
+  tests. Reporting now distinguishes 9 persisted candidate-stage rows from 0
+  dense-audited, selected, promoted, B5, and inventory rows.
+- A second review found registered packing had counted the legacy CF JSON form.
+  The packer now uses the shared GovInfo counterfactual materializer; v1 counts
+  reproduce the shared projections exactly and a fresh source run regenerated
+  the v2 blocker and receipt hash with CF=31,000.
+- P54 finished at commit `3490181` with a new EUR-Lex MDR legislative-chain
+  preflight. It compared NTSB, NHTSA, and EUR-Lex, selected the reproducibly
+  frozen EUR-Lex source set, retained 224,955 source tokens, and formed natural
+  aggregate 32K/64K/128K packs. Review removed hash-based evidence spreading,
+  corrected checked-window counts, and replaced quadratic regex replay with
+  precomputed role masks before the commit.
+- P54 remains aggregate-only: metadata is a normalized projection, prompt and
+  serialization costs are absent, raw-token windows and shared replay are not
+  implemented, and a refresh after the successful frozen receipt hit a
+  CloudFront WAF response. Candidate/train/inventory counts remain zero and the
+  pinned successful receipt was not silently refreshed or loosened.
+- Independent review also showed that the five-role remove-one check was a
+  role-presence tautology and that the pinned reuse Decision is Commission-
+  scoped. The report now marks topology `PARTIAL`, executable minimal evidence
+  `UNVERIFIED`, and rights `NEEDS_CANDIDATE_REVIEW`; the corrected metadata
+  projection retains only the structurally parsed corrected-by edge.

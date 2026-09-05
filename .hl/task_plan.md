@@ -454,3 +454,12 @@ then centralized shared-gate review and inventory binding.
 | P46 Ofgem spreadsheet world | P46 agent; `configs/p46_*`, `reports/p46_*`, `tests/test_p46_*`, `sources/research_p46_*` | executable cross-sheet/cross-workbook formula-DAG parent or quantified rejection | formula volume alone is not proof; answer must change under source-bound remove-one/CF replay |
 | P54 new official workflow | P54 agent; `configs/p54_*`, `reports/p54_*`, `tests/test_p54_*`, `sources/research_p54_*` | compare at least three official lifecycle sources and preflight the strongest | rights, immutable retrieval, natural unique capacity, and non-shortcut oracle must pass before candidates |
 | Integration and inventory | root; shared gates plus `.hl`/release documentation only | verified delta, rejection ledger, and layered Git history | preserve exact-band, near-dup, lineage, derived-view, truncation, and production trust boundaries |
+
+### P54 scale-out checkpoint
+
+| Unit | Status | Next admissible action |
+| --- | --- | --- |
+| P46 Ofgem | blocked: 469,328 near-deduplicated template tokens but zero authenticated answer-dependent capacity | switch to a public cap-level table plus dated decision chain; do not synthesize from formula aggregates |
+| P52 GovInfo | blocked: 3 authentic parents and 9 candidate-stage projections; shared 8K artifact window fails, structural v2 exact-band pack emits 0 | change bill transition/task geometry; do not move background or retry the same F219/D207 or A138/F219 construction |
+| P54 EUR-Lex | partial aggregate preflight: six official MDR sources and natural 32K/64K/128K capacity, but only corrected-by is parsed; 0 candidates | bind exact relation spans and selected-document rights, register task replay, then run candidate-level exact-band and raw-token windows |
+| Integration | complete after review: train inventory remains 141 rows; B5 training-condition sample remains 80 examples | preserve immutable products; scale through new executable worlds, not view or length multiplication |

@@ -1,5 +1,33 @@
 # Summary — P7 source-rich integration
 
+## 2026-09-05 authentic-world scale-out checkpoint
+
+No new row became train-ready in this slice. The six immutable local-probe
+products remain **141 train rows / 7,274,595 exact tokens** plus 18 eval rows /
+682,032 tokens. Their signed B5 training-condition samples total **80 examples /
+5,021,465 estimated tokens**, including 18 at 128K. Production/KMS-qualified
+inventory remains zero.
+
+The scale-out still produced useful forward progress. P46 rejected Ofgem's
+large formula inventory because persisted aggregates contain zero executable
+cell closures or answer changes. P52 rebuilt authentic 32K/64K/128K parents and
+persisted 9 candidate-stage projections, but shared proof found an 8K shortcut;
+the only approved structural-key alternative then failed factual/CF exact-band
+parity before signing. P54 introduced a new EUR-Lex `public_law` source set
+with 224,955 near-deduplicated source tokens and aggregate capacity at all three
+bands. Only corrected-by is structurally parsed; executable answer
+reconstruction, other relations, and selected-document rights remain open, so
+it correctly retains zero candidates before registered replay, serialized exact
+bands, and exhaustive raw-token windows exist.
+
+Next conversion priority is P54's exact relation/right receipts followed by a
+source-span replay adapter. In parallel, new entities should use different
+answer-changing programs: another GovInfo bill transition with naturally
+dispersed, length-compatible endpoints and an Ofgem public cap-level revision
+table with explicit reuse and stable row keys. Do not retry the rejected
+layouts or relax near-duplicate, exact-band, derived-view, truncation, lineage,
+replay, or production gates.
+
 ## P40/P43 current checkpoint — 2026-09-04
 
 No new IETF row is train-ready. P43's natural 16K/64K successor passes six

@@ -172,3 +172,14 @@
   `graph.proof_depth` fall 4→2 and fail `real_proof_depth_growth`. Parent
   later computes from the published prior rung plus _new_ sections only.
   Hybrid signatures on the causal closure are 3/6/8, not 3/5/10.
+- Do not retry P52 H.R. 4366 F/II/219 + D/II/207 by moving background. Its
+  authentic chronological ordered view is answerable inside one 8K artifact
+  window, so the same layout cannot pass shared proof.
+- Do not retry P52 A/I/138 + F/II/219 under the same deterministic whole-section
+  packer. The factual/ordered views are 32,621 tokens but the authenticated
+  real-text counterfactual is 31,000 under the shared materializer; switch bill
+  transition or predeclare a different task rather than pad, truncate, or
+  rearrange.
+- Do not synthesize formula-DAG rows from the P46 Ofgem aggregate. It has raw
+  template capacity but no persisted cell closure, output receipt, or
+  cross-workbook answer-changing relation.

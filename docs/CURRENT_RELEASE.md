@@ -1,6 +1,6 @@
 # Current release status
 
-Last updated: 2026-09-04
+Last updated: 2026-09-05
 
 This file is the canonical publication-status summary. Historical receipts and
 `.hl/` logs remain useful for reproducibility, but they do not override this
@@ -31,6 +31,53 @@ design queue. Pending candidates do not count in the numbers above. Details and
 the diversity accounting are in
 `reports/p17_training_conversion_closeout_20260903.md` and
 `reports/p17_domain_design_matrix_20260903.md`.
+
+## 2026-09-05 authentic-world scale-out checkpoint
+
+This scale-out added no train-ready row. The current immutable-product inventory
+therefore remains **141 train rows / 7,274,595 exact tokens** with 36×16K,
+39×32K, 48×64K, and 18×128K. The separately signed B5
+training-condition samples contain **80 examples / 5,021,465 estimated tokens**:
+15×16K, 19×32K, 28×64K, and 18×128K. Product rows and B5 samples are
+different bound sets and must not be added together. Production/KMS inventory
+is still zero.
+
+Three independent source-first tracks were resolved without relaxing any gate:
+
+- P46 Ofgem has 469,328 template-deduplicated Qwen tokens across three official
+  workbooks, but zero persisted cell closures, output receipts, or replayable
+  cross-workbook answer changes. It emitted zero candidates.
+- P52 GovInfo rebuilt three authentic full parents and persisted nine projected
+  candidate-stage rows across 32K/64K/128K. Projection, preflight, and ranking
+  passed 9/9, but the first shared 32K ordered audit found the complete answer
+  inside one 8K artifact window. Its sole approved structural-key alternative
+  emitted zero rows because `full=32621`, `cf=31000`, and `ordered=32621` cannot
+  all satisfy the 32K exact band under the current deterministic packer. Thus
+  shared dense-audited, selected, promoted, B5, and inventory counts are zero.
+- P54 selected a new EUR-Lex `public_law` source set covering proposal,
+  first-reading position, adopted regulation, corrigendum, metadata, and a
+  reuse decision. Its six frozen official representations retain 224,955
+  near-deduplicated authentic-source tokens;
+  whole-artifact aggregate packs reach 32,277 / 64,285 / 128,392 tokens without
+  padding, cloning, splitting, or truncation. They are not candidate exact-band
+  receipts because prompt/serialization costs, exact metadata spans, registered
+  replay, and exhaustive raw-token windows remain outstanding. Only the
+  corrected-by edge is structurally parsed; target-answer reconstruction is
+  `UNVERIFIED`, topology is `PARTIAL`, and the Commission-scoped reuse Decision
+  leaves selected-document coverage at `NEEDS_CANDIDATE_REVIEW`. P54 therefore
+  also has zero candidates and zero inventory delta.
+
+The next permitted P54 work is to bind exact relation spans and selected-
+document reuse coverage, then build a fresh source-span parent and registered
+task-replay adapter before candidate-level exact-band and raw-window checks.
+Parallel discovery should change entity and answer program:
+a naturally dispersed GovInfo bill transition and an explicitly reusable Ofgem
+public cap-level revision table are preferred. The rejected P46/P52 layouts
+must not be repaired through padding, background movement, cloning, truncation,
+or gate relaxation. Detailed evidence is in
+`reports/p46_ofgem_formula_dependency_gate_closeout_20260905.md`,
+`reports/p52_govinfo_bill_disposition_registered_parent_closeout_20260905.md`,
+and `reports/p54_eurlex_legislative_chain_preflight_closeout_20260905.md`.
 
 ## 2026-09-04 IETF semantic-growth closure
 
