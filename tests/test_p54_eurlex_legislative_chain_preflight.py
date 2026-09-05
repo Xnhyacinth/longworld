@@ -96,8 +96,29 @@ def test_rights_check_uses_the_legal_decision_not_dynamic_site_chrome() -> None:
 
     result = p54._rights_check(raw)
 
-    assert result["technical_rights_preflight"] == "PASS"
+    assert result["technical_rights_preflight"] == "NEEDS_CANDIDATE_REVIEW"
     assert result["legal_documents_reuse_basis"] == "Decision 2011/833/EU"
+    assert result["selected_document_coverage_verified"] is False
+
+
+def test_metadata_projection_does_not_promote_unrelated_identifiers_to_edges() -> None:
+    chain = json.loads(CONFIG.read_text())["selected_chain"]
+    raw = b"""\
+<ROOT>
+  <UNRELATED>52012PC0542 52014AP0266 2012/0266/COD</UNRELATED>
+  <ACT>32017R0745</ACT>
+  <RESOURCE_LEGAL_CORRECTED_BY_RESOURCE_LEGAL>
+    32017R0745R(01)
+  </RESOURCE_LEGAL_CORRECTED_BY_RESOURCE_LEGAL>
+</ROOT>
+"""
+
+    evidence = p54._metadata_evidence(raw, chain)
+
+    assert "32017R0745 corrected_by 32017R0745R(01)" in evidence["text"]
+    assert "52012PC0542" not in evidence["text"]
+    assert "52014AP0266" not in evidence["text"]
+    assert "2012/0266/COD" not in evidence["text"]
 
 
 def test_oracle_requires_each_source_stage_and_correction_count() -> None:
@@ -138,6 +159,8 @@ def test_oracle_requires_each_source_stage_and_correction_count() -> None:
     result = p54._replay_oracle(artifacts, rules, expected_correction_count=14)
 
     assert result["status"] == "PASS"
+    assert result["proof_scope"] == "role_presence_only"
+    assert result["answer"] == "roles_present; corrections=14"
     assert result["correction_count"] == 14
     for removed in range(len(artifacts)):
         missing = p54._replay_oracle(
@@ -146,6 +169,16 @@ def test_oracle_requires_each_source_stage_and_correction_count() -> None:
             expected_correction_count=14,
         )
         assert missing["status"] == "UNKNOWN"
+
+
+def test_committed_report_does_not_claim_oracle_or_rights_completion() -> None:
+    report = json.loads(
+        Path("reports/p54_eurlex_legislative_chain_preflight_v1.json").read_text()
+    )
+
+    assert report["verdict"]["minimal_evidence_oracle_preflight"] == "UNVERIFIED"
+    assert report["verdict"]["technical_rights_preflight"] == ("NEEDS_CANDIDATE_REVIEW")
+    assert report["oracle_preflight"]["executable_answer_reconstruction"] is False
 
 
 def test_shortcut_audit_precomputes_oracle_roles(monkeypatch) -> None:

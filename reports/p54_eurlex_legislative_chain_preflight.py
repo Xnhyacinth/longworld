@@ -238,7 +238,6 @@ def _replay_oracle(
     rules: dict[str, dict[str, str]],
     *,
     expected_correction_count: int,
-    answer: str | None = None,
 ) -> dict[str, Any]:
     matched = {
         role: any(_matches_rule(artifact, rule) for artifact in artifacts)
@@ -253,12 +252,14 @@ def _replay_oracle(
         return {
             "status": "UNKNOWN",
             "answer": "unknown",
+            "proof_scope": "role_presence_only",
             "matched_roles": matched,
             "correction_count": correction_count,
         }
     return {
         "status": "PASS",
-        "answer": answer or "resolved",
+        "answer": f"roles_present; corrections={correction_count}",
+        "proof_scope": "role_presence_only",
         "matched_roles": matched,
         "correction_count": correction_count,
     }
@@ -412,15 +413,8 @@ def _artifact_aligned_shortcut_audit(
 
 def _metadata_evidence(raw: bytes, chain: dict[str, Any]) -> dict[str, Any]:
     text = raw.decode("utf-8")
-    identifiers = [
-        chain["proposal_celex"],
-        chain["position_celex"],
-        chain["adopted_act_celex"],
-        chain["corrigendum_celex"],
-        chain["procedure_id"],
-    ]
-    if any(identifier not in text for identifier in identifiers):
-        raise ValueError("P54 metadata omits a selected legislative identifier")
+    if chain["adopted_act_celex"] not in text:
+        raise ValueError("P54 metadata omits the selected adopted act")
     corrected_pattern = re.compile(
         r"<RESOURCE_LEGAL_CORRECTED_BY_RESOURCE_LEGAL.*?"
         + re.escape(chain["corrigendum_celex"])
@@ -431,16 +425,14 @@ def _metadata_evidence(raw: bytes, chain: dict[str, Any]) -> dict[str, Any]:
     if match is None:
         raise ValueError("P54 metadata lacks the explicit corrected-by edge")
     projection = " ".join(
-        [
-            chain["proposal_celex"],
-            chain["position_celex"],
+        (
             chain["adopted_act_celex"],
+            "corrected_by",
             chain["corrigendum_celex"],
-            chain["procedure_id"],
             _normalize(match.group(0)),
-        ]
+        )
     )
-    return _unit("metadata:selected-chain", "metadata", projection, source_ordinal=0)
+    return _unit("metadata:corrected-by", "metadata", projection, source_ordinal=0)
 
 
 def _rights_check(raw: bytes) -> dict[str, Any]:
@@ -454,9 +446,11 @@ def _rights_check(raw: bytes) -> dict[str, Any]:
     if missing:
         raise ValueError(f"P54 EUR-Lex rights notice changed: {missing}")
     return {
-        "technical_rights_preflight": "PASS",
+        "technical_rights_preflight": "NEEDS_CANDIDATE_REVIEW",
         "legal_opinion": False,
         "legal_documents_reuse_basis": "Decision 2011/833/EU",
+        "decision_scope": "European Commission and documents produced on its behalf",
+        "selected_document_coverage_verified": False,
         "editorial_content_used": False,
         "attribution_required": True,
         "third_party_exclusions_must_be_reviewed": True,
@@ -585,18 +579,16 @@ def run(config_path: Path, output_path: Path) -> dict[str, Any]:
         essential,
         rules,
         expected_correction_count=chain["expected_correction_count"],
-        answer=chain["answer"],
     )
     remove_one = {
         item["artifact_id"]: _replay_oracle(
             [candidate for candidate in essential if candidate is not item],
             rules,
             expected_correction_count=chain["expected_correction_count"],
-            answer=chain["answer"],
         )["status"]
         for item in essential
     }
-    minimal_evidence_pass = full_replay["status"] == "PASS" and all(
+    role_presence_complete = full_replay["status"] == "PASS" and all(
         status == "UNKNOWN" for status in remove_one.values()
     )
 
@@ -684,12 +676,13 @@ def run(config_path: Path, output_path: Path) -> dict[str, Any]:
             "exact_band_task_pack_preflight": packs,
         },
         "oracle_preflight": {
-            "answer": chain["answer"],
-            "full_minimal_replay": full_replay,
-            "remove_one_status": remove_one,
-            "minimal_evidence_pass": minimal_evidence_pass,
+            "proposed_target_answer": chain["answer"],
+            "full_role_presence_replay": full_replay,
+            "remove_one_role_presence_status": remove_one,
+            "role_presence_complete": role_presence_complete,
+            "minimal_evidence_status": "UNVERIFIED",
+            "executable_answer_reconstruction": False,
             "correction_count_derived_from_source": full_replay["correction_count"],
-            "question_only_answer_available": False,
         },
         "candidate_generation_gate": {
             "aggregate_capacity_exact_all_bands": all_exact,
@@ -700,11 +693,9 @@ def run(config_path: Path, output_path: Path) -> dict[str, Any]:
             "next_step": "implement a registered source-span replay adapter and exhaustive pinned-token raw-window audit before materializing any candidate",
         },
         "verdict": {
-            "official_multidocument_topology": "PASS",
+            "official_multidocument_topology": "PARTIAL",
             "technical_rights_preflight": rights["technical_rights_preflight"],
-            "minimal_evidence_oracle_preflight": (
-                "PASS" if minimal_evidence_pass else "FAIL"
-            ),
+            "minimal_evidence_oracle_preflight": "UNVERIFIED",
             "near_deduplicated_32k_64k_128k_capacity_preflight": (
                 "PASS" if all_exact else "FAIL"
             ),

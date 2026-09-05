@@ -33,7 +33,7 @@
           }
         },
         "artifact_count": 2372,
-        "artifact_ids_sha256": "b0908c9a60ad236cd8f1a87fd46d5bfae00319030fd9fb3111c3fa7c3a354129",
+        "artifact_ids_sha256": "81565ff0234651d98bae9afdc78a37125d626c5d42273068bf1c36ce9bf790a4",
         "cloned_artifacts": 0,
         "deficit_tokens": 0,
         "essential_artifact_count": 5,
@@ -50,7 +50,7 @@
             "corrigendum"
           ]
         },
-        "source_tokens": 128424,
+        "source_tokens": 128392,
         "split_or_truncated_artifacts": 0
       },
       "32k": {
@@ -76,7 +76,7 @@
           }
         },
         "artifact_count": 541,
-        "artifact_ids_sha256": "8f7822b4a0e6d1508b6966a8344727ce87de15b77abc244a47de2f3efffdec52",
+        "artifact_ids_sha256": "bd437ed78bde5a27e280f4112e2841e70e9c86385494449f574d2d3db09ad646",
         "cloned_artifacts": 0,
         "deficit_tokens": 0,
         "essential_artifact_count": 5,
@@ -93,7 +93,7 @@
             "corrigendum"
           ]
         },
-        "source_tokens": 32309,
+        "source_tokens": 32277,
         "split_or_truncated_artifacts": 0
       },
       "64k": {
@@ -119,7 +119,7 @@
           }
         },
         "artifact_count": 1135,
-        "artifact_ids_sha256": "709bcb032f691ced5ee64a35471354cf29d19fd92d3d6a34cb2396ce37d4636e",
+        "artifact_ids_sha256": "ebec891a253582b6129a93ce69b9bdf812a72f786274402cdaf5797fa35a102e",
         "cloned_artifacts": 0,
         "deficit_tokens": 0,
         "essential_artifact_count": 5,
@@ -136,15 +136,15 @@
             "corrigendum"
           ]
         },
-        "source_tokens": 64317,
+        "source_tokens": 64285,
         "split_or_truncated_artifacts": 0
       }
     },
-    "metadata_projection_tokens": 473,
+    "metadata_projection_tokens": 441,
     "near_deduplicated_authentic_source_tokens": 224955,
     "oracle_overlap_background_units_excluded": 3
   },
-  "config_sha256": "4c8074570a3c77e25c876d28d7c5109c154b792e33cd82dafa10a45b8ec58fda",
+  "config_sha256": "4b98b18495904129943a897c8e76bc2ad302ea2e96123bd8c7b06a1f9e9800f3",
   "data_product": "p54_eurlex_mdr_legislative_chain_preflight_v1",
   "normalization": {
     "length_filtered_block_count": 1468,
@@ -159,36 +159,40 @@
   },
   "observed_at": "2026-09-05T14:42:30Z",
   "oracle_preflight": {
-    "answer": "2012/0266/COD -> 52012PC0542 -> 52014AP0266 -> 32017R0745 -> 32017R0745R(01); corrections=14",
     "correction_count_derived_from_source": 14,
-    "full_minimal_replay": {
-      "answer": "2012/0266/COD -> 52012PC0542 -> 52014AP0266 -> 32017R0745 -> 32017R0745R(01); corrections=14",
+    "executable_answer_reconstruction": false,
+    "full_role_presence_replay": {
+      "answer": "roles_present; corrections=14",
       "correction_count": 14,
       "matched_roles": {
         "act": true,
         "corrigendum": true,
-        "metadata_relation": true,
+        "metadata_corrected_by": true,
         "position": true,
         "proposal": true
       },
+      "proof_scope": "role_presence_only",
       "status": "PASS"
     },
-    "minimal_evidence_pass": true,
-    "question_only_answer_available": false,
-    "remove_one_status": {
+    "minimal_evidence_status": "UNVERIFIED",
+    "proposed_target_answer": "2012/0266/COD -> 52012PC0542 -> 52014AP0266 -> 32017R0745 -> 32017R0745R(01); corrections=14",
+    "remove_one_role_presence_status": {
       "act:block:00004": "UNKNOWN",
       "corrigendum:whole-document": "UNKNOWN",
-      "metadata:selected-chain": "UNKNOWN",
+      "metadata:corrected-by": "UNKNOWN",
       "position:block:00033": "UNKNOWN",
       "proposal:block:00001": "UNKNOWN"
-    }
+    },
+    "role_presence_complete": true
   },
   "rights_and_privacy": {
     "attribution_required": true,
+    "decision_scope": "European Commission and documents produced on its behalf",
     "editorial_content_used": false,
     "legal_documents_reuse_basis": "Decision 2011/833/EU",
     "legal_opinion": false,
-    "technical_rights_preflight": "PASS",
+    "selected_document_coverage_verified": false,
+    "technical_rights_preflight": "NEEDS_CANDIDATE_REVIEW",
     "third_party_exclusions_must_be_reviewed": true
   },
   "schema_version": "longworld.p54-eurlex-legislative-chain-preflight-report.v1",
@@ -287,10 +291,10 @@
     "do_not_generate": true,
     "formal_candidate_gates": "NOT_RUN",
     "inventory_delta": 0,
-    "minimal_evidence_oracle_preflight": "PASS",
+    "minimal_evidence_oracle_preflight": "UNVERIFIED",
     "near_deduplicated_32k_64k_128k_capacity_preflight": "PASS",
-    "official_multidocument_topology": "PASS",
-    "technical_rights_preflight": "PASS",
+    "official_multidocument_topology": "PARTIAL",
+    "technical_rights_preflight": "NEEDS_CANDIDATE_REVIEW",
     "train_ready": false
   },
   "workflow_comparison": [

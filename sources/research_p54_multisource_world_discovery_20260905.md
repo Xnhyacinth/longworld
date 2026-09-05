@@ -56,11 +56,14 @@ No fetched legal-document body is stored in the repository.
 - Official legal reuse basis selected for a byte-stable rights receipt:
   Decision 2011/833/EU,
   <https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32011D0833>.
-  It permits reuse for commercial or non-commercial purposes subject to source
-  acknowledgement and stated exclusions. This is a technical preflight, not a
-  legal opinion; third-party material still requires review.
-- Access verdict: **PASS for aggregate-only preflight**. It does not establish
-  candidate or training eligibility.
+  It defines commercial and non-commercial reuse and requires source
+  acknowledgement, but its operative scope is Commission documents or
+  documents produced on the Commission's behalf. It does not by itself verify
+  coverage of every selected EUR-Lex document. A broad official legal-notice
+  receipt, attribution, and exclusions review remain required; this is not a
+  legal opinion.
+- Access verdict: **PASS for source/capacity measurement; PARTIAL for topology
+  and rights**. It does not establish candidate or training eligibility.
 
 ### Selected official chain and frozen receipts
 
@@ -79,17 +82,20 @@ byte-stable curl representation. Raw bodies were processed ephemerally only.
 | Adopted-act metadata | `32017R0745` | <https://eur-lex.europa.eu/legal-content/EN/TXT/XML/?uri=CELEX:32017R0745> | 1988977 | `6828cefc760cf398c4517a01d76b20bb5f05144455c59f6298c5bd1e0404b99b` |
 | Reuse decision | `32011D0833` | <https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32011D0833> | 50410 | `ee6bd2e5bbb4eedc1f2e8118df6a372465e0ab18abc52f6ccfef9d73df5fb370` |
 
-The adopted-act XML contains the selected proposal, position, ordinary
-legislative procedure `2012/0266/COD`, and a `corrected by` relation to the
-corrigendum. The corrigendum contains 14 explicit `On page` correction entries.
-These source-bound facts define the P54 oracle; they are not inferred from a
-generated narrative.
+The adopted-act XML contains occurrences of the selected proposal, position,
+ordinary legislative procedure `2012/0266/COD`, and a structurally checked
+`corrected by` relation to the corrigendum. Only the corrected-by edge is
+currently parsed as a relation; the other identifier occurrences do not yet
+establish dossier or adoption edges. The corrigendum contains 14 explicit `On
+page` correction entries. These facts support source/capacity and role-presence
+preflight, not an executable P54 answer oracle.
 
 ## Selection decision
 
 EUR-Lex is the only one of the three probes that simultaneously supplied a
-publicly retrievable, hash-pinnable multi-document chain, an explicit official
-relation receipt, enough authentic text for a 128K aggregate capacity check, and
-a stable first-party reuse instrument. It is therefore selected for P54.
+publicly retrievable, hash-pinnable multi-document set, one explicit corrected-
+by relation, and enough authentic text for a 128K aggregate capacity check. It
+is therefore selected for further P54 adapter research, not candidate
+generation. Full topology and selected-document reuse coverage remain open.
 NTSB and NHTSA remain discovery results only until their document relations can
 be frozen without browser-only or access-denied dependencies.

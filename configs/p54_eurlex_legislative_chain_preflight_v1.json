@@ -4,7 +4,7 @@
   "authorization": {
     "record_id": "p54-eurlex-mdr-legislative-chain-preflight-v1",
     "scope": "anonymous retrieval of six hash-pinned public EUR-Lex resources for aggregate-only source, topology, rights, exact-band and shortcut feasibility measurement",
-    "basis": "EUR-Lex states that its legal documents may be reused for commercial or non-commercial purposes unless otherwise specified under Decision 2011/833/EU; source attribution and exclusions remain mandatory",
+    "basis": "Decision 2011/833/EU is hash-pinned only as a Commission-scope reuse preflight; coverage of every selected EUR-Lex document remains unverified until a broad legal-notice receipt and candidate-level exclusions review are bound",
     "reviewed_at": "2026-09-05T14:42:30Z",
     "allowed_actions": [
       "fetch_hash_pinned_public_sources_to_process_memory",
@@ -152,9 +152,9 @@
       "source_id": "corrigendum",
       "pattern": "Corrigendum to Regulation \\(EU\\) 2017/745"
     },
-    "metadata_relation": {
+    "metadata_corrected_by": {
       "source_id": "metadata",
-      "pattern": "52012PC0542.*52014AP0266.*32017R0745R\\(01\\)"
+      "pattern": "32017R0745 corrected_by 32017R0745R\\(01\\)"
     }
   },
   "normalization": {
