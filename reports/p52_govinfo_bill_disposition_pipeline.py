@@ -26,6 +26,12 @@ from longworld.core.attestation import (
     attestation_key_from_env,
     verify_attestation,
 )
+from longworld.core.govinfodisposition import (
+    GOVINFO_DISPOSITION_ANSWER_PROGRAM,
+    GOVINFO_DISPOSITION_TASK_SCHEMA,
+    replay_govinfo_disposition,
+    validate_govinfo_task,
+)
 from longworld.core.pack import SEP, prompt_document_prefix, wrap_prompt
 from longworld.core.promotion import (
     CANDIDATE_ATTESTATION_PURPOSE,
@@ -40,6 +46,13 @@ from longworld.core.record_contract import (
     EXACT_TOKEN_BAND_RANGES,
     STRICT_REPLAY_REVISION,
     exact_token_band_reject_reason,
+)
+from longworld.core.taskpromotion import _canonical_task_identifiers
+from longworld.core.taskreplaysidecar import (
+    GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
+    build_task_replay_sidecar,
+    task_candidate_content_commitment,
+    task_replay_sidecar_binding,
 )
 from longworld.core.tokenizer_assets import (
     resolved_tokenizer_asset_manifest_sha256,
@@ -323,6 +336,138 @@ def replay_candidate(
         )
         result[code] = RETAINED if similarity >= threshold else MODIFIED
     return result
+
+
+def build_registered_parent(
+    source_candidate: Mapping[str, Any], task: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Convert one freshly built authentic full pack into a registered parent."""
+    validated_task = deepcopy(validate_govinfo_task(dict(task)))
+    parent = deepcopy(dict(source_candidate))
+    classifications = parent.get("artifact_classification")
+    if (
+        not isinstance(classifications, list)
+        or not classifications
+        or any(
+            not isinstance(item, dict) or item.get("source_origin") != "real_public"
+            for item in classifications
+        )
+    ):
+        raise P52Blocker("P52 registered parent must contain only authentic artifacts")
+    requests = parent.get("requested_dispositions")
+    task_requests = validated_task["requested_dispositions"]
+    if (
+        not isinstance(requests, list)
+        or not requests
+        or requests != task_requests[: len(requests)]
+    ):
+        raise P52Blocker("P52 registered parent request prefix is invalid")
+    source_binding = parent.get("source_binding")
+    if (
+        not isinstance(source_binding, dict)
+        or source_binding.get("source_receipt_sha256")
+        != validated_task["source_receipt_sha256"]
+        or set(source_binding)
+        != {
+            "authorization_record_id",
+            "preflight_config_sha256",
+            "source_bundle_sha256",
+            "source_receipt_sha256",
+        }
+    ):
+        raise P52Blocker("P52 registered parent source binding is invalid")
+    documents = _artifact_documents(parent)
+    counterfactual_request = next(
+        (
+            request
+            for request in requests
+            if request.get("code") == validated_task["counterfactual_code"]
+        ),
+        None,
+    )
+    if not isinstance(counterfactual_request, dict):
+        raise P52Blocker("P52 registered parent counterfactual request is missing")
+    endpoints = {
+        str(value.get("stage") or ""): (artifact_id, value)
+        for artifact_id, value in documents.items()
+        if value.get("artifact_type") == "govinfo_section"
+        and value.get("bill_id") == counterfactual_request["bill_id"]
+        and value.get("base_key") == counterfactual_request["base_key"]
+    }
+    try:
+        source_id, source = endpoints[counterfactual_request["from_stage"]]
+        target_id, target = endpoints[counterfactual_request["to_stage"]]
+    except KeyError as error:
+        raise P52Blocker(
+            "P52 registered parent counterfactual endpoints are missing"
+        ) from error
+    parent.update(
+        {
+            "schema_version": "longworld.p52-govinfo-bill-disposition-parent.v1",
+            "view": "full",
+            "composition_method": "same_case_dossier",
+            "answer_program_id": GOVINFO_DISPOSITION_ANSWER_PROGRAM,
+            "strict_replay_revision": GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[1],
+            "govinfo_disposition_task": validated_task,
+            "oracle_revision": validated_task["oracle_revision"],
+            "oracle_shingle_size": validated_task["oracle_shingle_size"],
+            "oracle_threshold": validated_task["oracle_threshold"],
+            "counterfactual_twin": {
+                "provenance_operation": (
+                    "replace_target_with_authenticated_source_body"
+                ),
+                "source_artifact_id": source_id,
+                "target_artifact_id": target_id,
+                "parent_value": {
+                    "source_text": target["source_text"],
+                    "oracle_text": target["oracle_text"],
+                },
+                "value": {
+                    "source_text": source["source_text"],
+                    "oracle_text": source["oracle_text"],
+                },
+            },
+            "dossier_id": str(parent.get("dossier_id") or "")
+            or _sha256_text(
+                f"{parent.get('world_id')}|{parent.get('length_bucket')}|first"
+            )[:20],
+            "semantic_growth_group_id": str(
+                parent.get("semantic_growth_group_id") or ""
+            )
+            or _sha256_text(f"{parent.get('world_id')}|nested-bands")[:20],
+            "promotion_eligible": False,
+            "train_ready": False,
+            "production_eligible": False,
+            "promoted": False,
+        }
+    )
+    artifact_ids = [str(item.get("artifact_id") or "") for item in classifications]
+    factual = replay_govinfo_disposition(parent, artifact_ids)
+    counterfactual = replay_govinfo_disposition(
+        parent, artifact_ids, counterfactual=True
+    )
+    if factual["answer"] == counterfactual["answer"]:
+        raise P52Blocker("P52 registered parent counterfactual is ineffective")
+    parent["answer"] = factual["answer"]
+    parent["cf_answer"] = counterfactual["answer"]
+    for field in (
+        "source_record_ids",
+        "source_relation_ids",
+        "authentic_source_relation_edges",
+        "verified_derived_order_relation_edges",
+        "event_count",
+        "strict_support_event_count",
+    ):
+        parent[field] = deepcopy(factual[field])
+    parent["graph"] = {
+        **dict(parent.get("graph") or {}),
+        "proof_depth": factual["proof_depth"],
+        "hop_count": factual["hop_count"],
+    }
+    parent.update(
+        _canonical_task_identifiers(parent, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER)
+    )
+    return parent
 
 
 def _stage_source(chain: Mapping[str, Any], stage_name: str) -> Mapping[str, Any]:
@@ -1125,6 +1270,146 @@ def build_candidates(
     return signed, source_receipt, source_receipt_raw, receipt
 
 
+def build_registered_parents(
+    config_path: Path,
+) -> tuple[list[dict[str, Any]], bytes, bytes, dict[str, Any]]:
+    """Build three authentic full parents and their source-attested replay sidecar."""
+    config, config_raw, preflight = _load_config(config_path)
+    source_manifest_key = attestation_key_from_env(SOURCE_RECEIPT_PURPOSE)
+    source_sidecar_key = attestation_key_from_env("task_replay_sidecar")
+    candidate_key = attestation_key_from_env(CANDIDATE_ATTESTATION_PURPOSE)
+    if None in {source_manifest_key, source_sidecar_key, candidate_key}:
+        raise P52Blocker(
+            "P52 registered generation requires source and candidate role keys"
+        )
+    assert source_manifest_key is not None
+    assert source_sidecar_key is not None
+    assert candidate_key is not None
+    state = _verified_source_state(config, preflight)
+    _source_receipt_value, source_receipt_raw = _source_receipt(
+        config, config_raw, state, source_manifest_key
+    )
+    source_receipt_sha256 = _sha256_bytes(source_receipt_raw)
+    tokenizer = _load_tokenizer(config)
+    _full_question, task_requests = _question(config, len(config["requested_keys"]))
+    task = {
+        "schema_version": GOVINFO_DISPOSITION_TASK_SCHEMA,
+        "answer_program_id": GOVINFO_DISPOSITION_ANSWER_PROGRAM,
+        "bill_id": config["bill_id"],
+        "from_stage": config["from_stage"],
+        "to_stage": config["to_stage"],
+        "oracle_revision": config["oracle"]["revision"],
+        "oracle_shingle_size": config["oracle"]["near_duplicate_word_shingle_size"],
+        "oracle_threshold": config["oracle"]["near_duplicate_jaccard_threshold"],
+        "counterfactual_code": config["counterfactual_code"],
+        "requested_dispositions": task_requests,
+        "source_receipt_sha256": source_receipt_sha256,
+    }
+    validate_govinfo_task(task)
+    parents: list[dict[str, Any]] = []
+    prior_ids: set[str] = set()
+    pack_receipts: dict[str, Any] = {}
+    for bucket in ("32k", "64k", "128k"):
+        entries, question, requests, essential_ids, cf_source_id, cf_target_id = (
+            _pack_bucket(config, state, tokenizer, bucket=bucket, prior_ids=prior_ids)
+        )
+        prior_ids = set(entries)
+        source_candidate = _build_candidate(
+            config,
+            tokenizer,
+            source_receipt_sha256,
+            bucket=bucket,
+            entries=entries,
+            question=question,
+            requests=requests,
+            essential_ids=essential_ids,
+            cf_source_id=cf_source_id,
+            cf_target_id=cf_target_id,
+            view="full",
+        )
+        source_candidate["source_binding"] = {
+            "source_receipt_sha256": source_receipt_sha256,
+            "source_bundle_sha256": state["source_bundle_sha256"],
+            "authorization_record_id": config["authorization"]["record_id"],
+            "preflight_config_sha256": config["preflight_config"]["sha256"],
+        }
+        parent = build_registered_parent(source_candidate, task)
+        parents.append(parent)
+        pack_receipts[bucket] = {
+            "artifact_count": len(entries),
+            "essential_artifact_count": len(essential_ids),
+            "parent_context_tokens": parent["tokenizer_context_tokens"],
+            "parent_near_dup_sentence_ratio": parent["near_dup_sentence_ratio"],
+        }
+    commitments = sorted(
+        (task_candidate_content_commitment(parent) for parent in parents),
+        key=lambda item: (item["world_id"], item["length_bucket"]),
+    )
+    adapter_id, adapter_revision, sidecar_schema = (
+        GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER
+    )
+    sidecar = build_task_replay_sidecar(
+        adapter_id=adapter_id,
+        adapter_revision=adapter_revision,
+        sidecar_schema_version=sidecar_schema,
+        replay_payload={
+            "source_receipt_raw_utf8": source_receipt_raw.decode("utf-8"),
+            "source_receipt_sha256": source_receipt_sha256,
+            "source_bundle_sha256": state["source_bundle_sha256"],
+            "preflight_config_sha256": config["preflight_config"]["sha256"],
+            "authorization_record_id": config["authorization"]["record_id"],
+            "govinfo_disposition_task": task,
+            "task_sha256": _canonical_sha256(task),
+            "replay_revision": adapter_revision,
+            "tokenizer_model_id": config["tokenizer"]["model_id"],
+            "tokenizer_revision": config["tokenizer"]["revision"],
+            "tokenizer_asset_manifest_sha256": config["tokenizer"][
+                "asset_manifest_sha256"
+            ],
+            "candidate_content_commitments": commitments,
+        },
+        source_attestation_key=source_sidecar_key,
+    )
+    sidecar_raw = _canonical_bytes(sidecar)
+    binding = task_replay_sidecar_binding(
+        sidecar_raw, source_attestation_key=source_sidecar_key
+    )
+    signed: list[dict[str, Any]] = []
+    for parent in parents:
+        unsigned = deepcopy(parent)
+        unsigned["task_replay_sidecar"] = dict(binding)
+        unsigned["promotion_blocker_code"] = "task_view_projection_pending"
+        unsigned["pipeline_capabilities"] = {
+            "generic_strict_replay": True,
+            "generic_promotion": False,
+        }
+        signed.append(
+            attach_attestation(
+                unsigned, candidate_key, purpose=CANDIDATE_ATTESTATION_PURPOSE
+            )
+        )
+    receipt = {
+        "schema_version": "longworld.p52-govinfo-registered-generation-receipt.v1",
+        "data_stage": "candidate_parent",
+        "parent_candidate_count": len(signed),
+        "parent_candidate_row_set_sha256": _sha256_text(
+            "\n".join(sorted(serialized_row_sha256(row) for row in signed))
+        ),
+        "source_receipt_sha256": source_receipt_sha256,
+        "task_sha256": _canonical_sha256(task),
+        "task_replay_sidecar_sha256": binding["sha256"],
+        "packs": pack_receipts,
+        "raw_xml_persisted": False,
+        "padding_tokens": 0,
+        "cloned_artifacts": 0,
+        "split_or_truncated_sections": 0,
+        "promotion_eligible": False,
+        "train_ready": False,
+        "production_eligible": False,
+    }
+    return signed, sidecar_raw, source_receipt_raw, receipt
+
+
 def _expected_entries(
     config: Mapping[str, Any], state: Mapping[str, Any]
 ) -> dict[str, dict[str, Any]]:
@@ -1738,6 +2023,30 @@ def _write_generation_output(
         raise
 
 
+def _write_registered_generation_output(
+    output_dir: Path,
+    parents: Sequence[Mapping[str, Any]],
+    sidecar_raw: bytes,
+    source_raw: bytes,
+    receipt: Mapping[str, Any],
+) -> None:
+    if output_dir.exists():
+        raise P52Blocker(f"P52 output directory already exists: {output_dir}")
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(
+        tempfile.mkdtemp(prefix=f".{output_dir.name}.", dir=output_dir.parent)
+    )
+    try:
+        _write_jsonl(staging / "parents.jsonl", parents)
+        _write_atomic(staging / "TASK_REPLAY_SIDECAR.json", sidecar_raw)
+        _write_atomic(staging / "SOURCE_RECEIPT.json", source_raw)
+        _write_atomic(staging / "GENERATION_RECEIPT.json", _canonical_bytes(receipt))
+        os.replace(staging, output_dir)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+
+
 def _write_blocker(output_dir: Path, error: Exception) -> None:
     if output_dir.exists():
         raise P52Blocker(f"refusing to replace existing P52 output: {output_dir}")
@@ -1764,6 +2073,9 @@ def main() -> None:
     generate = subparsers.add_parser("generate")
     generate.add_argument("--config", type=Path, required=True)
     generate.add_argument("--output-dir", type=Path, required=True)
+    generate_registered = subparsers.add_parser("generate-registered")
+    generate_registered.add_argument("--config", type=Path, required=True)
+    generate_registered.add_argument("--output-dir", type=Path, required=True)
     preflight = subparsers.add_parser("preflight")
     preflight.add_argument("--config", type=Path, required=True)
     preflight.add_argument("--candidates", type=Path, required=True)
@@ -1788,6 +2100,22 @@ def main() -> None:
                     {
                         "command": "generate",
                         "rows": len(candidates),
+                        "output": str(args.output_dir),
+                    }
+                )
+            )
+        elif args.command == "generate-registered":
+            parents, sidecar_raw, source_raw, receipt = build_registered_parents(
+                args.config
+            )
+            _write_registered_generation_output(
+                args.output_dir, parents, sidecar_raw, source_raw, receipt
+            )
+            print(
+                json.dumps(
+                    {
+                        "command": "generate-registered",
+                        "rows": len(parents),
                         "output": str(args.output_dir),
                     }
                 )
@@ -1827,7 +2155,7 @@ def main() -> None:
                 )
             )
     except P52Blocker as error:
-        if args.command == "generate":
+        if args.command in {"generate", "generate-registered"}:
             _write_blocker(args.output_dir, error)
         raise SystemExit(f"P52 blocked: {error}") from error
 
