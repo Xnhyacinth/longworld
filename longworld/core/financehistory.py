@@ -19,12 +19,15 @@ from typing import Any
 from urllib.parse import urlparse
 
 from longworld.core.domainhistory import (
-    HistoryBand,
     _EXPECTED_BANDS,
+    HistoryBand,
     audit_cumulative_history,
 )
 from longworld.core.filingworkflow import ISSUER_GCS_MERGED_COMPONENT_REVISION_V2
-from longworld.core.issuerfilingworkflow import parse_issuer_ir_rendered_metrics
+from longworld.core.issuerfilingworkflow import (
+    ALPHABET_BREAKDOWN_SECTIONS,
+    parse_issuer_ir_rendered_metrics,
+)
 from longworld.core.pack import SEP
 from longworld.core.provenance import ProvenanceError
 from longworld.core.secxbrl import parse_sec_financial_program
@@ -332,15 +335,36 @@ def _sec_role_facts(program: Any) -> dict[str, Any]:
 
 
 def _role_marker_options(role: str) -> tuple[tuple[str, ...], ...]:
+    if role in {"category_hedging", "geo_hedging"}:
+        return (("defref_us-gaap_GainLossOnOilAndGasHedgingActivity", ">Hedging gains (losses)</a>"),)
     options: list[tuple[str, ...]] = []
     if role in _SEMANTIC_ROLE_MARKERS:
         options.append(_SEMANTIC_ROLE_MARKERS[role])
     if role in _SEC_SEMANTIC_ROLE_MARKERS:
         options.append(_SEC_SEMANTIC_ROLE_MARKERS[role])
+    if role == "revenue":
+        options.extend(
+            (concept, ">Revenues</a>")
+            for concept in (
+                "defref_us-gaap_Revenues",
+                "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax",
+            )
+        )
     if role.startswith(_TABLE_ROLE_PREFIXES):
         options.append(
             ("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",)
         )
+        options.extend(
+            (concept, ">Total revenues</a>")
+            for concept in (
+                "defref_us-gaap_Revenues",
+                "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax",
+            )
+        )
+        options.append((
+            "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax",
+            ">Revenues from contract with customer</a>",
+        ))
     return tuple(options)
 
 
@@ -422,7 +446,12 @@ def extract_financial_filings(manifest: dict[str, Any]) -> tuple[FinancialFiling
         report_date = str(record.get("report_date") or "")
         if not isinstance(source_text, str) or not source_text:
             raise ProvenanceError("issuer financial source text is missing")
-        program = parse_issuer_ir_rendered_metrics(source_text, report_date=report_date)
+        program = parse_issuer_ir_rendered_metrics(
+            source_text,
+            report_date=report_date,
+            issuer_cik=str(issuer.get("cik") or ""),
+            metric_profile=manifest.get("financial_metric_profile"),
+        )
         facts_by_span = sorted(program.facts, key=lambda fact: fact.char_start)
         source_rows: list[FinancialSourceRow] = []
         local_row_indexes: dict[str, int] = {}
@@ -1175,6 +1204,11 @@ def _candidate_rows(
         if filing.record_id in selected_ids
         for row in filing.rows
         if row.record_id not in used_ids
+        and not (
+            filing.record_id.startswith("issuer-ir:0001652044:")
+            and row.section in ALPHABET_BREAKDOWN_SECTIONS
+            and not any(role.startswith(_TABLE_ROLE_PREFIXES) for role in active_roles)
+        )
         and (
             not row.facts
             or any(fact.role in active_roles for fact in row.facts)
@@ -1319,7 +1353,7 @@ def build_financial_history_candidates(
                 filing = filing_by_id[filing_id]
                 for section in sorted(sections):
                     topology_records.append(_table_branch_record(filing, section))
-                topology_records.append(_year_join_record(filing, sections))
+                topology_records.append(_year_join_record(filing, tuple(sections)))
             records = [*records, *topology_records]
         context = _context(records)
         tokens = token_counter(context)
@@ -2036,14 +2070,7 @@ def audit_financial_history_candidate(task: dict[str, Any]) -> dict[str, bool]:
         role = str(fact["role"])
         marker_sets = [
             markers
-            for markers in (
-                _SEMANTIC_ROLE_MARKERS[role],
-                *(
-                    (_SEC_SEMANTIC_ROLE_MARKERS[role],)
-                    if role in _SEC_SEMANTIC_ROLE_MARKERS
-                    else ()
-                ),
-            )
+            for markers in _role_marker_options(role)
             if all(marker in str(target["source_text"]) for marker in markers)
         ]
         if not marker_sets:

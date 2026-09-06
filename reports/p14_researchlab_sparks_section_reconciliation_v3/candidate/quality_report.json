@@ -1,0 +1,115 @@
+{
+  "schema_version": "p3.0",
+  "data_product": "worldlong_p14_researchlab_sparks_section_reconciliation_v1",
+  "data_stage": "candidate",
+  "trust_scope": "local_probe",
+  "release_profile_id": "p7-paper-source-slice-1-v1",
+  "release_profile_sha256": "0e42fc5c44f85bf537fe45439d06cf7c958ff7d9b39f04e86150ca1d7849c2ab",
+  "n_worlds": 1,
+  "target_promoted_worlds": 1,
+  "n_world_ids": 1,
+  "n_rows": 9,
+  "candidate_row_set_sha256": "48cd117bc795457ed03f56ac30abb07d2abc988f8880b4526e34b7a182012da6",
+  "n_questions": 1,
+  "n_question_slots": 3,
+  "n_rejects": 0,
+  "n_attempts": 6,
+  "n_kept_slots": 3,
+  "retention": 0.5,
+  "n_clones": 0,
+  "unique_full_answers": 3,
+  "n_unique_base_tasks": 1,
+  "n_unique_executable_proofs": 3,
+  "n_unique_source_relations": 2,
+  "n_unique_answer_programs": 3,
+  "n_unique_content_hashes": 9,
+  "n_exact_duplicate_rows": 0,
+  "n_topologies": 3,
+  "n_topology_families": 1,
+  "n_canonical_topologies": 3,
+  "canonical_neff": 3.0,
+  "max_canonical_share": 0.3333,
+  "mean_boilerplate_token_ratio": 0.0,
+  "mean_pulse_doc_ratio": 0.0,
+  "mean_hard_negative_doc_ratio": 0.0,
+  "mean_real_source_token_ratio": 0.9027,
+  "n_source_grounded_full": 0,
+  "n_source_choice_full": 0,
+  "n_revisitation_full": 0,
+  "n_ratification_full": 0,
+  "n_docket_control_full": 0,
+  "n_deep_dependency_full": 2,
+  "n_long_range_retrieval_full": 1,
+  "by_dependency_class": {
+    "long_range_retrieval": 1,
+    "deep_dependency": 2
+  },
+  "mean_evidence_distance": 37683.7,
+  "n_registers": 1,
+  "register_neff": 1.0,
+  "by_register": {
+    "audit_trail": 3
+  },
+  "n_style_clusters": 1,
+  "style_cluster_neff": 1.0,
+  "by_style_cluster": {
+    "audit_trail:json": 3
+  },
+  "mean_near_dup_sentence_ratio": 0.0056,
+  "n_cross_workstream_full": 0,
+  "motif_composition_rate": 0.0,
+  "join_row_share": 0.0,
+  "n_motifs": 1,
+  "n_domains": 1,
+  "planned_worlds_by_domain": {
+    "researchlab": 1
+  },
+  "attempted_worlds_by_domain": {
+    "researchlab": 1
+  },
+  "emitting_worlds_by_domain": {
+    "researchlab": 1
+  },
+  "train_questions": 1,
+  "eval_questions": 0,
+  "train_question_slots": 3,
+  "eval_question_slots": 0,
+  "by_query_type": {
+    "paper_revision_section_reconciliation": 9
+  },
+  "by_view": {
+    "full": 3,
+    "cf": 3,
+    "ordered_artifact_view": 3
+  },
+  "by_length": {
+    "16k": 3,
+    "32k": 3,
+    "64k": 3
+  },
+  "by_motif": {
+    "paper_revision_section_reconciliation": 9
+  },
+  "by_domain": {
+    "researchlab": 9
+  },
+  "by_topology_family": {
+    "lab.paper_revision_section_reconciliation": 9
+  },
+  "by_canonical_topology": {
+    "researchlab|paper_revision_section_reconciliation|paper_revision_section_reconciliation|arxiv_revision_16k_0_4_section_03_theory_of_mind+arxiv_revision_16k_0_4_section_02_similarity_metric_limit+arxiv_revision_16k_0_4_section_01_autoregressive_planning_limit+arxiv_section_reconciliation_control_16k+arxiv_section_reconciliation_decision_16k|d2|n5": 1,
+    "researchlab|paper_revision_section_reconciliation|paper_revision_section_reconciliation|arxiv_revision_32k_0_4_section_05_cross_domain_composition+arxiv_revision_32k_0_4_section_04_mathematical_research_limit+arxiv_revision_32k_0_4_section_03_theory_of_mind+arxiv_revision_32k_0_4_section_02_similarity_metric_limit+arxiv_revision_32k_0_4_section_01_autoregressive_planning_limit+arxiv_revision_32k_0_3_prior_endpoint_v4+arxiv_revision_relation_32k_0+arxiv_section_reconciliation_control_32k+arxiv_section_reconciliation_decision_32k|d3|n9": 1,
+    "researchlab|paper_revision_section_reconciliation|paper_revision_section_reconciliation|arxiv_revision_64k_0_4_section_10_agi_scope+arxiv_revision_64k_0_4_section_09_cross_domain_composition+arxiv_revision_64k_0_4_section_08_mathematical_research_limit+arxiv_revision_64k_0_4_section_07_embodied_text_interface+arxiv_revision_64k_0_4_section_06_theory_of_mind+arxiv_revision_64k_0_4_section_05_pii_corpus_size+arxiv_revision_64k_0_4_section_04_similarity_metric_limit+arxiv_revision_64k_0_4_section_03_autoregressive_planning_limit+arxiv_revision_64k_0_4_section_02_personalized_manipulation_risk+arxiv_revision_64k_0_4_section_01_mechanism_status+arxiv_revision_64k_0_3_prior_endpoint_v4+arxiv_revision_64k_0_2_prior_endpoint_v3+arxiv_revision_relation_64k_0+arxiv_revision_relation_64k_0+arxiv_section_reconciliation_control_64k+arxiv_section_reconciliation_decision_64k|d4|n16": 1
+  },
+  "reject_reasons": {},
+  "gold_cfr": 1.0,
+  "local_probe_trust_isolation": "non_independent_local_diagnostic",
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "quality_report",
+    "role": "report",
+    "key_id": "probe-report-6cb83e952bd6fefb4a8294bab36edbe0",
+    "environment": "probe",
+    "digest": "9924e65ec51ea95b1d8bdea499b06c524f1fe7bb392cd14448dffafc542158ab"
+  }
+}

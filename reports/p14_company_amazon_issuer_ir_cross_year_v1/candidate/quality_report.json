@@ -1,0 +1,116 @@
+{
+  "schema_version": "p3.0",
+  "data_product": "worldlong_p14_company_amazon_issuer_ir_cross_year_v1",
+  "data_stage": "candidate",
+  "trust_scope": "local_probe",
+  "release_profile_id": "p12-sec-source-slice-1-v1",
+  "release_profile_sha256": "a1aa2e5260782ffc1ec8e08b2d2277659b44e512b6d8df4892fa31b658eaa8ff",
+  "n_worlds": 1,
+  "target_promoted_worlds": 1,
+  "n_world_ids": 1,
+  "n_rows": 9,
+  "candidate_row_set_sha256": "e19afb667ef3b0153687bf390a5f0d4f1f60249c3e5e1cb79b7a106446a08a6d",
+  "n_questions": 1,
+  "n_question_slots": 3,
+  "n_rejects": 0,
+  "n_attempts": 12,
+  "n_kept_slots": 3,
+  "retention": 0.25,
+  "n_clones": 0,
+  "unique_full_answers": 3,
+  "n_unique_base_tasks": 1,
+  "n_unique_executable_proofs": 3,
+  "n_unique_source_relations": 3,
+  "n_unique_answer_programs": 3,
+  "n_unique_content_hashes": 9,
+  "n_exact_duplicate_rows": 0,
+  "n_topologies": 3,
+  "n_topology_families": 1,
+  "n_canonical_topologies": 3,
+  "canonical_neff": 3.0,
+  "max_canonical_share": 0.3333,
+  "mean_boilerplate_token_ratio": 0.0,
+  "mean_pulse_doc_ratio": 0.0,
+  "mean_hard_negative_doc_ratio": 0.0,
+  "mean_real_source_token_ratio": 0.958,
+  "n_source_grounded_full": 0,
+  "n_source_choice_full": 0,
+  "n_revisitation_full": 0,
+  "n_ratification_full": 0,
+  "n_docket_control_full": 0,
+  "n_deep_dependency_full": 3,
+  "n_long_range_retrieval_full": 0,
+  "by_dependency_class": {
+    "deep_dependency": 3
+  },
+  "mean_evidence_distance": 34253.3,
+  "n_registers": 1,
+  "register_neff": 1.0,
+  "by_register": {
+    "ops_log": 3
+  },
+  "n_style_clusters": 1,
+  "style_cluster_neff": 1.0,
+  "by_style_cluster": {
+    "ops_log:issuer_ir_source_section": 3
+  },
+  "mean_near_dup_sentence_ratio": 0.1099,
+  "n_cross_workstream_full": 0,
+  "motif_composition_rate": 0.0,
+  "join_row_share": 0.0,
+  "n_motifs": 1,
+  "n_domains": 1,
+  "planned_worlds_by_domain": {
+    "company": 1
+  },
+  "attempted_worlds_by_domain": {
+    "company": 1
+  },
+  "emitting_worlds_by_domain": {
+    "company": 1
+  },
+  "train_questions": 1,
+  "eval_questions": 0,
+  "train_question_slots": 3,
+  "eval_question_slots": 0,
+  "by_query_type": {
+    "issuer_ir_two_year_growth": 3,
+    "issuer_ir_three_year_growth": 3,
+    "issuer_ir_four_year_consistency": 3
+  },
+  "by_view": {
+    "full": 3,
+    "cf": 3,
+    "ordered_artifact_view": 3
+  },
+  "by_length": {
+    "16k": 3,
+    "32k": 3,
+    "64k": 3
+  },
+  "by_motif": {
+    "company.issuer_ir_cross_year_financial_history": 9
+  },
+  "by_domain": {
+    "company": 9
+  },
+  "by_topology_family": {
+    "company.issuer_ir_cross_year": 9
+  },
+  "by_canonical_topology": {
+    "company|company.issuer_ir_cross_year_financial_history|issuer_ir_two_year_growth|issuer_ir_section_0_0+issuer_ir_section_12_0+issuer_ir_section_1_0+issuer_ir_section_2_0+issuer_ir_section_3_0+issuer_ir_section_4_0+issuer_ir_section_6_0+issuer_ir_section_7_0+issuer_ir_section_8_0+issuer_ir_section_9_0+issuer_ir_section_0_0+issuer_ir_section_12_0+issuer_ir_section_1_0+issuer_ir_section_2_0+issuer_ir_section_3_0+issuer_ir_section_4_0+issuer_ir_section_5_0+issuer_ir_section_6_0+issuer_ir_section_7_0+issuer_ir_section_8_0+issuer_ir_section_9_0+issuer_ir_relation_0+issuer_ir_answer_16k|d3|n23": 1,
+    "company|company.issuer_ir_cross_year_financial_history|issuer_ir_three_year_growth|issuer_ir_section_0_0+issuer_ir_section_10_0+issuer_ir_section_11_0+issuer_ir_section_12_0+issuer_ir_section_1_0+issuer_ir_section_2_0+issuer_ir_section_3_0+issuer_ir_section_4_0+issuer_ir_section_5_0+issuer_ir_section_6_0+issuer_ir_section_7_0+issuer_ir_section_8_0+issuer_ir_section_9_0+issuer_ir_section_0_0+issuer_ir_section_10_0+issuer_ir_section_11_0+issuer_ir_section_12_0+issuer_ir_section_1_0+issuer_ir_section_2_0+issuer_ir_section_3_0+issuer_ir_section_4_0+issuer_ir_section_5_0+issuer_ir_section_6_0+issuer_ir_section_7_0+issuer_ir_section_8_0+issuer_ir_section_9_0+issuer_ir_relation_0+issuer_ir_section_0_0+issuer_ir_section_10_0+issuer_ir_section_11_0+issuer_ir_section_12_0+issuer_ir_section_1_0+issuer_ir_section_2_0+issuer_ir_section_3_0+issuer_ir_section_4_0+issuer_ir_section_5_0+issuer_ir_section_6_0+issuer_ir_section_7_0+issuer_ir_section_8_0+issuer_ir_section_9_0+issuer_ir_relation_0+issuer_ir_answer_16k+issuer_ir_answer_32k|d4|n43": 1,
+    "company|company.issuer_ir_cross_year_financial_history|issuer_ir_four_year_consistency|issuer_ir_section_0_0+issuer_ir_section_10_0+issuer_ir_section_11_0+issuer_ir_section_12_0+issuer_ir_section_13_0+issuer_ir_section_14_0+issuer_ir_section_15_0+issuer_ir_section_16_0+issuer_ir_section_17_0+issuer_ir_section_18_0+issuer_ir_section_1_0+issuer_ir_section_22_0+issuer_ir_section_2_0+issuer_ir_section_3_0+issuer_ir_section_4_0+issuer_ir_section_5_0+issuer_ir_section_6_0+issuer_ir_section_7_0+issuer_ir_section_8_0+issuer_ir_section_9_0+issuer_ir_section_0_0+issuer_ir_section_10_0+issuer_ir_section_11_0+issuer_ir_section_12_0+issuer_ir_section_13_0+issuer_ir_section_14_0+issuer_ir_section_15_0+issuer_ir_section_16_0+issuer_ir_section_17_0+issuer_ir_section_18_0+issuer_ir_section_1_0+issuer_ir_section_2_0+issuer_ir_section_3_0+issuer_ir_section_4_0+issuer_ir_section_5_0+issuer_ir_section_6_0+issuer_ir_section_7_0+issuer_ir_section_8_0+issuer_ir_section_9_0+issuer_ir_relation_0+issuer_ir_section_0_0+issuer_ir_section_10_0+issuer_ir_section_11_0+issuer_ir_section_12_0+issuer_ir_section_13_0+issuer_ir_section_14_0+issuer_ir_section_15_0+issuer_ir_section_16_0+issuer_ir_section_17_0+issuer_ir_section_18_0+issuer_ir_section_1_0+issuer_ir_section_2_0+issuer_ir_section_3_0+issuer_ir_section_4_0+issuer_ir_section_5_0+issuer_ir_section_6_0+issuer_ir_section_7_0+issuer_ir_section_8_0+issuer_ir_section_9_0+issuer_ir_relation_0+issuer_ir_section_0_0+issuer_ir_section_10_0+issuer_ir_section_11_0+issuer_ir_section_12_0+issuer_ir_section_13_0+issuer_ir_section_14_0+issuer_ir_section_15_0+issuer_ir_section_16_0+issuer_ir_section_17_0+issuer_ir_section_18_0+issuer_ir_section_1_0+issuer_ir_section_2_0+issuer_ir_section_3_0+issuer_ir_section_4_0+issuer_ir_section_5_0+issuer_ir_section_6_0+issuer_ir_section_7_0+issuer_ir_section_8_0+issuer_ir_section_9_0+issuer_ir_relation_0+issuer_ir_answer_16k+issuer_ir_answer_32k+issuer_ir_answer_64k|d5|n83": 1
+  },
+  "reject_reasons": {},
+  "gold_cfr": 1.0,
+  "local_probe_trust_isolation": "non_independent_local_diagnostic",
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "quality_report",
+    "role": "report",
+    "key_id": "probe-report-6cb83e952bd6fefb4a8294bab36edbe0",
+    "environment": "probe",
+    "digest": "e6b74566d72d28389ba04d2f2860d68b5e15eb55787ef3785dccac2b3cfe1447"
+  }
+}

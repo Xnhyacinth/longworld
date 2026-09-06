@@ -428,7 +428,6 @@ def _cyber_candidate(
 
 def _financial_filings() -> tuple[FinancialFiling, ...]:
     filings = []
-    roles = tuple(financehistory._SEMANTIC_ROLE_MARKERS)
     for year_index, year in enumerate((2021, 2022)):
         values = {
             "revenue": 1000 + year_index * 100,
@@ -442,8 +441,7 @@ def _financial_filings() -> tuple[FinancialFiling, ...]:
             "cash_period_change": 150 + year_index * 10,
         }
         rows = []
-        for row_index, role in enumerate(roles):
-            value = values[role]
+        for row_index, (role, value) in enumerate(values.items()):
             quote = f"({abs(value):,})" if value < 0 else f"{value:,}"
             markers = financehistory._SEMANTIC_ROLE_MARKERS[role]
             prefix = f"{markers[0]} | {markers[1]} | fiscal {year} | "

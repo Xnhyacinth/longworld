@@ -1,0 +1,3175 @@
+{
+  "schema_version": "longworld.git-workflow.v1",
+  "repository_url": "https://github.com/duckdb/duckdb",
+  "source_origin": "real_public",
+  "revision": "2d69f075ee91c42ad4fe4208a4d1f06d0034faff",
+  "license": "MIT",
+  "exported_at": "2026-09-03T07:17:51.605863Z",
+  "authorization": {
+    "record_id": "PUBLIC-GITHUB-TERMS-2026-08",
+    "scope": "read-only workflow export",
+    "basis": "public repository under recorded license",
+    "reviewed_at": "2026-08-30T00:00:00Z"
+  },
+  "public_policy": {
+    "record_id": "PUBLIC-GITHUB-TERMS-2026-08",
+    "sha256": "dd39cfef6803b01b08cc476acef805265a7f10d62378889e1d56cb8603cb4c60"
+  },
+  "source_client": {
+    "path": "/usr/bin/gh",
+    "sha256": "2fd925d68889746976958342fb749bf102bc7dc8bcba3abfa533a80ad7791673"
+  },
+  "privacy_review": {
+    "emails": "redacted",
+    "secrets": "fail_closed",
+    "scanner": "longworld-public-secret-patterns",
+    "scanner_revision": "v2"
+  },
+  "records": [
+    {
+      "id": "license:4e1fbb7695a7e4fb679d654ce5391c1a20fa8c5f",
+      "kind": "license",
+      "occurred_at": "2025-01-04T07:46:24Z",
+      "text": "Copyright 2018-2025 Stichting DuckDB Foundation\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.",
+      "links": [],
+      "attributes": {
+        "spdx_id": "MIT"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/contents/LICENSE?ref=d54d36faae00120f548b39d1e21d93ca25f17087"
+    },
+    {
+      "id": "commit:62fe1bff77a60fd690b9911aa7a38b7bc197f865",
+      "kind": "commit",
+      "occurred_at": "2025-11-03T21:10:37Z",
+      "text": "commit 62fe1bff77a60fd690b9911aa7a38b7bc197f865\nPass down extensions_test_selection -> complete\n\ndiff -- .github/workflows/_extension_distribution.yml\n@@ -64,5 +64,7 @@ jobs:\n       skip_tests: ${{ inputs.skip_tests }}\n       save_cache: ${{ inputs.save_cache }}\n \n+      # This forces tests to be run for all extensions in the config\n+      extensions_test_selection: 'complete'\n       # The extension_config.cmake configuration that gets built\n       extra_extension_config: ${{ inputs.extension_config }}",
+      "links": [
+        "license:4e1fbb7695a7e4fb679d654ce5391c1a20fa8c5f"
+      ],
+      "attributes": {
+        "sha": "62fe1bff77a60fd690b9911aa7a38b7bc197f865"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/commits/62fe1bff77a60fd690b9911aa7a38b7bc197f865"
+    },
+    {
+      "id": "commit:b77a9615117de845fa48463f09be20a89dea7434",
+      "kind": "commit",
+      "occurred_at": "2025-11-03T21:10:43Z",
+      "text": "commit b77a9615117de845fa48463f09be20a89dea7434\nAdd ducklake tests\n\ndiff -- .github/config/extensions/ducklake.cmake\n@@ -2,4 +2,5 @@ duckdb_extension_load(ducklake\n     DONT_LINK\n     GIT_URL https://github.com/duckdb/ducklake\n     GIT_TAG 2554312f71916ba11530c838b5c8c65b4786825c\n+    LOAD_TESTS\n )",
+      "links": [
+        "license:4e1fbb7695a7e4fb679d654ce5391c1a20fa8c5f"
+      ],
+      "attributes": {
+        "sha": "b77a9615117de845fa48463f09be20a89dea7434"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/commits/b77a9615117de845fa48463f09be20a89dea7434"
+    },
+    {
+      "id": "commit:bd58abcdfb4485a1a9dbb750bd0587803fd1c559",
+      "kind": "commit",
+      "occurred_at": "2025-11-03T21:10:43Z",
+      "text": "commit bd58abcdfb4485a1a9dbb750bd0587803fd1c559\nLoad vortex tests\n\ndiff -- .github/config/extensions/vortex.cmake\n@@ -5,5 +5,6 @@ if (NOT WIN32 AND NOT ${WASM_ENABLED} AND NOT ${MUSL_ENABLED})\n             GIT_TAG 9ea698117199440f62a7cf1673afb647dc6437c7\n             SUBMODULES vortex\n             APPLY_PATCHES\n+            LOAD_TESTS\n     )\n-endif()\n\\ No newline at end of file\n+endif()",
+      "links": [
+        "license:4e1fbb7695a7e4fb679d654ce5391c1a20fa8c5f"
+      ],
+      "attributes": {
+        "sha": "bd58abcdfb4485a1a9dbb750bd0587803fd1c559"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/commits/bd58abcdfb4485a1a9dbb750bd0587803fd1c559"
+    },
+    {
+      "id": "pull_request:19631",
+      "kind": "pull_request",
+      "occurred_at": "2025-11-03T21:12:19Z",
+      "text": "Pull request #19631: Enable running all extensions tests as part of the build step\n\nThis is enabled via https://github.com/duckdb/extension-ci-tools/pull/278, that introduced a way to hook into running tests for all extension of a given configuration (as opposed to a single one).\r\n\r\nAlso few minor fixes I bumped into:\r\n* disable unused platforms from the external extension builds\r\n* remove `[persistence]` tests to be always run\r\n* enable `vortex` tests\r\n* avoid `httpfs` tests on Windows, to be reverted in a follow up",
+      "links": [
+        "commit:62fe1bff77a60fd690b9911aa7a38b7bc197f865"
+      ],
+      "attributes": {
+        "number": 19631,
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/pulls/19631"
+    },
+    {
+      "id": "commit:9c5f82fa358fcf236cff21499351c1e739ca032a",
+      "kind": "commit",
+      "occurred_at": "2025-11-04T09:40:41Z",
+      "text": "commit 9c5f82fa358fcf236cff21499351c1e739ca032a\nCurrently no external extension works on wasm or windows or musl\n\nTo be expanded once that changes\n\ndiff -- .github/workflows/Extensions.yml\n@@ -136,7 +136,7 @@ jobs:\n         name: Configure External extensions\n         env:\n           CONFIG_FILE: .github/config/external_extensions.cmake\n-          DEFAULT_EXCLUDE_ARCHS: ''\n+          DEFAULT_EXCLUDE_ARCHS: 'wasm_mvp;wasm_eh;wasm_threads;windows_amd64_mingw;windows_amd64;linux_amd64_musl'\n         run: |\n           echo exclude_archs=\"$DEFAULT_EXCLUDE_ARCHS;$BASE_EXCLUDE_ARCHS;$EXTRA_EXCLUDE_ARCHS\" >> $GITHUB_OUTPUT\n           external_extensions=\"`cat .github/config/external_extensions.cmake`\"\n@@ -402,4 +402,4 @@ jobs:\n         if: failure()\n         run: |\n           echo \"There are differences in src/include/duckdb/main/extension_entries.hpp\"\n-          echo \"Check the uploaded extension_entries.hpp (in the workflow Summary), and check that in instead of src/include/duckdb/main/extension_entries.hpp\"\n\\ No newline at end of file\n+          echo \"Check the uploaded extension_entries.hpp (in the workflow Summary), and check that in instead of src/include/duckdb/main/extension_entries.hpp\"",
+      "links": [
+        "license:4e1fbb7695a7e4fb679d654ce5391c1a20fa8c5f"
+      ],
+      "attributes": {
+        "sha": "9c5f82fa358fcf236cff21499351c1e739ca032a"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/commits/9c5f82fa358fcf236cff21499351c1e739ca032a"
+    },
+    {
+      "id": "commit:eb322ce251b5c4347650afc455171d862c51bf34",
+      "kind": "commit",
+      "occurred_at": "2025-11-04T09:41:40Z",
+      "text": "commit eb322ce251b5c4347650afc455171d862c51bf34\nSwitch from running on PRs wasm_mvp to wasm_eh\n\ndiff -- .github/workflows/Extensions.yml\n@@ -93,7 +93,7 @@ jobs:\n \n     env:\n       # NOTE: on PRs we exclude some archs to speed things up\n-      BASE_EXCLUDE_ARCHS: ${{ (github.event_name == 'pull_request' || inputs.run_all != 'true') && 'wasm_eh;wasm_threads;windows_amd64_mingw;osx_amd64;linux_arm64;linux_amd64_musl;' || '' }}\n+      BASE_EXCLUDE_ARCHS: ${{ (github.event_name == 'pull_request' || inputs.run_all != 'true') && 'wasm_mvp;wasm_threads;windows_amd64_mingw;osx_amd64;linux_arm64;linux_amd64_musl;' || '' }}\n       EXTRA_EXCLUDE_ARCHS: ${{ inputs.extra_exclude_archs }}\n     steps:\n       - uses: actions/checkout@v4",
+      "links": [
+        "license:4e1fbb7695a7e4fb679d654ce5391c1a20fa8c5f"
+      ],
+      "attributes": {
+        "sha": "eb322ce251b5c4347650afc455171d862c51bf34"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/commits/eb322ce251b5c4347650afc455171d862c51bf34"
+    },
+    {
+      "id": "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+      "kind": "commit",
+      "occurred_at": "2025-11-04T09:45:32Z",
+      "text": "commit 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nMove also [persistence] tests back under ENABLE_UNITTEST_CPP_TESTS\n\ndiff -- test/CMakeLists.txt\n@@ -34,7 +34,9 @@ if(NOT WIN32 AND NOT SUN)\n   if(${BUILD_TPCE})\n     add_subdirectory(tpce)\n   endif()\n-  add_subdirectory(persistence)\n+  if(${ENABLE_UNITTEST_CPP_TESTS})\n+    add_subdirectory(persistence)\n+  endif()\n endif()\n \n set(UNITTEST_ROOT_DIRECTORY",
+      "links": [
+        "license:4e1fbb7695a7e4fb679d654ce5391c1a20fa8c5f"
+      ],
+      "attributes": {
+        "sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/commits/133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+    },
+    {
+      "id": "ci:54451563213",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T09:45:49Z",
+      "text": "CI check Mark as draft for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54451563213 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Mark as draft",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-04T09:45:50Z",
+        "completed_at": "2025-11-04T09:45:49Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54451563213"
+    },
+    {
+      "id": "ci:54451643068",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T09:46:36Z",
+      "text": "CI check Placeholder for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54451643068 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Placeholder",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-04T09:46:42Z",
+        "completed_at": "2025-11-04T09:46:36Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54451643068"
+    },
+    {
+      "id": "ci:54451928558",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T09:49:53Z",
+      "text": "CI check create_or_label_issue for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54451928558 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "create_or_label_issue",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-04T09:49:53Z",
+        "completed_at": "2025-11-04T09:49:53Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54451928558"
+    },
+    {
+      "id": "ci:54451928563",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T09:49:53Z",
+      "text": "CI check create_documentation_issue for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54451928563 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "create_documentation_issue",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-04T09:49:53Z",
+        "completed_at": "2025-11-04T09:49:53Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54451928563"
+    },
+    {
+      "id": "ci:54451633341",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T09:53:01Z",
+      "text": "CI check check-draft for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54451633341 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T09:52:58Z",
+        "completed_at": "2025-11-04T09:53:01Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54451633341"
+    },
+    {
+      "id": "ci:54451633382",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T10:16:27Z",
+      "text": "CI check check-draft for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54451633382 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:16:25Z",
+        "completed_at": "2025-11-04T10:16:27Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54451633382"
+    },
+    {
+      "id": "ci:54451633427",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T10:16:27Z",
+      "text": "CI check check-draft for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54451633427 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:16:25Z",
+        "completed_at": "2025-11-04T10:16:27Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54451633427"
+    },
+    {
+      "id": "ci:54451633214",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T10:22:39Z",
+      "text": "CI check check-draft for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54451633214 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:22:37Z",
+        "completed_at": "2025-11-04T10:22:39Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54451633214"
+    },
+    {
+      "id": "ci:54454884343",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T10:26:02Z",
+      "text": "CI check Format Check for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54454884343 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Format Check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:24:04Z",
+        "completed_at": "2025-11-04T10:26:02Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54454884343"
+    },
+    {
+      "id": "ci:54454332526",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T10:29:46Z",
+      "text": "CI check Amalgamation Tests for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54454332526 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Amalgamation Tests",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:27:05Z",
+        "completed_at": "2025-11-04T10:29:46Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54454332526"
+    },
+    {
+      "id": "ci:54455186757",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T10:42:11Z",
+      "text": "CI check C Enum Integrity Check for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54455186757 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "C Enum Integrity Check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:41:39Z",
+        "completed_at": "2025-11-04T10:42:11Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54455186757"
+    },
+    {
+      "id": "ci:54451635095",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T10:51:28Z",
+      "text": "CI check check-draft for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54451635095 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:51:25Z",
+        "completed_at": "2025-11-04T10:51:28Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54451635095"
+    },
+    {
+      "id": "ci:54451633347",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T10:52:17Z",
+      "text": "CI check check-draft for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54451633347 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:52:14Z",
+        "completed_at": "2025-11-04T10:52:17Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54451633347"
+    },
+    {
+      "id": "ci:54454332008",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T10:57:47Z",
+      "text": "CI check Storage Size Regression Test for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54454332008 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Storage Size Regression Test",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:24:01Z",
+        "completed_at": "2025-11-04T10:57:47Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54454332008"
+    },
+    {
+      "id": "ci:54455186773",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T11:17:21Z",
+      "text": "CI check Tidy Check for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54455186773 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Tidy Check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:30:30Z",
+        "completed_at": "2025-11-04T11:17:21Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54455186773"
+    },
+    {
+      "id": "ci:54457411342",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T11:30:33Z",
+      "text": "CI check Load Extension Configs for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54457411342 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Load Extension Configs",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T11:30:04Z",
+        "completed_at": "2025-11-04T11:30:33Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54457411342"
+    },
+    {
+      "id": "ci:54454332469",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T11:35:32Z",
+      "text": "CI check Linux Debug for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54454332469 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Linux Debug",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:27:05Z",
+        "completed_at": "2025-11-04T11:35:32Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54454332469"
+    },
+    {
+      "id": "ci:54454332038",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T11:39:27Z",
+      "text": "CI check Regression Test Join Order Plan Cost for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54454332038 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Regression Test Join Order Plan Cost",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T11:03:36Z",
+        "completed_at": "2025-11-04T11:39:27Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54454332038"
+    },
+    {
+      "id": "ci:54454332030",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T11:44:05Z",
+      "text": "CI check Regression test binary size for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54454332030 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Regression test binary size",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T11:06:40Z",
+        "completed_at": "2025-11-04T11:44:05Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54454332030"
+    },
+    {
+      "id": "ci:54452203899",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T11:50:15Z",
+      "text": "CI check Linux CLI (amd64) for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54452203899 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Linux CLI (amd64)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:24:55Z",
+        "completed_at": "2025-11-04T11:50:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54452203899"
+    },
+    {
+      "id": "ci:54452203905",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T11:55:50Z",
+      "text": "CI check Linux CLI (arm64) for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54452203905 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Linux CLI (arm64)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T09:58:13Z",
+        "completed_at": "2025-11-04T11:55:50Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54452203905"
+    },
+    {
+      "id": "ci:54454332499",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T12:01:17Z",
+      "text": "CI check Tests a release build with different configurations for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54454332499 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Tests a release build with different configurations",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:18:42Z",
+        "completed_at": "2025-11-04T12:01:17Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54454332499"
+    },
+    {
+      "id": "ci:54457480099",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T12:03:39Z",
+      "text": "CI check Windows (64 Bit) for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54457480099 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Windows (64 Bit)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:54:25Z",
+        "completed_at": "2025-11-04T12:03:39Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54457480099"
+    },
+    {
+      "id": "ci:54463338538",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T12:03:39Z",
+      "text": "CI check Windows (32 Bit) for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54463338538 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Windows (32 Bit)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-04T12:03:39Z",
+        "completed_at": "2025-11-04T12:03:39Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54463338538"
+    },
+    {
+      "id": "ci:54463338690",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T12:03:39Z",
+      "text": "CI check Windows (ARM64) for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54463338690 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Windows (ARM64)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-04T12:03:39Z",
+        "completed_at": "2025-11-04T12:03:39Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54463338690"
+    },
+    {
+      "id": "ci:54463338696",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T12:03:39Z",
+      "text": "CI check win-packaged-upload for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54463338696 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "win-packaged-upload",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-04T12:03:39Z",
+        "completed_at": "2025-11-04T12:03:39Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54463338696"
+    },
+    {
+      "id": "ci:54462697504",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T12:10:14Z",
+      "text": "CI check Upload libduckdb-src.zip for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54462697504 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Upload libduckdb-src.zip",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T12:09:33Z",
+        "completed_at": "2025-11-04T12:10:14Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54462697504"
+    },
+    {
+      "id": "ci:54460708940",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T12:16:54Z",
+      "text": "CI check Main Extensions / Build / Generate matrix for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54460708940 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Main Extensions / Build / Generate matrix",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T12:16:47Z",
+        "completed_at": "2025-11-04T12:16:54Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54460708940"
+    },
+    {
+      "id": "ci:54454332006",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T12:20:02Z",
+      "text": "CI check Regression Tests for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54454332006 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Regression Tests",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:46:48Z",
+        "completed_at": "2025-11-04T12:20:02Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54454332006"
+    },
+    {
+      "id": "ci:54462697489",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T12:24:00Z",
+      "text": "CI check Symbol Leakage for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54462697489 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Symbol Leakage",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T12:19:51Z",
+        "completed_at": "2025-11-04T12:24:00Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54462697489"
+    },
+    {
+      "id": "ci:54460708970",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T12:27:29Z",
+      "text": "CI check Rust-based Extensions / Build / Generate matrix for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54460708970 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Rust-based Extensions / Build / Generate matrix",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T12:27:22Z",
+        "completed_at": "2025-11-04T12:27:29Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54460708970"
+    },
+    {
+      "id": "ci:54454332477",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T12:30:11Z",
+      "text": "CI check Linux Release (full suite) for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54454332477 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Linux Release (full suite)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T10:51:32Z",
+        "completed_at": "2025-11-04T12:30:11Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54454332477"
+    },
+    {
+      "id": "ci:54460709046",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T12:32:57Z",
+      "text": "CI check External Extensions / Build / Generate matrix for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54460709046 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "External Extensions / Build / Generate matrix",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T12:32:53Z",
+        "completed_at": "2025-11-04T12:32:57Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54460709046"
+    },
+    {
+      "id": "ci:54463338421",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T12:35:23Z",
+      "text": "CI check MinGW (64 Bit) for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54463338421 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "MinGW (64 Bit)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T12:09:48Z",
+        "completed_at": "2025-11-04T12:35:23Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54463338421"
+    },
+    {
+      "id": "ci:54463131102",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T12:36:22Z",
+      "text": "CI check Valgrind for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54463131102 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Valgrind",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T12:22:22Z",
+        "completed_at": "2025-11-04T12:36:22Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54463131102"
+    },
+    {
+      "id": "ci:54463131081",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T13:07:57Z",
+      "text": "CI check Vector Sizes for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54463131081 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Vector Sizes",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T12:20:11Z",
+        "completed_at": "2025-11-04T13:07:57Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54463131081"
+    },
+    {
+      "id": "ci:54465892567",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T13:18:42Z",
+      "text": "CI check External Extensions / Build / Linux (linux_amd64, ubuntu-24.04, x64-linux-release, x64-linux-release, true) for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54465892567 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "External Extensions / Build / Linux (linux_amd64, ubuntu-24.04, x64-linux-release, x64-linux-release, true)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T12:54:25Z",
+        "completed_at": "2025-11-04T13:18:42Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54465892567"
+    },
+    {
+      "id": "ci:54469950745",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T13:18:42Z",
+      "text": "CI check External Extensions / Build / Windows for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54469950745 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "External Extensions / Build / Windows",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-04T13:18:42Z",
+        "completed_at": "2025-11-04T13:18:42Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54469950745"
+    },
+    {
+      "id": "ci:54469950866",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T13:18:42Z",
+      "text": "CI check External Extensions / Build / DuckDB-Wasm for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54469950866 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "External Extensions / Build / DuckDB-Wasm",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-04T13:18:42Z",
+        "completed_at": "2025-11-04T13:18:42Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54469950866"
+    },
+    {
+      "id": "ci:54465425902",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T13:19:13Z",
+      "text": "CI check Rust-based Extensions / Build / Linux (linux_amd64, ubuntu-24.04, x64-linux-release, x64-linux-release, true) for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54465425902 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Rust-based Extensions / Build / Linux (linux_amd64, ubuntu-24.04, x64-linux-release, x64-linux-release, true)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T12:51:15Z",
+        "completed_at": "2025-11-04T13:19:13Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54465425902"
+    },
+    {
+      "id": "ci:54470001870",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T13:19:14Z",
+      "text": "CI check Rust-based Extensions / Build / DuckDB-Wasm for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54470001870 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Rust-based Extensions / Build / DuckDB-Wasm",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-04T13:19:14Z",
+        "completed_at": "2025-11-04T13:19:14Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54470001870"
+    },
+    {
+      "id": "ci:54463131094",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T13:36:49Z",
+      "text": "CI check No String Inline / Destroy Unpinned Blocks for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54463131094 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "No String Inline / Destroy Unpinned Blocks",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T12:19:16Z",
+        "completed_at": "2025-11-04T13:36:49Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54463131094"
+    },
+    {
+      "id": "ci:54463131119",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T13:52:36Z",
+      "text": "CI check Thread Sanitizer for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54463131119 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Thread Sanitizer",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T12:24:17Z",
+        "completed_at": "2025-11-04T13:52:36Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54463131119"
+    },
+    {
+      "id": "ci:54470001914",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T13:59:20Z",
+      "text": "CI check Rust-based Extensions / Build / Windows (windows_amd64, x64-windows-static-md-release-vs2019comp, x64-windows-static-md-release-v... for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54470001914 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Rust-based Extensions / Build / Windows (windows_amd64, x64-windows-static-md-release-vs2019comp, x64-windows-static-md-release-v...",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T13:21:30Z",
+        "completed_at": "2025-11-04T13:59:20Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54470001914"
+    },
+    {
+      "id": "ci:54464514377",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T14:27:09Z",
+      "text": "CI check Main Extensions / Build / Linux (linux_amd64, ubuntu-24.04, x64-linux-release, x64-linux-release, true) for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54464514377 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Main Extensions / Build / Linux (linux_amd64, ubuntu-24.04, x64-linux-release, x64-linux-release, true)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T12:48:45Z",
+        "completed_at": "2025-11-04T14:27:09Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54464514377"
+    },
+    {
+      "id": "ci:54470001907",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T14:32:34Z",
+      "text": "CI check Rust-based Extensions / Build / MacOS (osx_arm64, arm64, arm64-osx-release, arm64-osx-release, true) for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54470001907 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Rust-based Extensions / Build / MacOS (osx_arm64, arm64, arm64-osx-release, arm64-osx-release, true)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T14:14:46Z",
+        "completed_at": "2025-11-04T14:32:34Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54470001907"
+    },
+    {
+      "id": "ci:54469950652",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T14:43:53Z",
+      "text": "CI check External Extensions / Build / MacOS (osx_arm64, arm64, arm64-osx-release, arm64-osx-release, true) for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54469950652 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "External Extensions / Build / MacOS (osx_arm64, arm64, arm64-osx-release, arm64-osx-release, true)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T14:14:47Z",
+        "completed_at": "2025-11-04T14:43:53Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54469950652"
+    },
+    {
+      "id": "ci:54476947939",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T16:32:57Z",
+      "text": "CI check Main Extensions / Build / Windows (windows_amd64, x64-windows-static-md-release-vs2019comp, x64-windows-static-md-release-v... for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54476947939 status=completed conclusion=failure",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Main Extensions / Build / Windows (windows_amd64, x64-windows-static-md-release-vs2019comp, x64-windows-static-md-release-v...",
+        "status": "completed",
+        "conclusion": "failure",
+        "started_at": "2025-11-04T14:27:38Z",
+        "completed_at": "2025-11-04T16:32:57Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54476947939"
+    },
+    {
+      "id": "ci:54476948028",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T17:19:44Z",
+      "text": "CI check Main Extensions / Build / MacOS (osx_arm64, arm64, arm64-osx-release, arm64-osx-release, true) for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54476948028 status=completed conclusion=failure",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Main Extensions / Build / MacOS (osx_arm64, arm64, arm64-osx-release, arm64-osx-release, true)",
+        "status": "completed",
+        "conclusion": "failure",
+        "started_at": "2025-11-04T15:33:13Z",
+        "completed_at": "2025-11-04T17:19:44Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54476948028"
+    },
+    {
+      "id": "ci:54476948016",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T18:36:08Z",
+      "text": "CI check Main Extensions / Build / DuckDB-Wasm (wasm_eh, wasm32-emscripten, x64-linux, false) for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54476948016 status=completed conclusion=success",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Main Extensions / Build / DuckDB-Wasm (wasm_eh, wasm32-emscripten, x64-linux, false)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-04T17:37:45Z",
+        "completed_at": "2025-11-04T18:36:08Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54476948016"
+    },
+    {
+      "id": "ci:54502790059",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T18:36:10Z",
+      "text": "CI check Create Extension Repository for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54502790059 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Create Extension Repository",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-04T18:36:10Z",
+        "completed_at": "2025-11-04T18:36:10Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54502790059"
+    },
+    {
+      "id": "ci:54502790989",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T18:36:11Z",
+      "text": "CI check Checks extension entries for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54502790989 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Checks extension entries",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-04T18:36:11Z",
+        "completed_at": "2025-11-04T18:36:11Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54502790989"
+    },
+    {
+      "id": "ci:54502790997",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T18:36:11Z",
+      "text": "CI check Extension Autoloading Tests for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54502790997 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Extension Autoloading Tests",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-04T18:36:11Z",
+        "completed_at": "2025-11-04T18:36:11Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54502790997"
+    },
+    {
+      "id": "ci:54502791009",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-04T18:36:11Z",
+      "text": "CI check Upload Extensions for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54502791009 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "Upload Extensions",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-04T18:36:11Z",
+        "completed_at": "2025-11-04T18:36:11Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54502791009"
+    },
+    {
+      "id": "commit:e719c837851f016ea614b28380685de8794ccf39",
+      "kind": "commit",
+      "occurred_at": "2025-11-05T10:04:57Z",
+      "text": "commit e719c837851f016ea614b28380685de8794ccf39\nRevert \"Add ducklake tests\"\n\nThis reverts commit b77a9615117de845fa48463f09be20a89dea7434.\n\ndiff -- .github/config/extensions/ducklake.cmake\n@@ -2,5 +2,4 @@ duckdb_extension_load(ducklake\n     DONT_LINK\n     GIT_URL https://github.com/duckdb/ducklake\n     GIT_TAG 2554312f71916ba11530c838b5c8c65b4786825c\n-    LOAD_TESTS\n )",
+      "links": [
+        "license:4e1fbb7695a7e4fb679d654ce5391c1a20fa8c5f"
+      ],
+      "attributes": {
+        "sha": "e719c837851f016ea614b28380685de8794ccf39"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/commits/e719c837851f016ea614b28380685de8794ccf39"
+    },
+    {
+      "id": "ci:54563829201",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:05:29Z",
+      "text": "CI check create_documentation_issue for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54563829201 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "create_documentation_issue",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:05:29Z",
+        "completed_at": "2025-11-05T10:05:29Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54563829201"
+    },
+    {
+      "id": "ci:54563829210",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:05:29Z",
+      "text": "CI check create_or_label_issue for 133a15ee61a64a831de46e4407f38d8bdd7b71f5\nrun_id=54563829210 status=completed conclusion=skipped",
+      "links": [
+        "commit:133a15ee61a64a831de46e4407f38d8bdd7b71f5"
+      ],
+      "attributes": {
+        "head_sha": "133a15ee61a64a831de46e4407f38d8bdd7b71f5",
+        "name": "create_or_label_issue",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:05:29Z",
+        "completed_at": "2025-11-05T10:05:29Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54563829210"
+    },
+    {
+      "id": "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+      "kind": "commit",
+      "occurred_at": "2025-11-05T10:07:40Z",
+      "text": "commit e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nAvoid testing httpfs on Windows (fix incoming)\n\ndiff -- .github/config/extensions/httpfs.cmake\n@@ -1,5 +1,11 @@\n+IF (NOT WIN32)\n+    set(LOAD_HTTPFS_TESTS \"LOAD_TESTS\")\n+else ()\n+    set(LOAD_HTTPFS_TESTS \"\")\n+endif()\n duckdb_extension_load(httpfs\n-    LOAD_TESTS\n+    # TODO: restore once httpfs is fixed\n+    ${LOAD_HTTPFS_TESTS}\n     GIT_URL https://github.com/duckdb/duckdb-httpfs\n     GIT_TAG 8356a9017444f54018159718c8017ff7db4ea756\n     INCLUDE_DIR src/include",
+      "links": [
+        "license:4e1fbb7695a7e4fb679d654ce5391c1a20fa8c5f"
+      ],
+      "attributes": {
+        "sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/commits/e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+    },
+    {
+      "id": "ci:54564058166",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:00Z",
+      "text": "CI check Mark as draft for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564058166 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Mark as draft",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:07:55Z",
+        "completed_at": "2025-11-05T10:08:00Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564058166"
+    },
+    {
+      "id": "ci:54564093984",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Format Check for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564093984 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Format Check",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564093984"
+    },
+    {
+      "id": "ci:54564094035",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Regression Tests for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094035 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Regression Tests",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094035"
+    },
+    {
+      "id": "ci:54564094055",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check check-draft for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094055 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094055"
+    },
+    {
+      "id": "ci:54564094069",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Tidy Check for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094069 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Tidy Check",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094069"
+    },
+    {
+      "id": "ci:54564094072",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Regression test binary size for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094072 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Regression test binary size",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094072"
+    },
+    {
+      "id": "ci:54564094074",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Regression Test Join Order Plan Cost for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094074 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Regression Test Join Order Plan Cost",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094074"
+    },
+    {
+      "id": "ci:54564094107",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check check-draft for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094107 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094107"
+    },
+    {
+      "id": "ci:54564094124",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check C Enum Integrity Check for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094124 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "C Enum Integrity Check",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094124"
+    },
+    {
+      "id": "ci:54564094138",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Windows (64 Bit) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094138 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Windows (64 Bit)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094138"
+    },
+    {
+      "id": "ci:54564094195",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check MinGW (64 Bit) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094195 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "MinGW (64 Bit)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094195"
+    },
+    {
+      "id": "ci:54564094276",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Windows (32 Bit) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094276 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Windows (32 Bit)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094276"
+    },
+    {
+      "id": "ci:54564094292",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check check-draft for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094292 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094292"
+    },
+    {
+      "id": "ci:54564094315",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check check-draft for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094315 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094315"
+    },
+    {
+      "id": "ci:54564094331",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check check-draft for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094331 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094331"
+    },
+    {
+      "id": "ci:54564094342",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check win-packaged-upload for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094342 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "win-packaged-upload",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094342"
+    },
+    {
+      "id": "ci:54564094400",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Storage Size Regression Test for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094400 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Storage Size Regression Test",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094400"
+    },
+    {
+      "id": "ci:54564094441",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Windows (ARM64) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094441 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Windows (ARM64)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094441"
+    },
+    {
+      "id": "ci:54564094712",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Upload libduckdb-src.zip for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094712 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Upload libduckdb-src.zip",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094712"
+    },
+    {
+      "id": "ci:54564094774",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Linux CLI (${{ matrix.config.arch }}) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094774 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Linux CLI (${{ matrix.config.arch }})",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094774"
+    },
+    {
+      "id": "ci:54564094977",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Symbol Leakage for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564094977 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Symbol Leakage",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564094977"
+    },
+    {
+      "id": "ci:54564095201",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Linux Debug for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095201 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Linux Debug",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095201"
+    },
+    {
+      "id": "ci:54564095295",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Amalgamation Tests for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095295 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Amalgamation Tests",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095295"
+    },
+    {
+      "id": "ci:54564095329",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Linux Release (full suite) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095329 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Linux Release (full suite)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:15Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095329"
+    },
+    {
+      "id": "ci:54564095445",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Tests a release build with different configurations for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095445 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Tests a release build with different configurations",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:16Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095445"
+    },
+    {
+      "id": "ci:54564095454",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Load Extension Configs for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095454 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Load Extension Configs",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:16Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095454"
+    },
+    {
+      "id": "ci:54564095542",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Main Extensions for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095542 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Main Extensions",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:16Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095542"
+    },
+    {
+      "id": "ci:54564095596",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check External Extensions for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095596 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "External Extensions",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:16Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095596"
+    },
+    {
+      "id": "ci:54564095623",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Valgrind for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095623 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Valgrind",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:16Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095623"
+    },
+    {
+      "id": "ci:54564095749",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Thread Sanitizer for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095749 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Thread Sanitizer",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:16Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095749"
+    },
+    {
+      "id": "ci:54564095792",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Vector Sizes for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095792 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Vector Sizes",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:16Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095792"
+    },
+    {
+      "id": "ci:54564095821",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check Rust-based Extensions for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095821 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Rust-based Extensions",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:16Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095821"
+    },
+    {
+      "id": "ci:54564095835",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check No String Inline / Destroy Unpinned Blocks for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095835 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "No String Inline / Destroy Unpinned Blocks",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:16Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095835"
+    },
+    {
+      "id": "ci:54564109117",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:15Z",
+      "text": "CI check check-draft for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564109117 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:24Z",
+        "completed_at": "2025-11-05T10:08:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564109117"
+    },
+    {
+      "id": "ci:54564095760",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:16Z",
+      "text": "CI check Extension Autoloading Tests for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095760 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Extension Autoloading Tests",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:16Z",
+        "completed_at": "2025-11-05T10:08:16Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095760"
+    },
+    {
+      "id": "ci:54564095822",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:16Z",
+      "text": "CI check Create Extension Repository for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095822 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Create Extension Repository",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:16Z",
+        "completed_at": "2025-11-05T10:08:16Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095822"
+    },
+    {
+      "id": "ci:54564095842",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:16Z",
+      "text": "CI check Upload Extensions for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095842 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Upload Extensions",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:16Z",
+        "completed_at": "2025-11-05T10:08:16Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095842"
+    },
+    {
+      "id": "ci:54564095973",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:16Z",
+      "text": "CI check Checks extension entries for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564095973 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Checks extension entries",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:16Z",
+        "completed_at": "2025-11-05T10:08:16Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564095973"
+    },
+    {
+      "id": "ci:54564116197",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:28Z",
+      "text": "CI check Placeholder for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564116197 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Placeholder",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:08:29Z",
+        "completed_at": "2025-11-05T10:08:28Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564116197"
+    },
+    {
+      "id": "ci:54564116039",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:33Z",
+      "text": "CI check check-draft for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564116039 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:31Z",
+        "completed_at": "2025-11-05T10:08:33Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564116039"
+    },
+    {
+      "id": "ci:54564116307",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:34Z",
+      "text": "CI check check-draft for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564116307 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:31Z",
+        "completed_at": "2025-11-05T10:08:34Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564116307"
+    },
+    {
+      "id": "ci:54564116845",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:34Z",
+      "text": "CI check check-draft for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564116845 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:32Z",
+        "completed_at": "2025-11-05T10:08:34Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564116845"
+    },
+    {
+      "id": "ci:54564117133",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:34Z",
+      "text": "CI check check-draft for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564117133 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:32Z",
+        "completed_at": "2025-11-05T10:08:34Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564117133"
+    },
+    {
+      "id": "ci:54564116078",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:35Z",
+      "text": "CI check check-draft for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564116078 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:32Z",
+        "completed_at": "2025-11-05T10:08:35Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564116078"
+    },
+    {
+      "id": "ci:54564116269",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:08:36Z",
+      "text": "CI check check-draft for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564116269 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "check-draft",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:32Z",
+        "completed_at": "2025-11-05T10:08:36Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564116269"
+    },
+    {
+      "id": "ci:54564125603",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:09:07Z",
+      "text": "CI check Load Extension Configs for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564125603 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Load Extension Configs",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:37Z",
+        "completed_at": "2025-11-05T10:09:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564125603"
+    },
+    {
+      "id": "ci:54564176048",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:09:15Z",
+      "text": "CI check External Extensions / Build / Generate matrix for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564176048 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "External Extensions / Build / Generate matrix",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:09:11Z",
+        "completed_at": "2025-11-05T10:09:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564176048"
+    },
+    {
+      "id": "ci:54564175993",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:09:16Z",
+      "text": "CI check Rust-based Extensions / Build / Generate matrix for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564175993 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Rust-based Extensions / Build / Generate matrix",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:09:11Z",
+        "completed_at": "2025-11-05T10:09:16Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564175993"
+    },
+    {
+      "id": "ci:54564176036",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:09:18Z",
+      "text": "CI check Main Extensions / Build / Generate matrix for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564176036 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Main Extensions / Build / Generate matrix",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:09:11Z",
+        "completed_at": "2025-11-05T10:09:18Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564176036"
+    },
+    {
+      "id": "ci:54564125416",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:10:23Z",
+      "text": "CI check Format Check for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564125416 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Format Check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:37Z",
+        "completed_at": "2025-11-05T10:10:23Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564125416"
+    },
+    {
+      "id": "ci:54564305930",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:11:10Z",
+      "text": "CI check C Enum Integrity Check for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564305930 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "C Enum Integrity Check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:10:36Z",
+        "completed_at": "2025-11-05T10:11:10Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564305930"
+    },
+    {
+      "id": "ci:54564127771",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:11:25Z",
+      "text": "CI check Amalgamation Tests for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564127771 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Amalgamation Tests",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:39Z",
+        "completed_at": "2025-11-05T10:11:25Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564127771"
+    },
+    {
+      "id": "ci:54564128952",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:13:21Z",
+      "text": "CI check Storage Size Regression Test for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564128952 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Storage Size Regression Test",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:40Z",
+        "completed_at": "2025-11-05T10:13:21Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564128952"
+    },
+    {
+      "id": "ci:54564128956",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:13:51Z",
+      "text": "CI check Regression test binary size for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564128956 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Regression test binary size",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:40Z",
+        "completed_at": "2025-11-05T10:13:51Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564128956"
+    },
+    {
+      "id": "ci:54564128997",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:15:17Z",
+      "text": "CI check Regression Test Join Order Plan Cost for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564128997 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Regression Test Join Order Plan Cost",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:40Z",
+        "completed_at": "2025-11-05T10:15:17Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564128997"
+    },
+    {
+      "id": "ci:54564187325",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:31:25Z",
+      "text": "CI check External Extensions / Build / Linux (linux_amd64, ubuntu-24.04, x64-linux-release, x64-linux-release, true) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564187325 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "External Extensions / Build / Linux (linux_amd64, ubuntu-24.04, x64-linux-release, x64-linux-release, true)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:09:19Z",
+        "completed_at": "2025-11-05T10:31:25Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564187325"
+    },
+    {
+      "id": "ci:54566189329",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:31:25Z",
+      "text": "CI check External Extensions / Build / DuckDB-Wasm for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54566189329 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "External Extensions / Build / DuckDB-Wasm",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:31:25Z",
+        "completed_at": "2025-11-05T10:31:25Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54566189329"
+    },
+    {
+      "id": "ci:54566189503",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:31:25Z",
+      "text": "CI check External Extensions / Build / Windows for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54566189503 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "External Extensions / Build / Windows",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:31:26Z",
+        "completed_at": "2025-11-05T10:31:25Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54566189503"
+    },
+    {
+      "id": "ci:54564189309",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:37:24Z",
+      "text": "CI check Rust-based Extensions / Build / Linux (linux_amd64, ubuntu-24.04, x64-linux-release, x64-linux-release, true) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564189309 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Rust-based Extensions / Build / Linux (linux_amd64, ubuntu-24.04, x64-linux-release, x64-linux-release, true)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:09:19Z",
+        "completed_at": "2025-11-05T10:37:24Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564189309"
+    },
+    {
+      "id": "ci:54566701179",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:37:25Z",
+      "text": "CI check Rust-based Extensions / Build / DuckDB-Wasm for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54566701179 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Rust-based Extensions / Build / DuckDB-Wasm",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T10:37:25Z",
+        "completed_at": "2025-11-05T10:37:25Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54566701179"
+    },
+    {
+      "id": "ci:54564127689",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:43:07Z",
+      "text": "CI check Linux Debug for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564127689 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Linux Debug",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:38Z",
+        "completed_at": "2025-11-05T10:43:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564127689"
+    },
+    {
+      "id": "ci:54566189174",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:47:07Z",
+      "text": "CI check External Extensions / Build / MacOS (osx_arm64, arm64, arm64-osx-release, arm64-osx-release, true) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54566189174 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "External Extensions / Build / MacOS (osx_arm64, arm64, arm64-osx-release, arm64-osx-release, true)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:31:28Z",
+        "completed_at": "2025-11-05T10:47:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54566189174"
+    },
+    {
+      "id": "ci:54564305860",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T10:58:17Z",
+      "text": "CI check Tidy Check for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564305860 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Tidy Check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:10:36Z",
+        "completed_at": "2025-11-05T10:58:17Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564305860"
+    },
+    {
+      "id": "ci:54564129009",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T11:05:06Z",
+      "text": "CI check Regression Tests for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564129009 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Regression Tests",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:40Z",
+        "completed_at": "2025-11-05T11:05:06Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564129009"
+    },
+    {
+      "id": "ci:54566700921",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T11:07:32Z",
+      "text": "CI check Rust-based Extensions / Build / MacOS (osx_arm64, arm64, arm64-osx-release, arm64-osx-release, true) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54566700921 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Rust-based Extensions / Build / MacOS (osx_arm64, arm64, arm64-osx-release, arm64-osx-release, true)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:37:28Z",
+        "completed_at": "2025-11-05T11:07:32Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54566700921"
+    },
+    {
+      "id": "ci:54566700933",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T11:14:38Z",
+      "text": "CI check Rust-based Extensions / Build / Windows (windows_amd64, x64-windows-static-md-release-vs2019comp, x64-windows-static-md-release-v... for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54566700933 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Rust-based Extensions / Build / Windows (windows_amd64, x64-windows-static-md-release-vs2019comp, x64-windows-static-md-release-v...",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:37:29Z",
+        "completed_at": "2025-11-05T11:14:38Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54566700933"
+    },
+    {
+      "id": "ci:54564126010",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T11:20:05Z",
+      "text": "CI check Windows (64 Bit) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564126010 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Windows (64 Bit)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:48Z",
+        "completed_at": "2025-11-05T11:20:05Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564126010"
+    },
+    {
+      "id": "ci:54570304066",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T11:20:05Z",
+      "text": "CI check Windows (ARM64) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54570304066 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Windows (ARM64)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T11:20:05Z",
+        "completed_at": "2025-11-05T11:20:05Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54570304066"
+    },
+    {
+      "id": "ci:54570304107",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T11:20:05Z",
+      "text": "CI check Windows (32 Bit) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54570304107 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Windows (32 Bit)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T11:20:06Z",
+        "completed_at": "2025-11-05T11:20:05Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54570304107"
+    },
+    {
+      "id": "ci:54570304278",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T11:20:05Z",
+      "text": "CI check win-packaged-upload for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54570304278 status=completed conclusion=skipped",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "win-packaged-upload",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2025-11-05T11:20:06Z",
+        "completed_at": "2025-11-05T11:20:05Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54570304278"
+    },
+    {
+      "id": "ci:54564124174",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T11:33:26Z",
+      "text": "CI check Linux CLI (amd64) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564124174 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Linux CLI (amd64)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:37Z",
+        "completed_at": "2025-11-05T11:33:26Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564124174"
+    },
+    {
+      "id": "ci:54564192103",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T11:45:11Z",
+      "text": "CI check Main Extensions / Build / Linux (linux_amd64, ubuntu-24.04, x64-linux-release, x64-linux-release, true) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564192103 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Main Extensions / Build / Linux (linux_amd64, ubuntu-24.04, x64-linux-release, x64-linux-release, true)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:09:23Z",
+        "completed_at": "2025-11-05T11:45:11Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564192103"
+    },
+    {
+      "id": "ci:54570303993",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T11:46:00Z",
+      "text": "CI check MinGW (64 Bit) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54570303993 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "MinGW (64 Bit)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T11:20:09Z",
+        "completed_at": "2025-11-05T11:46:00Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54570303993"
+    },
+    {
+      "id": "ci:54564127690",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T11:46:22Z",
+      "text": "CI check Linux Release (full suite) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564127690 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Linux Release (full suite)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:39Z",
+        "completed_at": "2025-11-05T11:46:22Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564127690"
+    },
+    {
+      "id": "ci:54564127759",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T11:51:05Z",
+      "text": "CI check Tests a release build with different configurations for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564127759 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Tests a release build with different configurations",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:39Z",
+        "completed_at": "2025-11-05T11:51:05Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564127759"
+    },
+    {
+      "id": "ci:54564124157",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T12:04:13Z",
+      "text": "CI check Linux CLI (arm64) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54564124157 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Linux CLI (arm64)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T10:08:40Z",
+        "completed_at": "2025-11-05T12:04:13Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54564124157"
+    },
+    {
+      "id": "ci:54573865322",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T12:04:53Z",
+      "text": "CI check Upload libduckdb-src.zip for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54573865322 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Upload libduckdb-src.zip",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T12:04:16Z",
+        "completed_at": "2025-11-05T12:04:53Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54573865322"
+    },
+    {
+      "id": "ci:54572798230",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T12:05:43Z",
+      "text": "CI check Valgrind for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54572798230 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Valgrind",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T11:51:08Z",
+        "completed_at": "2025-11-05T12:05:43Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54572798230"
+    },
+    {
+      "id": "ci:54573865332",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T12:06:29Z",
+      "text": "CI check Symbol Leakage for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54573865332 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Symbol Leakage",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T12:04:16Z",
+        "completed_at": "2025-11-05T12:06:29Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54573865332"
+    },
+    {
+      "id": "ci:54572798256",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T12:40:04Z",
+      "text": "CI check Vector Sizes for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54572798256 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Vector Sizes",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T11:51:08Z",
+        "completed_at": "2025-11-05T12:40:04Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54572798256"
+    },
+    {
+      "id": "ci:54572338572",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T12:41:36Z",
+      "text": "CI check Main Extensions / Build / DuckDB-Wasm (wasm_eh, wasm32-emscripten, x64-linux, false) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54572338572 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Main Extensions / Build / DuckDB-Wasm (wasm_eh, wasm32-emscripten, x64-linux, false)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T11:45:14Z",
+        "completed_at": "2025-11-05T12:41:36Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54572338572"
+    },
+    {
+      "id": "ci:54572798211",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T13:02:35Z",
+      "text": "CI check No String Inline / Destroy Unpinned Blocks for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54572798211 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "No String Inline / Destroy Unpinned Blocks",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T11:51:08Z",
+        "completed_at": "2025-11-05T13:02:35Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54572798211"
+    },
+    {
+      "id": "ci:54572798265",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T13:14:21Z",
+      "text": "CI check Thread Sanitizer for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54572798265 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Thread Sanitizer",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T11:51:08Z",
+        "completed_at": "2025-11-05T13:14:21Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54572798265"
+    },
+    {
+      "id": "ci:54572338554",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T13:27:40Z",
+      "text": "CI check Main Extensions / Build / MacOS (osx_arm64, arm64, arm64-osx-release, arm64-osx-release, true) for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54572338554 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Main Extensions / Build / MacOS (osx_arm64, arm64, arm64-osx-release, arm64-osx-release, true)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T11:45:15Z",
+        "completed_at": "2025-11-05T13:27:40Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54572338554"
+    },
+    {
+      "id": "ci:54572338565",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T13:40:49Z",
+      "text": "CI check Main Extensions / Build / Windows (windows_amd64, x64-windows-static-md-release-vs2019comp, x64-windows-static-md-release-v... for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54572338565 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Main Extensions / Build / Windows (windows_amd64, x64-windows-static-md-release-vs2019comp, x64-windows-static-md-release-v...",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T11:45:15Z",
+        "completed_at": "2025-11-05T13:40:49Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54572338565"
+    },
+    {
+      "id": "ci:54582551510",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T13:43:33Z",
+      "text": "CI check Create Extension Repository for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54582551510 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Create Extension Repository",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T13:40:52Z",
+        "completed_at": "2025-11-05T13:43:33Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54582551510"
+    },
+    {
+      "id": "ci:54582816741",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T13:50:49Z",
+      "text": "CI check Upload Extensions for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54582816741 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Upload Extensions",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T13:43:37Z",
+        "completed_at": "2025-11-05T13:50:49Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54582816741"
+    },
+    {
+      "id": "ci:54582816772",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T14:01:46Z",
+      "text": "CI check Checks extension entries for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54582816772 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Checks extension entries",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T13:43:37Z",
+        "completed_at": "2025-11-05T14:01:46Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54582816772"
+    },
+    {
+      "id": "ci:54582816795",
+      "kind": "ci_run",
+      "occurred_at": "2025-11-05T14:02:49Z",
+      "text": "CI check Extension Autoloading Tests for e3fb2eb8843f9ff90ad29fd69938ee6961b644dc\nrun_id=54582816795 status=completed conclusion=success",
+      "links": [
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "head_sha": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "name": "Extension Autoloading Tests",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2025-11-05T13:43:37Z",
+        "completed_at": "2025-11-05T14:02:49Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/check-runs/54582816795"
+    },
+    {
+      "id": "review:3422407284",
+      "kind": "review",
+      "occurred_at": "2025-11-05T14:27:20Z",
+      "text": "review_id=3422407284 state=APPROVED\nThanks!",
+      "links": [
+        "pull_request:19631",
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc"
+      ],
+      "attributes": {
+        "state": "APPROVED"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/pulls/19631/reviews/3422407284"
+    },
+    {
+      "id": "merge:19631",
+      "kind": "merge",
+      "occurred_at": "2025-11-05T14:27:28Z",
+      "text": "Merged pull request #19631 from validated head commit e3fb2eb8843f9ff90ad29fd69938ee6961b644dc.",
+      "links": [
+        "pull_request:19631",
+        "commit:e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "license:4e1fbb7695a7e4fb679d654ce5391c1a20fa8c5f",
+        "review:3422407284"
+      ],
+      "attributes": {
+        "commit": "e3fb2eb8843f9ff90ad29fd69938ee6961b644dc",
+        "merge_commit_sha": "2d69f075ee91c42ad4fe4208a4d1f06d0034faff"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/pulls/19631"
+    },
+    {
+      "id": "release:v1.4.2",
+      "kind": "release",
+      "occurred_at": "2025-11-12T13:04:29Z",
+      "text": "Release v1.4.2\n\nThis is a bug fix release for various issues discovered after we released 1.4.1. PR #19716 addresses the issues raised in [CVE-2025-64429]( https://github.com/duckdb/duckdb/security/advisories/GHSA-vmp8-hg63-v2hp). Users of the DuckDB encryption feature are encouraged to update.\r\n\r\n\r\n## What's Changed\r\n* bump duckdb-azure ref for 1.4.1 by @benfleis in https://github.com/duckdb/duckdb/pull/19275\r\n* Fix regex optimization to remove flags when converting to contains by @mlafeldt in https://github.com/duckdb/duckdb/pull/19290\r\n* feat: Fix length of sort keys by @krlmlr in https://github.com/duckdb/duckdb/pull/19260\r\n* Pass lambda bindings to next binder by @Dtenwolde in https://github.com/duckdb/duckdb/pull/19144\r\n* bump Julia to v1.4.1 by @c-herrewijn in https://github.com/duckdb/duckdb/pull/19306\r\n* Use cross-compilation for static libs on OSX by @hannes in https://github.com/duckdb/duckdb/pull/19304\r\n* Allow multiple read-only attaches to the same database across database instances by @Mytherin in https://github.com/duckdb/duckdb/pull/19319\r\n* hugeint_t fixes by @carlopi in https://github.com/duckdb/duckdb/pull/19318\r\n* Use CMAKE_<LANG>_COMPILER_LAUNCHER by @evertlammerts in https://github.com/duckdb/duckdb/pull/19326\r\n* Add settings field to test config by @Mytherin in https://github.com/duckdb/duckdb/pull/19330\r\n* Keep track of which database managers have which databases attached in the DatabaseFilePathManager by @Mytherin in https://github.com/duckdb/duckdb/pull/19338\r\n* Bugfixes by @lnkuiper in https://github.com/duckdb/duckdb/pull/19329\r\n* skip several ci jobs on prs that only bump extensions by @samansmink in https://github.com/duckdb/duckdb/pull/19249\r\n* [C API] bind_value out of range fix by @taniabogatsch in https://github.com/duckdb/duckdb/pull/19348\r\n* Destroy TaskNotifier prior to calling FinishTask by @Mytherin in https://github.com/duckdb/duckdb/pull/19373\r\n* Remove zip bombs by @Mytherin in https://github.com/duckdb/duckdb/pull/19380\r\n* Avoid calling shared_from_this() and instead use the passed in ClientContext in buffered data by @Mytherin in https://github.com/duckdb/duckdb/pull/19379\r\n* add test tag support [vfs integration tests p1] by @benfleis in https://github.com/duckdb/duckdb/pull/19331\r\n* Throw if non-`VARCHAR` key is passed to `json_object` by @lnkuiper in https://github.com/duckdb/duckdb/pull/19365\r\n* BUGFIX: Silent failure to write row groups with large lists by @J-Meyers in https://github.com/duckdb/duckdb/pull/19376\r\n* Fixes for CTE (de)serialization compatibility with older versions by @Mytherin in https://github.com/duckdb/duckdb/pull/19393\r\n* Fix #18139: correctly initialize flush size in MemoryStream, and re-use writer states by @Mytherin in https://github.com/duckdb/duckdb/pull/19398\r\n* Fixup Kalman fiter: bound it's (0, scale_factor), not (0, 1) by @carlopi in https://github.com/duckdb/duckdb/pull/19395\r\n* Fix StringDecompress for hugeint_t values by @ywelsch in https://github.com/duckdb/duckdb/pull/19403\r\n* Fix #19211: make INSERT OR IGNORE correctly handle multiple constraints by @Mytherin in https://github.com/duckdb/duckdb/pull/19409\r\n* Issue #19386: ICU TZDEFAULT by @hawkfish in https://github.com/duckdb/duckdb/pull/19413\r\n* Fix issue in MetadataManager triggered when doing concurrent reads while checkpointing, and rework concurrent attach / detach test by @Mytherin in https://github.com/duckdb/duckdb/pull/19424\r\n* ADBC fix: escape schema, table and column identifiers by @evertlammerts in https://github.com/duckdb/duckdb/pull/19407\r\n* v1.4: Only serialize CTE nodes when MATERIALIZED is specified by @Mytherin in https://github.com/duckdb/duckdb/pull/19420\r\n* Add forwards compatibility tests to CI by @Mytherin in https://github.com/duckdb/duckdb/pull/19432\r\n* Internal #6168: Unsupported Correlated Binds  by @hawkfish in https://github.com/duckdb/duckdb/pull/19431\r\n* Don't pull up filters through `DISTINCT ON` and make `enum` casts in Parquet safe (bugfixes) by @lnkuiper in https://github.com/duckdb/duckdb/pull/19406\r\n* Get table bindings for all operators under a logical get if the logical get function is an unnest by @Tmonster in https://github.com/duckdb/duckdb/pull/19467\r\n* WASM #1897: UTC Offset Support by @hawkfish in https://github.com/duckdb/duckdb/pull/19464\r\n* Add tests for nested lambda bindings by @Dtenwolde in https://github.com/duckdb/duckdb/pull/19453\r\n* [Compression] Fix issue in ZSTD decompression related to mis-interpreted segment offsets by @Tishj in https://github.com/duckdb/duckdb/pull/19475\r\n* vfs integration tests p2 - update (env) vars and tests by @benfleis in https://github.com/duckdb/duckdb/pull/19428\r\n* CI Fix: clear benchmark cache between runs by @Mytherin in https://github.com/duckdb/duckdb/pull/19508\r\n* Make `DatabaseInstance::log_manager` a `unique_ptr` by @Flogex in https://github.com/duckdb/duckdb/pull/19471\r\n* Support non-standard NULL in Parquet again by @Mytherin in https://github.com/duckdb/duckdb/pull/19523\r\n* Bump: inet by @samansmink in https://github.com/duckdb/duckdb/pull/19526\r\n* Bump multiple extensions by @samansmink in https://github.com/duckdb/duckdb/pull/19522\r\n* add upcoming patch release to internal versions by @samansmink in https://github.com/duckdb/duckdb/pull/19525\r\n* Add test that either 'latest' or 'vX.Y.Z' are supported STORAGE_VERSIONs by @carlopi in https://github.com/duckdb/duckdb/pull/19527\r\n* Moving staging to cf and uploading to install bucket by @hannes in https://github.com/duckdb/duckdb/pull/19539\r\n* Creating separate OSX cli binaries for each arch by @hannes in https://github.com/duckdb/duckdb/pull/19538\r\n* [Dev] Disable the use of `ZSTD` if the block_manager is the `InMemoryBlockManager` by @Tishj in https://github.com/duckdb/duckdb/pull/19543\r\n* Follow up to staging move by @hannes in https://github.com/duckdb/duckdb/pull/19551\r\n* Bugfixes: Parquet JSON+DELTA_LENGTH_BYTE_ARRAY and sorting iterator by @lnkuiper in https://github.com/duckdb/duckdb/pull/19556\r\n* [ported from main] Fix bug initializing std::vector for column names by @evertlammerts in https://github.com/duckdb/duckdb/pull/19555\r\n* Disable jemalloc on BSD by @lnkuiper in https://github.com/duckdb/duckdb/pull/19560\r\n* Fix race condition between `Append` and `Scan` by @Captain32 in https://github.com/duckdb/duckdb/pull/19571\r\n* Release relevant tests to still be run on all builds by @carlopi in https://github.com/duckdb/duckdb/pull/19559\r\n* fix inconsistent behavior in remote read_file/blob, and prevent union… by @Maxxen in https://github.com/duckdb/duckdb/pull/19531\r\n* [v1.4-andium] Add Profiler output to logger interface by @carlopi in https://github.com/duckdb/duckdb/pull/19572\r\n* Fix edge case in uncompressed validity scan with offset and fix off-by-one in ArrayColumnData::Select by @Maxxen in https://github.com/duckdb/duckdb/pull/19567\r\n* Skip compiling remote optimizer test when TSAN Is enabled by @Mytherin in https://github.com/duckdb/duckdb/pull/19590\r\n* Wal index deletes by @artjomPlaunov in https://github.com/duckdb/duckdb/pull/19477\r\n* add vortex external extension by @samansmink in https://github.com/duckdb/duckdb/pull/19580\r\n* Avoid eagerly resolving the next on-disk pointer in the MetadataReader, as that pointer might not always be valid by @Mytherin in https://github.com/duckdb/duckdb/pull/19588\r\n* [DevEx] Improve error message when FROM clause is omitted by @Tishj in https://github.com/duckdb/duckdb/pull/18995\r\n* bump iceberg by @Tmonster in https://github.com/duckdb/duckdb/pull/19618\r\n* Improve error message around compression type deprecation/availability checks by @Tishj in https://github.com/duckdb/duckdb/pull/19619\r\n* Increase cast-cost of old-style implicit cast to string by @Maxxen in https://github.com/duckdb/duckdb/pull/19621\r\n* Try to prevent overshooting of `FILE_SIZE_BYTES` by pre-emptively increasing bytes written in Parquet writer by @lnkuiper in https://github.com/duckdb/duckdb/pull/19622\r\n* Bump: spatial by @Maxxen in https://github.com/duckdb/duckdb/pull/19620\r\n* Detect invalid merge into action and throw exception by @Mytherin in https://github.com/duckdb/duckdb/pull/19636\r\n* Fix #19455: correctly extract root table in merge into when running ajoin that contains single-sided predicates that are transformed into filters by @Mytherin in https://github.com/duckdb/duckdb/pull/19637\r\n* Remove `FlushAll` from `DETACH` by @lnkuiper in https://github.com/duckdb/duckdb/pull/19644\r\n* Bump MySQL scanner by @staticlibs in https://github.com/duckdb/duckdb/pull/19643\r\n* Enable running all extensions tests as part of the build step by @carlopi in https://github.com/duckdb/duckdb/pull/19631\r\n* Always remember extra_metadata_blocks when checkpointing by @ywelsch in https://github.com/duckdb/duckdb/pull/19639\r\n* duckdb_logs_parsed to do case-insensitive matching by @carlopi in https://github.com/duckdb/duckdb/pull/19669\r\n* Categorize ParseLogMessage as CAN_THROW_RUNTIME_ERROR by @carlopi in https://github.com/duckdb/duckdb/pull/19672\r\n* Fixup linking for LLVM by @carlopi in https://github.com/duckdb/duckdb/pull/19668\r\n* Log total probe matches in hash join by @lnkuiper in https://github.com/duckdb/duckdb/pull/19683\r\n* Fix InsertRelation on attached database by @evertlammerts in https://github.com/duckdb/duckdb/pull/19583\r\n* Add request timing to HTTP log by @samansmink in https://github.com/duckdb/duckdb/pull/19691\r\n* Add missing query location to blob cast by @Mytherin in https://github.com/duckdb/duckdb/pull/19689\r\n* Bump: aws, ducklake, httpfs, iceberg by @samansmink in https://github.com/duckdb/duckdb/pull/19654\r\n* Bump: delta, ducklake, httpfs by @samansmink in https://github.com/duckdb/duckdb/pull/19715\r\n* Fix #19355: correctly resolve subquery in MERGE INTO action condition by @Mytherin in https://github.com/duckdb/duckdb/pull/19720\r\n* Fix #19700: correctly sort output selection vector in nested selection operations by @Mytherin in https://github.com/duckdb/duckdb/pull/19718\r\n* Bump httpfs and resume testing on Windows by @carlopi in https://github.com/duckdb/duckdb/pull/19714\r\n* [Dev] Fix assertion failure for empty ColumnData serialization by @Tishj in https://github.com/duckdb/duckdb/pull/19713\r\n* Bump the Postgres scanner extension by @Mytherin in https://github.com/duckdb/duckdb/pull/19730\r\n* Add explicit Initialize(HTTPParam&) method to HTTPClient by @carlopi in https://github.com/duckdb/duckdb/pull/19723\r\n* Logs to be case-insensitive also at enable_logging callsite by @carlopi in https://github.com/duckdb/duckdb/pull/19734\r\n* Fix CVE https://github.com/duckdb/duckdb/security/advisories/GHSA-vmp8-hg63-v2hp crypto issues by @samansmink in https://github.com/duckdb/duckdb/pull/19716\r\n\r\n\r\n**Full Changelog**: https://github.com/duckdb/duckdb/compare/v1.4.1...v1.4.2",
+      "links": [
+        "pull_request:19631",
+        "merge:19631",
+        "ci:54564127771",
+        "ci:54564305930",
+        "ci:54582816772",
+        "ci:54582551510",
+        "ci:54582816795",
+        "ci:54564095596",
+        "ci:54566189329",
+        "ci:54564176048",
+        "ci:54564187325",
+        "ci:54566189174",
+        "ci:54566189503",
+        "ci:54564125416",
+        "ci:54564094774",
+        "ci:54564124174",
+        "ci:54564124157",
+        "ci:54564127689",
+        "ci:54564127690",
+        "ci:54564125603",
+        "ci:54564095542",
+        "ci:54572338572",
+        "ci:54564176036",
+        "ci:54564192103",
+        "ci:54572338554",
+        "ci:54572338565",
+        "ci:54564058166",
+        "ci:54570303993",
+        "ci:54572798211",
+        "ci:54564116197",
+        "ci:54564128997",
+        "ci:54564129009",
+        "ci:54564128956",
+        "ci:54564095821",
+        "ci:54566701179",
+        "ci:54564175993",
+        "ci:54564189309",
+        "ci:54566700921",
+        "ci:54566700933",
+        "ci:54564128952",
+        "ci:54573865332",
+        "ci:54564127759",
+        "ci:54572798265",
+        "ci:54564305860",
+        "ci:54582816741",
+        "ci:54573865322",
+        "ci:54572798230",
+        "ci:54572798256",
+        "ci:54570304107",
+        "ci:54564126010",
+        "ci:54570304066",
+        "ci:54564117133",
+        "ci:54570304278"
+      ],
+      "attributes": {
+        "tag": "v1.4.2",
+        "target_commitish": "68d7555f68bd25c1a251ccca2e6338949c33986a",
+        "tag_commit_sha": "68d7555f68bd25c1a251ccca2e6338949c33986a",
+        "merge_commit_sha": "2d69f075ee91c42ad4fe4208a4d1f06d0034faff",
+        "ancestry_verified": true,
+        "compare_status": "ahead",
+        "compare_base_sha": "2d69f075ee91c42ad4fe4208a4d1f06d0034faff",
+        "compare_head_sha": "68d7555f68bd25c1a251ccca2e6338949c33986a",
+        "compare_endpoint": "https://api.github.com/repos/duckdb/duckdb/compare/2d69f075ee91c42ad4fe4208a4d1f06d0034faff...68d7555f68bd25c1a251ccca2e6338949c33986a",
+        "compare_response_sha256": "18daabbe453153852b198f3423c3666c4e68f61732d3642bd2b6f0b3b2407597",
+        "ci_evidence_scope": "observed_selected_final_pre_merge_check_runs",
+        "required_check_policy_verified": false,
+        "required_check_policy_requirement": "external_signed_policy_required_for_production_eligibility"
+      },
+      "source_pointer": "https://api.github.com/repos/duckdb/duckdb/releases/261384737"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "git_workflow",
+    "role": "source",
+    "key_id": "probe-source-e4bac7778cdcfa3808f3c373b474e85f",
+    "environment": "probe",
+    "digest": "699fe72f76b6233f3e1cfb199997187b52b47725ce3250bac1c6f7027141f3c9"
+  }
+}

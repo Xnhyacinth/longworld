@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.p52-govinfo-geometry-plan.v1",
+  "base_generation_config": "configs/p52_govinfo_bill_disposition_structural_span_generation_v2.json",
+  "transitions": [
+    {"bill_id": "118-HR-4366", "from_stage": "eas", "to_stage": "eah"},
+    {"bill_id": "118-HR-815", "from_stage": "eas", "to_stage": "eah"}
+  ],
+  "maximum_combinations_per_transition": 12,
+  "selection_rule": "Freeze all trial keys before pack/window evaluation. Among unambiguous whole-section modified pairs choose the first three keys by absolute required-only shared CF token delta, then lexical structural key. Pair each anchor as D02 with lexical key quantiles 0, 1/3, 2/3, 1 as D01, excluding equality. Append remaining lexical keys to at most six requests. Never use artifact hash or observed evidence position to select keys. Preserve the existing whole-section filler order and packer, source chronology, exact bands, and all gates.",
+  "train_ready": false,
+  "inventory_delta": 0
+}

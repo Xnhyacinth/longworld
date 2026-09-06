@@ -1,0 +1,95 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr24360_support.json",
+      "sha256": "750dac05c87818eb8329b58941f3ebcaa28ae89d25a02709c6eae3d9ae7284bf"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr25585_support.json",
+      "sha256": "93edd5fc9dec0c28750965ac4fedb98c8bf3ebed4595765318f3a9b1e0d7ec14"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr25909_crates_v0.146.0.json",
+      "sha256": "f35a0d4f4f9cbf37f02ba5f0ea9a7e36a9ca2db507366868fb9388cc7298bd37"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr25403_crates_v0.147.0.json",
+      "sha256": "1867e896dbbc2f5596ac0cedc0535010a4618214d355e1b58db9c2f26fcb613e"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26021_support.json",
+      "sha256": "f8fa9c100cc16c792297d977477b11e337e879d5e65def91643e3ecbeba59104"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26047_support.json",
+      "sha256": "c77fbd33dcb0894fec18b9b16e7dcc249c126657bcb2089c7b4aa4fa518f3c7f"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26081_support.json",
+      "sha256": "48baa0543cf0f9447af1b69f71d6c823219cc13bfed241ef4ffc1e4f5e3cc627"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26050_support.json",
+      "sha256": "94c26c0ef1fd868dcc408b8e9a5b19fb0ad94f8d214cb4767a338156764d38eb"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr25944_support.json",
+      "sha256": "3f37657167ce5f4b6e89864ec8b7d4b58c038bc7f9f8038bb2a3be46f4c60348"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26084_support.json",
+      "sha256": "308a1891884c020c6a0e69ecb5fa891e21d0e30e769205bc573216d5bad2a98c"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26099_support.json",
+      "sha256": "589031e3a9349af1a44d6d8d6684082b392219e7486799c84d73b678584ad021"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26142_support.json",
+      "sha256": "b20a925048daddf27b5767ca983fb19535d153901220f81695dbccddc0e3770e"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26144_support.json",
+      "sha256": "4fbacb2266abe4e2eeb6a6b5c6c672cce9b815b69e3274a5ae78694ad3d42cf0"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26169_support.json",
+      "sha256": "31595b27ba1a2ed9efa2b489bd4c117cfd6d729aa0bd2ae4f85d97ff1124fc84"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26128_support.json",
+      "sha256": "1a66e96094f0c238d46e0e64d3717343b7935dcb996ac496a81ad8e24e2b4b32"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr25930_support.json",
+      "sha256": "300a3a21c4facc21caa025f8cbb30081d6ba3f8d68bc4c3efbae6dca7adf9ee9"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26172_crates_v0.148.0.json",
+      "sha256": "3266f218512c83c46e53d09e7b6b80dee8da605fe1dfeaac19cbcdd29ad43223"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr25958_crates_v0.147.0.json",
+      "sha256": "4b3aaf966efcfb30de7408a8b964f912b61be312f187ddab9c665f0b7a4be334"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr25975_crates_v0.147.0.json",
+      "sha256": "5cd9bff4cf3ba1c2ad405ec726ceca23c32558fb18c0f09e77983ed99a0d1133"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr25986_support.json",
+      "sha256": "28ebdf55706759c6c237e0e44aec20f77f9ac553e6645e3b0087115d28046fa5"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "probe-source-e4bac7778cdcfa3808f3c373b474e85f",
+    "environment": "probe",
+    "digest": "521abc39ba2d804fcba769849783aee1a74f7fa8924dee715871e989dfe3f3f3"
+  }
+}

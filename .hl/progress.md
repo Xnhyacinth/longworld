@@ -970,3 +970,57 @@ in`; no private-repository or upload claim was made.
   scoped. The report now marks topology `PARTIAL`, executable minimal evidence
   `UNVERIFIED`, and rights `NEEDS_CANDIDATE_REVIEW`; the corrected metadata
   projection retains only the structurally parsed corrected-by edge.
+
+## 2026-09-06 execution checkpoint
+
+- User requested sustained parallel synthesis and world expansion; three workers
+  now execute P54 exact-source oracles, P52 alternative transitions, and Ofgem
+  public tables with a subsequent Alphabet entity track. Root owns shared audit
+  and inventory integration. No gate/profile relaxation or GPU training.
+- Existing trust loader rejected two old private roots because their parent
+  directories no longer have mode 0700. Left shared roots and signed products
+  unchanged; created separate per-track local-probe roots outside Git through
+  the existing initializer, then validated mode/ACL/role isolation with the
+  existing loader. They remain local diagnostic trust, not production KMS.
+- P52 froze 21 combinations from two actual bills, rejected nine 32K geometry
+  cases, and materialized 36 signed candidate parents. These are neither 36
+  worlds nor train-ready rows. HR815 has flat necessary support at 64K→128K;
+  HR4366 needs a shared-formula proof-growth precheck before dense computation.
+- Root projected HR4366 EAS→EAH trial 01 into nine standard candidates and
+  verified shared structural preflight 9/9. The candidate file digest is
+  `1ba404afdb46f856fadee19128ac6f8cbc96c402b120c3e5da232e8b90b57ae7`.
+  Dense/raw-window/selection/promotion remain pending, not implied by preflight.
+- P54 rebuilt proposal→act qualification values and an exact metadata adoption
+  edge from official bytes. Its first 32K pack exposes a 16K shortcut; preserve
+  that rejection and test a different real cross-reference dependency program.
+- Ofgem's public table delta is answerable from 483 tokens; three NTSB final
+  statuses also have short evidence. Those probes do not produce long tasks.
+  Alphabet's current issuer index yielded five genuine annual filing bundles;
+  explicit source-parser compatibility is being implemented before parents.
+- Actual B5 content/answer identity matches the corresponding product rows via
+  the existing four-field training identity. Current B5 spans 14 train world IDs,
+  32 dossiers, and seven domain labels; counts remain 80. The P14 B5 reduction
+  follows the frozen equal-token ablation export, so it is not a dropped-row bug
+  or an invitation to relax that profile to inflate training inventory.
+- P52 growth 01 was directly rejected by shared raw-window upper-bound replay
+  at ordered 32K offsets 4258:20642. Existing frozen bases 04/05 also failed in
+  full/CF. New necessary-request schedules 4→8→16 and 6→12→24 passed 32K
+  shared raw proof across all views and exact proof-growth checks. Root's full
+  shared signed audit has completed 32K/64K for the first schedule; 128K is
+  running. All-M factual labels imply a separate analytical shortcut, so these
+  remain diagnostic while P56 creates bounded mixed R/M tasks.
+- Alphabet v3 supplies four authentic parent bands and twelve exact standard
+  views. The 128K task consumes source-bound segment/geography revenue and
+  hedge reconciliation; lower bands exclude these tables. Independent review
+  reproduced and then verified fixes for annual-duration, axis/member, and
+  hedge-concept substitution bugs. All 48 source/finance tests pass; original
+  v1/v2/v3 signed manifests still validate without re-signing. Root's full
+  shared signed audits have passed 16K/32K/64K; 128K is running.
+- Shared audits use the existing `create_task_dense_audit` function in separate
+  CPU-bounded processes by length band, retaining the same candidate, ranker,
+  source, and auditor bindings. Partial audit files do not enter inventory;
+  full profile selection and promotion remain mandatory.
+- P54's first PMS parent is superseded diagnostic evidence pending a corrected
+  source-driven Article83 scope and updated selected-span rights coverage.
+  Independent review also rejected requiring an unrelated neighboring sentence
+  after the complete risk-control list. No P54 train-ready claim is made.

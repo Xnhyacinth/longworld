@@ -1,0 +1,495 @@
+{
+  "schema_version": "longworld.p56-mixed-constant-baselines.v1",
+  "scope": "measured on signed projected candidate answer labels, not model evaluation; views and schedules are not independent worlds",
+  "rows": [
+    {
+      "trial_id": "mixed-01",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-01-20260906:128k:full:first:standard:cf",
+      "view": "cf",
+      "length_bucket": "128k",
+      "actual_context_tokens": 128404,
+      "candidate_file_sha256": "37e8d3c76bb78a871dd10f2e367427217ef0762f153703516deaf50632cc41b6",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 11,
+          "total_labels": 16
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 5,
+          "total_labels": 16
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 12,
+          "total_labels": 16
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-01",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-01-20260906:128k:full:first:standard:full",
+      "view": "full",
+      "length_bucket": "128k",
+      "actual_context_tokens": 128622,
+      "candidate_file_sha256": "37e8d3c76bb78a871dd10f2e367427217ef0762f153703516deaf50632cc41b6",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 12,
+          "total_labels": 16
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 4,
+          "total_labels": 16
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 11,
+          "total_labels": 16
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-01",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-01-20260906:128k:full:first:standard:ordered_artifact_view",
+      "view": "ordered_artifact_view",
+      "length_bucket": "128k",
+      "actual_context_tokens": 128622,
+      "candidate_file_sha256": "37e8d3c76bb78a871dd10f2e367427217ef0762f153703516deaf50632cc41b6",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 12,
+          "total_labels": 16
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 4,
+          "total_labels": 16
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 11,
+          "total_labels": 16
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-01",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-01-20260906:32k:full:first:standard:cf",
+      "view": "cf",
+      "length_bucket": "32k",
+      "actual_context_tokens": 32108,
+      "candidate_file_sha256": "37e8d3c76bb78a871dd10f2e367427217ef0762f153703516deaf50632cc41b6",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 2,
+          "total_labels": 4
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 2,
+          "total_labels": 4
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 3,
+          "total_labels": 4
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-01",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-01-20260906:32k:full:first:standard:full",
+      "view": "full",
+      "length_bucket": "32k",
+      "actual_context_tokens": 32326,
+      "candidate_file_sha256": "37e8d3c76bb78a871dd10f2e367427217ef0762f153703516deaf50632cc41b6",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 3,
+          "total_labels": 4
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 1,
+          "total_labels": 4
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 2,
+          "total_labels": 4
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-01",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-01-20260906:32k:full:first:standard:ordered_artifact_view",
+      "view": "ordered_artifact_view",
+      "length_bucket": "32k",
+      "actual_context_tokens": 32326,
+      "candidate_file_sha256": "37e8d3c76bb78a871dd10f2e367427217ef0762f153703516deaf50632cc41b6",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 3,
+          "total_labels": 4
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 1,
+          "total_labels": 4
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 2,
+          "total_labels": 4
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-01",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-01-20260906:64k:full:first:standard:cf",
+      "view": "cf",
+      "length_bucket": "64k",
+      "actual_context_tokens": 64158,
+      "candidate_file_sha256": "37e8d3c76bb78a871dd10f2e367427217ef0762f153703516deaf50632cc41b6",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 5,
+          "total_labels": 8
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 3,
+          "total_labels": 8
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 6,
+          "total_labels": 8
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-01",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-01-20260906:64k:full:first:standard:full",
+      "view": "full",
+      "length_bucket": "64k",
+      "actual_context_tokens": 64376,
+      "candidate_file_sha256": "37e8d3c76bb78a871dd10f2e367427217ef0762f153703516deaf50632cc41b6",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 6,
+          "total_labels": 8
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 2,
+          "total_labels": 8
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 5,
+          "total_labels": 8
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-01",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-01-20260906:64k:full:first:standard:ordered_artifact_view",
+      "view": "ordered_artifact_view",
+      "length_bucket": "64k",
+      "actual_context_tokens": 64376,
+      "candidate_file_sha256": "37e8d3c76bb78a871dd10f2e367427217ef0762f153703516deaf50632cc41b6",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 6,
+          "total_labels": 8
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 2,
+          "total_labels": 8
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 5,
+          "total_labels": 8
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-03",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-03-20260906:128k:full:first:standard:cf",
+      "view": "cf",
+      "length_bucket": "128k",
+      "actual_context_tokens": 128334,
+      "candidate_file_sha256": "217c63ef1189a5a694e64bd60499693be530a14363bcaf438ca172af4c545df4",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 15,
+          "total_labels": 24
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 9,
+          "total_labels": 24
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 14,
+          "total_labels": 24
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-03",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-03-20260906:128k:full:first:standard:full",
+      "view": "full",
+      "length_bucket": "128k",
+      "actual_context_tokens": 128319,
+      "candidate_file_sha256": "217c63ef1189a5a694e64bd60499693be530a14363bcaf438ca172af4c545df4",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 16,
+          "total_labels": 24
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 8,
+          "total_labels": 24
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 15,
+          "total_labels": 24
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-03",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-03-20260906:128k:full:first:standard:ordered_artifact_view",
+      "view": "ordered_artifact_view",
+      "length_bucket": "128k",
+      "actual_context_tokens": 128319,
+      "candidate_file_sha256": "217c63ef1189a5a694e64bd60499693be530a14363bcaf438ca172af4c545df4",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 16,
+          "total_labels": 24
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 8,
+          "total_labels": 24
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 15,
+          "total_labels": 24
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-03",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-03-20260906:32k:full:first:standard:cf",
+      "view": "cf",
+      "length_bucket": "32k",
+      "actual_context_tokens": 32136,
+      "candidate_file_sha256": "217c63ef1189a5a694e64bd60499693be530a14363bcaf438ca172af4c545df4",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 3,
+          "total_labels": 6
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 3,
+          "total_labels": 6
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 2,
+          "total_labels": 6
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-03",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-03-20260906:32k:full:first:standard:full",
+      "view": "full",
+      "length_bucket": "32k",
+      "actual_context_tokens": 32121,
+      "candidate_file_sha256": "217c63ef1189a5a694e64bd60499693be530a14363bcaf438ca172af4c545df4",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 4,
+          "total_labels": 6
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 2,
+          "total_labels": 6
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 3,
+          "total_labels": 6
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-03",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-03-20260906:32k:full:first:standard:ordered_artifact_view",
+      "view": "ordered_artifact_view",
+      "length_bucket": "32k",
+      "actual_context_tokens": 32121,
+      "candidate_file_sha256": "217c63ef1189a5a694e64bd60499693be530a14363bcaf438ca172af4c545df4",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 4,
+          "total_labels": 6
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 2,
+          "total_labels": 6
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 3,
+          "total_labels": 6
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-03",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-03-20260906:64k:full:first:standard:cf",
+      "view": "cf",
+      "length_bucket": "64k",
+      "actual_context_tokens": 64107,
+      "candidate_file_sha256": "217c63ef1189a5a694e64bd60499693be530a14363bcaf438ca172af4c545df4",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 7,
+          "total_labels": 12
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 5,
+          "total_labels": 12
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 6,
+          "total_labels": 12
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-03",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-03-20260906:64k:full:first:standard:full",
+      "view": "full",
+      "length_bucket": "64k",
+      "actual_context_tokens": 64092,
+      "candidate_file_sha256": "217c63ef1189a5a694e64bd60499693be530a14363bcaf438ca172af4c545df4",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 8,
+          "total_labels": 12
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 4,
+          "total_labels": 12
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 7,
+          "total_labels": 12
+        }
+      }
+    },
+    {
+      "trial_id": "mixed-03",
+      "query_id": "govinfo-118-hr4366-eas-eah-mixed-03-20260906:64k:full:first:standard:ordered_artifact_view",
+      "view": "ordered_artifact_view",
+      "length_bucket": "64k",
+      "actual_context_tokens": 64092,
+      "candidate_file_sha256": "217c63ef1189a5a694e64bd60499693be530a14363bcaf438ca172af4c545df4",
+      "scores": {
+        "always_M": {
+          "exact_match": false,
+          "correct_labels": 8,
+          "total_labels": 12
+        },
+        "always_R": {
+          "exact_match": false,
+          "correct_labels": 4,
+          "total_labels": 12
+        },
+        "fixed_D02_R_else_M": {
+          "exact_match": false,
+          "correct_labels": 7,
+          "total_labels": 12
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "always_M": {
+      "exact_matches": 0,
+      "correct_labels": 141,
+      "total_labels": 210,
+      "rows": 18,
+      "label_accuracy": 0.6714285714285714,
+      "exact_match_rate": 0.0
+    },
+    "always_R": {
+      "exact_matches": 0,
+      "correct_labels": 69,
+      "total_labels": 210,
+      "rows": 18,
+      "label_accuracy": 0.32857142857142857,
+      "exact_match_rate": 0.0
+    },
+    "fixed_D02_R_else_M": {
+      "exact_matches": 0,
+      "correct_labels": 129,
+      "total_labels": 210,
+      "rows": 18,
+      "label_accuracy": 0.6142857142857143,
+      "exact_match_rate": 0.0
+    }
+  },
+  "posthoc_periodic_baseline": {
+    "pattern": "MMMRRM",
+    "period": 6,
+    "exact_matches": 4,
+    "correct_labels": 153,
+    "total_labels": 210,
+    "rows": 18,
+    "templates_tested": 126,
+    "predeclared": false,
+    "scope": "all binary M/R positional templates of periods 1..6, selected on these same rows; not a held-out model evaluation"
+  },
+  "train_ready": false,
+  "inventory_delta": 0
+}

@@ -1,0 +1,272 @@
+{
+  "candidate_count": 0,
+  "config_sha256": "853be79f06ef03631a504a8890fb26665007c68c64c4844854ab6660814ba290",
+  "counterfactual_replay": {
+    "answer": {
+      "first_unresolved_reference": "Annex I Section 4",
+      "parsed_path": [
+        "Article 15 PMS duty",
+        "Article 10(10)",
+        "Article 83",
+        "Article 84 reverse-reference plan",
+        "Annex III Section 1.1",
+        "Annex I Section 3"
+      ],
+      "risk_control_priority": "UNKNOWN",
+      "surveillance_risk_scope": {
+        "annex": "I",
+        "chapter": "I"
+      }
+    },
+    "status": "PARTIAL"
+  },
+  "formal_shared_audit_run": false,
+  "full_replay": {
+    "answer": {
+      "first_unresolved_reference": null,
+      "parsed_path": [
+        "Article 15 PMS duty",
+        "Article 10(10)",
+        "Article 83",
+        "Article 84 reverse-reference plan",
+        "Annex III Section 1.1",
+        "Annex I Section 3",
+        "Annex I Section 4"
+      ],
+      "risk_control_priority": [
+        "eliminate or reduce risks as far as possible through safe design and manufacture",
+        "where appropriate, take adequate protection measures, including alarms if necessary, in relation to risks that cannot be eliminated",
+        "provide information for safety (warnings/precautions/contra-indications) and, where appropriate, training to users"
+      ],
+      "surveillance_risk_scope": {
+        "annex": "I",
+        "chapter": "I"
+      }
+    },
+    "status": "PASS"
+  },
+  "geometry": {
+    "all_views_in_32k_band": true,
+    "background_near_duplicates_removed": 22,
+    "context_sha256": "3d0d2e8bab4cea91e37546383450f6f535a25d16f639b7d94c436d972efd6090",
+    "counterfactual": "omit the authentic Annex I Section 4 block; retain the proved prefix through Section 3 and report Section 4 as first unresolved",
+    "essential_whole_artifact_positions": {
+      "act:1082965": {
+        "token_end": 23970,
+        "token_start": 23441
+      },
+      "act:249702": {
+        "token_end": 5865,
+        "token_start": 4120
+      },
+      "act:299162": {
+        "token_end": 7259,
+        "token_start": 6650
+      },
+      "act:691685": {
+        "token_end": 15116,
+        "token_start": 14732
+      },
+      "act:699811": {
+        "token_end": 15193,
+        "token_start": 15121
+      },
+      "act:907139": {
+        "token_end": 20536,
+        "token_start": 20151
+      },
+      "act:912768": {
+        "token_end": 20697,
+        "token_start": 20541
+      }
+    },
+    "exact_serialized_tokens": {
+      "cf": 32058,
+      "full": 32219,
+      "ordered": 32219
+    },
+    "higher_band_proof_growth": "UNVERIFIED",
+    "padding_or_cloning_or_truncation": false,
+    "raw_prefix_shortcut_found": false,
+    "raw_prefix_window_scope": "Exact pinned token prefix decoded from the serialized prompt; source-bound artifact intersections replay semantic nodes, including sufficient partial articles. One sufficient witness rejects the layout; no exhaustive success audit is claimed.",
+    "raw_prefix_window_trials": [
+      {
+        "answer": {
+          "first_unresolved_reference": "responsible-person post-market surveillance duty",
+          "parsed_path": [],
+          "risk_control_priority": "UNKNOWN",
+          "surveillance_risk_scope": null
+        },
+        "start_token": 0,
+        "status": "PARTIAL",
+        "window_text_sha256": "f313a5eb2a1d5ee7bc4f6b3216cc8f0019185fdd38855763287d88cd030afa3b",
+        "window_tokens": 4096
+      },
+      {
+        "answer": {
+          "first_unresolved_reference": "Article 83",
+          "parsed_path": [
+            "Article 15 PMS duty",
+            "Article 10(10)"
+          ],
+          "risk_control_priority": "UNKNOWN",
+          "surveillance_risk_scope": null
+        },
+        "start_token": 0,
+        "status": "PARTIAL",
+        "window_text_sha256": "e46e44d2d2addd92dfc63956a6c6f8a7c4164e85e30be8b68f5a5bd28b07df23",
+        "window_tokens": 8192
+      },
+      {
+        "answer": {
+          "first_unresolved_reference": "Annex III Section 1.1",
+          "parsed_path": [
+            "Article 15 PMS duty",
+            "Article 10(10)",
+            "Article 83",
+            "Article 84 reverse-reference plan"
+          ],
+          "risk_control_priority": "UNKNOWN",
+          "surveillance_risk_scope": {
+            "annex": "I",
+            "chapter": "I"
+          }
+        },
+        "start_token": 0,
+        "status": "PARTIAL",
+        "window_text_sha256": "869a93dc18a45decbc2abc21ca76deddd8a434d814f6fe354d546dc83b0d5d97",
+        "window_tokens": 16384
+      }
+    ],
+    "selected_artifact_count": 476,
+    "selected_artifact_ids_sha256": "cc0f1dee65e41955eb82f1213774b016da2ed5cd9e7ceb416b15637f87dc04ed",
+    "serialization": "longworld.core.pack.wrap_prompt + SEP, timing=last",
+    "shared_counterfactual_materializer_registered": false,
+    "shared_derived_view_gate": "NOT_RUN",
+    "shared_raw_window_audit": "NOT_RUN",
+    "status": "GEOMETRY_ONLY",
+    "whole_artifact_cover_span_tokens": 19850,
+    "whole_artifact_coverage_limitation": "This is not a raw-token replay audit: smaller sufficient clauses or alternate evidence may answer within a window. No shortcut PASS is claimed.",
+    "whole_artifact_coverage_only_4k_8k_16k": {
+      "16384": false,
+      "4096": false,
+      "8192": false
+    }
+  },
+  "geometry_artifacts_path": "data/research/p54-eurlex-pms-chain-20260906-v1/geometry_artifacts.json",
+  "geometry_artifacts_sha256": "0590badaaad5e5efb29352cff1abc02925f652019d60093570a9e9bc863ba153",
+  "proper_subset_count": 127,
+  "proper_subset_matches_cf": [
+    [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  ],
+  "proper_subset_matches_full": 0,
+  "rights": {
+    "candidate_background_coverage": "NEEDS_CANDIDATE_REVIEW",
+    "coverage_scope": "only the exact source spans listed in documents; no unselected background coverage",
+    "documents": {
+      "act": {
+        "attribution": "European Union, EUR-Lex, act",
+        "basis": "EUR-Lex legal-document reuse notice",
+        "selected_non_text_assets": 0,
+        "selected_spans": [
+          {
+            "byte_end": 309332,
+            "byte_start": 299162,
+            "raw_span_sha256": "8e6dbaddb18cd9b7e2edcae89a46e272d2e97f0a590c556518ac4bc26990ff37"
+          },
+          {
+            "byte_end": 269827,
+            "byte_start": 249702,
+            "raw_span_sha256": "03fb8a7487fc1e349273a1fa2db36aba891c3b91d7630fd9eaf831373eceea80"
+          },
+          {
+            "byte_end": 699811,
+            "byte_start": 691685,
+            "raw_span_sha256": "f9d5cb51405ef55dcdaf371d5cd3f1996d87a8d0e5e8d3c00856c02debdf5fef"
+          },
+          {
+            "byte_end": 700519,
+            "byte_start": 699811,
+            "raw_span_sha256": "40265213657f69377164ad802b74c1edd4cc1470515704da7d1d812fca9f751b"
+          },
+          {
+            "byte_end": 1097854,
+            "byte_start": 1082965,
+            "raw_span_sha256": "cc5ad51b1eb81409ca72f70eceb96bd422a0a5f18b4dcb6341dcc1700f5ffa70"
+          },
+          {
+            "byte_end": 912768,
+            "byte_start": 907139,
+            "raw_span_sha256": "795f7941419863b1e9317a73340a28a42799a9c013708312a536590e2c4cfaab"
+          },
+          {
+            "byte_end": 915186,
+            "byte_start": 912768,
+            "raw_span_sha256": "1f724a9216db2fc18bb7455f7ff324dd135683cd2fa95232825ad1a7df0c024e"
+          }
+        ]
+      }
+    },
+    "exclusions": [
+      "third-party works",
+      "logos and images",
+      "industrial property rights"
+    ],
+    "legal_opinion": false,
+    "normalization_disclosed": "HTML tags removed; whitespace collapsed; exact raw spans retained",
+    "notice_sha256": "650467a4a593796e872a9984ed2da27f6cba1659b90d03b6a38c642c4e19acaf",
+    "official_notice_url": "https://eur-lex.europa.eu/content/legal-notice/legal-notice.html",
+    "technical_selected_span_coverage": "PASS",
+    "whole_document_third_party_review": "NOT_PERFORMED"
+  },
+  "schema_version": "longworld.p54-eurlex-pms-chain-report.v1",
+  "selected_spans_path": "data/research/p54-eurlex-pms-chain-20260906-v1/selected_spans.json",
+  "selected_spans_sha256": "c3628716c115955ccca81c7648e173c87e67b7888e74945e09c1fade6c6b532b",
+  "shared_layout_support_windows": {
+    "full": {
+      "cf_prefix_support_window_tokens": 19084,
+      "context_tokens": 32219,
+      "full_support_window": {
+        "artifact_start": 122,
+        "artifact_stop": 410,
+        "replays_full": true,
+        "tokens": 19245
+      }
+    },
+    "ordered": {
+      "cf_prefix_support_window_tokens": 19689,
+      "context_tokens": 32219,
+      "full_support_window": {
+        "artifact_start": 61,
+        "artifact_stop": 323,
+        "replays_full": true,
+        "tokens": 19850
+      }
+    }
+  },
+  "source_receipts": [
+    {
+      "expected_bytes": 1709984,
+      "expected_sha256": "3ed27dd77a9614fb00350c3031321a43cd3ce62143e9571690d3e219104546a5",
+      "max_bytes": 1900000,
+      "role": "capacity_and_oracle",
+      "source_id": "act",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32017R0745"
+    },
+    {
+      "expected_bytes": 134752,
+      "expected_sha256": "650467a4a593796e872a9984ed2da27f6cba1659b90d03b6a38c642c4e19acaf",
+      "max_bytes": 1000000,
+      "source_id": "legal_notice",
+      "url": "https://eur-lex.europa.eu/content/legal-notice/legal-notice.html"
+    }
+  ],
+  "train_ready": false
+}

@@ -1278,6 +1278,7 @@ def _task_sidecar_matches_candidate(
             "cyber.kev_history.v1": "cyber",
             "finance.multi_filing.v1": "finance",
             "government.govinfo_bill_disposition.v1": "government_legislation",
+            "public_law.eurlex_pms_risk_control.v1": "public_law",
             "macro.gdp_vintage_reconstruction.v1": "macro_economics",
             "standards.ietf_oauth_requirement.v1": "standards",
         }

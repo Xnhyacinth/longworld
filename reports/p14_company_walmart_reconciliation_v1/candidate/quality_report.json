@@ -1,0 +1,116 @@
+{
+  "schema_version": "p3.0",
+  "data_product": "worldlong_p14_company_walmart_reconciliation_v1",
+  "data_stage": "candidate",
+  "trust_scope": "local_probe",
+  "release_profile_id": "p7-sec-source-slice-1-v1",
+  "release_profile_sha256": "a2b08e46b0fe9cfed32ca15c2c01b1074bcac9876432dc42fd803d26d1dbce84",
+  "n_worlds": 1,
+  "target_promoted_worlds": 1,
+  "n_world_ids": 1,
+  "n_rows": 9,
+  "candidate_row_set_sha256": "9f57157e116b0987643cc19fd8d4dd5305c7a524a5eb949ed3242fd455f69af6",
+  "n_questions": 1,
+  "n_question_slots": 3,
+  "n_rejects": 0,
+  "n_attempts": 6,
+  "n_kept_slots": 3,
+  "retention": 0.5,
+  "n_clones": 0,
+  "unique_full_answers": 3,
+  "n_unique_base_tasks": 1,
+  "n_unique_executable_proofs": 3,
+  "n_unique_source_relations": 2,
+  "n_unique_answer_programs": 3,
+  "n_unique_content_hashes": 9,
+  "n_exact_duplicate_rows": 0,
+  "n_topologies": 3,
+  "n_topology_families": 1,
+  "n_canonical_topologies": 3,
+  "canonical_neff": 3.0,
+  "max_canonical_share": 0.3333,
+  "mean_boilerplate_token_ratio": 0.0,
+  "mean_pulse_doc_ratio": 0.0,
+  "mean_hard_negative_doc_ratio": 0.3333,
+  "mean_real_source_token_ratio": 0.9884,
+  "n_source_grounded_full": 0,
+  "n_source_choice_full": 0,
+  "n_revisitation_full": 0,
+  "n_ratification_full": 0,
+  "n_docket_control_full": 0,
+  "n_deep_dependency_full": 0,
+  "n_long_range_retrieval_full": 3,
+  "by_dependency_class": {
+    "long_range_retrieval": 3
+  },
+  "mean_evidence_distance": 37467.3,
+  "n_registers": 1,
+  "register_neff": 1.0,
+  "by_register": {
+    "instrument": 3
+  },
+  "n_style_clusters": 1,
+  "style_cluster_neff": 1.0,
+  "by_style_cluster": {
+    "instrument:walmart_reconciliation_section": 3
+  },
+  "mean_near_dup_sentence_ratio": 0.1303,
+  "n_cross_workstream_full": 0,
+  "motif_composition_rate": 0.0,
+  "join_row_share": 0.0,
+  "n_motifs": 1,
+  "n_domains": 1,
+  "planned_worlds_by_domain": {
+    "company": 1
+  },
+  "attempted_worlds_by_domain": {
+    "company": 1
+  },
+  "emitting_worlds_by_domain": {
+    "company": 1
+  },
+  "train_questions": 1,
+  "eval_questions": 0,
+  "train_question_slots": 3,
+  "eval_question_slots": 0,
+  "by_query_type": {
+    "walmart_reconciliation_current": 3,
+    "walmart_reconciliation_transition": 3,
+    "walmart_reconciliation_full_chain": 3
+  },
+  "by_view": {
+    "full": 3,
+    "cf": 3,
+    "ordered_artifact_view": 3
+  },
+  "by_length": {
+    "16k": 3,
+    "32k": 3,
+    "64k": 3
+  },
+  "by_motif": {
+    "company.walmart_segment_strategy_capex_icfr": 9
+  },
+  "by_domain": {
+    "company": 9
+  },
+  "by_topology_family": {
+    "company.walmart_reconciliation": 9
+  },
+  "by_canonical_topology": {
+    "company|company.walmart_segment_strategy_capex_icfr|walmart_reconciliation_current|walmart_reconciliation_0_3+walmart_reconciliation_0_3+walmart_reconciliation_0_3+walmart_reconciliation_0_3+walmart_reconciliation_0_3|d2|n5": 1,
+    "company|company.walmart_segment_strategy_capex_icfr|walmart_reconciliation_transition|walmart_reconciliation_0_2+walmart_reconciliation_0_2+walmart_reconciliation_0_2+walmart_reconciliation_0_2+walmart_reconciliation_0_2+walmart_reconciliation_0_3+walmart_reconciliation_0_3+walmart_reconciliation_0_3+walmart_reconciliation_0_3+walmart_reconciliation_0_3|d2|n10": 1,
+    "company|company.walmart_segment_strategy_capex_icfr|walmart_reconciliation_full_chain|walmart_reconciliation_0_0+walmart_reconciliation_0_0+walmart_reconciliation_0_0+walmart_reconciliation_0_0+walmart_reconciliation_0_0+walmart_reconciliation_0_1+walmart_reconciliation_0_1+walmart_reconciliation_0_1+walmart_reconciliation_0_1+walmart_reconciliation_0_1+walmart_reconciliation_0_2+walmart_reconciliation_0_2+walmart_reconciliation_0_2+walmart_reconciliation_0_2+walmart_reconciliation_0_2+walmart_reconciliation_0_3+walmart_reconciliation_0_3+walmart_reconciliation_0_3+walmart_reconciliation_0_3+walmart_reconciliation_0_3|d2|n20": 1
+  },
+  "reject_reasons": {},
+  "gold_cfr": 1.0,
+  "local_probe_trust_isolation": "non_independent_local_diagnostic",
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "quality_report",
+    "role": "report",
+    "key_id": "probe-report-6cb83e952bd6fefb4a8294bab36edbe0",
+    "environment": "probe",
+    "digest": "48b84998bcfc63fed301cd442fa50ebf905376e9bd4e9e92a2bc2c03e3364751"
+  }
+}

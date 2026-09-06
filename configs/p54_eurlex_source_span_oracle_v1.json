@@ -1,0 +1,114 @@
+{
+  "schema_version": "longworld.p54-eurlex-source-span-oracle.v1",
+  "data_product": "p54-eurlex-source-span-oracle-20260906-v1",
+  "authorization": {
+    "scope": "Source persistence, exact byte-span relation and clause replay, reduced-evidence and serialized geometry research authorized by the current user task",
+    "allowed_actions": [
+      "fetch_hash_pinned_public_sources",
+      "persist_sources_and_receipts",
+      "measure_source_bound_oracle",
+      "measure_serialized_geometry"
+    ],
+    "prohibited_actions": [
+      "promote_without_shared_gates",
+      "count_preflight_as_training_inventory"
+    ]
+  },
+  "source_directory": "data/research/p54-eurlex-source-span-oracle-20260906-v1",
+  "sources": [
+    {
+      "source_id": "proposal",
+      "role": "capacity_and_oracle",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:52012PC0542",
+      "expected_bytes": 500720,
+      "expected_sha256": "324d7104f7e21e6df7d2c28d66428ac302ea35f2cb0a30345a546092b9683dcd",
+      "max_bytes": 600000
+    },
+    {
+      "source_id": "position",
+      "role": "capacity_and_oracle",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:52014AP0266",
+      "expected_bytes": 1209684,
+      "expected_sha256": "f9b43d0f3cb0f5197b1b75ba4661014e828e0183216c0317d5e9c13f79991906",
+      "max_bytes": 1400000
+    },
+    {
+      "source_id": "act",
+      "role": "capacity_and_oracle",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32017R0745",
+      "expected_bytes": 1709984,
+      "expected_sha256": "3ed27dd77a9614fb00350c3031321a43cd3ce62143e9571690d3e219104546a5",
+      "max_bytes": 1900000
+    },
+    {
+      "source_id": "corrigendum",
+      "role": "capacity_and_oracle",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32017R0745R%2801%29",
+      "expected_bytes": 20990,
+      "expected_sha256": "2f94f5313e3a2928fae84f660d8ea5922bbe230f644ea345c9a5ea4ebaa21fe1",
+      "max_bytes": 50000
+    },
+    {
+      "source_id": "metadata",
+      "role": "topology_only",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/XML/?uri=CELEX:32017R0745",
+      "expected_bytes": 1988977,
+      "expected_sha256": "6828cefc760cf398c4517a01d76b20bb5f05144455c59f6298c5bd1e0404b99b",
+      "max_bytes": 2200000
+    },
+    {
+      "source_id": "rights",
+      "role": "rights_only",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32011D0833",
+      "expected_bytes": 50410,
+      "expected_sha256": "ee6bd2e5bbb4eedc1f2e8118df6a372465e0ab18abc52f6ccfef9d73df5fb370",
+      "max_bytes": 70000
+    },
+    {
+      "source_id": "legal_notice",
+      "url": "https://eur-lex.europa.eu/content/legal-notice/legal-notice.html",
+      "expected_bytes": 134752,
+      "expected_sha256": "650467a4a593796e872a9984ed2da27f6cba1659b90d03b6a38c642c4e19acaf",
+      "max_bytes": 1000000
+    }
+  ],
+  "source_celex": {
+    "proposal": "52012PC0542",
+    "position": "52014AP0266",
+    "act": "32017R0745",
+    "corrigendum": "32017R0745R(01)"
+  },
+  "task": {
+    "answer_program": "eurlex.manufacturer_qualification.adoption_change.v1",
+    "question": "Follow the adopted act metadata to its adopted proposal. Compare the manufacturer person responsible for regulatory compliance qualification routes: report the minimum years with a diploma and with experience alone in proposal and act, plus each signed change (act minus proposal). Return UNKNOWN if the adoption relation or either source qualification cannot be established.",
+    "article_title": "Person responsible for regulatory compliance"
+  },
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "near_duplicate": {
+    "minimum_oracle_block_characters": 20,
+    "minimum_background_block_characters": 80,
+    "near_duplicate_word_shingle_size": 5,
+    "near_duplicate_jaccard_threshold": 0.9,
+    "preserve_whole_semantic_blocks": true,
+    "persist_raw_sources": false
+  },
+  "source_order": [
+    "metadata",
+    "proposal",
+    "act"
+  ],
+  "length_buckets": {
+    "32k": [
+      32000,
+      32768
+    ]
+  },
+  "candidate_count": 0,
+  "train_ready": false
+}

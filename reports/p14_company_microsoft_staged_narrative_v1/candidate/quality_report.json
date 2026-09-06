@@ -1,0 +1,113 @@
+{
+  "schema_version": "p3.0",
+  "data_product": "worldlong_p14_company_microsoft_staged_narrative_v1",
+  "data_stage": "candidate",
+  "trust_scope": "local_probe",
+  "release_profile_id": "p12-sec-source-slice-1-v1",
+  "release_profile_sha256": "a1aa2e5260782ffc1ec8e08b2d2277659b44e512b6d8df4892fa31b658eaa8ff",
+  "n_worlds": 1,
+  "target_promoted_worlds": 1,
+  "n_world_ids": 1,
+  "n_rows": 3,
+  "candidate_row_set_sha256": "beb5a2a2bb2e5e0582014cdf4a446df484bfc6ce1d229ccc4d509f50f2b391be",
+  "n_questions": 1,
+  "n_question_slots": 1,
+  "n_rejects": 2,
+  "n_attempts": 12,
+  "n_kept_slots": 1,
+  "retention": 0.0833,
+  "n_clones": 0,
+  "unique_full_answers": 1,
+  "n_unique_base_tasks": 1,
+  "n_unique_executable_proofs": 1,
+  "n_unique_source_relations": 1,
+  "n_unique_answer_programs": 1,
+  "n_unique_content_hashes": 3,
+  "n_exact_duplicate_rows": 0,
+  "n_topologies": 1,
+  "n_topology_families": 1,
+  "n_canonical_topologies": 1,
+  "canonical_neff": 1.0,
+  "max_canonical_share": 1.0,
+  "mean_boilerplate_token_ratio": 0.0,
+  "mean_pulse_doc_ratio": 0.0,
+  "mean_hard_negative_doc_ratio": 0.4375,
+  "mean_real_source_token_ratio": 0.9762,
+  "n_source_grounded_full": 0,
+  "n_source_choice_full": 0,
+  "n_revisitation_full": 0,
+  "n_ratification_full": 0,
+  "n_docket_control_full": 0,
+  "n_deep_dependency_full": 1,
+  "n_long_range_retrieval_full": 0,
+  "by_dependency_class": {
+    "deep_dependency": 1
+  },
+  "mean_evidence_distance": 64184.0,
+  "n_registers": 1,
+  "register_neff": 1.0,
+  "by_register": {
+    "ops_log": 1
+  },
+  "n_style_clusters": 1,
+  "style_cluster_neff": 1.0,
+  "by_style_cluster": {
+    "ops_log:sec_filing": 1
+  },
+  "mean_near_dup_sentence_ratio": 0.1325,
+  "n_cross_workstream_full": 0,
+  "motif_composition_rate": 0.0,
+  "join_row_share": 0.0,
+  "n_motifs": 1,
+  "n_domains": 1,
+  "planned_worlds_by_domain": {
+    "company": 1
+  },
+  "attempted_worlds_by_domain": {
+    "company": 1
+  },
+  "emitting_worlds_by_domain": {
+    "company": 1
+  },
+  "train_questions": 1,
+  "eval_questions": 0,
+  "train_question_slots": 1,
+  "eval_question_slots": 0,
+  "by_query_type": {
+    "sec_financial_narrative_reconciliation": 3
+  },
+  "by_view": {
+    "full": 1,
+    "cf": 1,
+    "ordered_artifact_view": 1
+  },
+  "by_length": {
+    "64k": 3
+  },
+  "by_motif": {
+    "source-financial-narrative-reconciliation": 3
+  },
+  "by_domain": {
+    "company": 3
+  },
+  "by_topology_family": {
+    "company.sec_financial_narrative_reconciliation": 3
+  },
+  "by_canonical_topology": {
+    "company|source-financial-narrative-reconciliation|sec_financial_narrative_reconciliation|sec_filing_0+sec_section_item1_business_0+sec_section_item7a_market_risk_0+sec_section_note11_income_taxes_0+sec_filing_0+sec_section_item1_business_0+sec_section_item2_properties_0+sec_section_item7a_market_risk_0+sec_section_item8_cash_flow_0+sec_section_note11_income_taxes_0+sec_prior_annual_0+sec_financial_narrative_64k_2_0|d3|n12": 1
+  },
+  "reject_reasons": {
+    "exact_16k_out_of_range": 1,
+    "exact_32k_out_of_range": 1
+  },
+  "gold_cfr": 1.0,
+  "local_probe_trust_isolation": "non_independent_local_diagnostic",
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "quality_report",
+    "role": "report",
+    "key_id": "probe-report-6cb83e952bd6fefb4a8294bab36edbe0",
+    "environment": "probe",
+    "digest": "5112d9e46c77a50fe5cf1946fd29ca134ceee2e2c93ca5afa2a8a00794c086ea"
+  }
+}

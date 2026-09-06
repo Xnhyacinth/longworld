@@ -1,0 +1,43 @@
+{
+  "schema_version": "longworld.public-github-export-request.v1",
+  "request_id": "p13-codeforge-ruff-first-three-view-workspace-v1",
+  "repository": "astral-sh/ruff",
+  "allowlist": "configs/public_repo_allowlist.yaml",
+  "episodes": [
+    {
+      "pull": 27626,
+      "release": "0.16.3",
+      "role": "release_cycle"
+    },
+    {
+      "pull": 27687,
+      "release": null,
+      "role": "intervening_pr_ci"
+    },
+    {
+      "pull": 27835,
+      "release": "0.16.4",
+      "role": "release_cycle"
+    },
+    {
+      "pull": 27924,
+      "release": null,
+      "role": "intervening_pr_ci"
+    },
+    {
+      "pull": 28023,
+      "release": null,
+      "role": "intervening_pr_ci"
+    },
+    {
+      "pull": 28024,
+      "release": "0.16.5",
+      "role": "release_cycle"
+    }
+  ],
+  "composition": "chronological_causal_union",
+  "synthetic_filler_allowed": false,
+  "random_join_allowed": false,
+  "trust_scope": "local_probe",
+  "notes": "Release PRs are release-cited and pass the pre-merge selected CI gate. Skipped #27251/#26460 (checks completed after merge) and fat P12 pair #27570/#17804."
+}

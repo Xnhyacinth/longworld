@@ -463,3 +463,32 @@ then centralized shared-gate review and inventory binding.
 | P52 GovInfo | blocked: 3 authentic parents and 9 candidate-stage projections; shared 8K artifact window fails, structural v2 exact-band pack emits 0 | change bill transition/task geometry; do not move background or retry the same F219/D207 or A138/F219 construction |
 | P54 EUR-Lex | partial aggregate preflight: six official MDR sources and natural 32K/64K/128K capacity, but only corrected-by is parsed; 0 candidates | bind exact relation spans and selected-document rights, register task replay, then run candidate-level exact-band and raw-token windows |
 | Integration | complete after review: train inventory remains 141 rows; B5 training-condition sample remains 80 examples | preserve immutable products; scale through new executable worlds, not view or length multiplication |
+
+## Source-to-training execution wave — 2026-09-06
+
+User requested continued rapid parallel execution, especially authentic effective
+data synthesis and world expansion. Execute the approved design in
+`reports/world_task_scaleout_plan_20260906.md`; this supersedes the old pending
+states above, without changing immutable gate profiles.
+
+| Track | Owner | Status | Current bounded deliverable |
+| --- | --- | --- | --- |
+| P54 exact-source oracle | p54 agent | in_progress | source spans, per-document reuse evidence, actual clause-transition oracle, reduced-evidence tests, then candidate adapter if justified |
+| P52 alternative transition | govinfo agent | in_progress | predeclared two-transition geometry batch, at most 12 combinations each, compatible builder and authentic parents if shared lengths/windows pass |
+| P46 public cap chain | worlds agent | in_progress | frozen public cap tables and Decimal temporal oracle; pivot to bounded NTSB branch evidence if short-source rejection holds |
+| Shared integration | root | in_progress | review oracle interfaces, shared candidate audit, source-bound conversion and inventory delta; no GPU training or publication |
+
+Execution refinements: the P52 2-key geometry and subsequent 2→6→12 growth
+layouts failed shared raw upper-bound checks. The 4→8→16 and 6→12→24 request
+expansions passed 32K raw proof and all-band growth prechecks; root is auditing
+the first complete set. Their all-M factual labels remain a content shortcut,
+so P56 now tests at most three frozen mixed R/M tasks with non-fixed CF anchor
+codes, without relaxing source dedup or any shared gate. Alphabet v3 has four
+source-bound bands and twelve standard views under the existing Finance
+profile. P54 is limited to one source-driven PMS/risk-reference chain after
+rejecting the qualification and single-reference shortcuts.
+
+## Next Step
+
+Integrate the first source-backed candidate that passes its small-oracle and
+shared serialization prechecks; preserve exact rejection evidence for others.

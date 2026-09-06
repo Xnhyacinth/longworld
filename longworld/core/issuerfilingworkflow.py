@@ -719,12 +719,285 @@ def _policy_fact(
     )
 
 
+ALPHABET_ASSET_BREAKDOWN_PROFILE = "alphabet.asset-revenue-breakdown.v1"
+ALPHABET_BREAKDOWN_SECTIONS = (
+    "Revenues - Revenue by Segment (Details)",
+    "Revenues - Revenue by Geographic Location (Details)",
+    "Revenues (Revenue by Segment) (Details)",
+    "Revenues (Revenue by Geographic Location) (Details)",
+)
+
+
+def _alphabet_annual_value_index(table: str, display_date: str) -> int:
+    headers = [
+        _visible_cell_text(cell[1])
+        for row in list(_ROW.finditer(table))[:2]
+        for cell in _HEADER_CELL.finditer(row.group())
+    ]
+    durations = [value for value in headers if "Months Ended" in value]
+    if durations != ["12 Months Ended"]:
+        raise ProvenanceError("Alphabet financial duration is not annual")
+    return _report_value_cell_index(table, display_date)
+
+
+def _alphabet_breakdown_facts(
+    source_text: str, report_date: str, display_date: str
+) -> tuple[tuple[IssuerIrMetricFact, ...], tuple[tuple[str, int, int], ...]]:
+    """Read disjoint segment/geography operands and the stated hedge adjustment."""
+    titles = (
+        ALPHABET_BREAKDOWN_SECTIONS[:2]
+        if report_date >= "2022-01-01"
+        else ALPHABET_BREAKDOWN_SECTIONS[2:]
+    )
+    groups = (
+        (
+            "category",
+            (
+                (
+                    "google_services",
+                    "Google Services",
+                    "us-gaap_StatementBusinessSegmentsAxis=goog_GoogleServicesMember",
+                ),
+                (
+                    "google_cloud",
+                    "Google Cloud",
+                    "us-gaap_StatementBusinessSegmentsAxis=goog_GoogleCloudMember",
+                ),
+                (
+                    "other_bets",
+                    "Other Bets",
+                    "us-gaap_StatementBusinessSegmentsAxis=us-gaap_AllOtherSegmentsMember",
+                ),
+            ),
+        ),
+        (
+            "geo",
+            (
+                (
+                    "united_states",
+                    "United States",
+                    "srt_StatementGeographicalAxis=country_US",
+                ),
+                ("emea", "EMEA", "srt_StatementGeographicalAxis=us-gaap_EMEAMember"),
+                ("apac", "APAC", "srt_StatementGeographicalAxis=srt_AsiaPacificMember"),
+                (
+                    "other_americas",
+                    "Other Americas",
+                    "srt_StatementGeographicalAxis=goog_AmericasExcludingUnitedStatesMember",
+                ),
+            ),
+        ),
+    )
+    facts: list[IssuerIrMetricFact] = []
+    ranges: list[tuple[str, int, int]] = []
+    revenue_concept = (
+        "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax"
+    )
+    for title, (prefix, members) in zip(titles, groups, strict=True):
+        start, end = _statement_table(source_text, title)
+        ranges.append((title, start, end))
+        table = source_text[start:end]
+        heading = re.search(
+            r"<strong\b[^>]*>(.*?)</strong>", table, re.IGNORECASE | re.DOTALL
+        )
+        if heading is None or not _visible_cell_text(heading[1]).endswith(
+            "- USD ($) $ in Millions"
+        ):
+            raise ProvenanceError("Alphabet breakdown units are not USD millions")
+        value_index = _alphabet_annual_value_index(table, display_date)
+        rows = list(_ROW.finditer(table))
+        for role, label, axis_member in members:
+            matches = [
+                i
+                for i, row in enumerate(rows)
+                if 'class="rh"' in row.group()
+                and (cells := list(_CELL.finditer(row.group())))
+                and _visible_cell_text(cells[0][1]) == label
+            ]
+            if len(matches) != 1:
+                raise ProvenanceError(
+                    "Alphabet breakdown member is missing or ambiguous"
+                )
+            index = matches[0]
+            dimensions = re.findall(r"'defref_([^']*Axis=[^']+)'", rows[index].group())
+            if dimensions != [axis_member]:
+                raise ProvenanceError("Alphabet breakdown dimension identity mismatch")
+            next_index = next(
+                (
+                    j
+                    for j in range(index + 1, len(rows))
+                    if 'class="rh"' in rows[j].group()
+                ),
+                len(rows),
+            )
+            operands = [
+                row
+                for row in rows[index + 1 : next_index]
+                if f"'{revenue_concept}'" in row.group()
+            ]
+            if len(operands) != 1:
+                raise ProvenanceError(
+                    "Alphabet breakdown operand is missing or ambiguous"
+                )
+            row = operands[0]
+            facts.append(
+                _metric_fact(
+                    source_text,
+                    role=f"{prefix}_{role}",
+                    title=title,
+                    concept=revenue_concept,
+                    table_start=start + row.start(),
+                    table_end=start + row.end(),
+                    occurrence=0,
+                    value_cell_index=value_index,
+                    display_date=display_date,
+                )
+            )
+        hedge_concept = "defref_us-gaap_GainLossOnOilAndGasHedgingActivity"
+        hedge_rows = [row for row in rows if f"'{hedge_concept}'" in row.group()]
+        if len(hedge_rows) != 1 or "Hedging gains (losses)" not in _visible_cell_text(
+            hedge_rows[0].group()
+        ):
+            raise ProvenanceError("Alphabet hedge adjustment is missing or ambiguous")
+        facts.append(
+            _metric_fact(
+                source_text,
+                role=f"{prefix}_hedging",
+                title=title,
+                concept=hedge_concept,
+                table_start=start,
+                table_end=end,
+                occurrence=0,
+                value_cell_index=value_index,
+                display_date=display_date,
+            )
+        )
+    return tuple(facts), tuple(ranges)
+
+
+def _parse_alphabet_asset_metrics(
+    source_text: str, *, report_date: str, metric_profile: str | None = None
+) -> IssuerIrRenderedProgram:
+    """Bind the four existing asset-trajectory operands, in USD millions."""
+    display_date = _display_date(report_date)
+    cover_start, cover_end = _statement_table(source_text, "Cover Page")
+    cover = source_text[cover_start:cover_end]
+    for concept, expected in (
+        ("EntityCentralIndexKey", "0001652044"),
+        ("DocumentType", "10-K"),
+        ("DocumentPeriodEndDate", display_date),
+    ):
+        rows = [
+            row
+            for row in _ROW.finditer(cover)
+            if f"'defref_dei_{concept}'" in row.group()
+        ]
+        if len(rows) != 1:
+            raise ProvenanceError("Alphabet filing identity is missing or ambiguous")
+        cells = list(_CELL.finditer(rows[0].group()))
+        if len(cells) < 2 or _visible_cell_text(cells[1].group(1)) != expected:
+            raise ProvenanceError("Alphabet filing identity mismatch")
+    metrics = (
+        (
+            "revenue",
+            "CONSOLIDATED STATEMENTS OF INCOME",
+            "RevenueFromContractWithCustomerExcludingAssessedTax",
+        ),
+        ("assets", "CONSOLIDATED BALANCE SHEETS", "Assets"),
+        (
+            "liabilities_and_equity",
+            "CONSOLIDATED BALANCE SHEETS",
+            "LiabilitiesAndStockholdersEquity",
+        ),
+        (
+            "cash_from_operations",
+            "CONSOLIDATED STATEMENTS OF CASH FLOWS",
+            "NetCashProvidedByUsedInOperatingActivities",
+        ),
+    )
+    ranges = {title: _statement_table(source_text, title) for _, title, _ in metrics}
+    facts = []
+    for role, title, concept in metrics:
+        start, end = ranges[title]
+        table = source_text[start:end]
+        if role == "revenue" and report_date < "2022-01-01":
+            concept = "Revenues"
+        heading = re.search(
+            r"<strong\b[^>]*>(.*?)</strong>", table, re.IGNORECASE | re.DOTALL
+        )
+        if heading is None or not _visible_cell_text(heading[1]).endswith(
+            "- USD ($) $ in Millions"
+        ):
+            raise ProvenanceError("Alphabet financial units are not USD millions")
+        exact_concept = f"'defref_us-gaap_{concept}'"
+        if sum(exact_concept in row.group() for row in _ROW.finditer(table)) != 1:
+            raise ProvenanceError("Alphabet financial operand is missing or ambiguous")
+        facts.append(
+            _metric_fact(
+                source_text,
+                role=role,
+                title=title,
+                concept="defref_us-gaap_" + concept,
+                table_start=start,
+                table_end=end,
+                occurrence=0,
+                value_cell_index=(
+                    _alphabet_annual_value_index(table, display_date)
+                    if role in {"revenue", "cash_from_operations"}
+                    else _report_value_cell_index(table, display_date)
+                ),
+                display_date=display_date,
+            )
+        )
+    values = {fact.role: fact.numeric_value for fact in facts}
+    if values["assets"] != values["liabilities_and_equity"]:
+        raise ProvenanceError("Alphabet balance-sheet identity fails")
+    if metric_profile == ALPHABET_ASSET_BREAKDOWN_PROFILE:
+        extra_facts, extra_ranges = _alphabet_breakdown_facts(
+            source_text, report_date, display_date
+        )
+        for prefix in ("category_", "geo_"):
+            if (
+                sum(f.numeric_value for f in extra_facts if f.role.startswith(prefix))
+                != values["revenue"]
+            ):
+                raise ProvenanceError("Alphabet revenue breakdown identity fails")
+        facts.extend(extra_facts)
+        ranges.update({title: (start, end) for title, start, end in extra_ranges})
+    start, end = ranges[metrics[0][1]]
+    dates = list(re.finditer(re.escape(display_date), source_text[start:end]))
+    if len(dates) != 1:
+        raise ProvenanceError("Alphabet current-year column is ambiguous")
+    date_start = start + dates[0].start()
+    return IssuerIrRenderedProgram(
+        report_date=report_date,
+        report_date_display=display_date,
+        report_date_char_start=date_start,
+        report_date_char_end=date_start + len(display_date),
+        facts=tuple(facts),
+        section_ranges=tuple((title, *bounds) for title, bounds in ranges.items()),
+        source_sha256=hashlib.sha256(source_text.encode()).hexdigest(),
+    )
+
+
 def parse_issuer_ir_rendered_metrics(
-    source_text: str, *, report_date: str
+    source_text: str,
+    *,
+    report_date: str,
+    issuer_cik: str | None = None,
+    metric_profile: str | None = None,
 ) -> IssuerIrRenderedProgram:
     """Parse current-year metrics from exact issuer-rendered statement rows."""
     if not isinstance(source_text, str) or not source_text:
         raise ProvenanceError("issuer IR rendered XBRL text is missing")
+    if metric_profile is not None and (
+        issuer_cik != "0001652044" or metric_profile != ALPHABET_ASSET_BREAKDOWN_PROFILE
+    ):
+        raise ProvenanceError("unsupported issuer financial metric profile")
+    if issuer_cik == "0001652044":
+        return _parse_alphabet_asset_metrics(
+            source_text, report_date=report_date, metric_profile=metric_profile
+        )
     try:
         display_date = _display_date(report_date)
     except ValueError as exc:
@@ -991,11 +1264,17 @@ def _audit_acquisition_inventory(
             raise ProvenanceError("issuer IR detail page contains email PII")
         form = str(filing.get("form") or "")
         filing_date = str(filing.get("filing_date") or "")
-        if _detail_value(detail_text, "_ctrl0_ctl54_lblForm") != form:
+        alphabet = normalized["cik"] == "0001652044"
+        control_prefix = "_ctrl0_ctl33_" if alphabet else "_ctrl0_ctl54_"
+        if alphabet and normalized["detail_host"] != "abc.xyz":
+            raise ProvenanceError("Alphabet detail host mismatch")
+        if _detail_value(detail_text, control_prefix + "lblForm") != form:
             raise ProvenanceError("issuer IR detail-page form mismatch")
-        observed_date = _detail_value(detail_text, "_ctrl0_ctl54_lblDate")
+        observed_date = _detail_value(detail_text, control_prefix + "lblDate")
         try:
-            parsed = time.strptime(observed_date, "%b %d, %Y")
+            parsed = time.strptime(
+                observed_date, "%m/%d/%Y" if alphabet else "%b %d, %Y"
+            )
             parsed_date = date(parsed.tm_year, parsed.tm_mon, parsed.tm_mday)
         except ValueError as exc:
             raise ProvenanceError("issuer IR detail-page date is invalid") from exc
@@ -1114,7 +1393,12 @@ def build_issuer_ir_filing_manifest(
         _reject_secrets(text)
         if _EMAIL.search(text):
             raise ProvenanceError("issuer IR rendered XBRL contains email PII")
-        program = parse_issuer_ir_rendered_metrics(text, report_date=report_date)
+        program = parse_issuer_ir_rendered_metrics(
+            text,
+            report_date=report_date,
+            issuer_cik=cik,
+            metric_profile=inventory.get("financial_metric_profile"),
+        )
         record_id = f"issuer-ir:{cik}:{report_date}"
         if filing_id in filing_ids or record_id in filing_ids.values():
             raise ProvenanceError("issuer IR filing identity is duplicated")
@@ -1221,6 +1505,8 @@ def build_issuer_ir_filing_manifest(
         "records": sorted(records, key=lambda record: record["report_date"]),
         "relations": sorted(relations, key=lambda relation: relation["relation_id"]),
     }
+    if inventory.get("financial_metric_profile") is not None:
+        manifest["financial_metric_profile"] = inventory["financial_metric_profile"]
     _audit_issuer_ir_filing_manifest(manifest)
     return manifest
 
@@ -1312,7 +1598,10 @@ def _audit_issuer_ir_filing_manifest(payload: dict[str, Any]) -> None:
             record.get("retrieval_url"), host=detail_host, field="record retrieval"
         )
         program = parse_issuer_ir_rendered_metrics(
-            text, report_date=str(record.get("report_date") or "")
+            text,
+            report_date=str(record.get("report_date") or ""),
+            issuer_cik=issuer_cik,
+            metric_profile=payload.get("financial_metric_profile"),
         )
         expected_facts = {
             "report_date_display": {

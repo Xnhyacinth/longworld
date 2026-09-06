@@ -1,0 +1,284 @@
+{
+  "all_15_proper_subsets": [
+    {
+      "span_indices": [],
+      "status": "UNKNOWN"
+    },
+    {
+      "span_indices": [
+        0
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "span_indices": [
+        1
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "span_indices": [
+        2
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "span_indices": [
+        3
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "span_indices": [
+        0,
+        1
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "span_indices": [
+        0,
+        2
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "span_indices": [
+        0,
+        3
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "span_indices": [
+        1,
+        2
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "span_indices": [
+        1,
+        3
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "span_indices": [
+        2,
+        3
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "span_indices": [
+        0,
+        1,
+        2
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "span_indices": [
+        0,
+        1,
+        3
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "span_indices": [
+        0,
+        2,
+        3
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "span_indices": [
+        1,
+        2,
+        3
+      ],
+      "status": "UNKNOWN"
+    }
+  ],
+  "all_proper_subsets_unknown": true,
+  "candidate_count": 0,
+  "config_sha256": "c67977479845c57ad2cde520a7afa2a62365c9679ee6603dd07daf9b4eb2ed84",
+  "dependency_program": [
+    "find responsible-person duty conditioned on investigational devices",
+    "parse target annex/chapter/section from that duty",
+    "resolve the parsed target in source order",
+    "parse statement issuer and conformity exception",
+    "bind safeguard to the excepted aspects using its explicit anaphoric link"
+  ],
+  "full_replay": {
+    "answer": {
+      "condition": "investigational devices",
+      "conformity_requirement": "the general safety and performance requirements",
+      "excepted_aspects": "the aspects covered by the clinical investigation",
+      "issuer": "the natural or legal person responsible for the manufacture of the investigational device",
+      "origin_article": "15",
+      "reference": {
+        "annex": "XV",
+        "chapter": "II",
+        "section": "4.1"
+      },
+      "safeguard_for_excepted_aspects": "every precaution has been taken to protect the health and safety of the subject"
+    },
+    "status": "PASS"
+  },
+  "geometry": {
+    "all_views_in_32k_band": true,
+    "background_near_duplicates_removed": 22,
+    "context_sha256": "62d1367e7fa68d30bf7a798883951ba5f4055d8c344536126712c51cdf4c11eb",
+    "counterfactual": "remove the exact referenced statement paragraph; target resolution returns UNKNOWN",
+    "essential_whole_artifact_positions": {
+      "act:1624002": {
+        "token_end": 30991,
+        "token_start": 30988
+      },
+      "act:1627760": {
+        "token_end": 31165,
+        "token_start": 31163
+      },
+      "act:1655790": {
+        "token_end": 31802,
+        "token_start": 31734
+      },
+      "act:299162": {
+        "token_end": 6100,
+        "token_start": 5491
+      }
+    },
+    "exact_serialized_tokens": {
+      "cf": 32001,
+      "full": 32074,
+      "ordered": 32074
+    },
+    "higher_band_proof_growth": "UNVERIFIED",
+    "necessary_marker_raw_window_preflight": {
+      "mode": "exhaustive_start_positions_with_necessary_marker_pruning",
+      "necessary_marker_token_envelopes": [
+        [
+          5494,
+          5501
+        ],
+        [
+          31737,
+          31743
+        ]
+      ],
+      "scope": "Both markers are required by the literal raw-text oracle. Zero co-visible marker windows proves insufficiency for this parser, including shorter windows. This does not establish semantic necessity against other answer programs or substitute for the shared registered audit.",
+      "windows": {
+        "16384": {
+          "all_short_windows_rejected_by_necessary_markers": true,
+          "checked_maximal_token_windows": 15691,
+          "replayed_windows": 0,
+          "shortcut_found": false,
+          "windows_not_pruned": 0
+        },
+        "4096": {
+          "all_short_windows_rejected_by_necessary_markers": true,
+          "checked_maximal_token_windows": 27979,
+          "replayed_windows": 0,
+          "shortcut_found": false,
+          "windows_not_pruned": 0
+        },
+        "8192": {
+          "all_short_windows_rejected_by_necessary_markers": true,
+          "checked_maximal_token_windows": 23883,
+          "replayed_windows": 0,
+          "shortcut_found": false,
+          "windows_not_pruned": 0
+        }
+      }
+    },
+    "padding_or_cloning_or_truncation": false,
+    "raw_prefix_shortcut_found": false,
+    "raw_prefix_window_scope": "Exact pinned token prefix decoded from the serialized prompt; source-bound artifact intersections replay semantic nodes, including sufficient partial articles. One sufficient witness rejects the layout; no exhaustive success audit is claimed.",
+    "raw_prefix_window_trials": [
+      {
+        "answer": "UNKNOWN",
+        "start_token": 0,
+        "status": "UNKNOWN",
+        "window_text_sha256": "e15396dc10dff4af5bafadc8074c293848bd1ea41e7e7787f51528d22a9f8c52",
+        "window_tokens": 4096
+      },
+      {
+        "answer": "UNKNOWN",
+        "start_token": 0,
+        "status": "UNKNOWN",
+        "window_text_sha256": "003b7ef07ef97725a8fe290375b0b523a3ccb41524602d7880bfcf4be27f5393",
+        "window_tokens": 8192
+      },
+      {
+        "answer": "UNKNOWN",
+        "start_token": 0,
+        "status": "UNKNOWN",
+        "window_text_sha256": "3217d9b4cdeb161799079452622a3eda056ee4508c9ba25ed2c62f108206408e",
+        "window_tokens": 16384
+      }
+    ],
+    "selected_artifact_count": 529,
+    "selected_artifact_ids_sha256": "6056fe76c47efa79508c10ab283a7b136bc7edf2e566663cc2917f69f18adb7e",
+    "serialization": "longworld.core.pack.wrap_prompt + SEP, timing=last",
+    "shared_counterfactual_materializer_registered": false,
+    "shared_derived_view_gate": "NOT_RUN",
+    "shared_raw_window_audit": "NOT_RUN",
+    "status": "GEOMETRY_ONLY",
+    "whole_artifact_cover_span_tokens": 26311,
+    "whole_artifact_coverage_limitation": "This is not a raw-token replay audit: smaller sufficient clauses or alternate evidence may answer within a window. No shortcut PASS is claimed.",
+    "whole_artifact_coverage_only_4k_8k_16k": {
+      "16384": false,
+      "4096": false,
+      "8192": false
+    }
+  },
+  "geometry_artifacts_path": "data/research/p54-eurlex-reference-statement-20260906-v1/geometry_artifacts.json",
+  "geometry_artifacts_sha256": "4708ee28dd46717bf777daed20d38f63c317c63ba12876445464d9ff14dc6293",
+  "inventory_delta": 0,
+  "next_gate": "REJECTED: the shared full layout exposes complete support in a 10,485-token witness; keep this negative control and use the distinct PMS chain",
+  "rights": {
+    "candidate_background_coverage": "NEEDS_CANDIDATE_REVIEW",
+    "coverage_scope": "Article 15, Annex XV and Chapter II headings, and resolved Section 4.1 only",
+    "documents": {
+      "act": {
+        "attribution": "European Union, EUR-Lex, CELEX 32017R0745",
+        "basis": "EUR-Lex legal-document reuse notice",
+        "selected_content": "Article 15, Annex XV and Chapter II headings, and resolved Section 4.1 only",
+        "selected_non_text_assets": 0
+      }
+    },
+    "exclusions": [
+      "third-party works",
+      "logos and images",
+      "industrial property rights"
+    ],
+    "legal_opinion": false,
+    "normalization_disclosed": "HTML tags removed; whitespace collapsed; exact raw spans retained",
+    "notice_sha256": "650467a4a593796e872a9984ed2da27f6cba1659b90d03b6a38c642c4e19acaf",
+    "official_notice_url": "https://eur-lex.europa.eu/content/legal-notice/legal-notice.html",
+    "technical_selected_span_coverage": "PASS",
+    "whole_document_third_party_review": "NOT_PERFORMED"
+  },
+  "schema_version": "longworld.p54-eurlex-reference-statement-report.v1",
+  "selected_spans_path": "data/research/p54-eurlex-reference-statement-20260906-v1/selected_spans.json",
+  "selected_spans_sha256": "7c14322835480d70c694ae182ed0eef848e8ffe60e316bf69570bd9b6b48da64",
+  "source_receipts": [
+    {
+      "bytes": 1709984,
+      "sha256": "3ed27dd77a9614fb00350c3031321a43cd3ce62143e9571690d3e219104546a5",
+      "source_id": "act",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32017R0745"
+    },
+    {
+      "bytes": 134752,
+      "sha256": "650467a4a593796e872a9984ed2da27f6cba1659b90d03b6a38c642c4e19acaf",
+      "source_id": "legal_notice",
+      "url": "https://eur-lex.europa.eu/content/legal-notice/legal-notice.html"
+    }
+  ],
+  "train_ready": false
+}

@@ -139,6 +139,15 @@ def _write_jsonl(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
     _write_atomic(path, b"".join(_canonical_bytes(row) for row in rows))
 
 
+def _allowed_requested_dispositions(config: Mapping[str, Any]) -> set[str]:
+    policy = config.get("requested_disposition_policy", "modified_only")
+    if policy == "modified_only":
+        return {MODIFIED}
+    if policy == "mixed_retained_modified":
+        return {RETAINED, MODIFIED}
+    raise P52Blocker("P52 requested disposition policy is invalid")
+
+
 def _load_config(path: Path) -> tuple[dict[str, Any], bytes, dict[str, Any]]:
     raw = path.read_bytes()
     config = json.loads(raw)
@@ -146,6 +155,7 @@ def _load_config(path: Path) -> tuple[dict[str, Any], bytes, dict[str, Any]]:
         "longworld.p52-govinfo-bill-disposition-generation.v1"
     ):
         raise P52Blocker("P52 generation config schema is invalid")
+    _allowed_requested_dispositions(config)
     preflight_binding = config.get("preflight_config")
     if not isinstance(preflight_binding, dict):
         raise P52Blocker("P52 preflight config binding is missing")
@@ -670,6 +680,7 @@ def _fetch_source_state(
     from_stage = str(config["from_stage"])
     to_stage = str(config["to_stage"])
     requested_keys = list(config["requested_keys"])
+    allowed_dispositions = _allowed_requested_dispositions(config)
     for base_key in requested_keys:
         if (
             base_key in stage_ambiguous[from_stage]
@@ -686,7 +697,7 @@ def _fetch_source_state(
             shingle_size=shingle_size,
             threshold=threshold,
         ).get(base_key)
-        if disposition != MODIFIED:
+        if disposition not in allowed_dispositions:
             raise P52Blocker(
                 f"requested pair is not a modified source-text pair: {base_key}"
             )
@@ -781,8 +792,13 @@ def _question(
         }
         for index, base_key in enumerate(config["requested_keys"][:count], start=1)
     ]
+    stage_names = {"enr": "ENR", "law": "Public-Law"}
+    transition_name = "-to-".join(
+        stage_names.get(str(config[field]), str(config[field]).upper())
+        for field in ("from_stage", "to_stage")
+    )
     lines = [
-        "Resolve each requested GovInfo ENR-to-Public-Law source-text disposition.",
+        f"Resolve each requested GovInfo {transition_name} source-text disposition.",
         "Use the authenticated transition record and compare the two whole sections after excluding page, sidenote, sourceCredit, and note presentation subtrees plus the num or enum identifier already encoded in the structural key.",
         "Codebook: R=retained (canonical five-word-shingle Jaccard at least 0.90); M=modified (same unambiguous structural key below 0.90); U=unknown (transition or either endpoint absent).",
         "Return only one compact JSON object whose keys are the requested codes.",
@@ -800,7 +816,7 @@ def _relations(
     return [
         {
             "relation_id": (
-                f"govinfo:{config['bill_id']}:enr-law:"
+                f"govinfo:{config['bill_id']}:{config['from_stage']}-{config['to_stage']}:"
                 f"{_sha256_text(request['base_key'])[:20]}"
             ),
             "parent_record_id": (
@@ -982,9 +998,18 @@ def _entries_for_requests(
     essential_ids = [str(relation["artifact_id"])]
     cf_source_id = ""
     cf_target_id = ""
+    mixed = _allowed_requested_dispositions(config) == {RETAINED, MODIFIED}
+    requested_labels: dict[str, str] = {}
     for request in requests:
         source_record = state["records"][(request["from_stage"], request["base_key"])]
         target_record = state["records"][(request["to_stage"], request["base_key"])]
+        if mixed:
+            requested_labels[request["code"]] = cross_schema_dispositions(
+                {request["base_key"]: source_record},
+                {request["base_key"]: target_record},
+                shingle_size=int(config["oracle"]["near_duplicate_word_shingle_size"]),
+                threshold=float(config["oracle"]["near_duplicate_jaccard_threshold"]),
+            )[request["base_key"]]
         for record in (source_record, target_record):
             entry = _section_entry(record, workflow_id=workflow_id, essential=True)
             entries[entry["artifact_id"]] = entry
@@ -992,6 +1017,11 @@ def _entries_for_requests(
         if request["code"] == config["counterfactual_code"]:
             cf_source_id = _section_artifact_id(source_record)
             cf_target_id = _section_artifact_id(target_record)
+    if mixed:
+        if set(requested_labels.values()) != {RETAINED, MODIFIED}:
+            raise P52Blocker("P52 mixed task requires both R and M in every bucket")
+        if requested_labels.get(config["counterfactual_code"]) != MODIFIED:
+            raise P52Blocker("P52 mixed counterfactual anchor must be modified")
     if not cf_source_id or not cf_target_id:
         raise P52Blocker("P52 counterfactual request is not present")
     return entries, essential_ids, cf_source_id, cf_target_id
@@ -1180,7 +1210,7 @@ def _build_candidate(
         "strict_replay_revision": STRICT_REPLAY_REVISION,
         "base_task_id": _sha256_text(f"{config['world_id']}|bill-disposition")[:20],
         "semantic_base_task_id": _sha256_text(
-            "govinfo|enr-law|source-text-disposition"
+            f"govinfo|{config['from_stage']}-{config['to_stage']}|source-text-disposition"
         )[:20],
         "semantic_growth_group_id": _sha256_text(f"{config['world_id']}|nested-bands")[
             :20
@@ -1356,7 +1386,10 @@ def build_registered_parents(
     parents: list[dict[str, Any]] = []
     prior_ids: set[str] = set()
     pack_receipts: dict[str, Any] = {}
-    for bucket in ("32k", "64k", "128k"):
+    buckets = config.get("generation_buckets", ["32k", "64k", "128k"])
+    if buckets not in (["32k"], ["32k", "64k"], ["32k", "64k", "128k"]):
+        raise P52Blocker("P52 generation buckets must be a nonempty nested prefix")
+    for bucket in buckets:
         entries, question, requests, essential_ids, cf_source_id, cf_target_id = (
             _pack_bucket(
                 config,
@@ -1553,7 +1586,7 @@ def _validate_candidate(
     expected_identity = {
         "base_task_id": _sha256_text(f"{config['world_id']}|bill-disposition")[:20],
         "semantic_base_task_id": _sha256_text(
-            "govinfo|enr-law|source-text-disposition"
+            f"govinfo|{config['from_stage']}-{config['to_stage']}|source-text-disposition"
         )[:20],
         "semantic_growth_group_id": _sha256_text(f"{config['world_id']}|nested-bands")[
             :20
