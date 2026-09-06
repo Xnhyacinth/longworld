@@ -1,0 +1,31 @@
+{
+  "environment": "probe",
+  "probe_id": "local-probe-cd296de84d802c334e20d7d0db4804c3",
+  "roles": {
+    "auditor": {
+      "key": "4a3e22747478d55dc218c1f360825f151c0af2109c642335ffb282550ec4d2f0",
+      "key_id": "probe-auditor-d041bc872ae7679ab41056b1015fbf79"
+    },
+    "candidate": {
+      "key": "e141bba4e00df30c9cac46674a0b6ea32395ac749300169faa1ef7a040547c7d",
+      "key_id": "probe-candidate-89a8f0c80536d5f9eacf707d6a8156c6"
+    },
+    "promotion": {
+      "key": "46e5922446faa9965ee4f39d4dd0f8937959c43d3cd53caf7d41ad6e97fdaec1",
+      "key_id": "probe-promotion-9efd65b21640b4ff6fd92af0acaa41a1"
+    },
+    "ranker": {
+      "key": "65bd5edec9a90b19e35c3c1ee75361d7342e820e5a022df4fa3ae9a8e59a7c82",
+      "key_id": "probe-ranker-fd1e53f435dd8637ad81bcd48218491b"
+    },
+    "report": {
+      "key": "154b0a9398effe51b7f166a05a9d6d1e5259f245c0289cb8f5ddda90e20bd62b",
+      "key_id": "probe-report-0121f8b2ad598ea4b1731925e290421a"
+    },
+    "source": {
+      "key": "d44b3cb63ee192abe754e6c93f1ac6eb94164c635a604305bcaef493f487d735",
+      "key_id": "probe-source-8dbafad3a1a3e675781e7b4a932e713d"
+    }
+  },
+  "schema_version": "longworld-local-probe-trust-v1"
+}
