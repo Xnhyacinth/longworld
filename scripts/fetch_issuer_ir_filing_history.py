@@ -85,14 +85,21 @@ _ISSUER_SOURCE_ALLOWLIST = {
         "artifact_host": "d18rn0p25nwr6d.cloudfront.net",
         "artifact_path_prefix": "/CIK-0001045810/",
     },
+    "0001652044": {
+        "detail_host": "abc.xyz",
+        "detail_path": "/investor/sec-filings/sec-filings-details/default.aspx",
+        "artifact_host": "d18rn0p25nwr6d.cloudfront.net",
+        "artifact_path_prefix": "/CIK-0001652044/",
+    },
 }
 
 HttpGet = Callable[[str, dict[str, str], float], tuple[bytes, Mapping[str, str]]]
 
 
 class _DetailParser(HTMLParser):
-    def __init__(self) -> None:
+    def __init__(self, control_prefix: str = "_ctrl0_ctl54_") -> None:
         super().__init__(convert_charrefs=True)
+        self.control_prefix = control_prefix
         self.form_parts: list[str] = []
         self.date_parts: list[str] = []
         self.artifact_urls: dict[str, str] = {}
@@ -101,13 +108,15 @@ class _DetailParser(HTMLParser):
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attributes = dict(attrs)
         identity = attributes.get("id")
-        if tag == "span" and identity == "_ctrl0_ctl54_lblForm":
+        if tag == "span" and identity == self.control_prefix + "lblForm":
             self._capture = self.form_parts
-        elif tag == "span" and identity == "_ctrl0_ctl54_lblDate":
+        elif tag == "span" and identity == self.control_prefix + "lblDate":
             self._capture = self.date_parts
         elif tag == "a" and identity:
             for role, (expected_id, _) in _ARTIFACTS.items():
-                if identity == expected_id:
+                if identity == expected_id.replace(
+                    "_ctrl0_ctl54_", self.control_prefix
+                ):
                     href = str(attributes.get("href") or "").strip()
                     if role in self.artifact_urls or not href:
                         raise ProvenanceError(
@@ -382,13 +391,27 @@ def _parse_detail(
     artifact_host: str,
     artifact_path_prefix: str,
 ) -> dict[str, str]:
-    if _challenge(body):
+    alphabet = artifact_path_prefix == "/CIK-0001652044/"
+    # Alphabet's ordinary filing page contains an unrelated reCAPTCHA string
+    # in navigation JavaScript. Ignore script contents only for this registered
+    # page; visible challenge text and other challenge markers still fail.
+    challenge_body = body
+    if alphabet:
+        challenge_body = re.sub(
+            rb"<script\b[^>]*>.*?</script>",
+            b"",
+            body,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if any(marker in body.lower() for marker in _CHALLENGE_MARKERS[:-1]):
+            raise ProvenanceError("issuer IR detail page returned a challenge page")
+    if _challenge(challenge_body):
         raise ProvenanceError("issuer IR detail page returned a challenge page")
     try:
         text = body.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise ProvenanceError("issuer IR detail page is not UTF-8") from exc
-    parser = _DetailParser()
+    parser = _DetailParser("_ctrl0_ctl33_" if alphabet else "_ctrl0_ctl54_")
     try:
         parser.feed(text)
     except Exception as exc:
@@ -398,7 +421,9 @@ def _parse_detail(
     observed_form = " ".join(parser.form_parts).strip()
     observed_date = " ".join(parser.date_parts).strip()
     try:
-        parsed_time = time.strptime(observed_date, "%b %d, %Y")
+        parsed_time = time.strptime(
+            observed_date, "%m/%d/%Y" if alphabet else "%b %d, %Y"
+        )
         parsed_date = date(
             parsed_time.tm_year, parsed_time.tm_mon, parsed_time.tm_mday
         ).isoformat()

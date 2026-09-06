@@ -22,6 +22,14 @@ from longworld.core.domainhistory import (
     replay_kev_pipeline_candidate,
     replay_kev_pipeline_raw_slice,
 )
+from longworld.core.eurlexworkflow import (
+    EURLEX_PMS_ANSWER_PROGRAM,
+    EURLEX_PMS_TASK_SCHEMA,
+    audit_eurlex_pms_candidate,
+    eurlex_chronology,
+    replay_eurlex_pms_candidate,
+    replay_eurlex_pms_raw_slice,
+)
 from longworld.core.financehistory import (
     audit_finance_pipeline_candidate,
     replay_finance_pipeline_raw_slice,
@@ -50,6 +58,7 @@ from longworld.core.standardsworkflow import (
 from longworld.core.taskreplaysidecar import (
     CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
     CYBER_KEV_TASK_REPLAY_ADAPTER,
+    EURLEX_PMS_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
     GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
     IETF_OAUTH_TASK_REPLAY_ADAPTER,
@@ -62,6 +71,7 @@ from longworld.core.taskreplaysidecar import (
     TASK_VIEW_DERIVATION_REVISION,
     TaskReplayRegistryKey,
 )
+from longworld.core.tokenizer_windows import certified_json_window_counter
 from longworld.core.verify import Verification
 
 TASK_PROOF_RECEIPT_SCHEMA = "longworld.task-proof-receipt.v5"
@@ -471,6 +481,10 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
         expected_domain = "government_legislation"
         expected_view = "full"
         expected_composition = "same_case_dossier"
+    elif family == EURLEX_PMS_TASK_REPLAY_ADAPTER[:2]:
+        expected_domain = "public_law"
+        expected_view = "full"
+        expected_composition = "same_case_dossier"
     else:  # pragma: no cover - the closed registry is checked first
         raise TaskProofError("candidate task replay adapter is unsupported")
     if candidate.get("domain") != expected_domain:
@@ -539,6 +553,14 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
             isinstance(task, dict)
             and task.get("answer_program_id")
             == ietf_task_programs.get(str(task.get("schema_version") or ""))
+            and candidate.get("answer_program_id") == task.get("answer_program_id")
+        )
+    elif family == EURLEX_PMS_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("eurlex_pms_task")
+        replay_identity_valid = bool(
+            isinstance(task, dict)
+            and task.get("schema_version") == EURLEX_PMS_TASK_SCHEMA
+            and task.get("answer_program_id") == EURLEX_PMS_ANSWER_PROGRAM
             and candidate.get("answer_program_id") == task.get("answer_program_id")
         )
     else:
@@ -762,6 +784,19 @@ def _projection_chronology(
         return [
             {"artifact_id": item[1]["artifact_id"], "order_key": item[0]}
             for item in govinfo_chronology(
+                [
+                    (classification, document)
+                    for classification, document in zip(
+                        classifications, documents, strict=True
+                    )
+                    if isinstance(classification, Mapping)
+                ]
+            )
+        ]
+    if domain == "public_law":
+        return [
+            {"artifact_id": item[1]["artifact_id"], "order_key": item[0]}
+            for item in eurlex_chronology(
                 [
                     (classification, document)
                     for classification, document in zip(
@@ -1256,6 +1291,8 @@ def _adapter_audit(
             audit = audit_macro_vintage_pipeline_candidate(candidate)
         elif adapter_key == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER:
             audit = audit_govinfo_disposition_candidate(candidate)
+        elif adapter_key == EURLEX_PMS_TASK_REPLAY_ADAPTER:
+            audit = audit_eurlex_pms_candidate(candidate)
         else:  # pragma: no cover - the closed registry is checked first
             raise TaskProofError("task replay adapter is unsupported")
     except TaskProofError:
@@ -1330,6 +1367,10 @@ def _replay(
         return replay_govinfo_disposition(
             candidate, artifact_ids, counterfactual=counterfactual
         )
+    if adapter_key[:2] == EURLEX_PMS_TASK_REPLAY_ADAPTER[:2]:
+        return replay_eurlex_pms_candidate(
+            candidate, artifact_ids, counterfactual=counterfactual
+        )
     raise TaskProofError("task replay adapter is unsupported")
 
 
@@ -1394,6 +1435,13 @@ def _replay_raw_slice(
         )
     if adapter_key[:2] == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]:
         return replay_govinfo_disposition_raw_slice(
+            candidate,
+            raw_document_context,
+            left_framed=left_framed,
+            right_framed=right_framed,
+        )
+    if adapter_key[:2] == EURLEX_PMS_TASK_REPLAY_ADAPTER[:2]:
+        return replay_eurlex_pms_raw_slice(
             candidate,
             raw_document_context,
             left_framed=left_framed,
@@ -1539,12 +1587,17 @@ def _contiguous_window_proof(
 ) -> tuple[dict[str, Any], bool]:
     if len(documents) != len(artifact_ids):
         raise TaskProofError("contiguous window documents are unbound")
+    window_counter = certified_json_window_counter(documents, token_counter)
     token_cache: dict[tuple[int, int], int] = {}
 
     def exact_window_tokens(start: int, stop: int) -> int:
         key = (start, stop)
         if key not in token_cache:
-            token_cache[key] = token_counter(SEP.join(documents[start:stop]))
+            token_cache[key] = (
+                window_counter(start, stop)
+                if window_counter is not None
+                else token_counter(SEP.join(documents[start:stop]))
+            )
         value = token_cache[key]
         if not isinstance(value, int) or isinstance(value, bool) or value < 1:
             raise TaskProofError("exact token counter produced an invalid window")
@@ -1596,6 +1649,11 @@ def _contiguous_window_proof(
             "max_span_tokens": max(item["span_tokens"] for item in enumerated),
             "enumeration_sha256": _canonical_sha256(enumerated),
         }
+    if window_counter is not None:
+        try:
+            window_counter.verify_unchanged()
+        except ValueError as error:
+            raise TaskProofError(str(error)) from error
     return output, has_strict_evidence
 
 

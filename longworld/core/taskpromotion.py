@@ -24,6 +24,15 @@ from longworld.core.domainhistory import (
     replay_cross_cve_pipeline_candidate,
     replay_kev_pipeline_candidate,
 )
+from longworld.core.eurlexworkflow import (
+    EURLEX_PMS_ANSWER_PROGRAM,
+    EURLEX_PMS_TASK_SCHEMA,
+    audit_eurlex_pms_candidate,
+    eurlex_chronology,
+    materialize_eurlex_counterfactual,
+    replay_eurlex_pms_candidate,
+    validate_eurlex_candidate_source_binding,
+)
 from longworld.core.financehistory import (
     audit_finance_pipeline_candidate,
     replay_finance_pipeline_selection,
@@ -82,6 +91,7 @@ from longworld.core.taskproof import (
 from longworld.core.taskreplaysidecar import (
     CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
     CYBER_KEV_TASK_REPLAY_ADAPTER,
+    EURLEX_PMS_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
     GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
     IETF_OAUTH_TASK_REPLAY_ADAPTER,
@@ -155,6 +165,7 @@ def task_sidecar_token_counter(
     if counter is None:
         raise PromotionError("task sidecar exact tokenizer is unavailable")
     counter.offset_tokenizer = tokenizer
+    counter._json_window_tokenizer = tokenizer
     return counter
 
 
@@ -374,6 +385,30 @@ def _validate_sidecar_payload(
         except ValueError as error:
             raise PromotionError(
                 "candidate GovInfo source binding is invalid"
+            ) from error
+    elif _sidecar_uses(sidecar, EURLEX_PMS_TASK_REPLAY_ADAPTER):
+        if candidate.get("domain") != "public_law":
+            raise PromotionError("task replay adapter does not match candidate domain")
+        task = candidate.get("eurlex_pms_task")
+        source = candidate.get("source_binding")
+        if not isinstance(source, dict):
+            raise PromotionError("candidate EUR-Lex source binding is missing")
+        expected = {
+            "source_receipt_raw_utf8": payload.get("source_receipt_raw_utf8"),
+            "source_receipt_sha256": source.get("source_receipt_sha256"),
+            "source_bundle_sha256": source.get("source_bundle_sha256"),
+            "preflight_config_sha256": source.get("preflight_config_sha256"),
+            "authorization_record_id": source.get("authorization_record_id"),
+            "eurlex_pms_task": task,
+            "task_sha256": _canonical_sha256(task),
+            "replay_revision": candidate.get("strict_replay_revision"),
+            **tokenizer_binding,
+        }
+        try:
+            validate_eurlex_candidate_source_binding(candidate, payload)
+        except ValueError as error:
+            raise PromotionError(
+                "candidate EUR-Lex source binding is invalid"
             ) from error
     else:
         raise PromotionError("task replay adapter is not registered for promotion")
@@ -638,6 +673,8 @@ def _adapter_audit(
                 audit = audit_macro_vintage_pipeline_candidate(candidate)
             elif _sidecar_uses(sidecar, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER):
                 audit = audit_govinfo_disposition_candidate(candidate)
+            elif _sidecar_uses(sidecar, EURLEX_PMS_TASK_REPLAY_ADAPTER):
+                audit = audit_eurlex_pms_candidate(candidate)
             else:
                 raise PromotionError(
                     "task replay adapter is not registered for promotion"
@@ -716,6 +753,10 @@ def _replay_selection(
             )
         if _sidecar_uses(sidecar, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER):
             return replay_govinfo_disposition(
+                candidate, artifact_ids, counterfactual=counterfactual
+            )
+        if _sidecar_uses(sidecar, EURLEX_PMS_TASK_REPLAY_ADAPTER):
+            return replay_eurlex_pms_candidate(
                 candidate, artifact_ids, counterfactual=counterfactual
             )
     raise PromotionError("task replay adapter is not registered for promotion")
@@ -814,6 +855,7 @@ def _task_selection_metrics(
         or _sidecar_uses(sidecar, CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER)
         or _sidecar_uses(sidecar, IETF_OAUTH_TASK_REPLAY_ADAPTER)
         or _sidecar_uses(sidecar, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER)
+        or _sidecar_uses(sidecar, EURLEX_PMS_TASK_REPLAY_ADAPTER)
     ):
         candidate_source_records = candidate.get("source_record_ids_by_artifact")
         if not isinstance(candidate_source_records, Mapping):
@@ -883,6 +925,8 @@ def _task_selection_metrics(
         group_suffix = "ietf-oauth-cross-spec"
     elif _sidecar_uses(sidecar, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER):
         group_suffix = "govinfo-bill-disposition"
+    elif _sidecar_uses(sidecar, EURLEX_PMS_TASK_REPLAY_ADAPTER):
+        group_suffix = "eurlex-pms-risk-control"
     else:  # pragma: no cover - sidecar loading rejects this first
         raise PromotionError("task replay adapter is not registered for promotion")
     candidate_graph = candidate.get("graph")
@@ -1713,6 +1757,23 @@ def _canonical_task_identifiers(
             "join_whole_sections_by_structural_key",
             "canonicalize_presentation_free_body",
             "classify_source_text_disposition",
+        )
+    elif family == EURLEX_PMS_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("eurlex_pms_task")
+        if (
+            not isinstance(task, Mapping)
+            or task.get("schema_version") != EURLEX_PMS_TASK_SCHEMA
+            or task.get("answer_program_id") != EURLEX_PMS_ANSWER_PROGRAM
+            or candidate.get("answer_program_id") != task.get("answer_program_id")
+        ):
+            raise PromotionError("EUR-Lex answer program is unsupported")
+        motif = "explicit_reference_chain+visible_source_withholding"
+        answer_program_id = EURLEX_PMS_ANSWER_PROGRAM
+        program_ops = (
+            "select_responsible_person_pms_duty",
+            "follow_article_and_reverse_plan_references",
+            "resolve_annex_risk_control_references",
+            "return_proved_prefix_and_visible_terminal_state",
         )
     else:
         raise PromotionError("task semantic identifier adapter is unsupported")
@@ -2755,6 +2816,10 @@ def _task_view_replay(
             return replay_govinfo_disposition(
                 candidate, artifact_ids, counterfactual=counterfactual
             )
+        if adapter_key == EURLEX_PMS_TASK_REPLAY_ADAPTER:
+            return replay_eurlex_pms_candidate(
+                candidate, artifact_ids, counterfactual=counterfactual
+            )
     raise PromotionError("standard task views are not implemented for adapter")
 
 
@@ -2811,6 +2876,7 @@ def build_task_candidate_view_projections(
         MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
         IETF_OAUTH_TASK_REPLAY_ADAPTER,
         GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
+        EURLEX_PMS_TASK_REPLAY_ADAPTER,
     }:
         raise PromotionError("standard task views are not implemented for adapter")
     artifacts = _task_view_artifacts(candidate)
@@ -2893,6 +2959,21 @@ def build_task_candidate_view_projections(
     elif adapter_key == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER:
         cf_artifacts = materialize_govinfo_counterfactual(candidate, artifacts)
         chronology = govinfo_chronology(artifacts)
+        cf_candidate = deepcopy(candidate)
+        cf_candidate["document_context"] = SEP.join(
+            document for _classification, document in cf_artifacts
+        )
+        cf_candidate["artifact_classification"] = [
+            deepcopy(classification) for classification, _document in cf_artifacts
+        ]
+        cf_candidate["context"] = wrap_prompt(
+            str(candidate.get("question") or ""),
+            str(cf_candidate["document_context"]),
+            "first",
+        )
+    elif adapter_key == EURLEX_PMS_TASK_REPLAY_ADAPTER:
+        cf_artifacts = materialize_eurlex_counterfactual(candidate, artifacts)
+        chronology = eurlex_chronology(artifacts)
         cf_candidate = deepcopy(candidate)
         cf_candidate["document_context"] = SEP.join(
             document for _classification, document in cf_artifacts

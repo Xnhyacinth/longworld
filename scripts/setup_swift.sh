@@ -43,6 +43,8 @@ if [[ "${INSTALL_SWIFT:-0}" == "1" ]]; then
       # --no-deps/--no-cache: git causal-conv1d otherwise resolves PyPI torch or reuses a wheel built against it.
       uv pip install "flash-linear-attention>=0.4.2" --no-build-isolation --no-deps
       CAUSAL_CONV1D_FORCE_BUILD=TRUE uv pip install --no-deps --no-build-isolation --no-cache git+https://github.com/Dao-AILab/causal-conv1d
+      # Hopper + Triton 3.4–3.7.0: FLA gated bwd is numerically wrong; TileLang is the default backend.
+      uv pip install tilelang
     else
       echo "SKIP_GDN_EXTRAS=1; FLA/causal-conv1d not installed (128k Qwen3.5 will be very slow)"
     fi

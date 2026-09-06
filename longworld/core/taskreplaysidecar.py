@@ -23,6 +23,7 @@ from longworld.core.attestation import (
     canonical_attested_payload,
     verify_attestation,
 )
+from longworld.core.eurlexworkflow import EurLexWorkflowError, verify_eurlex_pms_payload
 from longworld.core.govinfodisposition import (
     GovInfoDispositionError,
     verify_govinfo_replay_payload,
@@ -69,6 +70,16 @@ GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER = (
     "government.govinfo_bill_disposition.v1",
     "longworld.govinfo-bill-disposition-replay.v1",
     TASK_REPLAY_SIDECAR_SCHEMA,
+)
+EURLEX_PMS_TASK_REPLAY_ADAPTER = (
+    "public_law.eurlex_pms_risk_control.v1",
+    "longworld.eurlex-pms-risk-control-replay.v2",
+    TASK_REPLAY_SIDECAR_SCHEMA,
+)
+EURLEX_PMS_TASK_REPLAY_ADAPTER_V3 = (
+    EURLEX_PMS_TASK_REPLAY_ADAPTER[0],
+    EURLEX_PMS_TASK_REPLAY_ADAPTER[1],
+    TASK_REPLAY_SIDECAR_SCHEMA_V3,
 )
 IETF_OAUTH_TASK_REPLAY_ADAPTER_V3 = (
     IETF_OAUTH_TASK_REPLAY_ADAPTER[0],
@@ -335,6 +346,23 @@ def _contract(key: TaskReplayRegistryKey) -> TaskReplayAdapterContract:
                 "candidate_content_commitments",
             }
         )
+    elif family == EURLEX_PMS_TASK_REPLAY_ADAPTER[:2]:
+        payload_fields = frozenset(
+            {
+                "source_receipt_raw_utf8",
+                "source_receipt_sha256",
+                "source_bundle_sha256",
+                "preflight_config_sha256",
+                "authorization_record_id",
+                "eurlex_pms_task",
+                "task_sha256",
+                "replay_revision",
+                "tokenizer_model_id",
+                "tokenizer_revision",
+                "tokenizer_asset_manifest_sha256",
+                "candidate_content_commitments",
+            }
+        )
     else:
         raise ProvenanceError("task replay adapter contract is not registered")
     if key[2] == TASK_REPLAY_SIDECAR_SCHEMA_V3:
@@ -366,6 +394,7 @@ TASK_REPLAY_ADAPTER_REGISTRY: Mapping[
             IETF_OAUTH_TASK_REPLAY_ADAPTER,
             ELIFE_REVIEW_REVISION_TASK_REPLAY_ADAPTER,
             GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
+            EURLEX_PMS_TASK_REPLAY_ADAPTER,
             CYBER_KEV_TASK_REPLAY_ADAPTER_V2,
             CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER_V2,
             FINANCE_TASK_REPLAY_ADAPTER_V2,
@@ -376,6 +405,7 @@ TASK_REPLAY_ADAPTER_REGISTRY: Mapping[
             MACRO_VINTAGE_TASK_REPLAY_ADAPTER_V3,
             IETF_OAUTH_TASK_REPLAY_ADAPTER_V3,
             GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER_V3,
+            EURLEX_PMS_TASK_REPLAY_ADAPTER_V3,
         )
     }
 )
@@ -579,6 +609,11 @@ def _verify_replay_payload(
             verify_govinfo_replay_payload(replay_payload)
         except GovInfoDispositionError as error:
             raise ProvenanceError("GovInfo task replay payload is invalid") from error
+    if contract.adapter_id == EURLEX_PMS_TASK_REPLAY_ADAPTER[0]:
+        try:
+            verify_eurlex_pms_payload(replay_payload)
+        except EurLexWorkflowError as error:
+            raise ProvenanceError("EUR-Lex task replay payload is invalid") from error
     tokenizer_revision = replay_payload.get("tokenizer_revision")
     source_families = replay_payload.get("source_families")
     fetch_receipt = replay_payload.get("fetch_receipt")
