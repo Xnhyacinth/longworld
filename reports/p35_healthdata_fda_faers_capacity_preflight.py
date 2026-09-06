@@ -375,6 +375,12 @@ def main() -> None:
             "formal_near_duplicate_audit_executed": False,
             "near_duplicate_upper_bound_tokens": exact_dedup_structural_tokens,
             "coarsened_conservative_estimate_tokens": coarsened_structural_tokens,
+            "gap_from_near_duplicate_upper_bound_to_64k_lower": (
+                exact_dedup_structural_tokens - config["capacity_bands"]["64k"][0]
+            ),
+            "gap_from_near_duplicate_upper_bound_to_128k_lower": (
+                exact_dedup_structural_tokens - config["capacity_bands"]["128k"][0]
+            ),
             "64k_upper_bound_possible": upper_64k,
             "128k_upper_bound_possible": upper_128k,
             "64k_coarsened_estimate_possible": lower_64k,

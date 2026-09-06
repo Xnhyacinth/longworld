@@ -271,6 +271,8 @@
     "formal_near_duplicate_audit_executed": false,
     "near_duplicate_upper_bound_tokens": 17865637,
     "coarsened_conservative_estimate_tokens": 7810074,
+    "gap_from_near_duplicate_upper_bound_to_64k_lower": 17801637,
+    "gap_from_near_duplicate_upper_bound_to_128k_lower": 17737637,
     "64k_upper_bound_possible": true,
     "128k_upper_bound_possible": true,
     "64k_coarsened_estimate_possible": true,
