@@ -6,6 +6,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck disable=SC1091
 source "$ROOT/scripts/uv_project_env.sh"
+export CUDA_HOME="${CUDA_HOME:-/usr/local/cuda-12.6}"
+export PATH="$CUDA_HOME/bin:${PATH}"
 if [[ -f "$ROOT/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
@@ -162,6 +164,16 @@ require_qwen35_fla() {
   if ! "$py" -c 'from fla.ops.gated_delta_rule import chunk_gated_delta_rule; from fla.modules.convolution import causal_conv1d; import causal_conv1d_cuda' >/dev/null 2>&1; then
     echo "Qwen3.5 128k SFT needs flash-linear-attention in the ms-swift venv (torch GDN fallback is ~40min/step)." >&2
     echo "Install: SKIP_GDN_EXTRAS=0 INSTALL_SWIFT=1 bash scripts/setup_swift.sh" >&2
+    exit 1
+  fi
+  # FLA 0.5.2 raises on Hopper + Triton [3.4.0, 3.7.1) unless TileLang is usable.
+  if ! "$py" -c 'from fla.ops.common.backends.tilelang import TileLangBackend
+from fla.utils import IS_NVIDIA_HOPPER, TRITON_ABOVE_3_4_0, TRITON_ABOVE_3_7_1
+if IS_NVIDIA_HOPPER and TRITON_ABOVE_3_4_0 and not TRITON_ABOVE_3_7_1:
+    raise SystemExit(0 if (TileLangBackend.is_available() and TileLangBackend.is_enabled()) else 1)
+raise SystemExit(0)' >/dev/null 2>&1; then
+    echo "Qwen3.5 128k SFT on Hopper needs tilelang (Triton 3.4–3.7.0 gated bwd is wrong; FLA #640)." >&2
+    echo "Install: source scripts/uv_project_env.sh && uv pip install --python .vendor/ms-swift/.venv/bin/python tilelang" >&2
     exit 1
   fi
 }

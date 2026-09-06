@@ -132,7 +132,11 @@ for cond in "${CONDS[@]}"; do
     continue
   fi
   nproc="$(awk -F, '{print NF}' <<<"$GPUS")"
-  log="$LOG_DIR/swift_${cond}-4b-${nproc}gpu.log"
+  fail_size="4b"
+  if [[ "$model" == *Base* ]]; then
+    fail_size="4b-base"
+  fi
+  log="$LOG_DIR/swift_${cond}-${fail_size}-${nproc}gpu.log"
   if [[ ! -f "$log" ]] || ! is_oom "$log"; then
     echo "===== $cond 4B failed (not OOM); see $log =====" >&2
     exit 1
