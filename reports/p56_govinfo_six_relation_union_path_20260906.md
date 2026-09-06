@@ -1,74 +1,54 @@
 # P56 six authentic relation-set path
 
 Date: 2026-09-06
-Status: mixed-03 shared audit passed; single-world regeneration not yet gated
+Status: fail-closed at selection; no inventory delta
 
 ## Why mixed-01 is not train-ready
 
 Nine mixed-01 rows completed shared audit and row-level promotion, but the
 immutable `p52-govinfo-bill-disposition-probe-1-v1` gate counts **distinct
-`authentic_source_relation_id` values**, not edges or requested clauses. That
-hash is `sha256(authentic_source_relation_edges)[:20]`. Mixed-01 is three
-bands × three views of one world, so it contributes **3** identities:
+`authentic_source_relation_id` values**. Mixed-01 is three bands × three views
+of one world, so it contributes **3** identities. The gate requires 6.
 
-| Band | Edges | `authentic_source_relation_id` |
-| --- | ---: | --- |
-| 32K | 4 | `b14fea02d64136aeffe7` |
-| 64K | 8 | `536db491a970017819a9` |
-| 128K | 16 | `0498a59e3c98369f9a80` |
+## Mixed-03 and the shared-world regeneration
 
-The gate requires 6. The profile also requires `expected_promoted_worlds=1`
-and one `government_legislation` world. Relation-set identifiers were not
-rewritten. The threshold was not lowered.
+The original mixed-03 projections passed shared dense audit 9/9
+(`no_shortcut=true`, proof events 6→12→24). A new uniquely named generation
+`p56_govinfo_mixed_union_20260906` reused the frozen mixed-01/mixed-03 seeds
+and prefixes, set
+`shared_world_id=govinfo-118-hr4366-eas-eah-mixed-union-20260906`, and used
+`task_instance_id` so parent query ids did not collide.
 
-## Mixed-03 shared audit
+That product has one world id, 6 unique parent query ids, 18 projected views,
+18 dense rankings, and 18 shared audits, all `no_shortcut=true`. The six
+gate-facing identities are unchanged from the original schedules:
 
-CPU dense ranking of the existing mixed-03 projections finished 9/9
-(`all-MiniLM-L6-v2@1110a243`, rankings SHA-256
-`cd2118ad828d2533dcdddecdc15d45b9b08232aea46a1a09f6c6552fac062509`).
-Shared `create_task_dense_audit` then passed **9/9** in 452s. AUDIT_MANIFEST
-`dense_audit_complete=true`, audits SHA-256
-`c3284db0bf4bb17f5a9d5b03fab26caebadb6b7973f5e99ef967f34727ff97c3`.
+| Schedule | 32K | 64K | 128K |
+| --- | --- | --- | --- |
+| mixed-01 | `b14fea02d64136aeffe7` | `536db491a970017819a9` | `0498a59e3c98369f9a80` |
+| mixed-03 | `eaa89def1d83a4224e74` | `d41f43272c79b3e4c784` | `9ef594600e59fba9f253` |
 
-Every mixed-03 row has `no_shortcut=true`, contiguous/local/artifact windows
-insufficient, BM25/TF-IDF top-k insufficient, full-pool strict replay
-sufficient, and near-duplicate sentence ratios 0.0285–0.0380. Proof events
-grow 6→12→24. Gate-facing authentic relation-set identities:
+Preflight accepted 18/18. Selection then failed:
 
-| Band | Essential events | `authentic_source_relation_id` |
-| --- | ---: | --- |
-| 32K | 6 | `eaa89def1d83a4224e74` |
-| 64K | 12 | `d41f43272c79b3e4c784` |
-| 128K | 24 | `9ef594600e59fba9f253` |
+`insufficient worlds with immutable world lineage: ... duplicate_cells=...+mixed_source_binding`
 
-Together mixed-01+03 are exactly six authentic relation-set identities. They
-are correlated tasks from one bill and must occupy **one source-connected
-world**. Relabeling `world_id` in the existing signed rows would break
-sidecar commitments, `query_id` canonicalization, rankings, and audits.
+## Why 3+3 cannot enter this profile
 
-## Query-id collision
+A world may occupy each `(length_bucket, view, first)` cell only once. The
+profile requires 32K/64K/128K × full/CF/ordered, so one world has **9 cells**
+and at most **3** authentic relation-set identities (views of one parent share
+edges). Two 3-band schedules need 18 cells. Putting them in one `world_id`
+duplicates every cell; putting them in two `world_id`s violates
+`expected_promoted_worlds=1` and the `government_legislation` quota of 1.
 
-Parent `query_id` is `{world_id}:{bucket}:{view}:first`. If mixed-01 and
-mixed-03 keep those three bands under one `world_id` without an extra
-instance token, the 32K/64K/128K full parents collide. The permitted
-follow-through is a **new uniquely named** generation that:
+Relation-set hashes were not rewritten. `min_real_source_relations=6` was not
+lowered. Mixed-02 remains rejected and is not a filler source of IDs.
 
-1. Reuses the frozen mixed-01 and mixed-03 seeds, prefixes, and CF anchors.
-2. Sets `shared_world_id=govinfo-118-hr4366-eas-eah-mixed-union-20260906`.
-3. Sets `task_instance_id` to `mixed-01` / `mixed-03` so query ids remain unique.
-4. Leaves authentic relation-set hashes and `min_real_source_relations=6`
-   unchanged.
+## Permitted next work
 
-Mixed-02 remains rejected and is not a filler source of IDs.
-
-## Next command
-
-```bash
-uv run python reports/p56_govinfo_mixed_dispositions_20260906.py \
-  --plan configs/p56_govinfo_mixed_union_20260906.json \
-  --output-dir data/candidates/p56_govinfo_mixed_union_20260906
-```
-
-Then project, dense-rank, shared-audit, select, promote, and quality-gate that
-single world. Fail closed on any shortcut window, missing proof growth, or
-world-count mismatch.
+A later GovInfo world can reach 6 identities only by adding **new bands or a
+new source-connected parent family that does not reuse these 9 cells**, or by
+an **explicit new profile** that admits two worlds while keeping the 6-identity
+threshold. Neither change is in this closeout. Parallel entity expansion should
+move to a different bill/transition or another domain rather than retuning this
+layout.
