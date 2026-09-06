@@ -25,7 +25,7 @@ saves/
 *.safetensors
 *.gguf
 
-# Local secrets
+# Local secrets and probe HMAC roots (live outside Git under $HOME)
 .env
 .env.*
 *.pem
@@ -35,6 +35,11 @@ saves/
 .netrc
 .hf/
 .longworld-trust/
+.longworld-private/
+.longworld-agent-probe/
+.longworld-local-probe-private/
+.longworld-scaleout-*-private/
+.longworld_probe_keys/
 
 # Local planning state (canonical project status lives in .hl/)
 .planning/
