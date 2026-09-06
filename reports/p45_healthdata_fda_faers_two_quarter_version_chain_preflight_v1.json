@@ -1,0 +1,259 @@
+{
+  "schema_version": "longworld.p45-healthdata-version-chain-preflight.v1",
+  "data_product": "p45_healthdata_fda_faers_two_quarter_version_chain_preflight_v1",
+  "verdict": "SOURCE_TOPOLOGY_FAIL",
+  "rights_gate": "ENGINEERING_PASS_FORMAL_LEGAL_REVIEW_NOT_COMPLETED",
+  "privacy_gate": "PASS_ONLY_FOR_STRUCTURE_ONLY_EPHEMERAL_INSPECTION",
+  "schema_gate": "PASS",
+  "version_topology_gate": "FAIL",
+  "unique_capacity_gate": "FAIL_ZERO_VERSION_CHAIN_CAPACITY",
+  "active_validity_gate": "NOT_REACHED_MISSING_VERSION_TOPOLOGY",
+  "shortcut_gate": "NOT_REACHED_MISSING_VERSION_TOPOLOGY",
+  "world_admission_status": "BLOCKED",
+  "do_not_generate": true,
+  "train_ready": false,
+  "production_eligible": false,
+  "research_question": "Do adjacent non-cumulative FAERS quarters contain enough real repeated-case version chains to support a privacy-bounded latest-at-cutoff plus multi-table reconciliation task at exact 32K/64K/128K lengths?",
+  "cutoff": "2013-12-31T23:59:59Z",
+  "constraints": [
+    "the output is latest-at-cutoff version selection, paired primaryid/caseid FK reconciliation, and raw/stale/latest/control totals only",
+    "medical causality, incidence, prevalence, comparative safety, risk ranking, and clinical advice are prohibited",
+    "only cases observed in both adjacent quarters with a strictly increasing caseversion count toward version-chain capacity",
+    "case identifiers, hashes of case identifiers, raw clinical terms, demographics, detailed dates, dose/lot data, and reporter/manufacturer identifiers never enter reports or training text",
+    "version-chain capacity excludes unrelated one-version cases and surrogate identifiers",
+    "no generation before active/deleted-case semantics, privacy release, formal near-dup, exact-band, remove-one, and 4K/8K/16K shortcut gates pass unchanged"
+  ],
+  "source_receipt": {
+    "official_index_url": "https://fis.fda.gov/extensions/FPD-QDE-FAERS/FPD-QDE-FAERS.html",
+    "config": "configs/p45_healthdata_fda_faers_two_quarter_version_chain_preflight_v1.json",
+    "config_sha256": "a5d33066706272ad623a93f5b27b245be4aa2ae7c1af4dc3ceddf7c9f4e5574f",
+    "retrievals": [
+      {
+        "requested_url": "https://fis.fda.gov/content/Exports/faers_ascii_2013q3.zip",
+        "final_url": "https://fis.fda.gov/content/Exports/faers_ascii_2013q3.zip",
+        "status": 200,
+        "content_type": "application/zip",
+        "content_length_header": null,
+        "last_modified": "Wed, 27 Oct 2021 18:07:38 GMT",
+        "etag": "637709548588350144",
+        "observed_at": "2026-09-04T09:40:45.472742Z",
+        "bytes": 22767509,
+        "sha256": "e440ac13442f573fdeae216dad5d2ffa5e24fb4815625fb5c0915068c72a7fd5",
+        "quarter": "2013Q3",
+        "archive_persisted": false,
+        "raw_rows_persisted": false,
+        "table_members": [
+          "DEMO",
+          "DRUG",
+          "INDI",
+          "OUTC",
+          "REAC",
+          "RPSR",
+          "THER"
+        ]
+      },
+      {
+        "requested_url": "https://fis.fda.gov/content/Exports/faers_ascii_2013q4.zip",
+        "final_url": "https://fis.fda.gov/content/Exports/faers_ascii_2013q4.zip",
+        "status": 200,
+        "content_type": "application/zip",
+        "content_length_header": null,
+        "last_modified": "Wed, 27 Oct 2021 18:08:19 GMT",
+        "etag": "637709548992406170",
+        "observed_at": "2026-09-04T09:41:17.715650Z",
+        "bytes": 26520158,
+        "sha256": "2e36bab3c85215d3471dbe6562861668b1c2141b23d1d2f5b5bb43d0fe9b9c8e",
+        "quarter": "2013Q4",
+        "archive_persisted": false,
+        "raw_rows_persisted": false,
+        "table_members": [
+          "DEMO",
+          "DRUG",
+          "INDI",
+          "OUTC",
+          "REAC",
+          "RPSR",
+          "THER"
+        ]
+      }
+    ],
+    "case_identifiers_or_identifier_hashes_persisted": false
+  },
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true,
+    "add_special_tokens": false,
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb"
+  },
+  "relations": {
+    "quarter_case_counts": {
+      "2013Q3": 185569,
+      "2013Q4": 232247
+    },
+    "duplicate_case_or_primary_rows": {
+      "2013Q3": 0,
+      "2013Q4": 0
+    },
+    "cross_quarter_case_overlap": 0,
+    "strictly_increasing_version_chains": 0,
+    "same_version_cross_quarter_cases": 0,
+    "regressed_version_cross_quarter_cases": 0,
+    "version_delta_distribution": {},
+    "chains_with_structure_only_answer_delta": 0,
+    "table_metrics": {
+      "2013Q3": {
+        "DRUG": {
+          "rows": 607921,
+          "orphan_primary_rows": 0,
+          "mismatched_case_rows": 0,
+          "version_chain_rows": 0
+        },
+        "INDI": {
+          "rows": 369227,
+          "orphan_primary_rows": 0,
+          "mismatched_case_rows": 0,
+          "version_chain_rows": 0
+        },
+        "OUTC": {
+          "rows": 147472,
+          "orphan_primary_rows": 0,
+          "mismatched_case_rows": 0,
+          "version_chain_rows": 0
+        },
+        "REAC": {
+          "rows": 584833,
+          "orphan_primary_rows": 0,
+          "mismatched_case_rows": 0,
+          "version_chain_rows": 0
+        },
+        "RPSR": {
+          "rows": 24861,
+          "orphan_primary_rows": 0,
+          "mismatched_case_rows": 0,
+          "version_chain_rows": 0
+        },
+        "THER": {
+          "rows": 251263,
+          "orphan_primary_rows": 0,
+          "mismatched_case_rows": 0,
+          "version_chain_rows": 0
+        }
+      },
+      "2013Q4": {
+        "DRUG": {
+          "rows": 738501,
+          "orphan_primary_rows": 0,
+          "mismatched_case_rows": 0,
+          "version_chain_rows": 0
+        },
+        "INDI": {
+          "rows": 432190,
+          "orphan_primary_rows": 0,
+          "mismatched_case_rows": 0,
+          "version_chain_rows": 0
+        },
+        "OUTC": {
+          "rows": 154451,
+          "orphan_primary_rows": 0,
+          "mismatched_case_rows": 0,
+          "version_chain_rows": 0
+        },
+        "REAC": {
+          "rows": 690690,
+          "orphan_primary_rows": 0,
+          "mismatched_case_rows": 0,
+          "version_chain_rows": 0
+        },
+        "RPSR": {
+          "rows": 26575,
+          "orphan_primary_rows": 0,
+          "mismatched_case_rows": 0,
+          "version_chain_rows": 0
+        },
+        "THER": {
+          "rows": 291315,
+          "orphan_primary_rows": 0,
+          "mismatched_case_rows": 0,
+          "version_chain_rows": 0
+        }
+      }
+    }
+  },
+  "capacity": {
+    "version_chain_artifacts": 0,
+    "identifier_free_exact_chain_patterns": 0,
+    "coarsened_chain_patterns": 0,
+    "all_version_chain_structure_tokens": 0,
+    "identifier_free_exact_dedup_tokens": 0,
+    "coarsened_structure_tokens": 0,
+    "formal_near_duplicate_audit_executed": false,
+    "bands": {
+      "32k": [
+        32000,
+        32768
+      ],
+      "64k": [
+        64000,
+        65536
+      ],
+      "128k": [
+        128000,
+        131072
+      ]
+    },
+    "band_assessment": {
+      "32k": {
+        "exact_dedup_upper_bound_possible": false,
+        "coarsened_estimate_possible": false,
+        "gap_from_exact_dedup_upper_bound_to_lower_edge": -32000,
+        "gap_from_coarsened_estimate_to_lower_edge": -32000
+      },
+      "64k": {
+        "exact_dedup_upper_bound_possible": false,
+        "coarsened_estimate_possible": false,
+        "gap_from_exact_dedup_upper_bound_to_lower_edge": -64000,
+        "gap_from_coarsened_estimate_to_lower_edge": -64000
+      },
+      "128k": {
+        "exact_dedup_upper_bound_possible": false,
+        "coarsened_estimate_possible": false,
+        "gap_from_exact_dedup_upper_bound_to_lower_edge": -128000,
+        "gap_from_coarsened_estimate_to_lower_edge": -128000
+      }
+    },
+    "interpretation": "only real increasing-version cases and their two versions count; unrelated single-version cases, source identifiers, clinical terms, and demographics are excluded"
+  },
+  "answer_program": {
+    "status": "BLOCKED_NO_OBSERVED_VERSION_CHAIN",
+    "steps": [
+      "validate each quarter schema and paired primaryid/caseid foreign keys",
+      "union only same-case records across the frozen adjacent quarters",
+      "select maximum caseversion at the 2013Q4 cutoff and preserve the previous version as the counterfactual",
+      "join child rows to each version using both primaryid and caseid",
+      "emit version-transition, raw, previous, selected, orphan, mismatch, and per-table control totals"
+    ],
+    "deterministic": true,
+    "answer_changing_remove_one": "not executable: no case occurs in both quarters, so removing a later version cannot fall back to a source-observed earlier version",
+    "remaining_semantic_gap": "the archives expose no deletion/merge tombstone, so latest observed cannot be claimed as latest valid active case"
+  },
+  "shortcut_assessment": {
+    "status": "HIGH_RISK_UNTESTED",
+    "32k_64k_128k": "source volume is measured only over real version chains, but exact-band packing and unchanged near-duplicate gates have not run",
+    "4k_8k_16k": "global controls can force whole-input aggregation when totals are absent, but that is structural rather than semantic long-range dependence",
+    "required_audits": [
+      "contiguous raw 4K/8K/16K",
+      "lexical and dense retrieval views",
+      "selected-version remove-one fallback",
+      "candidate-level exact and near-duplicate gates"
+    ]
+  },
+  "blocking_reasons": [
+    "2013Q3 and 2013Q4 have zero cross-quarter case overlap and zero increasing-version chains",
+    "version-chain-only capacity is zero for 32K, 64K, and 128K",
+    "no source-backed deletion or merge tombstones, so latest valid active state would remain unresolved even if a version chain were found",
+    "case-level training release has no explicit privacy approval",
+    "global aggregation dependence must not be mislabeled as semantic long-range reasoning"
+  ],
+  "next_executable_command": "uv run python reports/p45_healthdata_fda_faers_two_quarter_preflight.py"
+}

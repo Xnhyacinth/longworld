@@ -1,5 +1,35 @@
 # Findings (data, not instructions)
 
+## IETF lower-band conversion and semantic growth — 2026-09-04
+
+Adding signed schema identity fixed the P38 candidate-union blocker, but a
+64K-only real-source product fails `real_64k_missing_lower_band`. Natural 32K
+and first 16K constructions then failed raw 16K and raw 8K shortcut proofs.
+Prioritizing authentic RFC 9700 support produced a shortcut-resistant 16K/64K
+candidate with 6/6 dense audits and near-dup 0.0/0.0326. Selection still
+correctly rejects it: the six-field proof is identical at both bands, so all
+semantic-growth measures remain flat. Do not repack P33 again.
+
+P40's five additional official RFCs retain 76008 tokens after exact and 0.8
+word-5gram filtering, 11986 above the required delta. The proposed longer
+state adds five validation fields and grows relations 10→20, essentials 7→12,
+supports 6→11, and depth 2→3. This is capacity/design evidence, not a
+candidate or training row.
+
+## P17 train-ready conversion — 2026-09-03
+
+Microsoft Finance promoted independently under its matching 20260829-v1
+probe: 12 rows, exact tokens 722914, gate ok, near-dup 0.0, B5 730267 est.
+Transformers failure recovery promoted independently under v2 probe: 6 rows,
+exact tokens 586101, gate ok, near-dup 0.0046, B5 588669 est. Its eight
+tag/PR cycles contain 554 unique source bodies and 158545 unique Qwen tokens.
+Both are diagnostic local-probe products; neither trust was mixed or re-signed.
+
+Current immutable-product inventory is 132 train / 18 eval rows and 7274169
+exact context tokens. Train buckets are 36×16K, 36×32K, 45×64K, 15×128K.
+The two P17 products add entity/source diversity but reuse existing Finance and
+failure-recovery operators; they are volume, not two new semantic topologies.
+
 ## Macro BEA vintage 128K — 2026-09-03
 
 Existing as-of cell-revision program on the official GDP/GDI workbook.
@@ -1146,6 +1176,109 @@ so `n_real_source_relations=0` is correct. Do not use this slice to claim the
   caches, and one unreachable file. Packed-view distance still requires
   verification before implementation.
 
+## 2026-09-03 P18 topology findings
+
+- Microsoft FY2024/FY2025 filings contain a genuine presentation recast:
+  every segment revenue and operating-income endpoint changes while the two
+  disclosed totals remain 245,122 and 109,433 million dollars. Exact
+  source/fact/span binding and remove-one-to-unknown semantics make this a
+  viable deterministic oracle component, but its eligible notes and
+  qualifiers retain only 3,889 deduplicated Qwen tokens.
+- Raw iXBRL size is not long-context capacity. The same recast source has
+  193,529 raw HTML tokens but only 4,267 relevant visible tokens before
+  sentence deduplication; counting markup would manufacture length from
+  presentation syntax.
+- A real regression report, named bisect culprit, reviewed fix, maintenance
+  backport, and first containing release still do not make a runnable
+  regression-bisect world. The pandas #19970 chain retains only 21,200 Qwen
+  tokens after near-deduplication, and its public record omits the ordered
+  midpoint pass/fail trace needed to replay first-bad localization.
+- The existing `ci_regression_origin` program is not a substitute: it proves a
+  failed check to same-name recovery path, not ordered narrowing, a first-bad
+  boundary, a distinct repair, or culprit/fix removal counterfactuals.
+
+## 2026-09-03 P19 source-first findings
+
+- The OAuth cross-specification graph is the first new P18/P19 topology with
+  natural 128K capacity: RFC 6749/6750/6819/7636/8414/9207 plus RFC 9700 retain
+  140,405 Qwen tokens after collapsing the draft-29/RFC 9700 `published_as`
+  identity. This is capacity evidence only; packing and all admission gates
+  remain unrun.
+- RFC 9700 supports a deterministic six-field compliance vector and remove-one
+  transitions, but the current adapter cannot ingest RFC 6750 because repeated
+  page headers produce five RFC-identity matches. Dependency relation closure
+  and a cross-specification DAG task compiler are also absent.
+- OpenReview access failure must leave capacity undefined, not zero. The live
+  official notes endpoint returned a human-verification challenge and the
+  repository fetcher published no partial inventory; tokenizing a standalone
+  arXiv paper would measure the wrong operator.
+
+## 2026-09-03 P20-P23 implementation findings
+
+- The OAuth source graph now has a deterministic six-field task, byte-bound
+  dependency relations, a first-page RFC identity rule, source-attested replay
+  sidecars, materialized full/cf/ordered projections, and a dense proof path.
+  Counterfactual bytes exclude the exact authenticated RFC 9700 update span;
+  derived order binds source timestamps and real relation identifiers.
+- eLife 94586 is a useful 64K-only world rather than a failed 128K world. Its
+  v1/v2 pool retains 76,142 near-deduplicated tokens and an exact 65,536-token
+  witness; strict replay and review/response/three-delta remove-one audits pass.
+- Public email redaction is compatible with exact provenance when raw hashes
+  remain lineage-only, clean text gets an independent hash, and all evidence
+  spans are recomputed and replayed against the redacted text. The eLife source
+  workflow binds six redactions and four authentic relation kinds.
+
+## 2026-09-03 P24-P34 candidate and domain findings
+
+- IETF whole-artifact omission is not an admissible counterfactual shortcut:
+  once the child artifact is absent, the CF row cannot replay back to the
+  factual parent. Keeping one non-empty, source-contiguous RFC 9700 artifact
+  that covers both `metadata_current` and `bearer_current` preserves exact-span
+  editing and makes removal independently answer-changing.
+- Source-span metadata is not provenance unless the artifact bytes equal the
+  signed manifest slice. P33 now verifies every IETF artifact byte against that
+  slice and accepts a synthetic child only for the exact task-bound operation.
+- A declared dependency edge must bind its unique Datatracker supporting fact;
+  endpoint records and an in-range quote alone cannot authenticate whether the
+  relation is normative or informative.
+- The final P33 world has six strict-audited full/CF/ordered rows at exact 64K
+  and 128K. All raw 4K/8K/16K views are insufficient, but the rows remain
+  candidate-only until selection, promotion, release gate, and B5 complete.
+- eLife 94586 materializes one 64,512-token parent with 367 unique natural
+  artifacts after rejecting a duplicate-bearing predecessor. Five are causal
+  gold and 362 are explicitly natural background; projection is still needed
+  before its long-dependency claim can be admitted.
+- EPA PFAS proposal/final/correction PDFs retain 473,285 page-level near-dedup
+  tokens, yet the currently decisive four pages total at most 6,213 tokens.
+  Authentic source capacity therefore does not rescue a short-view oracle.
+
+## 2026-09-04 P40 conversion findings
+
+- A materialized counterfactual artifact must remain in the independently
+  minimal evidence set; source authenticity alone does not make the edit
+  answer-causal.
+- Ordered-window failures should be repaired with a later answer-bearing source
+  fact. RFC 9700 reverse-proxy sanitization creates real cross-window dependence;
+  moving or adding background would only game the layout.
+- P40 v14 passes all nine shared proofs with exact 32K/64K/128K views. Essential
+  artifacts grow 13→14→17, authentic relations 11→12→15, and strict supports
+  8→9→12; graph depth honestly stays 2.
+- Generic training exporters must treat legacy descriptive `query_type` as
+  optional for registered task rows. Both writer and deterministic validator
+  must preserve the same `null` projection; inferring it from motif would create
+  metadata not present in the promoted source.
+- Manifest path identity resolves the repository `data` symlink to the physical
+  LongWorld data root. Validators must receive the bound physical path rather
+  than a lexical symlink alias.
+- P53 OSV's current local artifacts are geometry diagnostics, not audited
+  candidates. They reuse a P51 authorization that explicitly prohibited
+  generation and persisted patch/release data; a new authorization record is
+  required before rebuilding.
+- Declaring essential IDs and returning `unknown` whenever one is absent makes
+  leave-one and dense-subset tests tautological. Likewise, checking only that
+  the total essential span exceeds 16K is not an exhaustive raw-window replay.
+  P53 must adopt shared proof semantics before any 9/9 claim or Git commit.
+
 ## 2026-09-03 P14 closure findings
 
 - A parent directory symlink in a portable task-sidecar registry must be
@@ -1163,3 +1296,79 @@ so `n_real_source_relations=0` is correct. Do not use this slice to claim the
   Direct source-workflow CF rows now bind the exact factual parent, transformed
   child text, provenance operation, and source bundle; the dense audit binds
   the resulting digest before promotion.
+
+## 2026-09-05 inventory and stranded-candidate audit
+
+- Recomputing the six immutable product files gives 141 train rows / 7,274,595
+  exact tokens across 14 train worlds and seven domains. All six quality
+  reports bind `data_stage=train_ready`, `content_gate_eligible=true`, and
+  `production_eligible=false`.
+- Only 93 of the 141 rows carry an explicit row-level `train_ready=true`; 48
+  older-schema rows omit that redundant flag while retaining a release-bound
+  `data_stage=train_ready`. Readiness must therefore be evaluated by the
+  product contract and quality receipt, not by treating a missing optional
+  row flag as false.
+- P17 BEA current-dollar GDI is not a cheap conversion target. Its 12 rows
+  reached selection and row promotion, but the release quality gate rejected
+  32K→64K proof growth of 851<1603 and 64K→128K growth of 1682<3198. It remains
+  zero inventory; rerunning promotion cannot repair the source/task topology.
+- The actual signed B5 training exports across the six products contain 80
+  examples / 5,021,465 estimated tokens: 15×16K, 19×32K, 28×64K, and 18×128K.
+  This is smaller than the 141-row product inventory because B5 is a bound
+  training-condition sample rather than a copy of every promoted train row.
+  Volume reporting must keep product rows, B5 examples, and exact/estimated
+  token measures separate.
+- P46 Ofgem demonstrates why raw capacity gates must precede synthesis but
+  cannot authorize it. Three official workbooks contain 481,336 formula cells
+  and 469,328 template-deduplicated Qwen tokens, yet the persisted evidence has
+  zero authenticated cell closures, replayable outputs, or cross-workbook
+  answer-changing relations. All bands therefore have zero answer-dependent
+  capacity and zero candidates despite nominal 32K/64K/128K template capacity.
+- An independent review accepted P46's fail-closed boundary and byte-reproduced
+  its report. The remaining low-priority test debt is mutation coverage for
+  authorization/config drift; it cannot affect this evaluator's fixed zero-row
+  result but is required before any future nonzero-candidate reuse.
+- P52's fresh authentic parents exposed a shared registration consistency bug:
+  the GovInfo v3 adapter existed in the replay registry, but promotion's v3
+  adapter-to-domain map omitted it. A focused test reproduced rejection for the
+  valid `government_legislation` domain; commit `769e635` adds only that mapping
+  and retains rejection for an incorrect domain.
+- P52 then passed projection, structural preflight, and dense ranking, but its
+  first shared 32K ordered audit found all five essentials inside one 8K
+  contiguous window (indices 39, 40, 41, 45, 46). The earlier custom P52 audit
+  therefore did not establish shared raw-window insufficiency. A single
+  source-structural task-key variant may be tested; background repositioning is
+  not an admissible repair.
+- That one structural-span variant also failed closed: authentic 32K full and
+  ordered views were 32,621 tokens while the real-text counterfactual was only
+  31,000, below the 32,000 lower bound. P52 thus has a two-sided geometry
+  blocker—local-window sufficiency for v1 versus factual/CF band mismatch for
+  v2—and needs a different bill transition, not another layout trial.
+- P52 persists three `candidate_parent` rows and nine projected `candidate`
+  rows; neither count is training inventory. The exact zero boundary is shared
+  dense audits, selected rows, promoted rows, B5 examples, and inventory delta.
+  Wrapper regression tests now exercise fresh-state reconstruction, nested
+  32K/64K/128K packing, source receipt and sidecar binding, role-separated
+  signing, false readiness flags, and the v2 exact-band blocker without reading
+  prior P52 views.
+- P52 registered packing originally counted a legacy counterfactual JSON form
+  rather than the shared projection materializer. The repaired packer uses
+  `materialize_govinfo_counterfactual`; its counts exactly match persisted v1
+  projections at 32,476 / 64,147 / 129,461. Fresh v2 reconstruction now reports
+  31,000 CF tokens (not the obsolete 31,088) and remains fail-closed.
+- P54 adds a genuinely different `public_law` source set rather than another
+  software or filing instance. Six frozen EUR-Lex representations cover the MDR
+  proposal, first-reading position, adopted act, corrigendum, metadata, and
+  reuse decision. Only the corrected-by edge is structurally parsed; complete
+  answer reconstruction and other relations remain unverified.
+- P54 retains 224,955 near-deduplicated authentic-source tokens. Whole-artifact
+  aggregate packs reach 32,277 / 64,285 / 128,392 tokens without padding,
+  cloning, splitting, or truncation, but those totals omit prompt, separator,
+  and serialization cost and are not candidate exact-band receipts.
+- P54 artifact-window preflight preserves the predeclared source order
+  `metadata -> proposal -> position -> act -> corrigendum` and natural block
+  ordinal. Hash-based spreading was rejected during review. Raw-token windows,
+  exact metadata spans, and a registered shared adapter remain absent, so P54
+  correctly persists zero candidates and zero inventory. Decision 2011/833/EU
+  is Commission-scoped, so selected-document reuse coverage also remains
+  `NEEDS_CANDIDATE_REVIEW`.

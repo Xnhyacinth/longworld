@@ -1,5 +1,23 @@
 # Progress
 
+- 2026-09-04 P38/P43 IETF conversion remains blocked with zero formal rows.
+  Schema-fixed P33 rebuilt and audited 6/6; the 64K-only chain reached strict
+  promotion but failed the existing lower-band quality gate. A natural
+  16K/64K successor audited 6/6 at 16246--16277 and 64387--64418 tokens but
+  selection rejected unchanged proof topology (relations 10→10, essentials
+  7→7, supports 6→6, depth 2→2). P40 source-first growth is feasible: five
+  new RFCs retain 76008 unique tokens and propose 10→20 relations. Inventory
+  stays 132 train + 18 eval; no B5/HF.
+- 2026-09-03 P17 converted two independent candidates into train-ready local-
+  probe products: Microsoft Finance 12 rows (3 each at 16/32/64/128K) and
+  Transformers CodeForge 6 rows (3 each at 64/128K). Both gates and B5
+  manifests are green. P17 adds 18 train rows / 1,309,015 exact context
+  tokens / 6×128K. Current signed inventory is 132 train + 18 eval rows,
+  7,274,169 exact tokens, and 15×128K train rows. No HF.
+- 2026-09-03 P17 diversity research recorded 26 primary URLs and six ranked
+  executable designs. Entity copies on an existing operator count as volume,
+  not semantic topology. BEA GDI 2005Q1 source/capacity/preflight/ranking is
+  green but its 12-view strict replay remains pending and is not counted.
 - 2026-09-03 P16 BEA local-probe extension is train-ready: 1 world / 12 rows
   / 3×128K at 128251 tokens, B5 export 12 rows, gate ok, near-dup 0.0.
   Independent of P15 v7. Finance stays unmixed (different probe). No HF.
@@ -865,3 +883,90 @@ in`; no private-repository or upload claim was made.
   queue led by BEA spreadsheet vintage, GitHub failure recovery, and Microsoft
   five-year cross-statement programs. Diversity is tracked by executable task
   topology and oracle, not by relabeling domains.
+
+## 2026-09-04 P40 IETF closure
+
+- V14 projected 9 source-bound candidates at exact 32K/64K/128K with
+  full/CF/ordered views; all four replay directions and structural preflight
+  passed.
+- The complete dense audit ran once and accepted 9/9. Candidate/audit digests
+  match, dense/BM25/TF-IDF top-3 are insufficient, every 4K/8K/16K raw window
+  is insufficient, and maximum near-duplicate ratio is 0.0399.
+- Selection, candidate-union, source-bound promotion, train-ready reporting,
+  and quality gate completed. The promoted product has 9 train / 0 eval rows,
+  682,458 exact tokens, retention 1.0, and `production_eligible=false`.
+- B5 export produced 9 examples / 683,635 estimated tokens with zero duplicate
+  drops or contract rejects. Deterministic manifest validation returned
+  `ok=true` for 9 source rows and 4 outputs.
+- TDD fixed the exporter and deterministic validator to preserve optional task
+  `query_type` as null. Commits: `0748d29`, `a38e3e0`, `eb5c8c1`, `8fd28db`.
+- Six independent local-probe products now total 141 train rows / 7,274,595
+  exact tokens: 36×16K, 39×32K, 48×64K, and 18×128K. Production/KMS-qualified
+  inventory remains zero; no HF upload was attempted.
+- P53 OSV local outputs were independently reviewed and deliberately left
+  uncommitted. Two focused tests and hashes reproduce, but authorization is
+  invalid for generation and its custom essential-ID/span audit cannot support
+  shared remove-one or exhaustive raw-window claims. Inventory delta remains 0.
+
+## 2026-09-05 scale-out kickoff
+
+- Re-audited the current boundary at 141 local-probe train rows / 7,274,595
+  exact tokens, including 18×128K; production/KMS-qualified inventory remains
+  zero.
+- Started three disjoint tracks: authentic-parent rebuild for P52 GovInfo,
+  formula-DAG feasibility for P46 Ofgem workbooks, and P54 comparison of new
+  official multi-document lifecycle sources. Root retains shared-gate,
+  inventory, `.hl`, and release-document ownership.
+- Success is measured by executable task/proof diversity and fully verified
+  train-ready rows, not candidate count, entity copies, or nominal source
+  length. Failed capacity/shortcut probes remain useful rejection evidence.
+- Reverted `d9c80b4` with `11c5d66` after confirming that the former P53
+  candidate commit contradicted its authorization and overstated custom
+  shortcut checks as shared audit evidence. The revert preserves history and
+  restores the documented zero-inventory boundary for P53.
+- P46 finished at commit `c93efcf`: raw formula-template capacity passes all
+  requested bands, but executable answer-dependent capacity is zero, so it
+  generated no candidate and ran no unnecessary dense/promotion stages.
+  Independent review returned PASS with no blocking or actionable correctness
+  finding; the next Ofgem entity is an explicitly reusable public cap-level
+  table plus dated decision chain.
+- P52 rebuilt three authentic parents and projected nine exact 32K/64K/128K
+  views. Shared preflight initially rejected the registered GovInfo v3 sidecar
+  because promotion's domain map omitted its adapter. RED→GREEN commit
+  `769e635` adds the one missing mapping; valid and wrong-domain tests pass.
+- P52 shared preflight and ranking subsequently passed 9/9, but the first 32K
+  ordered dense audit failed because an 8K raw window at artifacts 38:47
+  retrieves every required answer unit. Inventory remains zero while one
+  authentic, structurally separated key combination is tested without moving
+  background or changing the gate.
+- P52's sole structural-span variant rebuilt from source but failed exact 32K
+  before signing (`full=32621`, corrected shared `cf=31000`, `ordered=32621`).
+  Commit `af86d64` preserves the authentic-parent builder and both blocker
+  receipts. No third key combination, dense audit, promotion, or B5 run was
+  attempted; inventory delta is zero.
+- Independent P52 review reproduced the 8K shared-artifact blocker and v2
+  byte-identical exact-band blocker, then requested owner-level wrapper tests.
+  Added a fresh-state three-band nested-pack/sidecar/signing regression and a
+  fixed-counter v2 fail-closed regression; P52 plus adapter suite passes 13
+  tests. Reporting now distinguishes 9 persisted candidate-stage rows from 0
+  dense-audited, selected, promoted, B5, and inventory rows.
+- A second review found registered packing had counted the legacy CF JSON form.
+  The packer now uses the shared GovInfo counterfactual materializer; v1 counts
+  reproduce the shared projections exactly and a fresh source run regenerated
+  the v2 blocker and receipt hash with CF=31,000.
+- P54 finished at commit `3490181` with a new EUR-Lex MDR legislative-chain
+  preflight. It compared NTSB, NHTSA, and EUR-Lex, selected the reproducibly
+  frozen EUR-Lex source set, retained 224,955 source tokens, and formed natural
+  aggregate 32K/64K/128K packs. Review removed hash-based evidence spreading,
+  corrected checked-window counts, and replaced quadratic regex replay with
+  precomputed role masks before the commit.
+- P54 remains aggregate-only: metadata is a normalized projection, prompt and
+  serialization costs are absent, raw-token windows and shared replay are not
+  implemented, and a refresh after the successful frozen receipt hit a
+  CloudFront WAF response. Candidate/train/inventory counts remain zero and the
+  pinned successful receipt was not silently refreshed or loosened.
+- Independent review also showed that the five-role remove-one check was a
+  role-presence tautology and that the pinned reuse Decision is Commission-
+  scoped. The report now marks topology `PARTIAL`, executable minimal evidence
+  `UNVERIFIED`, and rights `NEEDS_CANDIDATE_REVIEW`; the corrected metadata
+  projection retains only the structurally parsed corrected-by edge.

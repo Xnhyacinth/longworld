@@ -1,0 +1,82 @@
+{
+  "schema_version": "longworld.p45-healthdata-source-preflight-request.v1",
+  "data_product": "p45_healthdata_fda_faers_two_quarter_version_chain_preflight_v1",
+  "authorization": {
+    "record_id": "p45-healthdata-fda-faers-2013q3-q4-version-chain-preflight-v1",
+    "scope": "two adjacent FDA-published non-cumulative FAERS ASCII quarters, inspected ephemerally for real case-version chains and aggregate-only capacity",
+    "basis": "same FDA public-source, website-policy, openFDA CC0, and narrative-withholding evidence frozen in the P35 source register; no formal legal opinion",
+    "reviewed_at": "2026-09-04T00:00:00Z",
+    "allowed_actions": [
+      "fetch_two_official_quarters_to_process_memory",
+      "inspect_schema_and_cross_quarter_version_relations",
+      "measure_aggregate_only_structure_capacity"
+    ],
+    "prohibited_actions": [
+      "persist_or_commit_raw_case_rows",
+      "persist_or_commit_case_identifiers_or_identifier_hashes",
+      "generate_candidates",
+      "infer_medical_causality_or_risk",
+      "promote_or_count_inventory"
+    ]
+  },
+  "research_question": "Do adjacent non-cumulative FAERS quarters contain enough real repeated-case version chains to support a privacy-bounded latest-at-cutoff plus multi-table reconciliation task at exact 32K/64K/128K lengths?",
+  "cutoff": "2013-12-31T23:59:59Z",
+  "sources": [
+    {
+      "quarter": "2013Q3",
+      "archive_url": "https://fis.fda.gov/content/Exports/faers_ascii_2013q3.zip",
+      "expected_sha256": "e440ac13442f573fdeae216dad5d2ffa5e24fb4815625fb5c0915068c72a7fd5",
+      "expected_archive_bytes": 22767509
+    },
+    {
+      "quarter": "2013Q4",
+      "archive_url": "https://fis.fda.gov/content/Exports/faers_ascii_2013q4.zip",
+      "expected_sha256": "2e36bab3c85215d3471dbe6562861668b1c2141b23d1d2f5b5bb43d0fe9b9c8e",
+      "expected_archive_bytes": 26520158
+    }
+  ],
+  "official_index_url": "https://fis.fda.gov/extensions/FPD-QDE-FAERS/FPD-QDE-FAERS.html",
+  "tables": {
+    "DEMO": ["primaryid", "caseid", "caseversion", "i_f_code", "event_dt", "mfr_dt", "init_fda_dt", "fda_dt", "rept_cod", "mfr_num", "mfr_sndr", "age", "age_cod", "gndr_cod", "e_sub", "wt", "wt_cod", "rept_dt", "to_mfr", "occp_cod", "reporter_country", "occr_country"],
+    "DRUG": ["primaryid", "caseid", "drug_seq", "role_cod", "drugname", "val_vbm", "route", "dose_vbm", "cum_dose_chr", "cum_dose_unit", "dechal", "rechal", "lot_num", "exp_dt", "nda_num", "dose_amt", "dose_unit", "dose_form", "dose_freq"],
+    "INDI": ["primaryid", "caseid", "indi_drug_seq", "indi_pt"],
+    "OUTC": ["primaryid", "caseid", "outc_cod"],
+    "REAC": ["primaryid", "caseid", "pt"],
+    "RPSR": ["primaryid", "caseid", "rpsr_cod"],
+    "THER": ["primaryid", "caseid", "dsg_drug_seq", "start_dt", "end_dt", "dur", "dur_cod"]
+  },
+  "structural_fields": [
+    "caseversion",
+    "i_f_code",
+    "rept_cod",
+    "e_sub",
+    "drug_seq",
+    "role_cod",
+    "route",
+    "dechal",
+    "rechal",
+    "indi_drug_seq",
+    "outc_cod",
+    "rpsr_cod",
+    "dsg_drug_seq"
+  ],
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "capacity_bands": {
+    "32k": [32000, 32768],
+    "64k": [64000, 65536],
+    "128k": [128000, 131072]
+  },
+  "constraints": [
+    "the output is latest-at-cutoff version selection, paired primaryid/caseid FK reconciliation, and raw/stale/latest/control totals only",
+    "medical causality, incidence, prevalence, comparative safety, risk ranking, and clinical advice are prohibited",
+    "only cases observed in both adjacent quarters with a strictly increasing caseversion count toward version-chain capacity",
+    "case identifiers, hashes of case identifiers, raw clinical terms, demographics, detailed dates, dose/lot data, and reporter/manufacturer identifiers never enter reports or training text",
+    "version-chain capacity excludes unrelated one-version cases and surrogate identifiers",
+    "no generation before active/deleted-case semantics, privacy release, formal near-dup, exact-band, remove-one, and 4K/8K/16K shortcut gates pass unchanged"
+  ]
+}

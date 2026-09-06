@@ -19,9 +19,11 @@ from datetime import date
 from typing import Any
 
 from longworld.core.documentworkflow import (
+    ELIFE_REVIEW_REVISION_INVENTORY_SCHEMA,
     PAPER_FETCH_WORKFLOW_MANIFEST_SCHEMA,
     PAPER_WORKFLOW_MANIFEST_SCHEMA,
     WIKIPEDIA_WORKFLOW_MANIFEST_SCHEMA,
+    audit_elife_review_revision_task,
 )
 from longworld.core.filingworkflow import (
     SEC_ANNUAL_RELATION_FIELDS,
@@ -53,7 +55,11 @@ SOURCE_WORKFLOW_ADAPTER_REVISIONS = frozenset(
 _SOURCE_KIND_SCHEMAS = {
     SEC_SOURCE_KIND: frozenset({SEC_FILING_MANIFEST_SCHEMA}),
     PAPER_SOURCE_KIND: frozenset(
-        {PAPER_WORKFLOW_MANIFEST_SCHEMA, PAPER_FETCH_WORKFLOW_MANIFEST_SCHEMA}
+        {
+            PAPER_WORKFLOW_MANIFEST_SCHEMA,
+            PAPER_FETCH_WORKFLOW_MANIFEST_SCHEMA,
+            ELIFE_REVIEW_REVISION_INVENTORY_SCHEMA,
+        }
     ),
     WIKIMEDIA_SOURCE_KIND: frozenset({WIKIPEDIA_WORKFLOW_MANIFEST_SCHEMA}),
     ISSUER_IR_SOURCE_KIND: frozenset({ISSUER_IR_FILING_MANIFEST_SCHEMA}),
@@ -85,6 +91,12 @@ _PAPER_RELATION_ROLES = {
     "responds_to": ("author_response", "peer_review"),
     "evaluates_benchmark": ("manuscript_revision", "benchmark_report"),
     "reproduces_result": ("benchmark_report", "manuscript_revision"),
+}
+_ELIFE_RELATIONS = {
+    "implements_revision_delta",
+    "requests_revision",
+    "responds_to_review",
+    "revision_of",
 }
 _WIKIMEDIA_RELATIONS = {
     "revision_of",
@@ -944,6 +956,10 @@ def adapt_paper_manifest(
     manifest: Mapping[str, Any], *, signed_bundle_authorized: bool = False
 ) -> tuple[SourceWorkflow, ...]:
     """Normalize an already-verified paper revision/review inventory."""
+    if manifest.get("schema_version") == ELIFE_REVIEW_REVISION_INVENTORY_SCHEMA:
+        return adapt_elife_review_revision_manifest(
+            manifest, signed_bundle_authorized=signed_bundle_authorized
+        )
     _check_schema(
         manifest,
         source_kind=PAPER_SOURCE_KIND,
@@ -989,6 +1005,150 @@ def adapt_paper_manifest(
             or (source.kind, target.kind) != expected_roles
         ):
             raise ProvenanceError("paper source relation crosses workflow boundaries")
+    return _normalize_components(
+        source_kind=PAPER_SOURCE_KIND,
+        source_origin=origin,
+        records=records,
+        relations=relations,
+    )
+
+
+def _elife_relation(
+    raw: Mapping[str, Any], *, records: Mapping[str, SourceRecord]
+) -> SourceRelation:
+    relation_id = str(raw.get("relation_id") or "")
+    kind = str(raw.get("kind") or "")
+    source_id = str(raw.get("source_record_id") or "")
+    target_id = str(raw.get("target_record_id") or "")
+    raw_evidence = raw.get("evidence")
+    if (
+        set(raw)
+        != {
+            "relation_id",
+            "kind",
+            "source_record_id",
+            "target_record_id",
+            "evidence",
+        }
+        or not relation_id
+        or kind not in _ELIFE_RELATIONS
+        or source_id == target_id
+        or source_id not in records
+        or target_id not in records
+        or not isinstance(raw_evidence, list)
+        or not raw_evidence
+    ):
+        raise ProvenanceError("eLife source relation identity is invalid")
+    evidence: list[SourceEvidence] = []
+    evidence_ids: set[str] = set()
+    for item in raw_evidence:
+        if not isinstance(item, Mapping) or set(item) != {
+            "evidence_id",
+            "record_id",
+            "evidence_quote",
+            "evidence_char_start",
+            "evidence_char_end",
+            "source_sha256",
+            "text_sha256",
+        }:
+            raise ProvenanceError("eLife source relation evidence is invalid")
+        evidence_id = str(item.get("evidence_id") or "")
+        record_id = str(item.get("record_id") or "")
+        quote = str(item.get("evidence_quote") or "")
+        start = item.get("evidence_char_start")
+        end = item.get("evidence_char_end")
+        record = records.get(record_id)
+        if (
+            not evidence_id
+            or evidence_id in evidence_ids
+            or record is None
+            or not quote
+            or not isinstance(start, int)
+            or not isinstance(end, int)
+            or end != start + len(quote)
+            or record.text[start:end] != quote
+            or item.get("source_sha256") != record.source_sha256
+            or item.get("text_sha256") != record.text_sha256
+        ):
+            raise ProvenanceError("eLife source relation evidence is invalid")
+        evidence_ids.add(evidence_id)
+        evidence.append(
+            SourceEvidence(
+                record_id=record_id,
+                evidence_quote=quote,
+                char_start=start,
+                char_end=end,
+                source_sha256=record.source_sha256,
+                fact_ids=(evidence_id,),
+            )
+        )
+    if {source_id, target_id} - {item.record_id for item in evidence}:
+        raise ProvenanceError("eLife source relation lacks endpoint evidence")
+    expected_orientation = {
+        "requests_revision": ("v1", "v2"),
+        "responds_to_review": ("v2", "v1"),
+        "revision_of": ("v2", "v1"),
+        "implements_revision_delta": ("v2", "v1"),
+    }[kind]
+    endpoints = (
+        records[source_id].attribute("revision_id"),
+        records[target_id].attribute("revision_id"),
+    )
+    if endpoints != expected_orientation:
+        raise ProvenanceError("eLife source relation endpoint roles are invalid")
+    return SourceRelation(
+        relation_id=relation_id,
+        kind=kind,
+        source_record_id=source_id,
+        target_record_id=target_id,
+        evidence=tuple(evidence),
+    )
+
+
+def adapt_elife_review_revision_manifest(
+    manifest: Mapping[str, Any], *, signed_bundle_authorized: bool = False
+) -> tuple[SourceWorkflow, ...]:
+    """Normalize a verified eLife review-response-revision inventory."""
+    _check_schema(
+        manifest,
+        source_kind=PAPER_SOURCE_KIND,
+        expected_schemas=frozenset({ELIFE_REVIEW_REVISION_INVENTORY_SCHEMA}),
+    )
+    origin = _inventory_origin(
+        manifest,
+        source_kind=PAPER_SOURCE_KIND,
+        signed_bundle_authorized=signed_bundle_authorized,
+    )
+    audit = audit_elife_review_revision_task(dict(manifest))
+    if audit.get("passed") is not True:
+        raise ProvenanceError("eLife strict source task replay failed")
+    raw_records = _objects(manifest.get("records"), "eLife records")
+    if manifest.get("n_records") != len(raw_records):
+        raise ProvenanceError("eLife source inventory count is invalid")
+    records = [
+        _record(
+            raw,
+            kind="elife_revision",
+            occurred_at=str(raw.get("effective_date") or ""),
+            source_family="elife_article_xml",
+            source_origin=origin,
+            identity_fields=(
+                "publisher_id",
+                "canonical_doi",
+                "version_doi",
+                "version",
+                "revision_id",
+            ),
+        )
+        for raw in raw_records
+    ]
+    records_by_id = {record.record_id: record for record in records}
+    raw_relations = _objects(manifest.get("relations"), "eLife relations")
+    if manifest.get("n_relations") != len(raw_relations):
+        raise ProvenanceError("eLife source relation count is invalid")
+    relations = [_elife_relation(raw, records=records_by_id) for raw in raw_relations]
+    if {relation.kind for relation in relations} != _ELIFE_RELATIONS:
+        raise ProvenanceError("eLife source relation set is incomplete")
     return _normalize_components(
         source_kind=PAPER_SOURCE_KIND,
         source_origin=origin,
@@ -1114,6 +1274,9 @@ def adapt_standards_manifest(
             if str(record.get("record_id") or "") in referenced_evidence_ids
         ),
     ]
+    raw_records_by_id = {
+        str(record.get("record_id") or ""): record for record in selected_raw_records
+    }
     records: list[SourceRecord] = []
     for raw in selected_raw_records:
         transformed = dict(raw)
@@ -1148,7 +1311,14 @@ def adapt_standards_manifest(
         )
     records_by_id = {record.record_id: record for record in records}
     relations: list[SourceRelation] = []
-    allowed_kinds = {"revision_of", "published_as", "updates", "obsoletes"}
+    allowed_kinds = {
+        "revision_of",
+        "published_as",
+        "updates",
+        "obsoletes",
+        "normative_reference",
+        "informative_reference",
+    }
     for raw in raw_relations:
         relation_id = str(raw.get("relation_id") or "")
         kind = str(raw.get("kind") or "")
@@ -1163,6 +1333,7 @@ def adapt_standards_manifest(
         ):
             raise ProvenanceError("IETF source relation identity is invalid")
         evidence: list[SourceEvidence] = []
+        dependency_evidence: list[SourceEvidence] = []
         for item in _objects(raw.get("evidence"), "IETF relation evidence"):
             record_id = str(item.get("record_id") or "")
             record = records_by_id.get(record_id)
@@ -1178,20 +1349,38 @@ def adapt_standards_manifest(
                 or record.text[start:end] != quote
                 or item.get("source_sha256") != record.source_sha256
                 or not isinstance(fact_ids, list)
-                or not fact_ids
-                or any(not isinstance(fact_id, str) for fact_id in fact_ids)
+                or len(fact_ids) != 1
+                or not isinstance(fact_ids[0], str)
             ):
                 raise ProvenanceError("IETF source relation evidence is invalid")
-            evidence.append(
-                SourceEvidence(
-                    record_id=record_id,
-                    evidence_quote=quote,
-                    char_start=start,
-                    char_end=end,
-                    source_sha256=record.source_sha256,
-                    fact_ids=tuple(fact_ids),
-                )
+            fact = next(
+                (
+                    fact
+                    for fact in _objects(
+                        raw_records_by_id[record_id].get("facts"), "IETF facts"
+                    )
+                    if fact.get("fact_id") == fact_ids[0]
+                ),
+                None,
             )
+            if (
+                fact is None
+                or fact.get("evidence_quote") != quote
+                or fact.get("char_start") != start
+                or fact.get("char_end") != end
+            ):
+                raise ProvenanceError("IETF source relation evidence fact is invalid")
+            bound_evidence = SourceEvidence(
+                record_id=record_id,
+                evidence_quote=quote,
+                char_start=start,
+                char_end=end,
+                source_sha256=record.source_sha256,
+                fact_ids=(fact_ids[0],),
+            )
+            evidence.append(bound_evidence)
+            if record.kind == "datatracker_relation":
+                dependency_evidence.append(bound_evidence)
         if not {source_id, target_id}.issubset({item.record_id for item in evidence}):
             raise ProvenanceError("IETF source relation lacks endpoint evidence")
         source_kind = records_by_id[source_id].kind
@@ -1201,9 +1390,20 @@ def adapt_standards_manifest(
             "published_as": ("draft_revision", "rfc"),
             "updates": ("rfc", "rfc"),
             "obsoletes": ("rfc", "rfc"),
+            "normative_reference": ("rfc", "rfc"),
+            "informative_reference": ("rfc", "rfc"),
         }[kind]
         if (source_kind, target_kind) != expected_kinds:
             raise ProvenanceError("IETF source relation endpoint roles are invalid")
+        if kind in {"normative_reference", "informative_reference"}:
+            target_number = records_by_id[target_id].attribute("rfc_number")
+            if (
+                not target_number.isdigit()
+                or len(dependency_evidence) != 1
+                or dependency_evidence[0].fact_ids
+                != (f"{kind}:{target_number}",)
+            ):
+                raise ProvenanceError("IETF source dependency evidence is invalid")
         relations.append(
             SourceRelation(
                 relation_id=relation_id,

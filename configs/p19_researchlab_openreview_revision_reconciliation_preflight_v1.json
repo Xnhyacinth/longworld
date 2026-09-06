@@ -1,0 +1,20 @@
+{
+  "schema_version": "longworld.paper-fetch-request.v1",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P19-PUBLIC-OPENREVIEW-20260903-01",
+    "scope": "bounded read-only preflight of one public OpenReview forum for review-response-revision reconciliation",
+    "basis": "project owner authorized public-source research and preflight for LongWorld P19",
+    "reviewed_at": "2026-09-03T00:00:00Z",
+    "allowed_actions": [
+      "fetch_openreview_forum"
+    ]
+  },
+  "arxiv_version_ids": [],
+  "openreview_forum_ids": [
+    "n2qXFXiMsAM"
+  ],
+  "fetch_arxiv_source": false,
+  "requests_per_second": 1,
+  "max_retries": 1
+}

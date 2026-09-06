@@ -1,0 +1,44 @@
+{
+  "schema_version": "longworld.ietf-fetch-request.v1",
+  "user_agent": "LongWorld/0.2 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "p40-ietf-oauth-semantic-growth-v1",
+    "scope": "public IETF Datatracker, Internet-Draft archive, and RFC Editor records for a nested OAuth cross-specification validation graph",
+    "basis": "IETF open-records research export for byte-bound semantic-growth and remove-one replay",
+    "reviewed_at": "2026-09-04T00:00:00Z",
+    "allowed_actions": [
+      "fetch_datatracker_document",
+      "fetch_datatracker_relation",
+      "fetch_draft_revision",
+      "fetch_rfc"
+    ]
+  },
+  "drafts": [
+    {
+      "name": "draft-ietf-oauth-security-topics",
+      "revisions": [
+        "29"
+      ]
+    }
+  ],
+  "rfc_numbers": [
+    6749,
+    6750,
+    6819,
+    7636,
+    8414,
+    8705,
+    9101,
+    9126,
+    9207,
+    9396,
+    9449,
+    9700
+  ],
+  "approved_public_test_vector_sha256": [
+    "5a058adf319a316eefb09bdb26d77e49933c00113f8fce30f689d74adca1a7ab",
+    "7e5030a39637a0819831cf5a3ed42b18be383d2b20befe02750273d86cd7704d"
+  ],
+  "requests_per_second": 1.0,
+  "max_retries": 2
+}

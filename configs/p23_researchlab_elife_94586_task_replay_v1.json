@@ -1,0 +1,69 @@
+{
+  "schema_version": "longworld.elife-review-revision-task-replay-preflight.v1",
+  "data_product": "p23_researchlab_elife_94586_task_replay_v1",
+  "adapter": {
+    "adapter_id": "researchlab.elife_review_revision.v1",
+    "adapter_revision": "longworld.elife-review-revision-replay.v1",
+    "sidecar_schema_version": "longworld.task-replay-sidecar.v1"
+  },
+  "source_inventory": {
+    "path": "data/source_inventories/p21-researchlab-elife-94586-review-revision-64k-v1/source_inventory.json",
+    "raw_file_sha256": "c7a1959d34b757053640f5f122a249f13180d00bed24fcb6badf8378fdd43ff5",
+    "authorization_record_id": "P21-PUBLIC-ELIFE-94586-20260903-01"
+  },
+  "source_record_bindings": [
+    {
+      "record_id": "elife:94586:v1",
+      "raw_source_sha256": "5d99c76699e3efe626b44834adb6a2b3867154603a886de74160c690453d826b",
+      "redacted_text_sha256": "61bd896575a1767fc16193956abc52acb2602dfa104489f5f268923823f33092",
+      "email_redaction_count": 4
+    },
+    {
+      "record_id": "elife:94586:v2",
+      "raw_source_sha256": "33a572b45a70a32fd92741566dd04d967a784fa287ab2bceefc92b12e1d2906a",
+      "redacted_text_sha256": "76c4dc3426a0413b7ae750f2b0ffa318c108fa540c61fdafa63469322c6cb00b",
+      "email_redaction_count": 2
+    }
+  ],
+  "email_redaction_receipt": {
+    "replacement": "[redacted-email]",
+    "total": 6
+  },
+  "relation_kinds": [
+    "implements_revision_delta",
+    "requests_revision",
+    "responds_to_review",
+    "revision_of"
+  ],
+  "task": {
+    "program_id": "researchlab.review_response_revision_claim_disposition.v1",
+    "task_sha256": "5581930f025687ab0237fe3efc2d8d53f8eb97cbc1265c64684e4b0331ae9fe0",
+    "strict_answer": "VERIFIED_IMPLEMENTED",
+    "model_written_gold": false
+  },
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "candidate_content_commitment_gate": {
+    "status": "pending_parent_candidate_materialization",
+    "required_fields": [
+      "world_id",
+      "length_bucket",
+      "content_sha256"
+    ],
+    "allowed_length_buckets": [
+      "64k"
+    ],
+    "reason": "P23.B does not authorize candidate generation; no placeholder content hash is treated as a real commitment"
+  },
+  "release_state": {
+    "source_attested_sidecar_contract": "validated_on_public_test_fixture",
+    "materialized_sidecar": false,
+    "candidate_generated": false,
+    "train_ready": false
+  }
+}

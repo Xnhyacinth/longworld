@@ -1,0 +1,76 @@
+{
+  "schema_version": "longworld.elife-review-revision-fetch-request.v1",
+  "data_product": "p21_researchlab_elife_94586_review_revision_64k_v1",
+  "authorization": {
+    "record_id": "P21-PUBLIC-ELIFE-94586-20260903-01",
+    "scope": "bounded public eLife 94586 v1/v2 source inventory and deterministic task replay",
+    "basis": "official eLife article XML at one pinned Git commit; P20 established 64K-only near-deduplicated capacity",
+    "reviewed_at": "2026-09-03T00:00:00Z",
+    "allowed_actions": [
+      "fetch_pinned_elife_xml"
+    ]
+  },
+  "source": {
+    "repository": "elifesciences/elife-article-xml",
+    "repository_url": "https://github.com/elifesciences/elife-article-xml",
+    "repository_commit": "d36c41edc37e354a80eb3b476399f135b8c83cda",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "candidate": {
+    "publisher_id": "94586",
+    "canonical_doi": "10.7554/eLife.94586",
+    "title": "Overflow metabolism originates from growth optimization and cell heterogeneity",
+    "transition_program": "researchlab.review_response_revision_claim_disposition.v1"
+  },
+  "versions": [
+    {
+      "version": 1,
+      "path": "preprints/elife-preprint-94586-v1.xml",
+      "version_doi": "10.7554/eLife.94586.1",
+      "effective_date": "2024-02-07",
+      "bytes": 908691,
+      "sha256": "5d99c76699e3efe626b44834adb6a2b3867154603a886de74160c690453d826b",
+      "git_blob_sha1": "6f9e3dc38d7bfa29d6af337c91a286709f3c4182"
+    },
+    {
+      "version": 2,
+      "path": "preprints/elife-preprint-94586-v2.xml",
+      "version_doi": "10.7554/eLife.94586.2",
+      "effective_date": "2024-12-19",
+      "bytes": 1225363,
+      "sha256": "33a572b45a70a32fd92741566dd04d967a784fa287ab2bceefc92b12e1d2906a",
+      "git_blob_sha1": "a4c6f52094c9c1570f2fd7b7c2bdd6f6b2caeca6"
+    }
+  ],
+  "oracle_witness": {
+    "review_paragraph_sha256": "2bd025181bb190f1f4414d097fed845a38ca2270386082c0e0d9516e52fc4a58",
+    "response_paragraph_sha256": "d90dcbad51abd146184049409f04c99bf56139eb0e7e1224dc1d7b921e87e3cd",
+    "required_v1_to_v2_object_transitions": {
+      "body_figure_fig5": [
+        0,
+        1
+      ],
+      "appendix_APP9": [
+        0,
+        1
+      ],
+      "appendix_table_tbl3": [
+        0,
+        1
+      ]
+    }
+  },
+  "length_policy": {
+    "allowed_bands": [
+      "64k"
+    ],
+    "exact_64k_band": [
+      65536,
+      67584
+    ],
+    "measured_exact_dedup_capacity": 109213,
+    "measured_near_dedup_capacity": 76142,
+    "exact_64k_witness_tokens": 65536,
+    "source_scope": "v1/v2 only"
+  }
+}

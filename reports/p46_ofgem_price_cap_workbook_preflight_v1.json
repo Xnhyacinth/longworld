@@ -1,0 +1,1276 @@
+{
+  "capacity": {
+    "capacity_is_preflight_only": true,
+    "cross_version_exact_deduplicated_qwen_tokens": 14714242,
+    "cross_version_exact_deduplicated_unit_count": 254586,
+    "cross_version_template_deduplicated_qwen_tokens": 469328,
+    "cross_version_template_deduplicated_unit_count": 18224,
+    "exact_band_capacity": {
+      "128k": true,
+      "32k": true,
+      "64k": true
+    }
+  },
+  "config_sha256": "fa6d7a9e4b5221da9328cb86f611eb8c9bab452fd7a3a0e9f280832b50a6c3c0",
+  "data_product": "p46_ofgem_price_cap_workbook_preflight_v1",
+  "oracle_preflight": {
+    "libreoffice_available_in_environment": false,
+    "openpyxl_available_in_project_environment": false,
+    "required_boundary_policy": "external-link cached cells are immutable signed inputs; external relationship targets are stripped and never dereferenced",
+    "required_libreoffice_check": "run headless in an isolated profile with networking disabled and link updates disabled; recalculate only a frozen internal dependency closure; require two identical exports and agreement with the Python oracle within declared decimal tolerances",
+    "required_openpyxl_check": "load formula and data_only views with keep_links=False; bind every retained cached boundary value by workbook hash, sheet, and cell; reject formula errors and unresolved non-boundary external references",
+    "status": "blocked_pending_cross_engine_oracle"
+  },
+  "promotion_status": {
+    "candidate_generation_allowed": false,
+    "reason": "capacity alone is insufficient; embedded Internal Only headers require rights review, stale external-link and broken-name parts require an exclusion boundary, and neither recalculation engine is installed or validated",
+    "train_ready": false
+  },
+  "schema_version": "longworld.p46-ofgem-workbook-preflight-report.v1",
+  "tokenizer": {
+    "add_special_tokens": false,
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "workbooks": [
+    {
+      "archive": {
+        "active_content_member_count": 0,
+        "encrypted_member_count": 0,
+        "internal_only_marker_part_count": 39,
+        "macro_enabled_content_type": false,
+        "max_compression_ratio": 20.13643,
+        "max_single_member_bytes": 3293987,
+        "member_count": 176,
+        "printer_settings_binary_count": 38,
+        "total_uncompressed_bytes": 25496389,
+        "unsafe_member_count": 0
+      },
+      "broken_defined_name_count": 1112,
+      "comments_and_people_metadata_excluded": true,
+      "dag_branch_preflight": [
+        {
+          "branch": "electricity_direct_fuel",
+          "calculator_sheet": "ElecSingle_Other_3100kWh",
+          "output_selector": "INDIRECT over the calculator sheet name",
+          "output_selector_formula_count": 3,
+          "output_sheet": "1a Default tariff cap",
+          "source_reference_formula_counts": {
+            "3a DF": 700
+          },
+          "source_sheets": [
+            "3a DF"
+          ]
+        },
+        {
+          "branch": "electricity_network",
+          "calculator_sheet": "ElecSingle_Other_3100kWh",
+          "output_selector": "INDIRECT over the calculator sheet name",
+          "output_selector_formula_count": 3,
+          "output_sheet": "1a Default tariff cap",
+          "source_reference_formula_counts": {
+            "3e NC-Elec": 700
+          },
+          "source_sheets": [
+            "3e NC-Elec"
+          ]
+        },
+        {
+          "branch": "gas_network",
+          "calculator_sheet": "Gas_Other_12000kWh",
+          "output_selector": "INDIRECT over the calculator sheet name",
+          "output_selector_formula_count": 3,
+          "output_sheet": "1a Default tariff cap",
+          "source_reference_formula_counts": {
+            "3f NC-Gas": 1372
+          },
+          "source_sheets": [
+            "3f NC-Gas"
+          ]
+        },
+        {
+          "branch": "inflation_and_debt",
+          "calculator_sheet": "ElecSingle_Other_3100kWh",
+          "output_selector": "INDIRECT over the calculator sheet name",
+          "output_selector_formula_count": 3,
+          "output_sheet": "1a Default tariff cap",
+          "source_reference_formula_counts": {
+            "3g CPIH": 4116,
+            "3k EBIT": 1372
+          },
+          "source_sheets": [
+            "3g CPIH",
+            "3k EBIT",
+            "3n DRC"
+          ]
+        }
+      ],
+      "defined_name_count": 1558,
+      "document_properties_excluded": true,
+      "download": {
+        "bytes": 4236086,
+        "content_length_header": "4236086",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "etag": "\"67fcef78-40a336\"",
+        "final_url": "https://www.ofgem.gov.uk/sites/default/files/2024-08/Default_tariff_cap_level_v1.23.xlsx",
+        "last_modified": "Mon, 14 Apr 2025 11:20:24 GMT",
+        "observed_at": "2026-09-04T10:00:55.221659Z",
+        "requested_url": "https://www.ofgem.gov.uk/sites/default/files/2024-08/Default_tariff_cap_level_v1.23.xlsx",
+        "sha256": "b4aa5e7b1504d706e5297ad525857dde2a586db5a981b79fa63f85b575c8f267",
+        "status": 200
+      },
+      "exact_deduplicated_qwen_tokens": 5922504,
+      "exact_deduplicated_unit_count": 109896,
+      "external_defined_name_count": 1027,
+      "external_defined_name_unique_name_count": 99,
+      "external_links": {
+        "external_link_part_count": 11,
+        "external_relationship_target_count": 11,
+        "external_relationship_target_schemes": {
+          "file": 6,
+          "http": 2,
+          "https": 2,
+          "relative_or_unc": 1
+        },
+        "targets_persisted": false
+      },
+      "external_workbook_formula_count": 0,
+      "formula_count": 155347,
+      "formula_template_reduction_ratio": 0.940427,
+      "hidden_defined_name_count": 1558,
+      "hidden_sheet_count": 0,
+      "images_excluded": true,
+      "live_external_defined_name_reference_count": 0,
+      "new_template_units_vs_previous_count": 13098,
+      "new_template_units_vs_previous_qwen_tokens": 335864,
+      "nonempty_cell_count": 219863,
+      "period": "2024Q4",
+      "shared_formula_follower_count": 25901,
+      "sheet_count": 38,
+      "sheet_names": [
+        "Front sheet",
+        "Notes",
+        "1. Outputs=>",
+        "1a Default tariff cap",
+        "1b Historical level tables",
+        "1c Consumption adjusted levels",
+        "2. Calculations=>",
+        "ElecSingle_Other_3100kWh",
+        "ElecSingle_SC_3100kWh",
+        "Gas_Other_12000kWh",
+        "Gas_SC_12000kWh",
+        "ElecMulti_Other_4200kWh",
+        "ElecMulti_SC_4200kWh",
+        "ElecSingle_Other_Nil",
+        "ElecSingle_SC_Nil",
+        "Gas_Other_Nil",
+        "Gas_SC_Nil",
+        "ElecMulti_SC_Nil",
+        "ElecMulti_Other_Nil",
+        "ElecSingle_PPM_3100kWh",
+        "Gas_PPM_12000kWh",
+        "ElecMulti_PPM_4200kWh",
+        "ElecSingle_PPM_Nil",
+        "Gas_PPM_Nil",
+        "ElecMulti_PPM_Nil",
+        "3. Inputs=>",
+        "3a DF",
+        "3b CM",
+        "3c AA",
+        "3d PC",
+        "3e NC-Elec",
+        "3f NC-Gas",
+        "3g CPIH",
+        "3h OC ",
+        "3i SMNCC",
+        "3j PAAC PAP",
+        "3k EBIT",
+        "3l HAP"
+      ],
+      "template_deduplicated_qwen_tokens": 335864,
+      "template_deduplicated_unit_count": 13098,
+      "top_cross_sheet_formula_edges": [
+        {
+          "formula_count": 14040,
+          "from": "1c Consumption adjusted levels",
+          "to": "1b Historical level tables"
+        },
+        {
+          "formula_count": 4116,
+          "from": "ElecSingle_Other_3100kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "ElecSingle_SC_3100kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "Gas_Other_12000kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "Gas_SC_12000kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "ElecMulti_Other_4200kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "ElecMulti_SC_4200kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "ElecSingle_Other_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "ElecSingle_SC_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "Gas_Other_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "Gas_SC_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "ElecMulti_SC_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "ElecMulti_Other_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "ElecSingle_PPM_3100kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "Gas_PPM_12000kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "ElecMulti_PPM_4200kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "ElecSingle_PPM_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "Gas_PPM_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 4116,
+          "from": "ElecMulti_PPM_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 2058,
+          "from": "Gas_Other_Nil",
+          "to": "3d PC"
+        },
+        {
+          "formula_count": 2058,
+          "from": "Gas_SC_Nil",
+          "to": "3d PC"
+        },
+        {
+          "formula_count": 2058,
+          "from": "Gas_PPM_Nil",
+          "to": "3d PC"
+        },
+        {
+          "formula_count": 1372,
+          "from": "ElecSingle_Other_3100kWh",
+          "to": "3c AA"
+        },
+        {
+          "formula_count": 1372,
+          "from": "ElecSingle_Other_3100kWh",
+          "to": "3j PAAC PAP"
+        },
+        {
+          "formula_count": 1372,
+          "from": "ElecSingle_Other_3100kWh",
+          "to": "3k EBIT"
+        },
+        {
+          "formula_count": 1372,
+          "from": "ElecSingle_SC_3100kWh",
+          "to": "3c AA"
+        },
+        {
+          "formula_count": 1372,
+          "from": "ElecSingle_SC_3100kWh",
+          "to": "3j PAAC PAP"
+        },
+        {
+          "formula_count": 1372,
+          "from": "ElecSingle_SC_3100kWh",
+          "to": "3k EBIT"
+        },
+        {
+          "formula_count": 1372,
+          "from": "Gas_Other_12000kWh",
+          "to": "3a DF"
+        },
+        {
+          "formula_count": 1372,
+          "from": "Gas_Other_12000kWh",
+          "to": "3c AA"
+        }
+      ],
+      "top_formula_sheets": [
+        {
+          "formula_count": 8779,
+          "sheet": "ElecSingle_Other_3100kWh"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecSingle_SC_3100kWh"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecMulti_Other_4200kWh"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecMulti_SC_4200kWh"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecSingle_PPM_3100kWh"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecMulti_PPM_4200kWh"
+        },
+        {
+          "formula_count": 8093,
+          "sheet": "Gas_Other_12000kWh"
+        },
+        {
+          "formula_count": 8093,
+          "sheet": "Gas_SC_12000kWh"
+        },
+        {
+          "formula_count": 8093,
+          "sheet": "Gas_PPM_12000kWh"
+        },
+        {
+          "formula_count": 7407,
+          "sheet": "ElecSingle_Other_Nil"
+        },
+        {
+          "formula_count": 7407,
+          "sheet": "ElecSingle_SC_Nil"
+        },
+        {
+          "formula_count": 7407,
+          "sheet": "ElecMulti_SC_Nil"
+        }
+      ],
+      "top_nonempty_cell_sheets": [
+        {
+          "cell_count": 12820,
+          "sheet": "3c AA"
+        },
+        {
+          "cell_count": 9680,
+          "sheet": "ElecSingle_Other_Nil"
+        },
+        {
+          "cell_count": 9680,
+          "sheet": "ElecMulti_PPM_4200kWh"
+        },
+        {
+          "cell_count": 9680,
+          "sheet": "ElecSingle_PPM_Nil"
+        },
+        {
+          "cell_count": 9577,
+          "sheet": "ElecSingle_Other_3100kWh"
+        },
+        {
+          "cell_count": 9526,
+          "sheet": "ElecSingle_SC_3100kWh"
+        },
+        {
+          "cell_count": 9526,
+          "sheet": "Gas_Other_12000kWh"
+        },
+        {
+          "cell_count": 9526,
+          "sheet": "Gas_SC_12000kWh"
+        },
+        {
+          "cell_count": 9526,
+          "sheet": "ElecMulti_Other_4200kWh"
+        },
+        {
+          "cell_count": 9526,
+          "sheet": "ElecMulti_SC_4200kWh"
+        },
+        {
+          "cell_count": 9526,
+          "sheet": "ElecSingle_SC_Nil"
+        },
+        {
+          "cell_count": 9526,
+          "sheet": "Gas_Other_Nil"
+        }
+      ],
+      "volatile_formula_count": 3
+    },
+    {
+      "archive": {
+        "active_content_member_count": 0,
+        "encrypted_member_count": 0,
+        "internal_only_marker_part_count": 40,
+        "macro_enabled_content_type": false,
+        "max_compression_ratio": 20.100627,
+        "max_single_member_bytes": 3468804,
+        "member_count": 187,
+        "printer_settings_binary_count": 39,
+        "total_uncompressed_bytes": 30068265,
+        "unsafe_member_count": 0
+      },
+      "broken_defined_name_count": 1112,
+      "comments_and_people_metadata_excluded": true,
+      "dag_branch_preflight": [
+        {
+          "branch": "electricity_direct_fuel",
+          "calculator_sheet": "ElecSingle_Other_3100kWh",
+          "output_selector": "INDIRECT over the calculator sheet name",
+          "output_selector_formula_count": 6,
+          "output_sheet": "1a Default tariff cap",
+          "source_reference_formula_counts": {
+            "3a DF": 700
+          },
+          "source_sheets": [
+            "3a DF"
+          ]
+        },
+        {
+          "branch": "electricity_network",
+          "calculator_sheet": "ElecSingle_Other_3100kWh",
+          "output_selector": "INDIRECT over the calculator sheet name",
+          "output_selector_formula_count": 6,
+          "output_sheet": "1a Default tariff cap",
+          "source_reference_formula_counts": {
+            "3e NC-Elec": 700
+          },
+          "source_sheets": [
+            "3e NC-Elec"
+          ]
+        },
+        {
+          "branch": "gas_network",
+          "calculator_sheet": "Gas_Other_12000kWh",
+          "output_selector": "INDIRECT over the calculator sheet name",
+          "output_selector_formula_count": 6,
+          "output_sheet": "1a Default tariff cap",
+          "source_reference_formula_counts": {
+            "3f NC-Gas": 1372
+          },
+          "source_sheets": [
+            "3f NC-Gas"
+          ]
+        },
+        {
+          "branch": "inflation_and_debt",
+          "calculator_sheet": "ElecSingle_Other_3100kWh",
+          "output_selector": "INDIRECT over the calculator sheet name",
+          "output_selector_formula_count": 6,
+          "output_sheet": "1a Default tariff cap",
+          "source_reference_formula_counts": {
+            "3g CPIH": 3192,
+            "3k EBIT": 1372,
+            "3n DRC": 924
+          },
+          "source_sheets": [
+            "3g CPIH",
+            "3k EBIT",
+            "3n DRC"
+          ]
+        }
+      ],
+      "defined_name_count": 1560,
+      "document_properties_excluded": true,
+      "download": {
+        "bytes": 5040045,
+        "content_length_header": "5040045",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "etag": "\"68ae9dc5-4ce7ad\"",
+        "final_url": "https://www.ofgem.gov.uk/sites/default/files/2025-08/energy-price-cap-levels-pre-levelised-rates-model.xlsx",
+        "last_modified": "Wed, 27 Aug 2025 05:55:17 GMT",
+        "observed_at": "2026-09-04T10:01:03.161897Z",
+        "requested_url": "https://www.ofgem.gov.uk/sites/default/files/2025-08/energy-price-cap-levels-pre-levelised-rates-model.xlsx",
+        "sha256": "d0cf3749e43081bec2f6503b3440a884044208703cd2f0ec53801f4da2d73957",
+        "status": 200
+      },
+      "exact_deduplicated_qwen_tokens": 6642213,
+      "exact_deduplicated_unit_count": 118450,
+      "external_defined_name_count": 1027,
+      "external_defined_name_unique_name_count": 99,
+      "external_links": {
+        "external_link_part_count": 11,
+        "external_relationship_target_count": 11,
+        "external_relationship_target_schemes": {
+          "file": 6,
+          "http": 2,
+          "https": 2,
+          "relative_or_unc": 1
+        },
+        "targets_persisted": false
+      },
+      "external_workbook_formula_count": 0,
+      "formula_count": 161910,
+      "formula_template_reduction_ratio": 0.946644,
+      "hidden_defined_name_count": 1560,
+      "hidden_sheet_count": 0,
+      "images_excluded": true,
+      "live_external_defined_name_reference_count": 0,
+      "new_template_units_vs_previous_count": 1527,
+      "new_template_units_vs_previous_qwen_tokens": 42478,
+      "nonempty_cell_count": 270859,
+      "period": "2025Q4",
+      "shared_formula_follower_count": 27249,
+      "sheet_count": 41,
+      "sheet_names": [
+        "Front sheet",
+        "Notes",
+        "1. Outputs=>",
+        "1a Default tariff cap",
+        "1b Historical level tables",
+        "1c Consumption adjusted levels",
+        "2. Calculations=>",
+        "ElecSingle_Other_3100kWh",
+        "ElecSingle_SC_3100kWh",
+        "Gas_Other_12000kWh",
+        "Gas_SC_12000kWh",
+        "ElecMulti_Other_4200kWh",
+        "ElecMulti_SC_4200kWh",
+        "ElecSingle_Other_Nil",
+        "ElecSingle_SC_Nil",
+        "Gas_Other_Nil",
+        "Gas_SC_Nil",
+        "ElecMulti_Other_Nil",
+        "ElecMulti_SC_Nil",
+        "ElecSingle_PPM_3100kWh",
+        "Gas_PPM_12000kWh",
+        "ElecSingle_PPM_Nil",
+        "Gas_PPM_Nil",
+        "ElecMulti_PPM_4200kWh",
+        "ElecMulti_PPM_Nil",
+        "3. Inputs=>",
+        "3a DF",
+        "3b CM",
+        "3c AA",
+        "3d PC",
+        "3e NC-Elec",
+        "3f NC-Gas",
+        "3g CPIH",
+        "3h OC ",
+        "3i SMNCC",
+        "3j PAAC PAP",
+        "3k EBIT",
+        "3l HAP",
+        "3m CO",
+        "3n DRC",
+        "3o IC"
+      ],
+      "template_deduplicated_qwen_tokens": 374017,
+      "template_deduplicated_unit_count": 14452,
+      "top_cross_sheet_formula_edges": [
+        {
+          "formula_count": 21384,
+          "from": "1c Consumption adjusted levels",
+          "to": "1b Historical level tables"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecSingle_Other_3100kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecSingle_SC_3100kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "Gas_Other_12000kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "Gas_SC_12000kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecMulti_Other_4200kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecMulti_SC_4200kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecSingle_Other_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecSingle_SC_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "Gas_Other_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "Gas_SC_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecMulti_Other_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecMulti_SC_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecSingle_PPM_3100kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "Gas_PPM_12000kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecSingle_PPM_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "Gas_PPM_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecMulti_PPM_4200kWh",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecMulti_PPM_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 2058,
+          "from": "Gas_Other_Nil",
+          "to": "3d PC"
+        },
+        {
+          "formula_count": 2058,
+          "from": "Gas_SC_Nil",
+          "to": "3d PC"
+        },
+        {
+          "formula_count": 2058,
+          "from": "Gas_PPM_Nil",
+          "to": "3d PC"
+        },
+        {
+          "formula_count": 1680,
+          "from": "ElecSingle_PPM_Nil",
+          "to": "ElecSingle_PPM_3100kWh"
+        },
+        {
+          "formula_count": 1680,
+          "from": "Gas_PPM_Nil",
+          "to": "Gas_PPM_12000kWh"
+        },
+        {
+          "formula_count": 1680,
+          "from": "ElecMulti_PPM_Nil",
+          "to": "ElecMulti_PPM_4200kWh"
+        },
+        {
+          "formula_count": 1372,
+          "from": "ElecSingle_Other_3100kWh",
+          "to": "3c AA"
+        },
+        {
+          "formula_count": 1372,
+          "from": "ElecSingle_Other_3100kWh",
+          "to": "3k EBIT"
+        },
+        {
+          "formula_count": 1372,
+          "from": "ElecSingle_SC_3100kWh",
+          "to": "3c AA"
+        },
+        {
+          "formula_count": 1372,
+          "from": "ElecSingle_SC_3100kWh",
+          "to": "3k EBIT"
+        },
+        {
+          "formula_count": 1372,
+          "from": "Gas_Other_12000kWh",
+          "to": "3a DF"
+        }
+      ],
+      "top_formula_sheets": [
+        {
+          "formula_count": 8784,
+          "sheet": "1c Consumption adjusted levels"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecSingle_Other_3100kWh"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecSingle_SC_3100kWh"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecMulti_Other_4200kWh"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecMulti_SC_4200kWh"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecSingle_PPM_3100kWh"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecMulti_PPM_4200kWh"
+        },
+        {
+          "formula_count": 8568,
+          "sheet": "1b Historical level tables"
+        },
+        {
+          "formula_count": 8093,
+          "sheet": "Gas_Other_12000kWh"
+        },
+        {
+          "formula_count": 8093,
+          "sheet": "Gas_SC_12000kWh"
+        },
+        {
+          "formula_count": 8093,
+          "sheet": "Gas_PPM_12000kWh"
+        },
+        {
+          "formula_count": 7407,
+          "sheet": "ElecSingle_Other_Nil"
+        }
+      ],
+      "top_nonempty_cell_sheets": [
+        {
+          "cell_count": 12820,
+          "sheet": "3c AA"
+        },
+        {
+          "cell_count": 12020,
+          "sheet": "ElecSingle_PPM_Nil"
+        },
+        {
+          "cell_count": 12020,
+          "sheet": "ElecMulti_PPM_4200kWh"
+        },
+        {
+          "cell_count": 12018,
+          "sheet": "ElecSingle_Other_Nil"
+        },
+        {
+          "cell_count": 11917,
+          "sheet": "ElecSingle_Other_3100kWh"
+        },
+        {
+          "cell_count": 11866,
+          "sheet": "ElecSingle_SC_3100kWh"
+        },
+        {
+          "cell_count": 11866,
+          "sheet": "Gas_Other_12000kWh"
+        },
+        {
+          "cell_count": 11866,
+          "sheet": "Gas_SC_12000kWh"
+        },
+        {
+          "cell_count": 11866,
+          "sheet": "ElecMulti_Other_4200kWh"
+        },
+        {
+          "cell_count": 11866,
+          "sheet": "ElecMulti_SC_4200kWh"
+        },
+        {
+          "cell_count": 11866,
+          "sheet": "ElecSingle_SC_Nil"
+        },
+        {
+          "cell_count": 11866,
+          "sheet": "Gas_Other_Nil"
+        }
+      ],
+      "volatile_formula_count": 6
+    },
+    {
+      "archive": {
+        "active_content_member_count": 0,
+        "encrypted_member_count": 0,
+        "internal_only_marker_part_count": 40,
+        "macro_enabled_content_type": false,
+        "max_compression_ratio": 20.141257,
+        "max_single_member_bytes": 3523041,
+        "member_count": 238,
+        "printer_settings_binary_count": 39,
+        "total_uncompressed_bytes": 30689661,
+        "unsafe_member_count": 0
+      },
+      "broken_defined_name_count": 1112,
+      "comments_and_people_metadata_excluded": true,
+      "dag_branch_preflight": [
+        {
+          "branch": "electricity_direct_fuel",
+          "calculator_sheet": "ElecSingle_Other_Benchmark",
+          "output_selector": "INDIRECT over the calculator sheet name",
+          "output_selector_formula_count": 6,
+          "output_sheet": "1a Default tariff cap",
+          "source_reference_formula_counts": {
+            "3a DF": 700
+          },
+          "source_sheets": [
+            "3a DF"
+          ]
+        },
+        {
+          "branch": "electricity_network",
+          "calculator_sheet": "ElecSingle_Other_Benchmark",
+          "output_selector": "INDIRECT over the calculator sheet name",
+          "output_selector_formula_count": 6,
+          "output_sheet": "1a Default tariff cap",
+          "source_reference_formula_counts": {
+            "3e NC-Elec": 700
+          },
+          "source_sheets": [
+            "3e NC-Elec"
+          ]
+        },
+        {
+          "branch": "gas_network",
+          "calculator_sheet": "Gas_Other_Benchmark",
+          "output_selector": "INDIRECT over the calculator sheet name",
+          "output_selector_formula_count": 6,
+          "output_sheet": "1a Default tariff cap",
+          "source_reference_formula_counts": {
+            "3f NC-Gas": 1372
+          },
+          "source_sheets": [
+            "3f NC-Gas"
+          ]
+        },
+        {
+          "branch": "inflation_and_debt",
+          "calculator_sheet": "ElecSingle_Other_Benchmark",
+          "output_selector": "INDIRECT over the calculator sheet name",
+          "output_selector_formula_count": 6,
+          "output_sheet": "1a Default tariff cap",
+          "source_reference_formula_counts": {
+            "3g CPIH": 3192,
+            "3k EBIT": 1372,
+            "3n DRC": 924
+          },
+          "source_sheets": [
+            "3g CPIH",
+            "3k EBIT",
+            "3n DRC"
+          ]
+        }
+      ],
+      "defined_name_count": 1560,
+      "document_properties_excluded": true,
+      "download": {
+        "bytes": 5240596,
+        "content_length_header": "5240596",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "etag": "\"6a1687fd-4ff714\"",
+        "final_url": "https://www.ofgem.gov.uk/sites/default/files/2026-05/Energy-price-cap-levels-pre-levelised-rates-model-v1.30-July-September-2026.xlsx",
+        "last_modified": "Wed, 27 May 2026 05:58:21 GMT",
+        "observed_at": "2026-09-04T10:01:12.331234Z",
+        "requested_url": "https://www.ofgem.gov.uk/sites/default/files/2026-05/Energy-price-cap-levels-pre-levelised-rates-model-v1.30-July-September-2026.xlsx",
+        "sha256": "f5b5c04a48b130ccf654ee9e7bfe81620e2fe85e0837004007fa36476c6b1a9e",
+        "status": 200
+      },
+      "exact_deduplicated_qwen_tokens": 6544189,
+      "exact_deduplicated_unit_count": 122693,
+      "external_defined_name_count": 1027,
+      "external_defined_name_unique_name_count": 99,
+      "external_links": {
+        "external_link_part_count": 11,
+        "external_relationship_target_count": 12,
+        "external_relationship_target_schemes": {
+          "file": 7,
+          "http": 2,
+          "https": 3
+        },
+        "targets_persisted": false
+      },
+      "external_workbook_formula_count": 0,
+      "formula_count": 164079,
+      "formula_template_reduction_ratio": 0.943572,
+      "hidden_defined_name_count": 1560,
+      "hidden_sheet_count": 0,
+      "images_excluded": true,
+      "live_external_defined_name_reference_count": 0,
+      "new_template_units_vs_previous_count": 3653,
+      "new_template_units_vs_previous_qwen_tokens": 92141,
+      "nonempty_cell_count": 273500,
+      "period": "2026Q3",
+      "shared_formula_follower_count": 27775,
+      "sheet_count": 41,
+      "sheet_names": [
+        "Front sheet",
+        "Notes",
+        "1. Outputs=>",
+        "1a Default tariff cap",
+        "1b Historical level tables",
+        "1c Consumption adjusted levels",
+        "2. Calculations=>",
+        "ElecSingle_Other_Benchmark",
+        "ElecSingle_SC_Benchmark",
+        "Gas_Other_Benchmark",
+        "Gas_SC_Benchmark",
+        "ElecMulti_Other_Benchmark",
+        "ElecMulti_SC_Benchmark",
+        "ElecSingle_Other_Nil",
+        "ElecSingle_SC_Nil",
+        "Gas_Other_Nil",
+        "Gas_SC_Nil",
+        "ElecMulti_Other_Nil",
+        "ElecMulti_SC_Nil",
+        "ElecSingle_PPM_Benchmark",
+        "Gas_PPM_Benchmark",
+        "ElecSingle_PPM_Nil",
+        "Gas_PPM_Nil",
+        "ElecMulti_PPM_Benchmark",
+        "ElecMulti_PPM_Nil",
+        "3. Inputs=>",
+        "3a DF",
+        "3b CM",
+        "3c AA",
+        "3d PC",
+        "3e NC-Elec",
+        "3f NC-Gas",
+        "3g CPIH",
+        "3h OC ",
+        "3i SMNCC",
+        "3j PAAC PAP",
+        "3k EBIT",
+        "3l HAP",
+        "3m CO",
+        "3n DRC",
+        "3o IC"
+      ],
+      "template_deduplicated_qwen_tokens": 390367,
+      "template_deduplicated_unit_count": 15433,
+      "top_cross_sheet_formula_edges": [
+        {
+          "formula_count": 24057,
+          "from": "1c Consumption adjusted levels",
+          "to": "1b Historical level tables"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecSingle_Other_Benchmark",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecSingle_SC_Benchmark",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "Gas_Other_Benchmark",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "Gas_SC_Benchmark",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecMulti_Other_Benchmark",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecMulti_SC_Benchmark",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecSingle_Other_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecSingle_SC_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "Gas_Other_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "Gas_SC_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecMulti_Other_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecMulti_SC_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecSingle_PPM_Benchmark",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "Gas_PPM_Benchmark",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecSingle_PPM_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "Gas_PPM_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecMulti_PPM_Benchmark",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 3192,
+          "from": "ElecMulti_PPM_Nil",
+          "to": "3g CPIH"
+        },
+        {
+          "formula_count": 2058,
+          "from": "Gas_Other_Nil",
+          "to": "3d PC"
+        },
+        {
+          "formula_count": 2058,
+          "from": "Gas_SC_Nil",
+          "to": "3d PC"
+        },
+        {
+          "formula_count": 2058,
+          "from": "Gas_PPM_Nil",
+          "to": "3d PC"
+        },
+        {
+          "formula_count": 1680,
+          "from": "ElecSingle_PPM_Nil",
+          "to": "ElecSingle_PPM_Benchmark"
+        },
+        {
+          "formula_count": 1680,
+          "from": "Gas_PPM_Nil",
+          "to": "Gas_PPM_Benchmark"
+        },
+        {
+          "formula_count": 1680,
+          "from": "ElecMulti_PPM_Nil",
+          "to": "ElecMulti_PPM_Benchmark"
+        },
+        {
+          "formula_count": 1372,
+          "from": "ElecSingle_Other_Benchmark",
+          "to": "3c AA"
+        },
+        {
+          "formula_count": 1372,
+          "from": "ElecSingle_Other_Benchmark",
+          "to": "3k EBIT"
+        },
+        {
+          "formula_count": 1372,
+          "from": "ElecSingle_SC_Benchmark",
+          "to": "3c AA"
+        },
+        {
+          "formula_count": 1372,
+          "from": "ElecSingle_SC_Benchmark",
+          "to": "3k EBIT"
+        },
+        {
+          "formula_count": 1372,
+          "from": "Gas_Other_Benchmark",
+          "to": "3a DF"
+        }
+      ],
+      "top_formula_sheets": [
+        {
+          "formula_count": 9882,
+          "sheet": "1c Consumption adjusted levels"
+        },
+        {
+          "formula_count": 9639,
+          "sheet": "1b Historical level tables"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecSingle_Other_Benchmark"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecSingle_SC_Benchmark"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecMulti_Other_Benchmark"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecMulti_SC_Benchmark"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecSingle_PPM_Benchmark"
+        },
+        {
+          "formula_count": 8779,
+          "sheet": "ElecMulti_PPM_Benchmark"
+        },
+        {
+          "formula_count": 8093,
+          "sheet": "Gas_Other_Benchmark"
+        },
+        {
+          "formula_count": 8093,
+          "sheet": "Gas_SC_Benchmark"
+        },
+        {
+          "formula_count": 8093,
+          "sheet": "Gas_PPM_Benchmark"
+        },
+        {
+          "formula_count": 7407,
+          "sheet": "ElecSingle_Other_Nil"
+        }
+      ],
+      "top_nonempty_cell_sheets": [
+        {
+          "cell_count": 12820,
+          "sheet": "3c AA"
+        },
+        {
+          "cell_count": 12022,
+          "sheet": "ElecMulti_PPM_Benchmark"
+        },
+        {
+          "cell_count": 12020,
+          "sheet": "ElecSingle_PPM_Nil"
+        },
+        {
+          "cell_count": 12018,
+          "sheet": "ElecSingle_Other_Nil"
+        },
+        {
+          "cell_count": 11919,
+          "sheet": "ElecSingle_Other_Benchmark"
+        },
+        {
+          "cell_count": 11868,
+          "sheet": "ElecSingle_SC_Benchmark"
+        },
+        {
+          "cell_count": 11868,
+          "sheet": "Gas_Other_Benchmark"
+        },
+        {
+          "cell_count": 11868,
+          "sheet": "Gas_SC_Benchmark"
+        },
+        {
+          "cell_count": 11868,
+          "sheet": "ElecMulti_Other_Benchmark"
+        },
+        {
+          "cell_count": 11868,
+          "sheet": "ElecMulti_SC_Benchmark"
+        },
+        {
+          "cell_count": 11868,
+          "sheet": "ElecSingle_PPM_Benchmark"
+        },
+        {
+          "cell_count": 11868,
+          "sheet": "Gas_PPM_Benchmark"
+        }
+      ],
+      "volatile_formula_count": 6
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "schema_version": "longworld.p52-govinfo-bill-disposition-generation.v1",
+  "data_product": "p52_govinfo_bill_disposition_candidate_v1",
+  "preflight_config": {
+    "path": "configs/p49_govinfo_bill_text_disposition_preflight_v1.json",
+    "sha256": "f465d2eef69e330e2216ef1a32a4bfeb314cfa5f5c6b94c01a9ed334c2d55c67"
+  },
+  "authorization": {
+    "record_id": "p52-govinfo-bill-disposition-candidate-v1",
+    "scope": "frozen official GovInfo Bill Status, enrolled-bill XML, and Public Law USLM XML for H.R. 4366",
+    "basis": "the selected legislative XML carries the explicit 17 USC 105 public-domain statement; only whole normalized public legislative sections and action text are persisted as derived candidate records",
+    "reviewed_at": "2026-09-04T00:00:00Z",
+    "allowed_actions": [
+      "fetch_frozen_official_xml_to_process_memory",
+      "persist_deterministic_whole_section_derivatives",
+      "derive_one_explicit_counterfactual_by_replacing_the_target_body_with_its_authenticated_source_body",
+      "sign_candidate_rows",
+      "run_candidate_preflight_dense_ranking_and_dense_replay_audit"
+    ],
+    "prohibited_actions": [
+      "persist_raw_xml",
+      "include_third_party_material",
+      "split_or_truncate_sections",
+      "pad_or_clone_background_context_to_reach_a_length_band",
+      "select_promote_or_count_inventory"
+    ]
+  },
+  "world_id": "govinfo-118-hr4366-enrolled-law-disposition-v1",
+  "workflow_id": "p52-govinfo-bill-disposition-v1",
+  "bill_id": "118-HR-4366",
+  "from_stage": "enr",
+  "to_stage": "law",
+  "oracle": {
+    "revision": "p52-govinfo-cross-schema-section-disposition-v1",
+    "near_duplicate_word_shingle_size": 5,
+    "near_duplicate_jaccard_threshold": 0.9,
+    "minimum_section_characters": 80,
+    "max_candidate_near_duplicate_sentence_ratio": 0.25
+  },
+  "requested_keys": [
+    "division:f/title:ii/section:219",
+    "division:d/title:ii/section:207",
+    "division:a/title:i/section:138",
+    "division:a/title:iii/section:301",
+    "division:e/title:i/section:114",
+    "division:e/title:iv/section:418"
+  ],
+  "requested_key_count_by_bucket": {
+    "32k": 2,
+    "64k": 4,
+    "128k": 6
+  },
+  "counterfactual_code": "D02",
+  "length_buckets": {
+    "32k": [32000, 32768],
+    "64k": [64000, 65536],
+    "128k": [128000, 131072]
+  },
+  "views": ["full", "cf", "ordered_artifact_view"],
+  "shortcut_windows": [4096, 8192, 16384],
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "dense_model": {
+    "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "top_k": 3
+  },
+  "output_dir": "data/candidates/p52_govinfo_bill_disposition_v1",
+  "train_ready": false,
+  "promotion_eligible": false,
+  "do_not_select": true,
+  "do_not_promote": true,
+  "do_not_count": true
+}

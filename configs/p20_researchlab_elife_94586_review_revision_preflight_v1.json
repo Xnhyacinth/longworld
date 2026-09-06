@@ -1,0 +1,116 @@
+{
+  "schema_version": "longworld.elife-review-revision-preflight-request.v1",
+  "data_product": "p20_researchlab_elife_94586_review_revision_preflight_v1",
+  "authorization": {
+    "record_id": "P20-PUBLIC-ELIFE-94586-20260903-01",
+    "scope": "bounded read-only preflight of one public eLife reviewed-preprint version family",
+    "basis": "project owner authorized public-source ResearchLab preflight for LongWorld P20",
+    "reviewed_at": "2026-09-03T00:00:00Z",
+    "allowed_actions": [
+      "fetch_pinned_elife_xml",
+      "measure_unique_capacity",
+      "verify_review_response_revision_relation"
+    ]
+  },
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "source": {
+    "publisher": "eLife Sciences Publications, Ltd",
+    "publisher_process_url": "https://elifesciences.org/about/peer-review",
+    "repository": "elifesciences/elife-article-xml",
+    "repository_url": "https://github.com/elifesciences/elife-article-xml",
+    "repository_commit": "d36c41edc37e354a80eb3b476399f135b8c83cda",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "candidate": {
+    "publisher_id": "94586",
+    "canonical_doi": "10.7554/eLife.94586",
+    "title": "Overflow metabolism originates from growth optimization and cell heterogeneity",
+    "domain": "ResearchLab",
+    "transition_program": "researchlab.review_response_revision_claim_disposition.v1-proposed",
+    "topology": "review fan-out -> author response -> revised-artifact delta -> claim disposition",
+    "required_counterfactuals": [
+      "remove controlling review and disposition becomes unknown",
+      "remove required revision delta and disposition becomes claimed-but-unverified"
+    ]
+  },
+  "versions": [
+    {
+      "version": 1,
+      "path": "preprints/elife-preprint-94586-v1.xml",
+      "version_doi": "10.7554/eLife.94586.1",
+      "effective_date": "2024-02-07",
+      "path_commit": "529968da30f6052bd279ea9394e2af6084f53532",
+      "git_blob_sha1": "6f9e3dc38d7bfa29d6af337c91a286709f3c4182",
+      "bytes": 908691,
+      "sha256": "5d99c76699e3efe626b44834adb6a2b3867154603a886de74160c690453d826b"
+    },
+    {
+      "version": 2,
+      "path": "preprints/elife-preprint-94586-v2.xml",
+      "version_doi": "10.7554/eLife.94586.2",
+      "effective_date": "2024-12-19",
+      "path_commit": "3e62f2aec170c88bf955884a259ace4479a1df3f",
+      "git_blob_sha1": "a4c6f52094c9c1570f2fd7b7c2bdd6f6b2caeca6",
+      "bytes": 1225363,
+      "sha256": "33a572b45a70a32fd92741566dd04d967a784fa287ab2bceefc92b12e1d2906a"
+    },
+    {
+      "version": 3,
+      "path": "preprints/elife-preprint-94586-v3.xml",
+      "version_doi": "10.7554/eLife.94586.3",
+      "effective_date": "2025-03-24",
+      "path_commit": "6f9ad6585d6e4d473857c11719c39d42f94dc939",
+      "git_blob_sha1": "76c242e60abef91a5859c954e188297ceadcda6c",
+      "bytes": 1208179,
+      "sha256": "9be80598b9fdfd908ec6161f74e881ee92647b5133018de8ed768db47cb2f0d8"
+    }
+  ],
+  "oracle_witness": {
+    "review_paragraph_sha256": "2bd025181bb190f1f4414d097fed845a38ca2270386082c0e0d9516e52fc4a58",
+    "response_paragraph_sha256": "d90dcbad51abd146184049409f04c99bf56139eb0e7e1224dc1d7b921e87e3cd",
+    "required_v1_to_v2_object_transitions": {
+      "body_figure_fig5": [
+        0,
+        1
+      ],
+      "appendix_APP9": [
+        0,
+        1
+      ],
+      "appendix_table_tbl3": [
+        0,
+        1
+      ]
+    }
+  },
+  "capacity_policy": {
+    "tokenizer": {
+      "model_id": "Qwen/Qwen3.5-4B",
+      "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+      "local_files_only": true,
+      "add_special_tokens": false
+    },
+    "minimum_block_chars": 80,
+    "near_duplicate_threshold": 0.9,
+    "exact_64k_band": [
+      65536,
+      67584
+    ],
+    "exact_128k_band": [
+      128000,
+      131072
+    ],
+    "include": [
+      "public referee-report paragraphs",
+      "direct author-response paragraphs excluding nested review quotations",
+      "changed semantic blocks from adjacent body and appendix versions"
+    ],
+    "exclude": [
+      "unchanged manuscript body and appendices",
+      "bibliography, metadata, and editor assessments",
+      "nested review quotations duplicated inside author responses",
+      "graphics without source alt text",
+      "unrelated paper text and derived renderings"
+    ]
+  }
+}

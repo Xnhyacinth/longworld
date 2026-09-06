@@ -1,0 +1,62 @@
+{
+  "schema_version": "longworld.ietf-oauth-training-conversion-preflight.v1",
+  "source_candidate_path": "data/candidates/p33_ietf_oauth_coarsened_cf_v1/projected/candidates.jsonl",
+  "source_candidate_sha256": "9ef1d5a5a12209fcd03fe08880b61e5a61f06bf20983601f1f3606c2615ffa0a",
+  "source_audit_path": "data/candidates/p33_ietf_oauth_coarsened_cf_v1/projected/audits.jsonl",
+  "source_audit_sha256": "6ea9394ea45374cc41a66ce595f7ef69636d119cbc6c22f456647d40c6adc082",
+  "source_audit_manifest_path": "data/candidates/p33_ietf_oauth_coarsened_cf_v1/projected/AUDIT_MANIFEST.json",
+  "source_audit_manifest_sha256": "c3b1594b33c1a5fbfae790a3743355197e81d02b9526d1dcf3086d5c157520a8",
+  "candidate_world_id": "ietf-oauth-cross-spec-requirement-v1",
+  "candidate_domain": "standards",
+  "candidate_adapter_id": "standards.ietf_oauth_requirement.v1",
+  "candidate_rows": 6,
+  "requested_release_profile_id": "p36-ietf-oauth-128k-extension-probe-1-v1",
+  "requested_profile_contract": {
+    "environment": "probe",
+    "expected_promoted_worlds": 1,
+    "min_train_worlds": 1,
+    "min_eval_worlds": 0,
+    "min_real_train_worlds": 1,
+    "min_real_eval_worlds": 0,
+    "min_domains": 1,
+    "promoted_domain_world_quotas": {
+      "standards": 1
+    },
+    "min_exact_64k_rows_by_domain": {
+      "standards": 3
+    },
+    "min_real_exact_64k_rows_by_domain": {
+      "standards": 3
+    },
+    "min_real_exact_64k_worlds_by_domain": {
+      "standards": 1
+    },
+    "min_source_families": 1,
+    "min_real_base_tasks": 1,
+    "min_real_source_relations": 1,
+    "min_real_64k_rows": 3,
+    "min_unique_real_source_workflows": 1,
+    "min_motifs": 1,
+    "min_unique_executable_proofs": 1,
+    "min_unique_answer_programs": 1,
+    "min_unique_semantic_base_tasks": 1,
+    "training_conditions": ["B5"],
+    "training_length_buckets": ["64k", "128k"],
+    "required_exact_length_buckets": ["64k", "128k"],
+    "required_view_timings": [
+      ["full", "first"],
+      ["cf", "first"],
+      ["ordered_artifact_view", "first"]
+    ],
+    "min_train_worlds_by_domain": {
+      "standards": 1
+    },
+    "min_eval_domains": 0,
+    "require_all_rows_source_bound": true
+  },
+  "status": "blocked_missing_registered_profile_and_promotion_adapter_domain",
+  "do_not_select": true,
+  "do_not_promote": true,
+  "do_not_export": true,
+  "do_not_count": true
+}

@@ -1,5 +1,8 @@
 # LongWorld must-not-break gates
 
+- Public GitHub replay must receive the exact signed source-client and policy
+  SHA allowlist through the isolated child environment; missing pins fail
+  closed and are never repaired by re-signing source artifacts.
 - Never count candidate/view/length multiplication as semantic scale.
 - Never label synthetic executable workflows as authentic source rows.
 - Real-source answers must fail when an essential body span is corrupted or
@@ -46,3 +49,18 @@
 - Wikipedia birth evidence may uniquely wrap a duplicated `{{Birth date}}`
   template; CF still requires that wrapper to contain the year once. Do not
   treat a duplicated bare template as a unique span.
+- Artifact shortcut audits must preserve a predeclared authentic source order
+  and each document's natural ordinal. Hash ordering may select a pack but must
+  never spread causal roles to manufacture long-range geometry.
+- `checked_artifact_windows` counts one maximal window per start position. An
+  artifact-aligned shortcut preflight must not be reported as an exhaustive
+  pinned-token sliding-window audit.
+- A registered GovInfo parent and successful custom audit do not bypass shared
+  task proof. Candidate-stage rows remain outside inventory after any shared
+  artifact-window failure, even when projection, preflight, and ranking pass.
+- A remove-one checker that defines configured roles as mandatory proves only
+  role presence. It cannot establish evidence necessity unless the answer is
+  actually reconstructed from source relations and reduced evidence.
+- A reuse instrument's operative scope must cover every selected source type.
+  A Commission-scoped Decision cannot be promoted into a broad EUR-Lex legal-
+  document grant without a pinned official notice and exclusions review.

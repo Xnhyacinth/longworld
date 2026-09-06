@@ -1,0 +1,226 @@
+{
+  "schema_version": "longworld.p51-osv-upstream-remediation-lifecycle-preflight.v1",
+  "data_product": "p51_osv_upstream_remediation_lifecycle_preflight_v1",
+  "authorization": {
+    "record_id": "p51-osv-upstream-remediation-lifecycle-preflight-v1",
+    "scope": "a commit-pinned PyPA advisory-database archive, a generation-pinned OSV.dev PyPI export, and five bounded official upstream commit, license, and PyPI release receipts inspected ephemerally",
+    "basis": "the PyPA advisory database is CC BY 4.0; each bounded upstream repository has a commit-pinned open-source license; patch bodies and PyPI metadata are relationship evidence only and do not contribute capacity",
+    "reviewed_at": "2026-09-04T00:00:00Z",
+    "allowed_actions": [
+      "fetch_frozen_sources_to_process_memory",
+      "validate_advisory_alias_range_fix_duplicate_topology",
+      "measure_aggregate_only_qwen_capacity"
+    ],
+    "prohibited_actions": [
+      "persist_or_commit_raw_advisories_patches_or_release_metadata",
+      "label_an_unlisted_version_safe",
+      "generate_candidates",
+      "promote_or_count_inventory"
+    ]
+  },
+  "research_question": "Can licensed OSV-format PyPI advisories plus official upstream commit and release evidence support deterministic affected/fixed and withdrawn-duplicate lifecycle tasks with near-deduplicated exact 32K, 64K, and 128K capacity?",
+  "official_pages": {
+    "osv_data_exports": "https://google.github.io/osv.dev/data/",
+    "osv_schema": "https://ossf.github.io/osv-schema/",
+    "pypa_advisory_database": "https://github.com/pypa/advisory-database",
+    "pypi_json_api": "https://docs.pypi.org/api/json/"
+  },
+  "pypa_archive": {
+    "url": "https://codeload.github.com/pypa/advisory-database/tar.gz/c4a1fde8cb41b3b5180fed3561596c9ce6de99ad",
+    "commit": "c4a1fde8cb41b3b5180fed3561596c9ce6de99ad",
+    "expected_bytes": 4199425,
+    "expected_sha256": "4e40288bddd838b87be3b004c721e9384629eaec646c351e8dc8324d53c8195a",
+    "max_bytes": 5000000,
+    "license_member_suffix": "/LICENSE",
+    "license_spdx": "CC-BY-4.0",
+    "license_expected_bytes": 18657,
+    "license_expected_sha256": "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411"
+  },
+  "osv_pypi_export": {
+    "url": "https://osv-vulnerabilities.storage.googleapis.com/PyPI/all.zip?generation=1788521584495343",
+    "generation": "1788521584495343",
+    "expected_bytes": 34218425,
+    "expected_sha256": "99b7dabe36c8bd98dc0754327994ef13753c351abc1a245befc6db0efcee5dca",
+    "max_bytes": 35000000
+  },
+  "topology_chains": [
+    {
+      "withdrawn_id": "PYSEC-2022-43182",
+      "active_duplicate_id": "PYSEC-2022-239",
+      "shared_package": "fava",
+      "required_shared_alias": "CVE-2022-2514",
+      "fixed_commit": "ca9e3882c7b5fbf5273ba52340b9fea6a99f3711",
+      "fixed_release": "1.22",
+      "patch_source": {
+        "url": "https://github.com/beancount/fava/commit/ca9e3882c7b5fbf5273ba52340b9fea6a99f3711.patch",
+        "expected_bytes": 6470,
+        "expected_sha256": "1ce430ec84fb8c222830ebb4dceae1715accd15a94dac75668d05eadbcb269b3",
+        "max_bytes": 100000
+      },
+      "release_source": {
+        "url": "https://pypi.org/pypi/fava/1.22/json",
+        "expected_bytes": 6793,
+        "expected_sha256": "cb01f2be23ae3a82c0a725ebf5e671d2a114e4880eb4261edddfe3c7e2164eee",
+        "max_bytes": 100000
+      },
+      "license_source": {
+        "url": "https://raw.githubusercontent.com/beancount/fava/ca9e3882c7b5fbf5273ba52340b9fea6a99f3711/LICENSE",
+        "spdx": "MIT",
+        "required_text": "The MIT License (MIT)",
+        "expected_bytes": 1108,
+        "expected_sha256": "143ab9400e5ecf3fe1ec07725e1781ec60c24fa2765a6bd22c6a0eda6770d567",
+        "max_bytes": 100000
+      }
+    },
+    {
+      "withdrawn_id": "PYSEC-2020-346",
+      "active_duplicate_id": "PYSEC-2020-50",
+      "shared_package": "jupyter-server",
+      "required_shared_alias": "CVE-2020-26275",
+      "fixed_commit": "85e4abccf6ea9321d29153f73b0bd72ccb3a6bca",
+      "fixed_release": "1.1.1",
+      "patch_source": {
+        "url": "https://github.com/jupyter-server/jupyter_server/commit/85e4abccf6ea9321d29153f73b0bd72ccb3a6bca.patch",
+        "expected_bytes": 5410,
+        "expected_sha256": "e5ad5145982fca965188ceb7ba7130f40c9eb86a988bc322ceb5ff2a366577c0",
+        "max_bytes": 100000
+      },
+      "release_source": {
+        "url": "https://pypi.org/pypi/jupyter-server/1.1.1/json",
+        "expected_bytes": 30595,
+        "expected_sha256": "4a3ae8faddcffe998d6f3c4b1b4f1d14d5ba7747966599b5f3034328064a12dd",
+        "max_bytes": 100000
+      },
+      "license_source": {
+        "url": "https://raw.githubusercontent.com/jupyter-server/jupyter_server/85e4abccf6ea9321d29153f73b0bd72ccb3a6bca/COPYING.md",
+        "spdx": "BSD-3-Clause",
+        "required_text": "Modified BSD License",
+        "expected_bytes": 2888,
+        "expected_sha256": "aa93a54b783ec3c2eafe5969d1b7947f427a7813846551ae65a52e1fa5489f42",
+        "max_bytes": 100000
+      }
+    },
+    {
+      "withdrawn_id": "PYSEC-2022-43184",
+      "active_duplicate_id": "PYSEC-2022-292",
+      "shared_package": "rdiffweb",
+      "required_shared_alias": "CVE-2022-3290",
+      "fixed_commit": "667657c6fe2b336c90be37f37fb92f65df4feee3",
+      "fixed_release": "2.4.8",
+      "patch_source": {
+        "url": "https://github.com/ikus060/rdiffweb/commit/667657c6fe2b336c90be37f37fb92f65df4feee3.patch",
+        "expected_bytes": 8722,
+        "expected_sha256": "40a6a3d89e7bd557cc0bf84a8822cfddb96e5a447045091204f2f14be662953b",
+        "max_bytes": 100000
+      },
+      "release_source": {
+        "url": "https://pypi.org/pypi/rdiffweb/2.4.8/json",
+        "expected_bytes": 40838,
+        "expected_sha256": "f400fdf0b2e6d558e50fc42027d57dd6f209b28933af087b0ad34b68d9afff68",
+        "max_bytes": 100000
+      },
+      "license_source": {
+        "url": "https://raw.githubusercontent.com/ikus060/rdiffweb/667657c6fe2b336c90be37f37fb92f65df4feee3/LICENSE",
+        "spdx": "GPL-3.0-only",
+        "required_text": "GNU GENERAL PUBLIC LICENSE",
+        "expected_bytes": 35146,
+        "expected_sha256": "c53a65c2fd561c87eaabf1072ef5dcab8653042bc15308465f52413585eb6271",
+        "max_bytes": 100000
+      }
+    },
+    {
+      "withdrawn_id": "PYSEC-2014-117",
+      "active_duplicate_id": "PYSEC-2014-17",
+      "shared_package": "rply",
+      "required_shared_alias": "CVE-2014-1604",
+      "fixed_commit": "fc9bbcd25b0b4f09bbd6339f710ad24c129d5d7c",
+      "fixed_release": "0.7.1",
+      "patch_source": {
+        "url": "https://github.com/alex/rply/commit/fc9bbcd25b0b4f09bbd6339f710ad24c129d5d7c.patch",
+        "expected_bytes": 2038,
+        "expected_sha256": "d9c99436d93e656817d698f7203635333b72a37afc1257d496a6c70189dc22e8",
+        "max_bytes": 100000
+      },
+      "release_source": {
+        "url": "https://pypi.org/pypi/rply/0.7.1/json",
+        "expected_bytes": 6968,
+        "expected_sha256": "eec6061918313aac8201942c4e143379ba24e60b3c3f3eb69ac7cf3034b43420",
+        "max_bytes": 100000
+      },
+      "license_source": {
+        "url": "https://raw.githubusercontent.com/alex/rply/fc9bbcd25b0b4f09bbd6339f710ad24c129d5d7c/LICENSE",
+        "spdx": "BSD-3-Clause",
+        "required_text": "Redistribution and use in source and binary forms",
+        "expected_bytes": 1535,
+        "expected_sha256": "aa19e7ffb50ba42c2b9df7e9e8b317d3fc24ed3c40f11eb958856b68cf381d18",
+        "max_bytes": 100000
+      }
+    },
+    {
+      "withdrawn_id": "PYSEC-2023-313",
+      "active_duplicate_id": "PYSEC-2023-52",
+      "shared_package": "vantage6",
+      "required_shared_alias": "CVE-2022-39228",
+      "fixed_commit": "ab4381c35d24add06f75d5a8a284321f7a340bd2",
+      "fixed_release": "3.8.0",
+      "patch_source": {
+        "url": "https://github.com/vantage6/vantage6/commit/ab4381c35d24add06f75d5a8a284321f7a340bd2.patch",
+        "expected_bytes": 32090,
+        "expected_sha256": "ac2682e2f5f339e4cab5ac51525ee77662e8e5d77857319448802b5e07ffcf38",
+        "max_bytes": 100000
+      },
+      "release_source": {
+        "url": "https://pypi.org/pypi/vantage6/3.8.0/json",
+        "expected_bytes": 35068,
+        "expected_sha256": "63e4109c6a327ee15011e62d8777251b4ddf26a91ea0955b46d763f772c2a7e6",
+        "max_bytes": 100000
+      },
+      "license_source": {
+        "url": "https://raw.githubusercontent.com/vantage6/vantage6/ab4381c35d24add06f75d5a8a284321f7a340bd2/LICENSE",
+        "spdx": "Apache-2.0",
+        "required_text": "Apache License",
+        "expected_bytes": 11333,
+        "expected_sha256": "64f513f80a474c27b21f87dee40548fe1234588e7e36157de6847cdefe810977",
+        "max_bytes": 100000
+      }
+    }
+  ],
+  "capacity_filter": {
+    "required_ecosystem": "PyPI",
+    "require_alias": true,
+    "require_fixed_event": true,
+    "require_github_fix_commit_reference": true,
+    "require_explicit_affected_versions": true,
+    "reject_affected_fixed_boundary_overlap": true,
+    "minimum_semantic_characters": 120,
+    "near_duplicate_word_shingle_size": 5,
+    "near_duplicate_jaccard_threshold": 0.9,
+    "excluded_capacity_fields": [
+      "affected.versions",
+      "database_specific",
+      "ecosystem_specific",
+      "severity"
+    ]
+  },
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "capacity_bands": {
+    "32k": [32000, 32768],
+    "64k": [64000, 65536],
+    "128k": [128000, 131072]
+  },
+  "constraints": [
+    "an advisory alias is an identity join only; related and upstream fields never imply supersession",
+    "a superseding edge exists only when the withdrawn source details explicitly name the active duplicate target and the records share a package and external alias",
+    "AFFECTED is assigned only by exact membership in affected.versions; FIXED_BOUNDARY only by exact equality with an ECOSYSTEM fixed event; all other package versions are UNKNOWN",
+    "FIXED_COMMIT requires exact equality between a GIT fixed event hash and a GitHub FIX reference plus a frozen upstream patch receipt",
+    "affected.versions is oracle metadata and excluded from language capacity so long version enumerations cannot act as padding",
+    "global five-word-shingle Jaccard 0.90 near-duplicate collapse precedes capacity counting",
+    "no advisory, field, patch, release metadata, padding, clone, split, or truncation may be repeated to fill a band",
+    "capacity is preflight evidence only; all unchanged candidate, lineage, derived-view, truncation, shortcut, counterfactual, remove-one, and promotion gates remain mandatory"
+  ]
+}

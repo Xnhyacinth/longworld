@@ -1,0 +1,136 @@
+{
+  "schema_version": "longworld.p40-ietf-capacity-oracle-growth-matrix.v1",
+  "verdict": "source_capacity_and_semantic_growth_feasible_candidate_generation_not_authorized",
+  "capacity": {
+    "p33_target_delta_tokens": 64022,
+    "four_priority_rfcs_unique_tokens": 62752,
+    "four_priority_rfcs_deficit_tokens": 1270,
+    "five_rfc_raw_tokens": 86594,
+    "five_rfc_unique_tokens_after_near_dedup": 76008,
+    "five_rfc_margin_tokens": 11986,
+    "dedup": {
+      "paragraphs": 1407,
+      "kept": 1295,
+      "exact_removed": 81,
+      "near_removed": 31,
+      "removed_tokens": 10474,
+      "threshold": "normalized word-5gram Jaccard >= 0.8"
+    }
+  },
+  "fields": [
+    {
+      "field": "mtls_certificate_bound_access",
+      "record_id": "ietf:rfc:8705",
+      "oracle_span": [22115, 22822],
+      "oracle_span_sha256": "605447c0f4c2591352711c5f67d18c554fced0d941b4c2d267f96daf886318f4",
+      "oracle_tokens": 159,
+      "coherent_artifact_span": [19860, 27486],
+      "coherent_artifact_sha256": "bb8dc3e640f52e50baeee832681352118101f828ffff9ae0b61f9f14b4eb120e",
+      "coherent_artifact_tokens": 1890,
+      "oracle": "PASS_CERT_MATCH only when the protected-resource TLS certificate equals the certificate bound to the access token; otherwise FAIL_INVALID_TOKEN_401",
+      "counterfactual": "exclude the exact oracle span from its nonempty coherent artifact; result becomes UNRESOLVED_MISSING_MTLS_ORACLE",
+      "max_base_word_5gram_jaccard": 0.006897,
+      "estimated_128k_position": [68000, 69890]
+    },
+    {
+      "field": "jar_request_object_validation",
+      "record_id": "ietf:rfc:9101",
+      "oracle_span": [26570, 27261],
+      "oracle_span_sha256": "74d04fcaa2c583b95f315780730ea13a45b0eb5f91de565320af710fff939230",
+      "oracle_tokens": 164,
+      "coherent_artifact_span": [11987, 28029],
+      "coherent_artifact_sha256": "6d4d87c348a7f250dfc9106aadc8947b5abba6632543aae0e48717998ec0fa9d",
+      "coherent_artifact_tokens": 5762,
+      "oracle": "PASS_SIGNATURE_AND_CLIENT_ID_MATCH only when the JWS signature key belongs to the client, alg is accepted, and request/client claim identifiers match; otherwise FAIL_INVALID_REQUEST_OBJECT",
+      "counterfactual": "exclude the exact oracle span from its nonempty coherent artifact; result becomes UNRESOLVED_MISSING_JAR_ORACLE",
+      "max_base_word_5gram_jaccard": 0.015385,
+      "estimated_128k_position": [76000, 81762]
+    },
+    {
+      "field": "par_request_uri_validation",
+      "record_id": "ietf:rfc:9126",
+      "oracle_span": [17819, 19598],
+      "oracle_span_sha256": "057bfd03298976c7f102d52e66bc2aae86793085747e3365a3b75f4eeeaa6c03",
+      "oracle_tokens": 389,
+      "coherent_artifact_span": [10639, 32390],
+      "coherent_artifact_sha256": "c93dd71bbde8169a1b4db23861d0be95e247e6d64f6e0bc6d40c94750cd8a95f",
+      "coherent_artifact_tokens": 6745,
+      "oracle": "PASS_SINGLE_USE_BOUND_UNEXPIRED only when request_uri is unpredictable, client-bound, unexpired, and used once; otherwise FAIL_INVALID_REQUEST_URI",
+      "counterfactual": "exclude the exact oracle span from its nonempty coherent artifact; result becomes UNRESOLVED_MISSING_PAR_ORACLE",
+      "max_base_word_5gram_jaccard": 0.032787,
+      "estimated_128k_position": [89000, 95745]
+    },
+    {
+      "field": "rar_authorization_details_validation",
+      "record_id": "ietf:rfc:9396",
+      "oracle_span": [21033, 21748],
+      "oracle_span_sha256": "fd5d3337afcf1ed0626c00a2fe898f8e1169e08a78c3191c1dc49f02f8096231",
+      "oracle_tokens": 144,
+      "coherent_artifact_span": [6493, 28004],
+      "coherent_artifact_sha256": "3392f883830a43d9119994ae7638fdeccc4423d3ad1a9e08e8212af7f50a9a94",
+      "coherent_artifact_tokens": 5215,
+      "oracle": "FAIL_INVALID_AUTHORIZATION_DETAILS when a known type carries an unknown field, wrong type, invalid value, or misses a required field; otherwise PASS_TYPED_DETAILS",
+      "counterfactual": "exclude the exact oracle span from its nonempty coherent artifact; result becomes UNRESOLVED_MISSING_RAR_ORACLE",
+      "max_base_word_5gram_jaccard": 0.0,
+      "estimated_128k_position": [101000, 106215]
+    },
+    {
+      "field": "dpop_proof_validation",
+      "record_id": "ietf:rfc:9449",
+      "oracle_span": [22904, 24821],
+      "oracle_span_sha256": "7dc3c0f371e8b78a774e5491d53975f3c436e98c4385a4e54033b5e980b7fd50",
+      "oracle_tokens": 490,
+      "coherent_artifact_span": [18952, 24821],
+      "coherent_artifact_sha256": "d9789ad7484a56e3f6ad83bcd6abd3da26e88a8fc49998188085401e4fe363bf",
+      "coherent_artifact_tokens": 1634,
+      "oracle": "PASS_DPOP_BOUND only when signature, typ, alg, htm, htu, time/nonce, ath, and bound public key checks all succeed; otherwise FAIL_INVALID_DPOP_PROOF",
+      "counterfactual": "exclude the exact oracle span from its nonempty coherent artifact; result becomes UNRESOLVED_MISSING_DPOP_ORACLE",
+      "max_base_word_5gram_jaccard": 0.002174,
+      "estimated_128k_position": [118000, 119634]
+    }
+  ],
+  "relations": {
+    "existing_64k_count": 10,
+    "estimated_128k_count": 20,
+    "new_edges": [
+      "rfc9700 -refnorm-> rfc8705",
+      "rfc9700 -refinfo-> rfc9101",
+      "rfc9700 -refinfo-> rfc9126",
+      "rfc9700 -refinfo-> rfc9396",
+      "rfc9700 -refinfo-> rfc9449",
+      "rfc8705 -refnorm-> rfc6749",
+      "rfc9101 -refnorm-> rfc6749",
+      "rfc9126 -refnorm-> rfc6749",
+      "rfc9396 -refinfo-> rfc6749",
+      "rfc9449 -refnorm-> rfc6749"
+    ],
+    "datatracker_identity_dedup": [
+      "draft-ietf-oauth-mtls -became_rfc-> rfc8705",
+      "draft-ietf-oauth-jwsreq -became_rfc-> rfc9101",
+      "draft-ietf-oauth-par -became_rfc-> rfc9126",
+      "draft-ietf-oauth-rar -became_rfc-> rfc9396",
+      "draft-ietf-oauth-dpop -became_rfc-> rfc9449"
+    ]
+  },
+  "growth": {
+    "context_tokens": [64533, 128555],
+    "context_growth": 64022,
+    "proof_bearing_growth_lower_bound": 21246,
+    "required_proof_bearing_growth": 3202,
+    "proof_growth_share": 0.3318528005997938,
+    "authentic_relations": [10, 20],
+    "essential_events": [7, 12],
+    "strict_supports": [6, 11],
+    "proof_depth": [2, 3],
+    "event_bearing_tokens_full_ordered_lower_bound": [10045, 31291],
+    "event_bearing_tokens_cf_lower_bound": [10014, 31260]
+  },
+  "not_performed": [
+    "candidate_generation",
+    "projection",
+    "dense_ranking",
+    "promotion",
+    "inventory_count",
+    "gate_or_profile_change"
+  ]
+}

@@ -1125,7 +1125,11 @@ def _cumulative_history_violations_by_world(
             for index, metric_name in enumerate(metric_names):
                 before_max = max(value[index] for value in before_metrics if value)
                 after_min = min(value[index] for value in after_metrics if value)
-                if after_min <= before_max:
+                if (
+                    after_min < before_max
+                    if metric_name == "proof_depth"
+                    else after_min <= before_max
+                ):
                     violations[world_id].add(
                         f"{label}:{metric_name}_not_growing={before_max}->{after_min}"
                     )
@@ -1273,7 +1277,9 @@ def _task_sidecar_matches_candidate(
             "cyber.cross_cve_remediation.v1": "cyber",
             "cyber.kev_history.v1": "cyber",
             "finance.multi_filing.v1": "finance",
+            "government.govinfo_bill_disposition.v1": "government_legislation",
             "macro.gdp_vintage_reconstruction.v1": "macro_economics",
+            "standards.ietf_oauth_requirement.v1": "standards",
         }
         return bool(
             key[0] in expected_domains

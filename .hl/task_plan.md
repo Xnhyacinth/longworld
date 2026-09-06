@@ -362,3 +362,104 @@ raw-window, or replay. Do not mix probe trusts. Do not promote/HF until a
 complete new world is candidate-local audited. Root records ledger after
 workers write closeouts.
 
+## P17 parallel volume and diversity run — 2026-09-03
+
+Goal: grow the number of authentic, long-context-dependent training examples
+along two simultaneous axes: (1) generate and filter additional executable
+tasks over already verified source workflows; (2) discover and preflight new
+domains, entities, artifact types, interaction topologies, and deterministic
+oracles. Row multiplication by view/length alone does not count as scale.
+
+Complexity is 10/10 (breadth, depth, dependency, uncertainty, validation all
+2), so `.hl/policy.md` routes this as mixed execution with three disjoint
+workers plus root integration. Workers use separate `p17_*` config/report/source
+namespaces, do not edit shared core or `.hl`, and do not commit from the shared
+worktree. Root reconciles candidates, runs the one necessary gate chain, and
+owns Git commits.
+
+| Track | Ownership | Deliverable | Success criterion | Status |
+| --- | --- | --- | --- | --- |
+| P17.A existing-world batch | `configs/p17_macro_*`, `reports/p17_macro_*` | additional BEA workbook entities/vintages using the verified cell-revision adapter, with new query IDs and proof-bearing relations | at least one new complete 16/32/64/128K three-view world, or an exact capacity rejection ledger | promotion_in_progress: dense 12/12, near-dup max 0, selection 12; B5 replay pending |
+| P17.B new CodeForge chain | `configs/p17_codeforge_*`, `reports/p17_codeforge_*` | a new repository/entity with authentic failure→repair→check/review→merge/release cycles | exact 64K plus 128K only when unique source mass supports it; every emitted cell passes replay and shortcut gates | complete: Transformers 6/6 train-ready, 3×64K + 3×128K |
+| P17.C new-domain research | `sources/research_p17_*`, `reports/p17_domain_design_*` | current primary-source study and executable design matrix for software, spreadsheet, agent interaction, retrieval/deep research, documents, and finance | rank only designs with obtainable authentic artifacts, deterministic oracle, counterfactual operation, and plausible 64K/128K unique capacity | complete: 26 primary URLs, six executable designs ranked |
+| P17.D root integration | release inventory/profile, gate execution, `.hl`, Git | reconcile P14/P15/P16/P17 without mixing trust scopes or duplicating semantic tasks | nonzero newly train-ready rows with exact bucket distribution; otherwise preserve prior releases and name the measured capacity blocker | complete: Finance 12 + CodeForge 6 train-ready; separate probe products |
+
+Verification is staged to reduce redundant work without weakening admission:
+source/capacity preflight first, candidate-local generation and dense audit
+second, and selection/promotion/export once per compatible row set only after a
+new complete world exists. Production approval and HF upload remain out of
+scope unless an independent trust receipt exists.
+
+## P18 next-topology capacity preflight — 2026-09-03
+
+While P17.A finishes strict replay, two disjoint source-first probes test the
+highest-ranked new transition/oracle programs. Neither may generate SFT until
+the authentic relation, executable oracle, remove-one flip, and unique-token
+capacity are measured.
+
+| Track | Ownership | Exit criterion | Status |
+| --- | --- | --- | --- |
+| P18.A SEC restatement | `configs/p18_finance_*`, `reports/p18_finance_*` | locate accession/footnote/restatement graph in existing signed local filings; report 64K/128K unique capacity and exact arithmetic oracle | blocked: authentic Microsoft segment recast, but only 3,889 deduplicated tokens |
+| P18.B regression bisect | `configs/p18_codeforge_*`, `reports/p18_codeforge_*` | locate licensed issue/culprit/fix/test/release chain; prove failing/passing endpoints and token histogram distinct from failure-recovery | blocked: pandas chain authentic, but near-dedup capacity 21,200 tokens and no midpoint/check-run oracle |
+
+## P19/P20 executable-topology conversion — 2026-09-03
+
+P19 repeats the source/capacity/oracle preflight before any expensive
+generation. P20 implements only the one new topology whose authentic source
+pool clears both length bands, while an independent source-only track searches
+for an accessible substitute for the OpenReview-challenged forum.
+
+| Track | Ownership | Exit criterion | Status |
+| --- | --- | --- | --- |
+| P19.A IETF cross-spec | `configs/p19_ietf_*`, `reports/p19_ietf_*` | official update/dependency graph, deterministic requirement vector, remove-one replay, unique 64K/128K capacity | capacity_passed_generation_blocked: 140,405 unique tokens; adapter/compiler gaps |
+| P19.B review-response-revision | `configs/p19_researchlab_*`, `reports/p19_researchlab_*` | immutable review/response/artifact-version records and measurable 64K/128K capacity | blocked_access: official OpenReview API returned challenge; capacity undefined |
+| P20.A IETF implementation | IETF source workflow/compiler and focused tests plus `p20_ietf_*` artifacts | vertical-slice RED/GREEN for paginated RFC identity, dependency relations, six-field resolver, then candidate-local audit if complete | complete_source_task: 44 focused tests; task strict/remove-one green |
+| P20.B review-source alternative | `configs/p20_researchlab_*`, `reports/p20_researchlab_*`, `sources/p20_researchlab_*` | one official retrievable review-response-revision chain or exact fail-closed ledger | complete_preflight: eLife 94586 has 64K capacity, 128K blocked |
+| P21.A IETF sidecar | IETF replay registry and focused sidecar tests | exact-byte build/serialize/bind/load/replay without unsupported adapter fallbacks | complete: 21 focused tests; source-attested v1 sidecar |
+| P21.B eLife 64K source task | eLife document workflow and focused tests | official v1/v2 review-response-delta task with deterministic strict/remove-one audit | complete: 64K witness; 62 regressions; privacy adapter required |
+| P22.A/P23.A IETF projection+dense | IETF task projection/proof/promotion dispatch and focused tests | materialized byte-bound CF, v3 sidecar, verified order edges, public dense audit | complete: 51 projection plus 1 dense focused tests; generation not yet run |
+| P22.B eLife privacy/source adapter | eLife document/source workflow and focused tests | redact 6 emails with raw/text hash separation and bind four real relation kinds | complete: 99 regressions; source workflow green |
+| P24.A-P33 IETF generation | `configs/p24_ietf_*` through `p33_ietf_*`, ignored generated data | exact 64K/128K full/cf/ordered projections and one candidate-local dense audit | complete_candidate: P33 6/6 strict audits; 64K/128K; promotion pending |
+| P24.B eLife materialization | `configs/p24_researchlab_*`, `reports/p24_researchlab_*`, ignored generated data | exact 64K authentic review-response-revision parent without near-duplicate artifacts | complete_parent: 64,512 tokens, 367/367 representatives, projection pending |
+| P34 new-domain preflight | `configs/p34_*`, `reports/p34_*`, `sources/research_p34_*` | compare structured-data, interaction, and retrieval/correction topologies; measure the strongest source | complete_fail_closed: PFAS has 473,285 near-dedup tokens but current oracle is sub-8K shortcut-prone |
+| P35 HealthData preflight | `configs/p35_*`, `reports/p35_*`, `sources/research_p35_*` | rights/privacy/schema admission before aggregate-only FAERS case-version capacity measurement | complete_fail_closed: 185569 cases but zero multi-version cases; topology absent, raw rows excluded |
+| P36-P43 IETF conversion | `configs/p36_ietf_*`, `configs/p43_ietf_*`, `reports/p36_*`, `reports/p38_*`, `reports/p43_*` | select/promote/gate/B5 an authentic cumulative IETF world without changing proof gates | blocked_current_task: schema fixed and 16K/64K audit 6/6, but proof topology is flat and selection rejects |
+| P40 IETF semantic growth | `configs/p40_ietf_*`, `reports/p40_ietf_*`, `sources/research_p40_*` | add answer-changing RFC validation fields so the longer state grows relations, events, and supports | complete: v14 9/9 promoted; 682458 exact tokens; signed B5 and manifest green |
+
+## P40 conversion closure and next-world queue — 2026-09-04
+
+P40 v14 is complete as one independently signed local-probe product. It adds 9
+train rows across 32K/64K/128K and full/CF/ordered views. Production trust and
+HF publication remain out of scope.
+
+| Track | Current state | Next admissible action |
+| --- | --- | --- |
+| P40 IETF | complete: audit, selection, promotion, quality, B5, manifest | preserve immutable product; optimize proof reuse only with equivalent signed verification |
+| P50 Treasury | fail-closed: 1,717 replayable bill chains, all gold chains ≤4K | change task/entity; do not pad auction text |
+| P52 GovInfo | adapter registered; old direct-view candidates not promotable | rebuild three authentic full parents, then project and run shared proof |
+| P53 OSV | blocked diagnostic: inherited authorization prohibits generation; shortcut audit is non-exhaustive | create a distinct authorized source contract, remove task-declared essential-ID tautology, and use shared raw-window replay before candidate claims |
+
+## P54 scale-out run charter — 2026-09-05
+
+Assumptions: `.hl/policy.md` is the control plane; this is research-pipeline
+work rather than one-shot reporting; independent delegation reduces cycle time
+because P52, P46, and new-source discovery have disjoint files and evidence.
+Complexity is high (breadth 2, depth 2, dependency 1, uncertainty 2,
+validation 2; total 9/10), so execution is mixed: parallel source/world work,
+then centralized shared-gate review and inventory binding.
+
+| Unit | Owner and files | Deliverable | Admission rule |
+| --- | --- | --- | --- |
+| P52 GovInfo conversion | P52 agent; `configs/p52_*`, `reports/p52_*`, `tests/test_p52_*`, `sources/research_p52_*` | three authentic full parents before task-view projection | no inventory until shared replay, dense/raw-window, selection, promotion, quality, and export all pass |
+| P46 Ofgem spreadsheet world | P46 agent; `configs/p46_*`, `reports/p46_*`, `tests/test_p46_*`, `sources/research_p46_*` | executable cross-sheet/cross-workbook formula-DAG parent or quantified rejection | formula volume alone is not proof; answer must change under source-bound remove-one/CF replay |
+| P54 new official workflow | P54 agent; `configs/p54_*`, `reports/p54_*`, `tests/test_p54_*`, `sources/research_p54_*` | compare at least three official lifecycle sources and preflight the strongest | rights, immutable retrieval, natural unique capacity, and non-shortcut oracle must pass before candidates |
+| Integration and inventory | root; shared gates plus `.hl`/release documentation only | verified delta, rejection ledger, and layered Git history | preserve exact-band, near-dup, lineage, derived-view, truncation, and production trust boundaries |
+
+### P54 scale-out checkpoint
+
+| Unit | Status | Next admissible action |
+| --- | --- | --- |
+| P46 Ofgem | blocked: 469,328 near-deduplicated template tokens but zero authenticated answer-dependent capacity | switch to a public cap-level table plus dated decision chain; do not synthesize from formula aggregates |
+| P52 GovInfo | blocked: 3 authentic parents and 9 candidate-stage projections; shared 8K artifact window fails, structural v2 exact-band pack emits 0 | change bill transition/task geometry; do not move background or retry the same F219/D207 or A138/F219 construction |
+| P54 EUR-Lex | partial aggregate preflight: six official MDR sources and natural 32K/64K/128K capacity, but only corrected-by is parsed; 0 candidates | bind exact relation spans and selected-document rights, register task replay, then run candidate-level exact-band and raw-token windows |
+| Integration | complete after review: train inventory remains 141 rows; B5 training-condition sample remains 80 examples | preserve immutable products; scale through new executable worlds, not view or length multiplication |

@@ -49,6 +49,10 @@ PAPER_WORKFLOW_INPUT_SCHEMA = "longworld.paper-workflow-input.v1"
 PAPER_WORKFLOW_MANIFEST_SCHEMA = "longworld.paper-workflow-manifest.v1"
 PAPER_FETCH_INVENTORY_SCHEMA = "longworld.paper-fetch-inventory.v1"
 PAPER_FETCH_WORKFLOW_MANIFEST_SCHEMA = "longworld.paper-workflow-manifest.v2"
+ELIFE_REVIEW_REVISION_REQUEST_SCHEMA = (
+    "longworld.elife-review-revision-fetch-request.v1"
+)
+ELIFE_REVIEW_REVISION_INVENTORY_SCHEMA = "longworld.elife-review-revision-inventory.v1"
 WIKIPEDIA_WORKFLOW_INPUT_SCHEMA = "longworld.wikipedia-workflow-input.v2"
 WIKIPEDIA_WORKFLOW_MANIFEST_SCHEMA = "longworld.wikipedia-workflow-manifest.v2"
 WIKIMEDIA_FETCH_RECEIPT_SCHEMA = "longworld.wikimedia-fetch-receipt.v1"
@@ -68,6 +72,7 @@ OPENREVIEW_API_DEFINITION = (
     "https://docs.openreview.net/reference/api-v2/openapi-definition"
 )
 ARXIV_ARCHIVE_PARSER_REVISION = "arxiv_source_tar_v2"
+ELIFE_XML_PARSER_REVISION = "elife-article-xml@1"
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _ENTITY_ID = re.compile(r"^Q[1-9]\d*$")
@@ -174,6 +179,648 @@ _PAPER_FETCH_CONTENT_TYPES = {
     },
     "openreview_v2_api": {"application/json"},
 }
+
+_ELIFE_REQUEST_FIELDS = {
+    "schema_version",
+    "data_product",
+    "authorization",
+    "source",
+    "candidate",
+    "versions",
+    "oracle_witness",
+    "length_policy",
+}
+_ELIFE_EVIDENCE_IDS = frozenset(
+    {
+        "controlling_review",
+        "direct_author_response",
+        "body_figure_fig5",
+        "appendix_APP9",
+        "appendix_table_tbl3",
+    }
+)
+
+
+def _elife_git_blob_sha1(raw: bytes) -> str:
+    return hashlib.sha1(f"blob {len(raw)}\0".encode() + raw).hexdigest()
+
+
+def _elife_local_name(element: ET.Element) -> str:
+    return element.tag.rsplit("}", 1)[-1]
+
+
+def _elife_visible_text(element: ET.Element) -> str:
+    parts: list[str] = []
+
+    def append(node: ET.Element, *, include_tail: bool = True) -> None:
+        name = _elife_local_name(node)
+        if name == "alternatives":
+            choice = next(
+                (child for child in node if _elife_local_name(child) == "tex-math"),
+                next(iter(node), None),
+            )
+            if choice is not None:
+                append(choice, include_tail=False)
+        elif name in {"graphic", "inline-graphic"}:
+            for descendant in node.iter():
+                if _elife_local_name(descendant) == "alt-text" and descendant.text:
+                    parts.append(descendant.text)
+        else:
+            if node.text:
+                parts.append(node.text)
+            for child in node:
+                append(child)
+        if include_tail and node.tail:
+            parts.append(node.tail)
+
+    append(element)
+    return " ".join("".join(parts).split())
+
+
+def _elife_article_identity(
+    root: ET.Element,
+    *,
+    version: int,
+    expected: dict[str, Any],
+    candidate: dict[str, Any],
+    license_url: str,
+) -> dict[str, Any]:
+    article_meta = root.find("./front/article-meta")
+    if article_meta is None:
+        raise ProvenanceError(f"eLife v{version} article-meta is missing")
+    identifiers = {
+        (item.attrib.get("pub-id-type"), item.attrib.get("specific-use")): " ".join(
+            "".join(item.itertext()).split()
+        )
+        for item in article_meta.findall("./article-id")
+    }
+    title_nodes = article_meta.findall("./title-group/article-title")
+    date_type = "original-publication" if version == 1 else "update"
+    date_nodes = article_meta.findall(f"./pub-date[@date-type='{date_type}']")
+    licenses = {
+        item.attrib.get("{http://www.w3.org/1999/xlink}href")
+        for item in article_meta.findall("./permissions/license")
+    }
+    observed = {
+        "publisher_id": identifiers.get(("publisher-id", None)),
+        "canonical_doi": identifiers.get(("doi", None)),
+        "version_doi": identifiers.get(("doi", "version")),
+        "title": _elife_visible_text(title_nodes[0]) if len(title_nodes) == 1 else "",
+        "effective_date": (
+            date_nodes[0].attrib.get("iso-8601-date") if len(date_nodes) == 1 else None
+        ),
+    }
+    expected_identity = {
+        "publisher_id": candidate.get("publisher_id"),
+        "canonical_doi": candidate.get("canonical_doi"),
+        "version_doi": expected.get("version_doi"),
+        "title": candidate.get("title"),
+        "effective_date": expected.get("effective_date"),
+    }
+    if observed != expected_identity:
+        raise ProvenanceError(f"eLife v{version} DOI or article identity mismatch")
+    if licenses != {license_url}:
+        raise ProvenanceError(f"eLife v{version} license identity mismatch")
+    return observed
+
+
+def _elife_direct_paragraphs(subarticle: ET.Element) -> list[ET.Element]:
+    paragraphs: list[ET.Element] = []
+
+    def walk(element: ET.Element, inside_quote: bool = False) -> None:
+        inside_quote = inside_quote or _elife_local_name(element) == "disp-quote"
+        if _elife_local_name(element) == "p" and not inside_quote:
+            paragraphs.append(element)
+        for child in element:
+            walk(child, inside_quote)
+
+    body = subarticle.find("./body")
+    if body is not None:
+        walk(body)
+    return paragraphs
+
+
+def _elife_witness(
+    roots: dict[int, ET.Element], request: dict[str, Any]
+) -> dict[str, Any]:
+    witness = request["oracle_witness"]
+    review_digest = str(witness.get("review_paragraph_sha256") or "")
+    response_digest = str(witness.get("response_paragraph_sha256") or "")
+    if (
+        _SHA256.fullmatch(review_digest) is None
+        or _SHA256.fullmatch(response_digest) is None
+    ):
+        raise ProvenanceError("eLife oracle paragraph hash is invalid")
+
+    controlling_reviews: list[dict[str, Any]] = []
+    direct_responses: list[dict[str, Any]] = []
+    review_quote_in_response = False
+    for version, root in roots.items():
+        for subarticle in root.findall("./sub-article"):
+            article_type = subarticle.attrib.get("article-type")
+            for paragraph in subarticle.findall("./body//p"):
+                text = _elife_visible_text(paragraph)
+                digest = hashlib.sha256(text.encode()).hexdigest()
+                if (
+                    version == 1
+                    and article_type == "referee-report"
+                    and digest == review_digest
+                ):
+                    controlling_reviews.append(
+                        {
+                            "version": version,
+                            "subarticle_id": subarticle.attrib.get("id"),
+                            "paragraph_sha256": digest,
+                            "text": text,
+                        }
+                    )
+            if version == 2 and article_type == "author-comment":
+                review_quote_in_response = review_quote_in_response or any(
+                    hashlib.sha256(_elife_visible_text(paragraph).encode()).hexdigest()
+                    == review_digest
+                    for paragraph in subarticle.findall("./body/disp-quote//p")
+                )
+                for paragraph in _elife_direct_paragraphs(subarticle):
+                    text = _elife_visible_text(paragraph)
+                    digest = hashlib.sha256(text.encode()).hexdigest()
+                    if digest == response_digest:
+                        direct_responses.append(
+                            {
+                                "version": version,
+                                "subarticle_id": subarticle.attrib.get("id"),
+                                "paragraph_sha256": digest,
+                                "text": text,
+                            }
+                        )
+    if (
+        len(controlling_reviews) != 1
+        or len(direct_responses) != 1
+        or not review_quote_in_response
+    ):
+        raise ProvenanceError("eLife review-response witness is not unique")
+
+    transitions = {
+        "body_figure_fig5": [
+            len(roots[1].findall("./body//fig[@id='fig5']")),
+            len(roots[2].findall("./body//fig[@id='fig5']")),
+        ],
+        "appendix_APP9": [
+            len(roots[1].findall("./back/app-group/app[@id='APP9']")),
+            len(roots[2].findall("./back/app-group/app[@id='APP9']")),
+        ],
+        "appendix_table_tbl3": [
+            len(roots[1].findall("./back/app-group//table-wrap[@id='tbl3']")),
+            len(roots[2].findall("./back/app-group//table-wrap[@id='tbl3']")),
+        ],
+    }
+    expected_transitions = witness.get("required_v1_to_v2_object_transitions")
+    if transitions != expected_transitions or any(
+        counts != [0, 1] for counts in transitions.values()
+    ):
+        raise ProvenanceError("eLife revision-object transition mismatch")
+    return {
+        "controlling_review": controlling_reviews[0],
+        "direct_author_response": direct_responses[0],
+        "review_quote_embedded_in_v2_author_comment": True,
+        "v1_to_v2_object_transitions": transitions,
+    }
+
+
+def _elife_evidence(
+    record: dict[str, Any], evidence_id: str, quote: str
+) -> dict[str, Any]:
+    text = str(record["text"])
+    if not quote or text.count(quote) != 1:
+        raise ProvenanceError(f"eLife {evidence_id} evidence is not unique")
+    start = text.index(quote)
+    return {
+        "evidence_id": evidence_id,
+        "record_id": record["record_id"],
+        "evidence_quote": quote,
+        "evidence_char_start": start,
+        "evidence_char_end": start + len(quote),
+        "source_sha256": record["source_sha256"],
+        "text_sha256": record["text_sha256"],
+    }
+
+
+def _elife_task_and_relations(
+    records: list[dict[str, Any]],
+    witness: dict[str, Any],
+    *,
+    program_id: object,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    v1, v2 = records
+    evidence = {
+        "controlling_review": _elife_evidence(
+            v1, "controlling_review", witness["controlling_review"]["text"]
+        ),
+        "direct_author_response": _elife_evidence(
+            v2,
+            "direct_author_response",
+            witness["direct_author_response"]["text"],
+        ),
+        "body_figure_fig5": _elife_evidence(v2, "body_figure_fig5", '<fig id="fig5"'),
+        "appendix_APP9": _elife_evidence(v2, "appendix_APP9", '<app id="APP9"'),
+        "appendix_table_tbl3": _elife_evidence(
+            v2, "appendix_table_tbl3", '<table-wrap id="tbl3"'
+        ),
+        "v1_version_doi": _elife_evidence(
+            v1,
+            "v1_version_doi",
+            '<article-id pub-id-type="doi" specific-use="version">'
+            f"{v1['version_doi']}</article-id>",
+        ),
+        "v2_version_doi": _elife_evidence(
+            v2,
+            "v2_version_doi",
+            '<article-id pub-id-type="doi" specific-use="version">'
+            f"{v2['version_doi']}</article-id>",
+        ),
+    }
+    grounded_witness = {**witness, "evidence": evidence}
+    task = {
+        "program_id": program_id,
+        "answer": "VERIFIED_IMPLEMENTED",
+        "essential_evidence_ids": sorted(_ELIFE_EVIDENCE_IDS),
+        "witness": grounded_witness,
+        "model_written_gold": False,
+    }
+    relations = [
+        {
+            "relation_id": "elife:94586:review-requests-revision",
+            "kind": "requests_revision",
+            "source_record_id": v1["record_id"],
+            "target_record_id": v2["record_id"],
+            "evidence": [
+                evidence["controlling_review"],
+                evidence["v2_version_doi"],
+            ],
+        },
+        {
+            "relation_id": "elife:94586:response-to-review",
+            "kind": "responds_to_review",
+            "source_record_id": v2["record_id"],
+            "target_record_id": v1["record_id"],
+            "evidence": [
+                evidence["direct_author_response"],
+                evidence["controlling_review"],
+            ],
+        },
+        {
+            "relation_id": "elife:94586:v2-revision-of-v1",
+            "kind": "revision_of",
+            "source_record_id": v2["record_id"],
+            "target_record_id": v1["record_id"],
+            "evidence": [evidence["v2_version_doi"], evidence["v1_version_doi"]],
+        },
+        {
+            "relation_id": "elife:94586:v2-implements-review-delta",
+            "kind": "implements_revision_delta",
+            "source_record_id": v2["record_id"],
+            "target_record_id": v1["record_id"],
+            "evidence": [
+                evidence["direct_author_response"],
+                evidence["body_figure_fig5"],
+                evidence["appendix_APP9"],
+                evidence["appendix_table_tbl3"],
+                evidence["v1_version_doi"],
+            ],
+        },
+    ]
+    return task, relations
+
+
+def build_elife_review_revision_inventory(
+    request: dict[str, Any],
+    version_bytes: dict[int, bytes],
+    *,
+    generated_at: str,
+) -> dict[str, Any]:
+    """Build a disabled eLife v1/v2 source inventory from pinned XML bytes."""
+    if (
+        set(request) != _ELIFE_REQUEST_FIELDS
+        or request.get("schema_version") != ELIFE_REVIEW_REVISION_REQUEST_SCHEMA
+    ):
+        raise ProvenanceError("unsupported eLife review-revision request schema")
+    _parse_timestamp(generated_at, "generated_at")
+    authorization = request.get("authorization")
+    if not isinstance(authorization, dict) or set(authorization) != {
+        "record_id",
+        "scope",
+        "basis",
+        "reviewed_at",
+        "allowed_actions",
+    }:
+        raise ProvenanceError("eLife source authorization is invalid")
+    _validate_authorization(authorization)
+    if authorization.get("allowed_actions") != ["fetch_pinned_elife_xml"]:
+        raise ProvenanceError("eLife source authorization action is invalid")
+
+    source = request.get("source")
+    candidate = request.get("candidate")
+    versions = request.get("versions")
+    length_policy = request.get("length_policy")
+    if (
+        not isinstance(source, dict)
+        or not isinstance(candidate, dict)
+        or not isinstance(versions, list)
+        or len(versions) != 2
+        or not isinstance(length_policy, dict)
+        or length_policy.get("allowed_bands") != ["64k"]
+        or length_policy.get("exact_64k_band") != [65536, 67584]
+        or not isinstance(length_policy.get("measured_near_dedup_capacity"), int)
+        or length_policy["measured_near_dedup_capacity"] < 65536
+    ):
+        raise ProvenanceError("eLife v1/v2 64K request is invalid")
+    repository = str(source.get("repository") or "")
+    commit = str(source.get("repository_commit") or "")
+    repository_url = str(source.get("repository_url") or "")
+    license_url = str(source.get("license_url") or "")
+    if (
+        repository != "elifesciences/elife-article-xml"
+        or repository_url != "https://github.com/elifesciences/elife-article-xml"
+        or re.fullmatch(r"[0-9a-f]{40}", commit) is None
+        or license_url != "https://creativecommons.org/licenses/by/4.0/"
+    ):
+        raise ProvenanceError("eLife official repository identity is invalid")
+    if set(version_bytes) != {1, 2}:
+        raise ProvenanceError("eLife inventory requires exactly v1 and v2 bytes")
+
+    roots: dict[int, ET.Element] = {}
+    records: list[dict[str, Any]] = []
+    for expected_version, expected in zip((1, 2), versions, strict=True):
+        if (
+            not isinstance(expected, dict)
+            or expected.get("version") != expected_version
+        ):
+            raise ProvenanceError("eLife version order or identity is invalid")
+        raw = version_bytes[expected_version]
+        if not isinstance(raw, bytes) or not raw:
+            raise ProvenanceError(f"eLife v{expected_version} bytes are invalid")
+        observed = {
+            "bytes": len(raw),
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "git_blob_sha1": _elife_git_blob_sha1(raw),
+        }
+        for field, value in observed.items():
+            if expected.get(field) != value:
+                raise ProvenanceError(f"eLife v{expected_version} {field} mismatch")
+        try:
+            root = ET.fromstring(raw)
+        except ET.ParseError as error:
+            raise ProvenanceError(
+                f"eLife v{expected_version} XML is invalid"
+            ) from error
+        raw_text = raw.decode("utf-8")
+        _reject_secrets(raw_text)
+        clean_text = _EMAIL.sub("[redacted-email]", raw_text)
+        text_sha256 = hashlib.sha256(clean_text.encode()).hexdigest()
+        roots[expected_version] = root
+        identity = _elife_article_identity(
+            root,
+            version=expected_version,
+            expected=expected,
+            candidate=candidate,
+            license_url=license_url,
+        )
+        path = str(expected.get("path") or "")
+        if (
+            PurePosixPath(path).is_absolute()
+            or ".." in PurePosixPath(path).parts
+            or path
+            != f"preprints/elife-preprint-{candidate.get('publisher_id')}-v{expected_version}.xml"
+        ):
+            raise ProvenanceError(
+                f"eLife v{expected_version} repository path is invalid"
+            )
+        records.append(
+            {
+                "record_id": f"elife:{candidate['publisher_id']}:v{expected_version}",
+                "version": expected_version,
+                "revision_id": f"v{expected_version}",
+                **identity,
+                "repository_path": path,
+                "repository_commit": commit,
+                "source_url": (
+                    f"https://raw.githubusercontent.com/{repository}/{commit}/{path}"
+                ),
+                "bytes": observed["bytes"],
+                "source_sha256": observed["sha256"],
+                "provenance_id": f"sha256:{observed['sha256']}",
+                "git_blob_sha1": observed["git_blob_sha1"],
+                "parser": ELIFE_XML_PARSER_REVISION,
+                "text_sha256": text_sha256,
+                "text": clean_text,
+                "privacy_review": {
+                    "emails": "redacted",
+                    "email_redaction_count": len(_EMAIL.findall(raw_text)),
+                    "secrets": "fail_closed",
+                    "scanner": DOCUMENT_WORKFLOW_SCANNER,
+                    "scanner_revision": DOCUMENT_WORKFLOW_SCANNER_REVISION,
+                },
+            }
+        )
+    witness = _elife_witness(roots, request)
+    task, relations = _elife_task_and_relations(
+        records, witness, program_id=candidate.get("transition_program")
+    )
+    request_sha256 = hashlib.sha256(
+        json.dumps(
+            request, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode()
+    ).hexdigest()
+    return {
+        "schema_version": ELIFE_REVIEW_REVISION_INVENTORY_SCHEMA,
+        "source_status": "public_api_export",
+        "data_stage": "source_inventory",
+        "hybrid_train_ready": False,
+        "production_eligible": False,
+        "generation_integration": "disabled",
+        "generated_at": generated_at,
+        "data_product": request.get("data_product"),
+        "authorization": dict(authorization),
+        "source": dict(source),
+        "length_policy": dict(length_policy),
+        "request": request,
+        "request_sha256": request_sha256,
+        "n_records": len(records),
+        "records": records,
+        "n_relations": len(relations),
+        "relations": relations,
+        "task": task,
+    }
+
+
+def replay_elife_review_revision_task(
+    inventory: dict[str, Any], *, removed_evidence_ids: frozenset[str] = frozenset()
+) -> str:
+    """Replay the deterministic eLife claim disposition after evidence removal."""
+    if not removed_evidence_ids.issubset(_ELIFE_EVIDENCE_IDS):
+        raise ProvenanceError("eLife task removal references unknown evidence")
+    task = inventory.get("task")
+    if not isinstance(task, dict) or set(task.get("essential_evidence_ids") or []) != (
+        _ELIFE_EVIDENCE_IDS
+    ):
+        raise ProvenanceError("eLife task evidence contract is invalid")
+    if "controlling_review" in removed_evidence_ids:
+        return "UNKNOWN_NO_REVIEW_CLAIM"
+    if "direct_author_response" in removed_evidence_ids:
+        return "UNKNOWN_NO_AUTHOR_RESPONSE"
+    if removed_evidence_ids & {
+        "body_figure_fig5",
+        "appendix_APP9",
+        "appendix_table_tbl3",
+    }:
+        return "CLAIMED_NOT_VERIFIED"
+    return "VERIFIED_IMPLEMENTED"
+
+
+def audit_elife_review_revision_task(inventory: dict[str, Any]) -> dict[str, Any]:
+    """Reparse redacted sources and audit strict plus every remove-one replay."""
+    if inventory.get("schema_version") != ELIFE_REVIEW_REVISION_INVENTORY_SCHEMA:
+        raise ProvenanceError("unsupported eLife review-revision inventory schema")
+    records = inventory.get("records")
+    request = inventory.get("request")
+    if (
+        not isinstance(records, list)
+        or len(records) != 2
+        or not isinstance(request, dict)
+    ):
+        raise ProvenanceError("eLife review-revision inventory is invalid")
+    _parse_timestamp(str(inventory.get("generated_at") or ""), "generated_at")
+    expected_request_sha256 = hashlib.sha256(
+        json.dumps(
+            request, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode()
+    ).hexdigest()
+    if (
+        inventory.get("source_status") != "public_api_export"
+        or inventory.get("data_stage") != "source_inventory"
+        or inventory.get("hybrid_train_ready") is not False
+        or inventory.get("production_eligible") is not False
+        or inventory.get("generation_integration") != "disabled"
+        or inventory.get("request_sha256") != expected_request_sha256
+        or inventory.get("n_records") != 2
+        or inventory.get("n_relations") != 4
+        or inventory.get("authorization") != request.get("authorization")
+        or inventory.get("source") != request.get("source")
+        or inventory.get("length_policy") != request.get("length_policy")
+    ):
+        raise ProvenanceError("eLife inventory does not match its source contract")
+    versions = request.get("versions")
+    candidate = request.get("candidate")
+    source = request.get("source")
+    if (
+        not isinstance(versions, list)
+        or len(versions) != 2
+        or not isinstance(candidate, dict)
+        or not isinstance(source, dict)
+    ):
+        raise ProvenanceError("eLife inventory request is invalid")
+    roots: dict[int, ET.Element] = {}
+    for record, expected in zip(records, versions, strict=True):
+        if not isinstance(record, dict) or not isinstance(expected, dict):
+            raise ProvenanceError("eLife inventory source record is invalid")
+        text = record.get("text")
+        privacy = record.get("privacy_review")
+        expected_version = expected.get("version")
+        expected_sha256 = expected.get("sha256")
+        if (
+            not isinstance(text, str)
+            or _EMAIL.search(text)
+            or hashlib.sha256(text.encode()).hexdigest() != record.get("text_sha256")
+            or record.get("source_sha256") != expected_sha256
+            or record.get("provenance_id") != f"sha256:{expected_sha256}"
+            or record.get("bytes") != expected.get("bytes")
+            or record.get("git_blob_sha1") != expected.get("git_blob_sha1")
+            or record.get("version") != expected_version
+            or record.get("repository_path") != expected.get("path")
+            or record.get("repository_commit") != source.get("repository_commit")
+            or record.get("parser") != ELIFE_XML_PARSER_REVISION
+            or not isinstance(privacy, dict)
+            or privacy
+            != {
+                "emails": "redacted",
+                "email_redaction_count": privacy.get("email_redaction_count"),
+                "secrets": "fail_closed",
+                "scanner": DOCUMENT_WORKFLOW_SCANNER,
+                "scanner_revision": DOCUMENT_WORKFLOW_SCANNER_REVISION,
+            }
+            or not isinstance(privacy["email_redaction_count"], int)
+            or privacy["email_redaction_count"] < 0
+            or text.count("[redacted-email]") != privacy["email_redaction_count"]
+        ):
+            raise ProvenanceError("eLife inventory does not match its source bytes")
+        expected_url = (
+            f"https://raw.githubusercontent.com/{source['repository']}/"
+            f"{source['repository_commit']}/{expected['path']}"
+        )
+        if record.get("source_url") != expected_url:
+            raise ProvenanceError("eLife inventory source URL is invalid")
+        try:
+            root = ET.fromstring(text.encode())
+        except ET.ParseError as error:
+            raise ProvenanceError("eLife redacted source XML is invalid") from error
+        roots[int(expected_version)] = root
+        _elife_article_identity(
+            root,
+            version=int(expected_version),
+            expected=expected,
+            candidate=candidate,
+            license_url=str(source.get("license_url") or ""),
+        )
+    witness = _elife_witness(roots, request)
+    expected_task, expected_relations = _elife_task_and_relations(
+        records, witness, program_id=candidate.get("transition_program")
+    )
+    if (
+        inventory.get("task") != expected_task
+        or inventory.get("relations") != expected_relations
+    ):
+        raise ProvenanceError("eLife inventory does not match its source relations")
+
+    strict = replay_elife_review_revision_task(inventory)
+    without_review = replay_elife_review_revision_task(
+        inventory, removed_evidence_ids=frozenset({"controlling_review"})
+    )
+    without_response = replay_elife_review_revision_task(
+        inventory, removed_evidence_ids=frozenset({"direct_author_response"})
+    )
+    delta_results = {
+        evidence_id: replay_elife_review_revision_task(
+            inventory, removed_evidence_ids=frozenset({evidence_id})
+        )
+        for evidence_id in sorted(
+            {
+                "body_figure_fig5",
+                "appendix_APP9",
+                "appendix_table_tbl3",
+            }
+        )
+    }
+    expected = str(inventory["task"].get("answer") or "")
+    result = {
+        "program_id": inventory["task"].get("program_id"),
+        "strict_answer": strict,
+        "without_controlling_review": without_review,
+        "without_direct_response": without_response,
+        "without_required_revision_delta": delta_results,
+        "remove_review_fails": without_review != expected,
+        "remove_response_fails": without_response != expected,
+        "remove_delta_fails": all(
+            answer != expected for answer in delta_results.values()
+        ),
+        "model_written_gold": inventory["task"].get("model_written_gold"),
+    }
+    result["passed"] = bool(
+        strict == expected
+        and result["remove_review_fails"]
+        and result["remove_response_fails"]
+        and result["remove_delta_fails"]
+        and result["model_written_gold"] is False
+    )
+    return result
 
 
 def _reject_secrets(text: str) -> None:

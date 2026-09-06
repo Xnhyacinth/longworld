@@ -649,6 +649,24 @@ def test_training_export_rows_are_exact_deterministic_promoted_projections(
         validate_deterministic_training_transform(manifest_path, manifest)
 
 
+def test_deterministic_sharegpt_projection_allows_missing_query_type() -> None:
+    from longworld.core import training_manifest
+
+    row = training_manifest._sharegpt_projection(
+        {
+            "world_id": "ietf-world",
+            "query_id": "ietf-world:q",
+            "view": "full",
+            "query_timing": "late",
+            "context": "records",
+            "answer": "answer",
+        },
+        sample_weight=1,
+    )
+
+    assert row["query_type"] is None
+
+
 def test_p12_sec_profile_deterministically_exports_legal_128k_rows(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

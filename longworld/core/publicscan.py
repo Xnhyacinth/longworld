@@ -7,7 +7,7 @@ from collections.abc import Iterator
 from typing import Any
 
 PUBLIC_SCANNER = "longworld-public-secret-patterns"
-PUBLIC_SCANNER_REVISION = "v2"
+PUBLIC_SCANNER_REVISION = "v3"
 EMAIL_RE = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}(?![\w.-])")
 SECRET_PATTERNS = (
     re.compile(r"\bgh[oprsu]_[A-Za-z0-9_]{20,}\b"),
@@ -18,7 +18,7 @@ SECRET_PATTERNS = (
     re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"),
     re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b"),
     re.compile(r"\bnpm_[A-Za-z0-9_-]{20,}\b"),
-    re.compile(r"\bBearer\s+[A-Za-z0-9._~-]{20,}\b", re.IGNORECASE),
+    re.compile(r"\b(?:Bearer|DPoP)\s+[A-Za-z0-9._~-]{20,}\b", re.IGNORECASE),
     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
 )
 

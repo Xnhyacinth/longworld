@@ -1,0 +1,20 @@
+{
+  "schema_version": "longworld.public-github-export-request.v1",
+  "request_id": "p17-codeforge-transformers-failure-recovery-v1",
+  "repository": "huggingface/transformers",
+  "allowlist": "configs/public_repo_allowlist.yaml",
+  "episodes": [
+    {"pull": 40744, "release": "v4.57.0", "role": "failure_recovery_release_cycle"},
+    {"pull": 45921, "release": "v5.9.0", "role": "failure_recovery_release_cycle"},
+    {"pull": 46142, "release": "v5.10.1", "role": "failure_recovery_release_cycle"},
+    {"pull": 44907, "release": "v5.12.0", "role": "failure_recovery_release_cycle"},
+    {"pull": 46830, "release": "v5.13.0", "role": "failure_recovery_release_cycle"},
+    {"pull": 46965, "release": "v5.14.0", "role": "failure_recovery_release_cycle"},
+    {"pull": 47727, "release": "v5.15.0", "role": "failure_recovery_release_cycle"},
+    {"pull": 48023, "release": "v5.16.0", "role": "failure_recovery_release_cycle"}
+  ],
+  "composition": "chronological_causal_union",
+  "synthetic_filler_allowed": false,
+  "random_join_allowed": false,
+  "trust_scope": "local_probe"
+}

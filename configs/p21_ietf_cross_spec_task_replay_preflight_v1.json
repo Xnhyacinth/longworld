@@ -1,0 +1,15 @@
+{
+  "schema_version": "longworld.ietf-task-replay-integration-preflight.v1",
+  "data_product": "p21_ietf_cross_spec_task_replay_preflight_v1",
+  "source_fetch_config": "configs/p20_ietf_oauth_cross_spec_requirement_fetch_v1.json",
+  "adapter_id": "standards.ietf_oauth_requirement.v1",
+  "adapter_revision": "longworld.ietf-oauth-cross-spec-replay.v1",
+  "sidecar_schema_version": "longworld.task-replay-sidecar.v1",
+  "public_sidecar_replay": true,
+  "candidate_projection_ready": false,
+  "dense_audit_ready": false,
+  "do_not_generate": true,
+  "do_not_promote": true,
+  "production_eligible": false,
+  "blocker": "missing source-text counterfactual contract and IETF standard-view projection replay"
+}

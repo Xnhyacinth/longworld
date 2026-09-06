@@ -1,0 +1,73 @@
+{
+  "schema_version": "longworld.p52-govinfo-bill-disposition-conversion-report.v1",
+  "generated_at": "2026-09-04T13:57:32Z",
+  "source_preflight_commit": "a365484b2b855f5378561545a842a0cd8e9fe8e1",
+  "world_id": "govinfo-118-hr4366-enrolled-law-disposition-v1",
+  "candidate_data_path": "data/candidates/p52_govinfo_bill_disposition_v1",
+  "candidate_data_git_tracked": false,
+  "candidate_data_storage_note": "data is a workspace symlink to /workspace/wynckeliao/longworld/data, so signed large artifacts remain outside this repository commit",
+  "candidate_count": 9,
+  "accepted_count": 9,
+  "rejected_count": 0,
+  "buckets": {
+    "32k": {
+      "views": 3,
+      "context_tokens": {
+        "full": 32341,
+        "cf": 32565,
+        "ordered_artifact_view": 32341
+      },
+      "artifact_count": 49,
+      "essential_artifact_count": 5
+    },
+    "64k": {
+      "views": 3,
+      "context_tokens": {
+        "full": 64012,
+        "cf": 64236,
+        "ordered_artifact_view": 64012
+      },
+      "artifact_count": 106,
+      "essential_artifact_count": 9
+    },
+    "128k": {
+      "views": 3,
+      "context_tokens": {
+        "full": 129326,
+        "cf": 129550,
+        "ordered_artifact_view": 129326
+      },
+      "artifact_count": 231,
+      "essential_artifact_count": 13
+    }
+  },
+  "gates": {
+    "frozen_official_source_reconstruction": true,
+    "source_and_candidate_attestations": true,
+    "exact_32k_64k_128k_bands": true,
+    "three_view_coverage": true,
+    "full_pool_replay": true,
+    "essential_leave_one": true,
+    "shortcut_4k_8k_16k_insufficient": true,
+    "strict_nested_source_essential_and_relation_sets": true,
+    "counterfactual_single_answer_delta": true,
+    "near_duplicate_sentence_cap": true,
+    "padding_clone_or_truncation_rejected": true,
+    "dense_top3_insufficient": true,
+    "raw_xml_persisted": false
+  },
+  "hashes": {
+    "candidate_file_sha256": "7d6e333e7a3efc5d37933fbdcbe5e9347549831811868594706bd3b869c76261",
+    "candidate_row_set_sha256": "6ef173af5655294ce194d2eebe37f8165f4fb7fe04ddf4e67c99eb9a50b70e0d",
+    "source_receipt_sha256": "c985ee7d2fa203837dee2d40a70b1c1d277a32bdc2fb9c773b81c83c1dafc977",
+    "preflight_report_sha256": "216a8d4f452dda257056b14591a3c5a308237a9d3934b14ad43e288b9ae5e12b",
+    "dense_rankings_sha256": "53cc0ad30e11a06b5d19313e4a2b49ae110ebb33c6a0cca52989458066ebc66c",
+    "dense_audits_sha256": "b6ff1314b8cdfc52c75d8459322a1fe5b34b9f6f672e0bb05e7ed73f88dfe64d",
+    "dense_audit_row_set_sha256": "d84e1887e5d0d8280992a7e41b6e373d1782576000d6aee77f34b8026e8ccdd8"
+  },
+  "inventory_delta": 0,
+  "promotion_eligible": false,
+  "train_ready": false,
+  "production_eligible": false,
+  "release_note": "Candidate conversion and audits passed, but this P52 task did not register the GovInfo replay adapter in shared promotion or select, promote, export, or count the rows."
+}

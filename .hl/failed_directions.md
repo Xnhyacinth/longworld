@@ -1,5 +1,9 @@
 # Rejected or blocked directions
 
+- Do not replay public GitHub episode bundles without their signed client and
+  public-policy SHA pins, and do not re-sign exports to bypass a pin mismatch.
+  The P17 Transformers promotion correctly failed closed until the original
+  pins were explicitly propagated into the isolated probe process.
 - Do not mix Microsoft Finance 128K into the P16 v2 probe extension. Its
   issuer-SEC manifest verifies only under `p12-probe-12-20260829-v1`.
 - Do not pad leftover PRs onto Pulumi failure-recovery to fake 128K.
@@ -106,6 +110,34 @@
   `#27766` (`cancelled`). `#26460` is thinner than `#17804`.
 - Do not export a release-cited GitHub PR whose head check-runs lack
   `success` or include blocking conclusions. oxc `#25909` failed that gate.
+- Do not generate pandas #19970 as a 64K/128K regression-bisect world. Its
+  authentic issue/culprit/fix/backport/release chain has only 21,200
+  near-deduplicated Qwen tokens, the reported bisect omits midpoint outcomes,
+  and GitHub exposes no machine check records for the four critical SHAs.
+- Do not expand the Microsoft FY2024/FY2025 segment recast with unrelated
+  notes or raw iXBRL markup. The authentic arithmetic relation has only 3,889
+  eligible deduplicated tokens, leaving 60,111/124,111-token deficits at the
+  exact 64K/128K lower bounds.
+- Do not bypass the OpenReview 403 challenge with search snippets, current-PDF
+  inference, or a third-party cache. Without immutable note/edit/PDF-version
+  records, review-response-delta relations and capacity are undefined.
+- Do not count the 140,405-token OAuth RFC pool as training data. It is a
+  source-capacity pass blocked before candidate generation by RFC6750 identity
+  parsing, dependency relation closure, and the cross-spec DAG compiler.
+- Do not count P20-P23 IETF source/task/sidecar/projection/dense tracer outputs
+  as training rows. They close implementation contracts but have not yet
+  materialized and audited exact 64K/128K candidate rows.
+- Do not make whole-artifact omission a special-case IETF counterfactual. Once
+  the artifact is absent, replay cannot reconstruct the factual parent answer;
+  retain a non-empty, exact source-bound transformed artifact instead.
+- Do not count the P33 6/6 dense-audited IETF rows before P36 selection,
+  promotion, release quality gate, and B5 validation complete.
+- Do not generate the P34 PFAS dossier from its 473,285-token source pool. The
+  present correction oracle is plausibly solvable from at most 6,213 tokens;
+  the other pages would be unrelated length fill unless a new distributed
+  multi-constraint oracle first survives shortcut audit.
+- Do not force eLife 94586 into 128K. The v1/v2 near-deduplicated pool is 76,142
+  tokens; use its exact 64K witness and obtain a different source for 128K.
 - Do not export dprint `#1215`: `sanitize_public_text` fail-closed on a
   credential-shaped secret. Do not weaken the scanner. `#1207`→`0.56.0`
   exported instead (CI 16 success, ancestry ahead).
@@ -163,3 +195,14 @@
 - Do not substitute issuer-owned IR pages for blocked SEC acquisition. NVIDIA
   IR stops fail-closed on a challenge page and the AMD multifiling directories
   hold no source filings, so neither is an attested fallback.
+- Do not retry P52 H.R. 4366 F/II/219 + D/II/207 by moving background. Its
+  authentic chronological ordered view is answerable inside one 8K artifact
+  window, so the same layout cannot pass shared proof.
+- Do not retry P52 A/I/138 + F/II/219 under the same deterministic whole-section
+  packer. The factual/ordered views are 32,621 tokens but the authenticated
+  real-text counterfactual is 31,000 under the shared materializer; switch bill
+  transition or predeclare a different task rather than pad, truncate, or
+  rearrange.
+- Do not synthesize formula-DAG rows from the P46 Ofgem aggregate. It has raw
+  template capacity but no persisted cell closure, output receipt, or
+  cross-workbook answer-changing relation.

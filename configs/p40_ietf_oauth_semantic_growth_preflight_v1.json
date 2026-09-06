@@ -1,0 +1,109 @@
+{
+  "schema_version": "longworld.p40-ietf-semantic-growth-preflight.v1",
+  "data_product": "p40_ietf_oauth_semantic_growth_source_first_preflight_v1",
+  "predecessor": {
+    "config": "configs/p33_ietf_oauth_coarsened_cf_generation_v1.json",
+    "candidate_report": "reports/p33_ietf_oauth_coarsened_cf_dense_audit_20260903.md",
+    "rejection_report": "reports/p36_ietf_oauth_training_conversion_p37_closeout_20260903.md"
+  },
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "target": {
+    "world_id": "ietf-oauth-cross-spec-semantic-growth-v1",
+    "semantic_growth_group_id": "ietf-oauth-effective-requirements",
+    "answer_program_id": "ietf.oauth_effective_requirement.v2-proposed",
+    "length_buckets": {
+      "64k": [64000, 65536],
+      "128k": [128000, 131072]
+    },
+    "views": ["full", "cf", "ordered_artifact_view"],
+    "nested_state": "64k authenticated graph is a strict subset of the 128k graph",
+    "candidate_generation_authorized": false
+  },
+  "published_sources": [
+    {
+      "record_id": "ietf:rfc:8705",
+      "url": "https://www.rfc-editor.org/rfc/rfc8705.txt",
+      "path": "sources/research_p40_ietf_rfc8705.txt",
+      "sha256": "6e45a1ee94c6a6a177a4cb077fe67d74bd70c1218c9362f2db2f153239612414",
+      "pinned_tokens": 14946
+    },
+    {
+      "record_id": "ietf:rfc:9101",
+      "url": "https://www.rfc-editor.org/rfc/rfc9101.txt",
+      "path": "sources/research_p40_ietf_rfc9101.txt",
+      "sha256": "a1400b5b8d27cfabb127325458a88415f83bb04b2ff9e6facbe50b8ef4ea2b60",
+      "pinned_tokens": 16615
+    },
+    {
+      "record_id": "ietf:rfc:9126",
+      "url": "https://www.rfc-editor.org/rfc/rfc9126.txt",
+      "path": "sources/research_p40_ietf_rfc9126.txt",
+      "sha256": "a79d0e30fcc24a22b79c8e18aa82362f6e63a7b8a5d58b480e746360e97388db",
+      "pinned_tokens": 12752
+    },
+    {
+      "record_id": "ietf:rfc:9396",
+      "url": "https://www.rfc-editor.org/rfc/rfc9396.txt",
+      "path": "sources/research_p40_ietf_rfc9396.txt",
+      "sha256": "d6a8f032d8a585daae1c33a8c7b6e539d199f886ec8cc1c7898436f7f2eed29c",
+      "pinned_tokens": 16886
+    },
+    {
+      "record_id": "ietf:rfc:9449",
+      "url": "https://www.rfc-editor.org/rfc/rfc9449.txt",
+      "path": "sources/research_p40_ietf_rfc9449.txt",
+      "sha256": "3842c58e1f6043389416023b9bb8d765048266024982fbbd90640e05943f4e13",
+      "pinned_tokens": 25395
+    }
+  ],
+  "identity_policy": {
+    "datatracker_documents": "sources/research_p40_ietf_datatracker_documents.json",
+    "published_draft_policy": "exclude draft bytes when Datatracker became_rfc binds the draft identity to an included RFC",
+    "excluded_drafts": [
+      "draft-ietf-oauth-mtls",
+      "draft-ietf-oauth-jwsreq",
+      "draft-ietf-oauth-par",
+      "draft-ietf-oauth-rar",
+      "draft-ietf-oauth-dpop"
+    ]
+  },
+  "deduplication": {
+    "unit": "blank-line-or-form-feed paragraph",
+    "normalization": "lowercase alphanumeric tokens with collapsed whitespace",
+    "near_duplicate_metric": "word-5gram Jaccard",
+    "near_duplicate_threshold": 0.8,
+    "comparison_pool": "P20 RFC/draft text plus earlier accepted P40 paragraphs",
+    "raw_joined_tokens": 86594,
+    "exact_duplicate_paragraphs_removed": 81,
+    "near_duplicate_paragraphs_removed": 31,
+    "removed_tokens": 10474,
+    "unique_joined_tokens": 76008
+  },
+  "growth_estimate": {
+    "target_added_context_tokens": 64022,
+    "unique_capacity_margin_tokens": 11986,
+    "coherent_proof_section_tokens": 21246,
+    "minimum_proof_growth_tokens": 3202,
+    "estimated_proof_growth_share": 0.3318528005997938,
+    "relations": [10, 20],
+    "strict_supports": [6, 11],
+    "essential_events": [7, 12],
+    "proof_depth": [2, 3],
+    "full_ordered_event_bearing_tokens_lower_bound": [10045, 31291],
+    "cf_event_bearing_tokens_lower_bound": [10014, 31260]
+  },
+  "safety": {
+    "padding": false,
+    "draft_and_rfc_double_counting": false,
+    "candidate_generation": false,
+    "promotion": false,
+    "inventory_count": false,
+    "gate_changes": false
+  }
+}

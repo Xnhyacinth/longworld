@@ -1,0 +1,130 @@
+{
+  "schema_version": "longworld.finance-restatement-preflight.v1",
+  "preflight_id": "p18_finance_microsoft_fy2024_segment_recast_v1",
+  "status": "fail_closed_capacity",
+  "candidate_generation": false,
+  "train_ready": false,
+  "production_eligible": false,
+  "signed_manifest": "/workspace/wynckeliao/longworld/data/source_inventory/p13_company_microsoft_four_annual_v4/sec_filing_manifest.p14.finance.v1.signed.json",
+  "signed_manifest_sha256": "82f61c8815e901fe9eaf9d7bd78380c2baa08495a338cccefb9c71c08f124aed",
+  "authorization_record_id": "P13-MICROSOFT-GCS-FOUR-ANNUAL-20260901",
+  "source_attestation_key_id": "probe-source-3a689228f9679b0522a18cadd07f1e97",
+  "issuer": {"name": "Microsoft Corporation", "cik": "0000789019"},
+  "relation": {
+    "kind": "recasts_comparative_segment_information",
+    "classification": "presentation_recast_no_consolidated_statement_impact",
+    "not_an_amended_filing": true,
+    "old_filing_record_id": "sec:0000950170-24-087843",
+    "recast_filing_record_id": "sec:0000950170-25-100235",
+    "fact_period": {"start": "2023-07-01", "end": "2024-06-30"},
+    "axis": "us-gaap:StatementBusinessSegmentsAxis",
+    "members": [
+      "msft:ProductivityAndBusinessProcessesMember",
+      "msft:IntelligentCloudMember",
+      "msft:MorePersonalComputingMember"
+    ],
+    "unit_ref": "U_USD",
+    "scale": 6,
+    "decimals": "-6"
+  },
+  "filing_bindings": {
+    "old": {
+      "report_date": "2024-06-30",
+      "source_sha256": "450976d68e85900807c6f143dd0ffdb0b8985d38053efa757b54688620a475e9",
+      "text_sha256": "450976d68e85900807c6f143dd0ffdb0b8985d38053efa757b54688620a475e9",
+      "component_sha256": "e0876a451b17749c1bc0614e7ef93a8fb8b2ce53de6afc21fc9f49233f7ce12d",
+      "segment_note_span": [5861581, 6098108]
+    },
+    "recast": {
+      "report_date": "2025-06-30",
+      "source_sha256": "05dbf0c0107110572938280e244af32f7fa3d23be8736dff3235fa08a04e5b35",
+      "text_sha256": "1f0c40e01ee1934f89e95216d36817c044bfed71506a8b1b67442f15739986da",
+      "component_sha256": "bc864780d27dd93fdf73ca37758ff04edaf410d8fc97a1fc64db38bd96f20adc",
+      "segment_note_span": [6990868, 7390348]
+    }
+  },
+  "qualifier_spans": [
+    {
+      "span": [2493106, 2493247],
+      "sha256": "564eb2dda0b45be45afb8adf4fa1414053d1af9e9b409b3128bc2b3d6e023695",
+      "meaning": "prior-period segment information was recast"
+    },
+    {
+      "span": [2493248, 2493400],
+      "sha256": "d728d3b8f1ba7ab1a966d94224f9a6e1d3de7afcb90608ad286b5d5f000e18d6",
+      "meaning": "the recast primarily affected Notes 8, 12, and 18"
+    },
+    {
+      "span": [2493770, 2493929],
+      "sha256": "3a2e0b27db1433d902b9434c4ab5618da4e5088c418a401b9f15074e9dbe6278",
+      "meaning": "the recast did not affect consolidated statements"
+    }
+  ],
+  "oracle": {
+    "revision": "p18-msft-segment-recast-oracle-v1",
+    "concepts": {
+      "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax": {
+        "old_fact_ids": [
+          "F_9b7df341-db96-4d2b-8377-e2c4d39dadd0",
+          "F_311644ea-1694-406b-84d6-fe1a2ac91cfe",
+          "F_1501afd5-2d6d-4cd4-babb-a1b4a3a02481"
+        ],
+        "old_values_millions": [77728, 105362, 62032],
+        "old_spans": [[5897874, 5897880], [5902153, 5902160], [5906446, 5906452]],
+        "recast_fact_ids": [
+          "F_0b4bc285-3de9-4e54-aaa1-35ef9c299753",
+          "F_cef6df36-dc4d-4fcc-b85f-52f21c3e970b",
+          "F_fd173fcd-5a03-4087-91e3-0860152579fe"
+        ],
+        "recast_values_millions": [106820, 87464, 50838],
+        "recast_spans": [[7039136, 7039143], [7086861, 7086867], [7134524, 7134530]],
+        "old_total_fact_id": "F_2e631cf5-584a-4ec4-88db-cd4fa33164e5",
+        "recast_total_fact_id": "F_178cf46c-3d3d-41a5-9b98-01f3f26db500",
+        "total_millions": 245122
+      },
+      "us-gaap:OperatingIncomeLoss": {
+        "old_fact_ids": [
+          "F_5faa257c-a4c0-4a2b-adf0-89d2452249e2",
+          "F_29152833-e1ed-4420-a8bb-d3d704ba4e92",
+          "F_423b2daa-1fc5-40c1-b49a-8bf3d3972e7d"
+        ],
+        "old_values_millions": [40540, 49584, 19309],
+        "old_spans": [[5934967, 5934973], [5939176, 5939182], [5943453, 5943459]],
+        "recast_fact_ids": [
+          "F_e8539872-7bea-4c49-a861-00f1d2a8fd86",
+          "F_7c4b7b5c-6d98-4ba6-9e5a-87a877f6399c",
+          "F_b0a8ba66-25cc-484e-93d8-abda4f340427"
+        ],
+        "recast_values_millions": [59661, 37813, 11959],
+        "recast_spans": [[7063280, 7063286], [7111173, 7111179], [7159631, 7159637]],
+        "old_total_fact_id": "F_1dffa247-a8b5-4f10-a039-f8fabd0f0e0b",
+        "recast_total_fact_id": "F_f0554497-9376-4c22-b914-5c5e38943c8f",
+        "total_millions": 109433
+      }
+    },
+    "checks": [
+      "replay every fact from its text hash, component hash, fact id, context, period, axis member, unit, decimals, scale, and exact span",
+      "require every old member value to differ from its recast value",
+      "require sum(old segment values) == sum(recast segment values) == disclosed total for each concept",
+      "require all three qualifier spans and their exact hashes",
+      "classify as a segment presentation recast, not an amended filing or consolidated-statement correction"
+    ],
+    "remove_one": "Removing any qualifier, member fact, or disclosed total makes the affected answer unknown; no partial answer is promotion-eligible."
+  },
+  "capacity": {
+    "tokenizer_model_id": "Qwen/Qwen3.5-4B",
+    "tokenizer_revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "tokenizer_asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "eligible_scope": "only the two complete segment-information notes plus the three Note 1 qualifier sentences",
+    "visible_tokens_before_sentence_dedup": 4267,
+    "sentence_deduplicated_unique_tokens": 3889,
+    "sentence_near_dup_ratio": 0.15600652292081899,
+    "near_dup_gate_max": 0.25,
+    "raw_html_tokens_excluded_as_markup_inflation": 193529,
+    "bands": {
+      "64k": {"lower": 64000, "feasible": false, "deficit_unique_tokens": 60111},
+      "128k": {"lower": 128000, "feasible": false, "deficit_unique_tokens": 124111}
+    }
+  },
+  "blocked_reason": "The authentic recast relation is executable, but its relevant deduplicated visible source stream cannot support exact 64K or 128K without unrelated disclosure or markup padding."
+}

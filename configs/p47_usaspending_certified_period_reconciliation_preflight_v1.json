@@ -1,0 +1,176 @@
+{
+  "schema_version": "longworld.p47-usaspending-certified-period-preflight-request.v1",
+  "data_product": "p47_usaspending_certified_period_reconciliation_preflight_v1",
+  "authorization": {
+    "record_id": "p47-usaspending-certified-period-preflight-v1",
+    "scope": "official USAspending FY2024 NASA certified-submission metadata, prime transaction archives, subaward search results, and File C availability probes",
+    "basis": "USAspending publishes the records for public spending transparency; its official software repositories are US Government works released under CC0, but this technical preflight does not treat the code licence as blanket clearance for every third-party field in the data",
+    "reviewed_at": "2026-09-04T00:00:00Z",
+    "allowed_actions": [
+      "fetch_official_archives_into_ephemeral_memory_or_tmp_storage",
+      "query_public_no_key_official_api_endpoints",
+      "inspect_only_configured_non_personal_fields",
+      "persist_aggregate_counts_hashes_urls_and_schema_field_names"
+    ],
+    "prohibited_actions": [
+      "persist_or_commit_raw_transaction_or_subaward_rows",
+      "persist_award_subaward_recipient_or_officer_identifiers_or_their_hashes",
+      "treat_prime_recipient_subaward_data_as_agency_certified",
+      "generate_candidates",
+      "promote_or_count_inventory"
+    ]
+  },
+  "research_question": "Can official USAspending data at a frozen FY2024 NASA P6/P9 boundary support a deterministic certified-period to prime-award transaction to subaward reconciliation task with source-authentic 32K, 64K, and 128K unique capacity?",
+  "cutoff": {
+    "fiscal_year": 2024,
+    "earlier_period": 6,
+    "later_period": 9,
+    "start_date": "2023-10-01",
+    "earlier_end_date": "2024-03-31",
+    "later_end_date": "2024-06-30"
+  },
+  "agency": {
+    "name": "National Aeronautics and Space Administration",
+    "abbreviation": "NASA",
+    "toptier_code": "080",
+    "reference_agency_id": 862,
+    "bulk_download_agency_id": 72
+  },
+  "official_endpoints": {
+    "agency_reference": "https://api.usaspending.gov/api/v2/references/toptier_agencies/",
+    "submission_history_template": "https://api.usaspending.gov/api/v2/reporting/agencies/080/2024/{period}/submission_history/",
+    "monthly_file_list": "https://api.usaspending.gov/api/v2/bulk_download/list_monthly_files/",
+    "download_count": "https://api.usaspending.gov/api/v2/download/count/",
+    "subaward_search": "https://api.usaspending.gov/api/v2/search/spending_by_award/",
+    "download_status": "https://api.usaspending.gov/api/v2/download/status"
+  },
+  "official_documentation": {
+    "api_contracts": "https://github.com/fedspendingtransparency/usaspending-api/tree/master/usaspending_api/api_contracts/contracts/v2",
+    "certified_loading_order": "https://github.com/fedspendingtransparency/usaspending-api/blob/master/loading_data.md",
+    "broker_validation_rules": "https://github.com/fedspendingtransparency/data-act-broker-backend/blob/master/dataactvalidator/config/sqlrules/sqlRules.csv",
+    "about_data_content": "https://github.com/fedspendingtransparency/usaspending-website/tree/master/src/content/about-the-data",
+    "website_license": "https://github.com/fedspendingtransparency/usaspending-website/blob/master/LICENSE.md",
+    "api_license": "https://github.com/fedspendingtransparency/usaspending-api/blob/master/LICENSE"
+  },
+  "archives": [
+    {
+      "group": "contracts",
+      "url": "https://files.usaspending.gov/award_data_archive/FY2024_080_Contracts_Full_20260806.zip",
+      "expected_bytes": 10138004,
+      "expected_sha256": "88da9b1bb602a79cd30e6187a1fe3a63c826a0dd2295701b1eccd003327add2f",
+      "expected_csv_bytes": 67760720,
+      "expected_csv_sha256": "86c7d0fa693f25257ddf9a637ed730ad8e0eba26318060a34def037ebd46768f",
+      "expected_header_sha256": "8129822831851028916d9165603895619b7798da806a3b6db8330ac02a9de074",
+      "transaction_key": "contract_transaction_unique_key",
+      "award_key": "contract_award_unique_key",
+      "award_type_field": "award_type_code",
+      "award_type_codes": ["A", "B", "C", "D"],
+      "safe_fields": [
+        "federal_action_obligation",
+        "total_dollars_obligated",
+        "total_outlayed_amount_for_overall_award",
+        "action_date",
+        "action_date_fiscal_year",
+        "awarding_agency_code",
+        "awarding_sub_agency_code",
+        "funding_agency_code",
+        "funding_sub_agency_code",
+        "award_type_code",
+        "action_type_code",
+        "product_or_service_code",
+        "naics_code",
+        "number_of_actions"
+      ]
+    },
+    {
+      "group": "assistance",
+      "url": "https://files.usaspending.gov/award_data_archive/FY2024_080_Assistance_Full_20260806.zip",
+      "expected_bytes": 3750666,
+      "expected_sha256": "f4a6ff63abeca97b70e10021826affab42081266b3c01f50c8e00a3b14974026",
+      "expected_csv_bytes": 21561691,
+      "expected_csv_sha256": "8c67504bf777f0d8e72bbc30421e239ca027edd59e51a677da4421a59ab2633c",
+      "expected_header_sha256": "807b833881fd03efc047c4f50d30734da5e6e8a2b80c3207404e4702f4bb79dd",
+      "transaction_key": "assistance_transaction_unique_key",
+      "award_key": "assistance_award_unique_key",
+      "award_type_field": "assistance_type_code",
+      "award_type_codes": ["02", "03", "04", "05"],
+      "safe_fields": [
+        "federal_action_obligation",
+        "total_obligated_amount",
+        "total_outlayed_amount_for_overall_award",
+        "action_date",
+        "action_date_fiscal_year",
+        "awarding_agency_code",
+        "awarding_sub_agency_code",
+        "funding_agency_code",
+        "funding_sub_agency_code",
+        "cfda_number",
+        "assistance_type_code",
+        "correction_delete_indicator_code",
+        "action_type_code",
+        "record_type_code"
+      ]
+    }
+  ],
+  "subaward_groups": [
+    {
+      "group": "contracts",
+      "award_type_codes": ["A", "B", "C", "D"],
+      "expected_count_api": 2682
+    },
+    {
+      "group": "assistance",
+      "award_type_codes": ["02", "03", "04", "05"],
+      "expected_count_api": 1326
+    }
+  ],
+  "subaward_fields": [
+    "Prime Award ID",
+    "Sub-Award ID",
+    "Sub-Award Amount",
+    "Sub-Award Date",
+    "Sub-Award Type",
+    "Awarding Agency"
+  ],
+  "file_c_probes": [
+    {
+      "period": 6,
+      "status_url": "https://api.usaspending.gov/api/v2/download/status?file_name=FY2024P01-P06_NASA_TAS_AccountBreakdownByAward_2026-09-04_H11M01S32630594.zip",
+      "file_url": "https://files.usaspending.gov/generated_downloads/FY2024P01-P06_NASA_TAS_AccountBreakdownByAward_2026-09-04_H11M01S32630594.zip"
+    },
+    {
+      "period": 9,
+      "status_url": "https://api.usaspending.gov/api/v2/download/status?file_name=FY2024P01-P09_NASA_TAS_AccountBreakdownByAward_2026-09-04_H11M01S33775985.zip",
+      "file_url": "https://files.usaspending.gov/generated_downloads/FY2024P01-P09_NASA_TAS_AccountBreakdownByAward_2026-09-04_H11M01S33775985.zip"
+    }
+  ],
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "capacity_bands": {
+    "32k": [32000, 32768],
+    "64k": [64000, 65536],
+    "128k": [128000, 131072]
+  },
+  "privacy_exclusions": [
+    "recipient and parent recipient names",
+    "UEI DUNS CAGE and recipient hashes",
+    "street city county ZIP phone and fax fields",
+    "officer names and compensation",
+    "transaction award and subaward descriptions",
+    "funding opportunity goals and free-text location fields",
+    "raw award subaward transaction and recipient identifiers in reports or training text"
+  ],
+  "constraints": [
+    "certification applies to agency account submissions and must not be propagated to prime-recipient subaward records",
+    "a current regenerated annual archive is not a historical as-certified P6 or P9 snapshot",
+    "only identifiers used ephemerally for foreign-key checks may enter memory; reports contain aggregates and hashes only",
+    "identifier-free and amount/date-coarsened capacity must be reported separately from admissible certified-chain capacity",
+    "duplicate subaward rows must not count as semantic capacity",
+    "no padding cloning candidate generation promotion or inventory counting",
+    "no near-duplicate exact-band derived-view truncation source-lineage remove-one or shortcut gate may be relaxed"
+  ]
+}

@@ -1,6 +1,6 @@
 # Current release status
 
-Last updated: 2026-09-01
+Last updated: 2026-09-05
 
 This file is the canonical publication-status summary. Historical receipts and
 `.hl/` logs remain useful for reproducibility, but they do not override this
@@ -8,6 +8,104 @@ status. The canonical project root is `/workspace/wynckeliao/longworld`;
 project code, source inventory, generated data, release receipts, reports, and
 durable progress records must live there. Tool caches may be reconstructed
 outside the repository, and credentials must remain outside Git.
+
+## 2026-09-04 train-ready local-probe inventory
+
+The current content-gated SFT inventory consists of six immutable signed
+products: P14 six-domain, P15 CodeForge/Cyber 128K, P16 Macro 128K, P17
+Microsoft Finance 128K, P17 Transformers CodeForge 128K, and P40 IETF OAuth
+semantic growth. Together they contain **141 train rows / 7,274,595 exact Qwen
+context tokens** and **18 eval rows / 682,032 tokens**. Total local inventory is
+**159 rows / 7,956,627 tokens** across 16 unique world IDs and seven domains.
+
+Train length distribution is 36×16K, 39×32K, 48×64K, and **18×128K**. P40 adds
+9 train rows / 682,458 exact tokens: three each at 32K, 64K, and 128K, with
+full/CF/ordered views. Its release gate and signed B5 manifest pass with zero
+duplicate drops or contract rejects. These products use separate local-probe
+trust roots and must not be represented as a single signed release. They are
+valid for local diagnostic training, but remain `production_eligible=false`;
+no new HF upload was performed.
+
+P17 also has a second BEA entity in strict replay and an executable six-domain
+design queue. Pending candidates do not count in the numbers above. Details and
+the diversity accounting are in
+`reports/p17_training_conversion_closeout_20260903.md` and
+`reports/p17_domain_design_matrix_20260903.md`.
+
+## 2026-09-05 authentic-world scale-out checkpoint
+
+This scale-out added no train-ready row. The current immutable-product inventory
+therefore remains **141 train rows / 7,274,595 exact tokens** with 36×16K,
+39×32K, 48×64K, and 18×128K. The separately signed B5
+training-condition samples contain **80 examples / 5,021,465 estimated tokens**:
+15×16K, 19×32K, 28×64K, and 18×128K. Product rows and B5 samples are
+different bound sets and must not be added together. Production/KMS inventory
+is still zero.
+
+Three independent source-first tracks were resolved without relaxing any gate:
+
+- P46 Ofgem has 469,328 template-deduplicated Qwen tokens across three official
+  workbooks, but zero persisted cell closures, output receipts, or replayable
+  cross-workbook answer changes. It emitted zero candidates.
+- P52 GovInfo rebuilt three authentic full parents and persisted nine projected
+  candidate-stage rows across 32K/64K/128K. Projection, preflight, and ranking
+  passed 9/9, but the first shared 32K ordered audit found the complete answer
+  inside one 8K artifact window. Its sole approved structural-key alternative
+  emitted zero rows because `full=32621`, `cf=31000`, and `ordered=32621` cannot
+  all satisfy the 32K exact band under the current deterministic packer. Thus
+  shared dense-audited, selected, promoted, B5, and inventory counts are zero.
+- P54 selected a new EUR-Lex `public_law` source set covering proposal,
+  first-reading position, adopted regulation, corrigendum, metadata, and a
+  reuse decision. Its six frozen official representations retain 224,955
+  near-deduplicated authentic-source tokens;
+  whole-artifact aggregate packs reach 32,277 / 64,285 / 128,392 tokens without
+  padding, cloning, splitting, or truncation. They are not candidate exact-band
+  receipts because prompt/serialization costs, exact metadata spans, registered
+  replay, and exhaustive raw-token windows remain outstanding. Only the
+  corrected-by edge is structurally parsed; target-answer reconstruction is
+  `UNVERIFIED`, topology is `PARTIAL`, and the Commission-scoped reuse Decision
+  leaves selected-document coverage at `NEEDS_CANDIDATE_REVIEW`. P54 therefore
+  also has zero candidates and zero inventory delta.
+
+The next permitted P54 work is to bind exact relation spans and selected-
+document reuse coverage, then build a fresh source-span parent and registered
+task-replay adapter before candidate-level exact-band and raw-window checks.
+Parallel discovery should change entity and answer program:
+a naturally dispersed GovInfo bill transition and an explicitly reusable Ofgem
+public cap-level revision table are preferred. The rejected P46/P52 layouts
+must not be repaired through padding, background movement, cloning, truncation,
+or gate relaxation. Detailed evidence is in
+`reports/p46_ofgem_formula_dependency_gate_closeout_20260905.md`,
+`reports/p52_govinfo_bill_disposition_registered_parent_closeout_20260905.md`,
+and `reports/p54_eurlex_legislative_chain_preflight_closeout_20260905.md`.
+
+## 2026-09-04 IETF semantic-growth closure
+
+P40 v14 is the first IETF task to complete the full local-probe chain. It uses
+official RFC bytes and Datatracker relations, and adds a late RFC 9700 reverse-
+proxy header-sanitization dependency after the bearer-token evidence. This
+fixes the earlier minimal-counterfactual and first-16K ordered-window shortcuts
+without changing near-duplicate, exact-band, derived-view, raw-window, or
+truncation gates.
+
+All nine 32K/64K/128K full/CF/ordered candidates passed exact replay, preflight,
+dense ranking, exhaustive 4K/8K/16K raw-window checks, selection, source-bound
+promotion, the release quality gate, B5 export, and deterministic manifest
+validation. The signed product is
+`data/releases/p40-ietf-oauth-semantic-growth-probe-1-v1-promoted-v14`.
+Its B5 export contains nine examples / 683,635 estimated tokens and preserves
+all three views at all three bands. The formal evidence and hashes are recorded
+in `reports/p40_ietf_oauth_semantic_growth_conversion_20260904.md`.
+
+The prior P33/P43 attempts remain negative controls: the 64K-only construction
+lacked a valid lower band, and the 16K/64K construction lacked semantic growth.
+P50 Treasury remains capacity-blocked at sub-4K gold chains. P52 GovInfo now
+has a registered source-bound replay adapter, but its old nine candidates are
+not promotable and must be rebuilt from three authentic full parents before
+shared proof. P53 OSV remains an uncommitted geometry diagnostic: it reused a
+P51 authorization that prohibited generation, and its custom essential-ID and
+span checks are not exhaustive shared remove-one/raw-window proofs. None of
+these partial tracks contributes inventory rows.
 
 ## Published private dataset
 

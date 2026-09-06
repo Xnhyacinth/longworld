@@ -58,6 +58,7 @@ from longworld.core.promotion import (
     validate_task_candidate_content_uniqueness,
 )
 from longworld.core.provenance import ProvenanceError
+from longworld.core.release_profile import release_profile_sha256
 from longworld.core.taskpromotion import (
     build_task_candidate_view_projections,
     create_task_dense_audit,
@@ -1331,6 +1332,8 @@ def test_task_promotion_honors_signed_world_selection(tmp_path: Path) -> None:
     receipt = attach_attestation(
         {
             "schema_version": RELEASE_SELECTION_SCHEMA,
+            "release_profile_id": "p3-probe-12-v1",
+            "release_profile_sha256": release_profile_sha256("p3-probe-12-v1"),
             "selected_candidate_sha256": [digest],
             "split_by_world": {candidate["world_id"]: "train"},
             "audit_sha256_by_candidate": {digest: serialized_row_sha256(audit)},
@@ -1357,6 +1360,27 @@ def test_task_promotion_honors_signed_world_selection(tmp_path: Path) -> None:
 
     assert promoted["train_ready"] is True
     assert Verification.model_validate(promoted["verification"]).all_green()
+
+    stale_receipt = deepcopy(receipt)
+    stale_receipt.pop("attestation")
+    stale_receipt["release_profile_sha256"] = "0" * 64
+    stale_receipt = attach_attestation(
+        stale_receipt,
+        KEYS["auditor"],
+        purpose="release_world_selection",
+    )
+    with pytest.raises(PromotionError, match="not bound by world selection"):
+        promote_task_candidate(
+            candidate,
+            audit,
+            sidecar,
+            candidate_attestation_key=KEYS["candidate"],
+            audit_attestation_key=KEYS["auditor"],
+            promotion_attestation_key=KEYS["promotion"],
+            source_attestation_key=KEYS["source"],
+            expected_split="train",
+            release_selection_receipt=stale_receipt,
+        )
 
 
 def _candidate_task_views(
@@ -1961,6 +1985,8 @@ def test_task_view_projection_cli_is_deterministic_and_stays_candidate_only(
     selection = attach_attestation(
         {
             "schema_version": RELEASE_SELECTION_SCHEMA,
+            "release_profile_id": "p3-probe-12-v1",
+            "release_profile_sha256": release_profile_sha256("p3-probe-12-v1"),
             "selected_candidate_sha256": [full_digest],
             "split_by_world": {full["world_id"]: "train"},
             "audit_sha256_by_candidate": {
@@ -2314,6 +2340,8 @@ def test_macro_task_promotion_honors_signed_world_selection(
     receipt = attach_attestation(
         {
             "schema_version": RELEASE_SELECTION_SCHEMA,
+            "release_profile_id": "p3-probe-12-v1",
+            "release_profile_sha256": release_profile_sha256("p3-probe-12-v1"),
             "selected_candidate_sha256": [digest],
             "split_by_world": {candidate["world_id"]: "train"},
             "audit_sha256_by_candidate": {digest: serialized_row_sha256(audit)},

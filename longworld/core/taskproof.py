@@ -8,7 +8,7 @@ import math
 import re
 from bisect import bisect_left, bisect_right
 from collections import Counter
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from itertools import pairwise
 from typing import Any
@@ -27,18 +27,32 @@ from longworld.core.financehistory import (
     replay_finance_pipeline_raw_slice,
     replay_finance_pipeline_selection,
 )
+from longworld.core.govinfodisposition import (
+    GOVINFO_DISPOSITION_ANSWER_PROGRAM,
+    GOVINFO_DISPOSITION_TASK_SCHEMA,
+    audit_govinfo_disposition_candidate,
+    govinfo_chronology,
+    replay_govinfo_disposition,
+    replay_govinfo_disposition_raw_slice,
+)
 from longworld.core.macrovintage import (
     MACRO_VINTAGE_PIPELINE_CANDIDATE_SCHEMA,
     audit_macro_vintage_pipeline_candidate,
     replay_macro_vintage_pipeline_raw_slice,
     replay_macro_vintage_pipeline_selection,
 )
-from longworld.core.pack import SEP
+from longworld.core.pack import SEP, wrap_prompt
 from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
+from longworld.core.standardsworkflow import (
+    render_ietf_cross_spec_prompt,
+    replay_ietf_cross_spec_requirement_task,
+)
 from longworld.core.taskreplaysidecar import (
     CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
     CYBER_KEV_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
+    GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
+    IETF_OAUTH_TASK_REPLAY_ADAPTER,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     SOURCE_TOKEN_MEASUREMENT_BASIS,
     SOURCE_TOKEN_MEASUREMENT_RECEIPT_SCHEMA,
@@ -60,6 +74,341 @@ _LEXEME = re.compile(r"[^\W_]+", re.UNICODE)
 
 class TaskProofError(ValueError):
     """A task candidate lacks one or more independently replayed proof gates."""
+
+
+def relation_endpoints(relation: object) -> tuple[str, str] | None:
+    if isinstance(relation, Mapping):
+        parent = relation.get("parent_record_id")
+        child = relation.get("child_record_id")
+        if isinstance(parent, str) and parent and isinstance(child, str) and child:
+            return parent, child
+    if (
+        isinstance(relation, Sequence)
+        and not isinstance(relation, (str, bytes))
+        and len(relation) >= 2
+        and isinstance(relation[0], str)
+        and relation[0]
+        and isinstance(relation[1], str)
+        and relation[1]
+    ):
+        return relation[0], relation[1]
+    return None
+
+
+def relation_proof_depth(relations: Sequence[object]) -> int:
+    adjacency: dict[str, set[str]] = {}
+    nodes: set[str] = set()
+    for relation in relations:
+        endpoints = relation_endpoints(relation)
+        if endpoints is None:
+            raise TaskProofError("task replay relation edge is malformed")
+        parent, child = endpoints
+        nodes.update((parent, child))
+        adjacency.setdefault(parent, set()).add(child)
+
+    visiting: set[str] = set()
+    memo: dict[str, int] = {}
+
+    def depth(node: str) -> int:
+        if node in memo:
+            return memo[node]
+        if node in visiting:
+            raise TaskProofError("task replay relation graph contains a cycle")
+        visiting.add(node)
+        value = max((1 + depth(child) for child in adjacency.get(node, ())), default=0)
+        visiting.remove(node)
+        memo[node] = value
+        return value
+
+    return max(2, max((depth(node) for node in nodes), default=0))
+
+
+def replay_ietf_cross_spec_candidate(
+    candidate: dict[str, Any],
+    evidence_artifact_ids: Sequence[str],
+    *,
+    counterfactual: bool = False,
+) -> dict[str, Any]:
+    """Replay the OAuth requirement task from selected source-record artifacts."""
+    task = candidate.get("ietf_requirement_task")
+    source_records = candidate.get("source_record_ids_by_artifact")
+    classifications = candidate.get("artifact_classification")
+    if (
+        not isinstance(task, dict)
+        or not isinstance(source_records, dict)
+        or not isinstance(classifications, list)
+    ):
+        raise TaskProofError("IETF task replay contract is missing")
+    if candidate.get("question") != task.get("question"):
+        raise TaskProofError("candidate question is not bound to the IETF task")
+    classification_by_artifact = {
+        str(item.get("artifact_id") or ""): item
+        for item in classifications
+        if isinstance(item, dict)
+    }
+    if len(classification_by_artifact) != len(classifications):
+        raise TaskProofError("IETF task replay artifact spans are invalid")
+    document_context = candidate.get("document_context")
+    documents = document_context.split(SEP) if isinstance(document_context, str) else []
+    if len(documents) != len(classifications):
+        raise TaskProofError("IETF task replay artifact bytes are missing")
+    document_by_artifact = {
+        str(classification.get("artifact_id") or ""): document
+        for classification, document in zip(classifications, documents, strict=True)
+        if isinstance(classification, dict)
+    }
+    if len(document_by_artifact) != len(documents):
+        raise TaskProofError("IETF task replay artifact bytes are invalid")
+    selected_artifacts = list(evidence_artifact_ids)
+    if len(selected_artifacts) != len(set(selected_artifacts)) or any(
+        artifact_id not in source_records for artifact_id in selected_artifacts
+    ):
+        raise TaskProofError("IETF task replay artifact selection is invalid")
+    manifest_records = {
+        str(record.get("record_id") or ""): record
+        for record in (task.get("source_manifest") or {}).get("records") or []
+        if isinstance(record, dict)
+    }
+    selected_spans: dict[str, list[tuple[int, int]]] = {}
+    for artifact_id in selected_artifacts:
+        record_ids = source_records[artifact_id]
+        classification = classification_by_artifact.get(artifact_id)
+        if (
+            not isinstance(record_ids, list)
+            or len(record_ids) != 1
+            or not isinstance(record_ids[0], str)
+            or not isinstance(classification, dict)
+            or classification.get("source_record_id") != record_ids[0]
+        ):
+            raise TaskProofError("IETF task replay source mapping is invalid")
+        record_id = record_ids[0]
+        record = manifest_records.get(record_id)
+        start = classification.get("source_char_start")
+        end = classification.get("source_char_end")
+        if (
+            not isinstance(record, dict)
+            or not isinstance(start, int)
+            or isinstance(start, bool)
+            or not isinstance(end, int)
+            or isinstance(end, bool)
+            or not 0 <= start < end <= len(str(record.get("text") or ""))
+        ):
+            raise TaskProofError("IETF task replay artifact spans are invalid")
+        source_document = str(record["text"])[start:end]
+        document = document_by_artifact[artifact_id]
+        if classification.get("source_origin") == "synthetic_counterfactual":
+            twin = candidate.get("counterfactual_twin")
+            evidence = next(
+                (
+                    item
+                    for item in task.get("evidence_items") or []
+                    if isinstance(item, dict)
+                    and item.get("evidence_id")
+                    == (twin.get("evidence_id") if isinstance(twin, dict) else None)
+                ),
+                None,
+            )
+            evidence_start = (
+                evidence.get("char_start") if isinstance(evidence, dict) else None
+            )
+            evidence_end = (
+                evidence.get("char_end") if isinstance(evidence, dict) else None
+            )
+            parent_value = (
+                evidence.get("evidence_quote") if isinstance(evidence, dict) else None
+            )
+            if (
+                not isinstance(twin, dict)
+                or twin.get("provenance_operation") != "exclude_exact_source_span"
+                or not isinstance(evidence, dict)
+                or evidence.get("record_id") != record_id
+                or not isinstance(evidence_start, int)
+                or not isinstance(evidence_end, int)
+                or not isinstance(parent_value, str)
+                or not start <= evidence_start < evidence_end <= end
+            ):
+                raise TaskProofError("IETF counterfactual artifact bytes are invalid")
+            local_start = evidence_start - start
+            local_end = evidence_end - start
+            expected = (
+                source_document[:local_start]
+                + " " * len(parent_value)
+                + source_document[local_end:]
+            )
+            document_sha256 = hashlib.sha256(document.encode()).hexdigest()
+            if (
+                source_document[local_start:local_end] != parent_value
+                or document != expected
+                or classification.get("counterfactual_parent_text_sha256")
+                != hashlib.sha256(source_document.encode()).hexdigest()
+                or classification.get("counterfactual_child_text_sha256")
+                != document_sha256
+                or classification.get("counterfactual_operation_source_char_start")
+                != evidence_start
+                or classification.get("counterfactual_operation_source_char_end")
+                != evidence_end
+                or classification.get("counterfactual_operation_local_char_start")
+                != local_start
+                or classification.get("counterfactual_operation_local_char_end")
+                != local_end
+                or classification.get("provenance_id")
+                != "counterfactual-projection-sha256:" + document_sha256
+            ):
+                raise TaskProofError("IETF counterfactual artifact bytes are invalid")
+        elif document != source_document:
+            raise TaskProofError("IETF task replay artifact source bytes are invalid")
+        selected_spans.setdefault(record_id, []).append((start, end))
+    selected_records = set(selected_spans)
+    excluded_evidence_id = ""
+    if counterfactual:
+        twin = candidate.get("counterfactual_twin")
+        excluded_evidence_id = (
+            str(twin.get("evidence_id") or "") if isinstance(twin, dict) else ""
+        )
+        if excluded_evidence_id not in {
+            str(item.get("evidence_id") or "")
+            for item in task.get("evidence_items") or []
+            if isinstance(item, dict)
+        }:
+            raise TaskProofError("IETF counterfactual evidence binding is invalid")
+    evidence_ids = [
+        item["evidence_id"]
+        for item in task.get("evidence_items") or []
+        if any(
+            start <= item.get("char_start") and item.get("char_end") <= end
+            for start, end in selected_spans.get(str(item.get("record_id") or ""), [])
+        )
+        and item.get("evidence_id") != excluded_evidence_id
+    ]
+    relations = [
+        relation
+        for relation in (task.get("source_manifest") or {}).get("relations") or []
+        if relation.get("source_record_id") in selected_records
+        and relation.get("target_record_id") in selected_records
+    ]
+    relation_ids = [str(relation["relation_id"]) for relation in relations]
+    record_dates = {
+        str(record.get("record_id") or ""): str(record.get("occurred_at") or "")
+        for record in (task.get("source_manifest") or {}).get("records") or []
+        if isinstance(record, dict)
+    }
+    allowed_relation_kinds = {
+        "published_as",
+        "updates",
+        "normative_reference",
+        "informative_reference",
+    }
+    derived_order_edges: list[dict[str, str]] = []
+    for relation in relations:
+        source_id = str(relation["source_record_id"])
+        target_id = str(relation["target_record_id"])
+        source_date = record_dates.get(source_id, "")
+        target_date = record_dates.get(target_id, "")
+        kind = str(relation.get("kind") or "")
+        if (
+            kind not in allowed_relation_kinds
+            or not source_date
+            or not target_date
+            or source_date == target_date
+        ):
+            continue
+        parent_id, child_id, parent_date, child_date = (
+            (source_id, target_id, source_date, target_date)
+            if source_date < target_date
+            else (target_id, source_id, target_date, source_date)
+        )
+        derived_order_edges.append(
+            {
+                "parent_record_id": parent_id,
+                "child_record_id": child_id,
+                "relation_provenance": "authenticated_relation_timestamp_order",
+                "source_relation_id": str(relation["relation_id"]),
+                "source_relation_kind": kind,
+                "parent_occurred_at": parent_date,
+                "child_occurred_at": child_date,
+            }
+        )
+    answer = replay_ietf_cross_spec_requirement_task(
+        task,
+        evidence_ids=evidence_ids,
+        relation_ids=[
+            relation_id
+            for relation_id in task.get("essential_relation_ids") or []
+            if relation_id in relation_ids
+        ],
+    )
+    proof_depth = relation_proof_depth(
+        [
+            {
+                "parent_record_id": relation["source_record_id"],
+                "child_record_id": relation["target_record_id"],
+            }
+            for relation in relations
+        ]
+    )
+    return {
+        "answer": json.dumps(answer, sort_keys=True, separators=(",", ":")),
+        "source_record_ids": sorted(selected_records),
+        "source_relation_ids": relation_ids,
+        "authentic_source_relation_edges": [
+            {
+                "parent_record_id": relation["source_record_id"],
+                "child_record_id": relation["target_record_id"],
+                "relation_provenance": relation["kind"],
+            }
+            for relation in relations
+        ],
+        "verified_derived_order_relation_edges": derived_order_edges,
+        "event_count": len(evidence_ids),
+        "strict_support_event_count": len(
+            [value for value in answer.values() if value != "UNKNOWN"]
+        ),
+        "proof_depth": proof_depth,
+        "hop_count": proof_depth,
+    }
+
+
+def replay_ietf_cross_spec_raw_slice(
+    candidate: dict[str, Any],
+    raw_document_context: str,
+    *,
+    left_framed: bool,
+    right_framed: bool,
+) -> dict[str, Any]:
+    """Replay only complete IETF artifacts inside an exact raw context slice."""
+    classifications = candidate.get("artifact_classification")
+    document_context = candidate.get("document_context")
+    if not isinstance(classifications, list) or not isinstance(document_context, str):
+        raise TaskProofError("IETF raw replay artifact pool is missing")
+    documents = document_context.split(SEP)
+    if len(documents) != len(classifications) or not documents:
+        raise TaskProofError("IETF raw replay artifact pool is unbound")
+    artifact_by_document: dict[str, str] = {}
+    for classification, document in zip(classifications, documents, strict=True):
+        artifact_id = (
+            str(classification.get("artifact_id") or "")
+            if isinstance(classification, dict)
+            else ""
+        )
+        if not artifact_id or not document or document in artifact_by_document:
+            raise TaskProofError("IETF raw replay artifacts are invalid")
+        artifact_by_document[document] = artifact_id
+    parts = raw_document_context.split(SEP)
+    if not left_framed and parts:
+        parts = parts[1:]
+    if not right_framed and parts:
+        parts = parts[:-1]
+    selected = [
+        artifact_by_document[part] for part in parts if part in artifact_by_document
+    ]
+    materialized = any(
+        isinstance(classification, dict)
+        and classification.get("source_origin") == "synthetic_counterfactual"
+        for classification in classifications
+    )
+    return replay_ietf_cross_spec_candidate(
+        candidate, selected, counterfactual=materialized
+    )
 
 
 def _canonical_sha256(value: object) -> str:
@@ -99,8 +448,9 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
         TASK_REPLAY_SIDECAR_SCHEMA_V2,
         TASK_REPLAY_SIDECAR_SCHEMA_V3,
     }
-    if family == CYBER_KEV_TASK_REPLAY_ADAPTER[:2] or family == (
-        CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER[:2]
+    if (
+        family == CYBER_KEV_TASK_REPLAY_ADAPTER[:2]
+        or family == (CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER[:2])
     ):
         expected_domain = "cyber"
         expected_view = "ordered_artifact_view"
@@ -113,6 +463,14 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
         expected_domain = "macro_economics"
         expected_view = "ordered_release_timeline"
         expected_composition = "as_of_revision_workflow"
+    elif family == IETF_OAUTH_TASK_REPLAY_ADAPTER[:2]:
+        expected_domain = "standards"
+        expected_view = "full"
+        expected_composition = "same_case_dossier"
+    elif family == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]:
+        expected_domain = "government_legislation"
+        expected_view = "full"
+        expected_composition = "same_case_dossier"
     else:  # pragma: no cover - the closed registry is checked first
         raise TaskProofError("candidate task replay adapter is unsupported")
     if candidate.get("domain") != expected_domain:
@@ -163,9 +521,33 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
             and replay_contract.get("adapter_id") == key[0]
             and replay_contract.get("revision") == key[1]
         )
-    else:
+    elif family == MACRO_VINTAGE_TASK_REPLAY_ADAPTER[:2]:
         replay_identity_valid = (
             candidate.get("schema_version") == MACRO_VINTAGE_PIPELINE_CANDIDATE_SCHEMA
+        )
+    elif family == IETF_OAUTH_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("ietf_requirement_task")
+        ietf_task_programs = {
+            "longworld.ietf-cross-spec-requirement-task.v1": (
+                "ietf.oauth_effective_requirement.v1"
+            ),
+            "longworld.ietf-cross-spec-growth-requirement-task.v2": (
+                "ietf.oauth_effective_requirement.v3"
+            ),
+        }
+        replay_identity_valid = bool(
+            isinstance(task, dict)
+            and task.get("answer_program_id")
+            == ietf_task_programs.get(str(task.get("schema_version") or ""))
+            and candidate.get("answer_program_id") == task.get("answer_program_id")
+        )
+    else:
+        task = candidate.get("govinfo_disposition_task")
+        replay_identity_valid = bool(
+            isinstance(task, dict)
+            and task.get("schema_version") == GOVINFO_DISPOSITION_TASK_SCHEMA
+            and task.get("answer_program_id") == GOVINFO_DISPOSITION_ANSWER_PROGRAM
+            and candidate.get("answer_program_id") == task.get("answer_program_id")
         )
     if not replay_identity_valid:
         raise TaskProofError("candidate adapter replay contract is inconsistent")
@@ -234,6 +616,19 @@ def audit_task_view_projection(candidate: dict[str, Any]) -> dict[str, bool]:
     source_token_measurement_valid = _source_token_measurement_valid(
         candidate, projection
     )
+    question = candidate.get("question")
+    query_timing = candidate.get("query_timing")
+    renderer = (
+        render_ietf_cross_spec_prompt
+        if isinstance(candidate.get("ietf_requirement_task"), dict)
+        else wrap_prompt
+    )
+    serialized_context_valid = bool(
+        isinstance(question, str)
+        and query_timing in {"first", "late"}
+        and candidate.get("context")
+        == renderer(question, document_context, str(query_timing))
+    )
     checks = {
         "projection_document_digest_valid": projection.get("document_context_sha256")
         == hashlib.sha256(document_context.encode()).hexdigest(),
@@ -241,6 +636,7 @@ def audit_task_view_projection(candidate: dict[str, Any]) -> dict[str, bool]:
         "projection_chronology_valid": chronology_valid,
         "counterfactual_parent_binding_valid": parent_binding_valid,
         "source_token_measurement_valid": source_token_measurement_valid,
+        "serialized_context_valid": serialized_context_valid,
         "projection_candidate_only": all(
             candidate.get(field) is False
             for field in ("train_ready", "production_eligible", "promoted")
@@ -362,6 +758,67 @@ def _projection_chronology(
     documents: list[str],
 ) -> list[dict[str, str]]:
     domain = str(candidate.get("domain") or "")
+    if domain == "government_legislation":
+        return [
+            {"artifact_id": item[1]["artifact_id"], "order_key": item[0]}
+            for item in govinfo_chronology(
+                [
+                    (classification, document)
+                    for classification, document in zip(
+                        classifications, documents, strict=True
+                    )
+                    if isinstance(classification, Mapping)
+                ]
+            )
+        ]
+    if domain == "standards":
+        task = candidate.get("ietf_requirement_task")
+        manifest = task.get("source_manifest") if isinstance(task, dict) else None
+        records = manifest.get("records") if isinstance(manifest, dict) else None
+        source_records = candidate.get("source_record_ids_by_artifact")
+        if not isinstance(records, list) or not isinstance(source_records, dict):
+            raise TaskProofError("IETF chronology source binding is missing")
+        occurred_at_by_record = {
+            str(record.get("record_id") or ""): str(record.get("occurred_at") or "")
+            for record in records
+            if isinstance(record, dict)
+        }
+        ordered: list[tuple[str, str, int, int, str, dict[str, str]]] = []
+        for classification in classifications:
+            if not isinstance(classification, dict):
+                raise TaskProofError("IETF chronology classification is malformed")
+            artifact_id = str(classification.get("artifact_id") or "")
+            record_id = str(classification.get("source_record_id") or "")
+            char_start = classification.get("source_char_start")
+            char_end = classification.get("source_char_end")
+            occurred_at = occurred_at_by_record.get(record_id, "")
+            if (
+                not artifact_id
+                or source_records.get(artifact_id) != [record_id]
+                or not occurred_at
+                or isinstance(char_start, bool)
+                or not isinstance(char_start, int)
+                or isinstance(char_end, bool)
+                or not isinstance(char_end, int)
+                or char_start < 0
+                or char_end <= char_start
+            ):
+                raise TaskProofError("IETF chronology source span is invalid")
+            ordered.append(
+                (
+                    occurred_at,
+                    record_id,
+                    char_start,
+                    char_end,
+                    artifact_id,
+                    {
+                        "artifact_id": artifact_id,
+                        "order_key": f"{occurred_at}|{artifact_id}",
+                    },
+                )
+            )
+        ordered.sort(key=lambda item: item[:-1])
+        return [item[-1] for item in ordered]
     parsed: list[tuple[dict[str, Any], str, dict[str, Any] | list[dict[str, Any]]]] = []
     for classification, document in zip(classifications, documents, strict=True):
         if not isinstance(classification, dict):
@@ -422,9 +879,12 @@ def _projection_chronology(
                 raise TaskProofError("Macro chronology record type is unsupported")
             order_key = f"{occurred_at}|{kind}|{artifact_id}"
         elif domain == "cyber" and isinstance(value, list):
-            if value and isinstance(value[0], dict) and value[0].get(
-                "record_type"
-            ) in {"cyber_source_record", "cyber_source_relation"}:
+            if (
+                value
+                and isinstance(value[0], dict)
+                and value[0].get("record_type")
+                in {"cyber_source_record", "cyber_source_relation"}
+            ):
                 cve_dates: dict[str, str] = {}
                 for _classification, _document, records in parsed:
                     if not isinstance(records, list):
@@ -794,6 +1254,8 @@ def _adapter_audit(
             audit = audit_finance_pipeline_candidate(candidate)
         elif adapter_key == MACRO_VINTAGE_TASK_REPLAY_ADAPTER:
             audit = audit_macro_vintage_pipeline_candidate(candidate)
+        elif adapter_key == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER:
+            audit = audit_govinfo_disposition_candidate(candidate)
         else:  # pragma: no cover - the closed registry is checked first
             raise TaskProofError("task replay adapter is unsupported")
     except TaskProofError:
@@ -853,6 +1315,21 @@ def _replay(
             artifact_ids,
             counterfactual=counterfactual,
         )
+    if adapter_key[:2] == IETF_OAUTH_TASK_REPLAY_ADAPTER[:2]:
+        materialized = any(
+            isinstance(classification, dict)
+            and classification.get("source_origin") == "synthetic_counterfactual"
+            for classification in candidate.get("artifact_classification") or []
+        )
+        return replay_ietf_cross_spec_candidate(
+            candidate,
+            artifact_ids,
+            counterfactual=counterfactual != materialized,
+        )
+    if adapter_key[:2] == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]:
+        return replay_govinfo_disposition(
+            candidate, artifact_ids, counterfactual=counterfactual
+        )
     raise TaskProofError("task replay adapter is unsupported")
 
 
@@ -903,6 +1380,20 @@ def _replay_raw_slice(
         )
     if adapter_key[:2] == MACRO_VINTAGE_TASK_REPLAY_ADAPTER[:2]:
         return replay_macro_vintage_pipeline_raw_slice(
+            candidate,
+            raw_document_context,
+            left_framed=left_framed,
+            right_framed=right_framed,
+        )
+    if adapter_key[:2] == IETF_OAUTH_TASK_REPLAY_ADAPTER[:2]:
+        return replay_ietf_cross_spec_raw_slice(
+            candidate,
+            raw_document_context,
+            left_framed=left_framed,
+            right_framed=right_framed,
+        )
+    if adapter_key[:2] == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]:
+        return replay_govinfo_disposition_raw_slice(
             candidate,
             raw_document_context,
             left_framed=left_framed,
@@ -1188,6 +1679,7 @@ def _raw_token_window_proof(
     replay_artifact_answer: Callable[[Sequence[str]], str],
     expected_answer: str,
     expected_total_tokens: int,
+    records_are_artifacts: bool = False,
 ) -> tuple[dict[str, Any], bool, list[dict[str, int]]]:
     """Replay exact raw slices and separately run a non-certifying upper bound."""
     if len(documents) != len(artifact_ids) or not callable(offset_tokenizer):
@@ -1230,7 +1722,6 @@ def _raw_token_window_proof(
         raise TaskProofError("exact tokenizer produced invalid raw offsets")
     token_starts = [start for start, _end in offsets]
     token_ends = [end for _start, end in offsets]
-    record_char_spans = _canonical_record_char_spans(document_context)
     artifact_char_spans: list[tuple[int, int]] = []
     artifact_spans: list[tuple[int, int]] = []
     cursor = 0
@@ -1245,6 +1736,11 @@ def _raw_token_window_proof(
         if start >= stop:
             raise TaskProofError("raw token window artifact has no token span")
         artifact_spans.append((start, stop))
+    record_char_spans = (
+        artifact_char_spans
+        if records_are_artifacts
+        else _canonical_record_char_spans(document_context)
+    )
 
     total_tokens = len(token_ids)
     if total_tokens != expected_total_tokens:
@@ -1607,6 +2103,10 @@ def compute_task_proof(
             replay_artifact_answer=answer,
             expected_answer=expected_answer,
             expected_total_tokens=document_context_tokens,
+            records_are_artifacts=(
+                adapter_key[:2] == IETF_OAUTH_TASK_REPLAY_ADAPTER[:2]
+                or adapter_key[:2] == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]
+            ),
         )
         if not has_raw_window_evidence:
             raise TaskProofError("raw token windows have no strict sub-full evidence")
