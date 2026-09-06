@@ -1,6 +1,6 @@
 # Current release status
 
-Last updated: 2026-09-05
+Last updated: 2026-09-06
 
 This file is the canonical publication-status summary. Historical receipts and
 `.hl/` logs remain useful for reproducibility, but they do not override this
@@ -8,6 +8,41 @@ status. The canonical project root is `/workspace/wynckeliao/longworld`;
 project code, source inventory, generated data, release receipts, reports, and
 durable progress records must live there. Tool caches may be reconstructed
 outside the repository, and credentials must remain outside Git.
+
+## 2026-09-06 Alphabet conversion and GovInfo six-relation hold
+
+P55 Alphabet passed the final quality gate and signed B5 export validation.
+The current content-gated SFT inventory is therefore **seven** independently
+signed local-probe products: the previous six plus
+`p55-finance-alphabet-asset-breakdown-probe-1-v1-promoted-v1`. Together they
+contain **153 train rows / 8,002,320 exact Qwen context tokens** and
+**18 eval rows / 682,032 tokens**. Total local inventory is
+**171 rows / 8,684,352 tokens** across 17 unique world IDs and seven domains.
+Train length distribution is 39×16K, 42×32K, 51×64K, and **21×128K**. The
+separately signed B5 samples contain **92 examples / 5,757,426 estimated
+tokens**. Product rows and B5 samples remain different bound sets.
+`production_eligible` is still false; production/KMS inventory is still zero.
+
+Alphabet is one finance world (`finance_alphabet_asset_breakdown_2021_2024_v3`)
+with 12 train rows / 727,725 exact tokens (3×16K, 3×32K, 3×64K, 3×128K). It
+reuses `finance.multi_filing_asset_trajectory.v1` on a new issuer and a
+separate scaleout-20260906 probe trust root. B5 validation returned
+`ok=true` for 12 source rows and four bound outputs under
+`longworld-llamafactory-sharegpt-v4`. The signed product is on private
+`Xnhyacinth/LongWorld-Real-Workflows` under
+`local-probe-train-ready/p55-finance-alphabet-asset-breakdown-probe-1-v1-promoted-v1/`
+(Hub commit `02b4885f40b83495dcc4bf7dfb3ad4c9569b33ea`). Details are in
+`reports/p55_finance_alphabet_training_conversion_closeout_20260906.md`.
+
+P56 GovInfo mixed-01 still has nine row-level promoted rows and **3**
+authentic relation-set identities, so the immutable
+`min_real_source_relations=6` gate does not issue a release receipt. Mixed-03
+already supplies three additional identities from the same bill; those nine
+rows are in dense ranking so a later single-world union can be attempted
+without rewriting hashes or lowering the bar. See
+`reports/p56_govinfo_six_relation_union_path_20260906.md`. P54 EUR-Lex PMS
+remains a 32K-only research projection (three views, one relation-set ID) and
+is not inventory. P46 Ofgem remains a short-window rejection.
 
 ## 2026-09-04 train-ready local-probe inventory
 
