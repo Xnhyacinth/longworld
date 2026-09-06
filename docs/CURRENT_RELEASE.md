@@ -37,10 +37,11 @@ separate scaleout-20260906 probe trust root. B5 validation returned
 P56 GovInfo mixed-01 still has nine row-level promoted rows and **3**
 authentic relation-set identities, so the immutable
 `min_real_source_relations=6` gate does not issue a release receipt. Mixed-03
-already supplies three additional identities from the same bill; those nine
-rows passed shared dense audit with `no_shortcut=true`. A new single-world
-generation with `task_instance_id` is required before selection, because a
-naive shared `world_id` would collide parent query ids. See
+passed shared dense audit and a shared-world regeneration produced 18 audited
+rows with all six identities, but selection fail-closed on `duplicate_cells`:
+one world may occupy each band/view cell only once, so two 3-band schedules
+cannot satisfy both the 6-identity gate and `expected_promoted_worlds=1`.
+Hashes and thresholds were not changed. See
 `reports/p56_govinfo_six_relation_union_path_20260906.md`. P54 EUR-Lex PMS
 remains a 32K-only research projection (three views, one relation-set ID) and
 is not inventory. P46 Ofgem remains a short-window rejection.
