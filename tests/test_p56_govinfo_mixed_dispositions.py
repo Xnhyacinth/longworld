@@ -91,3 +91,24 @@ def test_constant_baseline_reports_failure_on_mixed_answers():
     }
     assert scores["always_R"]["exact_match"] is False
     assert scores["fixed_D02_R_else_M"]["correct_labels"] == 2
+
+
+def test_parent_query_id_keeps_default_and_distinguishes_shared_world_instances():
+    config = {"world_id": "govinfo-118-hr4366-eas-eah-mixed-union-20260906"}
+    assert (
+        p52._parent_query_id(config, "32k", "full")
+        == "govinfo-118-hr4366-eas-eah-mixed-union-20260906:32k:full:first"
+    )
+    config["task_instance_id"] = "mixed-01"
+    assert (
+        p52._parent_query_id(config, "32k", "full")
+        == "govinfo-118-hr4366-eas-eah-mixed-union-20260906:mixed-01:32k:full:first"
+    )
+    config["task_instance_id"] = "mixed-03"
+    assert (
+        p52._parent_query_id(config, "32k", "full")
+        == "govinfo-118-hr4366-eas-eah-mixed-union-20260906:mixed-03:32k:full:first"
+    )
+    config["task_instance_id"] = "Mixed/01"
+    with pytest.raises(p52.P52Blocker, match="task instance id"):
+        p52._parent_query_id(config, "32k", "full")

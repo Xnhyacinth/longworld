@@ -38,8 +38,9 @@ P56 GovInfo mixed-01 still has nine row-level promoted rows and **3**
 authentic relation-set identities, so the immutable
 `min_real_source_relations=6` gate does not issue a release receipt. Mixed-03
 already supplies three additional identities from the same bill; those nine
-rows are in dense ranking so a later single-world union can be attempted
-without rewriting hashes or lowering the bar. See
+rows passed shared dense audit with `no_shortcut=true`. A new single-world
+generation with `task_instance_id` is required before selection, because a
+naive shared `world_id` would collide parent query ids. See
 `reports/p56_govinfo_six_relation_union_path_20260906.md`. P54 EUR-Lex PMS
 remains a 32K-only research projection (three views, one relation-set ID) and
 is not inventory. P46 Ofgem remains a short-window rejection.

@@ -1,0 +1,14 @@
+{
+  "schema_version": "longworld.p56-govinfo-mixed-disposition-plan.v1",
+  "base_generation_config": "data/candidates/p52_govinfo_necessary_request_expansion_20260906/hr4366-eas-eah-necessary-4-8-16/generation_config.json",
+  "data_product": "p56_govinfo_mixed_union_20260906",
+  "shared_world_id": "govinfo-118-hr4366-eas-eah-mixed-union-20260906",
+  "tasks": [
+    {"trial_id": "mixed-01", "seed": 2026090601, "request_counts": [4, 8, 16], "retained_per_block": 1},
+    {"trial_id": "mixed-03", "seed": 2026090603, "request_counts": [6, 12, 24], "retained_per_block": 2}
+  ],
+  "selection_rule": "Reuse the frozen mixed-01 and mixed-03 seeds, request prefixes and CF anchors from the 20260906 mixed batch. Emit both surviving schedules under one source-connected world_id. Distinguish parent query ids with task_instance_id so 32K/64K/128K full parents do not collide. Do not reuse mixed-02. Do not rewrite authentic relation-set hashes or lower min_real_source_relations.",
+  "unchanged_gates": "No padding, row/section splitting, background movement, identifier tuning, duplicate exceptions or thresholds changed. Shared candidate, source-token, near-duplicate, derived-view, exact-band and raw-window gates remain required. expected_promoted_worlds remains 1.",
+  "train_ready": false,
+  "inventory_delta": 0
+}

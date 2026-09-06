@@ -197,7 +197,16 @@ def run(plan_path, output):
         slug = specification["trial_id"]
         config = deepcopy(base)
         config["data_product"] = plan["data_product"]
-        config["world_id"] = f"govinfo-118-hr4366-eas-eah-{slug}-20260906"
+        shared_world_id = str(plan.get("shared_world_id") or "")
+        if shared_world_id:
+            if (
+                re.fullmatch(r"govinfo-[a-z0-9-]{8,120}", shared_world_id) is None
+            ):
+                raise p52.P52Blocker("shared mixed-disposition world id is invalid")
+            config["world_id"] = shared_world_id
+            config["task_instance_id"] = slug
+        else:
+            config["world_id"] = f"govinfo-118-hr4366-eas-eah-{slug}-20260906"
         config["requested_keys"] = keys
         config["requested_key_count_by_bucket"] = dict(
             zip(("32k", "64k", "128k"), specification["request_counts"], strict=True)
