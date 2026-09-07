@@ -88,12 +88,24 @@ _ISSUER_IR_TAX_RATE_RECONCILIATION_SECTION = (
     "Taxes (Details) - USD ($) $ in Millions"
 )
 
+_AMAZON_OTHER_INCOME_DETAILS_SECTION = (
+    "Description of Business, Accounting Policies, and Supplemental "
+    "Disclosures - Other Income (Expense), Net (Details) - USD ($) shares "
+    "in Millions, $ in Millions"
+)
 _SECTION_TITLE_ALIASES = {
     _ISSUER_IR_TAX_RATE_RECONCILIATION_SECTION: (
         (
             "Income Taxes - Items Accounting for Differences Between Income Taxes "
             "Computed at Federal Statutory Rate and Provision Recorded for Income "
             "Taxes (Details) - USD ($)"
+        ),
+    ),
+    _AMAZON_OTHER_INCOME_DETAILS_SECTION: (
+        (
+            "Description of Business, Accounting Policies, and Supplemental "
+            "Disclosures - Other Income (Expense), Net (Details) - USD ($) "
+            "$ in Millions"
         ),
     ),
 }
@@ -121,11 +133,7 @@ _DISCLOSURE_SECTIONS = (
     ),
     (
         "disclosure_other_income",
-        (
-            "Description of Business, Accounting Policies, and Supplemental "
-            "Disclosures - Other Income (Expense), Net (Details) - USD ($) shares "
-            "in Millions, $ in Millions"
-        ),
+        _AMAZON_OTHER_INCOME_DETAILS_SECTION,
         (
             "Description of Business, Accounting Policies, and Supplemental "
             "Disclosures - Other Income (Expense), Net (Details)"
@@ -616,12 +624,16 @@ def _report_value_cell_index(table: str, display_date: str) -> int:
     matches: list[int] = []
     for row in _ROW.finditer(table):
         headers = list(_HEADER_CELL.finditer(row.group()))
-        has_row_label = bool(headers and 'class="tl"' in headers[0].group())
-        matches.extend(
-            index if has_row_label else index + 1
-            for index, header in enumerate(headers)
-            if _visible_cell_text(header.group(1)) == display_date
-        )
+        if not headers:
+            continue
+        has_row_label = 'class="tl"' in headers[0].group()
+        cursor = 0
+        for header in headers:
+            span_match = re.search(r'\bcolspan="(\d+)"', header.group(), re.I)
+            span = int(span_match.group(1)) if span_match else 1
+            if _visible_cell_text(header.group(1)) == display_date:
+                matches.append(cursor if has_row_label else cursor + 1)
+            cursor += span
     if len(set(matches)) != 1:
         raise ProvenanceError("issuer IR rendered XBRL report column is ambiguous")
     return matches[0]
@@ -720,6 +732,195 @@ def _policy_fact(
 
 
 ALPHABET_ASSET_BREAKDOWN_PROFILE = "alphabet.asset-revenue-breakdown.v1"
+NVIDIA_MARKET_SEGMENT_PROFILE = "nvidia.income-market-segment.v1"
+NVIDIA_CIK = "0001045810"
+NVIDIA_MARKET_SECTION = (
+    "Segment Information - Schedule of Revenue by Market (Details)"
+)
+META_SEGMENT_SECTION = (
+    "Revenue - Schedule of Disaggregation of Revenue (Details)"
+)
+META_SEGMENT_MEMBERS = (
+    (
+        "family_of_apps",
+        "Family of Apps",
+        "us-gaap_StatementBusinessSegmentsAxis=meta_FamilyOfAppsMember",
+    ),
+    (
+        "reality_labs",
+        "Reality Labs",
+        "us-gaap_StatementBusinessSegmentsAxis=meta_RealityLabsMember",
+    ),
+)
+MICRON_CIK = "0000723125"
+MICRON_CORE_METRICS = (
+    (
+        "revenue",
+        "CONSOLIDATED STATEMENTS OF OPERATIONS",
+        "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax",
+    ),
+    (
+        "assets",
+        "CONSOLIDATED BALANCE SHEETS",
+        "defref_us-gaap_Assets",
+    ),
+    (
+        "liabilities_and_equity",
+        "CONSOLIDATED BALANCE SHEETS",
+        "defref_us-gaap_LiabilitiesAndStockholdersEquity",
+    ),
+    (
+        "cash_from_operations",
+        "CONSOLIDATED STATEMENTS OF CASH FLOWS",
+        "defref_us-gaap_NetCashProvidedByUsedInOperatingActivities",
+    ),
+)
+MICRON_TECHNOLOGY_SECTIONS = (
+    "Revenue by Technology (Details)",
+    "Revenue and Customer Contract Liabilities (Details)",
+    "Revenue (Details)",
+)
+MICRON_GEO_SECTIONS = (
+    "Geographic Information - Revenue (Details)",
+    "Geographic Information (Details)",
+)
+MICRON_REVENUE_CONCEPT = (
+    "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax"
+)
+MICRON_TECHNOLOGY_MEMBERS = (
+    (
+        "dram",
+        ("DRAM",),
+        "srt_ProductOrServiceAxis=mu_DRAMProductsMember",
+    ),
+    (
+        "nand",
+        ("NAND",),
+        "srt_ProductOrServiceAxis=mu_NANDProductsMember",
+    ),
+    (
+        "other",
+        (
+            "Other (primarily NOR)",
+            "Other (primarily 3D XPoint memory and NOR)",
+        ),
+        "srt_ProductOrServiceAxis=mu_OtherProductSalesMember",
+    ),
+)
+MICRON_GEO_MEMBERS = (
+    (
+        "us",
+        ("U.S.", "United States"),
+        "srt_StatementGeographicalAxis=country_US",
+    ),
+    (
+        "taiwan",
+        ("Taiwan",),
+        "srt_StatementGeographicalAxis=country_TW",
+    ),
+    (
+        "mainland_china",
+        ("Mainland China (excluding Hong Kong)",),
+        "srt_StatementGeographicalAxis=country_CN",
+    ),
+    (
+        "other_asia_pacific",
+        ("Other Asia Pacific",),
+        "srt_StatementGeographicalAxis=mu_OtherAsiaPacificMember",
+    ),
+    (
+        "hong_kong",
+        ("Hong Kong",),
+        "srt_StatementGeographicalAxis=country_HK",
+    ),
+    (
+        "japan",
+        ("Japan",),
+        "srt_StatementGeographicalAxis=country_JP",
+    ),
+    (
+        "europe",
+        ("Europe",),
+        "srt_StatementGeographicalAxis=srt_EuropeMember",
+    ),
+    (
+        "other",
+        ("Other",),
+        "srt_StatementGeographicalAxis=mu_OtherCountriesMember",
+    ),
+)
+NVIDIA_MARKET_MEMBERS = (
+    (
+        "data_center",
+        ("Data Center",),
+        "srt_ProductOrServiceAxis=nvda_DataCenterMember",
+    ),
+    (
+        "gaming",
+        ("Gaming",),
+        "srt_ProductOrServiceAxis=nvda_GamingMember",
+    ),
+    (
+        "professional_visualization",
+        ("Professional Visualization",),
+        "srt_ProductOrServiceAxis=nvda_ProfessionalVisualizationMember",
+    ),
+    (
+        "automotive",
+        ("Automotive",),
+        "srt_ProductOrServiceAxis=nvda_AutomotiveMember",
+    ),
+    (
+        "oem_other",
+        ("OEM and Other", "OEM & Other"),
+        "srt_ProductOrServiceAxis=nvda_OEMAndOtherMember",
+    ),
+)
+NVIDIA_CORE_METRICS = (
+    (
+        "revenue",
+        "Consolidated Statements of Income",
+        "defref_us-gaap_Revenues",
+    ),
+    (
+        "assets",
+        "Consolidated Balance Sheets",
+        "defref_us-gaap_Assets",
+    ),
+    (
+        "liabilities_and_equity",
+        "Consolidated Balance Sheets",
+        "defref_us-gaap_LiabilitiesAndStockholdersEquity",
+    ),
+    (
+        "cash_from_operations",
+        "Consolidated Statements of Cash Flows",
+        "defref_us-gaap_NetCashProvidedByUsedInOperatingActivities",
+    ),
+)
+META_CIK = "0001326801"
+META_CORE_METRICS = (
+    (
+        "revenue",
+        "Consolidated Statements of Income",
+        "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax",
+    ),
+    (
+        "assets",
+        "Consolidated Balance Sheets",
+        "defref_us-gaap_Assets",
+    ),
+    (
+        "liabilities_and_equity",
+        "Consolidated Balance Sheets",
+        "defref_us-gaap_LiabilitiesAndStockholdersEquity",
+    ),
+    (
+        "cash_from_operations",
+        "Consolidated Statements of Cash Flows",
+        "defref_us-gaap_NetCashProvidedByUsedInOperatingActivities",
+    ),
+)
 ALPHABET_BREAKDOWN_SECTIONS = (
     "Revenues - Revenue by Segment (Details)",
     "Revenues - Revenue by Geographic Location (Details)",
@@ -980,6 +1181,494 @@ def _parse_alphabet_asset_metrics(
     )
 
 
+def _nvidia_usd_millions_heading(table: str) -> None:
+    heading = re.search(
+        r"<strong\b[^>]*>(.*?)</strong>", table, re.IGNORECASE | re.DOTALL
+    )
+    visible = "" if heading is None else _visible_cell_text(heading[1])
+    if "USD ($)" not in visible or not visible.endswith("$ in Millions"):
+        raise ProvenanceError("NVIDIA financial units are not USD millions")
+
+
+def _nvidia_market_facts(
+    source_text: str, display_date: str
+) -> tuple[tuple[IssuerIrMetricFact, ...], tuple[int, int]]:
+    start, end = _statement_table(source_text, NVIDIA_MARKET_SECTION)
+    table = source_text[start:end]
+    _nvidia_usd_millions_heading(table)
+    value_index = _alphabet_annual_value_index(table, display_date)
+    rows = list(_ROW.finditer(table))
+    facts: list[IssuerIrMetricFact] = []
+    for role, labels, axis_member in NVIDIA_MARKET_MEMBERS:
+        matches = [
+            i
+            for i, row in enumerate(rows)
+            if 'class="rh"' in row.group()
+            and (cells := list(_CELL.finditer(row.group())))
+            and _visible_cell_text(cells[0][1]) in labels
+        ]
+        if len(matches) != 1:
+            raise ProvenanceError("NVIDIA market member is missing or ambiguous")
+        index = matches[0]
+        dimensions = re.findall(r"'defref_([^']*Axis=[^']+)'", rows[index].group())
+        if dimensions != [axis_member]:
+            raise ProvenanceError("NVIDIA market dimension identity mismatch")
+        next_index = next(
+            (
+                j
+                for j in range(index + 1, len(rows))
+                if 'class="rh"' in rows[j].group()
+            ),
+            len(rows),
+        )
+        operands = [
+            row
+            for row in rows[index + 1 : next_index]
+            if any(
+                f"'{concept}'" in row.group()
+                for concept in (
+                    "defref_us-gaap_Revenues",
+                    "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax",
+                )
+            )
+        ]
+        if len(operands) != 1:
+            raise ProvenanceError("NVIDIA market operand is missing or ambiguous")
+        row = operands[0]
+        concept = next(
+            item
+            for item in (
+                "defref_us-gaap_Revenues",
+                "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax",
+            )
+            if f"'{item}'" in row.group()
+        )
+        facts.append(
+            _metric_fact(
+                source_text,
+                role=f"market_{role}",
+                title=NVIDIA_MARKET_SECTION,
+                concept=concept,
+                table_start=start + row.start(),
+                table_end=start + row.end(),
+                occurrence=0,
+                value_cell_index=value_index,
+                display_date=display_date,
+            )
+        )
+    return tuple(facts), (start, end)
+
+
+def _parse_nvidia_asset_metrics(
+    source_text: str, *, report_date: str, metric_profile: str | None = None
+) -> IssuerIrRenderedProgram:
+    """Bind NVIDIA income, balance, cash, and market-segment operands."""
+    display_date = _display_date(report_date)
+    cover_start, cover_end = _statement_table(source_text, "Cover Page")
+    cover = source_text[cover_start:cover_end]
+    for concept, expected in (
+        ("EntityCentralIndexKey", NVIDIA_CIK),
+        ("DocumentType", "10-K"),
+        ("DocumentPeriodEndDate", display_date),
+    ):
+        rows = [
+            row
+            for row in _ROW.finditer(cover)
+            if f"'defref_dei_{concept}'" in row.group()
+        ]
+        if len(rows) != 1:
+            raise ProvenanceError("NVIDIA filing identity is missing or ambiguous")
+        cells = list(_CELL.finditer(rows[0].group()))
+        if len(cells) < 2 or _visible_cell_text(cells[1].group(1)) != expected:
+            raise ProvenanceError("NVIDIA filing identity mismatch")
+    ranges: dict[str, tuple[int, int]] = {"Cover Page": (cover_start, cover_end)}
+    facts: list[IssuerIrMetricFact] = []
+    for role, title, concept in NVIDIA_CORE_METRICS:
+        start, end = _statement_table(source_text, title)
+        ranges[title] = (start, end)
+        table = source_text[start:end]
+        _nvidia_usd_millions_heading(table)
+        facts.append(
+            _metric_fact(
+                source_text,
+                role=role,
+                title=title,
+                concept=concept,
+                table_start=start,
+                table_end=end,
+                occurrence=0,
+                value_cell_index=(
+                    _alphabet_annual_value_index(table, display_date)
+                    if role in {"revenue", "cash_from_operations"}
+                    else _report_value_cell_index(table, display_date)
+                ),
+                display_date=display_date,
+            )
+        )
+    values = {fact.role: fact.numeric_value for fact in facts}
+    if values["assets"] != values["liabilities_and_equity"]:
+        raise ProvenanceError("NVIDIA balance-sheet identity fails")
+    if metric_profile == NVIDIA_MARKET_SEGMENT_PROFILE:
+        extra_facts, market_range = _nvidia_market_facts(source_text, display_date)
+        if sum(fact.numeric_value for fact in extra_facts) != values["revenue"]:
+            raise ProvenanceError("NVIDIA market-segment revenue identity fails")
+        facts.extend(extra_facts)
+        ranges[NVIDIA_MARKET_SECTION] = market_range
+    dates = [
+        match
+        for match in re.finditer(re.escape(display_date), source_text)
+        if cover_start <= match.start() < cover_end
+    ]
+    if len(dates) != 1:
+        raise ProvenanceError("NVIDIA report-date display is missing or ambiguous")
+    date_start = dates[0].start()
+    return IssuerIrRenderedProgram(
+        report_date=report_date,
+        report_date_display=display_date,
+        report_date_char_start=date_start,
+        report_date_char_end=date_start + len(display_date),
+        facts=tuple(facts),
+        section_ranges=tuple((title, *bounds) for title, bounds in ranges.items()),
+        source_sha256=hashlib.sha256(source_text.encode()).hexdigest(),
+    )
+
+
+def _meta_segment_facts(
+    source_text: str, display_date: str
+) -> tuple[tuple[IssuerIrMetricFact, ...], tuple[int, int]]:
+    """Bind Family of Apps and Reality Labs revenue operands that sum to total."""
+    start, end = _statement_table(source_text, META_SEGMENT_SECTION)
+    table = source_text[start:end]
+    heading = re.search(
+        r"<strong\b[^>]*>(.*?)</strong>", table, re.IGNORECASE | re.DOTALL
+    )
+    visible = "" if heading is None else _visible_cell_text(heading[1])
+    if "USD ($)" not in visible or not visible.endswith("$ in Millions"):
+        raise ProvenanceError("Meta segment units are not USD millions")
+    value_index = _alphabet_annual_value_index(table, display_date)
+    rows = list(_ROW.finditer(table))
+    revenue_concept = (
+        "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax"
+    )
+    facts: list[IssuerIrMetricFact] = []
+    for role, label, axis_member in META_SEGMENT_MEMBERS:
+        matches = [
+            i
+            for i, row in enumerate(rows)
+            if 'class="rh"' in row.group()
+            and (cells := list(_CELL.finditer(row.group())))
+            and _visible_cell_text(cells[0][1]) == label
+        ]
+        if len(matches) != 1:
+            raise ProvenanceError("Meta segment member is missing or ambiguous")
+        index = matches[0]
+        dimensions = re.findall(r"'defref_([^']*Axis=[^']+)'", rows[index].group())
+        if dimensions != [axis_member]:
+            raise ProvenanceError("Meta segment dimension identity mismatch")
+        next_index = next(
+            (
+                j
+                for j in range(index + 1, len(rows))
+                if 'class="rh"' in rows[j].group()
+            ),
+            len(rows),
+        )
+        operands = [
+            row
+            for row in rows[index + 1 : next_index]
+            if f"'{revenue_concept}'" in row.group()
+        ]
+        if len(operands) != 1:
+            raise ProvenanceError("Meta segment operand is missing or ambiguous")
+        row = operands[0]
+        facts.append(
+            _metric_fact(
+                source_text,
+                role=f"category_{role}",
+                title=META_SEGMENT_SECTION,
+                concept=revenue_concept,
+                table_start=start + row.start(),
+                table_end=start + row.end(),
+                occurrence=0,
+                value_cell_index=value_index,
+                display_date=display_date,
+            )
+        )
+    return tuple(facts), (start, end)
+
+
+def _parse_meta_asset_metrics(
+    source_text: str, *, report_date: str
+) -> IssuerIrRenderedProgram:
+    """Bind Meta income, balance, cash, and Family of Apps / Reality Labs operands."""
+    display_date = _display_date(report_date)
+    cover_start, cover_end = _statement_table(source_text, "Cover Page")
+    cover = source_text[cover_start:cover_end]
+    for concept, expected in (
+        ("EntityCentralIndexKey", META_CIK),
+        ("DocumentType", "10-K"),
+        ("DocumentPeriodEndDate", display_date),
+    ):
+        rows = [
+            row
+            for row in _ROW.finditer(cover)
+            if f"'defref_dei_{concept}'" in row.group()
+        ]
+        if len(rows) != 1:
+            raise ProvenanceError("Meta filing identity is missing or ambiguous")
+        cells = list(_CELL.finditer(rows[0].group()))
+        if len(cells) < 2 or _visible_cell_text(cells[1].group(1)) != expected:
+            raise ProvenanceError("Meta filing identity mismatch")
+    ranges: dict[str, tuple[int, int]] = {"Cover Page": (cover_start, cover_end)}
+    facts: list[IssuerIrMetricFact] = []
+    for role, title, concept in META_CORE_METRICS:
+        start, end = _statement_table(source_text, title)
+        ranges[title] = (start, end)
+        table = source_text[start:end]
+        heading = re.search(
+            r"<strong\b[^>]*>(.*?)</strong>", table, re.IGNORECASE | re.DOTALL
+        )
+        visible = "" if heading is None else _visible_cell_text(heading[1])
+        if "USD ($)" not in visible or not visible.endswith("$ in Millions"):
+            raise ProvenanceError("Meta financial units are not USD millions")
+        facts.append(
+            _metric_fact(
+                source_text,
+                role=role,
+                title=title,
+                concept=concept,
+                table_start=start,
+                table_end=end,
+                occurrence=0,
+                value_cell_index=(
+                    _alphabet_annual_value_index(table, display_date)
+                    if role in {"revenue", "cash_from_operations"}
+                    else _report_value_cell_index(table, display_date)
+                ),
+                display_date=display_date,
+            )
+        )
+    values = {fact.role: fact.numeric_value for fact in facts}
+    if values["assets"] != values["liabilities_and_equity"]:
+        raise ProvenanceError("Meta balance-sheet identity fails")
+    extra_facts, segment_range = _meta_segment_facts(source_text, display_date)
+    if sum(fact.numeric_value for fact in extra_facts) != values["revenue"]:
+        raise ProvenanceError("Meta segment revenue identity fails")
+    facts.extend(extra_facts)
+    ranges[META_SEGMENT_SECTION] = segment_range
+    dates = [
+        match
+        for match in re.finditer(re.escape(display_date), source_text)
+        if cover_start <= match.start() < cover_end
+    ]
+    if len(dates) != 1:
+        raise ProvenanceError("Meta report-date display is missing or ambiguous")
+    date_start = dates[0].start()
+    return IssuerIrRenderedProgram(
+        report_date=report_date,
+        report_date_display=display_date,
+        report_date_char_start=date_start,
+        report_date_char_end=date_start + len(display_date),
+        facts=tuple(facts),
+        section_ranges=tuple((title, *bounds) for title, bounds in ranges.items()),
+        source_sha256=hashlib.sha256(source_text.encode()).hexdigest(),
+    )
+
+
+def _micron_technology_title(report_date: str) -> str:
+    if report_date >= "2025-01-01":
+        return MICRON_TECHNOLOGY_SECTIONS[0]
+    if report_date >= "2024-01-01":
+        return MICRON_TECHNOLOGY_SECTIONS[1]
+    return MICRON_TECHNOLOGY_SECTIONS[2]
+
+
+def _micron_geo_title(report_date: str) -> str:
+    if report_date >= "2025-01-01":
+        return MICRON_GEO_SECTIONS[0]
+    return MICRON_GEO_SECTIONS[1]
+
+
+def _micron_geo_members(
+    report_date: str,
+) -> tuple[tuple[str, tuple[str, ...], str], ...]:
+    if report_date >= "2023-08-01":
+        return MICRON_GEO_MEMBERS
+    return tuple(member for member in MICRON_GEO_MEMBERS if member[0] != "europe")
+
+
+def _micron_axis_facts(
+    source_text: str,
+    *,
+    title: str,
+    display_date: str,
+    members: tuple[tuple[str, tuple[str, ...], str], ...],
+    role_prefix: str,
+    error_label: str,
+) -> tuple[tuple[IssuerIrMetricFact, ...], tuple[int, int]]:
+    """Bind named axis members whose revenue operands must later sum to total."""
+    start, end = _statement_table(source_text, title)
+    table = source_text[start:end]
+    heading = re.search(
+        r"<strong\b[^>]*>(.*?)</strong>", table, re.IGNORECASE | re.DOTALL
+    )
+    visible = "" if heading is None else _visible_cell_text(heading[1])
+    if "USD ($)" not in visible or not visible.endswith("$ in Millions"):
+        raise ProvenanceError(f"Micron {error_label} units are not USD millions")
+    value_index = _alphabet_annual_value_index(table, display_date)
+    rows = list(_ROW.finditer(table))
+    facts: list[IssuerIrMetricFact] = []
+    for role, labels, axis_member in members:
+        matches = [
+            i
+            for i, row in enumerate(rows)
+            if 'class="rh"' in row.group()
+            and (cells := list(_CELL.finditer(row.group())))
+            and _visible_cell_text(cells[0][1]) in labels
+        ]
+        if len(matches) != 1:
+            raise ProvenanceError(
+                f"Micron {error_label} member is missing or ambiguous"
+            )
+        index = matches[0]
+        dimensions = re.findall(r"'defref_([^']*Axis=[^']+)'", rows[index].group())
+        if dimensions != [axis_member]:
+            raise ProvenanceError(
+                f"Micron {error_label} dimension identity mismatch"
+            )
+        next_index = next(
+            (
+                j
+                for j in range(index + 1, len(rows))
+                if 'class="rh"' in rows[j].group()
+            ),
+            len(rows),
+        )
+        operands = [
+            row
+            for row in rows[index + 1 : next_index]
+            if f"'{MICRON_REVENUE_CONCEPT}'" in row.group()
+        ]
+        if len(operands) != 1:
+            raise ProvenanceError(
+                f"Micron {error_label} operand is missing or ambiguous"
+            )
+        row = operands[0]
+        facts.append(
+            _metric_fact(
+                source_text,
+                role=f"{role_prefix}{role}",
+                title=title,
+                concept=MICRON_REVENUE_CONCEPT,
+                table_start=start + row.start(),
+                table_end=start + row.end(),
+                occurrence=0,
+                value_cell_index=value_index,
+                display_date=display_date,
+            )
+        )
+    return tuple(facts), (start, end)
+
+
+def _parse_micron_asset_metrics(
+    source_text: str, *, report_date: str
+) -> IssuerIrRenderedProgram:
+    """Bind Micron income, balance, cash, technology mix, and geography operands."""
+    display_date = _display_date(report_date)
+    cover_start, cover_end = _statement_table(source_text, "Cover Page")
+    cover = source_text[cover_start:cover_end]
+    for concept, expected in (
+        ("EntityCentralIndexKey", MICRON_CIK),
+        ("DocumentType", "10-K"),
+        ("DocumentPeriodEndDate", display_date),
+    ):
+        rows = [
+            row
+            for row in _ROW.finditer(cover)
+            if f"'defref_dei_{concept}'" in row.group()
+        ]
+        if len(rows) != 1:
+            raise ProvenanceError("Micron filing identity is missing or ambiguous")
+        cells = list(_CELL.finditer(rows[0].group()))
+        if len(cells) < 2 or _visible_cell_text(cells[1].group(1)) != expected:
+            raise ProvenanceError("Micron filing identity mismatch")
+    ranges: dict[str, tuple[int, int]] = {"Cover Page": (cover_start, cover_end)}
+    facts: list[IssuerIrMetricFact] = []
+    for role, title, concept in MICRON_CORE_METRICS:
+        start, end = _statement_table(source_text, title)
+        ranges[title] = (start, end)
+        table = source_text[start:end]
+        heading = re.search(
+            r"<strong\b[^>]*>(.*?)</strong>", table, re.IGNORECASE | re.DOTALL
+        )
+        visible = "" if heading is None else _visible_cell_text(heading[1])
+        if "USD ($)" not in visible or not visible.endswith("$ in Millions"):
+            raise ProvenanceError("Micron financial units are not USD millions")
+        facts.append(
+            _metric_fact(
+                source_text,
+                role=role,
+                title=title,
+                concept=concept,
+                table_start=start,
+                table_end=end,
+                occurrence=0,
+                value_cell_index=(
+                    _alphabet_annual_value_index(table, display_date)
+                    if role in {"revenue", "cash_from_operations"}
+                    else _report_value_cell_index(table, display_date)
+                ),
+                display_date=display_date,
+            )
+        )
+    values = {fact.role: fact.numeric_value for fact in facts}
+    if values["assets"] != values["liabilities_and_equity"]:
+        raise ProvenanceError("Micron balance-sheet identity fails")
+    technology_title = _micron_technology_title(report_date)
+    extra_facts, technology_range = _micron_axis_facts(
+        source_text,
+        title=technology_title,
+        display_date=display_date,
+        members=MICRON_TECHNOLOGY_MEMBERS,
+        role_prefix="category_",
+        error_label="technology",
+    )
+    if sum(fact.numeric_value for fact in extra_facts) != values["revenue"]:
+        raise ProvenanceError("Micron technology revenue identity fails")
+    facts.extend(extra_facts)
+    ranges[technology_title] = technology_range
+    geo_title = _micron_geo_title(report_date)
+    geo_facts, geo_range = _micron_axis_facts(
+        source_text,
+        title=geo_title,
+        display_date=display_date,
+        members=_micron_geo_members(report_date),
+        role_prefix="geo_",
+        error_label="geography",
+    )
+    if sum(fact.numeric_value for fact in geo_facts) != values["revenue"]:
+        raise ProvenanceError("Micron geography revenue identity fails")
+    facts.extend(geo_facts)
+    ranges[geo_title] = geo_range
+    dates = [
+        match
+        for match in re.finditer(re.escape(display_date), source_text)
+        if cover_start <= match.start() < cover_end
+    ]
+    if len(dates) != 1:
+        raise ProvenanceError("Micron report-date display is missing or ambiguous")
+    date_start = dates[0].start()
+    return IssuerIrRenderedProgram(
+        report_date=report_date,
+        report_date_display=display_date,
+        report_date_char_start=date_start,
+        report_date_char_end=date_start + len(display_date),
+        facts=tuple(facts),
+        section_ranges=tuple((title, *bounds) for title, bounds in ranges.items()),
+        source_sha256=hashlib.sha256(source_text.encode()).hexdigest(),
+    )
+
+
 def parse_issuer_ir_rendered_metrics(
     source_text: str,
     *,
@@ -990,14 +1679,28 @@ def parse_issuer_ir_rendered_metrics(
     """Parse current-year metrics from exact issuer-rendered statement rows."""
     if not isinstance(source_text, str) or not source_text:
         raise ProvenanceError("issuer IR rendered XBRL text is missing")
-    if metric_profile is not None and (
-        issuer_cik != "0001652044" or metric_profile != ALPHABET_ASSET_BREAKDOWN_PROFILE
-    ):
+    allowed_profiles = {
+        ("0001652044", ALPHABET_ASSET_BREAKDOWN_PROFILE),
+        (NVIDIA_CIK, NVIDIA_MARKET_SEGMENT_PROFILE),
+    }
+    if metric_profile is not None and (issuer_cik, metric_profile) not in allowed_profiles:
         raise ProvenanceError("unsupported issuer financial metric profile")
     if issuer_cik == "0001652044":
         return _parse_alphabet_asset_metrics(
             source_text, report_date=report_date, metric_profile=metric_profile
         )
+    if issuer_cik == NVIDIA_CIK:
+        return _parse_nvidia_asset_metrics(
+            source_text, report_date=report_date, metric_profile=metric_profile
+        )
+    if issuer_cik == META_CIK:
+        if metric_profile is not None:
+            raise ProvenanceError("unsupported issuer financial metric profile")
+        return _parse_meta_asset_metrics(source_text, report_date=report_date)
+    if issuer_cik == MICRON_CIK:
+        if metric_profile is not None:
+            raise ProvenanceError("unsupported issuer financial metric profile")
+        return _parse_micron_asset_metrics(source_text, report_date=report_date)
     try:
         display_date = _display_date(report_date)
     except ValueError as exc:
@@ -1189,9 +1892,11 @@ def _xbrl_identity(raw: bytes) -> dict[str, str]:
     return {field: items[0] for field, items in values.items()}
 
 
-def _detail_value(text: str, identity: str) -> str:
+def _detail_value(text: str, identity: str, *, tag: str = "span") -> str:
+    if tag not in {"span", "div"}:
+        raise ProvenanceError("issuer IR detail-page identity is missing")
     match = re.search(
-        rf"<span\b[^>]*\bid=[\"']{re.escape(identity)}[\"'][^>]*>(.*?)</span>",
+        rf"<{tag}\b[^>]*\bid=[\"']{re.escape(identity)}[\"'][^>]*>(.*?)</{tag}>",
         text,
         re.IGNORECASE | re.DOTALL,
     )
@@ -1265,16 +1970,47 @@ def _audit_acquisition_inventory(
         form = str(filing.get("form") or "")
         filing_date = str(filing.get("filing_date") or "")
         alphabet = normalized["cik"] == "0001652044"
-        control_prefix = "_ctrl0_ctl33_" if alphabet else "_ctrl0_ctl54_"
+        nvidia = normalized["cik"] == NVIDIA_CIK
+        meta = normalized["cik"] == META_CIK
+        micron = normalized["cik"] == MICRON_CIK
+        if alphabet:
+            control_prefix = "_ctrl0_ctl33_"
+        elif nvidia:
+            control_prefix = "_ctrl0_ctl78_"
+        elif meta:
+            control_prefix = "_ctrl0_ctl51_"
+        elif micron:
+            control_prefix = "_ctrl0_ctl28_"
+        else:
+            control_prefix = "_ctrl0_ctl54_"
         if alphabet and normalized["detail_host"] != "abc.xyz":
             raise ProvenanceError("Alphabet detail host mismatch")
-        if _detail_value(detail_text, control_prefix + "lblForm") != form:
-            raise ProvenanceError("issuer IR detail-page form mismatch")
-        observed_date = _detail_value(detail_text, control_prefix + "lblDate")
-        try:
-            parsed = time.strptime(
-                observed_date, "%m/%d/%Y" if alphabet else "%b %d, %Y"
+        if nvidia and normalized["detail_host"] != "investor.nvidia.com":
+            raise ProvenanceError("NVIDIA detail host mismatch")
+        if meta and normalized["detail_host"] != "investor.atmeta.com":
+            raise ProvenanceError("Meta detail host mismatch")
+        if micron and normalized["detail_host"] != "investors.micron.com":
+            raise ProvenanceError("Micron detail host mismatch")
+        if micron:
+            if _detail_value(
+                detail_text,
+                control_prefix + "divSecFilingDetailsType",
+                tag="div",
+            ) != form:
+                raise ProvenanceError("issuer IR detail-page form mismatch")
+            observed_date = _detail_value(
+                detail_text,
+                control_prefix + "divSecFilingDetailsDate",
+                tag="div",
             )
+            date_format = "%B %d, %Y"
+        else:
+            if _detail_value(detail_text, control_prefix + "lblForm") != form:
+                raise ProvenanceError("issuer IR detail-page form mismatch")
+            observed_date = _detail_value(detail_text, control_prefix + "lblDate")
+            date_format = "%m/%d/%Y" if alphabet else "%b %d, %Y"
+        try:
+            parsed = time.strptime(observed_date, date_format)
             parsed_date = date(parsed.tm_year, parsed.tm_mon, parsed.tm_mday)
         except ValueError as exc:
             raise ProvenanceError("issuer IR detail-page date is invalid") from exc

@@ -1,0 +1,42 @@
+{
+  "schema_version": "longworld.ietf-fetch-request.v1",
+  "user_agent": "LongWorld-P57/1.0 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "p57-ietf-pkix-family-v1",
+    "scope": "public IETF Datatracker, Internet-Draft archive, and RFC Editor records for the PKIX certificate, OCSP, and Certificate Transparency specification family",
+    "basis": "IETF open-records research export for unique-token preflight and a distinct path-validation requirement graph. Disjoint from QUIC/HTTP/3, OAuth, and RFC 9421 revision stacking.",
+    "reviewed_at": "2026-09-07T02:00:00Z",
+    "allowed_actions": [
+      "fetch_datatracker_document",
+      "fetch_datatracker_relation",
+      "fetch_draft_revision",
+      "fetch_rfc"
+    ]
+  },
+  "drafts": [
+    {
+      "name": "draft-ietf-pkix-rfc2560bis",
+      "revisions": [
+        "20"
+      ]
+    }
+  ],
+  "rfc_numbers": [
+    3279,
+    4055,
+    5019,
+    5280,
+    5480,
+    5758,
+    6960,
+    6962,
+    8813,
+    9162
+  ],
+  "rfc_datatracker_sources": [
+    5280
+  ],
+  "approved_public_test_vector_sha256": [],
+  "requests_per_second": 1.0,
+  "max_retries": 2
+}

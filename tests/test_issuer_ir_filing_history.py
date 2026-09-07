@@ -27,19 +27,39 @@ NVIDIA_CIK = "0001045810"
 NVIDIA_ISSUER_NAME = "NVIDIA CORP"
 NVIDIA_DETAIL_HOST = "investor.nvidia.com"
 NVIDIA_DETAIL_PATH = "/financial-info/sec-filings/sec-filings-details/default.aspx"
+NVIDIA_CONTROL_PREFIX = "_ctrl0_ctl78_"
+META_CIK = "0001326801"
+META_ISSUER_NAME = "Meta Platforms, Inc."
+META_DETAIL_HOST = "investor.atmeta.com"
+META_DETAIL_PATH = "/financials/sec-filings-details/default.aspx"
+META_CONTROL_PREFIX = "_ctrl0_ctl51_"
+MICRON_CIK = "0000723125"
+MICRON_ISSUER_NAME = "Micron Technology, Inc."
+MICRON_DETAIL_HOST = "investors.micron.com"
+MICRON_DETAIL_PATH = "/financials/sec-filings/sec-filings-details/default.aspx"
+MICRON_CONTROL_PREFIX = "_ctrl0_ctl28_"
 
 
-def _detail_page(*, form: str, filing_date: str, prefix: str, cik: str = CIK) -> bytes:
+def _detail_page(
+    *,
+    form: str,
+    filing_date: str,
+    prefix: str,
+    cik: str = CIK,
+    control_prefix: str = "_ctrl0_ctl54_",
+    extra: str = "",
+) -> bytes:
     return f"""
     <html><body>
       <input value="eyJpublicstate12345.volatilepayload12345.signaturepart12345">
-      <span id="_ctrl0_ctl54_lblForm">{form}</span>
-      <span id="_ctrl0_ctl54_lblDate">{filing_date}</span>
-      <a id="_ctrl0_ctl54_hrefItemPdfDownload"
+      {extra}
+      <span id="{control_prefix}lblForm">{form}</span>
+      <span id="{control_prefix}lblDate">{filing_date}</span>
+      <a id="{control_prefix}hrefItemPdfDownload"
          href="https://{ARTIFACT_HOST}/CIK-{cik}/{prefix}.pdf">PDF</a>
-      <a id="_ctrl0_ctl54_hrefItemXBRLDownload"
+      <a id="{control_prefix}hrefItemXBRLDownload"
          href="https://{ARTIFACT_HOST}/CIK-{cik}/{prefix}.zip">ZIP</a>
-      <a id="_ctrl0_ctl54_hrefItemXBRLHTMLDownload"
+      <a id="{control_prefix}hrefItemXBRLHTMLDownload"
          href="https://{ARTIFACT_HOST}/CIK-{cik}/{prefix}.html">HTML</a>
     </body></html>
     """.encode()
@@ -137,6 +157,93 @@ def _nvidia_request() -> dict:
     return request
 
 
+def _meta_request() -> dict:
+    request = _request()
+    request["issuer"] = {
+        "name": META_ISSUER_NAME,
+        "cik": META_CIK,
+        "detail_host": META_DETAIL_HOST,
+        "artifact_host": ARTIFACT_HOST,
+    }
+    request["filings"] = [
+        {
+            "filing_id": "meta-fy2025-annual",
+            "detail_url": (
+                f"https://{META_DETAIL_HOST}{META_DETAIL_PATH}?FilingId=19095128"
+            ),
+            "form": "10-K",
+            "filing_date": "2026-01-29",
+            "report_date": "2025-12-31",
+        },
+        {
+            "filing_id": "meta-fy2024-annual",
+            "detail_url": (
+                f"https://{META_DETAIL_HOST}{META_DETAIL_PATH}?FilingId=18139841"
+            ),
+            "form": "10-K",
+            "filing_date": "2025-01-30",
+            "report_date": "2024-12-31",
+        },
+    ]
+    return request
+
+
+def _micron_detail_page(
+    *,
+    form: str,
+    filing_date: str,
+    prefix: str,
+    cik: str = MICRON_CIK,
+) -> bytes:
+    return f"""
+    <html><body>
+      <div id="{MICRON_CONTROL_PREFIX}divSecFilingDetailsType">{form}</div>
+      <div id="{MICRON_CONTROL_PREFIX}divSecFilingDetailsDate">{filing_date}</div>
+      <div id="{MICRON_CONTROL_PREFIX}divSecFilingDetailsDownloadViewContainer">
+        <a href="https://{ARTIFACT_HOST}/CIK-{cik}/{prefix}.pdf"
+           aria-label="Download / View, {form}, Annual Report, {filing_date}, pdf format, opens in new window">PDF</a>
+        <a href="https://{ARTIFACT_HOST}/CIK-{cik}/{prefix}.zip"
+           aria-label="Download / View, {form}, Annual Report, {filing_date}, zip format, opens in new window">ZIP</a>
+        <a href="https://{ARTIFACT_HOST}/CIK-{cik}/{prefix}.html"
+           aria-label="Download / View, {form}, Annual Report, {filing_date}, html format, opens in new window">HTML</a>
+        <a href="https://{ARTIFACT_HOST}/CIK-{cik}/{prefix}.xls"
+           aria-label="Download / View, {form}, Annual Report, {filing_date}, excel format, opens in new window">XLS</a>
+      </div>
+    </body></html>
+    """.encode()
+
+
+def _micron_request() -> dict:
+    request = _request()
+    request["issuer"] = {
+        "name": MICRON_ISSUER_NAME,
+        "cik": MICRON_CIK,
+        "detail_host": MICRON_DETAIL_HOST,
+        "artifact_host": ARTIFACT_HOST,
+    }
+    request["filings"] = [
+        {
+            "filing_id": "micron-fy2025-annual",
+            "detail_url": (
+                f"https://{MICRON_DETAIL_HOST}{MICRON_DETAIL_PATH}?FilingId=18823284"
+            ),
+            "form": "10-K",
+            "filing_date": "2025-10-03",
+            "report_date": "2025-08-28",
+        },
+        {
+            "filing_id": "micron-fy2024-annual",
+            "detail_url": (
+                f"https://{MICRON_DETAIL_HOST}{MICRON_DETAIL_PATH}?FilingId=17881193"
+            ),
+            "form": "10-K",
+            "filing_date": "2024-10-04",
+            "report_date": "2024-08-29",
+        },
+    ]
+    return request
+
+
 def test_fetch_accepts_pinned_nvidia_source_policy(tmp_path: Path) -> None:
     request = _nvidia_request()
     request_path = tmp_path / "request.json"
@@ -156,6 +263,7 @@ def test_fetch_accepts_pinned_nvidia_source_policy(tmp_path: Path) -> None:
                 filing_date=displayed_date,
                 prefix=prefix,
                 cik=NVIDIA_CIK,
+                control_prefix=NVIDIA_CONTROL_PREFIX,
             ),
             {"Content-Type": "text/html"},
         )
@@ -190,6 +298,214 @@ def test_fetch_accepts_pinned_nvidia_source_policy(tmp_path: Path) -> None:
     assert payload["issuer"] == request["issuer"]
     assert payload["n"] == 2
     assert payload["filing_relations"][0]["from_filing_id"] == ("nvidia-fy2025-annual")
+
+
+def test_fetch_accepts_pinned_meta_source_policy(tmp_path: Path) -> None:
+    request = _meta_request()
+    request_path = tmp_path / "request.json"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    bodies: dict[str, tuple[bytes, dict[str, str]]] = {}
+    for filing_id, displayed_date, report_date in (
+        ("19095128", "Jan 29, 2026", "2025-12-31"),
+        ("18139841", "Jan 30, 2025", "2024-12-31"),
+    ):
+        prefix = f"meta-{filing_id}"
+        detail_url = (
+            f"https://{META_DETAIL_HOST}{META_DETAIL_PATH}?FilingId={filing_id}"
+        )
+        bodies[detail_url] = (
+            _detail_page(
+                form="10-K",
+                filing_date=displayed_date,
+                prefix=prefix,
+                cik=META_CIK,
+                control_prefix=META_CONTROL_PREFIX,
+            ),
+            {"Content-Type": "text/html"},
+        )
+        artifact_prefix = f"https://{ARTIFACT_HOST}/CIK-{META_CIK}/{prefix}"
+        bodies[f"{artifact_prefix}.pdf"] = (
+            b"%PDF-1.7\nannual report\n%%EOF\n",
+            {"Content-Type": "application/pdf"},
+        )
+        bodies[f"{artifact_prefix}.zip"] = (
+            _xbrl_zip(
+                tmp_path,
+                report_date=report_date,
+                cik=META_CIK,
+                issuer_name=META_ISSUER_NAME,
+            ),
+            {"Content-Type": "application/zip"},
+        )
+        bodies[f"{artifact_prefix}.html"] = (
+            b"<!doctype html><html><body>XBRL rendering</body></html>",
+            {"Content-Type": "text/html"},
+        )
+
+    output = fetch_issuer_ir_filing_history(
+        request_path,
+        tmp_path / "inventory",
+        http_get=lambda url, *_: bodies[url],
+        sleep=lambda _: None,
+        generated_at="2026-09-07T04:00:00Z",
+    )
+    payload = json.loads(output.read_text(encoding="utf-8"))
+
+    assert payload["issuer"] == request["issuer"]
+    assert payload["n"] == 2
+    assert payload["filing_relations"][0]["from_filing_id"] == "meta-fy2025-annual"
+
+
+def test_fetch_accepts_pinned_micron_source_policy(tmp_path: Path) -> None:
+    request = _micron_request()
+    request_path = tmp_path / "request.json"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    bodies: dict[str, tuple[bytes, dict[str, str]]] = {}
+    for filing_id, displayed_date, report_date in (
+        ("18823284", "October 3, 2025", "2025-08-28"),
+        ("17881193", "October 4, 2024", "2024-08-29"),
+    ):
+        prefix = f"micron-{filing_id}"
+        detail_url = (
+            f"https://{MICRON_DETAIL_HOST}{MICRON_DETAIL_PATH}?FilingId={filing_id}"
+        )
+        bodies[detail_url] = (
+            _micron_detail_page(
+                form="10-K",
+                filing_date=displayed_date,
+                prefix=prefix,
+            ),
+            {"Content-Type": "text/html"},
+        )
+        artifact_prefix = f"https://{ARTIFACT_HOST}/CIK-{MICRON_CIK}/{prefix}"
+        bodies[f"{artifact_prefix}.pdf"] = (
+            b"%PDF-1.7\nannual report\n%%EOF\n",
+            {"Content-Type": "application/pdf"},
+        )
+        bodies[f"{artifact_prefix}.zip"] = (
+            _xbrl_zip(
+                tmp_path,
+                report_date=report_date,
+                cik=MICRON_CIK,
+                issuer_name=MICRON_ISSUER_NAME,
+            ),
+            {"Content-Type": "application/zip"},
+        )
+        bodies[f"{artifact_prefix}.html"] = (
+            b"<!doctype html><html><body>XBRL rendering</body></html>",
+            {"Content-Type": "text/html"},
+        )
+
+    output = fetch_issuer_ir_filing_history(
+        request_path,
+        tmp_path / "inventory",
+        http_get=lambda url, *_: bodies[url],
+        sleep=lambda _: None,
+        generated_at="2026-09-07T06:00:00Z",
+    )
+    payload = json.loads(output.read_text(encoding="utf-8"))
+
+    assert payload["issuer"] == request["issuer"]
+    assert payload["n"] == 2
+    assert payload["filing_relations"][0]["from_filing_id"] == "micron-fy2025-annual"
+
+
+def test_fetch_rejects_micron_lblform_widget(tmp_path: Path) -> None:
+    request = _micron_request()
+    request_path = tmp_path / "request.json"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    page = _detail_page(
+        form="10-K",
+        filing_date="Oct 03, 2025",
+        prefix="micron-18823284",
+        cik=MICRON_CIK,
+        control_prefix=MICRON_CONTROL_PREFIX,
+    )
+
+    with pytest.raises(ProvenanceError, match="invalid filing date"):
+        fetch_issuer_ir_filing_history(
+            request_path,
+            tmp_path / "inventory",
+            http_get=lambda *_: (page, {"Content-Type": "text/html"}),
+            sleep=lambda _: None,
+            generated_at="2026-09-07T06:00:00Z",
+        )
+
+
+def test_fetch_accepts_nvidia_subscribe_captcha_widget(tmp_path: Path) -> None:
+    request = _nvidia_request()
+    request_path = tmp_path / "request.json"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    bodies: dict[str, tuple[bytes, dict[str, str]]] = {}
+    widget = (
+        '<div id="_ctrl0_ctl36_UCCaptcha_divModuleContainer" '
+        'class="CaptchaContainer">email signup captcha</div>'
+    )
+    for filing_id, displayed_date, report_date in (
+        ("18226262", "Feb 26, 2025", "2025-01-26"),
+        ("17293267", "Feb 21, 2024", "2024-01-28"),
+    ):
+        prefix = f"nvidia-{filing_id}"
+        detail_url = (
+            f"https://{NVIDIA_DETAIL_HOST}{NVIDIA_DETAIL_PATH}?FilingId={filing_id}"
+        )
+        bodies[detail_url] = (
+            _detail_page(
+                form="10-K",
+                filing_date=displayed_date,
+                prefix=prefix,
+                cik=NVIDIA_CIK,
+                control_prefix=NVIDIA_CONTROL_PREFIX,
+                extra=widget,
+            ),
+            {"Content-Type": "text/html"},
+        )
+        artifact_prefix = f"https://{ARTIFACT_HOST}/CIK-{NVIDIA_CIK}/{prefix}"
+        bodies[f"{artifact_prefix}.pdf"] = (
+            b"%PDF-1.7\nannual report\n%%EOF\n",
+            {"Content-Type": "application/pdf"},
+        )
+        bodies[f"{artifact_prefix}.zip"] = (
+            _xbrl_zip(
+                tmp_path,
+                report_date=report_date,
+                cik=NVIDIA_CIK,
+                issuer_name=NVIDIA_ISSUER_NAME,
+            ),
+            {"Content-Type": "application/zip"},
+        )
+        bodies[f"{artifact_prefix}.html"] = (
+            b"<!doctype html><html><body>XBRL rendering</body></html>",
+            {"Content-Type": "text/html"},
+        )
+
+    output = fetch_issuer_ir_filing_history(
+        request_path,
+        tmp_path / "inventory",
+        http_get=lambda url, *_: bodies[url],
+        sleep=lambda _: None,
+        generated_at="2026-08-29T04:00:00Z",
+    )
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["n"] == 2
+
+
+def test_fetch_rejects_nvidia_generic_captcha_wall(tmp_path: Path) -> None:
+    request = _nvidia_request()
+    request_path = tmp_path / "request.json"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+
+    with pytest.raises(ProvenanceError, match="challenge"):
+        fetch_issuer_ir_filing_history(
+            request_path,
+            tmp_path / "inventory",
+            http_get=lambda *_: (
+                b"<html><h1>CAPTCHA challenge</h1></html>",
+                {"Content-Type": "text/html"},
+            ),
+            sleep=lambda _: None,
+            generated_at="2026-08-29T04:00:00Z",
+        )
 
 
 @pytest.mark.parametrize(
@@ -238,6 +554,7 @@ def test_fetch_rejects_nvidia_artifact_from_wrong_cik_boundary(
         filing_date="Feb 26, 2025",
         prefix="nvidia-2025",
         cik=CIK,
+        control_prefix=NVIDIA_CONTROL_PREFIX,
     )
 
     with pytest.raises(ProvenanceError, match="artifact URL"):
@@ -434,6 +751,17 @@ def test_detail_sanitizer_removes_adjacent_jwt_shaped_state() -> None:
 
     assert redactions == 1
     assert token not in sanitized
+
+
+def test_detail_sanitizer_removes_email_pii() -> None:
+    sanitized, redactions = _sanitize_detail_page(
+        b'contact <a href="mailto:investorrelations@micron.com">'
+        b"investorrelations@micron.com</a>"
+    )
+
+    assert redactions == 2
+    assert b"micron.com" not in sanitized
+    assert b"[redacted-email]" in sanitized
 
 
 def test_fetch_rejects_request_declared_hosts_outside_fixed_issuer_allowlist(

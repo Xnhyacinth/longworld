@@ -1,0 +1,37 @@
+{
+  "schema_version": "longworld.ietf-fetch-request.v1",
+  "user_agent": "LongWorld-P57/1.0 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "p57-ietf-dnssec-family-v1",
+    "scope": "public IETF Datatracker, Internet-Draft archive, and RFC Editor records for the DNSSEC specification family",
+    "basis": "IETF open-records research export for unique-token preflight of RFC 4033/4034/4035 plus DNS base RFC 1034/1035. Not HTTP/3, TLS, OAuth, or RFC 9421 revision stacking. A later closed graph must include authentic Obsoletes/Updates targets; this fetch is inventory capacity only.",
+    "reviewed_at": "2026-09-07T06:00:00Z",
+    "allowed_actions": [
+      "fetch_datatracker_document",
+      "fetch_datatracker_relation",
+      "fetch_draft_revision",
+      "fetch_rfc"
+    ]
+  },
+  "drafts": [
+    {
+      "name": "draft-ietf-dnsext-dnssec-bis-updates",
+      "revisions": [
+        "11"
+      ]
+    }
+  ],
+  "rfc_numbers": [
+    1034,
+    1035,
+    4033,
+    4034,
+    4035
+  ],
+  "rfc_datatracker_sources": [
+    4035
+  ],
+  "approved_public_test_vector_sha256": [],
+  "requests_per_second": 1.0,
+  "max_retries": 2
+}

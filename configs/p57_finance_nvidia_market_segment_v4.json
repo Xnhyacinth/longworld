@@ -1,0 +1,32 @@
+{
+  "schema_version": "longworld.finance-history-materialization.v1",
+  "world_id": "finance_nvidia_market_segment_fy2022_2025_v4",
+  "signed_issuer_manifest": "data/source_inventory/p57_finance_nvidia_ir_fy2022_2025_v1/issuer_ir_manifest_market_v1.signed.json",
+  "answer_program_id": "finance.multi_filing_asset_trajectory.v1",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "bands": [
+    {
+      "name": "16k",
+      "lower_tokens": 16000,
+      "upper_tokens": 16384
+    },
+    {
+      "name": "32k",
+      "lower_tokens": 32000,
+      "upper_tokens": 32768
+    },
+    {
+      "name": "64k",
+      "lower_tokens": 64000,
+      "upper_tokens": 65536
+    },
+    {
+      "name": "128k",
+      "lower_tokens": 128000,
+      "upper_tokens": 131072
+    }
+  ]
+}

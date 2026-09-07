@@ -22,6 +22,7 @@ from longworld.core.financehistory import (
     FinancialFact,
     FinancialFiling,
     FinancialSourceRow,
+    _task_view_wrap_headroom,
     audit_finance_dense_ranking,
     audit_finance_pipeline_candidate,
     audit_financial_history_candidate,
@@ -30,6 +31,7 @@ from longworld.core.financehistory import (
     extract_sec_financial_filings,
     replay_finance_pipeline_selection,
     replay_financial_history,
+    _candidate_rows,
 )
 from longworld.core.pack import SEP
 from longworld.core.promotion import candidate_sha256
@@ -175,7 +177,11 @@ def test_builds_nested_multi_filing_financial_histories() -> None:
             after["verified_derived_relation_edges"]
         )
     for band, row in zip(_bands(), rows, strict=True):
-        assert band.lower_tokens <= row["tokenizer_context_tokens"] <= band.upper_tokens
+        assert (
+            band.lower_tokens
+            <= row["tokenizer_context_tokens"]
+            <= band.upper_tokens - _task_view_wrap_headroom(band.name)
+        )
         assert row["train_ready"] is False
         assert row["complete_world"] is False
         assert row["real_source_verified"] is False
@@ -185,6 +191,173 @@ def test_builds_nested_multi_filing_financial_histories() -> None:
         assert row["real_source_token_ratio"] == pytest.approx(
             row["semantic_tokens"]["event_bearing"] / row["semantic_tokens"]["internal"]
         )
+
+
+def test_leftover_fill_skips_cover_page_identity_rows() -> None:
+    shifted: list[FinancialFiling] = []
+    for filing in _filings():
+        cover = FinancialSourceRow(
+            record_id=f"{filing.record_id}:cover:0",
+            filing_record_id=filing.record_id,
+            report_date=filing.report_date,
+            source_url=filing.source_url,
+            source_sha256=filing.source_sha256,
+            section="Cover Page",
+            source_char_start=0,
+            source_char_end=len(f"cover identity {filing.report_date} unique dek"),
+            source_text=f"cover identity {filing.report_date} unique dek",
+            facts=(),
+        )
+        moved = []
+        for row in filing.rows:
+            delta = 1_000
+            moved.append(
+                FinancialSourceRow(
+                    record_id=row.record_id,
+                    filing_record_id=row.filing_record_id,
+                    report_date=row.report_date,
+                    source_url=row.source_url,
+                    source_sha256=row.source_sha256,
+                    section=row.section,
+                    source_char_start=row.source_char_start + delta,
+                    source_char_end=row.source_char_end + delta,
+                    source_text=row.source_text,
+                    facts=row.facts,
+                )
+            )
+        shifted.append(
+            FinancialFiling(
+                record_id=filing.record_id,
+                filing_date=filing.filing_date,
+                report_date=filing.report_date,
+                source_url=filing.source_url,
+                source_sha256=filing.source_sha256,
+                rows=(cover, *moved),
+            )
+        )
+    rows = build_financial_history_candidates(
+        tuple(shifted),
+        world_id="finance-cover-page-leftover-test",
+        issuer_name="Example Issuer",
+        cik="0000000001",
+        source_binding={
+            "signed_manifest_sha256": "a" * 64,
+            "source_family": "issuer_ir_rendered_xbrl",
+            "authorization_record_id": "AUTH-1",
+        },
+        bands=_bands()[:1],
+        token_counter=len,
+        tokenizer_model_id="Qwen/Qwen3.5-4B",
+        tokenizer_revision="b" * 40,
+        answer_program_id="finance.multi_filing_asset_trajectory.v1",
+    )
+    sections = {
+        json.loads(line).get("section")
+        for line in rows[0]["context"].splitlines()
+        if json.loads(line).get("record_type") == "financial_source_row"
+    }
+    assert "Cover Page" not in sections
+    assert rows[0]["tokenizer_context_tokens"] <= (
+        _bands()[0].upper_tokens - _task_view_wrap_headroom(_bands()[0].name)
+    )
+
+
+def test_leftover_fill_skips_rows_before_first_fact() -> None:
+    shifted: list[FinancialFiling] = []
+    for filing in _filings():
+        preamble = FinancialSourceRow(
+            record_id=f"{filing.record_id}:preamble:0",
+            filing_record_id=filing.record_id,
+            report_date=filing.report_date,
+            source_url=filing.source_url,
+            source_sha256=filing.source_sha256,
+            section="statement-preamble",
+            source_char_start=0,
+            source_char_end=len(f"preamble {filing.report_date} unique dek"),
+            source_text=f"preamble {filing.report_date} unique dek",
+            facts=(),
+        )
+        moved = []
+        for row in filing.rows:
+            delta = 1_000
+            moved.append(
+                FinancialSourceRow(
+                    record_id=row.record_id,
+                    filing_record_id=row.filing_record_id,
+                    report_date=row.report_date,
+                    source_url=row.source_url,
+                    source_sha256=row.source_sha256,
+                    section=row.section,
+                    source_char_start=row.source_char_start + delta,
+                    source_char_end=row.source_char_end + delta,
+                    source_text=row.source_text,
+                    facts=row.facts,
+                )
+            )
+        shifted.append(
+            FinancialFiling(
+                record_id=filing.record_id,
+                filing_date=filing.filing_date,
+                report_date=filing.report_date,
+                source_url=filing.source_url,
+                source_sha256=filing.source_sha256,
+                rows=(preamble, *moved),
+            )
+        )
+    packed = build_financial_history_candidates(
+        tuple(shifted),
+        world_id="finance-preamble-leftover-test",
+        issuer_name="Example Issuer",
+        cik="0000000001",
+        source_binding={
+            "signed_manifest_sha256": "a" * 64,
+            "source_family": "issuer_ir_rendered_xbrl",
+            "authorization_record_id": "AUTH-1",
+        },
+        bands=_bands()[:1],
+        token_counter=len,
+        tokenizer_model_id="Qwen/Qwen3.5-4B",
+        tokenizer_revision="b" * 40,
+        answer_program_id="finance.multi_filing_asset_trajectory.v1",
+    )
+    sections = {
+        json.loads(line).get("section")
+        for line in packed[0]["context"].splitlines()
+        if json.loads(line).get("record_type") == "financial_source_row"
+    }
+    assert "statement-preamble" not in sections
+
+
+def test_leftover_candidates_prefer_latest_filing_tail() -> None:
+    filings = _filings()
+    used = {
+        row.record_id
+        for filing in filings[:2]
+        for row in filing.rows
+        if row.facts
+    }
+    selected = {filings[0].record_id, filings[1].record_id}
+    ordered = _candidate_rows(
+        filings[:2],
+        selected,
+        used,
+        {"revenue", "assets"},
+        newest_first=True,
+    )
+    assert ordered
+    assert ordered[0].report_date >= ordered[-1].report_date
+    latest = [row for row in ordered if row.report_date == ordered[0].report_date]
+    assert latest
+    assert latest == sorted(
+        latest,
+        key=lambda row: (row.source_char_start, row.record_id),
+        reverse=True,
+    )
+    earliest_first = _candidate_rows(
+        filings[:2], selected, used, {"revenue", "assets"}
+    )
+    assert earliest_first
+    assert earliest_first[0].report_date <= earliest_first[-1].report_date
 
 
 def test_builds_distinct_multi_filing_asset_trajectory_program() -> None:

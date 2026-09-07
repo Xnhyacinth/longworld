@@ -412,7 +412,17 @@ def main() -> int:
         type=Path,
         help="optional signed ranking JSONL for independent dense audits",
     )
+    parser.add_argument(
+        "--audit-only",
+        action="store_true",
+        help="audit existing projections without rebuilding them",
+    )
     args = parser.parse_args()
+    if args.audit_only:
+        if args.rankings is None:
+            raise SystemExit("--audit-only requires --rankings")
+        audit_projections(args.output_dir, args.rankings)
+        return 0
     project(
         args.candidates,
         args.sidecar,

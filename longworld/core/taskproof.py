@@ -52,8 +52,12 @@ from longworld.core.macrovintage import (
 from longworld.core.pack import SEP, wrap_prompt
 from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
 from longworld.core.standardsworkflow import (
+    IETF_HTTP3_QUIC_REQUIREMENT_TASK_SCHEMA,
+    IETF_TLS13_HANDSHAKE_SUCCESSION_TASK_SCHEMA,
     render_ietf_cross_spec_prompt,
     replay_ietf_cross_spec_requirement_task,
+    replay_ietf_http3_quic_requirement_task,
+    replay_ietf_tls13_handshake_succession_task,
 )
 from longworld.core.taskreplaysidecar import (
     CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
@@ -61,7 +65,9 @@ from longworld.core.taskreplaysidecar import (
     EURLEX_PMS_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
     GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
+    IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER,
     IETF_OAUTH_TASK_REPLAY_ADAPTER,
+    IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     SOURCE_TOKEN_MEASUREMENT_BASIS,
     SOURCE_TOKEN_MEASUREMENT_RECEIPT_SCHEMA,
@@ -77,6 +83,15 @@ from longworld.core.verify import Verification
 TASK_PROOF_RECEIPT_SCHEMA = "longworld.task-proof-receipt.v5"
 TokenCounter = Callable[[str], int]
 _WINDOW_BANDS = {"4k": 4_096, "8k": 8_192, "16k": 16_384}
+_IETF_REQUIREMENT_FAMILIES = {
+    IETF_OAUTH_TASK_REPLAY_ADAPTER[:2],
+    IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER[:2],
+    IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER[:2],
+}
+
+
+def _ietf_requirement_family(family: tuple[str, str]) -> bool:
+    return family in _IETF_REQUIREMENT_FAMILIES
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _COMMIT_SHA = re.compile(r"[0-9a-f]{40}")
 _LEXEME = re.compile(r"[^\W_]+", re.UNICODE)
@@ -139,7 +154,7 @@ def replay_ietf_cross_spec_candidate(
     *,
     counterfactual: bool = False,
 ) -> dict[str, Any]:
-    """Replay the OAuth requirement task from selected source-record artifacts."""
+    """Replay an IETF requirement task from selected source-record artifacts."""
     task = candidate.get("ietf_requirement_task")
     source_records = candidate.get("source_record_ids_by_artifact")
     classifications = candidate.get("artifact_classification")
@@ -305,6 +320,7 @@ def replay_ietf_cross_spec_candidate(
     allowed_relation_kinds = {
         "published_as",
         "updates",
+        "obsoletes",
         "normative_reference",
         "informative_reference",
     }
@@ -338,15 +354,29 @@ def replay_ietf_cross_spec_candidate(
                 "child_occurred_at": child_date,
             }
         )
-    answer = replay_ietf_cross_spec_requirement_task(
-        task,
-        evidence_ids=evidence_ids,
-        relation_ids=[
-            relation_id
-            for relation_id in task.get("essential_relation_ids") or []
-            if relation_id in relation_ids
-        ],
-    )
+    replay_relation_ids = [
+        relation_id
+        for relation_id in task.get("essential_relation_ids") or []
+        if relation_id in relation_ids
+    ]
+    if task.get("schema_version") == IETF_HTTP3_QUIC_REQUIREMENT_TASK_SCHEMA:
+        answer = replay_ietf_http3_quic_requirement_task(
+            task,
+            evidence_ids=evidence_ids,
+            relation_ids=replay_relation_ids,
+        )
+    elif task.get("schema_version") == IETF_TLS13_HANDSHAKE_SUCCESSION_TASK_SCHEMA:
+        answer = replay_ietf_tls13_handshake_succession_task(
+            task,
+            evidence_ids=evidence_ids,
+            relation_ids=replay_relation_ids,
+        )
+    else:
+        answer = replay_ietf_cross_spec_requirement_task(
+            task,
+            evidence_ids=evidence_ids,
+            relation_ids=replay_relation_ids,
+        )
     proof_depth = relation_proof_depth(
         [
             {
@@ -473,7 +503,7 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
         expected_domain = "macro_economics"
         expected_view = "ordered_release_timeline"
         expected_composition = "as_of_revision_workflow"
-    elif family == IETF_OAUTH_TASK_REPLAY_ADAPTER[:2]:
+    elif _ietf_requirement_family(family):
         expected_domain = "standards"
         expected_view = "full"
         expected_composition = "same_case_dossier"
@@ -553,6 +583,23 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
             isinstance(task, dict)
             and task.get("answer_program_id")
             == ietf_task_programs.get(str(task.get("schema_version") or ""))
+            and candidate.get("answer_program_id") == task.get("answer_program_id")
+        )
+    elif family == IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("ietf_requirement_task")
+        replay_identity_valid = bool(
+            isinstance(task, dict)
+            and task.get("schema_version") == IETF_HTTP3_QUIC_REQUIREMENT_TASK_SCHEMA
+            and task.get("answer_program_id")
+            == "ietf.http3_quic_effective_requirement.v1"
+            and candidate.get("answer_program_id") == task.get("answer_program_id")
+        )
+    elif family == IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("ietf_requirement_task")
+        replay_identity_valid = bool(
+            isinstance(task, dict)
+            and task.get("schema_version") == IETF_TLS13_HANDSHAKE_SUCCESSION_TASK_SCHEMA
+            and task.get("answer_program_id") == "ietf.tls13_handshake_succession.v1"
             and candidate.get("answer_program_id") == task.get("answer_program_id")
         )
     elif family == EURLEX_PMS_TASK_REPLAY_ADAPTER[:2]:
@@ -670,6 +717,78 @@ def audit_task_view_projection(candidate: dict[str, Any]) -> dict[str, bool]:
     return checks
 
 
+def _cf_omitted_isolated_span(candidate: Mapping[str, Any]) -> bool:
+    twin = candidate.get("counterfactual_twin")
+    classifications = candidate.get("artifact_classification")
+    if (
+        candidate.get("view") != "cf"
+        or not isinstance(twin, Mapping)
+        or twin.get("provenance_operation") != "exclude_exact_source_span"
+        or not isinstance(classifications, list)
+        or not classifications
+    ):
+        return False
+    record_id = twin.get("record_id")
+    char_start = twin.get("char_start")
+    char_end = twin.get("char_end")
+    if (
+        not record_id
+        or not isinstance(char_start, int)
+        or isinstance(char_start, bool)
+        or not isinstance(char_end, int)
+        or isinstance(char_end, bool)
+        or not char_start < char_end
+    ):
+        return False
+    return not any(
+        isinstance(item, dict)
+        and item.get("source_record_id") == record_id
+        and isinstance(item.get("source_char_start"), int)
+        and not isinstance(item.get("source_char_start"), bool)
+        and isinstance(item.get("source_char_end"), int)
+        and not isinstance(item.get("source_char_end"), bool)
+        and item["source_char_start"] <= char_start
+        and char_end <= item["source_char_end"]
+        for item in classifications
+    )
+
+
+def counterfactual_retained_source_tokens_valid(
+    candidate: Mapping[str, Any],
+    *,
+    retained_tokens: int,
+    parent_tokens: int,
+) -> bool:
+    """Accept in-place CF replacement or isolated-span omission.
+
+    Finance keeps the mutated artifact (`synthetic_counterfactual`), so retained
+    tokens must fall. Isolated IETF evidence quotes become all-whitespace and
+    are dropped; remaining real tokens then equal the filtered parent total.
+    """
+    if (
+        isinstance(retained_tokens, bool)
+        or not isinstance(retained_tokens, int)
+        or isinstance(parent_tokens, bool)
+        or not isinstance(parent_tokens, int)
+        or retained_tokens < 0
+        or parent_tokens < 1
+        or retained_tokens > parent_tokens
+    ):
+        return False
+    if candidate.get("view") != "cf":
+        return retained_tokens == parent_tokens
+    classifications = candidate.get("artifact_classification")
+    if not isinstance(classifications, list) or not classifications:
+        return False
+    if any(
+        isinstance(item, dict)
+        and item.get("source_origin") == "synthetic_counterfactual"
+        for item in classifications
+    ):
+        return retained_tokens < parent_tokens
+    return retained_tokens == parent_tokens and _cf_omitted_isolated_span(candidate)
+
+
 def _source_token_measurement_valid(
     candidate: dict[str, Any], projection: dict[str, Any]
 ) -> bool:
@@ -766,10 +885,10 @@ def _source_token_measurement_valid(
     expected_ratio = source_tokens / final_prompt_tokens
     return bool(
         measured_ratio == expected_ratio
-        and (
-            retained_tokens < parent_tokens
-            if candidate.get("view") == "cf"
-            else retained_tokens == parent_tokens
+        and counterfactual_retained_source_tokens_valid(
+            candidate,
+            retained_tokens=retained_tokens,
+            parent_tokens=parent_tokens,
         )
     )
 
@@ -882,26 +1001,34 @@ def _projection_chronology(
             record_type = str(value.get("record_type") or "")
             if record_type == "financial_source_row":
                 occurred_at, kind = str(value.get("report_date") or ""), "0"
+                start = value.get("source_char_start")
+                if not isinstance(start, int) or isinstance(start, bool) or start < 0:
+                    raise TaskProofError("Finance chronology source span is missing")
+                position = f"{start:012d}"
             elif record_type == "filing":
                 occurred_at, kind = str(value.get("filing_date") or ""), "1"
+                position = ""
             elif record_type == "filing_relation":
                 occurred_at, kind = (
                     filings.get(str(value.get("source_record_id") or ""), ""),
                     "2",
                 )
+                position = ""
             elif record_type == "table_branch_relation":
                 occurred_at, kind = (
                     filings.get(str(value.get("source_record_id") or ""), ""),
                     "3",
                 )
+                position = ""
             elif record_type == "year_join_relation":
                 occurred_at, kind = (
                     filings.get(str(value.get("source_record_id") or ""), ""),
                     "4",
                 )
+                position = ""
             else:
                 raise TaskProofError("Finance chronology record type is unsupported")
-            order_key = f"{occurred_at}|{kind}|{artifact_id}"
+            order_key = f"{occurred_at}|{kind}|{position}|{artifact_id}"
         elif domain == "macro_economics" and isinstance(value, dict):
             payload = value.get("source_payload")
             if not isinstance(payload, dict):
@@ -993,7 +1120,11 @@ def _counterfactual_parent_binding_valid(
         and item.get("source_origin") == "synthetic_counterfactual"
     ]
     if candidate.get("view") == "cf":
-        if len(synthetic) != 1:
+        if len(synthetic) == 1:
+            pass
+        elif len(synthetic) == 0 and _cf_omitted_isolated_span(candidate):
+            pass
+        else:
             return False
     elif synthetic:
         return False
@@ -1352,7 +1483,7 @@ def _replay(
             artifact_ids,
             counterfactual=counterfactual,
         )
-    if adapter_key[:2] == IETF_OAUTH_TASK_REPLAY_ADAPTER[:2]:
+    if _ietf_requirement_family(adapter_key[:2]):
         materialized = any(
             isinstance(classification, dict)
             and classification.get("source_origin") == "synthetic_counterfactual"
@@ -1426,7 +1557,7 @@ def _replay_raw_slice(
             left_framed=left_framed,
             right_framed=right_framed,
         )
-    if adapter_key[:2] == IETF_OAUTH_TASK_REPLAY_ADAPTER[:2]:
+    if _ietf_requirement_family(adapter_key[:2]):
         return replay_ietf_cross_spec_raw_slice(
             candidate,
             raw_document_context,
@@ -2162,7 +2293,7 @@ def compute_task_proof(
             expected_answer=expected_answer,
             expected_total_tokens=document_context_tokens,
             records_are_artifacts=(
-                adapter_key[:2] == IETF_OAUTH_TASK_REPLAY_ADAPTER[:2]
+                _ietf_requirement_family(adapter_key[:2])
                 or adapter_key[:2] == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]
             ),
         )
@@ -2192,7 +2323,22 @@ def compute_task_proof(
             == expected_cf_answer,
             "counterfactual_changes_answer": expected_cf_answer != expected_answer,
             "remove_one_fails": bool(remove_one)
-            and all(item["answer"] != expected_answer for item in remove_one),
+            and all(
+                item["answer"] != expected_answer
+                or str(
+                    replay(
+                        [
+                            value
+                            for value in essential_ids
+                            if value != item["removed_artifact_id"]
+                        ],
+                        counterfactual=True,
+                    ).get("answer")
+                    or ""
+                )
+                != expected_cf_answer
+                for item in remove_one
+            ),
             "single_essential_insufficient": bool(singles)
             and all(item["answer"] != expected_answer for item in singles),
             "empty_selection_insufficient": empty_answer != expected_answer,

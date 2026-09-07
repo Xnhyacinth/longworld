@@ -31,6 +31,7 @@ def test_real_q4_controls_with_unrelated_script_comment():
         expected_filing_date="2025-02-05",
         artifact_host="d18rn0p25nwr6d.cloudfront.net",
         artifact_path_prefix="/CIK-0001652044/",
+        control_prefix="_ctrl0_ctl33_",
     )
     assert set(urls) == {"annual_report_pdf", "xbrl_zip", "rendered_xbrl_html"}
 
@@ -44,6 +45,7 @@ def test_visible_challenge_still_rejected():
             expected_filing_date="2025-02-05",
             artifact_host="d18rn0p25nwr6d.cloudfront.net",
             artifact_path_prefix="/CIK-0001652044/",
+            control_prefix="_ctrl0_ctl33_",
         )
 
 

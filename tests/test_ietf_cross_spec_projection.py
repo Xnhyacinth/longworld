@@ -730,6 +730,7 @@ def test_omits_fully_excluded_ietf_counterfactual_chunk(tmp_path) -> None:
         item["artifact_id"] for item in receipt["parent_artifact_token_contributions"]
     }
     assert all(document.strip() for document in cf["document_context"].split(SEP))
+    assert all(audit_task_view_projection(cf).values())
     assert all(
         replay_ietf_cross_spec_candidate(
             cf,

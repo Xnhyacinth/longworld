@@ -154,3 +154,73 @@ def test_rejects_nonconsecutive_draft_revisions(tmp_path: Path) -> None:
             sleep=lambda _seconds: None,
             generated_at="2026-08-29T01:00:00Z",
         )
+
+
+def test_fetches_rfc_datatracker_sources_after_rfc_bodies(tmp_path: Path) -> None:
+    request_path = _request(tmp_path)
+    payload = json.loads(request_path.read_text())
+    payload["rfc_numbers"] = [8888, 9999]
+    payload["rfc_datatracker_sources"] = [9999]
+    request_path.write_text(json.dumps(payload))
+    seen: list[str] = []
+
+    def get(url: str, _headers: dict[str, str], _timeout: float) -> HttpResponse:
+        seen.append(url)
+        if "/document/rfc9999/" in url:
+            body = json.dumps(
+                {
+                    "name": "rfc9999",
+                    "rfc": "9999",
+                    "rev": "",
+                    "time": "2024-02-03T12:00:00Z",
+                }
+            ).encode()
+            content_type = "application/json"
+        elif "datatracker" in url:
+            body = b"{}"
+            content_type = "application/json"
+        else:
+            body = f"official body {url.rsplit('/', 1)[-1]}".encode()
+            content_type = "text/plain"
+        return HttpResponse(body, 200, url, content_type)
+
+    observed_times = iter(
+        [f"2026-08-29T01:00:{index:02d}Z" for index in range(1, 10)]
+    )
+    output = fetch_ietf_workflow(
+        request_path,
+        tmp_path / "out",
+        http_get=get,
+        sleep=lambda _seconds: None,
+        generated_at="2026-08-29T01:00:00Z",
+        clock=observed_times.__next__,
+    )
+    receipt = json.loads(output.read_text())
+    assert receipt["n_retrievals"] == 8
+    assert seen == [
+        "https://datatracker.ietf.org/api/v1/doc/document/draft-ietf-demo/",
+        "https://datatracker.ietf.org/api/v1/doc/relateddocument/?source__name=draft-ietf-demo&limit=100",
+        "https://www.ietf.org/archive/id/draft-ietf-demo-00.txt",
+        "https://www.ietf.org/archive/id/draft-ietf-demo-01.txt",
+        "https://www.rfc-editor.org/rfc/rfc8888.txt",
+        "https://www.rfc-editor.org/rfc/rfc9999.txt",
+        "https://datatracker.ietf.org/api/v1/doc/document/rfc9999/",
+        "https://datatracker.ietf.org/api/v1/doc/relateddocument/?source__name=rfc9999&limit=100",
+    ]
+
+
+def test_rejects_rfc_datatracker_sources_outside_rfc_numbers(tmp_path: Path) -> None:
+    request_path = _request(tmp_path)
+    payload = json.loads(request_path.read_text())
+    payload["rfc_datatracker_sources"] = [8888]
+    request_path.write_text(json.dumps(payload))
+    with pytest.raises(ProvenanceError, match="RFC datatracker sources"):
+        fetch_ietf_workflow(
+            request_path,
+            tmp_path / "out",
+            http_get=lambda *_args: HttpResponse(
+                b"x", 200, "https://www.ietf.org/x", "text/plain"
+            ),
+            sleep=lambda _seconds: None,
+            generated_at="2026-08-29T01:00:00Z",
+        )

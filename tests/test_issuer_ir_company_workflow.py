@@ -524,6 +524,18 @@ def _swap_matches(text: str, first: re.Match[str], second: re.Match[str]) -> str
     )
 
 
+def test_amazon_2025_other_income_details_title_omits_share_units() -> None:
+    from longworld.core.issuerfilingworkflow import _AMAZON_OTHER_INCOME_DETAILS_SECTION
+
+    html = (
+        "<table><tr><th class='tl'><strong>Description of Business, Accounting "
+        "Policies, and Supplemental Disclosures - Other Income (Expense), Net "
+        "(Details) - USD ($) $ in Millions</strong></th></tr></table>"
+    )
+    start, end = _statement_table(html, _AMAZON_OTHER_INCOME_DETAILS_SECTION)
+    assert 0 <= start < end <= len(html)
+
+
 def test_rendered_metric_period_binding_survives_column_and_row_reordering() -> None:
     source = Path(
         "data/source_inventory/p12_amazon_ir_history_v3/"

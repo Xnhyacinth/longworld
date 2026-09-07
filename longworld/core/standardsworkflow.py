@@ -44,6 +44,7 @@ MAX_IETF_RECORDS = 128
 MAX_IETF_MANIFEST_BYTES = 32_000_000
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _DRAFT = re.compile(r"^draft-[a-z0-9]+(?:-[a-z0-9]+)+$")
+_RFC_DOC = re.compile(r"^rfc([1-9]\d*)$")
 _DRAFT_ID = re.compile(
     r"(?<![A-Za-z0-9])(?P<name>draft-[a-z0-9]+(?:-[a-z0-9]+)+)-(?P<revision>\d{2})(?![A-Za-z0-9])"
 )
@@ -339,9 +340,11 @@ def _validate_bound_request(value: object) -> dict[str, Any]:
         "requests_per_second",
         "max_retries",
     }
+    extra = set(value) - fields if isinstance(value, dict) else set()
     if (
         not isinstance(value, dict)
-        or set(value) != fields
+        or not fields.issubset(value)
+        or extra not in (set(), {"rfc_datatracker_sources"})
         or value.get("schema_version") != "longworld.ietf-fetch-request.v1"
     ):
         raise ProvenanceError("IETF fetch request schema is invalid")
@@ -421,7 +424,25 @@ def _validate_bound_request(value: object) -> dict[str, Any]:
         ):
             raise ProvenanceError("IETF fetch request draft identity is invalid")
         names.add(name)
-    return value
+    sources: list[int] = []
+    if "rfc_datatracker_sources" in value:
+        raw_sources = value.get("rfc_datatracker_sources")
+        if (
+            not isinstance(raw_sources, list)
+            or not raw_sources
+            or raw_sources != sorted(raw_sources)
+            or len(set(raw_sources)) != len(raw_sources)
+            or any(
+                isinstance(number, bool) or not isinstance(number, int) or number < 1
+                for number in raw_sources
+            )
+            or any(number not in numbers for number in raw_sources)
+        ):
+            raise ProvenanceError("IETF fetch RFC datatracker sources are invalid")
+        sources = list(raw_sources)
+    result = dict(value)
+    result["rfc_datatracker_sources"] = sources
+    return result
 
 
 def _validate_retrieval_metadata(item: object) -> dict[str, Any]:
@@ -445,21 +466,29 @@ def _validate_retrieval_metadata(item: object) -> dict[str, Any]:
     if kind == "datatracker_document":
         valid = (
             parsed.hostname == "datatracker.ietf.org"
-            and re.fullmatch(
-                r"/api/v1/doc/document/draft-[a-z0-9]+(?:-[a-z0-9]+)+/", parsed.path
+            and (
+                re.fullmatch(
+                    r"/api/v1/doc/document/draft-[a-z0-9]+(?:-[a-z0-9]+)+/", parsed.path
+                )
+                is not None
+                or re.fullmatch(r"/api/v1/doc/document/rfc[1-9]\d*/", parsed.path)
+                is not None
             )
-            is not None
             and item.get("content_type") == "application/json"
         )
     elif kind == "datatracker_relation":
         query = parse_qs(parsed.query)
+        source_name = query.get("source__name", [""])[0]
         valid = (
             parsed.hostname == "datatracker.ietf.org"
             and parsed.path == "/api/v1/doc/relateddocument/"
             and set(query) == {"source__name", "limit"}
             and query.get("limit") == ["100"]
             and len(query.get("source__name", [])) == 1
-            and _DRAFT.fullmatch(query["source__name"][0]) is not None
+            and (
+                _DRAFT.fullmatch(source_name) is not None
+                or _RFC_DOC.fullmatch(source_name) is not None
+            )
             and item.get("content_type") == "application/json"
         )
     elif kind == "draft_revision":
@@ -620,6 +649,15 @@ def build_ietf_workflow_from_fetch_inventory(
             f"https://www.rfc-editor.org/rfc/rfc{number}.txt"
             for number in request.get("rfc_numbers", [])
         }
+        | {
+            f"https://datatracker.ietf.org/api/v1/doc/document/rfc{number}/"
+            for number in request.get("rfc_datatracker_sources", [])
+        }
+        | {
+            "https://datatracker.ietf.org/api/v1/doc/relateddocument/"
+            f"?source__name=rfc{number}&limit=100"
+            for number in request.get("rfc_datatracker_sources", [])
+        }
     )
     if {item[0]["requested_url"] for item in retrievals} != expected_urls:
         raise ProvenanceError("IETF retrievals do not exactly match the request")
@@ -627,8 +665,10 @@ def build_ietf_workflow_from_fetch_inventory(
     records: list[dict[str, Any]] = []
     supporting_records: list[dict[str, Any]] = []
     metadata: dict[str, dict[str, Any]] = {}
+    rfc_metadata: dict[int, dict[str, Any]] = {}
     publication_edges: dict[str, tuple[dict[str, Any], int]] = {}
     dependency_edges: dict[str, tuple[dict[str, Any], list[tuple[str, int]]]] = {}
+    rfc_dependency_edges: dict[int, tuple[dict[str, Any], list[tuple[str, int]]]] = {}
     drafts: dict[tuple[str, str], dict[str, Any]] = {}
     rfcs: dict[int, dict[str, Any]] = {}
     rfc_relation_targets: dict[int, list[tuple[str, int]]] = {}
@@ -657,41 +697,75 @@ def build_ietf_workflow_from_fetch_inventory(
             name = str(data.get("name") or "")
             path_name = urlparse(url).path.rstrip("/").rsplit("/", 1)[-1]
             revision = str(data.get("rev") or "")
-            if (
-                name != path_name
-                or _DRAFT.fullmatch(name) is None
-                or re.fullmatch(r"\d{2}", revision) is None
-            ):
-                raise ProvenanceError("Datatracker document identity is invalid")
-            time_value = str(data.get("time") or "")
-            _parse_timestamp(time_value, "Datatracker document time")
-            name_fact = _fact(
-                fact_id="draft_name",
-                field="draft_name",
-                value=name,
-                raw_text=raw_text,
-                clean_text=clean_text,
-                pattern=re.compile(rf'"name"\s*:\s*"{re.escape(name)}"'),
-            )
-            record = _record(
-                record_id=f"ietf:datatracker:{name}",
-                kind="datatracker_document",
-                occurred_at=time_value,
-                source_url=url,
-                raw=raw,
-                facts=[name_fact],
-                clean_text=clean_text,
-                email_count=email_count,
-                private_key_count=private_key_count,
-                credential_test_vector_count=credential_test_vector_count,
-            )
-            record.update(
-                {
-                    "draft_name": name,
-                    "revision": revision,
-                }
-            )
-            metadata[name] = record
+            rfc_match = _RFC_DOC.fullmatch(name)
+            if rfc_match is not None:
+                number = int(rfc_match.group(1))
+                if (
+                    name != path_name
+                    or number not in set(request["rfc_datatracker_sources"])
+                    or str(data.get("rfc") or "") != str(number)
+                ):
+                    raise ProvenanceError("Datatracker document identity is invalid")
+                time_value = str(data.get("time") or "")
+                _parse_timestamp(time_value, "Datatracker document time")
+                name_fact = _fact(
+                    fact_id="rfc_name",
+                    field="rfc_name",
+                    value=name,
+                    raw_text=raw_text,
+                    clean_text=clean_text,
+                    pattern=re.compile(rf'"name"\s*:\s*"{re.escape(name)}"'),
+                )
+                record = _record(
+                    record_id=f"ietf:datatracker:{name}",
+                    kind="datatracker_document",
+                    occurred_at=time_value,
+                    source_url=url,
+                    raw=raw,
+                    facts=[name_fact],
+                    clean_text=clean_text,
+                    email_count=email_count,
+                    private_key_count=private_key_count,
+                    credential_test_vector_count=credential_test_vector_count,
+                )
+                record["rfc_number"] = number
+                rfc_metadata[number] = record
+            else:
+                if (
+                    name != path_name
+                    or _DRAFT.fullmatch(name) is None
+                    or re.fullmatch(r"\d{2}", revision) is None
+                ):
+                    raise ProvenanceError("Datatracker document identity is invalid")
+                time_value = str(data.get("time") or "")
+                _parse_timestamp(time_value, "Datatracker document time")
+                name_fact = _fact(
+                    fact_id="draft_name",
+                    field="draft_name",
+                    value=name,
+                    raw_text=raw_text,
+                    clean_text=clean_text,
+                    pattern=re.compile(rf'"name"\s*:\s*"{re.escape(name)}"'),
+                )
+                record = _record(
+                    record_id=f"ietf:datatracker:{name}",
+                    kind="datatracker_document",
+                    occurred_at=time_value,
+                    source_url=url,
+                    raw=raw,
+                    facts=[name_fact],
+                    clean_text=clean_text,
+                    email_count=email_count,
+                    private_key_count=private_key_count,
+                    credential_test_vector_count=credential_test_vector_count,
+                )
+                record.update(
+                    {
+                        "draft_name": name,
+                        "revision": revision,
+                    }
+                )
+                metadata[name] = record
         elif retrieval["kind"] == "datatracker_relation":
             try:
                 data = json.loads(raw_text)
@@ -701,45 +775,53 @@ def build_ietf_workflow_from_fetch_inventory(
                 ) from error
             objects = data.get("objects") if isinstance(data, dict) else None
             name = parse_qs(urlparse(url).query)["source__name"][0]
-            became = [
-                item
-                for item in objects or []
-                if isinstance(item, dict)
-                and item.get("relationship")
-                == "/api/v1/name/docrelationshipname/became_rfc/"
-                and item.get("source") == f"/api/v1/doc/document/{name}/"
-                and re.fullmatch(
-                    r"/api/v1/doc/document/rfc[1-9]\d*/", str(item.get("target") or "")
-                )
-            ]
-            if len(became) != 1:
-                raise ProvenanceError("Datatracker became_rfc relation is not unique")
-            number = int(
-                str(became[0]["target"]).removesuffix("/").rsplit("rfc", 1)[-1]
-            )
+            rfc_match = _RFC_DOC.fullmatch(name)
             source_value = f"/api/v1/doc/document/{name}/"
-            target_value = f"/api/v1/doc/document/rfc{number}/"
-            edge_pattern = re.compile(
-                rf'\{{(?=[^{{}}]*"relationship"\s*:\s*"/api/v1/name/docrelationshipname/became_rfc/")'
-                rf'(?=[^{{}}]*"source"\s*:\s*"{re.escape(source_value)}")'
-                rf'(?=[^{{}}]*"target"\s*:\s*"{re.escape(target_value)}")[^{{}}]*\}}'
-            )
-            edge_fact = _fact(
-                fact_id="became_rfc",
-                field="became_rfc",
-                value=f"{name}->RFC {number}",
-                raw_text=raw_text,
-                clean_text=clean_text,
-                pattern=edge_pattern,
-            )
-            dependency_facts: list[dict[str, Any]] = []
-            dependencies: list[tuple[str, int]] = []
-            dependency_identities: set[tuple[str, int]] = set()
             requested_numbers = set(request["rfc_numbers"])
             relationship_kinds = {
                 "/api/v1/name/docrelationshipname/refnorm/": ("normative_reference"),
                 "/api/v1/name/docrelationshipname/refinfo/": ("informative_reference"),
             }
+            dependency_facts: list[dict[str, Any]] = []
+            dependencies: list[tuple[str, int]] = []
+            dependency_identities: set[tuple[str, int]] = set()
+            if rfc_match is not None:
+                number = int(rfc_match.group(1))
+                became = [
+                    item
+                    for item in objects or []
+                    if isinstance(item, dict)
+                    and item.get("relationship")
+                    == "/api/v1/name/docrelationshipname/became_rfc/"
+                    and item.get("source") == source_value
+                ]
+                if (
+                    number not in set(request["rfc_datatracker_sources"])
+                    or became
+                ):
+                    raise ProvenanceError(
+                        "RFC datatracker relation identity is invalid"
+                    )
+            else:
+                became = [
+                    item
+                    for item in objects or []
+                    if isinstance(item, dict)
+                    and item.get("relationship")
+                    == "/api/v1/name/docrelationshipname/became_rfc/"
+                    and item.get("source") == source_value
+                    and re.fullmatch(
+                        r"/api/v1/doc/document/rfc[1-9]\d*/",
+                        str(item.get("target") or ""),
+                    )
+                ]
+                if len(became) != 1:
+                    raise ProvenanceError(
+                        "Datatracker became_rfc relation is not unique"
+                    )
+                number = int(
+                    str(became[0]["target"]).removesuffix("/").rsplit("rfc", 1)[-1]
+                )
             for item in objects or []:
                 if not isinstance(item, dict) or item.get("source") != source_value:
                     continue
@@ -777,25 +859,63 @@ def build_ietf_workflow_from_fetch_inventory(
                 )
                 dependencies.append(identity)
                 dependency_identities.add(identity)
-            metadata_record = metadata.get(name)
-            if metadata_record is None:
-                raise ProvenanceError("Datatracker relation has no document metadata")
-            record = _record(
-                record_id=f"ietf:datatracker-relation:{name}:rfc{number}",
-                kind="datatracker_relation",
-                occurred_at=retrieval["observed_at"],
-                source_url=url,
-                raw=raw,
-                facts=[edge_fact, *dependency_facts],
-                clean_text=clean_text,
-                email_count=email_count,
-                private_key_count=private_key_count,
-                credential_test_vector_count=credential_test_vector_count,
-                temporal_semantics="retrieval_observation_only",
-            )
-            record.update({"draft_name": name, "rfc_number": number})
-            publication_edges[name] = (record, number)
-            dependency_edges[name] = (record, dependencies)
+            if rfc_match is not None:
+                if rfc_metadata.get(number) is None:
+                    raise ProvenanceError(
+                        "Datatracker relation has no document metadata"
+                    )
+                record = _record(
+                    record_id=f"ietf:datatracker-relation:{name}",
+                    kind="datatracker_relation",
+                    occurred_at=retrieval["observed_at"],
+                    source_url=url,
+                    raw=raw,
+                    facts=dependency_facts,
+                    clean_text=clean_text,
+                    email_count=email_count,
+                    private_key_count=private_key_count,
+                    credential_test_vector_count=credential_test_vector_count,
+                    temporal_semantics="retrieval_observation_only",
+                )
+                record["rfc_number"] = number
+                rfc_dependency_edges[number] = (record, dependencies)
+            else:
+                source_value = f"/api/v1/doc/document/{name}/"
+                target_value = f"/api/v1/doc/document/rfc{number}/"
+                edge_pattern = re.compile(
+                    rf'\{{(?=[^{{}}]*"relationship"\s*:\s*"/api/v1/name/docrelationshipname/became_rfc/")'
+                    rf'(?=[^{{}}]*"source"\s*:\s*"{re.escape(source_value)}")'
+                    rf'(?=[^{{}}]*"target"\s*:\s*"{re.escape(target_value)}")[^{{}}]*\}}'
+                )
+                edge_fact = _fact(
+                    fact_id="became_rfc",
+                    field="became_rfc",
+                    value=f"{name}->RFC {number}",
+                    raw_text=raw_text,
+                    clean_text=clean_text,
+                    pattern=edge_pattern,
+                )
+                metadata_record = metadata.get(name)
+                if metadata_record is None:
+                    raise ProvenanceError(
+                        "Datatracker relation has no document metadata"
+                    )
+                record = _record(
+                    record_id=f"ietf:datatracker-relation:{name}:rfc{number}",
+                    kind="datatracker_relation",
+                    occurred_at=retrieval["observed_at"],
+                    source_url=url,
+                    raw=raw,
+                    facts=[edge_fact, *dependency_facts],
+                    clean_text=clean_text,
+                    email_count=email_count,
+                    private_key_count=private_key_count,
+                    credential_test_vector_count=credential_test_vector_count,
+                    temporal_semantics="retrieval_observation_only",
+                )
+                record.update({"draft_name": name, "rfc_number": number})
+                publication_edges[name] = (record, number)
+                dependency_edges[name] = (record, dependencies)
         elif retrieval["kind"] == "draft_revision":
             match = _DRAFT_ID.search(raw_text)
             url_id = Path(urlparse(url).path).stem
@@ -955,6 +1075,31 @@ def build_ietf_workflow_from_fetch_inventory(
                 "Datatracker latest revision does not match requested history"
             )
         dependency_record, dependencies = dependency_edges[name]
+        if number not in set(request["rfc_datatracker_sources"]):
+            for kind, target_number in dependencies:
+                target_record = rfcs.get(target_number)
+                if target_record is None:
+                    raise ProvenanceError("requested RFC dependency target is missing")
+                relations.append(
+                    _relation(
+                        kind,
+                        rfc,
+                        target_record,
+                        "rfc_number",
+                        "rfc_number",
+                        supporting_evidence=[
+                            (dependency_record, f"{kind}:{target_number}")
+                        ],
+                    )
+                )
+    if set(rfc_metadata) != set(request["rfc_datatracker_sources"]) or set(
+        rfc_dependency_edges
+    ) != set(request["rfc_datatracker_sources"]):
+        raise ProvenanceError("RFC datatracker sources are incomplete")
+    for number, (dependency_record, dependencies) in rfc_dependency_edges.items():
+        rfc = rfcs.get(number)
+        if rfc is None:
+            raise ProvenanceError("requested RFC datatracker source is missing")
         for kind, target_number in dependencies:
             target_record = rfcs.get(target_number)
             if target_record is None:
@@ -992,6 +1137,11 @@ def build_ietf_workflow_from_fetch_inventory(
     referenced_targets.update(
         target_number
         for _record, dependencies in dependency_edges.values()
+        for _kind, target_number in dependencies
+    )
+    referenced_targets.update(
+        target_number
+        for _record, dependencies in rfc_dependency_edges.values()
         for _kind, target_number in dependencies
     )
     _validate_rfc_target_closure(
@@ -3054,6 +3204,859 @@ def materialize_ietf_cross_spec_counterfactual(
         if item.get("evidence_id") != evidence["evidence_id"]
     ]
     answer = replay_ietf_cross_spec_requirement_task(
+        task, evidence_ids=selected_evidence
+    )
+    return {
+        "record_id": record["record_id"],
+        "parent_text": parent,
+        "text": child,
+        "answer": answer,
+        "counterfactual_twin": {
+            "provenance_operation": "exclude_exact_source_span",
+            "source_origin": "synthetic_counterfactual",
+            "record_id": record["record_id"],
+            "evidence_id": evidence["evidence_id"],
+            "char_start": char_start,
+            "char_end": char_end,
+            "byte_start": byte_start,
+            "byte_end": byte_end,
+            "parent_value": parent_value,
+            "value": value,
+            "parent_text_sha256": hashlib.sha256(parent.encode()).hexdigest(),
+            "text_sha256": hashlib.sha256(child.encode()).hexdigest(),
+            "parent_source_sha256": record["source_sha256"],
+            "source_manifest_sha256": task["source_manifest_sha256"],
+        },
+    }
+
+
+def materialize_ietf_http3_quic_counterfactual(
+    task: dict[str, Any],
+    *,
+    evidence_id: str = "transport_current",
+) -> dict[str, Any]:
+    """Exclude one byte-bound HTTP/3 requirement without invented text."""
+    replay_ietf_http3_quic_requirement_task(task)
+    evidence = next(
+        (
+            item
+            for item in task["evidence_items"]
+            if item.get("evidence_id") == evidence_id
+        ),
+        None,
+    )
+    if not isinstance(evidence, dict):
+        raise ProvenanceError("IETF HTTP/3 counterfactual requirement is invalid")
+    manifest = task["source_manifest"]
+    record = next(
+        item
+        for item in manifest["records"]
+        if item.get("record_id") == evidence.get("record_id")
+    )
+    parent = str(record["text"])
+    parent_value = str(evidence["evidence_quote"])
+    char_start = int(evidence["char_start"])
+    char_end = int(evidence["char_end"])
+    if parent[char_start:char_end] != parent_value:
+        raise ProvenanceError("IETF HTTP/3 counterfactual requirement span is invalid")
+    value = " " * len(parent_value)
+    child = parent[:char_start] + value + parent[char_end:]
+    byte_start = len(parent[:char_start].encode())
+    byte_end = byte_start + len(parent_value.encode())
+    selected_evidence = [
+        item["evidence_id"]
+        for item in task["evidence_items"]
+        if item.get("evidence_id") != evidence["evidence_id"]
+    ]
+    answer = replay_ietf_http3_quic_requirement_task(
+        task, evidence_ids=selected_evidence
+    )
+    return {
+        "record_id": record["record_id"],
+        "parent_text": parent,
+        "text": child,
+        "answer": answer,
+        "counterfactual_twin": {
+            "provenance_operation": "exclude_exact_source_span",
+            "source_origin": "synthetic_counterfactual",
+            "record_id": record["record_id"],
+            "evidence_id": evidence["evidence_id"],
+            "char_start": char_start,
+            "char_end": char_end,
+            "byte_start": byte_start,
+            "byte_end": byte_end,
+            "parent_value": parent_value,
+            "value": value,
+            "parent_text_sha256": hashlib.sha256(parent.encode()).hexdigest(),
+            "text_sha256": hashlib.sha256(child.encode()).hexdigest(),
+            "parent_source_sha256": record["source_sha256"],
+            "source_manifest_sha256": task["source_manifest_sha256"],
+        },
+    }
+
+
+IETF_HTTP3_QUIC_REQUIREMENT_TASK_SCHEMA = (
+    "longworld.ietf-http3-quic-requirement-task.v1"
+)
+_HTTP3_REQUIREMENT_ANSWERS = {
+    "transport": "PASS_QUIC_V1",
+    "tls_version": "PASS_TLS_1_3",
+    "alpn": "PASS_H3",
+    "header_compression": "PASS_QPACK",
+    "settings": "PASS_SETTINGS_FIRST",
+}
+_HTTP3_REQUIREMENT_CODEBOOK = {
+    "transport": {
+        "code": "PASS_QUIC_V1",
+        "meaning": "accept because HTTP/3 is bound to QUIC version 1",
+    },
+    "tls_version": {
+        "code": "PASS_TLS_1_3",
+        "meaning": "accept because QUIC version 1 uses TLS 1.3 or greater",
+    },
+    "alpn": {
+        "code": "PASS_H3",
+        "meaning": "accept because HTTP/3 indicates support with ALPN token h3",
+    },
+    "header_compression": {
+        "code": "PASS_QPACK",
+        "meaning": "accept because HTTP/3 compresses fields with QPACK",
+    },
+    "settings": {
+        "code": "PASS_SETTINGS_FIRST",
+        "meaning": "accept because SETTINGS is the first HTTP control-stream frame",
+    },
+}
+_HTTP3_REQUIREMENT_SCENARIO = {
+    "application": "http3",
+    "transport_version": "quic_v1",
+    "alpn_token": "h3",
+    "tls_version": "1.3+",
+    "header_compression": "qpack",
+    "settings_on_control_stream": "first_frame_after_connect",
+}
+_HTTP3_REQUIREMENT_EVIDENCE = {
+    "transport_current": (
+        9114,
+        r"HTTP/3 relies on QUIC version 1 as the underlying transport\.",
+    ),
+    "transport_dependency": (
+        9000,
+        r"This document defines the core of the QUIC transport protocol\.",
+    ),
+    "tls_current": (
+        9114,
+        r"QUIC version 1 uses TLS version 1\.3 or greater as its handshake\s+protocol\.",
+    ),
+    "tls_dependency": (
+        8446,
+        r"This document specifies version 1\.3 of the Transport Layer Security\s+\(TLS\) protocol\.",
+    ),
+    "alpn_current": (
+        9114,
+        r'selecting the ALPN token "h3" in the TLS handshake\.',
+    ),
+    "alpn_dependency": (
+        7301,
+        r'except that the "ProtocolNameList" MUST contain\s+exactly one "ProtocolName"\.',
+    ),
+    "qpack_current": (
+        9114,
+        r"HTTP/3 replaces HPACK with QPACK \(\[QPACK\]\)\.",
+    ),
+    "qpack_dependency": (
+        9204,
+        r"This specification defines QPACK: a compression format for\s+efficiently representing HTTP fields that is to be used in HTTP/3\.",
+    ),
+    "settings_current": (
+        9114,
+        (
+            r"After the QUIC connection is\s+established, a SETTINGS frame MUST be "
+            r"sent by each endpoint as the\s+initial frame of their respective HTTP "
+            r"control stream\."
+        ),
+    ),
+}
+_HTTP3_REQUIREMENT_BRANCHES = {
+    "transport": (
+        "transport_current",
+        "transport_dependency",
+        "normative_reference",
+        9000,
+    ),
+    "tls_version": (
+        "tls_current",
+        "tls_dependency",
+        "informative_reference",
+        8446,
+    ),
+    "alpn": ("alpn_current", "alpn_dependency", "normative_reference", 7301),
+    "header_compression": (
+        "qpack_current",
+        "qpack_dependency",
+        "normative_reference",
+        9204,
+    ),
+    "settings": ("settings_current", None, None, None),
+}
+_HTTP3_RFC_NUMBERS = {7301, 8446, 9000, 9114, 9204}
+
+
+def _http3_requirement_question() -> str:
+    return (
+        "Resolve the effective HTTP/3 connection-establishment requirements at "
+        "2025-01-31T00:00:00Z for this scenario (canonical JSON): "
+        + json.dumps(
+            _HTTP3_REQUIREMENT_SCENARIO, sort_keys=True, separators=(",", ":")
+        )
+        + ". Return exactly one JSON object with these keys in this order: "
+        + json.dumps(tuple(_HTTP3_REQUIREMENT_CODEBOOK), separators=(",", ":"))
+        + ". Use this exact per-field output codebook (canonical JSON): "
+        + json.dumps(
+            _HTTP3_REQUIREMENT_CODEBOOK, sort_keys=True, separators=(",", ":")
+        )
+        + ". Resolve each field independently from the supplied RFC graph; use "
+        'the string "UNKNOWN" only for a field whose required evidence or relation '
+        "is absent."
+    )
+
+
+def _http3_rfc_records(manifest: dict[str, Any]) -> dict[int, dict[str, Any]]:
+    records: dict[int, dict[str, Any]] = {}
+    for record in manifest["records"]:
+        number = record.get("rfc_number")
+        if isinstance(number, int):
+            if number in records:
+                raise ProvenanceError("IETF HTTP/3 RFC identity is duplicated")
+            records[number] = record
+    if set(records) != _HTTP3_RFC_NUMBERS:
+        raise ProvenanceError("IETF HTTP/3 RFC graph is incomplete")
+    return records
+
+
+def _http3_requirement_relation(
+    manifest: dict[str, Any], *, kind: str, target_number: int
+) -> dict[str, Any]:
+    matches = [
+        relation
+        for relation in manifest["relations"]
+        if relation.get("kind") == kind
+        and relation.get("source_record_id") == "ietf:rfc:9114"
+        and relation.get("target_record_id") == f"ietf:rfc:{target_number}"
+    ]
+    if len(matches) != 1:
+        raise ProvenanceError("IETF HTTP/3 requirement relation is not unique")
+    return matches[0]
+
+
+def _http3_requirement_evidence(
+    records: dict[int, dict[str, Any]], evidence_id: str, specification: tuple[int, str]
+) -> dict[str, Any]:
+    number, pattern = specification
+    record = records[number]
+    matches = list(re.finditer(pattern, record["text"], re.MULTILINE | re.DOTALL))
+    if len(matches) != 1:
+        raise ProvenanceError("IETF HTTP/3 requirement evidence is not unique")
+    match = matches[0]
+    quote = match.group(0)
+    return {
+        "evidence_id": evidence_id,
+        "record_id": record["record_id"],
+        "evidence_quote": quote,
+        "char_start": match.start(),
+        "char_end": match.end(),
+        "quote_sha256": hashlib.sha256(quote.encode()).hexdigest(),
+        "source_sha256": record["source_sha256"],
+    }
+
+
+def build_ietf_http3_quic_requirement_task(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Compile HTTP/3 connection-establishment requirements from RFC 9114 edges."""
+    audit_ietf_workflow_manifest(manifest)
+    records = _http3_rfc_records(manifest)
+    evidence = [
+        _http3_requirement_evidence(records, evidence_id, specification)
+        for evidence_id, specification in _HTTP3_REQUIREMENT_EVIDENCE.items()
+    ]
+    requirement_relations = [
+        _http3_requirement_relation(manifest, kind=kind, target_number=target_number)
+        for _field, (_current, _dependency, kind, target_number) in (
+            _HTTP3_REQUIREMENT_BRANCHES.items()
+        )
+        if kind is not None and target_number is not None
+    ]
+    publication = [
+        relation
+        for relation in manifest["relations"]
+        if relation.get("kind") == "published_as"
+        and relation.get("target_record_id") == "ietf:rfc:9114"
+    ]
+    if len(publication) != 1:
+        raise ProvenanceError("IETF HTTP/3 publication relation is not unique")
+    task = {
+        "schema_version": IETF_HTTP3_QUIC_REQUIREMENT_TASK_SCHEMA,
+        "query_type": "cross_spec_requirement_resolution",
+        "answer_program_id": "ietf.http3_quic_effective_requirement.v1",
+        "question": _http3_requirement_question(),
+        "cutoff": "2025-01-31T00:00:00Z",
+        "scenario": dict(_HTTP3_REQUIREMENT_SCENARIO),
+        "source_manifest": deepcopy(manifest),
+        "source_manifest_sha256": _canonical_sha256(manifest),
+        "evidence_items": evidence,
+        "essential_evidence_ids": list(_HTTP3_REQUIREMENT_EVIDENCE),
+        "essential_relation_ids": [
+            publication[0]["relation_id"],
+            *(relation["relation_id"] for relation in requirement_relations),
+        ],
+        "answer": dict(_HTTP3_REQUIREMENT_ANSWERS),
+    }
+    replay_ietf_http3_quic_requirement_task(task)
+    return task
+
+
+def replay_ietf_http3_quic_requirement_task(
+    task: dict[str, Any],
+    *,
+    evidence_ids: list[str] | None = None,
+    relation_ids: list[str] | None = None,
+) -> dict[str, str]:
+    """Replay HTTP/3 requirements with optional evidence or relation removal."""
+    required_fields = {
+        "schema_version",
+        "query_type",
+        "answer_program_id",
+        "question",
+        "cutoff",
+        "scenario",
+        "source_manifest",
+        "source_manifest_sha256",
+        "evidence_items",
+        "essential_evidence_ids",
+        "essential_relation_ids",
+        "answer",
+    }
+    if (
+        not isinstance(task, dict)
+        or set(task) != required_fields
+        or task.get("schema_version") != IETF_HTTP3_QUIC_REQUIREMENT_TASK_SCHEMA
+        or task.get("query_type") != "cross_spec_requirement_resolution"
+        or task.get("answer_program_id") != "ietf.http3_quic_effective_requirement.v1"
+        or task.get("question") != _http3_requirement_question()
+        or task.get("cutoff") != "2025-01-31T00:00:00Z"
+        or task.get("scenario") != _HTTP3_REQUIREMENT_SCENARIO
+        or task.get("essential_evidence_ids") != list(_HTTP3_REQUIREMENT_EVIDENCE)
+        or task.get("answer") != _HTTP3_REQUIREMENT_ANSWERS
+    ):
+        raise ProvenanceError("IETF HTTP/3 task contract is invalid")
+    manifest = task.get("source_manifest")
+    if not isinstance(manifest, dict):
+        raise ProvenanceError("IETF HTTP/3 source manifest is missing")
+    audit_ietf_workflow_manifest(manifest)
+    if task.get("source_manifest_sha256") != _canonical_sha256(manifest):
+        raise ProvenanceError("IETF HTTP/3 source manifest binding is invalid")
+    records = _http3_rfc_records(manifest)
+    raw_evidence = task.get("evidence_items")
+    if not isinstance(raw_evidence, list):
+        raise ProvenanceError("IETF HTTP/3 evidence is invalid")
+    items = {
+        str(item.get("evidence_id") or ""): item
+        for item in raw_evidence
+        if isinstance(item, dict)
+    }
+    if set(items) != set(_HTTP3_REQUIREMENT_EVIDENCE) or len(items) != len(raw_evidence):
+        raise ProvenanceError("IETF HTTP/3 evidence identity is invalid")
+    for evidence_id, specification in _HTTP3_REQUIREMENT_EVIDENCE.items():
+        expected = _http3_requirement_evidence(records, evidence_id, specification)
+        if items[evidence_id] != expected:
+            raise ProvenanceError("IETF HTTP/3 evidence binding is invalid")
+    all_evidence = set(items)
+    selected_evidence = all_evidence if evidence_ids is None else set(evidence_ids)
+    if (
+        not isinstance(evidence_ids, (list, type(None)))
+        or len(selected_evidence) != len(evidence_ids or selected_evidence)
+        or not selected_evidence.issubset(all_evidence)
+    ):
+        raise ProvenanceError("IETF HTTP/3 evidence selection is invalid")
+    relations = {
+        str(relation["relation_id"]): relation for relation in manifest["relations"]
+    }
+    essential_relations = task.get("essential_relation_ids")
+    if (
+        not isinstance(essential_relations, list)
+        or len(set(essential_relations)) != len(essential_relations)
+        or any(item not in relations for item in essential_relations)
+    ):
+        raise ProvenanceError("IETF HTTP/3 relation identity is invalid")
+    selected_relations = (
+        set(essential_relations) if relation_ids is None else set(relation_ids)
+    )
+    if (
+        not isinstance(relation_ids, (list, type(None)))
+        or len(selected_relations) != len(relation_ids or selected_relations)
+        or not selected_relations.issubset(set(essential_relations))
+    ):
+        raise ProvenanceError("IETF HTTP/3 relation selection is invalid")
+    publication = next(
+        relation
+        for relation in manifest["relations"]
+        if relation.get("kind") == "published_as"
+        and relation.get("target_record_id") == "ietf:rfc:9114"
+    )
+    expected_essential_relations = [
+        publication["relation_id"],
+        *(
+            _http3_requirement_relation(
+                manifest, kind=kind, target_number=target_number
+            )["relation_id"]
+            for _field, (_current, _dependency, kind, target_number) in (
+                _HTTP3_REQUIREMENT_BRANCHES.items()
+            )
+            if kind is not None and target_number is not None
+        ),
+    ]
+    if essential_relations != expected_essential_relations:
+        raise ProvenanceError("IETF HTTP/3 task contract is invalid")
+    result: dict[str, str] = {}
+    publication_present = publication["relation_id"] in selected_relations
+    for field, (current, dependency, kind, target_number) in (
+        _HTTP3_REQUIREMENT_BRANCHES.items()
+    ):
+        needed = {current} if dependency is None else {current, dependency}
+        relations_present = publication_present
+        if kind is not None and target_number is not None:
+            relation = _http3_requirement_relation(
+                manifest, kind=kind, target_number=target_number
+            )
+            relations_present = (
+                publication_present and relation["relation_id"] in selected_relations
+            )
+        if needed.issubset(selected_evidence) and relations_present:
+            result[field] = _HTTP3_REQUIREMENT_ANSWERS[field]
+        else:
+            result[field] = "UNKNOWN"
+    return result
+
+
+def audit_ietf_http3_quic_requirement_task(task: dict[str, Any]) -> dict[str, bool]:
+    """Audit strict replay plus every remove-one evidence and relation replay."""
+    answer = task.get("answer")
+    evidence = list(task.get("essential_evidence_ids") or [])
+    relations = list(task.get("essential_relation_ids") or [])
+    return {
+        "strict_replay": replay_ietf_http3_quic_requirement_task(task) == answer,
+        "remove_one_evidence_fails": bool(evidence)
+        and all(
+            replay_ietf_http3_quic_requirement_task(
+                task,
+                evidence_ids=[item for item in evidence if item != removed],
+            )
+            != answer
+            for removed in evidence
+        ),
+        "remove_one_relation_fails": bool(relations)
+        and all(
+            replay_ietf_http3_quic_requirement_task(
+                task,
+                relation_ids=[item for item in relations if item != removed],
+            )
+            != answer
+            for removed in relations
+        ),
+    }
+
+
+IETF_TLS13_HANDSHAKE_SUCCESSION_TASK_SCHEMA = (
+    "longworld.ietf-tls13-handshake-succession-task.v1"
+)
+_TLS13_SUCCESSION_ANSWERS = {
+    "current_protocol": "TLS_1_3_RFC8446",
+    "obsoletes_session_tickets": "RFC5077",
+    "obsoletes_tls12": "RFC5246",
+    "obsoletes_ocsp_stapling": "RFC6961",
+    "updates_exporters": "RFC5705",
+    "updates_extensions": "RFC6066",
+}
+_TLS13_SUCCESSION_CODEBOOK = {
+    "current_protocol": {
+        "code": "TLS_1_3_RFC8446",
+        "meaning": "RFC 8446 is TLS protocol version 1.3",
+    },
+    "obsoletes_session_tickets": {
+        "code": "RFC5077",
+        "meaning": "RFC 8446 obsoletes TLS session resumption tickets",
+    },
+    "obsoletes_tls12": {
+        "code": "RFC5246",
+        "meaning": "RFC 8446 obsoletes TLS protocol version 1.2",
+    },
+    "obsoletes_ocsp_stapling": {
+        "code": "RFC6961",
+        "meaning": "RFC 8446 obsoletes multiple certificate status requests",
+    },
+    "updates_exporters": {
+        "code": "RFC5705",
+        "meaning": "RFC 8446 updates TLS keying material exporters",
+    },
+    "updates_extensions": {
+        "code": "RFC6066",
+        "meaning": "RFC 8446 updates TLS extension definitions",
+    },
+}
+_TLS13_SUCCESSION_SCENARIO = {
+    "protocol": "tls",
+    "version": "1.3",
+    "publication": "rfc8446",
+    "succession": "obsoletes_and_updates",
+}
+_TLS13_SUCCESSION_EVIDENCE = {
+    "current_protocol": (
+        8446,
+        r"This document specifies version 1\.3 of the Transport Layer Security\s+\(TLS\) protocol\.",
+    ),
+    "obsoletes_session_tickets": (
+        8446,
+        r"It also obsoletes the TLS ticket\s+mechanism defined in \[RFC5077\] and replaces it with the mechanism\s+defined in Section 2\.2\.",
+    ),
+    "obsoletes_tls12": (
+        8446,
+        r"This document supersedes and obsoletes previous versions of TLS,\s+including version 1\.2 \[RFC5246\]\.",
+    ),
+    "obsoletes_ocsp_stapling": (
+        8446,
+        r"obsoletes \[RFC6961\] as\s+described in Section 4\.4\.2\.1\.",
+    ),
+    "updates_exporters": (
+        8446,
+        r"Because TLS 1\.3 changes the way keys are\s+derived, it updates \[RFC5705\] as described in Section 7\.5\.",
+    ),
+    "updates_extensions": (
+        8446,
+        r"therefore updates \[RFC6066\] and obsoletes \[RFC6961\] as\s+described in Section 4\.4\.2\.1\.",
+    ),
+}
+_TLS13_SUCCESSION_BRANCHES = {
+    "current_protocol": ("current_protocol", None, None, None),
+    "obsoletes_session_tickets": (
+        "obsoletes_session_tickets",
+        None,
+        "obsoletes",
+        5077,
+    ),
+    "obsoletes_tls12": ("obsoletes_tls12", None, "obsoletes", 5246),
+    "obsoletes_ocsp_stapling": (
+        "obsoletes_ocsp_stapling",
+        None,
+        "obsoletes",
+        6961,
+    ),
+    "updates_exporters": ("updates_exporters", None, "updates", 5705),
+    "updates_extensions": ("updates_extensions", None, "updates", 6066),
+}
+_TLS13_RFC_NUMBERS = {5077, 5246, 5705, 6066, 6961, 8446}
+
+
+def _tls13_succession_question() -> str:
+    return (
+        "Resolve the effective TLS 1.3 handshake protocol succession at "
+        "2026-01-31T00:00:00Z for this scenario (canonical JSON): "
+        + json.dumps(
+            _TLS13_SUCCESSION_SCENARIO, sort_keys=True, separators=(",", ":")
+        )
+        + ". Return exactly one JSON object with these keys in this order: "
+        + json.dumps(tuple(_TLS13_SUCCESSION_CODEBOOK), separators=(",", ":"))
+        + ". Use this exact per-field output codebook (canonical JSON): "
+        + json.dumps(
+            _TLS13_SUCCESSION_CODEBOOK, sort_keys=True, separators=(",", ":")
+        )
+        + ". Resolve each field independently from the supplied RFC graph; use "
+        'the string "UNKNOWN" only for a field whose required evidence or relation '
+        "is absent."
+    )
+
+
+def _tls13_rfc_records(manifest: dict[str, Any]) -> dict[int, dict[str, Any]]:
+    records: dict[int, dict[str, Any]] = {}
+    for record in manifest["records"]:
+        number = record.get("rfc_number")
+        if isinstance(number, int):
+            if number in records:
+                raise ProvenanceError("IETF TLS 1.3 RFC identity is duplicated")
+            records[number] = record
+    if set(records) != _TLS13_RFC_NUMBERS:
+        raise ProvenanceError("IETF TLS 1.3 RFC graph is incomplete")
+    return records
+
+
+def _tls13_succession_relation(
+    manifest: dict[str, Any], *, kind: str, target_number: int
+) -> dict[str, Any]:
+    matches = [
+        relation
+        for relation in manifest["relations"]
+        if relation.get("kind") == kind
+        and relation.get("source_record_id") == "ietf:rfc:8446"
+        and relation.get("target_record_id") == f"ietf:rfc:{target_number}"
+    ]
+    if len(matches) != 1:
+        raise ProvenanceError("IETF TLS 1.3 succession relation is not unique")
+    return matches[0]
+
+
+def _tls13_succession_evidence(
+    records: dict[int, dict[str, Any]], evidence_id: str, specification: tuple[int, str]
+) -> dict[str, Any]:
+    number, pattern = specification
+    record = records[number]
+    matches = list(re.finditer(pattern, record["text"], re.MULTILINE | re.DOTALL))
+    if len(matches) != 1:
+        raise ProvenanceError("IETF TLS 1.3 succession evidence is not unique")
+    match = matches[0]
+    quote = match.group(0)
+    return {
+        "evidence_id": evidence_id,
+        "record_id": record["record_id"],
+        "evidence_quote": quote,
+        "char_start": match.start(),
+        "char_end": match.end(),
+        "quote_sha256": hashlib.sha256(quote.encode()).hexdigest(),
+        "source_sha256": record["source_sha256"],
+    }
+
+
+def build_ietf_tls13_handshake_succession_task(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Compile TLS 1.3 handshake succession from RFC 8446 Obsoletes/Updates."""
+    audit_ietf_workflow_manifest(manifest)
+    records = _tls13_rfc_records(manifest)
+    evidence = [
+        _tls13_succession_evidence(records, evidence_id, specification)
+        for evidence_id, specification in _TLS13_SUCCESSION_EVIDENCE.items()
+    ]
+    succession_relations = [
+        _tls13_succession_relation(manifest, kind=kind, target_number=target_number)
+        for _field, (_current, _dependency, kind, target_number) in (
+            _TLS13_SUCCESSION_BRANCHES.items()
+        )
+        if kind is not None and target_number is not None
+    ]
+    publication = [
+        relation
+        for relation in manifest["relations"]
+        if relation.get("kind") == "published_as"
+        and relation.get("target_record_id") == "ietf:rfc:8446"
+    ]
+    if len(publication) != 1:
+        raise ProvenanceError("IETF TLS 1.3 publication relation is not unique")
+    task = {
+        "schema_version": IETF_TLS13_HANDSHAKE_SUCCESSION_TASK_SCHEMA,
+        "query_type": "protocol_succession_resolution",
+        "answer_program_id": "ietf.tls13_handshake_succession.v1",
+        "question": _tls13_succession_question(),
+        "cutoff": "2026-01-31T00:00:00Z",
+        "scenario": dict(_TLS13_SUCCESSION_SCENARIO),
+        "source_manifest": deepcopy(manifest),
+        "source_manifest_sha256": _canonical_sha256(manifest),
+        "evidence_items": evidence,
+        "essential_evidence_ids": list(_TLS13_SUCCESSION_EVIDENCE),
+        "essential_relation_ids": [
+            publication[0]["relation_id"],
+            *(relation["relation_id"] for relation in succession_relations),
+        ],
+        "answer": dict(_TLS13_SUCCESSION_ANSWERS),
+    }
+    replay_ietf_tls13_handshake_succession_task(task)
+    return task
+
+
+def replay_ietf_tls13_handshake_succession_task(
+    task: dict[str, Any],
+    *,
+    evidence_ids: list[str] | None = None,
+    relation_ids: list[str] | None = None,
+) -> dict[str, str]:
+    """Replay TLS 1.3 succession with optional evidence or relation removal."""
+    required_fields = {
+        "schema_version",
+        "query_type",
+        "answer_program_id",
+        "question",
+        "cutoff",
+        "scenario",
+        "source_manifest",
+        "source_manifest_sha256",
+        "evidence_items",
+        "essential_evidence_ids",
+        "essential_relation_ids",
+        "answer",
+    }
+    if (
+        not isinstance(task, dict)
+        or set(task) != required_fields
+        or task.get("schema_version") != IETF_TLS13_HANDSHAKE_SUCCESSION_TASK_SCHEMA
+        or task.get("query_type") != "protocol_succession_resolution"
+        or task.get("answer_program_id") != "ietf.tls13_handshake_succession.v1"
+        or task.get("question") != _tls13_succession_question()
+        or task.get("cutoff") != "2026-01-31T00:00:00Z"
+        or task.get("scenario") != _TLS13_SUCCESSION_SCENARIO
+        or task.get("essential_evidence_ids") != list(_TLS13_SUCCESSION_EVIDENCE)
+        or task.get("answer") != _TLS13_SUCCESSION_ANSWERS
+    ):
+        raise ProvenanceError("IETF TLS 1.3 task contract is invalid")
+    manifest = task.get("source_manifest")
+    if not isinstance(manifest, dict):
+        raise ProvenanceError("IETF TLS 1.3 source manifest is missing")
+    audit_ietf_workflow_manifest(manifest)
+    if task.get("source_manifest_sha256") != _canonical_sha256(manifest):
+        raise ProvenanceError("IETF TLS 1.3 source manifest binding is invalid")
+    records = _tls13_rfc_records(manifest)
+    raw_evidence = task.get("evidence_items")
+    if not isinstance(raw_evidence, list):
+        raise ProvenanceError("IETF TLS 1.3 evidence is invalid")
+    items = {
+        str(item.get("evidence_id") or ""): item
+        for item in raw_evidence
+        if isinstance(item, dict)
+    }
+    if set(items) != set(_TLS13_SUCCESSION_EVIDENCE) or len(items) != len(raw_evidence):
+        raise ProvenanceError("IETF TLS 1.3 evidence identity is invalid")
+    for evidence_id, specification in _TLS13_SUCCESSION_EVIDENCE.items():
+        expected = _tls13_succession_evidence(records, evidence_id, specification)
+        if items[evidence_id] != expected:
+            raise ProvenanceError("IETF TLS 1.3 evidence binding is invalid")
+    all_evidence = set(items)
+    selected_evidence = all_evidence if evidence_ids is None else set(evidence_ids)
+    if (
+        not isinstance(evidence_ids, (list, type(None)))
+        or len(selected_evidence) != len(evidence_ids or selected_evidence)
+        or not selected_evidence.issubset(all_evidence)
+    ):
+        raise ProvenanceError("IETF TLS 1.3 evidence selection is invalid")
+    relations = {
+        str(relation["relation_id"]): relation for relation in manifest["relations"]
+    }
+    essential_relations = task.get("essential_relation_ids")
+    if (
+        not isinstance(essential_relations, list)
+        or len(set(essential_relations)) != len(essential_relations)
+        or any(item not in relations for item in essential_relations)
+    ):
+        raise ProvenanceError("IETF TLS 1.3 relation identity is invalid")
+    selected_relations = (
+        set(essential_relations) if relation_ids is None else set(relation_ids)
+    )
+    if (
+        not isinstance(relation_ids, (list, type(None)))
+        or len(selected_relations) != len(relation_ids or selected_relations)
+        or not selected_relations.issubset(set(essential_relations))
+    ):
+        raise ProvenanceError("IETF TLS 1.3 relation selection is invalid")
+    publication = next(
+        relation
+        for relation in manifest["relations"]
+        if relation.get("kind") == "published_as"
+        and relation.get("target_record_id") == "ietf:rfc:8446"
+    )
+    expected_essential_relations = [
+        publication["relation_id"],
+        *(
+            _tls13_succession_relation(
+                manifest, kind=kind, target_number=target_number
+            )["relation_id"]
+            for _field, (_current, _dependency, kind, target_number) in (
+                _TLS13_SUCCESSION_BRANCHES.items()
+            )
+            if kind is not None and target_number is not None
+        ),
+    ]
+    if essential_relations != expected_essential_relations:
+        raise ProvenanceError("IETF TLS 1.3 task contract is invalid")
+    result: dict[str, str] = {}
+    publication_present = publication["relation_id"] in selected_relations
+    for field, (current, dependency, kind, target_number) in (
+        _TLS13_SUCCESSION_BRANCHES.items()
+    ):
+        needed = {current} if dependency is None else {current, dependency}
+        relations_present = publication_present
+        if kind is not None and target_number is not None:
+            relation = _tls13_succession_relation(
+                manifest, kind=kind, target_number=target_number
+            )
+            relations_present = (
+                publication_present and relation["relation_id"] in selected_relations
+            )
+        if needed.issubset(selected_evidence) and relations_present:
+            result[field] = _TLS13_SUCCESSION_ANSWERS[field]
+        else:
+            result[field] = "UNKNOWN"
+    return result
+
+
+def audit_ietf_tls13_handshake_succession_task(task: dict[str, Any]) -> dict[str, bool]:
+    """Audit strict replay plus every remove-one evidence and relation replay."""
+    answer = task.get("answer")
+    evidence = list(task.get("essential_evidence_ids") or [])
+    relations = list(task.get("essential_relation_ids") or [])
+    return {
+        "strict_replay": replay_ietf_tls13_handshake_succession_task(task) == answer,
+        "remove_one_evidence_fails": bool(evidence)
+        and all(
+            replay_ietf_tls13_handshake_succession_task(
+                task,
+                evidence_ids=[item for item in evidence if item != removed],
+            )
+            != answer
+            for removed in evidence
+        ),
+        "remove_one_relation_fails": bool(relations)
+        and all(
+            replay_ietf_tls13_handshake_succession_task(
+                task,
+                relation_ids=[item for item in relations if item != removed],
+            )
+            != answer
+            for removed in relations
+        ),
+    }
+
+
+def materialize_ietf_tls13_handshake_counterfactual(
+    task: dict[str, Any],
+    *,
+    evidence_id: str = "current_protocol",
+) -> dict[str, Any]:
+    """Exclude one byte-bound TLS 1.3 succession quote without invented text."""
+    replay_ietf_tls13_handshake_succession_task(task)
+    evidence = next(
+        (
+            item
+            for item in task["evidence_items"]
+            if item.get("evidence_id") == evidence_id
+        ),
+        None,
+    )
+    if not isinstance(evidence, dict):
+        raise ProvenanceError("IETF TLS 1.3 counterfactual requirement is invalid")
+    manifest = task["source_manifest"]
+    record = next(
+        item
+        for item in manifest["records"]
+        if item.get("record_id") == evidence.get("record_id")
+    )
+    parent = str(record["text"])
+    parent_value = str(evidence["evidence_quote"])
+    char_start = int(evidence["char_start"])
+    char_end = int(evidence["char_end"])
+    if parent[char_start:char_end] != parent_value:
+        raise ProvenanceError("IETF TLS 1.3 counterfactual requirement span is invalid")
+    value = " " * len(parent_value)
+    child = parent[:char_start] + value + parent[char_end:]
+    byte_start = len(parent[:char_start].encode())
+    byte_end = byte_start + len(parent_value.encode())
+    selected_evidence = [
+        item["evidence_id"]
+        for item in task["evidence_items"]
+        if item.get("evidence_id") != evidence["evidence_id"]
+    ]
+    answer = replay_ietf_tls13_handshake_succession_task(
         task, evidence_ids=selected_evidence
     )
     return {

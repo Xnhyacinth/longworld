@@ -84,6 +84,7 @@ from longworld.core.taskproof import (
     canonicalize_cross_cve_projection_candidate,
     canonicalize_kev_projection_candidate,
     compute_task_proof,
+    counterfactual_retained_source_tokens_valid,
     normalize_projection_candidate_for_adapter,
     relation_endpoints,
     replay_ietf_cross_spec_candidate,
@@ -94,7 +95,9 @@ from longworld.core.taskreplaysidecar import (
     EURLEX_PMS_TASK_REPLAY_ADAPTER,
     FINANCE_TASK_REPLAY_ADAPTER,
     GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
+    IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER,
     IETF_OAUTH_TASK_REPLAY_ADAPTER,
+    IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     SOURCE_TOKEN_MEASUREMENT_BASIS,
     SOURCE_TOKEN_MEASUREMENT_RECEIPT_SCHEMA,
@@ -193,6 +196,18 @@ def _sidecar_uses(
     sidecar: LoadedTaskReplaySidecar, adapter: tuple[str, str, str]
 ) -> bool:
     return sidecar.registry_key[:2] == adapter[:2]
+
+
+def _ietf_requirement_adapter(adapter_key: tuple[str, str, str]) -> bool:
+    return adapter_key[:2] in {
+        IETF_OAUTH_TASK_REPLAY_ADAPTER[:2],
+        IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER[:2],
+        IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER[:2],
+    }
+
+
+def _sidecar_ietf_requirement(sidecar: LoadedTaskReplaySidecar) -> bool:
+    return _ietf_requirement_adapter(sidecar.registry_key)
 
 
 def _validate_loaded_sidecar(
@@ -335,7 +350,7 @@ def _validate_sidecar_payload(
             "replay_revision": candidate.get("strict_replay_revision"),
             **tokenizer_binding,
         }
-    elif _sidecar_uses(sidecar, IETF_OAUTH_TASK_REPLAY_ADAPTER):
+    elif _sidecar_ietf_requirement(sidecar):
         if candidate.get("domain") != "standards":
             raise PromotionError("task replay adapter does not match candidate domain")
         source = candidate.get("source_binding")
@@ -608,10 +623,10 @@ def _validate_v3_projection_derivation(
             for item in contributions
         )
         and sum(item["token_contribution"] for item in contributions) == parent_tokens
-        and (
-            retained_tokens < parent_tokens
-            if candidate.get("view") == "cf"
-            else retained_tokens == parent_tokens
+        and counterfactual_retained_source_tokens_valid(
+            candidate,
+            retained_tokens=retained_tokens,
+            parent_tokens=parent_tokens,
         )
     )
     if (
@@ -740,7 +755,7 @@ def _replay_selection(
                 artifact_ids,
                 counterfactual=counterfactual,
             )
-        if _sidecar_uses(sidecar, IETF_OAUTH_TASK_REPLAY_ADAPTER):
+        if _sidecar_ietf_requirement(sidecar):
             materialized = any(
                 isinstance(classification, Mapping)
                 and classification.get("source_origin") == "synthetic_counterfactual"
@@ -853,7 +868,7 @@ def _task_selection_metrics(
     if (
         _sidecar_uses(sidecar, CYBER_KEV_TASK_REPLAY_ADAPTER)
         or _sidecar_uses(sidecar, CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER)
-        or _sidecar_uses(sidecar, IETF_OAUTH_TASK_REPLAY_ADAPTER)
+        or _sidecar_ietf_requirement(sidecar)
         or _sidecar_uses(sidecar, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER)
         or _sidecar_uses(sidecar, EURLEX_PMS_TASK_REPLAY_ADAPTER)
     ):
@@ -923,6 +938,10 @@ def _task_selection_metrics(
         group_suffix = "macro-vintage-history"
     elif _sidecar_uses(sidecar, IETF_OAUTH_TASK_REPLAY_ADAPTER):
         group_suffix = "ietf-oauth-cross-spec"
+    elif _sidecar_uses(sidecar, IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER):
+        group_suffix = "ietf-http3-quic-requirement"
+    elif _sidecar_uses(sidecar, IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER):
+        group_suffix = "ietf-tls13-handshake-succession"
     elif _sidecar_uses(sidecar, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER):
         group_suffix = "govinfo-bill-disposition"
     elif _sidecar_uses(sidecar, EURLEX_PMS_TASK_REPLAY_ADAPTER):
@@ -1741,6 +1760,37 @@ def _canonical_task_identifiers(
             raise PromotionError("IETF answer program is unsupported")
         motif, program_ops = selected_program
         answer_program_id = str(task["answer_program_id"])
+    elif family == IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("ietf_requirement_task")
+        if (
+            not isinstance(task, Mapping)
+            or task.get("answer_program_id")
+            != "ietf.http3_quic_effective_requirement.v1"
+            or candidate.get("answer_program_id") != task.get("answer_program_id")
+        ):
+            raise PromotionError("IETF HTTP/3 answer program is unsupported")
+        motif = "http3_quic_requirement+dependency_closure+requirement_resolution"
+        program_ops = (
+            "select_cutoff_sources",
+            "resolve_publication_and_reference_relations",
+            "evaluate_http3_requirement_branches",
+        )
+        answer_program_id = str(task["answer_program_id"])
+    elif family == IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("ietf_requirement_task")
+        if (
+            not isinstance(task, Mapping)
+            or task.get("answer_program_id") != "ietf.tls13_handshake_succession.v1"
+            or candidate.get("answer_program_id") != task.get("answer_program_id")
+        ):
+            raise PromotionError("IETF TLS 1.3 answer program is unsupported")
+        motif = "tls13_handshake_succession+obsoletes_updates_closure"
+        program_ops = (
+            "select_cutoff_sources",
+            "resolve_publication_obsoletes_and_updates",
+            "evaluate_tls13_succession_branches",
+        )
+        answer_program_id = str(task["answer_program_id"])
     elif family == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]:
         task = candidate.get("govinfo_disposition_task")
         if (
@@ -2148,25 +2198,37 @@ def _finance_chronology(
         if record_type == "financial_source_row":
             occurred_at = str(record.get("report_date") or "")
             kind_order = "0"
+            start = record.get("source_char_start")
+            if not isinstance(start, int) or isinstance(start, bool) or start < 0:
+                raise PromotionError("Finance task chronology source span is missing")
+            position = f"{start:012d}"
         elif record_type == "filing":
             occurred_at = str(record.get("filing_date") or "")
             kind_order = "1"
+            position = ""
         elif record_type == "filing_relation":
             occurred_at = filings.get(str(record.get("source_record_id") or ""), "")
             kind_order = "2"
+            position = ""
         elif record_type == "table_branch_relation":
             occurred_at = filings.get(str(record.get("source_record_id") or ""), "")
             kind_order = "3"
+            position = ""
         elif record_type == "year_join_relation":
             occurred_at = filings.get(str(record.get("source_record_id") or ""), "")
             kind_order = "4"
+            position = ""
         else:
             raise PromotionError("Finance task chronology record type is unsupported")
         artifact_id = str(classification.get("artifact_id") or "")
         if not occurred_at or not artifact_id:
             raise PromotionError("Finance task chronology identity is incomplete")
         ordered.append(
-            (f"{occurred_at}|{kind_order}|{artifact_id}", classification, document)
+            (
+                f"{occurred_at}|{kind_order}|{position}|{artifact_id}",
+                classification,
+                document,
+            )
         )
     return sorted(ordered, key=lambda value: value[0])
 
@@ -2801,7 +2863,7 @@ def _task_view_replay(
                 artifact_ids,
                 counterfactual=counterfactual,
             )
-        if adapter_key == IETF_OAUTH_TASK_REPLAY_ADAPTER:
+        if _ietf_requirement_adapter(adapter_key):
             materialized = any(
                 isinstance(classification, Mapping)
                 and classification.get("source_origin") == "synthetic_counterfactual"
@@ -2821,6 +2883,74 @@ def _task_view_replay(
                 candidate, artifact_ids, counterfactual=counterfactual
             )
     raise PromotionError("standard task views are not implemented for adapter")
+
+
+def _ietf_counterfactual_materialized(candidate: Mapping[str, Any]) -> bool:
+    return any(
+        isinstance(classification, Mapping)
+        and classification.get("source_origin") == "synthetic_counterfactual"
+        for classification in candidate.get("artifact_classification") or []
+    )
+
+
+def _http3_xor_restore_artifact_ids(
+    candidate: Mapping[str, Any],
+    artifact_ids: Sequence[str],
+) -> list[str]:
+    task = candidate.get("ietf_requirement_task")
+    evidence = task.get("evidence_items") if isinstance(task, Mapping) else None
+    required = (
+        set(task.get("essential_evidence_ids") or [])
+        if isinstance(task, Mapping)
+        else set()
+    )
+    classifications = {
+        str(item.get("artifact_id") or ""): item
+        for item in candidate.get("artifact_classification") or []
+        if isinstance(item, Mapping)
+    }
+    if not isinstance(evidence, list) or not required:
+        raise PromotionError("HTTP/3 counterfactual restore evidence is missing")
+    output: list[str] = []
+    for artifact_id in artifact_ids:
+        classification = classifications.get(str(artifact_id))
+        start = (
+            classification.get("source_char_start")
+            if isinstance(classification, Mapping)
+            else None
+        )
+        end = (
+            classification.get("source_char_end")
+            if isinstance(classification, Mapping)
+            else None
+        )
+        record_id = (
+            classification.get("source_record_id")
+            if isinstance(classification, Mapping)
+            else None
+        )
+        if (
+            not isinstance(classification, Mapping)
+            or not isinstance(start, int)
+            or isinstance(start, bool)
+            or not isinstance(end, int)
+            or isinstance(end, bool)
+        ):
+            continue
+        covers = {
+            str(item.get("evidence_id") or "")
+            for item in evidence
+            if isinstance(item, Mapping)
+            and item.get("record_id") == record_id
+            and start <= item.get("char_start")
+            and item.get("char_end") <= end
+            and item.get("evidence_id") in required
+        }
+        if covers:
+            output.append(str(artifact_id))
+    if not output:
+        raise PromotionError("HTTP/3 counterfactual restore host is missing")
+    return output
 
 
 def _minimal_ietf_view_essential_ids(
@@ -2852,6 +2982,22 @@ def _minimal_ietf_view_essential_ids(
         )
     ):
         raise PromotionError("IETF task view essential artifact minimization failed")
+    if adapter_key != IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER:
+        return essential_ids
+    pinned = [
+        artifact_id
+        for artifact_id in _http3_xor_restore_artifact_ids(candidate, artifact_ids)
+        if artifact_id not in essential_ids
+    ]
+    essential_ids.extend(pinned)
+    materialized = _ietf_counterfactual_materialized(candidate)
+    restored = replay_ietf_cross_spec_candidate(
+        candidate,
+        essential_ids,
+        counterfactual=True != materialized,
+    )
+    if restored.get("answer") != candidate.get("cf_answer"):
+        raise PromotionError("HTTP/3 counterfactual restore essentials are insufficient")
     return essential_ids
 
 
@@ -2875,6 +3021,8 @@ def build_task_candidate_view_projections(
         FINANCE_TASK_REPLAY_ADAPTER,
         MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
         IETF_OAUTH_TASK_REPLAY_ADAPTER,
+        IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER,
+        IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER,
         GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
         EURLEX_PMS_TASK_REPLAY_ADAPTER,
     }:
@@ -2927,7 +3075,7 @@ def build_task_candidate_view_projections(
         cf_candidate["artifact_classification"] = [
             deepcopy(classification) for classification, _document in cf_artifacts
         ]
-    elif adapter_key == IETF_OAUTH_TASK_REPLAY_ADAPTER:
+    elif _ietf_requirement_adapter(adapter_key):
         cf_artifacts = _ietf_counterfactual_artifacts(candidate, artifacts)
         chronology = _ietf_chronology(candidate, artifacts)
         cf_candidate = deepcopy(candidate)
@@ -2996,7 +3144,7 @@ def build_task_candidate_view_projections(
         cf_candidate,
         adapter_key,
         materialized_ids,
-        counterfactual=adapter_key == IETF_OAUTH_TASK_REPLAY_ADAPTER,
+        counterfactual=_ietf_requirement_adapter(adapter_key),
     )
     if materialized_cf.get("answer") != candidate.get("cf_answer"):
         raise PromotionError("materialized task counterfactual replay does not match")
@@ -3041,7 +3189,7 @@ def build_task_candidate_view_projections(
         question = str(candidate["question"])
         context = (
             render_ietf_cross_spec_prompt(question, document_context, "first")
-            if adapter_key == IETF_OAUTH_TASK_REPLAY_ADAPTER
+            if _ietf_requirement_adapter(adapter_key)
             else wrap_prompt(question, document_context, "first")
         )
         context_tokens = token_counter(context)
@@ -3065,7 +3213,7 @@ def build_task_candidate_view_projections(
         )
         unsigned["cf_answer"] = candidate["cf_answer"]
         if view == "cf":
-            if adapter_key == IETF_OAUTH_TASK_REPLAY_ADAPTER:
+            if _ietf_requirement_adapter(adapter_key):
                 unsigned["source_record_ids_by_artifact"] = deepcopy(
                     cf_candidate["source_record_ids_by_artifact"]
                 )
@@ -3101,7 +3249,7 @@ def build_task_candidate_view_projections(
         view_replay = _task_view_replay(replay_candidate, adapter_key, view_ids)
         if view_replay.get("answer") != unsigned["answer"]:
             raise PromotionError("task view factual replay does not match answer")
-        if adapter_key == IETF_OAUTH_TASK_REPLAY_ADAPTER:
+        if _ietf_requirement_adapter(adapter_key):
             essential_ids = _minimal_ietf_view_essential_ids(
                 replay_candidate, adapter_key, view_ids, unsigned["answer"]
             )
@@ -3196,7 +3344,7 @@ def build_task_candidate_view_projections(
         )
         if view == "ordered_artifact_view":
             parent_view_artifacts = ordered_artifacts
-        elif view == "cf" and adapter_key == IETF_OAUTH_TASK_REPLAY_ADAPTER:
+        elif view == "cf" and _ietf_requirement_adapter(adapter_key):
             parent_by_id = {
                 str(classification.get("artifact_id") or ""): (
                     classification,

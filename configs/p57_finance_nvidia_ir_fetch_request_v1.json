@@ -1,0 +1,48 @@
+{
+  "schema_version": "longworld.issuer-ir-fetch-request.v1",
+  "user_agent": "LongWorld-P57/1.0 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P57-NVIDIA-IR-HISTORY-20260906",
+    "scope": "NVIDIA issuer-owned fiscal 2022 through fiscal 2025 annual filing artifacts and source-bound asset-trajectory local-probe synthesis",
+    "basis": "User-authorized authentic source synthesis and world expansion; source proof and all unchanged shared gates required",
+    "reviewed_at": "2026-09-06T10:00:00Z"
+  },
+  "issuer": {
+    "name": "NVIDIA CORP",
+    "cik": "0001045810",
+    "detail_host": "investor.nvidia.com",
+    "artifact_host": "d18rn0p25nwr6d.cloudfront.net"
+  },
+  "filings": [
+    {
+      "filing_id": "nvidia-fy2025-annual",
+      "detail_url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=18226262",
+      "form": "10-K",
+      "filing_date": "2025-02-26",
+      "report_date": "2025-01-26"
+    },
+    {
+      "filing_id": "nvidia-fy2024-annual",
+      "detail_url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=17293267",
+      "form": "10-K",
+      "filing_date": "2024-02-21",
+      "report_date": "2024-01-28"
+    },
+    {
+      "filing_id": "nvidia-fy2023-annual",
+      "detail_url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=16435381",
+      "form": "10-K",
+      "filing_date": "2023-02-24",
+      "report_date": "2023-01-29"
+    },
+    {
+      "filing_id": "nvidia-fy2022-annual",
+      "detail_url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=15668939",
+      "form": "10-K",
+      "filing_date": "2022-03-18",
+      "report_date": "2022-01-30"
+    }
+  ],
+  "requests_per_second": 2,
+  "max_retries": 3
+}
