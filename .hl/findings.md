@@ -2,6 +2,15 @@
 
 ## TLS 1.3 handshake succession 64k/128k — 2026-09-07
 
+Promoted as unique probe product
+`p57-ietf-tls13-handshake-succession-probe-1-v1-promoted-v1` under
+`p57-ietf-tls13-64k-128k-extension-probe-1-v1`. 6/6 views remain
+`global_proof_green` with 4k/8k windows insufficient. 64k and 128k share one
+succession proof; `LENGTH_VIEW_PAIR_PROFILE_IDS` skips nested relation growth
+without lowering window or correctness gates. Counts: 1 world / 1 semantic
+task / 1 proof family / 6 training views / 581,651 exact tokens.
+`production_eligible=false`.
+
 v1 failed `raw token window 16k intersecting-artifact upper bound` at `0:16384`
 because gold quotes lived on RFC 5077/5246 at chronology start. v3 failed 8k
 upper bound at `30747:38939` because leftover-only RFCs were paragraph-exploded

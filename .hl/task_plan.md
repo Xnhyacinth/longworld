@@ -491,16 +491,20 @@ rejecting the qualification and single-reference shortcuts.
 ## Next Step
 
 P57 dual-track conversion 2026-09-07: Canonical remains 7 products / 17 worlds
-/ 153 train / 8,002,320 tokens. Local NVIDIA v5 + Micron v1 add two finance
-worlds (24 train / 1,461,529 exact tokens) not on CURRENT_RELEASE.
-`production_eligible=false`. TLS v4 is 6/6 green at 64k/128k and is not
-inventory until a unique IETF 2-band probe profile promotes it.
+/ 153 train / 8,002,320 tokens. Local extras not on CURRENT_RELEASE:
+NVIDIA v5 (12), Micron v1 (12), TLS v4 (6). Combined local+canonical is
+10 products / 20 worlds / 183 train / 10,045,500 exact tokens.
+`production_eligible=false`. Production/KMS remains 0.
+
+TLS v4 counts as N_source-world=1, N_semantic-task=1, N_proof-family=1,
+N_training-view=6 under unique IETF 2-band profile
+`p57-ietf-tls13-64k-128k-extension-probe-1-v1`.
 
 Scale unit is verified independent semantic tasks from signed source graphs,
 not four-bucket world products. Strict 4k/8k/16k windows stay for the
 long-dependency profile. Retrieval/integration profiles are new versioned
-products, not a silent gate drop. Next conversion: (1) register and promote
-TLS 64k/128k on an IETF 2-band profile; (2) batch extra Finance/IETF queries
-from existing NVIDIA/Micron/TLS/HTTP-Semantics graphs; (3) keep Amazon/Meta/
-HTTP/3 fail-closed until window class is labeled. Do not rematerialize
-NVIDIA/Alphabet/Microsoft. Do not pad HTTP/2, DNSSEC, or ACME to 128k.
+products, not a silent gate drop. Next conversion: batch extra Finance/IETF
+queries from existing NVIDIA/Micron/TLS/HTTP-Semantics graphs; keep
+Amazon/Meta/HTTP/3 fail-closed until window class is labeled. Do not
+rematerialize NVIDIA/Alphabet/Microsoft. Do not pad HTTP/2, DNSSEC, or ACME
+to 128k.

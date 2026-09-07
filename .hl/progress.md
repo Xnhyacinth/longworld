@@ -1,11 +1,17 @@
 # Progress
 
+- 2026-09-07 TLS 1.3 handshake succession v4 promoted as unique local-probe
+  product `p57-ietf-tls13-64k-128k-extension-probe-1-v1` (6 train / 0 eval,
+  581,651 exact tokens). N_source-world=1, N_semantic-task=1, N_proof-family=1,
+  N_training-view=6. Length-view pairing, not nested 64k→128k relation growth.
+  `production_eligible=false`. Not on CURRENT_RELEASE / HF. Next: extra
+  independent tasks from signed NVIDIA/Micron/TLS/HTTP-Semantics graphs.
 - 2026-09-07 TLS 1.3 handshake succession v4: 64k/128k × full/cf/ordered
   dense-audited 6/6 `global_proof_green=true` (exact tokens 65493–65513 and
   128364–128384; sum 581,651). Packed parents are not inventory. 16k/32k not
   packed: seven thick relation endpoints cannot fit those bands without quote
-  isolation or leftover tinies. Next is a unique IETF 64k/128k probe profile,
-  not p17 finance. HTTP Semantics waits on that promotion path. No HF.
+  isolation or leftover tinies. HTTP Semantics can now follow this 2-band
+  promotion path. No HF.
 - 2026-09-04 P38/P43 IETF conversion remains blocked with zero formal rows.
   Schema-fixed P33 rebuilt and audited 6/6; the 64K-only chain reached strict
   promotion but failed the existing lower-band quality gate. A natural
