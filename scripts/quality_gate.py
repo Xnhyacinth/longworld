@@ -41,6 +41,7 @@ from longworld.core.record_contract import (
     sft_row_errors,
 )
 from longworld.core.release_profile import (
+    LENGTH_VIEW_PAIR_PROFILE_IDS,
     RELATION_PROVENANCE_SPLIT_PROFILE_IDS,
     SUBSTANTIAL_REAL_PROOF_GROWTH_PROFILE_IDS,
     ReleaseProfile,
@@ -149,6 +150,12 @@ def _create_release_gate_receipt(
     ):
         raise ValueError("release gate receipt requires a complete auditor identity")
     return receipt
+
+
+def _allows_shared_proof_length_views(profile: ReleaseProfile | None) -> bool:
+    return bool(
+        profile is not None and profile.profile_id in LENGTH_VIEW_PAIR_PROFILE_IDS
+    )
 
 
 def _requires_substantial_real_proof_growth(profile: ReleaseProfile | None) -> bool:
@@ -564,6 +571,7 @@ def _semantic_growth_errors(
     max_generic_growth_share: float,
     *,
     require_substantial_real_proof_growth: bool = False,
+    allow_shared_proof_length_views: bool = False,
 ) -> list[str]:
     def intrinsic_long_source(row: dict, semantic: dict, estimated_total: int) -> bool:
         exact_tokens = int(row.get("tokenizer_context_tokens") or 0)
@@ -642,7 +650,7 @@ def _semantic_growth_errors(
                 sibling.get("length_bucket") in {"16k", "32k"}
                 for sibling in groups.get(key, [])
             )
-            if not lower_band:
+            if not lower_band and not allow_shared_proof_length_views:
                 errors.append(
                     "real_64k_missing_lower_band:"
                     f"{row.get('base_task_id') or row.get('world_id') or '?'}:"
@@ -688,7 +696,10 @@ def _semantic_growth_errors(
                     f"{after.get('length_bucket')}:workflow={workflow_growth}:"
                     f"generic_share={generic_share:.3f}"
                 )
-            if after.get("real_source_verified") is True:
+            if (
+                after.get("real_source_verified") is True
+                and not allow_shared_proof_length_views
+            ):
                 before_authentic = before.get("authentic_source_relation_edges")
                 after_authentic = after.get("authentic_source_relation_edges")
                 causal_growth = (
@@ -1487,6 +1498,7 @@ def evaluate_quality(
             require_substantial_real_proof_growth=(
                 _requires_substantial_real_proof_growth(profile)
             ),
+            allow_shared_proof_length_views=_allows_shared_proof_length_views(profile),
         )
     )
     errors.extend(_row_contract_errors(rows))

@@ -64,6 +64,7 @@ from longworld.core.record_contract import (
     sft_row_errors,
 )
 from longworld.core.release_profile import (
+    LENGTH_VIEW_PAIR_PROFILE_IDS,
     release_profile,
     release_profile_sha256,
 )
@@ -1029,7 +1030,7 @@ def _cumulative_history_violations_by_world(
     rows: list[dict[str, Any]], profile: Any
 ) -> dict[str, tuple[str, ...]]:
     required = tuple(profile.required_exact_length_buckets)
-    if len(required) < 2:
+    if len(required) < 2 or profile.profile_id in LENGTH_VIEW_PAIR_PROFILE_IDS:
         return {}
     groups: defaultdict[tuple[str, str, str, str, str], list[dict[str, Any]]] = (
         defaultdict(list)
@@ -1281,6 +1282,8 @@ def _task_sidecar_matches_candidate(
             "public_law.eurlex_pms_risk_control.v1": "public_law",
             "macro.gdp_vintage_reconstruction.v1": "macro_economics",
             "standards.ietf_oauth_requirement.v1": "standards",
+            "standards.ietf_http3_quic_requirement.v1": "standards",
+            "standards.ietf_tls13_handshake_succession.v1": "standards",
         }
         return bool(
             key[0] in expected_domains

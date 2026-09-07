@@ -87,7 +87,9 @@ from longworld.core.sourcebundle import LoadedSourceWorkflowBundle
 from longworld.core.taskproof import TASK_PROOF_RECEIPT_SCHEMA
 from longworld.core.taskreplaysidecar import (
     GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER_V3,
+    IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER_V3,
     IETF_OAUTH_TASK_REPLAY_ADAPTER_V3,
+    IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER_V3,
     TASK_VIEW_DERIVATION_REVISION,
     task_candidate_content_commitment,
 )
@@ -5225,6 +5227,38 @@ def test_ietf_v3_projection_binding_accepts_only_standards_domain() -> None:
     assert not _task_sidecar_matches_candidate(
         {**candidate, "domain": "finance"}, binding
     )
+
+
+def test_ietf_tls13_and_http3_v3_projection_bindings_accept_standards_domain() -> None:
+    for adapter in (
+        IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER_V3,
+        IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER_V3,
+    ):
+        adapter_id, adapter_revision, sidecar_schema_version = adapter
+        binding = {
+            "adapter_id": adapter_id,
+            "adapter_revision": adapter_revision,
+            "sidecar_schema_version": sidecar_schema_version,
+            "sha256": "f" * 64,
+        }
+        candidate = {
+            "domain": "standards",
+            "view": "full",
+            "composition_method": "same_case_dossier",
+            "strict_replay_revision": adapter_revision,
+            "dossier_id": "ietf-succession-dossier",
+            "task_view_projection": {
+                "schema_version": "longworld.task-view-projection.v1",
+                "derivation_revision": TASK_VIEW_DERIVATION_REVISION,
+                "view": "full",
+                "dossier_id": "ietf-succession-dossier",
+            },
+        }
+
+        assert _task_sidecar_matches_candidate(candidate, binding)
+        assert not _task_sidecar_matches_candidate(
+            {**candidate, "domain": "finance"}, binding
+        )
 
 
 def test_govinfo_v3_projection_binding_accepts_only_legislation_domain() -> None:

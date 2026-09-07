@@ -1839,6 +1839,20 @@ def test_real_relation_growth_requires_strict_nested_history() -> None:
 
     assert any("real_causal_history_not_nested" in error for error in errors)
 
+    paired = quality_gate._semantic_growth_errors(
+        [before, after],
+        min_internal_growth=4_096,
+        max_generic_growth_share=0.3,
+        allow_shared_proof_length_views=True,
+    )
+
+    assert not any(
+        "real_causal_history_not_nested" in error
+        or "real_causal_history_growth" in error
+        or "real_strict_support_growth" in error
+        for error in paired
+    )
+
 
 def test_128k_semantic_density_uses_exact_not_estimated_total() -> None:
     row = {
