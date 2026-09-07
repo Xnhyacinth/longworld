@@ -1,0 +1,37 @@
+{
+  "schema_version": "longworld.ietf-fetch-request.v1",
+  "user_agent": "LongWorld-P57/1.0 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "p57-ietf-quic-http3-family-v1",
+    "scope": "public IETF Datatracker, Internet-Draft archive, and RFC Editor records for the QUIC transport and HTTP/3 specification family",
+    "basis": "IETF open-records research export for unique-token preflight and a distinct cross-specification requirement graph, not OAuth and not RFC 9421 revision stacking",
+    "reviewed_at": "2026-09-06T10:00:00Z",
+    "allowed_actions": [
+      "fetch_datatracker_document",
+      "fetch_datatracker_relation",
+      "fetch_draft_revision",
+      "fetch_rfc"
+    ]
+  },
+  "drafts": [
+    {
+      "name": "draft-ietf-quic-transport",
+      "revisions": [
+        "34"
+      ]
+    }
+  ],
+  "rfc_numbers": [
+    8999,
+    9000,
+    9001,
+    9002,
+    9114,
+    9204,
+    9368,
+    9369
+  ],
+  "approved_public_test_vector_sha256": [],
+  "requests_per_second": 1.0,
+  "max_retries": 2
+}

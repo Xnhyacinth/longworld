@@ -942,3 +942,183 @@ def test_export_signs_only_valid_disabled_manifest(tmp_path: Path) -> None:
     signed = json.loads(output.read_text())
     assert signed["production_eligible"] is False
     assert verify_attestation(signed, key, purpose="source_manifest")
+
+
+def test_rfc_datatracker_sources_bind_rfc_to_rfc_normative_edges(
+    tmp_path: Path,
+) -> None:
+    request = {
+        "schema_version": "longworld.ietf-fetch-request.v1",
+        "user_agent": "LongWorld/0.2 standards@example.org",
+        "authorization": {
+            "record_id": "ietf-test-rfc-dt",
+            "scope": "public IETF standards",
+            "basis": "public standards research",
+            "reviewed_at": "2026-08-29T00:00:00Z",
+            "allowed_actions": [
+                "fetch_datatracker_document",
+                "fetch_datatracker_relation",
+                "fetch_draft_revision",
+                "fetch_rfc",
+            ],
+        },
+        "drafts": [{"name": "draft-ietf-demo", "revisions": ["01"]}],
+        "rfc_numbers": [8888, 9999],
+        "rfc_datatracker_sources": [9999],
+        "approved_public_test_vector_sha256": [],
+        "requests_per_second": 1.0,
+        "max_retries": 2,
+    }
+    request_path = tmp_path / "ietf_fetch_request.json"
+    request_raw = (json.dumps(request, sort_keys=True) + "\n").encode()
+    request_path.write_bytes(request_raw)
+    bodies = {
+        "datatracker-draft-ietf-demo.json": json.dumps(
+            {
+                "name": "draft-ietf-demo",
+                "rev": "01",
+                "rfc": "RFC 9999",
+                "time": "2024-02-03T12:00:00Z",
+            },
+            sort_keys=True,
+        ).encode(),
+        "datatracker-draft-ietf-demo-relations.json": json.dumps(
+            {
+                "meta": {"total_count": 1},
+                "objects": [
+                    {
+                        "relationship": "/api/v1/name/docrelationshipname/became_rfc/",
+                        "source": "/api/v1/doc/document/draft-ietf-demo/",
+                        "target": "/api/v1/doc/document/rfc9999/",
+                    }
+                ],
+            },
+            sort_keys=True,
+        ).encode(),
+        "draft-ietf-demo-01.txt": (
+            b"Internet-Draft draft-ietf-demo-01\n2 February 2024\n"
+            b"HTTP/3 mapping over QUIC.\n"
+        ),
+        "rfc8888.txt": b"RFC 8888\nQUIC version 1 transport.\nJanuary 2021\n",
+        "rfc9999.txt": (
+            b"Request for Comments: 9999                    Example Publisher\n"
+            b"March 2025\n"
+            b"HTTP/3 relies on QUIC version 1 as the underlying transport.\n"
+        ),
+        "datatracker-rfc9999.json": json.dumps(
+            {
+                "name": "rfc9999",
+                "rfc": "9999",
+                "rev": "",
+                "time": "2024-03-01T00:00:00Z",
+            },
+            sort_keys=True,
+        ).encode(),
+        "datatracker-rfc9999-relations.json": json.dumps(
+            {
+                "meta": {"total_count": 1},
+                "objects": [
+                    {
+                        "relationship": "/api/v1/name/docrelationshipname/refnorm/",
+                        "source": "/api/v1/doc/document/rfc9999/",
+                        "target": "/api/v1/doc/document/rfc8888/",
+                    }
+                ],
+            },
+            sort_keys=True,
+        ).encode(),
+    }
+    specifications = [
+        (
+            "datatracker_document",
+            "datatracker-draft-ietf-demo.json",
+            "https://datatracker.ietf.org/api/v1/doc/document/draft-ietf-demo/",
+        ),
+        (
+            "datatracker_relation",
+            "datatracker-draft-ietf-demo-relations.json",
+            "https://datatracker.ietf.org/api/v1/doc/relateddocument/?source__name=draft-ietf-demo&limit=100",
+        ),
+        (
+            "draft_revision",
+            "draft-ietf-demo-01.txt",
+            "https://www.ietf.org/archive/id/draft-ietf-demo-01.txt",
+        ),
+        (
+            "rfc",
+            "rfc8888.txt",
+            "https://www.rfc-editor.org/rfc/rfc8888.txt",
+        ),
+        (
+            "rfc",
+            "rfc9999.txt",
+            "https://www.rfc-editor.org/rfc/rfc9999.txt",
+        ),
+        (
+            "datatracker_document",
+            "datatracker-rfc9999.json",
+            "https://datatracker.ietf.org/api/v1/doc/document/rfc9999/",
+        ),
+        (
+            "datatracker_relation",
+            "datatracker-rfc9999-relations.json",
+            "https://datatracker.ietf.org/api/v1/doc/relateddocument/?source__name=rfc9999&limit=100",
+        ),
+    ]
+    retrievals = []
+    for kind, filename, url in specifications:
+        item = _write(tmp_path / filename, bodies[filename])
+        item.update(
+            {
+                "kind": kind,
+                "requested_url": url,
+                "final_url": url,
+                "observed_at": f"2026-08-29T01:00:{len(retrievals) + 1:02d}Z",
+            }
+        )
+        retrievals.append(item)
+    inventory = {
+        "schema_version": IETF_FETCH_INVENTORY_SCHEMA,
+        "source_status": "public_api_export",
+        "data_stage": "source_inventory",
+        "hybrid_train_ready": False,
+        "production_eligible": False,
+        "generation_integration": "disabled",
+        "semantic_facts_train_ready": False,
+        "generated_at": "2026-08-29T01:00:00Z",
+        "request_file": request_path.name,
+        "request_sha256": hashlib.sha256(request_raw).hexdigest(),
+        "authorization": request["authorization"],
+        "fetch_receipt": {
+            "policy_url": "https://www.ietf.org/about/open-records/",
+            "started_at": "2026-08-29T01:00:00Z",
+            "completed_at": "2026-08-29T01:00:08Z",
+            "requests_per_second": 1.0,
+            "max_retries": 2,
+            "allowed_actions": request["authorization"]["allowed_actions"],
+            "request_file": request_path.name,
+            "request_sha256": hashlib.sha256(request_raw).hexdigest(),
+            "user_agent_sha256": hashlib.sha256(
+                request["user_agent"].encode()
+            ).hexdigest(),
+            "retrievals": retrievals,
+        },
+        "n_retrievals": len(retrievals),
+    }
+    manifest = build_ietf_workflow_from_fetch_inventory(
+        inventory,
+        tmp_path,
+        generated_at="2026-08-29T02:00:00Z",
+        fetch_inventory_sha256="a" * 64,
+    )
+    kinds = {(item["kind"], item["source_record_id"], item["target_record_id"]) for item in manifest["relations"]}
+    assert (
+        "normative_reference",
+        "ietf:rfc:9999",
+        "ietf:rfc:8888",
+    ) in kinds
+    assert (
+        "published_as",
+        "ietf:draft:draft-ietf-demo-01",
+        "ietf:rfc:9999",
+    ) in kinds

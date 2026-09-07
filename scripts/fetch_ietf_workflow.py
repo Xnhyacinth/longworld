@@ -123,19 +123,44 @@ def _authorization(value: object) -> dict[str, Any]:
     return result
 
 
-def _validate_request(payload: dict[str, Any]) -> dict[str, Any]:
+_IETF_FETCH_REQUEST_FIELDS = {
+    "schema_version",
+    "user_agent",
+    "authorization",
+    "drafts",
+    "rfc_numbers",
+    "approved_public_test_vector_sha256",
+    "requests_per_second",
+    "max_retries",
+}
+
+
+def _rfc_datatracker_sources(payload: dict[str, Any], rfc_numbers: list[int]) -> list[int]:
+    if "rfc_datatracker_sources" not in payload:
+        return []
+    sources = payload.get("rfc_datatracker_sources")
+    requested = set(rfc_numbers)
     if (
-        set(payload)
-        != {
-            "schema_version",
-            "user_agent",
-            "authorization",
-            "drafts",
-            "rfc_numbers",
-            "approved_public_test_vector_sha256",
-            "requests_per_second",
-            "max_retries",
-        }
+        not isinstance(sources, list)
+        or not sources
+        or len(sources) > MAX_RFCS
+        or any(
+            isinstance(number, bool) or not isinstance(number, int) or number < 1
+            for number in sources
+        )
+        or len(set(sources)) != len(sources)
+        or sources != sorted(sources)
+        or any(number not in requested for number in sources)
+    ):
+        raise ProvenanceError("IETF fetch RFC datatracker sources are invalid")
+    return list(sources)
+
+
+def _validate_request(payload: dict[str, Any]) -> dict[str, Any]:
+    extra = set(payload) - _IETF_FETCH_REQUEST_FIELDS
+    if (
+        not _IETF_FETCH_REQUEST_FIELDS.issubset(payload)
+        or extra not in (set(), {"rfc_datatracker_sources"})
         or payload.get("schema_version") != IETF_FETCH_REQUEST_SCHEMA
     ):
         raise ProvenanceError("unsupported IETF fetch request schema")
@@ -215,11 +240,13 @@ def _validate_request(payload: dict[str, Any]) -> dict[str, Any]:
     authorization = _authorization(payload.get("authorization"))
     if set(authorization["allowed_actions"]) != _ALLOWED_ACTIONS:
         raise ProvenanceError("IETF fetch request exceeds authorization actions")
+    rfc_numbers = list(numbers)
     return {
         "user_agent": user_agent,
         "authorization": authorization,
         "drafts": drafts,
-        "rfc_numbers": list(numbers),
+        "rfc_numbers": rfc_numbers,
+        "rfc_datatracker_sources": _rfc_datatracker_sources(payload, rfc_numbers),
         "approved_public_test_vector_sha256": list(approved_test_vectors),
         "requests_per_second": float(rate),
         "max_retries": retries,
@@ -379,6 +406,26 @@ def fetch_ietf_workflow(
             )
             for number in request["rfc_numbers"]
         )
+        for number in request["rfc_datatracker_sources"]:
+            specifications.append(
+                (
+                    "datatracker_document",
+                    f"datatracker-rfc{number}.json",
+                    f"https://datatracker.ietf.org/api/v1/doc/document/rfc{number}/",
+                    "application/json",
+                )
+            )
+            specifications.append(
+                (
+                    "datatracker_relation",
+                    f"datatracker-rfc{number}-relations.json",
+                    (
+                        "https://datatracker.ietf.org/api/v1/doc/relateddocument/"
+                        f"?source__name=rfc{number}&limit=100"
+                    ),
+                    "application/json",
+                )
+            )
         for kind, filename, url, content_type in specifications:
             response = downloader.get(url, content_type=content_type)
             observed_at = clock()

@@ -463,3 +463,20 @@ then centralized shared-gate review and inventory binding.
 | P52 GovInfo | blocked: 3 authentic parents and 9 candidate-stage projections; shared 8K artifact window fails, structural v2 exact-band pack emits 0 | change bill transition/task geometry; do not move background or retry the same F219/D207 or A138/F219 construction |
 | P54 EUR-Lex | partial aggregate preflight: six official MDR sources and natural 32K/64K/128K capacity, but only corrected-by is parsed; 0 candidates | bind exact relation spans and selected-document rights, register task replay, then run candidate-level exact-band and raw-token windows |
 | Integration | complete after review: train inventory remains 141 rows; B5 training-condition sample remains 80 examples | preserve immutable products; scale through new executable worlds, not view or length multiplication |
+
+## Next Step
+
+P57 dual-track conversion 2026-09-07: Canonical remains 7 products / 17 worlds
+/ 153 train / 8,002,320 tokens. Local NVIDIA v5 + Micron v1 add two finance
+worlds (24 train / 1,461,529 exact tokens) not on CURRENT_RELEASE.
+`production_eligible=false`. TLS v4 is 6/6 green at 64k/128k and is not
+inventory until a unique IETF 2-band probe profile promotes it.
+
+Scale unit is verified independent semantic tasks from signed source graphs,
+not four-bucket world products. Strict 4k/8k/16k windows stay for the
+long-dependency profile. Retrieval/integration profiles are new versioned
+products, not a silent gate drop. Next conversion: (1) register and promote
+TLS 64k/128k on an IETF 2-band profile; (2) batch extra Finance/IETF queries
+from existing NVIDIA/Micron/TLS/HTTP-Semantics graphs; (3) keep Amazon/Meta/
+HTTP/3 fail-closed until window class is labeled. Do not rematerialize
+NVIDIA/Alphabet/Microsoft. Do not pad HTTP/2, DNSSEC, or ACME to 128k.

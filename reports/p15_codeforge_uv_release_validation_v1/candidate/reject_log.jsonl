@@ -1,0 +1,2 @@
+{"seed": 150, "query_id": "code000150-nacrekit-34:patch_review_test_ancestry:1_cycles:release:0.12.9", "reason": "strict_support_overflow", "timing": "first", "position": "middle", "bucket": "16k"}
+{"seed": 150, "query_id": "code000150-nacrekit-34:patch_review_test_ancestry:2_cycles:release:0.12.9", "reason": "strict_support_overflow", "timing": "first", "position": "middle", "bucket": "32k"}

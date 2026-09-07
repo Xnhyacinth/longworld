@@ -1,0 +1,403 @@
+{
+  "schema_version": "longworld.p46-public-cap-oracle-probe.v1",
+  "source_receipts": [
+    {
+      "id": "rates",
+      "url": "https://www.ofgem.gov.uk/information-consumers/energy-advice-households/energy-price-cap-unit-rates-and-standing-charges",
+      "path": "sources/p46_public_cap_probe_20260906/rates.html.gz",
+      "sha256": "b82aefffa6cd354a5e99e676f5d07d9e2eca540ae2af7128ae8dc9ede90d4bad",
+      "bytes": 426536,
+      "extracted_text_sha256": "3cfad0536d0597f12bdf6f17d8ea00d533a555edac7cfb740b4205768f3babc9"
+    },
+    {
+      "id": "rights",
+      "url": "https://www.ofgem.gov.uk/c-ofgem-2026",
+      "path": "sources/p46_public_cap_probe_20260906/rights.html.gz",
+      "sha256": "00c62001a6b62427924bcc0026057f6a7279a3343ebd00935a3de238a81dd0c0",
+      "bytes": 185054,
+      "extracted_text_sha256": "d547f0653d30ddb46514206f731ec3f6af602679a1a3d64e60a954c3b56f5bca"
+    },
+    {
+      "id": "july_summary",
+      "url": "https://www.ofgem.gov.uk/sites/default/files/2026-05/Summary-of-changes-to-energy-price-cap-1-July-to-30-September-2026.pdf",
+      "path": "sources/p46_public_cap_probe_20260906/july_summary.pdf.gz",
+      "sha256": "a4934dee7d892caada9589a965c8d8e21711ce9a214c6abd0507669b10611024",
+      "bytes": 156765,
+      "extracted_text_sha256": "04f2b6722cb1450d9595f249cc92270d1d48e2888533781270b4aed6ad561640"
+    },
+    {
+      "id": "july_decision",
+      "url": "https://www.ofgem.gov.uk/press-release/energy-price-cap-will-rise-13-july",
+      "path": "sources/p46_public_cap_probe_20260906/july_decision.html.gz",
+      "sha256": "5f4b8bedcfd0eccb65908cd7552503fe6cee4725359fc0b680274a56ed2bfb43",
+      "bytes": 198124,
+      "extracted_text_sha256": "d3e0d7ea07bd4238b615260940c80502ec82c19ea6ed36adf3f459962dc810ca"
+    },
+    {
+      "id": "ntsb_rights",
+      "url": "https://www.ntsb.gov/about/Pages/Website-Policies.aspx",
+      "path": "sources/p46_public_cap_probe_20260906/ntsb_rights.html.gz",
+      "sha256": "8a5a33ecf291add70f74b4757e835aad4c8c38f0e44a6077205710d8a5472a1b",
+      "bytes": 63118,
+      "extracted_text_sha256": "5aa0255a8ebac009d498604b42eb67a994904031d853a43549b080cdb64ddf9e"
+    }
+  ],
+  "ofgem": {
+    "old_basis": {
+      "basis": "2023",
+      "rows": [
+        {
+          "key": "Direct Debit",
+          "previous_gbp": "1641",
+          "current_gbp": "1862",
+          "delta_gbp": "221",
+          "status": "changed",
+          "source_span": {
+            "start": 2140,
+            "end": 2170,
+            "text": "Direct Debit £1,641 £1,862 13%",
+            "text_sha256": "04f2b6722cb1450d9595f249cc92270d1d48e2888533781270b4aed6ad561640"
+          }
+        },
+        {
+          "key": "Standard Credit",
+          "previous_gbp": "1772",
+          "current_gbp": "2005",
+          "delta_gbp": "233",
+          "status": "changed",
+          "source_span": {
+            "start": 2172,
+            "end": 2205,
+            "text": "Standard Credit £1,772 £2,005 13%",
+            "text_sha256": "04f2b6722cb1450d9595f249cc92270d1d48e2888533781270b4aed6ad561640"
+          }
+        },
+        {
+          "key": "PPM",
+          "previous_gbp": "1597",
+          "current_gbp": "1812",
+          "delta_gbp": "215",
+          "status": "changed",
+          "source_span": {
+            "start": 2207,
+            "end": 2228,
+            "text": "PPM £1,597 £1,812 13%",
+            "text_sha256": "04f2b6722cb1450d9595f249cc92270d1d48e2888533781270b4aed6ad561640"
+          }
+        },
+        {
+          "key": "Economy 7 (Direct Debit)",
+          "previous_gbp": "1108",
+          "current_gbp": "1161",
+          "delta_gbp": "53",
+          "status": "changed",
+          "source_span": {
+            "start": 2230,
+            "end": 2273,
+            "text": "Economy 7 \n(Direct Debit) \n£1,108 £1,161 5%",
+            "text_sha256": "04f2b6722cb1450d9595f249cc92270d1d48e2888533781270b4aed6ad561640"
+          }
+        }
+      ],
+      "period_from": "2026-04-01/2026-06-30",
+      "period_to": "2026-07-01/2026-09-30"
+    },
+    "revised_basis": {
+      "basis": "revised_2026",
+      "rows": [
+        {
+          "key": "Direct Debit",
+          "previous_gbp": "1477",
+          "current_gbp": "1663",
+          "delta_gbp": "186",
+          "status": "changed",
+          "source_span": {
+            "start": 2981,
+            "end": 3011,
+            "text": "Direct Debit £1,477 £1,663 13%",
+            "text_sha256": "04f2b6722cb1450d9595f249cc92270d1d48e2888533781270b4aed6ad561640"
+          }
+        },
+        {
+          "key": "Standard Credit",
+          "previous_gbp": "1599",
+          "current_gbp": "1796",
+          "delta_gbp": "197",
+          "status": "changed",
+          "source_span": {
+            "start": 3013,
+            "end": 3046,
+            "text": "Standard Credit £1,599 £1,796 12%",
+            "text_sha256": "04f2b6722cb1450d9595f249cc92270d1d48e2888533781270b4aed6ad561640"
+          }
+        },
+        {
+          "key": "PPM",
+          "previous_gbp": "1439",
+          "current_gbp": "1620",
+          "delta_gbp": "181",
+          "status": "changed",
+          "source_span": {
+            "start": 3048,
+            "end": 3069,
+            "text": "PPM £1,439 £1,620 13%",
+            "text_sha256": "04f2b6722cb1450d9595f249cc92270d1d48e2888533781270b4aed6ad561640"
+          }
+        },
+        {
+          "key": "Economy 7 (Direct Debit)",
+          "previous_gbp": "993",
+          "current_gbp": "1039",
+          "delta_gbp": "46",
+          "status": "changed",
+          "source_span": {
+            "start": 3071,
+            "end": 3112,
+            "text": "Economy 7 (Direct \nDebit) \n£993 £1,039 5%",
+            "text_sha256": "04f2b6722cb1450d9595f249cc92270d1d48e2888533781270b4aed6ad561640"
+          }
+        }
+      ],
+      "period_from": "2026-04-01/2026-06-30",
+      "period_to": "2026-07-01/2026-09-30"
+    },
+    "revision_span": {
+      "start": 3114,
+      "end": 3412,
+      "text": "As of 1 July 2026, all bill values will be referenced at the revised Typical Domestic \nConsumption Values (TDCVs) at medium consumption, 2,500kWh for electricity, 9,500 \nkWh for gas and 3,400 kWh for multi-register meters, such as Economy 7 customers. All \nvalues are rounded to the nearest £ or %.",
+      "text_sha256": "04f2b6722cb1450d9595f249cc92270d1d48e2888533781270b4aed6ad561640"
+    },
+    "single_document_shortcut": true,
+    "shortcut_tokens": 483,
+    "shortcut_span": {
+      "start": 1997,
+      "end": 3414,
+      "text": "Summary of changes to the energy price cap by payment method and meter type \nCap level April to June 2026 July to \nSeptember 2026 \nChange (%) \nDirect Debit £1,641 £1,862 13% \nStandard Credit £1,772 £2,005 13% \nPPM £1,597 £1,812 13% \nEconomy 7 \n(Direct Debit) \n£1,108 £1,161 5% \nAll bill values presented in the table above are communicated using the current Typical \nDomestic Consumption Values (TDCVs) at medium consumption, 2,700kWh for \nelectricity, 11,500 kWh for gas and 3,900 kWh for multi-register meters, such as \nEconomy 7 customers. All values are rounded to the nearest £ or %. \nAlongside the cap levels, we have also published our decision on the review of the \nTypical Domestic Consumption Values (TDCV) which comes into effect starting 1 July \n2026.   \n   \n \n   \n \nSummary of changes to the energy price cap by payment method and meter type \nunder revised TDCV values (coming into effect 1 July 2026).  \nCap level April to June 2026 July to September \n2026 \nChange (%) \nDirect Debit £1,477 £1,663 13% \nStandard Credit £1,599 £1,796 12% \nPPM £1,439 £1,620 13% \nEconomy 7 (Direct \nDebit) \n£993 £1,039 5% \nAs of 1 July 2026, all bill values will be referenced at the revised Typical Domestic \nConsumption Values (TDCVs) at medium consumption, 2,500kWh for electricity, 9,500 \nkWh for gas and 3,400 kWh for multi-register meters, such as Economy 7 customers. All \nvalues are rounded to the nearest £ or %. \n",
+      "text_sha256": "04f2b6722cb1450d9595f249cc92270d1d48e2888533781270b4aed6ad561640"
+    },
+    "rates_shortcut_tokens": 210,
+    "rates_shortcut_span": {
+      "start": 4767,
+      "end": 5439,
+      "text": "Average electricity and gas unit prices and standing charges by Direct Debit\nEnergy price cap per unit and standing charge\n1 July to 30 September 2026\nEnergy price cap per unit and standing charge\n1 October to 31 December 2026\nElectricity\n26.11 pence per kWh\n57.19 pence daily standing charge\n26.32 pence per kWh\n54.83 pence daily standing charge\nGas\n7.33 pence per kWh\n29.04 pence daily standing charge\n7.97 pence per kWh\n29.68 pence daily standing charge\nFigures are rounded to two decimal places and include 5% VAT on gas. There is no VAT on electricity from 1 October 2026 to 31 March 2027.\nCosts cannot be compared directly to previous periods because of this change.",
+      "text_sha256": "3cfad0536d0597f12bdf6f17d8ea00d533a555edac7cfb740b4205768f3babc9"
+    },
+    "summary_total_tokens": 2552,
+    "rights": {
+      "policy_span": {
+        "start": 3780,
+        "end": 4300,
+        "text": "Material featured on this website is subject to Crown copyright protection unless otherwise indicated. You may use Crown copyright information (not including logos) free of charge in any format or medium, under the terms of the\nOpen Government Licence\n.\nThe permission to reproduce Crown copyright material does not extend to any material on this website that is identified as being the copyright of a third party. Authorisation to reproduce such material would need to be obtained from the copyright holders concerned.\n",
+        "text_sha256": "d547f0653d30ddb46514206f731ec3f6af602679a1a3d64e60a954c3b56f5bca"
+      },
+      "scope": "Ofgem-authored selected table and explanatory prose only; excludes logos, contacts, signatures and third-party material",
+      "selected_documents": [
+        "july_summary",
+        "rates",
+        "july_decision"
+      ],
+      "marker_scan": {
+        "july_summary": {
+          "Internal Only": false,
+          "third.party copyright": false
+        },
+        "rates": {
+          "Internal Only": false,
+          "third.party copyright": false
+        },
+        "july_decision": {
+          "Internal Only": false,
+          "third.party copyright": false
+        }
+      },
+      "status": "OGL_POLICY_BOUND_SELECTED_TEXT; NO_TRAINING_RELEASE"
+    },
+    "verdict": "REJECT_SINGLE_DOCUMENT_SHORTCUT",
+    "shared_candidate_eligible": false
+  },
+  "ntsb_fallback": [
+    {
+      "id": "A-20-002",
+      "url": "https://data.ntsb.gov/carol-main-public/api/Query/GetSrRecord/A-20-002",
+      "source_sha256": "6574ff9f8dd6ca7e55460e1337de39d00aa13ce45ed1f5e7a76116bfed1004a4",
+      "bytes": 31290,
+      "classification_spans": [
+        {
+          "branch": 0,
+          "event_index": 2,
+          "date": "2020-09-02T04:00:00Z",
+          "status": "OPEN ACCEPTABLE RESPONSE",
+          "source_span": {
+            "start": 406,
+            "end": 431,
+            "text": "OPEN--ACCEPTABLE RESPONSE",
+            "text_sha256": "10c1446087fe2687fa9e5a70a2fb7c819b6948d3cdf1167c88630b8bdb5a37c5"
+          }
+        },
+        {
+          "branch": 0,
+          "event_index": 4,
+          "date": "2024-02-05T05:00:00Z",
+          "status": "OPEN ACCEPTABLE ALTERNATE RESPONSE",
+          "source_span": {
+            "start": 1299,
+            "end": 1335,
+            "text": "OPEN-- ACCEPTABLE ALTERNATE RESPONSE",
+            "text_sha256": "f29fc51e56afb386aef6010749f910c6d4458f897d529f18dd52f9719b7673cd"
+          }
+        },
+        {
+          "branch": 0,
+          "event_index": 6,
+          "date": "2025-02-24T05:00:00Z",
+          "status": "CLOSED UNACCEPTABLE ACTION",
+          "source_span": {
+            "start": 1248,
+            "end": 1276,
+            "text": "CLOSED-- UNACCEPTABLE ACTION",
+            "text_sha256": "d20b71220e1f6f0c2223f5f0b5fe999ec9ff54594269323d7093617b764b0102"
+          }
+        }
+      ],
+      "timeline": [
+        {
+          "branch": 0,
+          "date": "2020-09-02T04:00:00Z",
+          "previous": null,
+          "current": "OPEN ACCEPTABLE RESPONSE"
+        },
+        {
+          "branch": 0,
+          "date": "2024-02-05T05:00:00Z",
+          "previous": "OPEN ACCEPTABLE RESPONSE",
+          "current": "OPEN ACCEPTABLE ALTERNATE RESPONSE"
+        },
+        {
+          "branch": 0,
+          "date": "2025-02-24T05:00:00Z",
+          "previous": "OPEN ACCEPTABLE ALTERNATE RESPONSE",
+          "current": "CLOSED UNACCEPTABLE ACTION"
+        }
+      ],
+      "status_projection_tokens": 450,
+      "final_state_shortcut": true,
+      "latest_status_span_tokens": 7,
+      "prior_state_required_by_final_classification": false,
+      "verdict": "REJECT_FINAL_STATE_SHORTCUT_AND_UNPROVEN_CAUSAL_CHAIN",
+      "rights": "NTSB-authored literal status spans only; recipient prose excluded; broader source rights/privacy review outstanding"
+    },
+    {
+      "id": "H-20-003",
+      "url": "https://data.ntsb.gov/carol-main-public/api/Query/GetSrRecord/H-20-003",
+      "source_sha256": "d24ec0732d5ad6aea2e8c3f2e2dd649f4d550a8257b509449bec23a93bf8fcca",
+      "bytes": 104205,
+      "classification_spans": [
+        {
+          "branch": 0,
+          "event_index": 3,
+          "date": "2021-03-01T05:00:00Z",
+          "status": "OPEN ACCEPTABLE RESPONSE",
+          "source_span": {
+            "start": 663,
+            "end": 689,
+            "text": "OPEN-- ACCEPTABLE RESPONSE",
+            "text_sha256": "19e003ffbf3713a92726ba99f9b411a5361af798e0f7f6cf7b0f3344c06daf50"
+          }
+        },
+        {
+          "branch": 0,
+          "event_index": 8,
+          "date": "2026-04-14T04:00:00Z",
+          "status": "CLOSED ACCEPTABLE ACTION/ SUPERSEDED",
+          "source_span": {
+            "start": 10396,
+            "end": 10434,
+            "text": "CLOSED-- ACCEPTABLE ACTION/ SUPERSEDED",
+            "text_sha256": "f3dc9b616466e21ab09e8bc94d0a94681e4970e6956ba2d12974d5a933784092"
+          }
+        }
+      ],
+      "timeline": [
+        {
+          "branch": 0,
+          "date": "2021-03-01T05:00:00Z",
+          "previous": null,
+          "current": "OPEN ACCEPTABLE RESPONSE"
+        },
+        {
+          "branch": 0,
+          "date": "2026-04-14T04:00:00Z",
+          "previous": "OPEN ACCEPTABLE RESPONSE",
+          "current": "CLOSED ACCEPTABLE ACTION/ SUPERSEDED"
+        }
+      ],
+      "status_projection_tokens": 305,
+      "final_state_shortcut": true,
+      "latest_status_span_tokens": 10,
+      "prior_state_required_by_final_classification": false,
+      "verdict": "REJECT_FINAL_STATE_SHORTCUT_AND_UNPROVEN_CAUSAL_CHAIN",
+      "rights": "NTSB-authored literal status spans only; recipient prose excluded; broader source rights/privacy review outstanding"
+    },
+    {
+      "id": "M-20-006",
+      "url": "https://data.ntsb.gov/carol-main-public/api/Query/GetSrRecord/M-20-006",
+      "source_sha256": "20f51ea2402777aaeba082fe209f6c65b796aa7ed94165519c5f9097eb68e848",
+      "bytes": 37234,
+      "classification_spans": [
+        {
+          "branch": 0,
+          "event_index": 3,
+          "date": "2021-02-03T05:00:00Z",
+          "status": "OPEN ACCEPTABLE RESPONSE",
+          "source_span": {
+            "start": 914,
+            "end": 940,
+            "text": "OPEN-- ACCEPTABLE RESPONSE",
+            "text_sha256": "5e94c1b4f6396ac2e1d2c88a33602438d6f1122770433c5f5a02dc2e1e0a5316"
+          }
+        },
+        {
+          "branch": 0,
+          "event_index": 4,
+          "date": "2024-09-25T04:00:00Z",
+          "status": "CLOSED NO LONGER APPLICABLE",
+          "source_span": {
+            "start": 714,
+            "end": 743,
+            "text": "CLOSED-- NO LONGER APPLICABLE",
+            "text_sha256": "d896a4a9850f4f1b72cc0c47bfe953aade9f0df4e2e16af6bde093c490f8bccd"
+          }
+        }
+      ],
+      "timeline": [
+        {
+          "branch": 0,
+          "date": "2021-02-03T05:00:00Z",
+          "previous": null,
+          "current": "OPEN ACCEPTABLE RESPONSE"
+        },
+        {
+          "branch": 0,
+          "date": "2024-09-25T04:00:00Z",
+          "previous": "OPEN ACCEPTABLE RESPONSE",
+          "current": "CLOSED NO LONGER APPLICABLE"
+        }
+      ],
+      "status_projection_tokens": 299,
+      "final_state_shortcut": true,
+      "latest_status_span_tokens": 9,
+      "prior_state_required_by_final_classification": false,
+      "verdict": "REJECT_FINAL_STATE_SHORTCUT_AND_UNPROVEN_CAUSAL_CHAIN",
+      "rights": "NTSB-authored literal status spans only; recipient prose excluded; broader source rights/privacy review outstanding"
+    }
+  ],
+  "candidate_count": 0,
+  "inventory_delta": 0,
+  "train_ready": false,
+  "production_eligible": false,
+  "limits": [
+    "No shared adapter, exact-band candidate, dense or exhaustive raw-window audit claimed.",
+    "NTSB timelines consume prior status for reporting only; source-backed causal transition oracle is unproved.",
+    "Public regional tables embedded as interactive content were not extracted; UK-average HTML and source PDF tables were inspected."
+  ]
+}

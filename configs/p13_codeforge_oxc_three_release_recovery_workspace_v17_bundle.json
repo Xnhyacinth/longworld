@@ -1,0 +1,35 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr25909_crates_v0.146.0.json",
+      "sha256": "f35a0d4f4f9cbf37f02ba5f0ea9a7e36a9ca2db507366868fb9388cc7298bd37"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr25975_crates_v0.147.0.json",
+      "sha256": "5cd9bff4cf3ba1c2ad405ec726ceca23c32558fb18c0f09e77983ed99a0d1133"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26144_crates_v0.148.0.json",
+      "sha256": "7bdd576f90d2ac7790513d3347e2d5b9f8d249fa6890c1024fa42a1778f48462"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26169_support.json",
+      "sha256": "31595b27ba1a2ed9efa2b489bd4c117cfd6d729aa0bd2ae4f85d97ff1124fc84"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26194_support.json",
+      "sha256": "8e3d960284858bf08e1e54f4eb7439e50e9746a0c7a386988e697a30fb6cbdd9"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "probe-source-e4bac7778cdcfa3808f3c373b474e85f",
+    "environment": "probe",
+    "digest": "5bca506723696ee5193a48814a18e8b07c69b4dc39969f48d6a6b46f55b36de0"
+  }
+}

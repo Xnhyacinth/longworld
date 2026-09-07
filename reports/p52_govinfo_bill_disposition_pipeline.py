@@ -148,6 +148,18 @@ def _allowed_requested_dispositions(config: Mapping[str, Any]) -> set[str]:
     raise P52Blocker("P52 requested disposition policy is invalid")
 
 
+def _parent_query_id(config: Mapping[str, Any], bucket: str, view: str) -> str:
+    world_id = str(config.get("world_id") or "")
+    instance = str(config.get("task_instance_id") or "")
+    if not world_id:
+        raise P52Blocker("GovInfo parent query id is missing a world id")
+    if instance:
+        if re.fullmatch(r"[a-z0-9][a-z0-9-]{0,79}", instance) is None:
+            raise P52Blocker("GovInfo task instance id is invalid")
+        return f"{world_id}:{instance}:{bucket}:{view}:first"
+    return f"{world_id}:{bucket}:{view}:first"
+
+
 def _load_config(path: Path) -> tuple[dict[str, Any], bytes, dict[str, Any]]:
     raw = path.read_bytes()
     config = json.loads(raw)
@@ -1160,7 +1172,7 @@ def _build_candidate(
         "schema_version": CANDIDATE_SCHEMA,
         "data_product": config["data_product"],
         "world_id": config["world_id"],
-        "query_id": f"{config['world_id']}:{bucket}:{view}:first",
+        "query_id": _parent_query_id(config, bucket, view),
         "domain": "government_legislation",
         "data_stage": "candidate",
         "training_objective": "sft",
@@ -1549,7 +1561,7 @@ def _validate_candidate(
     static_contract = {
         "data_product": config["data_product"],
         "world_id": config["world_id"],
-        "query_id": f"{config['world_id']}:{bucket}:{view}:first",
+        "query_id": _parent_query_id(config, bucket, view),
         "domain": "government_legislation",
         "training_objective": "sft",
         "query_timing": "first",

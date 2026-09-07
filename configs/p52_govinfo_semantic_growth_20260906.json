@@ -1,0 +1,9 @@
+{
+  "schema_version": "longworld.p52-govinfo-semantic-growth-plan.v1",
+  "base_generation_config": "data/candidates/p52_govinfo_geometry_screen_20260906/hr4366-eas-eah-01/generation_config.json",
+  "previous_batch": "data/candidates/p52_govinfo_geometry_screen_20260906",
+  "request_counts": [[2, 6, 12], [2, 8, 16], [2, 10, 20]],
+  "selection_rule": "Keep the first successful H.R.4366 EAS-to-EAH 32K two-key task and its D02 authentic CF endpoint. Append all other eligible modified keys in lexical structural-key order. Freeze all three schedules and explicit keys before geometric or proof-growth measurement. Rebuild fresh nested whole-section parents with the unchanged source packer; never select by artifact hash, observed window position, or filler volume.",
+  "train_ready": false,
+  "inventory_delta": 0
+}

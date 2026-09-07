@@ -26,6 +26,9 @@ from longworld.core.domainhistory import (
 from longworld.core.filingworkflow import ISSUER_GCS_MERGED_COMPONENT_REVISION_V2
 from longworld.core.issuerfilingworkflow import (
     ALPHABET_BREAKDOWN_SECTIONS,
+    META_SEGMENT_SECTION,
+    MICRON_GEO_SECTIONS,
+    MICRON_TECHNOLOGY_SECTIONS,
     parse_issuer_ir_rendered_metrics,
 )
 from longworld.core.pack import SEP
@@ -116,7 +119,29 @@ _SEC_OPTIONAL_TABLE_ROLE_MAP = {
     "product_revenue": "product_revenue",
     "service_revenue": "service_revenue",
 }
-_TABLE_ROLE_PREFIXES = ("category_", "geo_", "prior_geo_")
+_TABLE_ROLE_PREFIXES = ("category_", "geo_", "prior_geo_", "market_")
+# Standard task views wrap parent records with Question/Context/Answer plus
+# document separators. Observed wrap (view minus parent) on NVIDIA v5 and
+# Amazon v3: 16k ~29, 32k ~162, 64k 351-436, 128k ~988. A single 192-token
+# budget packed Amazon 64k to 65243 and overflowed at 65594; 128k would miss
+# next. 16k band width is only 384, so headroom is per-band. Frozen Alphabet /
+# Microsoft / NVIDIA products are not rematerialized.
+_TASK_VIEW_WRAP_HEADROOM_TOKENS = 192
+_TASK_VIEW_WRAP_HEADROOM_BY_BAND = {
+    "16k": 192,
+    "32k": 192,
+    "64k": 512,
+    "128k": 1152,
+}
+
+
+def _task_view_wrap_headroom(band_name: str) -> int:
+    return _TASK_VIEW_WRAP_HEADROOM_BY_BAND.get(
+        band_name, _TASK_VIEW_WRAP_HEADROOM_TOKENS
+    )
+
+
+_LEFTOVER_EXCLUDED_SECTIONS = frozenset({"Cover Page"})
 _RELATION_RECORD_TYPES = frozenset(
     {"filing_relation", "table_branch_relation", "year_join_relation"}
 )
@@ -344,10 +369,24 @@ def _role_marker_options(role: str) -> tuple[tuple[str, ...], ...]:
         options.append(_SEC_SEMANTIC_ROLE_MARKERS[role])
     if role == "revenue":
         options.extend(
-            (concept, ">Revenues</a>")
+            (concept, label)
             for concept in (
                 "defref_us-gaap_Revenues",
                 "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax",
+            )
+            for label in (">Revenues</a>", ">Revenue</a>")
+        )
+    if role == "liabilities_and_equity":
+        options.append(
+            (
+                "defref_us-gaap_LiabilitiesAndStockholdersEquity",
+                "shareholders' equity",
+            )
+        )
+        options.append(
+            (
+                "defref_us-gaap_LiabilitiesAndStockholdersEquity",
+                "Total liabilities and equity",
             )
         )
     if role.startswith(_TABLE_ROLE_PREFIXES):
@@ -356,6 +395,13 @@ def _role_marker_options(role: str) -> tuple[tuple[str, ...], ...]:
         )
         options.extend(
             (concept, ">Total revenues</a>")
+            for concept in (
+                "defref_us-gaap_Revenues",
+                "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax",
+            )
+        )
+        options.extend(
+            (concept, ">Revenue</a>")
             for concept in (
                 "defref_us-gaap_Revenues",
                 "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax",
@@ -1197,31 +1243,62 @@ def _candidate_rows(
     selected_ids: set[str],
     used_ids: set[str],
     active_roles: set[str],
+    *,
+    newest_first: bool = False,
 ) -> list[FinancialSourceRow]:
+    earliest_used_fact = {
+        filing.record_id: min(
+            (row for row in filing.rows if row.record_id in used_ids and row.facts),
+            key=lambda row: (row.source_char_start, row.record_id),
+        )
+        for filing in filings
+        if filing.record_id in selected_ids
+        and any(row.record_id in used_ids and row.facts for row in filing.rows)
+    }
     rows = [
         row
         for filing in filings
         if filing.record_id in selected_ids
         for row in filing.rows
         if row.record_id not in used_ids
+        and not row.facts
+        and row.section not in _LEFTOVER_EXCLUDED_SECTIONS
         and not (
             filing.record_id.startswith("issuer-ir:0001652044:")
             and row.section in ALPHABET_BREAKDOWN_SECTIONS
             and not any(role.startswith(_TABLE_ROLE_PREFIXES) for role in active_roles)
         )
+        and not (
+            filing.record_id.startswith("issuer-ir:0001326801:")
+            and row.section == META_SEGMENT_SECTION
+            and not any(role.startswith(_TABLE_ROLE_PREFIXES) for role in active_roles)
+        )
+        and not (
+            filing.record_id.startswith("issuer-ir:0000723125:")
+            and row.section in (*MICRON_TECHNOLOGY_SECTIONS, *MICRON_GEO_SECTIONS)
+            and not any(role.startswith(_TABLE_ROLE_PREFIXES) for role in active_roles)
+        )
         and (
-            not row.facts
-            or any(fact.role in active_roles for fact in row.facts)
+            filing.record_id not in earliest_used_fact
+            or (
+                row.source_char_start
+                >= earliest_used_fact[filing.record_id].source_char_start
+                and row.section != earliest_used_fact[filing.record_id].section
+            )
         )
     ]
+    # 64k/128k: newest leftover occupies the chronology tail so dossier-spread
+    # does not park the latest-year gold next to the earliest fact.
+    # 16k/32k: earliest leftover after the first fact keeps later-year facts
+    # out of the 8k spread front.
     return sorted(
         rows,
         key=lambda row: (
-            not bool(row.facts),
             row.report_date,
             row.source_char_start,
             row.record_id,
         ),
+        reverse=newest_first,
     )
 
 
@@ -1366,19 +1443,39 @@ def build_financial_history_candidates(
             if band.name == "128k"
             else band_roles
         )
-        for row in _candidate_rows(
-            filings, selected_filing_ids, used_row_ids, fill_roles
-        ):
-            candidate_records = [*records, _row_record(row)]
-            candidate_context = _context(candidate_records)
-            candidate_tokens = token_counter(candidate_context)
-            if candidate_tokens <= band.upper_tokens:
-                records = candidate_records
-                context = candidate_context
-                tokens = candidate_tokens
-                used_row_ids.add(row.record_id)
-            if tokens >= band.lower_tokens:
-                break
+        pack_upper = band.upper_tokens - _task_view_wrap_headroom(band.name)
+        if pack_upper < band.lower_tokens:
+            raise ProvenanceError(
+                f"cannot fill exact {band.name}: view wrap headroom exceeds band"
+            )
+        leftover_rows = _candidate_rows(
+            filings,
+            selected_filing_ids,
+            used_row_ids,
+            fill_roles,
+            newest_first=band.name in {"64k", "128k"},
+        )
+
+        def _absorb_leftover(cap: int) -> None:
+            nonlocal records, context, tokens
+            for row in leftover_rows:
+                if row.record_id in used_row_ids:
+                    continue
+                candidate_records = [*records, _row_record(row)]
+                candidate_context = _context(candidate_records)
+                candidate_tokens = token_counter(candidate_context)
+                if candidate_tokens <= cap:
+                    records = candidate_records
+                    context = candidate_context
+                    tokens = candidate_tokens
+                    used_row_ids.add(row.record_id)
+
+        if tokens < pack_upper:
+            _absorb_leftover(pack_upper)
+        if tokens < band.lower_tokens:
+            # Latest-year leftover rows can be larger than the headroom gap.
+            # Still require wrap room, but do not miss the exact-band floor.
+            _absorb_leftover(band.upper_tokens - min(32, _task_view_wrap_headroom(band.name)))
         if not band.lower_tokens <= tokens <= band.upper_tokens:
             raise ProvenanceError(
                 f"cannot fill exact {band.name} from verified source rows: {tokens} tokens"

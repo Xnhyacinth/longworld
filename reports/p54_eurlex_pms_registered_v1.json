@@ -1,0 +1,146 @@
+{
+  "artifact_count": 380,
+  "cf_answer": {
+    "first_unresolved_reference": "Annex I Section 4",
+    "parsed_path": [
+      "Article 15 PMS duty",
+      "Article 10(10)",
+      "Article 83",
+      "Article 84 reverse-reference plan",
+      "Annex III Section 1.1",
+      "Annex I Section 3"
+    ],
+    "risk_control_priority": "UNKNOWN",
+    "terminal_source_availability": "WITHHELD"
+  },
+  "essential_count": 7,
+  "full_answer": {
+    "first_unresolved_reference": null,
+    "parsed_path": [
+      "Article 15 PMS duty",
+      "Article 10(10)",
+      "Article 83",
+      "Article 84 reverse-reference plan",
+      "Annex III Section 1.1",
+      "Annex I Section 3",
+      "Annex I Section 4"
+    ],
+    "risk_control_priority": [
+      "eliminate or reduce risks as far as possible through safe design and manufacture",
+      "where appropriate, take adequate protection measures, including alarms if necessary, in relation to risks that cannot be eliminated",
+      "provide information for safety (warnings/precautions/contra-indications) and, where appropriate, training to users"
+    ],
+    "terminal_source_availability": "AVAILABLE"
+  },
+  "geometry": {
+    "all_views_in_32k_band": true,
+    "background_near_duplicates_removed": 22,
+    "context_sha256": "d50a1a455c4afbeb38a964a232103c8a493de376f10018018318d36a26348a4c",
+    "counterfactual": "remove exact authentic adoption element; UNKNOWN",
+    "essential_whole_artifact_positions": {
+      "act:1082965": {
+        "token_end": 23485,
+        "token_start": 22940
+      },
+      "act:249702": {
+        "token_end": 5892,
+        "token_start": 4132
+      },
+      "act:299162": {
+        "token_end": 7319,
+        "token_start": 6695
+      },
+      "act:691685": {
+        "token_end": 15171,
+        "token_start": 14772
+      },
+      "act:699811": {
+        "token_end": 15263,
+        "token_start": 15176
+      },
+      "act:907139": {
+        "token_end": 20338,
+        "token_start": 19938
+      },
+      "act:912768": {
+        "token_end": 20514,
+        "token_start": 20343
+      }
+    },
+    "exact_serialized_tokens": {
+      "cf": 32023,
+      "full": 32172,
+      "ordered": 32172
+    },
+    "higher_band_proof_growth": "UNVERIFIED",
+    "padding_or_cloning_or_truncation": false,
+    "raw_prefix_shortcut_found": false,
+    "raw_prefix_window_scope": "Exact pinned token prefix decoded from the serialized prompt; source-bound artifact intersections replay semantic nodes, including sufficient partial articles. One sufficient witness rejects the layout; no exhaustive success audit is claimed.",
+    "raw_prefix_window_trials": [
+      {
+        "answer": {
+          "first_unresolved_reference": "responsible-person post-market surveillance duty",
+          "parsed_path": [],
+          "risk_control_priority": "UNKNOWN"
+        },
+        "start_token": 0,
+        "status": "PARTIAL",
+        "window_text_sha256": "2cee781af4bc04c01f57907b8187a102de5416cba5758510b7e2ba97707cfdd9",
+        "window_tokens": 4096
+      },
+      {
+        "answer": {
+          "first_unresolved_reference": "Article 83",
+          "parsed_path": [
+            "Article 15 PMS duty",
+            "Article 10(10)"
+          ],
+          "risk_control_priority": "UNKNOWN"
+        },
+        "start_token": 0,
+        "status": "PARTIAL",
+        "window_text_sha256": "52e0bbf12efa649abde690f90b77438ce05dae9af25c70ef3a03eedaabda806c",
+        "window_tokens": 8192
+      },
+      {
+        "answer": {
+          "first_unresolved_reference": "Annex III Section 1.1",
+          "parsed_path": [
+            "Article 15 PMS duty",
+            "Article 10(10)",
+            "Article 83",
+            "Article 84 reverse-reference plan"
+          ],
+          "risk_control_priority": "UNKNOWN"
+        },
+        "start_token": 0,
+        "status": "PARTIAL",
+        "window_text_sha256": "fbf82e6ed0a08c132d1d9e77df08dfb011e9041fdff5469d22ec9c5654d1c4e8",
+        "window_tokens": 16384
+      }
+    ],
+    "selected_artifact_count": 380,
+    "selected_artifact_ids_sha256": "42a76542e689442f2cc286cbf2d50770e9aac292235c14b9ad05a39e7a9598d1",
+    "serialization": "longworld.core.pack.wrap_prompt + SEP, timing=last",
+    "shared_counterfactual_materializer_registered": false,
+    "shared_derived_view_gate": "NOT_RUN",
+    "shared_raw_window_audit": "NOT_RUN",
+    "status": "GEOMETRY_ONLY",
+    "whole_artifact_cover_span_tokens": 19353,
+    "whole_artifact_coverage_limitation": "This is not a raw-token replay audit: smaller sufficient clauses or alternate evidence may answer within a window. No shortcut PASS is claimed.",
+    "whole_artifact_coverage_only_4k_8k_16k": {
+      "16384": false,
+      "4096": false,
+      "8192": false
+    }
+  },
+  "inventory_delta": 0,
+  "near_dup_sentence_ratio": 0.0008,
+  "parent_candidate_count": 1,
+  "parent_context_tokens": 32172,
+  "parent_path": "data/research/p54-eurlex-pms-registered-32k-20260906-v1/parents.jsonl",
+  "parent_sidecar_path": "data/research/p54-eurlex-pms-registered-32k-20260906-v1/parent_sidecar.json",
+  "schema_version": "longworld.p54-eurlex-pms-parent-report.v1",
+  "source_receipt_sha256": "19a991327f7fdb5ed15e804aca891efcee1d19c60bc5251f04e281670a6da7db",
+  "train_ready": false
+}

@@ -1,5 +1,15 @@
 # Rejected or blocked directions
 
+- Do not clone HTTP/3 isolate-evidence / 5-field packing onto TLS succession.
+  TLS v1 failed 16k-from-start because gold sat on chronology-start RFCs; v3
+  failed 8k because leftover-only RFCs exploded into zipper tinies.
+- Do not pad HTTP/2 (103810), DNSSEC (126639), or ACME (82082) unique leftover
+  to a 128k bucket. Natural-length tasks belong on a non-128k profile.
+- Do not lower 4k/8k/16k raw windows for the strict long-dependency product.
+  Short-window-answerable rows may enter a separate retrieval profile after
+  re-validation; they are not Canonical/strict inventory.
+- Do not treat Amazon/Meta 8k zipper failures as automatic retrieval-profile
+  admits until the window failure is classified as local-answerable vs wrong.
 - Do not replay public GitHub episode bundles without their signed client and
   public-policy SHA pins, and do not re-sign exports to bypass a pin mismatch.
   The P17 Transformers promotion correctly failed closed until the original

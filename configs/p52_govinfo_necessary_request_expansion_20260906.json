@@ -1,0 +1,13 @@
+{
+  "schema_version": "longworld.p52-govinfo-necessary-request-expansion-plan.v1",
+  "data_product": "p52_govinfo_necessary_request_expansion_20260906",
+  "base_configs": [
+    "data/candidates/p52_govinfo_geometry_screen_20260906/hr4366-eas-eah-01/generation_config.json",
+    "data/candidates/p52_govinfo_geometry_screen_20260906/hr4366-eas-eah-01/generation_config.json"
+  ],
+  "request_schedules": [[4, 8, 16], [6, 12, 24]],
+  "selection_rule": "Use the earliest previous frozen H.R.4366 EAS-to-EAH anchor order (base 01) for both schedules, keep its D02 authenticated CF endpoint, then append the remaining eligible 108-list modified keys in lexical structural-key order. Freeze both explicit 4-to-8-to-16 and 6-to-12-to-24 schedules before any new pack/window evaluation. The 32K task must actually answer four or six distinct requested dispositions. Preserve source artifact IDs, source chronology, background ordering, original whole-section packer, and every threshold. Sign and project only 32K first; run shared raw-window functions on all three views; extend higher bands only after all three pass and verify actual proof growth before writing the final three-band parents.",
+  "label_distribution_limitation": "The current builder requests modified source-text pairs only: factual outputs are all M, and one D02 CF answer changes to R. More requested keys are more authentic dependencies, not a new oracle or balanced labels.",
+  "train_ready": false,
+  "inventory_delta": 0
+}

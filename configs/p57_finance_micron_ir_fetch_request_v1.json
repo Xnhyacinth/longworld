@@ -1,0 +1,48 @@
+{
+  "schema_version": "longworld.issuer-ir-fetch-request.v1",
+  "user_agent": "LongWorld-P57/1.0 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P57-MICRON-IR-HISTORY-20260907",
+    "scope": "Micron Technology issuer-owned fiscal 2022 through fiscal 2025 annual filing artifacts and source-bound asset-trajectory local-probe synthesis",
+    "basis": "User-authorized authentic source synthesis and world expansion; source proof and all unchanged shared gates required. FilingIds come from the issuer-owned Q4 GetEdgarFilingList feed, not sec.gov.",
+    "reviewed_at": "2026-09-07T06:30:00Z"
+  },
+  "issuer": {
+    "name": "Micron Technology, Inc.",
+    "cik": "0000723125",
+    "detail_host": "investors.micron.com",
+    "artifact_host": "d18rn0p25nwr6d.cloudfront.net"
+  },
+  "filings": [
+    {
+      "filing_id": "micron-fy2025-annual",
+      "detail_url": "https://investors.micron.com/financials/sec-filings/sec-filings-details/default.aspx?FilingId=18823284",
+      "form": "10-K",
+      "filing_date": "2025-10-03",
+      "report_date": "2025-08-28"
+    },
+    {
+      "filing_id": "micron-fy2024-annual",
+      "detail_url": "https://investors.micron.com/financials/sec-filings/sec-filings-details/default.aspx?FilingId=17881193",
+      "form": "10-K",
+      "filing_date": "2024-10-04",
+      "report_date": "2024-08-29"
+    },
+    {
+      "filing_id": "micron-fy2023-annual",
+      "detail_url": "https://investors.micron.com/financials/sec-filings/sec-filings-details/default.aspx?FilingId=16977892",
+      "form": "10-K",
+      "filing_date": "2023-10-06",
+      "report_date": "2023-08-31"
+    },
+    {
+      "filing_id": "micron-fy2022-annual",
+      "detail_url": "https://investors.micron.com/financials/sec-filings/sec-filings-details/default.aspx?FilingId=16126216",
+      "form": "10-K",
+      "filing_date": "2022-10-07",
+      "report_date": "2022-09-01"
+    }
+  ],
+  "requests_per_second": 2,
+  "max_retries": 3
+}

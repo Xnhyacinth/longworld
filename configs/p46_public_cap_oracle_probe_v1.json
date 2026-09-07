@@ -1,0 +1,56 @@
+{
+  "schema_version": "longworld.p46-public-cap-oracle-probe.v1",
+  "scope": "source-bound oracle and rejection probes only; no candidate generation or inventory",
+  "sources": [
+    {
+      "id": "rates",
+      "url": "https://www.ofgem.gov.uk/information-consumers/energy-advice-households/energy-price-cap-unit-rates-and-standing-charges",
+      "path": "sources/p46_public_cap_probe_20260906/rates.html.gz",
+      "sha256": "b82aefffa6cd354a5e99e676f5d07d9e2eca540ae2af7128ae8dc9ede90d4bad",
+      "bytes": 426536
+    },
+    {
+      "id": "rights",
+      "url": "https://www.ofgem.gov.uk/c-ofgem-2026",
+      "path": "sources/p46_public_cap_probe_20260906/rights.html.gz",
+      "sha256": "00c62001a6b62427924bcc0026057f6a7279a3343ebd00935a3de238a81dd0c0",
+      "bytes": 185054
+    },
+    {
+      "id": "july_summary",
+      "url": "https://www.ofgem.gov.uk/sites/default/files/2026-05/Summary-of-changes-to-energy-price-cap-1-July-to-30-September-2026.pdf",
+      "path": "sources/p46_public_cap_probe_20260906/july_summary.pdf.gz",
+      "sha256": "a4934dee7d892caada9589a965c8d8e21711ce9a214c6abd0507669b10611024",
+      "bytes": 156765
+    },
+    {
+      "id": "july_decision",
+      "url": "https://www.ofgem.gov.uk/press-release/energy-price-cap-will-rise-13-july",
+      "path": "sources/p46_public_cap_probe_20260906/july_decision.html.gz",
+      "sha256": "5f4b8bedcfd0eccb65908cd7552503fe6cee4725359fc0b680274a56ed2bfb43",
+      "bytes": 198124
+    },
+    {
+      "id": "ntsb_rights",
+      "url": "https://www.ntsb.gov/about/Pages/Website-Policies.aspx",
+      "path": "sources/p46_public_cap_probe_20260906/ntsb_rights.html.gz",
+      "sha256": "8a5a33ecf291add70f74b4757e835aad4c8c38f0e44a6077205710d8a5472a1b",
+      "bytes": 63118
+    }
+  ],
+  "ntsb_ids": [
+    "A-20-002",
+    "H-20-003",
+    "M-20-006"
+  ],
+  "ntsb_expected_sha256": {
+    "A-20-002": "6574ff9f8dd6ca7e55460e1337de39d00aa13ce45ed1f5e7a76116bfed1004a4",
+    "H-20-003": "d24ec0732d5ad6aea2e8c3f2e2dd649f4d550a8257b509449bec23a93bf8fcca",
+    "M-20-006": "20f51ea2402777aaeba082fe209f6c65b796aa7ed94165519c5f9097eb68e848"
+  },
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true
+  }
+}

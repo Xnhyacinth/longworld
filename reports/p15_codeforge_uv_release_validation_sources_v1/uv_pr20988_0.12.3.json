@@ -1,0 +1,1484 @@
+{
+  "schema_version": "longworld.git-workflow.v1",
+  "repository_url": "https://github.com/astral-sh/uv",
+  "source_origin": "real_public",
+  "revision": "1979349b68dbaa936b98c0f409c1df0598fa72f1",
+  "license": "Apache-2.0",
+  "exported_at": "2026-09-03T03:44:56.255341Z",
+  "authorization": {
+    "record_id": "PUBLIC-GITHUB-TERMS-2026-08",
+    "scope": "read-only workflow export",
+    "basis": "public repository under recorded license",
+    "reviewed_at": "2026-08-26T10:00:00Z"
+  },
+  "public_policy": {
+    "record_id": "PUBLIC-GITHUB-TERMS-2026-08",
+    "sha256": "dd39cfef6803b01b08cc476acef805265a7f10d62378889e1d56cb8603cb4c60"
+  },
+  "source_client": {
+    "path": "/usr/bin/gh",
+    "sha256": "2fd925d68889746976958342fb749bf102bc7dc8bcba3abfa533a80ad7791673"
+  },
+  "privacy_review": {
+    "emails": "redacted",
+    "secrets": "fail_closed",
+    "scanner": "longworld-public-secret-patterns",
+    "scanner_revision": "v2"
+  },
+  "records": [
+    {
+      "id": "license:261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+      "kind": "license",
+      "occurred_at": "2025-01-04T18:31:36Z",
+      "text": "Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an example is provided in the Appendix below).\n\n      \"Derivative Works\" shall mean any work, whether in Source or Object\n      form, that is based on (or derived from) the Work and for which the\n      editorial revisions, annotations, elaborations, or other modifications\n      represent, as a whole, an original work of authorship. For the purposes\n      of this License, Derivative Works shall not include works that remain\n      separable from, or merely link (or bind by name) to the interfaces of,\n      the Work and Derivative Works thereof.\n\n      \"Contribution\" shall mean any work of authorship, including\n      the original version of the Work and any modifications or additions\n      to that Work or Derivative Works thereof, that is intentionally\n      submitted to Licensor for inclusion in the Work by the copyright owner\n      or by an individual or Legal Entity authorized to submit on behalf of\n      the copyright owner. For the purposes of this definition, \"submitted\"\n      means any form of electronic, verbal, or written communication sent\n      to the Licensor or its representatives, including but not limited to\n      communication on electronic mailing lists, source code control systems,\n      and issue tracking systems that are managed by, or on behalf of, the\n      Licensor for the purpose of discussing and improving the Work, but\n      excluding communication that is conspicuously marked or otherwise\n      designated in writing by the copyright owner as \"Not a Contribution.\"\n\n      \"Contributor\" shall mean Licensor and any individual or Legal Entity\n      on behalf of whom a Contribution has been received by Licensor and\n      subsequently incorporated within the Work.\n\n   2. Grant of Copyright License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      copyright license to reproduce, prepare Derivative Works of,\n      publicly display, publicly perform, sublicense, and distribute the\n      Work and such Derivative Works in Source or Object form.\n\n   3. Grant of Patent License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      (except as stated in this section) patent license to make, have made,\n      use, offer to sell, sell, import, and otherwise transfer the Work,\n      where such license applies only to those patent claims licensable\n      by such Contributor that are necessarily infringed by their\n      Contribution(s) alone or by combination of their Contribution(s)\n      with the Work to which such Contribution(s) was submitted. If You\n      institute patent litigation against any entity (including a\n      cross-claim or counterclaim in a lawsuit) alleging that the Work\n      or a Contribution incorporated within the Work constitutes direct\n      or contributory patent infringement, then any patent licenses\n      granted to You under this License for that Work shall terminate\n      as of the date such litigation is filed.\n\n   4. Redistribution. You may reproduce and distribute copies of the\n      Work or Derivative Works thereof in any medium, with or without\n      modifications, and in Source or Object form, provided that You\n      meet the following conditions:\n\n      (a) You must give any other recipients of the Work or\n          Derivative Works a copy of this License; and\n\n      (b) You must cause any modified files to carry prominent notices\n          stating that You changed the files; and\n\n      (c) You must retain, in the Source form of any Derivative Works\n          that You distribute, all copyright, patent, trademark, and\n          attribution notices from the Source form of the Work,\n          excluding those notices that do not pertain to any part of\n          the Derivative Works; and\n\n      (d) If the Work includes a \"NOTICE\" text file as part of its\n          distribution, then any Derivative Works that You distribute must\n          include a readable copy of the attribution notices contained\n          within such NOTICE file, excluding those notices that do not\n          pertain to any part of the Derivative Works, in at least one\n          of the following places: within a NOTICE text file distributed\n          as part of the Derivative Works; within the Source form or\n          documentation, if provided along with the Derivative Works; or,\n          within a display generated by the Derivative Works, if and\n          wherever such third-party notices normally appear. The contents\n          of the NOTICE file are for informational purposes only and\n          do not modify the License. You may add Your own attribution\n          notices within Derivative Works that You distribute, alongside\n          or as an addendum to the NOTICE text from the Work, provided\n          that such additional attribution notices cannot be construed\n          as modifying the License.\n\n      You may add Your own copyright statement to Your modifications and\n      may provide additional or different license terms and conditions\n      for use, reproduction, or distribution of Your modifications, or\n      for any such Derivative Works as a whole, provided Your use,\n      reproduction, and distribution of the Work otherwise complies with\n      the conditions stated in this License.\n\n   5. Submission of Contributions. Unless You explicitly state otherwise,\n      any Contribution intentionally submitted for inclusion in the Work\n      by You to the Licensor shall be under the terms and conditions of\n      this License, without any additional terms or conditions.\n      Notwithstanding the above, nothing herein shall supersede or modify\n      the terms of any separate license agreement you may have executed\n      with Licensor regarding such Contributions.\n\n   6. Trademarks. This License does not grant permission to use the trade\n      names, trademarks, service marks, or product names of the Licensor,\n      except as required for reasonable and customary use in describing the\n      origin of the Work and reproducing the content of the NOTICE file.\n\n   7. Disclaimer of Warranty. Unless required by applicable law or\n      agreed to in writing, Licensor provides the Work (and each\n      Contributor provides its Contributions) on an \"AS IS\" BASIS,\n      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or\n      implied, including, without limitation, any warranties or conditions\n      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A\n      PARTICULAR PURPOSE. You are solely responsible for determining the\n      appropriateness of using or redistributing the Work and assume any\n      risks associated with Your exercise of permissions under this License.\n\n   8. Limitation of Liability. In no event and under no legal theory,\n      whether in tort (including negligence), contract, or otherwise,\n      unless required by applicable law (such as deliberate and grossly\n      negligent acts) or agreed to in writing, shall any Contributor be\n      liable to You for damages, including any direct, indirect, special,\n      incidental, or consequential damages of any character arising as a\n      result of this License or out of the use or inability to use the\n      Work (including but not limited to damages for loss of goodwill,\n      work stoppage, computer failure or malfunction, or any and all\n      other commercial damages or losses), even if such Contributor\n      has been advised of the possibility of such damages.\n\n   9. Accepting Warranty or Additional Liability. While redistributing\n      the Work or Derivative Works thereof, You may choose to offer,\n      and charge a fee for, acceptance of support, warranty, indemnity,\n      or other liability obligations and/or rights consistent with this\n      License. However, in accepting such obligations, You may act only\n      on Your own behalf and on Your sole responsibility, not on behalf\n      of any other Contributor, and only if You agree to indemnify,\n      defend, and hold each Contributor harmless for any liability\n      incurred by, or claims asserted against, such Contributor by reason\n      of your accepting any such warranty or additional liability.\n\n   END OF TERMS AND CONDITIONS\n\n   APPENDIX: How to apply the Apache License to your work.\n\n      To apply the Apache License to your work, attach the following\n      boilerplate notice, with the fields enclosed by brackets \"[]\"\n      replaced with your own identifying information. (Don't include\n      the brackets!)  The text should be enclosed in the appropriate\n      comment syntax for the file format. We also recommend that a\n      file or class name and description of purpose be included on the\n      same \"printed page\" as the copyright notice for easier\n      identification within third-party archives.\n\n   Copyright [yyyy] [name of copyright owner]\n\n   Licensed under the Apache License, Version 2.0 (the \"License\");\n   you may not use this file except in compliance with the License.\n   You may obtain a copy of the License at\n\n       http://www.apache.org/licenses/LICENSE-2.0\n\n   Unless required by applicable law or agreed to in writing, software\n   distributed under the License is distributed on an \"AS IS\" BASIS,\n   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n   See the License for the specific language governing permissions and\n   limitations under the License.",
+      "links": [],
+      "attributes": {
+        "spdx_id": "Apache-2.0"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/contents/LICENSE-APACHE?ref=825977640f6981c33df5da64b2f317df80234832"
+    },
+    {
+      "id": "commit:5fd203e2753d8dc8fd3f35d88f39caa216cd0d66",
+      "kind": "commit",
+      "occurred_at": "2026-07-16T01:48:05Z",
+      "text": "commit 5fd203e2753d8dc8fd3f35d88f39caa216cd0d66\nReuse compiled workspace exclusion patterns\n\ndiff -- crates/uv-bench/benches/workspace_discovery.rs\n@@ -21,6 +21,7 @@ const EXCLUDE_NEWER: &str = \"2024-08-08\";\n \n /// Mirroring the airflow workspace size at time of writing.\n const MEMBER_COUNT: usize = 127;\n+const EXCLUDE_COUNT: usize = 128;\n const OPTIONAL_DEPENDENCY_GROUP_COUNT: usize = 122;\n const DEPENDENCY_GROUP_COUNT: usize = 64;\n const UNUSED_ROOT_TABLE_COUNT: usize = 128;\n@@ -36,7 +37,7 @@ fn provider_requirement(member_index: usize) -> String {\n \n /// Create a synthetic workspace with a root and many members, returning the directories to run\n /// discovery from.\n-fn create_workspace(root: &Path) -> Vec<PathBuf> {\n+fn create_workspace(root: &Path, exclude_count: usize) -> Vec<PathBuf> {\n     let mut discovery_roots = Vec::with_capacity(MEMBER_COUNT + 1);\n     discovery_roots.push(root.to_path_buf());\n \n@@ -53,13 +54,13 @@ fn create_workspace(root: &Path) -> Vec<PathBuf> {\n         discovery_roots.push(member_root);\n     }\n \n-    fs_err::write(root.join(\"pyproject.toml\"), root_pyproject())\n+    fs_err::write(root.join(\"pyproject.toml\"), root_pyproject(exclude_count))\n         .expect(\"Failed to write workspace root pyproject.toml\");\n \n     discovery_roots\n }\n \n-fn root_pyproject() -> String {\n+fn root_pyproject(exclude_count: usize) -> String {\n     let dependencies: Vec<String> = (0..MEMBER_COUNT).map(provider_requirement).collect();\n \n     let optional_dependencies: toml::Table = (0..OPTIONAL_DEPENDENCY_GROUP_COUNT)\n@@ -104,6 +105,10 @@ fn root_pyproject() -> String {\n         })\n         .collect();\n \n+    let excludes: Vec<String> = (0..exclude_count)\n+        .map(|exclude_index| format!(\"./packages/excluded-{exclude_index:03}\"))\n+        .collect();\n+\n     // Generate some unrelated work for the toml parser, mimicking real tool configuration.\n     let generated: toml::Table = (0..UNUSED_ROOT_TABLE_COUNT)\n         .map(|table_index| {\n@@ -171,6 +176,7 @@ fn root_pyproject() -> String {\n \n         [tool.uv.workspace]\n         members = [\"packages/*\"]\n+        exclude = (excludes)\n \n         [tool.linter]\n         generated = (generated)\n@@ -258,16 +264,28 @@ fn member_pyproject(member_index: usize) -> String {\n }\n \n fn discover_workspace_from_all_members(c: &mut Criterion<WallTime>) {\n+    discover_workspace(c, \"discover_workspace_from_all_members\", 0);\n+}\n+\n+fn discover_workspace_from_all_members_with_excludes(c: &mut Criterion<WallTime>) {\n+    discover_workspace(\n+        c,\n+        \"discover_workspace_from_all_members_with_excludes\",\n+        EXCLUDE_COUNT,\n+    );\n+}\n+\n+fn discover_workspace(c: &mut Criterion<WallTime>, name: &str, exclude_count: usize) {\n     let dir = tempfile::tempdir().expect(\"Failed to create temporary directory\");\n-    let discovery_roots = create_workspace(dir.path());\n+    let discovery_roots = create_workspace(dir.path(), exclude_count);\n     let cache = Cache::from_path(dir.path().join(\".uv-cache\"));\n     let options = DiscoveryOptions::default();\n     let runtime = tokio::runtime::Builder::new_current_thread()\n         .enable_all()\n         .build()\n         .expect(\"Failed to create Tokio runtime\");\n \n-    c.bench_function(\"discover_workspace_from_all_members\", |b| {\n+    c.bench_function(name, |b| {\n         b.iter(|| {\n             let workspace_cache = WorkspaceCache::default();\n             for root in &discovery_roots {\n@@ -287,7 +305,7 @@ fn discover_workspace_from_all_members(c: &mut Criterion<WallTime>) {\n \n fn run_python_version_synthetic_workspace(c: &mut Criterion<WallTime>) {\n     let workspace_dir = tempfile::tempdir().expect(\"Failed to create temporary directory\");\n-    create_workspace(workspace_dir.path());\n+    create_workspace(workspace_dir.path(), 0);\n \n     let cache_dir = workspace_dir.path().join(\".uv-cache\");\n     let runtime = tokio::runtime::Builder::new_current_thread()\n@@ -365,6 +383,7 @@ fn run_cli(\n criterion_group!(\n     workspace_discovery,\n     discover_workspace_from_all_members,\n+    discover_workspace_from_all_members_with_excludes,\n     run_python_version_synthetic_workspace\n );\n criterion_main!(workspace_discovery);\n\ndiff -- crates/uv-workspace/src/workspace.rs\n@@ -1158,6 +1158,12 @@ impl Workspace {\n             );\n         }\n \n+        let exclude_patterns = if matches!(options.members, MemberDiscovery::None) {\n+            Vec::new()\n+        } else {\n+            workspace_exclude_patterns(workspace_root, workspace_definition)?\n+        };\n+\n         // Add all other workspace members.\n         for member_glob in workspace_definition.clone().members.unwrap_or_default() {\n             // Normalize the member glob to remove leading `./` and other relative path components\n@@ -1205,7 +1211,10 @@ impl Workspace {\n                 }\n \n                 // If the member is excluded, ignore it.\n-                if is_excluded_from_workspace(&member_root, workspace_root, workspace_definition)? {\n+                if exclude_patterns\n+                    .iter()\n+                    .any(|pattern| pattern.matches_path(&member_root))\n+                {\n                     debug!(\n                         \"Ignoring workspace member: `{}`\",\n                         member_root.simplified_display()\n@@ -1947,22 +1956,43 @@ fn is_excluded_from_workspace(\n     workspace: &ToolUvWorkspace,\n ) -> Result<bool, WorkspaceError> {\n     for exclude_glob in workspace.exclude.iter().flatten() {\n-        // Normalize the exclude glob to remove leading `./` and other relative path components\n-        let normalized_glob = normalize_path(Path::new(exclude_glob.as_str()));\n-        let absolute_glob = PathBuf::from(glob::Pattern::escape(\n-            workspace_root.simplified().to_string_lossy().as_ref(),\n-        ))\n-        .join(normalized_glob.as_ref());\n-        let absolute_glob = absolute_glob.to_string_lossy();\n-        let exclude_pattern = glob::Pattern::new(&absolute_glob)\n-            .map_err(|err| WorkspaceErrorKind::Pattern(absolute_glob.to_string(), err))?;\n+        let exclude_pattern = workspace_exclude_pattern(workspace_root, exclude_glob)?;\n         if exclude_pattern.matches_path(project_path) {\n             return Ok(true);\n         }\n     }\n     Ok(false)\n }\n \n+/// Compile the normalized workspace exclusion patterns.\n+fn workspace_exclude_patterns(\n+    workspace_root: &Path,\n+    workspace: &ToolUvWorkspace,\n+) -> Result<Vec<glob::Pattern>, WorkspaceError> {\n+    workspace\n+        .exclude\n+        .iter()\n+        .flatten()\n+        .map(|exclude_glob| workspace_exclude_pattern(workspace_root, exclude_glob))\n+        .collect()\n+}\n+\n+/// Compile a normalized workspace exclusion pattern.\n+fn workspace_exclude_pattern(\n+    workspace_root: &Path,\n+    exclude_glob: &glob::Pattern,\n+) -> Result<glob::Pattern, WorkspaceError> {\n+    // Normalize the exclude glob to remove leading `./` and other relative path components.\n+    let normalized_glob = normalize_path(Path::new(exclude_glob.as_str()));\n+    let absolute_glob = PathBuf::from(glob::Pattern::escape(\n+        workspace_root.simplified().to_string_lossy().as_ref(),\n+    ))\n+    .join(normalized_glob.as_ref());\n+    let absolute_glob = absolute_glob.to_string_lossy();\n+    glob::Pattern::new(&absolute_glob)\n+        .map_err(|err| WorkspaceErrorKind::Pattern(absolute_glob.to_string(), err).into())\n+}\n+\n /// Check if we're in the `tool.uv.workspace.members` of a workspace.\n fn is_included_in_workspace(\n     project_path: &Path,\n@@ -3298,6 +3328,52 @@ mod tests {\n         Ok(())\n     }\n \n+    #[tokio::test]\n+    async fn exclude_package_with_normalized_glob_and_escaped_root() -> Result<()> {\n+        let temp_dir = tempfile::TempDir::new()?;\n+        let root = ChildPath::new(temp_dir.path()).child(\"workspace[glob]?\");\n+\n+        root.child(\"pyproject.toml\").write_str(\n+            r#\"\n+            [project]\n+            name = \"albatross\"\n+            version = \"0.1.0\"\n+            requires-python = \">=3.12\"\n+\n+            [tool.uv.workspace]\n+            members = [\"./packages/*\"]\n+            exclude = [\"./ignored/../packages/excluded\", \"./packages/./excluded-glob-*\"]\n+            \"#,\n+        )?;\n+\n+        for member in [\"included\", \"excluded\", \"excluded-glob-one\"] {\n+            root.child(\"packages\")\n+                .child(member)\n+                .child(\"pyproject.toml\")\n+                .write_str(&format!(\n+                    r#\"\n+                    [project]\n+                    name = \"{member}\"\n+                    version = \"0.1.0\"\n+                    requires-python = \">=3.12\"\n+                    \"#,\n+                ))?;\n+        }\n+\n+        let (project, _) = temporary_test(root.as_ref()).await.unwrap();\n+        assert_json_snapshot!(\n+            project.workspace().packages().keys().collect::<Vec<_>>(),\n+            @r#\"\n+        [\n+          \"albatross\",\n+          \"included\"\n+        ]\n+        \"#\n+        );\n+\n+        Ok(())\n+    }\n+\n     #[test]\n     fn read_dependency_groups() {\n         let toml = r#\"",
+      "links": [
+        "license:261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+      ],
+      "attributes": {
+        "sha": "5fd203e2753d8dc8fd3f35d88f39caa216cd0d66"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/commits/5fd203e2753d8dc8fd3f35d88f39caa216cd0d66"
+    },
+    {
+      "id": "commit:71c8b2c4c1fe471507f3bd1d411782ffc98a2faa",
+      "kind": "commit",
+      "occurred_at": "2026-08-06T13:41:56Z",
+      "text": "commit 71c8b2c4c1fe471507f3bd1d411782ffc98a2faa\nCentralize workspace exclusion matching\n\ndiff -- crates/uv-workspace/src/workspace.rs\n@@ -8,7 +8,7 @@ use std::hash::BuildHasherDefault;\n use std::path::{Path, PathBuf};\n use std::sync::Arc;\n \n-use glob::{GlobError, PatternError, glob};\n+use glob::{GlobError, Pattern, PatternError, glob};\n use itertools::Itertools;\n use rustc_hash::{FxHashSet, FxHasher};\n use tracing::{debug, trace, warn};\n@@ -1158,10 +1158,10 @@ impl Workspace {\n             );\n         }\n \n-        let exclude_patterns = if matches!(options.members, MemberDiscovery::None) {\n-            Vec::new()\n+        let exclusions = if matches!(options.members, MemberDiscovery::None) {\n+            WorkspaceExclusions::default()\n         } else {\n-            workspace_exclude_patterns(workspace_root, workspace_definition)?\n+            WorkspaceExclusions::new(workspace_root, workspace_definition)?\n         };\n \n         // Add all other workspace members.\n@@ -1211,10 +1211,7 @@ impl Workspace {\n                 }\n \n                 // If the member is excluded, ignore it.\n-                if exclude_patterns\n-                    .iter()\n-                    .any(|pattern| pattern.matches_path(&member_root))\n-                {\n+                if exclusions.matches(&member_root) {\n                     debug!(\n                         \"Ignoring workspace member: `{}`\",\n                         member_root.simplified_display()\n@@ -1955,42 +1952,50 @@ fn is_excluded_from_workspace(\n     workspace_root: &Path,\n     workspace: &ToolUvWorkspace,\n ) -> Result<bool, WorkspaceError> {\n-    for exclude_glob in workspace.exclude.iter().flatten() {\n-        let exclude_pattern = workspace_exclude_pattern(workspace_root, exclude_glob)?;\n-        if exclude_pattern.matches_path(project_path) {\n-            return Ok(true);\n-        }\n-    }\n-    Ok(false)\n+    Ok(WorkspaceExclusions::new(workspace_root, workspace)?.matches(project_path))\n }\n \n-/// Compile the normalized workspace exclusion patterns.\n-fn workspace_exclude_patterns(\n-    workspace_root: &Path,\n-    workspace: &ToolUvWorkspace,\n-) -> Result<Vec<glob::Pattern>, WorkspaceError> {\n-    workspace\n-        .exclude\n-        .iter()\n-        .flatten()\n-        .map(|exclude_glob| workspace_exclude_pattern(workspace_root, exclude_glob))\n-        .collect()\n+/// Compiled workspace exclusion patterns.\n+#[derive(Debug, Default)]\n+struct WorkspaceExclusions {\n+    patterns: Vec<Pattern>,\n }\n \n-/// Compile a normalized workspace exclusion pattern.\n-fn workspace_exclude_pattern(\n-    workspace_root: &Path,\n-    exclude_glob: &glob::Pattern,\n-) -> Result<glob::Pattern, WorkspaceError> {\n-    // Normalize the exclude glob to remove leading `./` and other relative path components.\n-    let normalized_glob = normalize_path(Path::new(exclude_glob.as_str()));\n-    let absolute_glob = PathBuf::from(glob::Pattern::escape(\n-        workspace_root.simplified().to_string_lossy().as_ref(),\n-    ))\n-    .join(normalized_glob.as_ref());\n-    let absolute_glob = absolute_glob.to_string_lossy();\n-    glob::Pattern::new(&absolute_glob)\n-        .map_err(|err| WorkspaceErrorKind::Pattern(absolute_glob.to_string(), err).into())\n+impl WorkspaceExclusions {\n+    /// Compile the normalized workspace exclusion patterns.\n+    fn new(workspace_root: &Path, workspace: &ToolUvWorkspace) -> Result<Self, WorkspaceError> {\n+        let patterns = workspace\n+            .exclude\n+            .iter()\n+            .flatten()\n+            .map(|exclude_glob| Self::compile_pattern(workspace_root, exclude_glob))\n+            .collect::<Result<_, _>>()?;\n+\n+        Ok(Self { patterns })\n+    }\n+\n+    /// Return whether any workspace exclusion matches the project path.\n+    fn matches(&self, project_path: &Path) -> bool {\n+        self.patterns\n+            .iter()\n+            .any(|pattern| pattern.matches_path(project_path))\n+    }\n+\n+    /// Compile a normalized workspace exclusion pattern.\n+    fn compile_pattern(\n+        workspace_root: &Path,\n+        exclude_glob: &Pattern,\n+    ) -> Result<Pattern, WorkspaceError> {\n+        // Normalize the exclude glob to remove leading `./` and other relative path components.\n+        let normalized_glob = normalize_path(Path::new(exclude_glob.as_str()));\n+        let absolute_glob = PathBuf::from(Pattern::escape(\n+            workspace_root.simplified().to_string_lossy().as_ref(),\n+        ))\n+        .join(normalized_glob.as_ref());\n+        let absolute_glob = absolute_glob.to_string_lossy();\n+        Pattern::new(&absolute_glob)\n+            .map_err(|err| WorkspaceErrorKind::Pattern(absolute_glob.to_string(), err).into())\n+    }\n }\n \n /// Check if we're in the `tool.uv.workspace.members` of a workspace.",
+      "links": [
+        "license:261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+      ],
+      "attributes": {
+        "sha": "71c8b2c4c1fe471507f3bd1d411782ffc98a2faa"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/commits/71c8b2c4c1fe471507f3bd1d411782ffc98a2faa"
+    },
+    {
+      "id": "commit:a7f86c3ec3a1be2ec537ae62db4bd91e2d6636e1",
+      "kind": "commit",
+      "occurred_at": "2026-08-06T13:42:16Z",
+      "text": "commit a7f86c3ec3a1be2ec537ae62db4bd91e2d6636e1\nInitialize workspace exclusions only when needed\n\ndiff -- crates/uv-workspace/src/workspace.rs\n@@ -1158,11 +1158,7 @@ impl Workspace {\n             );\n         }\n \n-        let exclusions = if matches!(options.members, MemberDiscovery::None) {\n-            WorkspaceExclusions::default()\n-        } else {\n-            WorkspaceExclusions::new(workspace_root, workspace_definition)?\n-        };\n+        let mut exclusions = None;\n \n         // Add all other workspace members.\n         for member_glob in workspace_definition.clone().members.unwrap_or_default() {\n@@ -1211,7 +1207,16 @@ impl Workspace {\n                 }\n \n                 // If the member is excluded, ignore it.\n-                if exclusions.matches(&member_root) {\n+                if exclusions.is_none() {\n+                    exclusions = Some(WorkspaceExclusions::new(\n+                        workspace_root,\n+                        workspace_definition,\n+                    )?);\n+                }\n+                if exclusions\n+                    .as_ref()\n+                    .is_some_and(|exclusions| exclusions.matches(&member_root))\n+                {\n                     debug!(\n                         \"Ignoring workspace member: `{}`\",\n                         member_root.simplified_display()\n@@ -1956,7 +1961,7 @@ fn is_excluded_from_workspace(\n }\n \n /// Compiled workspace exclusion patterns.\n-#[derive(Debug, Default)]\n+#[derive(Debug)]\n struct WorkspaceExclusions {\n     patterns: Vec<Pattern>,\n }",
+      "links": [
+        "license:261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+      ],
+      "attributes": {
+        "sha": "a7f86c3ec3a1be2ec537ae62db4bd91e2d6636e1"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/commits/a7f86c3ec3a1be2ec537ae62db4bd91e2d6636e1"
+    },
+    {
+      "id": "commit:a4329f9cf800f0d4377b7b804119cc17b27dcdc7",
+      "kind": "commit",
+      "occurred_at": "2026-08-06T13:43:34Z",
+      "text": "commit a4329f9cf800f0d4377b7b804119cc17b27dcdc7\nReuse parsed workspace exclusion patterns\n\ndiff -- crates/uv-workspace/src/workspace.rs\n@@ -1,5 +1,6 @@\n //! Resolve the current [`ProjectWorkspace`] or [`Workspace`].\n \n+use std::borrow::Cow;\n use std::collections::{BTreeMap, BTreeSet};\n use std::error::Error;\n use std::fmt;\n@@ -1962,43 +1963,70 @@ fn is_excluded_from_workspace(\n \n /// Compiled workspace exclusion patterns.\n #[derive(Debug)]\n-struct WorkspaceExclusions {\n-    patterns: Vec<Pattern>,\n+struct WorkspaceExclusions<'workspace> {\n+    workspace_root: &'workspace Path,\n+    patterns: Vec<WorkspaceExclusion<'workspace>>,\n }\n \n-impl WorkspaceExclusions {\n+/// A workspace exclusion that can reuse its parsed pattern or requires normalization.\n+#[derive(Debug)]\n+enum WorkspaceExclusion<'workspace> {\n+    Relative(&'workspace Pattern),\n+    Absolute(Pattern),\n+}\n+\n+impl<'workspace> WorkspaceExclusions<'workspace> {\n     /// Compile the normalized workspace exclusion patterns.\n-    fn new(workspace_root: &Path, workspace: &ToolUvWorkspace) -> Result<Self, WorkspaceError> {\n+    fn new(\n+        workspace_root: &'workspace Path,\n+        workspace: &'workspace ToolUvWorkspace,\n+    ) -> Result<Self, WorkspaceError> {\n         let patterns = workspace\n             .exclude\n             .iter()\n             .flatten()\n             .map(|exclude_glob| Self::compile_pattern(workspace_root, exclude_glob))\n             .collect::<Result<_, _>>()?;\n \n-        Ok(Self { patterns })\n+        Ok(Self {\n+            workspace_root,\n+            patterns,\n+        })\n     }\n \n     /// Return whether any workspace exclusion matches the project path.\n     fn matches(&self, project_path: &Path) -> bool {\n-        self.patterns\n-            .iter()\n-            .any(|pattern| pattern.matches_path(project_path))\n+        let relative_path = project_path\n+            .simplified()\n+            .strip_prefix(self.workspace_root.simplified())\n+            .ok();\n+\n+        self.patterns.iter().any(|pattern| match pattern {\n+            WorkspaceExclusion::Relative(pattern) => {\n+                relative_path.is_some_and(|relative_path| pattern.matches_path(relative_path))\n+            }\n+            WorkspaceExclusion::Absolute(pattern) => pattern.matches_path(project_path),\n+        })\n     }\n \n-    /// Compile a normalized workspace exclusion pattern.\n+    /// Reuse an already compiled relative pattern or compile its normalized absolute equivalent.\n     fn compile_pattern(\n         workspace_root: &Path,\n-        exclude_glob: &Pattern,\n-    ) -> Result<Pattern, WorkspaceError> {\n+        exclude_glob: &'workspace Pattern,\n+    ) -> Result<WorkspaceExclusion<'workspace>, WorkspaceError> {\n         // Normalize the exclude glob to remove leading `./` and other relative path components.\n         let normalized_glob = normalize_path(Path::new(exclude_glob.as_str()));\n+        if matches!(&normalized_glob, Cow::Borrowed(_)) && normalized_glob.is_relative() {\n+            return Ok(WorkspaceExclusion::Relative(exclude_glob));\n+        }\n+\n         let absolute_glob = PathBuf::from(Pattern::escape(\n             workspace_root.simplified().to_string_lossy().as_ref(),\n         ))\n         .join(normalized_glob.as_ref());\n         let absolute_glob = absolute_glob.to_string_lossy();\n         Pattern::new(&absolute_glob)\n+            .map(WorkspaceExclusion::Absolute)\n             .map_err(|err| WorkspaceErrorKind::Pattern(absolute_glob.to_string(), err).into())\n     }\n }\n@@ -3341,7 +3369,8 @@ mod tests {\n     #[tokio::test]\n     async fn exclude_package_with_normalized_glob_and_escaped_root() -> Result<()> {\n         let temp_dir = tempfile::TempDir::new()?;\n-        let root = ChildPath::new(temp_dir.path()).child(\"workspace[glob]?\");\n+        let temp_dir_root = ChildPath::new(temp_dir.path());\n+        let root = temp_dir_root.child(\"workspace[glob]?\");\n \n         root.child(\"pyproject.toml\").write_str(\n             r#\"\n@@ -3351,12 +3380,22 @@ mod tests {\n             requires-python = \">=3.12\"\n \n             [tool.uv.workspace]\n-            members = [\"./packages/*\"]\n-            exclude = [\"./ignored/../packages/excluded\", \"./packages/./excluded-glob-*\"]\n+            members = [\"./packages/*\", \"../external-*\"]\n+            exclude = [\n+                \"packages/excluded-borrowed-*\",\n+                \"./ignored/../packages/excluded\",\n+                \"./packages/./excluded-glob-*\",\n+                \"../external-excluded\",\n+            ]\n             \"#,\n         )?;\n \n-        for member in [\"included\", \"excluded\", \"excluded-glob-one\"] {\n+        for member in [\n+            \"included\",\n+            \"excluded\",\n+            \"excluded-glob-one\",\n+            \"excluded-borrowed-one\",\n+        ] {\n             root.child(\"packages\")\n                 .child(member)\n                 .child(\"pyproject.toml\")\n@@ -3370,12 +3409,27 @@ mod tests {\n                 ))?;\n         }\n \n+        for member in [\"external-included\", \"external-excluded\"] {\n+            temp_dir_root\n+                .child(member)\n+                .child(\"pyproject.toml\")\n+                .write_str(&format!(\n+                    r#\"\n+                    [project]\n+                    name = \"{member}\"\n+                    version = \"0.1.0\"\n+                    requires-python = \">=3.12\"\n+                    \"#,\n+                ))?;\n+        }\n+\n         let (project, _) = temporary_test(root.as_ref()).await.unwrap();\n         assert_json_snapshot!(\n             project.workspace().packages().keys().collect::<Vec<_>>(),\n             @r#\"\n         [\n           \"albatross\",\n+          \"external-included\",\n           \"included\"\n         ]\n         \"#",
+      "links": [
+        "license:261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+      ],
+      "attributes": {
+        "sha": "a4329f9cf800f0d4377b7b804119cc17b27dcdc7"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/commits/a4329f9cf800f0d4377b7b804119cc17b27dcdc7"
+    },
+    {
+      "id": "commit:edef15232d86d3a32192666e0246eda36f2d0236",
+      "kind": "commit",
+      "occurred_at": "2026-08-06T13:43:59Z",
+      "text": "commit edef15232d86d3a32192666e0246eda36f2d0236\nPreserve the baseline workspace benchmark fixture\n\ndiff -- crates/uv-bench/benches/workspace_discovery.rs\n@@ -105,9 +105,15 @@ fn root_pyproject(exclude_count: usize) -> String {\n         })\n         .collect();\n \n-    let excludes: Vec<String> = (0..exclude_count)\n-        .map(|exclude_index| format!(\"./packages/excluded-{exclude_index:03}\"))\n-        .collect();\n+    let mut workspace = toml::toml! {\n+        members = [\"packages/*\"]\n+    };\n+    if exclude_count > 0 {\n+        let excludes: Vec<String> = (0..exclude_count)\n+            .map(|exclude_index| format!(\"./packages/excluded-{exclude_index:03}\"))\n+            .collect();\n+        workspace.insert(\"exclude\".to_string(), toml::Value::from(excludes));\n+    }\n \n     // Generate some unrelated work for the toml parser, mimicking real tool configuration.\n     let generated: toml::Table = (0..UNUSED_ROOT_TABLE_COUNT)\n@@ -173,10 +179,7 @@ fn root_pyproject(exclude_count: usize) -> String {\n         [tool.uv]\n         package = false\n         sources = (sources)\n-\n-        [tool.uv.workspace]\n-        members = [\"packages/*\"]\n-        exclude = (excludes)\n+        workspace = (workspace)\n \n         [tool.linter]\n         generated = (generated)",
+      "links": [
+        "license:261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+      ],
+      "attributes": {
+        "sha": "edef15232d86d3a32192666e0246eda36f2d0236"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/commits/edef15232d86d3a32192666e0246eda36f2d0236"
+    },
+    {
+      "id": "commit:e508fc36635cbfb4f752c787ad71721eb1234567",
+      "kind": "commit",
+      "occurred_at": "2026-08-06T13:44:09Z",
+      "text": "commit e508fc36635cbfb4f752c787ad71721eb1234567\nBenchmark reusable workspace exclusion patterns\n\ndiff -- crates/uv-bench/benches/workspace_discovery.rs\n@@ -110,7 +110,7 @@ fn root_pyproject(exclude_count: usize) -> String {\n     };\n     if exclude_count > 0 {\n         let excludes: Vec<String> = (0..exclude_count)\n-            .map(|exclude_index| format!(\"./packages/excluded-{exclude_index:03}\"))\n+            .map(|exclude_index| format!(\"packages/excluded-{exclude_index:03}\"))\n             .collect();\n         workspace.insert(\"exclude\".to_string(), toml::Value::from(excludes));\n     }",
+      "links": [
+        "license:261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+      ],
+      "attributes": {
+        "sha": "e508fc36635cbfb4f752c787ad71721eb1234567"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/commits/e508fc36635cbfb4f752c787ad71721eb1234567"
+    },
+    {
+      "id": "commit:8565e5bd1fc2068eb6d73b9f96e5c21a7bfc2a98",
+      "kind": "commit",
+      "occurred_at": "2026-08-06T13:44:30Z",
+      "text": "commit 8565e5bd1fc2068eb6d73b9f96e5c21a7bfc2a98\nPropagate workspace exclusion test failures\n\ndiff -- crates/uv-workspace/src/workspace.rs\n@@ -3423,7 +3423,9 @@ mod tests {\n                 ))?;\n         }\n \n-        let (project, _) = temporary_test(root.as_ref()).await.unwrap();\n+        let (project, _) = temporary_test(root.as_ref())\n+            .await\n+            .map_err(|(error, _)| error)?;\n         assert_json_snapshot!(\n             project.workspace().packages().keys().collect::<Vec<_>>(),\n             @r#\"",
+      "links": [
+        "license:261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+      ],
+      "attributes": {
+        "sha": "8565e5bd1fc2068eb6d73b9f96e5c21a7bfc2a98"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/commits/8565e5bd1fc2068eb6d73b9f96e5c21a7bfc2a98"
+    },
+    {
+      "id": "commit:c0bb4195f85aadb79dc69e31e000093f055600fc",
+      "kind": "commit",
+      "occurred_at": "2026-08-06T13:52:57Z",
+      "text": "commit c0bb4195f85aadb79dc69e31e000093f055600fc\nUse standard lazy initialization for workspace exclusions\n\ndiff -- crates/uv-workspace/src/workspace.rs\n@@ -1159,6 +1159,7 @@ impl Workspace {\n             );\n         }\n \n+        // Prepare exclusions only after finding a member that is not explicitly ignored.\n         let mut exclusions = None;\n \n         // Add all other workspace members.\n@@ -1208,15 +1209,13 @@ impl Workspace {\n                 }\n \n                 // If the member is excluded, ignore it.\n-                if exclusions.is_none() {\n-                    exclusions = Some(WorkspaceExclusions::new(\n-                        workspace_root,\n-                        workspace_definition,\n-                    )?);\n-                }\n                 if exclusions\n+                    .get_or_insert_with(|| {\n+                        WorkspaceExclusions::new(workspace_root, workspace_definition)\n+                    })\n                     .as_ref()\n-                    .is_some_and(|exclusions| exclusions.matches(&member_root))\n+                    .map_err(WorkspaceError::clone)?\n+                    .matches(&member_root)\n                 {\n                     debug!(\n                         \"Ignoring workspace member: `{}`\",",
+      "links": [
+        "license:261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+      ],
+      "attributes": {
+        "sha": "c0bb4195f85aadb79dc69e31e000093f055600fc"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/commits/c0bb4195f85aadb79dc69e31e000093f055600fc"
+    },
+    {
+      "id": "pull_request:20988",
+      "kind": "pull_request",
+      "occurred_at": "2026-08-06T13:56:54Z",
+      "text": "Pull request #20988: Reuse compiled workspace exclusion patterns\n\nWorkspace discovery normalized, escaped, and recompiled every exclusion glob for every candidate member, multiplying work in large workspaces with long exclusion lists.\n\nCentralize exclusion matching, initialize it only when a candidate needs checking, and reuse patterns already compiled while parsing `pyproject.toml`. Patterns that require normalization or absolute matching retain their existing behavior, including parent-directory exclusions and workspace roots containing glob characters.\n\nOptimized microbenchmark with 512 members and nonmatching exclusions:\n\n| Exclusions |   Before |  After | Improvement |\n| ---------: | -------: | -----: | ----------: |\n|         64 |   168 ms |  35 ms |        4.8× |\n|        128 |   311 ms | 126 ms |        2.5× |\n|        256 |   934 ms | 267 ms |        3.5× |\n|        512 | 2,497 ms | 683 ms |        3.7× |",
+      "links": [
+        "commit:5fd203e2753d8dc8fd3f35d88f39caa216cd0d66"
+      ],
+      "attributes": {
+        "number": 20988,
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/pulls/20988"
+    },
+    {
+      "id": "ci:92639375306",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:57:41Z",
+      "text": "CI check plan / plan for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639375306 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "plan / plan",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:05Z",
+        "completed_at": "2026-08-06T13:57:41Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639375306"
+    },
+    {
+      "id": "ci:92639563202",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:57:42Z",
+      "text": "CI check build-docker for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639563202 status=completed conclusion=skipped",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "build-docker",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-08-06T13:57:42Z",
+        "completed_at": "2026-08-06T13:57:42Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639563202"
+    },
+    {
+      "id": "ci:92639563308",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:57:42Z",
+      "text": "CI check test / cargo test on macos for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639563308 status=completed conclusion=skipped",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test / cargo test on macos",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-08-06T13:57:42Z",
+        "completed_at": "2026-08-06T13:57:42Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639563308"
+    },
+    {
+      "id": "ci:92639563309",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:57:42Z",
+      "text": "CI check build-release-binaries for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639563309 status=completed conclusion=skipped",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "build-release-binaries",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-08-06T13:57:42Z",
+        "completed_at": "2026-08-06T13:57:42Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639563309"
+    },
+    {
+      "id": "ci:92639563507",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:57:42Z",
+      "text": "CI check test-windows-trampolines for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639563507 status=completed conclusion=skipped",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test-windows-trampolines",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-08-06T13:57:42Z",
+        "completed_at": "2026-08-06T13:57:42Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639563507"
+    },
+    {
+      "id": "ci:92639562547",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:58:14Z",
+      "text": "CI check check-lint / ty for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562547 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-lint / ty",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:59Z",
+        "completed_at": "2026-08-06T13:58:14Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562547"
+    },
+    {
+      "id": "ci:92639562564",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:58:15Z",
+      "text": "CI check check-lint / readme for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562564 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-lint / readme",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:49Z",
+        "completed_at": "2026-08-06T13:58:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562564"
+    },
+    {
+      "id": "ci:92639562562",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:58:48Z",
+      "text": "CI check check-lint / cargo shear for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562562 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-lint / cargo shear",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:58:29Z",
+        "completed_at": "2026-08-06T13:58:48Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562562"
+    },
+    {
+      "id": "ci:92639562880",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:58:50Z",
+      "text": "CI check build-dev-binaries / macos aarch64 for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562880 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "build-dev-binaries / macos aarch64",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:58:05Z",
+        "completed_at": "2026-08-06T13:58:50Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562880"
+    },
+    {
+      "id": "ci:92639562976",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:58:59Z",
+      "text": "CI check build-dev-binaries / msrv for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562976 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "build-dev-binaries / msrv",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:47Z",
+        "completed_at": "2026-08-06T13:58:59Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562976"
+    },
+    {
+      "id": "ci:92639562878",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:59:02Z",
+      "text": "CI check build-dev-binaries / linux libc for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562878 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "build-dev-binaries / linux libc",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:47Z",
+        "completed_at": "2026-08-06T13:59:02Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562878"
+    },
+    {
+      "id": "ci:92639562852",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:59:09Z",
+      "text": "CI check build-dev-binaries / android aarch64 for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562852 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "build-dev-binaries / android aarch64",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:46Z",
+        "completed_at": "2026-08-06T13:59:09Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562852"
+    },
+    {
+      "id": "ci:92639562703",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:59:22Z",
+      "text": "CI check check-lint / clippy on windows for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562703 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-lint / clippy on windows",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:58:15Z",
+        "completed_at": "2026-08-06T13:59:22Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562703"
+    },
+    {
+      "id": "ci:92639562813",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:59:22Z",
+      "text": "CI check build-dev-binaries / linux musl for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562813 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "build-dev-binaries / linux musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:46Z",
+        "completed_at": "2026-08-06T13:59:22Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562813"
+    },
+    {
+      "id": "ci:92639563039",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:59:49Z",
+      "text": "CI check build-dev-binaries / linux aarch64 for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639563039 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "build-dev-binaries / linux aarch64",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:46Z",
+        "completed_at": "2026-08-06T13:59:49Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639563039"
+    },
+    {
+      "id": "ci:92639375297",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:59:52Z",
+      "text": "CI check check-fmt / rust for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639375297 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-fmt / rust",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:59:32Z",
+        "completed_at": "2026-08-06T13:59:52Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639375297"
+    },
+    {
+      "id": "ci:92639562674",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:59:58Z",
+      "text": "CI check check-lint / shellcheck for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562674 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-lint / shellcheck",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:59:50Z",
+        "completed_at": "2026-08-06T13:59:58Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562674"
+    },
+    {
+      "id": "ci:92639562856",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T13:59:59Z",
+      "text": "CI check build-dev-binaries / linux armv7 gnueabihf for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562856 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "build-dev-binaries / linux armv7 gnueabihf",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:47Z",
+        "completed_at": "2026-08-06T13:59:59Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562856"
+    },
+    {
+      "id": "ci:92639562454",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:00:07Z",
+      "text": "CI check check-lock / uv lockfiles for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562454 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-lock / uv lockfiles",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:59:42Z",
+        "completed_at": "2026-08-06T14:00:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562454"
+    },
+    {
+      "id": "ci:92639562761",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:00:12Z",
+      "text": "CI check build-dev-binaries / windows x86_64 for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562761 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "build-dev-binaries / windows x86_64",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:49Z",
+        "completed_at": "2026-08-06T14:00:12Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562761"
+    },
+    {
+      "id": "ci:92639562644",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:00:20Z",
+      "text": "CI check check-lint / ruff for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562644 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-lint / ruff",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:00:02Z",
+        "completed_at": "2026-08-06T14:00:20Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562644"
+    },
+    {
+      "id": "ci:92640426698",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:00:43Z",
+      "text": "CI check zizmor for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92640426698 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "zizmor",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:00:40Z",
+        "completed_at": "2026-08-06T14:00:43Z",
+        "app_id": 57789,
+        "app_slug": "github-advanced-security"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92640426698"
+    },
+    {
+      "id": "ci:92639375382",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:00:44Z",
+      "text": "CI check check-fmt / python for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639375382 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-fmt / python",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:00:21Z",
+        "completed_at": "2026-08-06T14:00:44Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639375382"
+    },
+    {
+      "id": "ci:92639562456",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:00:48Z",
+      "text": "CI check check-zizmor / zizmor for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562456 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-zizmor / zizmor",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:00:23Z",
+        "completed_at": "2026-08-06T14:00:48Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562456"
+    },
+    {
+      "id": "ci:92639562508",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:01:12Z",
+      "text": "CI check check-generated-files / cargo dev generate-all for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562508 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-generated-files / cargo dev generate-all",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:59:55Z",
+        "completed_at": "2026-08-06T14:01:12Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562508"
+    },
+    {
+      "id": "ci:92639562690",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:01:20Z",
+      "text": "CI check build-dev-binaries / macos x86_64 for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562690 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "build-dev-binaries / macos x86_64",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:50Z",
+        "completed_at": "2026-08-06T14:01:20Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562690"
+    },
+    {
+      "id": "ci:92639562696",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:01:22Z",
+      "text": "CI check check-lint / typos for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562696 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-lint / typos",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:01:04Z",
+        "completed_at": "2026-08-06T14:01:22Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562696"
+    },
+    {
+      "id": "ci:92639562530",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:01:28Z",
+      "text": "CI check test / cargo test on windows 3 of 3 for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562530 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test / cargo test on windows 3 of 3",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:58:15Z",
+        "completed_at": "2026-08-06T14:01:28Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562530"
+    },
+    {
+      "id": "ci:92639562771",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:01:38Z",
+      "text": "CI check test / cargo test on windows 2 of 3 for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562771 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test / cargo test on windows 2 of 3",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:58:14Z",
+        "completed_at": "2026-08-06T14:01:38Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562771"
+    },
+    {
+      "id": "ci:92639375645",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:01:39Z",
+      "text": "CI check check-fmt / prettier for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639375645 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-fmt / prettier",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:01:00Z",
+        "completed_at": "2026-08-06T14:01:39Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639375645"
+    },
+    {
+      "id": "ci:92639563080",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:01:49Z",
+      "text": "CI check build-dev-binaries / freebsd for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639563080 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "build-dev-binaries / freebsd",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:59:32Z",
+        "completed_at": "2026-08-06T14:01:49Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639563080"
+    },
+    {
+      "id": "ci:92639562629",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:01:55Z",
+      "text": "CI check check-lint / validate-pyproject for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562629 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-lint / validate-pyproject",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:01:27Z",
+        "completed_at": "2026-08-06T14:01:55Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562629"
+    },
+    {
+      "id": "ci:92639562794",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:01:57Z",
+      "text": "CI check build-dev-binaries / windows aarch64 for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562794 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "build-dev-binaries / windows aarch64",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:48Z",
+        "completed_at": "2026-08-06T14:01:57Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562794"
+    },
+    {
+      "id": "ci:92640801761",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:01:57Z",
+      "text": "CI check test-system for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92640801761 status=completed conclusion=skipped",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test-system",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-08-06T14:01:57Z",
+        "completed_at": "2026-08-06T14:01:57Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92640801761"
+    },
+    {
+      "id": "ci:92640802203",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:01:57Z",
+      "text": "CI check test-integration for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92640802203 status=completed conclusion=skipped",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test-integration",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-08-06T14:01:57Z",
+        "completed_at": "2026-08-06T14:01:57Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92640802203"
+    },
+    {
+      "id": "ci:92640802426",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:01:57Z",
+      "text": "CI check test uv publish for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92640802426 status=completed conclusion=skipped",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test uv publish",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-08-06T14:01:57Z",
+        "completed_at": "2026-08-06T14:01:57Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92640802426"
+    },
+    {
+      "id": "ci:92639562494",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:02:06Z",
+      "text": "CI check check-docs / mkdocs for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562494 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-docs / mkdocs",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:58:24Z",
+        "completed_at": "2026-08-06T14:02:06Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562494"
+    },
+    {
+      "id": "ci:92639562642",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:02:11Z",
+      "text": "CI check test / cargo test on windows 1 of 3 for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562642 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test / cargo test on windows 1 of 3",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:58:19Z",
+        "completed_at": "2026-08-06T14:02:11Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562642"
+    },
+    {
+      "id": "ci:92640801229",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:02:30Z",
+      "text": "CI check test-smoke / linux aarch64 for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92640801229 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test-smoke / linux aarch64",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:02:05Z",
+        "completed_at": "2026-08-06T14:02:30Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92640801229"
+    },
+    {
+      "id": "ci:92640801141",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:02:48Z",
+      "text": "CI check test-ecosystem / prefecthq/prefect for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92640801141 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test-ecosystem / prefecthq/prefect",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:02:20Z",
+        "completed_at": "2026-08-06T14:02:48Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92640801141"
+    },
+    {
+      "id": "ci:92639562661",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:02:54Z",
+      "text": "CI check test / cargo test on linux for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562661 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test / cargo test on linux",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:45Z",
+        "completed_at": "2026-08-06T14:02:54Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562661"
+    },
+    {
+      "id": "ci:92640801200",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:02:56Z",
+      "text": "CI check test-smoke / windows x86_64 for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92640801200 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test-smoke / windows x86_64",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:02:04Z",
+        "completed_at": "2026-08-06T14:02:56Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92640801200"
+    },
+    {
+      "id": "ci:92639562691",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:02:58Z",
+      "text": "CI check check-lint / hawk for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562691 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-lint / hawk",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:00:00Z",
+        "completed_at": "2026-08-06T14:02:58Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562691"
+    },
+    {
+      "id": "ci:92640801233",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:03:02Z",
+      "text": "CI check test-smoke / windows aarch64 for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92640801233 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test-smoke / windows aarch64",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:02:01Z",
+        "completed_at": "2026-08-06T14:03:02Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92640801233"
+    },
+    {
+      "id": "ci:92639562846",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:03:05Z",
+      "text": "CI check check-release / dist plan for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562846 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-release / dist plan",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:02:43Z",
+        "completed_at": "2026-08-06T14:03:05Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562846"
+    },
+    {
+      "id": "ci:92640801309",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:03:24Z",
+      "text": "CI check test-smoke / linux for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92640801309 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test-smoke / linux",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:03:00Z",
+        "completed_at": "2026-08-06T14:03:24Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92640801309"
+    },
+    {
+      "id": "ci:92639562331",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:03:30Z",
+      "text": "CI check check-publish / cargo publish dry-run for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562331 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-publish / cargo publish dry-run",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:45Z",
+        "completed_at": "2026-08-06T14:03:30Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562331"
+    },
+    {
+      "id": "ci:92640801147",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:03:33Z",
+      "text": "CI check test-smoke / linux musl for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92640801147 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test-smoke / linux musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:03:00Z",
+        "completed_at": "2026-08-06T14:03:33Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92640801147"
+    },
+    {
+      "id": "ci:92640801351",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:03:55Z",
+      "text": "CI check test-ecosystem / pydantic/pydantic-core for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92640801351 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test-ecosystem / pydantic/pydantic-core",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:03:31Z",
+        "completed_at": "2026-08-06T14:03:55Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92640801351"
+    },
+    {
+      "id": "ci:92640801519",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:03:57Z",
+      "text": "CI check test-ecosystem / pallets/flask for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92640801519 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test-ecosystem / pallets/flask",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:03:40Z",
+        "completed_at": "2026-08-06T14:03:57Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92640801519"
+    },
+    {
+      "id": "ci:92640801261",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:04:08Z",
+      "text": "CI check test-smoke / macos for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92640801261 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "test-smoke / macos",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:02:01Z",
+        "completed_at": "2026-08-06T14:04:08Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92640801261"
+    },
+    {
+      "id": "ci:92639562748",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:04:33Z",
+      "text": "CI check check-lint / clippy on linux for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562748 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "check-lint / clippy on linux",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:02:17Z",
+        "completed_at": "2026-08-06T14:04:33Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562748"
+    },
+    {
+      "id": "ci:92641549550",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:04:58Z",
+      "text": "CI check all required jobs passed for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92641549550 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "all required jobs passed",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:04:54Z",
+        "completed_at": "2026-08-06T14:04:58Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92641549550"
+    },
+    {
+      "id": "ci:92639562432",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:10:31Z",
+      "text": "CI check bench / simulated for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562432 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "bench / simulated",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:44Z",
+        "completed_at": "2026-08-06T14:10:31Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562432"
+    },
+    {
+      "id": "ci:92643258188",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:10:35Z",
+      "text": "CI check CodSpeed Performance Analysis for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92643258188 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "CodSpeed Performance Analysis",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:10:35Z",
+        "completed_at": "2026-08-06T14:10:35Z",
+        "app_id": 257293,
+        "app_slug": "codspeed-hq"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92643258188"
+    },
+    {
+      "id": "ci:92639562384",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:10:53Z",
+      "text": "CI check bench / walltime build for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562384 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "bench / walltime build",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:57:44Z",
+        "completed_at": "2026-08-06T14:10:53Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562384"
+    },
+    {
+      "id": "ci:92639562351",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:11:22Z",
+      "text": "CI check review / security review for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92639562351 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "review / security review",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T13:59:20Z",
+        "completed_at": "2026-08-06T14:11:22Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92639562351"
+    },
+    {
+      "id": "ci:92643482531",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:11:35Z",
+      "text": "CI check review / prepare for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92643482531 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "review / prepare",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:11:26Z",
+        "completed_at": "2026-08-06T14:11:35Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92643482531"
+    },
+    {
+      "id": "ci:92643545985",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:11:35Z",
+      "text": "CI check review / report for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92643545985 status=completed conclusion=skipped",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "review / report",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-08-06T14:11:36Z",
+        "completed_at": "2026-08-06T14:11:35Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92643545985"
+    },
+    {
+      "id": "ci:92643344289",
+      "kind": "ci_run",
+      "occurred_at": "2026-08-06T14:23:52Z",
+      "text": "CI check bench / walltime on aarch64 linux for c0bb4195f85aadb79dc69e31e000093f055600fc\nrun_id=92643344289 status=completed conclusion=success",
+      "links": [
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "head_sha": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "name": "bench / walltime on aarch64 linux",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-08-06T14:12:16Z",
+        "completed_at": "2026-08-06T14:23:52Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/check-runs/92643344289"
+    },
+    {
+      "id": "review:4875696677",
+      "kind": "review",
+      "occurred_at": "2026-08-06T14:26:30Z",
+      "text": "review_id=4875696677 state=APPROVED\n[no written review body]",
+      "links": [
+        "pull_request:20988",
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc"
+      ],
+      "attributes": {
+        "state": "APPROVED"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/pulls/20988/reviews/4875696677"
+    },
+    {
+      "id": "merge:20988",
+      "kind": "merge",
+      "occurred_at": "2026-08-06T18:05:24Z",
+      "text": "Merged pull request #20988 from validated head commit c0bb4195f85aadb79dc69e31e000093f055600fc.",
+      "links": [
+        "pull_request:20988",
+        "commit:c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "license:261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+        "review:4875696677"
+      ],
+      "attributes": {
+        "commit": "c0bb4195f85aadb79dc69e31e000093f055600fc",
+        "merge_commit_sha": "1979349b68dbaa936b98c0f409c1df0598fa72f1"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/pulls/20988"
+    },
+    {
+      "id": "release:0.12.3",
+      "kind": "release",
+      "occurred_at": "2026-08-07T16:34:42Z",
+      "text": "Release 0.12.3\n\n## Release Notes\n\nReleased on 2026-08-07.\n\n### Python\n\n- Add CPython 3.13.15 ([#20997](https://github.com/astral-sh/uv/pull/20997))\n\n### Preview features\n\n- Add `--output-format` to select automatic, human-readable, or raw-byte output for `uv cache size` ([#20992](https://github.com/astral-sh/uv/pull/20992))\n- Preserve JSON output from `uv workspace metadata --quiet` while suppressing diagnostics ([#20991](https://github.com/astral-sh/uv/pull/20991))\n- Reduce memory usage for large workspaces by streaming `uv workspace metadata` JSON output ([#20990](https://github.com/astral-sh/uv/pull/20990))\n\n### Performance\n\n- Reduce Linux startup latency by initializing the workspace cache before spawning another thread ([#20989](https://github.com/astral-sh/uv/pull/20989))\n- Reuse compiled workspace exclusion patterns during workspace discovery ([#20988](https://github.com/astral-sh/uv/pull/20988))\n- Speed up conflict-heavy resolutions by avoiding materialized range complements ([#20982](https://github.com/astral-sh/uv/pull/20982))\n- Avoid slow procfs reads during Python interpreter discovery on Linux ([#20987](https://github.com/astral-sh/uv/pull/20987))\n\n### Documentation\n\n- Add PEP 740 attestations to the GitHub Actions publishing example ([#20986](https://github.com/astral-sh/uv/pull/20986))\n- Restrict the GitHub Actions publishing example to Python version tags ([#20973](https://github.com/astral-sh/uv/pull/20973))\n- Correct `--python-pin` to `--pin-python` in the `uv init --bare` example ([#20876](https://github.com/astral-sh/uv/pull/20876))\n\n## Install uv 0.12.3\n\n### Install prebuilt binaries via shell script\n\n```sh\ncurl --proto '=https' --tlsv1.2 -LsSf https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-installer.sh | sh\n```\n\n### Install prebuilt binaries via powershell script\n\n```sh\npowershell -ExecutionPolicy Bypass -c \"irm https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-installer.ps1 | iex\"\n```\n\n## Download uv 0.12.3\n\n|  File  | Platform | Checksum |\n|--------|----------|----------|\n| [uv-aarch64-apple-darwin.tar.gz](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-aarch64-apple-darwin.tar.gz) | Apple Silicon macOS | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-aarch64-apple-darwin.tar.gz.sha256) |\n| [uv-x86_64-apple-darwin.tar.gz](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-x86_64-apple-darwin.tar.gz) | Intel macOS | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-x86_64-apple-darwin.tar.gz.sha256) |\n| [uv-aarch64-pc-windows-msvc.zip](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-aarch64-pc-windows-msvc.zip) | ARM64 Windows | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-aarch64-pc-windows-msvc.zip.sha256) |\n| [uv-i686-pc-windows-msvc.zip](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-i686-pc-windows-msvc.zip) | x86 Windows | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-i686-pc-windows-msvc.zip.sha256) |\n| [uv-x86_64-pc-windows-msvc.zip](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-x86_64-pc-windows-msvc.zip) | x64 Windows | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-x86_64-pc-windows-msvc.zip.sha256) |\n| [uv-aarch64-unknown-linux-gnu.tar.gz](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-aarch64-unknown-linux-gnu.tar.gz) | ARM64 Linux | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-aarch64-unknown-linux-gnu.tar.gz.sha256) |\n| [uv-i686-unknown-linux-gnu.tar.gz](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-i686-unknown-linux-gnu.tar.gz) | x86 Linux | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-i686-unknown-linux-gnu.tar.gz.sha256) |\n| [uv-powerpc64le-unknown-linux-gnu.tar.gz](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-powerpc64le-unknown-linux-gnu.tar.gz) | PPC64LE Linux | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-powerpc64le-unknown-linux-gnu.tar.gz.sha256) |\n| [uv-riscv64gc-unknown-linux-gnu.tar.gz](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-riscv64gc-unknown-linux-gnu.tar.gz) | RISCV Linux | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-riscv64gc-unknown-linux-gnu.tar.gz.sha256) |\n| [uv-s390x-unknown-linux-gnu.tar.gz](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-s390x-unknown-linux-gnu.tar.gz) | S390x Linux | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-s390x-unknown-linux-gnu.tar.gz.sha256) |\n| [uv-x86_64-unknown-linux-gnu.tar.gz](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-x86_64-unknown-linux-gnu.tar.gz) | x64 Linux | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-x86_64-unknown-linux-gnu.tar.gz.sha256) |\n| [uv-armv7-unknown-linux-gnueabihf.tar.gz](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-armv7-unknown-linux-gnueabihf.tar.gz) | ARMv7 Linux | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-armv7-unknown-linux-gnueabihf.tar.gz.sha256) |\n| [uv-aarch64-unknown-linux-musl.tar.gz](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-aarch64-unknown-linux-musl.tar.gz) | ARM64 MUSL Linux | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-aarch64-unknown-linux-musl.tar.gz.sha256) |\n| [uv-i686-unknown-linux-musl.tar.gz](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-i686-unknown-linux-musl.tar.gz) | x86 MUSL Linux | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-i686-unknown-linux-musl.tar.gz.sha256) |\n| [uv-riscv64gc-unknown-linux-musl.tar.gz](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-riscv64gc-unknown-linux-musl.tar.gz) | RISCV MUSL Linux | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-riscv64gc-unknown-linux-musl.tar.gz.sha256) |\n| [uv-x86_64-unknown-linux-musl.tar.gz](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-x86_64-unknown-linux-musl.tar.gz) | x64 MUSL Linux | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-x86_64-unknown-linux-musl.tar.gz.sha256) |\n| [uv-arm-unknown-linux-musleabihf.tar.gz](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-arm-unknown-linux-musleabihf.tar.gz) | ARMv6 MUSL Linux (Hardfloat) | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-arm-unknown-linux-musleabihf.tar.gz.sha256) |\n| [uv-armv7-unknown-linux-musleabihf.tar.gz](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-armv7-unknown-linux-musleabihf.tar.gz) | ARMv7 MUSL Linux | [checksum](https://releases.astral.sh/github/uv/releases/download/0.12.3/uv-armv7-unknown-linux-musleabihf.tar.gz.sha256) |\n\n## Verifying GitHub Artifact Attestations\n\nThe artifacts in this release have attestations generated with GitHub Artifact Attestations. These can be verified by using the [GitHub CLI](https://cli.github.com/manual/gh_attestation_verify):\n```sh\ngh attestation verify <file-path of downloaded artifact> --repo astral-sh/uv\n```\n\nYou can also download the attestation from [GitHub](https://github.com/astral-sh/uv/attestations) and verify against that directly:\n```sh\ngh attestation verify <file-path of downloaded artifact> --bundle <file-path of downloaded attestation>\n```",
+      "links": [
+        "pull_request:20988",
+        "merge:20988",
+        "ci:92641549550",
+        "ci:92639562432",
+        "ci:92639562384",
+        "ci:92643344289",
+        "ci:92639562852",
+        "ci:92639563080",
+        "ci:92639563039",
+        "ci:92639562856",
+        "ci:92639562878",
+        "ci:92639562813",
+        "ci:92639562880",
+        "ci:92639562690",
+        "ci:92639562976",
+        "ci:92639562794",
+        "ci:92639562761",
+        "ci:92639563202",
+        "ci:92639563309",
+        "ci:92639562494",
+        "ci:92639375645",
+        "ci:92639375382",
+        "ci:92639375297",
+        "ci:92639562508",
+        "ci:92639562562",
+        "ci:92639562748",
+        "ci:92639562703",
+        "ci:92639562691",
+        "ci:92639562564",
+        "ci:92639562644",
+        "ci:92639562674",
+        "ci:92639562547",
+        "ci:92639562696",
+        "ci:92639562629",
+        "ci:92639562454",
+        "ci:92639562331",
+        "ci:92639562846",
+        "ci:92639562456",
+        "ci:92639375306",
+        "ci:92643482531",
+        "ci:92643545985",
+        "ci:92639562351",
+        "ci:92639562661",
+        "ci:92639563308",
+        "ci:92639562642",
+        "ci:92639562771",
+        "ci:92639562530",
+        "ci:92640802426",
+        "ci:92640801519",
+        "ci:92640801141",
+        "ci:92640801351",
+        "ci:92640802203",
+        "ci:92640801309",
+        "ci:92640801229",
+        "ci:92640801147",
+        "ci:92640801261",
+        "ci:92640801233",
+        "ci:92640801200",
+        "ci:92640801761",
+        "ci:92639563507",
+        "ci:92643258188",
+        "ci:92640426698"
+      ],
+      "attributes": {
+        "tag": "0.12.3",
+        "target_commitish": "507230998c9541d67814b57463ac00e454ff6991",
+        "tag_commit_sha": "507230998c9541d67814b57463ac00e454ff6991",
+        "merge_commit_sha": "1979349b68dbaa936b98c0f409c1df0598fa72f1",
+        "ancestry_verified": true,
+        "compare_status": "ahead",
+        "compare_base_sha": "1979349b68dbaa936b98c0f409c1df0598fa72f1",
+        "compare_head_sha": "507230998c9541d67814b57463ac00e454ff6991",
+        "compare_endpoint": "https://api.github.com/repos/astral-sh/uv/compare/1979349b68dbaa936b98c0f409c1df0598fa72f1...507230998c9541d67814b57463ac00e454ff6991",
+        "compare_response_sha256": "51a2c5e2d0869d828aa79c9de6d432b0683839612cdc152a0475ff62fb59cb36",
+        "ci_evidence_scope": "observed_selected_final_pre_merge_check_runs",
+        "required_check_policy_verified": false,
+        "required_check_policy_requirement": "external_signed_policy_required_for_production_eligibility"
+      },
+      "source_pointer": "https://api.github.com/repos/astral-sh/uv/releases/366879609"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "git_workflow",
+    "role": "source",
+    "key_id": "probe-source-e4bac7778cdcfa3808f3c373b474e85f",
+    "environment": "probe",
+    "digest": "8101027d80da929e89e947063e771caf8a040ce05fae6ea6be0e0ea4f0ab4e83"
+  }
+}

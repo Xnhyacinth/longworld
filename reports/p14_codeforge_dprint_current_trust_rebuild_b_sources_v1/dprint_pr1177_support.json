@@ -1,0 +1,745 @@
+{
+  "schema_version": "longworld.git-workflow.v1",
+  "repository_url": "https://github.com/dprint/dprint",
+  "source_origin": "real_public",
+  "revision": "a21ce0b60d754015abaf25b2797b02e0f426d10f",
+  "license": "MIT",
+  "exported_at": "2026-09-02T21:55:04.741552Z",
+  "authorization": {
+    "record_id": "PUBLIC-GITHUB-TERMS-2026-08",
+    "scope": "read-only workflow export",
+    "basis": "public repository under recorded license",
+    "reviewed_at": "2026-08-27T04:00:00Z"
+  },
+  "public_policy": {
+    "record_id": "PUBLIC-GITHUB-TERMS-2026-08",
+    "sha256": "dd39cfef6803b01b08cc476acef805265a7f10d62378889e1d56cb8603cb4c60"
+  },
+  "source_client": {
+    "path": "/usr/bin/gh",
+    "sha256": "2fd925d68889746976958342fb749bf102bc7dc8bcba3abfa533a80ad7791673"
+  },
+  "privacy_review": {
+    "emails": "redacted",
+    "secrets": "fail_closed",
+    "scanner": "longworld-public-secret-patterns",
+    "scanner_revision": "v2"
+  },
+  "records": [
+    {
+      "id": "license:8c64c54183aaff2b0db2c632aac2eec1544513aa",
+      "kind": "license",
+      "occurred_at": "2025-05-18T22:09:27Z",
+      "text": "The MIT License (MIT)\n\nCopyright (c) 2019 David Sherret\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
+      "links": [],
+      "attributes": {
+        "spdx_id": "MIT"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/contents/LICENSE?ref=1fc528bbf351213114553f18c90a7de691f79332"
+    },
+    {
+      "id": "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0",
+      "kind": "commit",
+      "occurred_at": "2026-06-23T18:21:13Z",
+      "text": "commit 2408a06d3fa3a265f71d078004e9eabf4d388de0\nfeat: LSP completions and hover for dprint configuration files\n\nAdds schema-aware completions and hover for dprint config files\n(dprint.json(c)/.dprint.json(c)) to the `dprint lsp` command, so it\nworks in any LSP client rather than relying on the editor also running\na JSON language server with the schema associated (#806).\n\nThe engine builds a composite schema per config file: the embedded\ndprint base schema for the well-known root keys, plus each resolved\nplugin's downloaded config_schema_url nested under its config key.\nContext is determined from a tolerant token scan (so it works on the\ninvalid JSON you have mid-edit), and suggestions are driven by a small\nJSON-schema walker. A path can resolve to a set of schema nodes whose\nsuggestions are unioned, which is how plugin sections merge the common\nsection properties and how overrides entries merge files with the\nplugin's own config.\n\nThe base schema now lives in the crate (config_schema.json) as the\nsource of truth; the website build copies it to its assets so it is\nstill served at https://dprint.dev/schemas/v0.json.\n\ndiff -- crates/dprint/src/commands/lsp/config_completion.rs\n@@ -0,0 +1,1109 @@\n+use std::cell::RefCell;\n+use std::collections::HashMap;\n+use std::path::Path;\n+use std::rc::Rc;\n+\n+use jsonc_parser::Scanner;\n+use jsonc_parser::tokens::Token;\n+use serde_json::Value;\n+use text_size::TextSize;\n+use tower_lsp::lsp_types as lsp;\n+use url::Url;\n+\n+use crate::configuration::POSSIBLE_CONFIG_FILE_NAMES;\n+use crate::environment::Environment;\n+\n+use super::config::LspPluginsScopeContainer;\n+use super::text::LineIndex;\n+\n+/// The dprint configuration file JSON schema, embedded at compile time so that\n+/// completions for the well-known root keys work without any network access.\n+///\n+/// This crate is the source of truth for the schema. The website build copies\n+/// this file to `website/src/assets/schemas/v0.json` so it's also served at\n+/// https://dprint.dev/schemas/v0.json (see `website/_config.ts`).\n+const DPRINT_CONFIG_SCHEMA: &str = include_str!(\"config_schema.json\");\n+\n+/// Provides completions and hover information for dprint configuration files.\n+///\n+/// This is intentionally isolated from the rest of the language server: it owns\n+/// the base schema, fetches and caches each resolved plugin's configuration\n+/// schema, then stitches them together into a [`CompositeSchema`] that drives\n+/// schema-aware suggestions. The actual analysis ([`completions_for`] and\n+/// [`hover_for`]) is pure and operates only on text + a composite schema, which\n+/// keeps it easy to test without a running environment.\n+pub struct ConfigCompletions<TEnvironment: Environment> {\n+  environment: TEnvironment,\n+  scope_container: Rc<LspPluginsScopeContainer<TEnvironment>>,\n+  base_schema: Rc<Value>,\n+  /// Cache of plugin config schemas by url. `None` means the url was empty or\n+  /// the schema failed to download/parse, so we don't keep retrying it.\n+  schema_cache: RefCell<HashMap<String, Option<Rc<Value>>>>,\n+}\n+\n+/// Gets whether the given uri points at a file dprint recognizes as a\n+/// configuration file (ex. `dprint.json`).\n+pub fn is_config_uri(uri: &Url) -> bool {\n+  let Some(file_name) = uri.path_segments().and_then(|mut s| s.next_back()) else {\n+    return false;\n+  };\n+  POSSIBLE_CONFIG_FILE_NAMES.contains(&file_name)\n+}\n+\n+impl<TEnvironment: Environment> ConfigCompletions<TEnvironment> {\n+  pub fn new(environment: TEnvironment, scope_container: Rc<LspPluginsScopeContainer<TEnvironment>>) -> Self {\n+    let base_schema = serde_json::from_str(DPRINT_CONFIG_SCHEMA).expect(\"dprint config schema should be valid json\");\n+    Self {\n+      environment,\n+      scope_container,\n+      base_schema: Rc::new(base_schema),\n+      schema_cache: Default::default(),\n+    }\n+  }\n+\n+  pub async fn completions(&self, file_path: &Path, file_text: &str, position: lsp::Position) -> Option<Vec<lsp::CompletionItem>> {\n+    let line_index = LineIndex::new(file_text);\n+    let offset: usize = u32::from(line_index.offset(position).ok()?) as usize;\n+    let schema = self.build_composite_schema(file_path).await;\n+    Some(completions_for(&schema, file_text, &line_index, offset))\n+  }\n+\n+  pub async fn hover(&self, file_path: &Path, file_text: &str, position: lsp::Position) -> Option<lsp::Hover> {\n+    let line_index = LineIndex::new(file_text);\n+    let offset: usize = u32::from(line_index.offset(position).ok()?) as usize;\n+    let schema = self.build_composite_schema(file_path).await;\n+    hover_for(&schema, file_text, &line_index, offset)\n+  }\n+\n+  async fn build_composite_schema(&self, file_path: &Path) -> CompositeSchema {\n+    let mut plugins = Vec::new();\n+    if let Some(parent) = file_path.parent() {\n+      // a parse error while the user is mid-edit just means we fall back to\n+      // base-schema-only completions, so ignore any resolution error here\n+      if let Ok(Some(scope)) = self.scope_container.resolve_by_path(parent).await {\n+        for plugin in scope.plugins.values() {\n+          let info = plugin.info();\n+          let schema = self.fetch_schema(&info.config_schema_url).await;\n+          plugins.push(PluginSchema {\n+            config_key: info.config_key.clone(),\n+            name: info.name.clone(),\n+            schema,\n+          });\n+        }\n+      }\n+    }\n+    CompositeSchema {\n+      base: self.base_schema.clone(),\n+      plugins,\n+    }\n+  }\n+\n+  async fn fetch_schema(&self, url: &str) -> Option<Rc<Value>> {\n+    let url = url.trim();\n+    if url.is_empty() {\n+      return None;\n+    }\n+    if let Some(cached) = self.schema_cache.borrow().get(url) {\n+      return cached.clone();\n+    }\n+    let result = self.download_schema(url).await;\n+    self.schema_cache.borrow_mut().insert(url.to_string(), result.clone());\n+    result\n+  }\n+\n+  async fn download_schema(&self, url: &str) -> Option<Rc<Value>> {\n+    let parsed_url = Url::parse(url).ok()?;\n+    match self.environment.download_file_err_404(&parsed_url, None).await {\n+      Ok((_, file)) => match serde_json::from_slice::<Value>(&file.content) {\n+        Ok(value) => Some(Rc::new(value)),\n+        Err(err) => {\n+          log_debug!(self.environment, \"Failed parsing config schema at {}: {:#}\", url, err);\n+          None\n+        }\n+      },\n+      Err(err) => {\n+        log_debug!(self.environment, \"Failed downloading config schema at {}: {:#}\", url, err);\n+        None\n+      }\n+    }\n+  }\n+}\n+\n+/// The dprint base schema combined with the resolved plugins' schemas.\n+struct CompositeSchema {\n+  base: Rc<Value>,\n+  plugins: Vec<PluginSchema>,\n+}\n+\n+struct PluginSchema {\n+  config_key: String,\n+  name: String,\n+  /// The plugin's configuration schema. `None` when the plugin doesn't expose\n+  /// one or it couldn't be downloaded.\n+  schema: Option<Rc<Value>>,\n+}\n+\n+impl CompositeSchema {\n+  fn base_root(&self) -> SchemaRef<'_> {\n+    SchemaRef {\n+      doc: &self.base,\n+      node: &self.base,\n+    }\n+  }\n+\n+  /// The base schema's `additionalProperties`, which describes the properties\n+  /// common to every plugin's config section (ex. `locked`, `associations`).\n+  fn base_plugin_section(&self) -> Option<SchemaRef<'_>> {\n+    self.base.get(\"additionalProperties\").map(|node| SchemaRef { doc: &self.base, node })\n+  }\n+\n+  /// The schema describing a single entry of a plugin section's `overrides`\n+  /// (an object with `files` plus arbitrary plugin config).\n+  fn base_override_item(&self) -> Option<SchemaRef<'_>> {\n+    override_item(self.base_plugin_section()?.property(\"overrides\")?)\n+  }\n+\n+  fn plugin_by_key(&self, key: &str) -> Option<&PluginSchema> {\n+    self.plugins.iter().find(|p| p.config_key == key)\n+  }\n+\n+  fn plugin_root<'a>(&'a self, plugin: &'a PluginSchema) -> Option<SchemaRef<'a>> {\n+    plugin.schema.as_ref().map(|schema| SchemaRef { doc: schema, node: schema })\n+  }\n+\n+  /// Resolves the object or array located at `path` into the set of schema\n+  /// nodes that describe it. Suggestions are the union across the set, which is\n+  /// how plugin sections merge the plugin's own schema with the common section\n+  /// properties, and how `overrides` entries merge `files` with plugin config.\n+  fn schema_set_for_path(&self, path: &[PathSeg]) -> SchemaSet<'_> {\n+    // a top level plugin config section is handled specially\n+    if let Some(PathSeg::Key(key)) = path.first()\n+      && let Some(plugin) = self.plugin_by_key(key)\n+    {\n+      return self.plugin_section_set(plugin, &path[1..]);\n+    }\n+\n+    // otherwise navigate within the base schema\n+    let mut current = self.base_root();\n+    for seg in path {\n+      current = match navigate(current, seg) {\n+        Some(node) => node,\n+        None => return SchemaSet::empty(),\n+      };\n+    }\n+    SchemaSet::single(current)\n+  }\n+\n+  fn plugin_section_set<'a>(&'a self, plugin: &'a PluginSchema, rest: &[PathSeg]) -> SchemaSet<'a> {\n+    // the plugin section object itself: the plugin's own schema plus the\n+    // properties common to every section (locked, associations, overrides)\n+    if rest.is_empty() {\n+      let mut refs = Vec::new();\n+      refs.extend(self.plugin_root(plugin));\n+      refs.extend(self.base_plugin_section());\n+      return SchemaSet { refs };\n+    }\n+\n+    // inside `overrides`: each entry is an override object, regardless of\n+    // whether `overrides` was written as a single object or an array\n+    if matches!(&rest[0], PathSeg::Key(key) if key == \"overrides\") {\n+      let mut after = &rest[1..];\n+      if after.first() == Some(&PathSeg::Elem) {\n+        after = &after[1..];\n+      }\n+      // an override object accepts `files` plus the plugin's own config\n+      let mut refs = Vec::new();\n+      refs.extend(self.base_override_item());\n+      refs.extend(self.plugin_root(plugin));\n+      navigate_set(SchemaSet { refs }, after)\n+    } else {\n+      // a nested property of the plugin's own config\n+      let Some(root) = self.plugin_root(plugin) else {\n+        return SchemaSet::empty();\n+      };\n+      navigate_set(SchemaSet::single(root), rest)\n+    }\n+  }\n+\n+  /// Collects the property names that can be suggested for the object at\n+  /// `path`, excluding any already present in `existing_keys`.\n+  fn name_options(&self, path: &[PathSeg], existing_keys: &[String]) -> Vec<NameOption> {\n+    let mut options: Vec<NameOption> = Vec::new();\n+    let mut seen: Vec<String> = Vec::new();\n+    let push = |options: &mut Vec<NameOption>, seen: &mut Vec<String>, option: NameOption| {\n+      if seen.iter().any(|n| n == &option.name) || existing_keys.iter().any(|k| k == &option.name) {\n+        return;\n+      }\n+      seen.push(option.name.clone());\n+      options.push(option);\n+    };\n+\n+    for (name, prop) in self.schema_set_for_path(path).property_names() {\n+      let prop = prop.deref();\n+      push(\n+        &mut options,\n+        &mut seen,\n+        NameOption {\n+          name,\n+          detail: prop.type_label(),\n+          documentation: prop.description().map(str::to_string),\n+        },\n+      );\n+    }\n+\n+    // at the root, every resolved plugin's config key is a valid property\n+    if path.is_empty() {\n+      for plugin in &self.plugins {\n+        push(\n+          &mut options,\n+          &mut seen,\n+          NameOption {\n+            name: plugin.config_key.clone(),\n+            detail: Some(\"plugin\".to_string()),\n+            documentation: Some(format!(\"Configuration for the \\\"{}\\\" plugin.\", plugin.name)),\n+          },\n+        );\n+      }\n+    }\n+\n+    options\n+  }\n+\n+  /// Collects the value suggestions for the property `key` of the object at\n+  /// `path` (ex. the variants of an enum, or `true`/`false`). When `key` is\n+  /// `None` the suggestions are for an array element.\n+  fn value_options(&self, path: &[PathSeg], key: Option<&str>) -> Vec<ValueOption> {\n+    self.schema_set_for_path(path).value_options_for(key)\n+  }\n+}\n+\n+/// One or more schema nodes describing the same object or array. Property and\n+/// value suggestions are the union across all of them, with the first node\n+/// taking precedence on conflicts.\n+struct SchemaSet<'a> {\n+  refs: Vec<SchemaRef<'a>>,\n+}\n+\n+impl<'a> SchemaSet<'a> {\n+  fn empty() -> Self {\n+    SchemaSet { refs: Vec::new() }\n+  }\n+\n+  fn single(node: SchemaRef<'a>) -> Self {\n+    SchemaSet { refs: vec![node] }\n+  }\n+\n+  fn property_names(&self) -> Vec<(String, SchemaRef<'a>)> {\n+    let mut result: Vec<(String, SchemaRef<'a>)> = Vec::new();\n+    for node in &self.refs {\n+      for (name, prop) in node.property_names() {\n+        if !result.iter().any(|(existing, _)| existing == &name) {\n+          result.push((name, prop));\n+        }\n+      }\n+    }\n+    result\n+  }\n+\n+  fn property(&self, key: &str) -> Option<SchemaRef<'a>> {\n+    self.refs.iter().find_map(|node| node.property(key))\n+  }\n+\n+  fn item(&self) -> Option<SchemaRef<'a>> {\n+    self.refs.iter().find_map(|node| node.item())\n+  }\n+\n+  fn value_options_for(&self, key: Option<&str>) -> Vec<ValueOption> {\n+    let mut result: Vec<ValueOption> = Vec::new();\n+    for node in &self.refs {\n+      let target = match key {\n+        Some(key) => node.property(key),\n+        None => node.item(),\n+      };\n+      if let Some(target) = target {\n+        for option in target.value_options() {\n+          if !result.iter().any(|existing| existing.insert_text == option.insert_text) {\n+            result.push(option);\n+          }\n+        }\n+      }\n+    }\n+    result\n+  }\n+}\n+\n+fn navigate<'a>(schema: SchemaRef<'a>, seg: &PathSeg) -> Option<SchemaRef<'a>> {\n+  match seg {\n+    PathSeg::Key(key) => schema.property(key),\n+    PathSeg::Elem => schema.item(),\n+  }\n+}\n+\n+fn navigate_set<'a>(set: SchemaSet<'a>, segs: &[PathSeg]) -> SchemaSet<'a> {\n+  let mut refs = Vec::new();\n+  for node in set.refs {\n+    let mut current = Some(node);\n+    for seg in segs {\n+      current = current.and_then(|node| navigate(node, seg));\n+    }\n+    refs.extend(current);\n+  }\n+  SchemaSet { refs }\n+}\n+\n+/// Digs the override-entry object schema out of a plugin section's `overrides`\n+/// property, which is an `anyOf` of a single object or an array of them.\n+fn override_item(schema: SchemaRef<'_>) -> Option<SchemaRef<'_>> {\n+  let schema = schema.deref();\n+  if schema.node.get(\"properties\").is_some() {\n+    return Some(schema);\n+  }\n+  if let Some(item) = schema.item()\n+    && item.deref().node.get(\"properties\").is_some()\n+  {\n+    return Some(item);\n+  }\n+  for keyword in [\"anyOf\", \"oneOf\", \"allOf\"] {\n+    if let Some(Value::Array(branches)) = schema.node.get(keyword) {\n+      for branch in branches {\n+        if let Some(found) = override_item(SchemaRef { doc: schema.doc, node: branch }) {\n+          return Some(found);\n+        }\n+      }\n+    }\n+  }\n+  None\n+}\n+\n+/// A reference into a JSON schema document. `doc` is the root used for `$ref`\n+/// resolution; `node` is the current schema object.\n+#[derive(Clone, Copy)]\n+struct SchemaRef<'a> {\n+  doc: &'a Value,\n+  node: &'a Value,\n+}\n+\n+impl<'a> SchemaRef<'a> {\n+  /// Follows any `$ref` (a `#/...` JSON pointer within the same document).\n+  fn deref(self) -> SchemaRef<'a> {\n+    let mut node = self.node;\n+    for _ in 0..10 {\n+      let Some(Value::String(reference)) = node.get(\"$ref\") else {\n+        break;\n+      };\n+      match resolve_pointer(self.doc, reference) {\n+        Some(target) => node = target,\n+        None => break,\n+      }\n+    }\n+    SchemaRef { doc: self.doc, node }\n+  }\n+\n+  fn property(self, key: &str) -> Option<SchemaRef<'a>> {\n+    let me = self.deref();\n+    if let Some(prop) = me.node.get(\"properties\").and_then(|p| p.get(key)) {\n+      return Some(SchemaRef { doc: self.doc, node: prop });\n+    }\n+    for keyword in [\"allOf\", \"anyOf\", \"oneOf\"] {\n+      if let Some(Value::Array(branches)) = me.node.get(keyword) {\n+        for branch in branches {\n+          if let Some(found) = (SchemaRef { doc: self.doc, node: branch }).property(key) {\n+            return Some(found);\n+          }\n+        }\n+      }\n+    }\n+    match me.node.get(\"additionalProperties\") {\n+      Some(node @ Value::Object(_)) => Some(SchemaRef { doc: self.doc, node }),\n+      _ => None,\n+    }\n+  }\n+\n+  fn item(self) -> Option<SchemaRef<'a>> {\n+    let me = self.deref();\n+    match me.node.get(\"items\") {\n+      // only single-schema arrays are handled (not tuple validation)\n+      Some(node @ (Value::Object(_) | Value::Bool(_))) => Some(SchemaRef { doc: self.doc, node }),\n+      _ => {\n+        for keyword in [\"allOf\", \"anyOf\", \"oneOf\"] {\n+          if let Some(Value::Array(branches)) = me.node.get(keyword) {\n+            for branch in branches {\n+              if let Some(found) = (SchemaRef { doc: self.doc, node: branch }).item() {\n+                return Some(found);\n+              }\n+            }\n+          }\n+        }\n+        None\n+      }\n+    }\n+  }\n+\n+  fn property_names(self) -> Vec<(String, SchemaRef<'a>)> {\n+    let me = self.deref();\n+    let mut result = Vec::new();\n+    if let Some(Value::Object(props)) = me.node.get(\"properties\") {\n+      for (name, node) in props {\n+        result.push((name.clone(), SchemaRef { doc: self.doc, node }));\n+      }\n+    }\n+    for keyword in [\"allOf\", \"anyOf\", \"oneOf\"] {\n+      if let Some(Value::Array(branches)) = me.node.get(keyword) {\n+        for branch in branches {\n+          result.extend((SchemaRef { doc: self.doc, node: branch }).property_names());\n+        }\n+      }\n+    }\n+    result\n+  }\n+\n+  fn value_options(self) -> Vec<ValueOption> {\n+    let me = self.deref();\n+    let mut options: Vec<ValueOption> = Vec::new();\n+    let push = |options: &mut Vec<ValueOption>, value: &Value, documentation: Option<String>| {\n+      if let Some(option) = ValueOption::from_json(value, documentation)\n+        && !options.iter().any(|o| o.insert_text == option.insert_text)\n+      {\n+        options.push(option);\n+      }\n+    };\n+\n+    if let Some(Value::Array(values)) = me.node.get(\"enum\") {\n+      for value in values {\n+        push(&mut options, value, None);\n+      }\n+    }\n+    if let Some(value) = me.node.get(\"const\") {\n+      push(&mut options, value, me.description().map(str::to_string));\n+    }\n+    for keyword in [\"oneOf\", \"anyOf\"] {\n+      if let Some(Value::Array(branches)) = me.node.get(keyword) {\n+        for branch in branches {\n+          let branch_ref = (SchemaRef { doc: self.doc, node: branch }).deref();\n+          if let Some(value) = branch_ref.node.get(\"const\") {\n+            push(&mut options, value, branch_ref.description().map(str::to_string));\n+          } else if let Some(Value::Array(values)) = branch_ref.node.get(\"enum\") {\n+            for value in values {\n+              push(&mut options, value, None);\n+            }\n+          }\n+        }\n+      }\n+    }\n+    if options.is_empty() && me.has_type(\"boolean\") {\n+      push(&mut options, &Value::Bool(true), None);\n+      push(&mut options, &Value::Bool(false), None);\n+    }\n+\n+    options\n+  }\n+\n+  fn description(self) -> Option<&'a str> {\n+    self.node.get(\"description\").and_then(|d| d.as_str())\n+  }\n+\n+  fn has_type(self, name: &str) -> bool {\n+    match self.node.get(\"type\") {\n+      Some(Value::String(s)) => s == name,\n+      Some(Value::Array(arr)) => arr.iter().any(|v| v.as_str() == Some(name)),\n+      _ => false,\n+    }\n+  }\n+\n+  fn type_label(self) -> Option<String> {\n+    match self.node.get(\"type\") {\n+      Some(Value::String(s)) => Some(s.clone()),\n+      Some(Value::Array(arr)) => {\n+        let joined = arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(\" | \");\n+        (!joined.is_empty()).then_some(joined)\n+      }\n+      _ => {\n+        if self.node.get(\"enum\").is_some() || self.node.get(\"oneOf\").is_some() || self.node.get(\"anyOf\").is_some() {\n+          Some(\"enum\".to_string())\n+        } else {\n+          None\n+        }\n+      }\n+    }\n+  }\n+}\n+\n+fn resolve_pointer<'a>(doc: &'a Value, reference: &str) -> Option<&'a Value> {\n+  let pointer = reference.strip_prefix('#')?;\n+  if pointer.is_empty() {\n+    return Some(doc);\n+  }\n+  let mut current = doc;\n+  for part in pointer.split('/').skip(1) {\n+    let part = part.replace(\"~1\", \"/\").replace(\"~0\", \"~\");\n+    current = current.get(&part)?;\n+  }\n+  Some(current)\n+}\n+\n+struct NameOption {\n+  name: String,\n+  detail: Option<String>,\n+  documentation: Option<String>,\n+}\n+\n+struct ValueOption {\n+  /// The text inserted into the document (valid JSON, ex. `\"auto\"` or `true`).\n+  insert_text: String,\n+  /// The label/filter text shown to the user (ex. `auto`).\n+  display: String,\n+  documentation: Option<String>,\n+}\n+\n+impl ValueOption {\n+  fn from_json(value: &Value, documentation: Option<String>) -> Option<Self> {\n+    let insert_text = serde_json::to_string(value).ok()?;\n+    let display = match value {\n+      Value::String(s) => s.clone(),\n+      _ => insert_text.clone(),\n+    };\n+    Some(ValueOption {\n+      insert_text,\n+      display,\n+      documentation,\n+    })\n+  }\n+}\n+\n+// === Pure analysis ===\n+\n+#[derive(Debug, Clone, PartialEq)]\n+enum PathSeg {\n+  Key(String),\n+  Elem,\n+}\n+\n+/// A scanned token with its byte range and whether it can be \"edited\" (ie. the\n+/// cursor being inside it means the user is typing that value).\n+struct Tok {\n+  kind: TokKind,\n+  start: usize,\n+  end: usize,\n+}\n+\n+#[derive(Clone)]\n+enum TokKind {\n+  OpenBrace,\n+  CloseBrace,\n+  OpenBracket,\n+  CloseBracket,\n+  Comma,\n+  Colon,\n+  /// A string literal, with its decoded contents.\n+  Str(String),\n+  /// A bare word (loose property name or partially typed value).\n+  Word(String),\n+  /// A scalar that can't be a key in valid usage (boolean/number/null).\n+  Scalar(String),\n+  Comment,\n+}\n+\n+impl Tok {\n+  fn is_editable(&self) -> bool {\n+    matches!(self.kind, TokKind::Str(_) | TokKind::Word(_) | TokKind::Scalar(_))\n+  }\n+\n+  fn is_string(&self) -> bool {\n+    matches!(self.kind, TokKind::Str(_))\n+  }\n+\n+  fn scalar_text(&self) -> Option<&str> {\n+    match &self.kind {\n+      TokKind::Str(s) | TokKind::Word(s) | TokKind::Scalar(s) => Some(s),\n+      _ => None,\n+    }\n+  }\n+}\n+\n+fn scan_tokens(text: &str) -> Vec<Tok> {\n+  let mut scanner = Scanner::new(text, &Default::default());\n+  let mut tokens = Vec::new();\n+  // stop at the end of input or the first scan error; whatever tokens preceded\n+  // it are enough to determine context up to the cursor\n+  while let Ok(Some(token)) = scanner.scan() {\n+    let kind = match token {\n+      Token::OpenBrace => TokKind::OpenBrace,\n+      Token::CloseBrace => TokKind::CloseBrace,\n+      Token::OpenBracket => TokKind::OpenBracket,\n+      Token::CloseBracket => TokKind::CloseBracket,\n+      Token::Comma => TokKind::Comma,\n+      Token::Colon => TokKind::Colon,\n+      Token::String(value) => TokKind::Str(value.into_owned()),\n+      Token::Word(value) => TokKind::Word(value.to_string()),\n+      Token::Boolean(value) => TokKind::Scalar(value.to_string()),\n+      Token::Number(value) => TokKind::Scalar(value.to_string()),\n+      Token::Null => TokKind::Scalar(\"null\".to_string()),\n+      Token::CommentLine(_) | Token::CommentBlock(_) => TokKind::Comment,\n+    };\n+    tokens.push(Tok {\n+      kind,\n+      start: scanner.token_start(),\n+      end: scanner.token_end(),\n+    });\n+  }\n+  tokens\n+}\n+\n+#[derive(Debug)]\n+enum Frame {\n+  Object {\n+    key_in_parent: Option<PathSeg>,\n+    last_key: Option<String>,\n+    after_colon: bool,\n+    keys: Vec<String>,\n+  },\n+  Array {\n+    key_in_parent: Option<PathSeg>,\n+  },\n+}\n+\n+enum Position {\n+  /// Completing/hovering a property name.\n+  ObjectKey,\n+  /// Completing/hovering the value of `key`.\n+  ObjectValue { key: String },\n+  /// Completing/hovering an array element value.\n+  ArrayValue,\n+}\n+\n+struct Analysis {\n+  /// Path to the innermost container the cursor is in.\n+  container_path: Vec<PathSeg>,\n+  position: Position,\n+  /// Keys already present in the innermost object (before the cursor).\n+  existing_keys: Vec<String>,\n+  /// The byte range that an accepted completion should replace.\n+  replace_range: (usize, usize),\n+  /// Whether the cursor sits inside a quoted string.\n+  in_string: bool,\n+}\n+\n+fn analyze(tokens: &[Tok], offset: usize) -> Option<Analysis> {\n+  // the token the cursor is editing (cursor within an editable token)\n+  let edit_idx = tokens.iter().position(|t| t.is_editable() && t.start <= offset && offset <= t.end);\n+  let boundary = edit_idx.unwrap_or_else(|| tokens.iter().position(|t| t.end > offset).unwrap_or(tokens.len()));\n+\n+  let mut stack: Vec<Frame> = Vec::new();\n+  for tok in &tokens[..boundary] {\n+    match &tok.kind {\n+      TokKind::OpenBrace => {\n+        let key_in_parent = key_in_parent(&stack);\n+        stack.push(Frame::Object {\n+          key_in_parent,\n+          last_key: None,\n+          after_colon: false,\n+          keys: Vec::new(),\n+        });\n+      }\n+      TokKind::OpenBracket => {\n+        let key_in_parent = key_in_parent(&stack);\n+        stack.push(Frame::Array { key_in_parent });\n+      }\n+      TokKind::CloseBrace | TokKind::CloseBracket => {\n+        stack.pop();\n+        // the closed container was a completed value of its parent property\n+        if let Some(Frame::Object { last_key, after_colon, .. }) = stack.last_mut() {\n+          *last_key = None;\n+          *after_colon = false;\n+        }\n+      }\n+      TokKind::Colon => {\n+        if let Some(Frame::Object { after_colon, .. }) = stack.last_mut() {\n+          *after_colon = true;\n+        }\n+      }\n+      TokKind::Comma => {\n+        if let Some(Frame::Object { last_key, after_colon, .. }) = stack.last_mut() {\n+          *last_key = None;\n+          *after_colon = false;\n+        }\n+      }\n+      TokKind::Comment => {}\n+      TokKind::Str(_) | TokKind::Word(_) | TokKind::Scalar(_) => {\n+        if let Some(Frame::Object {\n+          last_key,\n+          after_colon,\n+          keys,\n+          ..\n+        }) = stack.last_mut()\n+        {\n+          if *after_colon {\n+            // a scalar value completes the property\n+            *last_key = None;\n+            *after_colon = false;\n+          } else {\n+            let text = tok.scalar_text().unwrap_or(\"\").to_string();\n+            keys.push(text.clone());\n+            *last_key = Some(text);\n+          }\n+        }\n+      }\n+    }\n+  }\n+\n+  let container_path = container_path(&stack);\n+  let (position, existing_keys) = match stack.last() {\n+    Some(Frame::Object {\n+      last_key, after_colon, keys, ..\n+    }) => {\n+      let position = match (after_colon, last_key) {\n+        (true, Some(key)) => Position::ObjectValue { key: key.clone() },\n+        _ => Position::ObjectKey,\n+      };\n+      (position, keys.clone())\n+    }\n+    Some(Frame::Array { .. }) => (Position::ArrayValue, Vec::new()),\n+    // not inside any container (ex. empty document)\n+    None => return None,\n+  };\n+\n+  let (replace_range, in_string) = match edit_idx {\n+    Some(idx) => ((tokens[idx].start, tokens[idx].end), tokens[idx].is_string()),\n+    None => ((offset, offset), false),\n+  };\n+\n+  Some(Analysis {\n+    container_path,\n+    position,\n+    existing_keys,\n+    replace_range,\n+    in_string,\n+  })\n+}\n+\n+fn key_in_parent(stack: &[Frame]) -> Option<PathSeg> {\n+  match stack.last() {\n+    Some(Frame::Object { last_key, .. }) => last_key.clone().map(PathSeg::Key),\n+    Some(Frame::Array { .. }) => Some(PathSeg::Elem),\n+    None => None,\n+  }\n+}\n+\n+fn container_path(stack: &[Frame]) -> Vec<PathSeg> {\n+  stack\n+    .iter()\n+    .filter_map(|frame| match frame {\n+      Frame::Object { key_in_parent, .. } => key_in_parent.clone(),\n+      Frame::Array { key_in_parent } => key_in_parent.clone(),\n+    })\n+    .collect()\n+}\n+\n+fn completions_for(schema: &CompositeSchema, text: &str, line_index: &LineIndex, offset: usize) -> Vec<lsp::CompletionItem> {\n+  let tokens = scan_tokens(text);\n+  let Some(analysis) = analyze(&tokens, offset) else {\n+    return Vec::new();\n+  };\n+  let range = lsp_range(line_index, analysis.replace_range.0, analysis.replace_range.1);\n+\n+  match &analysis.position {\n+    Position::ObjectKey => {\n+      let options = schema.name_options(&analysis.container_path, &analysis.existing_keys);\n+      options\n+        .into_iter()\n+        .map(|option| {\n+          let new_text = format!(\"\\\"{}\\\"\", option.name);\n+          let filter_text = if analysis.in_string { new_text.clone() } else { option.name.clone() };\n+          lsp::CompletionItem {\n+            label: option.name,\n+            kind: Some(lsp::CompletionItemKind::PROPERTY),\n+            detail: option.detail,\n+            documentation: option.documentation.map(markdown),\n+            filter_text: Some(filter_text),\n+            text_edit: Some(lsp::CompletionTextEdit::Edit(lsp::TextEdit { range, new_text })),\n+            ..Default::default()\n+          }\n+        })\n+        .collect()\n+    }\n+    Position::ObjectValue { key } => value_items(schema, &analysis, range, Some(key)),\n+    Position::ArrayValue => value_items(schema, &analysis, range, None),\n+  }\n+}\n+\n+fn value_items(schema: &CompositeSchema, analysis: &Analysis, range: lsp::Range, key: Option<&str>) -> Vec<lsp::CompletionItem> {\n+  schema\n+    .value_options(&analysis.container_path, key)\n+    .into_iter()\n+    .map(|option| {\n+      let filter_text = if analysis.in_string { option.insert_text.clone() } else { option.display.clone() };\n+      lsp::CompletionItem {\n+        label: option.display,\n+        kind: Some(lsp::CompletionItemKind::VALUE),\n+        documentation: option.documentation.map(markdown),\n+        filter_text: Some(filter_text),\n+        text_edit: Some(lsp::CompletionTextEdit::Edit(lsp::TextEdit {\n+          range,\n+          new_text: option.insert_text,\n+        })),\n+        ..Default::default()\n+      }\n+    })\n+    .collect()\n+}\n+\n+fn hover_for(schema: &CompositeSchema, text: &str, line_index: &LineIndex, offset: usize) -> Option<lsp::Hover> {\n+  let tokens = scan_tokens(text);\n+  // find the token under the cursor (inclusive of its end so hovering the last\n+  // character still resolves)\n+  let idx = tokens.iter().position(|t| t.is_editable() && t.start <= offset && offset <= t.end)?;\n+  let analysis = analyze(&tokens, tokens[idx].start)?;\n+\n+  let set = schema.schema_set_for_path(&analysis.container_path);\n+  let target = match &analysis.position {\n+    // the token is a property name\n+    Position::ObjectKey => {\n+      let key = tokens[idx].scalar_text()?;\n+      set.property(key)?\n+    }\n+    // the token is a value\n+    Position::ObjectValue { key } => set.property(key)?,\n+    Position::ArrayValue => set.item()?,\n+  };\n+  let target = target.deref();\n+\n+  let mut markdown_text = String::new();\n+  if let Some(type_label) = target.type_label() {\n+    markdown_text.push_str(&format!(\"*{}*\\n\\n\", type_label));\n+  }\n+  if let Some(description) = target.description() {\n+    markdown_text.push_str(description);\n+  }\n+  if markdown_text.trim().is_empty() {\n+    return None;\n+  }\n+\n+  Some(lsp::Hover {\n+    contents: lsp::HoverContents::Markup(lsp::MarkupContent {\n+      kind: lsp::MarkupKind::Markdown,\n+      value: markdown_text,\n+    }),\n+    range: Some(lsp_range(line_index, tokens[idx].start, tokens[idx].end)),\n+  })\n+}\n+\n+fn lsp_range(line_index: &LineIndex, start: usize, end: usize) -> lsp::Range {\n+  lsp::Range {\n+    start: line_index.position_utf16(TextSize::from(start as u32)),\n+    end: line_index.position_utf16(TextSize::from(end as u32)),\n+  }\n+}\n+\n+fn markdown(value: String) -> lsp::Documentation {\n+  lsp::Documentation::MarkupContent(lsp::MarkupContent {\n+    kind: lsp::MarkupKind::Markdown,\n+    value,\n+  })\n+}\n+\n+#[cfg(test)]\n+mod test {\n+  use super::*;\n+\n+  /// Splits a `%`-marked string into its text and the cursor's byte offset.\n+  fn at_cursor(text_with_marker: &str) -> (String, usize) {\n+    let offset = text_with_marker.find('%').expect(\"missing % cursor marker\");\n+    (text_with_marker.replacen('%', \"\", 1), offset)\n+  }\n+\n+  fn base_only() -> CompositeSchema {\n+    CompositeSchema {\n+      base: Rc::new(serde_json::from_str(DPRINT_CONFIG_SCHEMA).unwrap()),\n+      plugins: Vec::new(),\n+    }\n+  }\n+\n+  fn with_typescript_plugin() -> CompositeSchema {\n+    let mut schema = base_only();\n+    schema.plugins.push(PluginSchema {\n+      config_key: \"typescript\".to_string(),\n+      name: \"TypeScript\".to_string(),\n+      schema: Some(Rc::new(serde_json::json!({\n+        \"type\": \"object\",\n+        \"properties\": {\n+          \"semiColons\": {\n+            \"type\": \"string\",\n+            \"description\": \"How to use semi-colons.\",\n+            \"oneOf\": [\n+              { \"const\": \"always\", \"description\": \"Always uses semi-colons.\" },\n+              { \"const\": \"asNeeded\", \"description\": \"Only when necessary.\" }\n+            ]\n+          },\n+          \"lineWidth\": { \"type\": \"number\", \"description\": \"Plugin specific line width.\" }\n+        }\n+      }))),\n+    });\n+    schema\n+  }\n+\n+  fn complete(schema: &CompositeSchema, text_with_marker: &str) -> Vec<lsp::CompletionItem> {\n+    let (text, offset) = at_cursor(text_with_marker);\n+    completions_for(schema, &text, &LineIndex::new(&text), offset)\n+  }\n+\n+  fn labels(items: &[lsp::CompletionItem]) -> Vec<String> {\n+    items.iter().map(|item| item.label.clone()).collect()\n+  }\n+\n+  fn new_text(item: &lsp::CompletionItem) -> &str {\n+    match item.text_edit.as_ref().unwrap() {\n+      lsp::CompletionTextEdit::Edit(edit) => &edit.new_text,\n+      _ => unreachable!(),\n+    }\n+  }\n+\n+  fn item<'a>(items: &'a [lsp::CompletionItem], label: &str) -> &'a lsp::CompletionItem {\n+    items.iter().find(|i| i.label == label).unwrap_or_else(|| panic!(\"missing completion: {}\", label))\n+  }\n+\n+  #[test]\n+  fn embedded_schema_is_valid_json() {\n+    // ensures the include_str! path stays valid and the schema parses\n+    base_only();\n+  }\n+\n+  #[test]\n+  fn completes_root_property_names() {\n+    let items = complete(&base_only(), \"{\\n  %\\n}\");\n+    let labels = labels(&items);\n+    assert!(labels.contains(&\"lineWidth\".to_string()));\n+    assert!(labels.contains(&\"plugins\".to_string()));\n+    assert!(labels.contains(&\"newLineKind\".to_string()));\n+    // a property name should be inserted quoted\n+    assert_eq!(new_text(item(&items, \"lineWidth\")), \"\\\"lineWidth\\\"\");\n+    assert_eq!(item(&items, \"lineWidth\").kind, Some(lsp::CompletionItemKind::PROPERTY));\n+  }\n+\n+  #[test]\n+  fn completes_partial_property_name_inside_string() {\n+    let items = complete(&base_only(), \"{ \\\"line%\\\" }\");\n+    let line_width = item(&items, \"lineWidth\");\n+    // the whole string token (including quotes) is replaced\n+    assert_eq!(new_text(line_width), \"\\\"lineWidth\\\"\");\n+    assert_eq!(line_width.filter_text.as_deref(), Some(\"\\\"lineWidth\\\"\"));\n+  }\n+\n+  #[test]\n+  fn excludes_already_present_keys() {\n+    let items = complete(&base_only(), \"{ \\\"lineWidth\\\": 80, % }\");\n+    let labels = labels(&items);\n+    assert!(!labels.contains(&\"lineWidth\".to_string()));\n+    assert!(labels.contains(&\"indentWidth\".to_string()));\n+  }\n+\n+  #[test]\n+  fn completes_enum_values() {\n+    let items = complete(&base_only(), \"{ \\\"newLineKind\\\": % }\");\n+    let labels = labels(&items);\n+    assert_eq!(labels, vec![\"auto\", \"crlf\", \"lf\", \"system\"]);\n+    assert_eq!(new_text(item(&items, \"auto\")), \"\\\"auto\\\"\");\n+    assert_eq!(item(&items, \"auto\").kind, Some(lsp::CompletionItemKind::VALUE));\n+  }\n+\n+  #[test]\n+  fn completes_enum_values_inside_string() {\n+    let items = complete(&base_only(), \"{ \\\"newLineKind\\\": \\\"sys%\\\" }\");\n+    let system = item(&items, \"system\");\n+    assert_eq!(new_text(system), \"\\\"system\\\"\");\n+    assert_eq!(system.filter_text.as_deref(), Some(\"\\\"system\\\"\"));\n+  }\n+\n+  #[test]\n+  fn completes_boolean_values() {\n+    let items = complete(&base_only(), \"{ \\\"useTabs\\\": % }\");\n+    assert_eq!(labels(&items), vec![\"true\", \"false\"]);\n+    assert_eq!(new_text(item(&items, \"true\")), \"true\");\n+  }\n+\n+  #[test]\n+  fn completes_plugin_config_key_at_root() {\n+    let items = complete(&with_typescript_plugin(), \"{\\n  %\\n}\");\n+    let typescript = item(&items, \"typescript\");\n+    assert_eq!(new_text(typescript), \"\\\"typescript\\\"\");\n+    assert_eq!(typescript.detail.as_deref(), Some(\"plugin\"));\n+  }\n+\n+  #[test]\n+  fn completes_plugin_section_property_names() {\n+    let items = complete(&with_typescript_plugin(), \"{ \\\"typescript\\\": { % } }\");\n+    let labels = labels(&items);\n+    // the plugin's own properties\n+    assert!(labels.contains(&\"semiColons\".to_string()));\n+    // plus the properties common to every plugin section\n+    assert!(labels.contains(&\"locked\".to_string()));\n+    assert!(labels.contains(&\"associations\".to_string()));\n+  }\n+\n+  #[test]\n+  fn completes_plugin_nested_enum_values() {\n+    let items = complete(&with_typescript_plugin(), \"{ \\\"typescript\\\": { \\\"semiColons\\\": % } }\");\n+    assert_eq!(labels(&items), vec![\"always\", \"asNeeded\"]);\n+  }\n+\n+  #[test]\n+  fn completes_inside_overrides_object() {\n+    let items = complete(&with_typescript_plugin(), \"{ \\\"typescript\\\": { \\\"overrides\\\": { % } } }\");\n+    let labels = labels(&items);\n+    // the override's own `files` key\n+    assert!(labels.contains(&\"files\".to_string()), \"{:?}\", labels);\n+    // plus the plugin's config that can be overridden\n+    assert!(labels.contains(&\"semiColons\".to_string()), \"{:?}\", labels);\n+  }\n+\n+  #[test]\n+  fn completes_inside_overrides_array_element() {\n+    let items = complete(&with_typescript_plugin(), \"{ \\\"typescript\\\": { \\\"overrides\\\": [{ % }] } }\");\n+    let labels = labels(&items);\n+    assert!(labels.contains(&\"files\".to_string()), \"{:?}\", labels);\n+    assert!(labels.contains(&\"semiColons\".to_string()), \"{:?}\", labels);\n+  }\n+\n+  #[test]\n+  fn completes_overridden_plugin_enum_values() {\n+    let items = complete(&with_typescript_plugin(), \"{ \\\"typescript\\\": { \\\"overrides\\\": [{ \\\"semiColons\\\": % }] } }\");\n+    assert_eq!(labels(&items), vec![\"always\", \"asNeeded\"]);\n+  }\n+\n+  #[test]\n+  fn completes_overrides_without_plugin_schema() {\n+    // a plugin with no schema still offers the common override `files` key\n+    let mut schema = base_only();\n+    schema.plugins.push(PluginSchema {\n+      config_key: \"exec\".to_string(),\n+      name: \"Exec\".to_string(),\n+      schema: None,\n+    });\n+    let items = complete(&schema, \"{ \\\"exec\\\": { \\\"overrides\\\": [{ % }] } }\");\n+    assert!(labels(&items).contains(&\"files\".to_string()));\n+  }\n+\n+  #[test]\n+  fn no_completions_outside_object() {\n+    assert!(complete(&base_only(), \"%\").is_empty());\n+  }\n+\n+  #[test]\n+  fn hovers_property_name() {\n+    let (text, offset) = at_cursor(\"{ \\\"newLine%Kind\\\": \\\"auto\\\" }\");\n+    let hover = hover_for(&base_only(), &text, &LineIndex::new(&text), offset).unwrap();\n+    let lsp::HoverContents::Markup(content) = hover.contents else {\n+      unreachable!()\n+    };\n+    assert!(content.value.contains(\"The kind of newline to use.\"));\n+  }\n+\n+  #[test]\n+  fn hovers_plugin_property_value() {\n+    let (text, offset) = at_cursor(\"{ \\\"typescript\\\": { \\\"semiColons\\\": \\\"alw%ays\\\" } }\");\n+    let hover = hover_for(&with_typescript_plugin(), &text, &LineIndex::new(&text), offset).unwrap();\n+    let lsp::HoverContents::Markup(content) = hover.contents else {\n+      unreachable!()\n+    };\n+    assert!(content.value.contains(\"How to use semi-colons.\"));\n+  }\n+}\n\ndiff -- crates/dprint/src/commands/lsp/config_schema.json\n[patch unavailable]\n\ndiff -- crates/dprint/src/commands/lsp/mod.rs\n@@ -20,15 +20,23 @@ use tower_lsp::LanguageServer;\n use tower_lsp::LspService;\n use tower_lsp::Server;\n use tower_lsp::jsonrpc::Result as LspResult;\n+use tower_lsp::lsp_types::CompletionItem;\n+use tower_lsp::lsp_types::CompletionOptions;\n+use tower_lsp::lsp_types::CompletionParams;\n+use tower_lsp::lsp_types::CompletionResponse;\n use tower_lsp::lsp_types::DidChangeTextDocumentParams;\n use tower_lsp::lsp_types::DidCloseTextDocumentParams;\n use tower_lsp::lsp_types::DidOpenTextDocumentParams;\n use tower_lsp::lsp_types::DocumentFormattingParams;\n use tower_lsp::lsp_types::DocumentRangeFormattingParams;\n+use tower_lsp::lsp_types::Hover;\n+use tower_lsp::lsp_types::HoverParams;\n+use tower_lsp::lsp_types::HoverProviderCapability;\n use tower_lsp::lsp_types::InitializeParams;\n use tower_lsp::lsp_types::InitializeResult;\n use tower_lsp::lsp_types::InitializedParams;\n use tower_lsp::lsp_types::OneOf;\n+use tower_lsp::lsp_types::Position;\n use tower_lsp::lsp_types::ServerCapabilities;\n use tower_lsp::lsp_types::ServerInfo;\n use tower_lsp::lsp_types::TextDocumentSyncCapability;\n@@ -43,13 +51,16 @@ use crate::plugins::PluginResolver;\n \n use self::client::ClientWrapper;\n use self::config::LspPluginsScopeContainer;\n+use self::config_completion::ConfigCompletions;\n+use self::config_completion::is_config_uri;\n use self::documents::Documents;\n use self::text::LineIndex;\n use self::text::get_edits;\n use self::text::normalize_to_source_line_endings;\n \n mod client;\n mod config;\n+mod config_completion;\n mod documents;\n mod text;\n \n@@ -132,8 +143,16 @@ struct EditorFormatRequest {\n   pub token: Arc<CancellationToken>,\n }\n \n+struct ConfigEditorRequest {\n+  pub file_path: PathBuf,\n+  pub file_text: String,\n+  pub position: Position,\n+}\n+\n enum ChannelMessage {\n   Format(EditorFormatRequest, oneshot::Sender<Result<Option<Vec<TextEdit>>>>),\n+  Completion(ConfigEditorRequest, oneshot::Sender<Option<Vec<CompletionItem>>>),\n+  Hover(ConfigEditorRequest, oneshot::Sender<Option<Hover>>),\n   Shutdown(oneshot::Sender<()>),\n   /// This message is used for testing.\n   #[cfg(test)]\n@@ -232,6 +251,7 @@ fn start_message_handler<TEnvironment: Environment>(\n   let concurrency_limiter = Rc::new(Semaphore::new(std::cmp::max(1, max_cores - 1)));\n   let environment = environment.clone();\n   let scope_container = Rc::new(LspPluginsScopeContainer::new(environment.clone(), plugin_resolver.clone(), config_override));\n+  let config_completions = Rc::new(ConfigCompletions::new(environment.clone(), scope_container.clone()));\n   dprint_core::async_runtime::spawn(async move {\n     let mut pending_tokens = PendingTokens::default();\n     while let Some(message) = rx.recv().await {\n@@ -248,6 +268,20 @@ fn start_message_handler<TEnvironment: Environment>(\n             drop(token_guard); // remove the token from the pending tokens\n           });\n         }\n+        ChannelMessage::Completion(request, sender) => {\n+          let config_completions = config_completions.clone();\n+          dprint_core::async_runtime::spawn(async move {\n+            let result = config_completions.completions(&request.file_path, &request.file_text, request.position).await;\n+            let _ = sender.send(result);\n+          });\n+        }\n+        ChannelMessage::Hover(request, sender) => {\n+          let config_completions = config_completions.clone();\n+          dprint_core::async_runtime::spawn(async move {\n+            let result = config_completions.hover(&request.file_path, &request.file_text, request.position).await;\n+            let _ = sender.send(result);\n+          });\n+        }\n         ChannelMessage::Shutdown(sender) => {\n           pending_tokens.cancel_all();\n           scope_container.shutdown().await;\n@@ -350,6 +384,12 @@ impl<TEnvironment: Environment> LanguageServer for Backend<TEnvironment> {\n         })),\n         document_formatting_provider: Some(OneOf::Left(true)),\n         document_range_formatting_provider: Some(OneOf::Left(true)),\n+        completion_provider: Some(CompletionOptions {\n+          // `\"` opens a property/value string, `:` moves to a value position\n+          trigger_characters: Some(vec![\"\\\"\".to_string(), \":\".to_string()]),\n+          ..Default::default()\n+        }),\n+        hover_provider: Some(HoverProviderCapability::Simple(true)),\n         ..ServerCapabilities::default()\n       },\n     })\n@@ -419,6 +459,52 @@ impl<TEnvironment: Environment> LanguageServer for Backend<TEnvironment> {\n       .await\n   }\n \n+  async fn completion(&self, params: CompletionParams) -> LspResult<Option<CompletionResponse>> {\n+    let uri = params.text_document_position.text_document.uri;\n+    if !is_config_uri(&uri) {\n+      return Ok(None);\n+    }\n+    let Some(file_path) = url_to_file_path(&uri) else {\n+      return Ok(None);\n+    };\n+    let Some((file_text, _)) = self.state.lock().documents.get_content(&uri) else {\n+      return Ok(None);\n+    };\n+    let (sender, receiver) = oneshot::channel();\n+    let request = ConfigEditorRequest {\n+      file_path,\n+      file_text,\n+      position: params.text_document_position.position,\n+    };\n+    if self.sender.send(ChannelMessage::Completion(request, sender)).is_err() {\n+      return Ok(None);\n+    }\n+    Ok(receiver.await.ok().flatten().map(CompletionResponse::Array))\n+  }\n+\n+  async fn hover(&self, params: HoverParams) -> LspResult<Option<Hover>> {\n+    let uri = params.text_document_position_params.text_document.uri;\n+    if !is_config_uri(&uri) {\n+      return Ok(None);\n+    }\n+    let Some(file_path) = url_to_file_path(&uri) else {\n+      return Ok(None);\n+    };\n+    let Some((file_text, _)) = self.state.lock().documents.get_content(&uri) else {\n+      return Ok(None);\n+    };\n+    let (sender, receiver) = oneshot::channel();\n+    let request = ConfigEditorRequest {\n+      file_path,\n+      file_text,\n+      position: params.text_document_position_params.position,\n+    };\n+    if self.sender.send(ChannelMessage::Hover(request, sender)).is_err() {\n+      return Ok(None);\n+    }\n+    Ok(receiver.await.ok().flatten())\n+  }\n+\n   async fn shutdown(&self) -> LspResult<()> {\n     let (sender, receiver) = oneshot::channel();\n     if self.sender.send(ChannelMessage::Shutdown(sender)).is_ok() {\n\ndiff -- website/.gitignore\n@@ -1,2 +1,5 @@\n _site\n src/_includes/css/bulma\n+\n+# generated from crates/dprint/src/commands/lsp/config_schema.json by _config.ts\n+src/assets/schemas/v0.json\n\ndiff -- website/_config.ts\n@@ -8,6 +8,7 @@ import sass from \"lume/plugins/sass.ts\";\n import anchor from \"markdown-it-anchor\";\n \n await buildSass();\n+await copyConfigSchema();\n \n const site = lume({\n   src: \"./src\",\n@@ -44,6 +45,17 @@ site\n \n export default site;\n \n+async function copyConfigSchema() {\n+  // the dprint CLI crate is the source of truth for the config schema (it\n+  // embeds the file at compile time for LSP completions). Pull it in here so\n+  // it's served at https://dprint.dev/schemas/v0.json. This generated file is\n+  // gitignored.\n+  const source = new URL(\"../crates/dprint/src/commands/lsp/config_schema.json\", import.meta.url);\n+  const destDir = new URL(\"./src/assets/schemas/\", import.meta.url);\n+  await Deno.mkdir(destDir, { recursive: true });\n+  await Deno.copyFile(source, new URL(\"v0.json\", destDir));\n+}\n+\n async function buildSass() {\n   // sass doesn't support remote urls and I'm too lazy to switch away\n   // to anything else at the moment, so we download the bulma-scss",
+      "links": [
+        "license:8c64c54183aaff2b0db2c632aac2eec1544513aa"
+      ],
+      "attributes": {
+        "sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/commits/2408a06d3fa3a265f71d078004e9eabf4d388de0"
+    },
+    {
+      "id": "pull_request:1177",
+      "kind": "pull_request",
+      "occurred_at": "2026-06-23T18:21:36Z",
+      "text": "Pull request #1177: feat: LSP completions and hover for dprint configuration files\n\nCloses #806.\n\nAdds schema-aware **completions** and **hover** for dprint config files (`dprint.json(c)` / `.dprint.json(c)`) to the `dprint lsp` command, so it works in any LSP client (Neovim, Helix, Zed, …) rather than relying on the editor also running a JSON language server with the schema associated.\n\n### How it works\n- **Composite schema per config file** — the embedded dprint base schema for the well-known root keys (`lineWidth`, `plugins`, `extends`, …), plus each resolved plugin's downloaded `config_schema_url` nested under its config key. Plugin schemas are fetched on demand and cached.\n- **Tolerant context detection** — uses `jsonc-parser`'s scanner (not the AST) so completions work on the half-typed, invalid JSON you actually have mid-edit. A stack scan yields the container path, key-vs-value position, existing keys (to avoid re-suggesting), and the precise replace range.\n- **Small JSON-schema walker** — handles `properties`, `enum`, `const`, `oneOf`/`anyOf`, `additionalProperties`, `items`, and `$ref` (`#/definitions/...`).\n- **Set-based resolution** — a path can resolve to a *set* of schema nodes whose suggestions are unioned. This is how a plugin section merges the plugin's own schema with the common section props (`locked`, `associations`, `overrides`), and how an `overrides` entry merges `files` with the plugin's own config (incl. enum value completions for overridden keys).\n\nMost logic is isolated in a new `config_completion` module; the analysis (`completions_for` / `hover_for`) is pure over text + a composite schema and is covered by unit tests (root keys, partial-key-in-string, excluded keys, enum/boolean values, plugin keys, nested plugin props, overrides object/array, plugin-less overrides, hover).\n\n### Schema source of truth\nThe base schema now lives in the crate at `crates/dprint/src/commands/lsp/config_schema.json` (embedded via `include_str!` so it's packaged on `cargo publish`). The website build (`website/_config.ts`) copies it into its assets, so it's still served at https://dprint.dev/schemas/v0.json. The old `website/src/assets/schemas/v0.json` is now generated and gitignored.\n\n### Notes / follow-ups\n- Schema-validation **diagnostics** would be a natural next phase (the token/schema machinery is already here).\n- Couples the website build to the monorepo layout (reads `../crates/dprint/...`), which is consistent with how the website is already built.",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "number": 1177,
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/pulls/1177"
+    },
+    {
+      "id": "ci:83029411700",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:21:56Z",
+      "text": "CI check aarch64-unknown-linux-musl for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029411700 status=completed conclusion=success",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "aarch64-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:21:49Z",
+        "completed_at": "2026-06-23T18:21:56Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029411700"
+    },
+    {
+      "id": "ci:83029412062",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:21:56Z",
+      "text": "CI check aarch64-unknown-linux-gnu for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029412062 status=completed conclusion=success",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "aarch64-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:21:49Z",
+        "completed_at": "2026-06-23T18:21:56Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029412062"
+    },
+    {
+      "id": "ci:83029411871",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:22:31Z",
+      "text": "CI check x86_64-unknown-linux-gnu for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029411871 status=completed conclusion=failure",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "x86_64-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "failure",
+        "started_at": "2026-06-23T18:21:46Z",
+        "completed_at": "2026-06-23T18:22:31Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029411871"
+    },
+    {
+      "id": "ci:83029411495",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:22:32Z",
+      "text": "CI check build for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029411495 status=completed conclusion=success",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "build",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:21:47Z",
+        "completed_at": "2026-06-23T18:22:32Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029411495"
+    },
+    {
+      "id": "ci:83029411702",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:22:35Z",
+      "text": "CI check x86_64-apple-darwin for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029411702 status=completed conclusion=cancelled",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "x86_64-apple-darwin",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-06-23T18:21:47Z",
+        "completed_at": "2026-06-23T18:22:35Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029411702"
+    },
+    {
+      "id": "ci:83029411814",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:22:38Z",
+      "text": "CI check x86_64-unknown-linux-musl for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029411814 status=completed conclusion=cancelled",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "x86_64-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-06-23T18:21:47Z",
+        "completed_at": "2026-06-23T18:22:38Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029411814"
+    },
+    {
+      "id": "ci:83029411817",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:22:46Z",
+      "text": "CI check aarch64-linux-android for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029411817 status=completed conclusion=cancelled",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "aarch64-linux-android",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-06-23T18:21:46Z",
+        "completed_at": "2026-06-23T18:22:46Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029411817"
+    },
+    {
+      "id": "ci:83029411855",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:22:46Z",
+      "text": "CI check riscv64gc-unknown-linux-gnu for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029411855 status=completed conclusion=cancelled",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "riscv64gc-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-06-23T18:21:46Z",
+        "completed_at": "2026-06-23T18:22:46Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029411855"
+    },
+    {
+      "id": "ci:83029412268",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:22:46Z",
+      "text": "CI check powerpc64le-unknown-linux-gnu for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029412268 status=completed conclusion=cancelled",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "powerpc64le-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-06-23T18:21:46Z",
+        "completed_at": "2026-06-23T18:22:46Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029412268"
+    },
+    {
+      "id": "ci:83029411773",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:22:47Z",
+      "text": "CI check x86_64-linux-android for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029411773 status=completed conclusion=cancelled",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "x86_64-linux-android",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-06-23T18:21:46Z",
+        "completed_at": "2026-06-23T18:22:47Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029411773"
+    },
+    {
+      "id": "ci:83029411869",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:22:47Z",
+      "text": "CI check powerpc64le-unknown-linux-musl for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029411869 status=completed conclusion=cancelled",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "powerpc64le-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-06-23T18:21:46Z",
+        "completed_at": "2026-06-23T18:22:47Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029411869"
+    },
+    {
+      "id": "ci:83029411809",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:22:49Z",
+      "text": "CI check loongarch64-unknown-linux-gnu for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029411809 status=completed conclusion=cancelled",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "loongarch64-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-06-23T18:21:46Z",
+        "completed_at": "2026-06-23T18:22:49Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029411809"
+    },
+    {
+      "id": "ci:83029411972",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:22:49Z",
+      "text": "CI check aarch64-apple-darwin for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029411972 status=completed conclusion=cancelled",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "aarch64-apple-darwin",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-06-23T18:21:47Z",
+        "completed_at": "2026-06-23T18:22:49Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029411972"
+    },
+    {
+      "id": "ci:83029411923",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:22:51Z",
+      "text": "CI check loongarch64-unknown-linux-musl for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029411923 status=completed conclusion=cancelled",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "loongarch64-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-06-23T18:21:46Z",
+        "completed_at": "2026-06-23T18:22:51Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029411923"
+    },
+    {
+      "id": "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf",
+      "kind": "commit",
+      "occurred_at": "2026-06-23T18:22:54Z",
+      "text": "commit e70872cc01cf0897788b267c3c13566d54ce4fbf\nformat\n\ndiff -- crates/dprint/src/commands/lsp/config_completion.rs\n@@ -726,10 +726,7 @@ fn analyze(tokens: &[Tok], offset: usize) -> Option<Analysis> {\n       TokKind::Comment => {}\n       TokKind::Str(_) | TokKind::Word(_) | TokKind::Scalar(_) => {\n         if let Some(Frame::Object {\n-          last_key,\n-          after_colon,\n-          keys,\n-          ..\n+          last_key, after_colon, keys, ..\n         }) = stack.last_mut()\n         {\n           if *after_colon {\n@@ -831,7 +828,11 @@ fn value_items(schema: &CompositeSchema, analysis: &Analysis, range: lsp::Range,\n     .value_options(&analysis.container_path, key)\n     .into_iter()\n     .map(|option| {\n-      let filter_text = if analysis.in_string { option.insert_text.clone() } else { option.display.clone() };\n+      let filter_text = if analysis.in_string {\n+        option.insert_text.clone()\n+      } else {\n+        option.display.clone()\n+      };\n       lsp::CompletionItem {\n         label: option.display,\n         kind: Some(lsp::CompletionItemKind::VALUE),\n@@ -958,7 +959,10 @@ mod test {\n   }\n \n   fn item<'a>(items: &'a [lsp::CompletionItem], label: &str) -> &'a lsp::CompletionItem {\n-    items.iter().find(|i| i.label == label).unwrap_or_else(|| panic!(\"missing completion: {}\", label))\n+    items\n+      .iter()\n+      .find(|i| i.label == label)\n+      .unwrap_or_else(|| panic!(\"missing completion: {}\", label))\n   }\n \n   #[test]",
+      "links": [
+        "license:8c64c54183aaff2b0db2c632aac2eec1544513aa"
+      ],
+      "attributes": {
+        "sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/commits/e70872cc01cf0897788b267c3c13566d54ce4fbf"
+    },
+    {
+      "id": "ci:83029411832",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:22:55Z",
+      "text": "CI check x86_64-pc-windows-msvc for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029411832 status=completed conclusion=cancelled",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "x86_64-pc-windows-msvc",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-06-23T18:21:46Z",
+        "completed_at": "2026-06-23T18:22:55Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029411832"
+    },
+    {
+      "id": "ci:83029645800",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:22:56Z",
+      "text": "CI check draft_release for 2408a06d3fa3a265f71d078004e9eabf4d388de0\nrun_id=83029645800 status=completed conclusion=skipped",
+      "links": [
+        "commit:2408a06d3fa3a265f71d078004e9eabf4d388de0"
+      ],
+      "attributes": {
+        "head_sha": "2408a06d3fa3a265f71d078004e9eabf4d388de0",
+        "name": "draft_release",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-23T18:22:56Z",
+        "completed_at": "2026-06-23T18:22:56Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029645800"
+    },
+    {
+      "id": "ci:83029667207",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:23:15Z",
+      "text": "CI check aarch64-unknown-linux-gnu for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83029667207 status=completed conclusion=success",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "aarch64-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:23:08Z",
+        "completed_at": "2026-06-23T18:23:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029667207"
+    },
+    {
+      "id": "ci:83029667367",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:23:20Z",
+      "text": "CI check aarch64-unknown-linux-musl for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83029667367 status=completed conclusion=success",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "aarch64-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:23:08Z",
+        "completed_at": "2026-06-23T18:23:20Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029667367"
+    },
+    {
+      "id": "ci:83029666627",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:23:45Z",
+      "text": "CI check build for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83029666627 status=completed conclusion=success",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "build",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:23:04Z",
+        "completed_at": "2026-06-23T18:23:45Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029666627"
+    },
+    {
+      "id": "ci:83029667192",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:24:19Z",
+      "text": "CI check powerpc64le-unknown-linux-gnu for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83029667192 status=completed conclusion=success",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "powerpc64le-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:23:05Z",
+        "completed_at": "2026-06-23T18:24:19Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029667192"
+    },
+    {
+      "id": "ci:83029667352",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:24:20Z",
+      "text": "CI check riscv64gc-unknown-linux-gnu for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83029667352 status=completed conclusion=success",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "riscv64gc-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:23:05Z",
+        "completed_at": "2026-06-23T18:24:20Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029667352"
+    },
+    {
+      "id": "ci:83029667288",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:24:25Z",
+      "text": "CI check aarch64-linux-android for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83029667288 status=completed conclusion=success",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "aarch64-linux-android",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:23:05Z",
+        "completed_at": "2026-06-23T18:24:25Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029667288"
+    },
+    {
+      "id": "ci:83029667252",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:24:26Z",
+      "text": "CI check x86_64-linux-android for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83029667252 status=completed conclusion=success",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "x86_64-linux-android",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:23:05Z",
+        "completed_at": "2026-06-23T18:24:26Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029667252"
+    },
+    {
+      "id": "ci:83029667068",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:24:28Z",
+      "text": "CI check x86_64-unknown-linux-musl for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83029667068 status=completed conclusion=success",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "x86_64-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:23:05Z",
+        "completed_at": "2026-06-23T18:24:28Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029667068"
+    },
+    {
+      "id": "ci:83029667154",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:24:46Z",
+      "text": "CI check powerpc64le-unknown-linux-musl for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83029667154 status=completed conclusion=success",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "powerpc64le-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:23:05Z",
+        "completed_at": "2026-06-23T18:24:46Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029667154"
+    },
+    {
+      "id": "ci:83029667329",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:24:49Z",
+      "text": "CI check loongarch64-unknown-linux-musl for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83029667329 status=completed conclusion=success",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "loongarch64-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:23:05Z",
+        "completed_at": "2026-06-23T18:24:49Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029667329"
+    },
+    {
+      "id": "ci:83029667190",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:25:08Z",
+      "text": "CI check loongarch64-unknown-linux-gnu for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83029667190 status=completed conclusion=success",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "loongarch64-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:23:05Z",
+        "completed_at": "2026-06-23T18:25:08Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029667190"
+    },
+    {
+      "id": "ci:83029667100",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:25:17Z",
+      "text": "CI check aarch64-apple-darwin for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83029667100 status=completed conclusion=success",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "aarch64-apple-darwin",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:23:05Z",
+        "completed_at": "2026-06-23T18:25:17Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029667100"
+    },
+    {
+      "id": "ci:83029667087",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:26:21Z",
+      "text": "CI check x86_64-pc-windows-msvc for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83029667087 status=completed conclusion=success",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "x86_64-pc-windows-msvc",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:23:04Z",
+        "completed_at": "2026-06-23T18:26:21Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029667087"
+    },
+    {
+      "id": "ci:83029667620",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:26:58Z",
+      "text": "CI check x86_64-unknown-linux-gnu for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83029667620 status=completed conclusion=success",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "x86_64-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:23:05Z",
+        "completed_at": "2026-06-23T18:26:58Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029667620"
+    },
+    {
+      "id": "ci:83029667158",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:27:27Z",
+      "text": "CI check x86_64-apple-darwin for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83029667158 status=completed conclusion=success",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "x86_64-apple-darwin",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-23T18:23:06Z",
+        "completed_at": "2026-06-23T18:27:27Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83029667158"
+    },
+    {
+      "id": "ci:83030543755",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-23T18:27:27Z",
+      "text": "CI check draft_release for e70872cc01cf0897788b267c3c13566d54ce4fbf\nrun_id=83030543755 status=completed conclusion=skipped",
+      "links": [
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf"
+      ],
+      "attributes": {
+        "head_sha": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "name": "draft_release",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-23T18:27:28Z",
+        "completed_at": "2026-06-23T18:27:27Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/83030543755"
+    },
+    {
+      "id": "merge:1177",
+      "kind": "merge",
+      "occurred_at": "2026-06-23T18:56:20Z",
+      "text": "Merged pull request #1177 from validated head commit e70872cc01cf0897788b267c3c13566d54ce4fbf.",
+      "links": [
+        "pull_request:1177",
+        "commit:e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "license:8c64c54183aaff2b0db2c632aac2eec1544513aa"
+      ],
+      "attributes": {
+        "commit": "e70872cc01cf0897788b267c3c13566d54ce4fbf",
+        "merge_commit_sha": "a21ce0b60d754015abaf25b2797b02e0f426d10f"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/pulls/1177"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "git_workflow",
+    "role": "source",
+    "key_id": "probe-source-3a689228f9679b0522a18cadd07f1e97",
+    "environment": "probe",
+    "digest": "1c54e6b827a9b3aeee97129a52648a7427e9974a84f05b741e43799bd6466931"
+  }
+}

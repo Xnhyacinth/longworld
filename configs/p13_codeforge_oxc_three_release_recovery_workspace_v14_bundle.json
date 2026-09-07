@@ -1,0 +1,43 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr25909_crates_v0.146.0.json",
+      "sha256": "f35a0d4f4f9cbf37f02ba5f0ea9a7e36a9ca2db507366868fb9388cc7298bd37"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr25403_crates_v0.147.0.json",
+      "sha256": "1867e896dbbc2f5596ac0cedc0535010a4618214d355e1b58db9c2f26fcb613e"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26084_support.json",
+      "sha256": "308a1891884c020c6a0e69ecb5fa891e21d0e30e769205bc573216d5bad2a98c"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26099_support.json",
+      "sha256": "589031e3a9349af1a44d6d8d6684082b392219e7486799c84d73b678584ad021"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26144_crates_v0.148.0.json",
+      "sha256": "7bdd576f90d2ac7790513d3347e2d5b9f8d249fa6890c1024fa42a1778f48462"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26169_support.json",
+      "sha256": "31595b27ba1a2ed9efa2b489bd4c117cfd6d729aa0bd2ae4f85d97ff1124fc84"
+    },
+    {
+      "path": "data/source_inventory/p13_codeforge_oxc_first_workspace_v2/oxc_pr26194_support.json",
+      "sha256": "8e3d960284858bf08e1e54f4eb7439e50e9746a0c7a386988e697a30fb6cbdd9"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "probe-source-e4bac7778cdcfa3808f3c373b474e85f",
+    "environment": "probe",
+    "digest": "493e308f71c366993331c83f3a26faba6e0833dc9e4677086483f548b243299c"
+  }
+}

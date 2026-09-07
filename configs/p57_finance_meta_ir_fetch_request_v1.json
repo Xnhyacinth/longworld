@@ -1,0 +1,48 @@
+{
+  "schema_version": "longworld.issuer-ir-fetch-request.v1",
+  "user_agent": "LongWorld-P57/1.0 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P57-META-IR-HISTORY-20260907",
+    "scope": "Meta Platforms issuer-owned fiscal 2022 through fiscal 2025 annual filing artifacts and source-bound asset-trajectory local-probe synthesis",
+    "basis": "User-authorized authentic source synthesis and world expansion; source proof and all unchanged shared gates required. FilingIds come from the issuer-owned Q4 GetEdgarFilingList feed, not sec.gov.",
+    "reviewed_at": "2026-09-07T02:00:00Z"
+  },
+  "issuer": {
+    "name": "Meta Platforms, Inc.",
+    "cik": "0001326801",
+    "detail_host": "investor.atmeta.com",
+    "artifact_host": "d18rn0p25nwr6d.cloudfront.net"
+  },
+  "filings": [
+    {
+      "filing_id": "meta-fy2025-annual",
+      "detail_url": "https://investor.atmeta.com/financials/sec-filings-details/default.aspx?FilingId=19095128",
+      "form": "10-K",
+      "filing_date": "2026-01-29",
+      "report_date": "2025-12-31"
+    },
+    {
+      "filing_id": "meta-fy2024-annual",
+      "detail_url": "https://investor.atmeta.com/financials/sec-filings-details/default.aspx?FilingId=18139841",
+      "form": "10-K",
+      "filing_date": "2025-01-30",
+      "report_date": "2024-12-31"
+    },
+    {
+      "filing_id": "meta-fy2023-annual",
+      "detail_url": "https://investor.atmeta.com/financials/sec-filings-details/default.aspx?FilingId=17229405",
+      "form": "10-K",
+      "filing_date": "2024-02-02",
+      "report_date": "2023-12-31"
+    },
+    {
+      "filing_id": "meta-fy2022-annual",
+      "detail_url": "https://investor.atmeta.com/financials/sec-filings-details/default.aspx?FilingId=16357264",
+      "form": "10-K",
+      "filing_date": "2023-02-02",
+      "report_date": "2022-12-31"
+    }
+  ],
+  "requests_per_second": 2,
+  "max_retries": 3
+}

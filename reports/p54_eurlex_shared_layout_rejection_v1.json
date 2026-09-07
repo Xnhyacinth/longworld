@@ -1,0 +1,39 @@
+{
+  "candidate_count": 0,
+  "counterfactual_answer": "UNKNOWN",
+  "empty_answer": "UNKNOWN",
+  "formal_shared_audit_run": false,
+  "full_answer": {
+    "condition": "investigational devices",
+    "conformity_requirement": "the general safety and performance requirements",
+    "excepted_aspects": "the aspects covered by the clinical investigation",
+    "issuer": "the natural or legal person responsible for the manufacture of the investigational device",
+    "origin_article": "15",
+    "reference": {
+      "annex": "XV",
+      "chapter": "II",
+      "section": "4.1"
+    },
+    "safeguard_for_excepted_aspects": "every precaution has been taken to protect the health and safety of the subject"
+  },
+  "schema_version": "longworld.p54-shared-layout-rejection.v1",
+  "shared_full_context_tokens": 32074,
+  "shared_full_layout": "longworld.core.taskpromotion._dossier_spread",
+  "shared_ordered_context_tokens": 32074,
+  "witness_answer": {
+    "condition": "investigational devices",
+    "conformity_requirement": "the general safety and performance requirements",
+    "excepted_aspects": "the aspects covered by the clinical investigation",
+    "issuer": "the natural or legal person responsible for the manufacture of the investigational device",
+    "origin_article": "15",
+    "reference": {
+      "annex": "XV",
+      "chapter": "II",
+      "section": "4.1"
+    },
+    "safeguard_for_excepted_aspects": "every precaution has been taken to protect the health and safety of the subject"
+  },
+  "witness_artifact_start": 9,
+  "witness_artifact_stop": 175,
+  "witness_tokens": 10485
+}

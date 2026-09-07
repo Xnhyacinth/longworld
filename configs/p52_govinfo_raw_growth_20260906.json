@@ -1,0 +1,11 @@
+{
+  "schema_version": "longworld.p52-govinfo-raw-growth-plan.v1",
+  "base_configs": [
+    "data/candidates/p52_govinfo_geometry_screen_20260906/hr4366-eas-eah-04/generation_config.json",
+    "data/candidates/p52_govinfo_geometry_screen_20260906/hr4366-eas-eah-05/generation_config.json"
+  ],
+  "request_counts": [2, 6, 12],
+  "selection_rule": "Use only the earlier frozen 04 and 05 base tasks, in that order. Keep their two 32K requested keys and D02 authenticated CF endpoint. Append eligible modified sections lexically to 6 and 12 requests. Preserve source artifact IDs, source chronology, background order, whole-section packer and thresholds. Freeze both complete schedules before packing. Sign and project only a 32K prefix first; call the existing shared raw-window function on all three views, then extend to 64/128 only if all three pass. Fresh three-band 32K context must equal the raw-checked prefix context.",
+  "train_ready": false,
+  "inventory_delta": 0
+}

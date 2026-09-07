@@ -2,11 +2,11 @@
 
 version: "2.0"
 owner: "longworld"
-updated_at: "2026-08-19"
+updated_at: "2026-09-07"
 
 objective:
 primary_goal: "Scale N_proof × N_world-process × N_artifact × N_task × N_style, not n_worlds × n_view × n_length."
-non_goals: - "210-world regen before N_eff ≥ 40" - "Pulse/prose fill to 64k/128k" - "Claiming ordered_artifact_view is ACC" - "Six new domains in the first slice" - "LLM-as-judge gold"
+non_goals: - "210-world regen before N_eff ≥ 40" - "Pulse/prose fill to 64k/128k" - "Claiming ordered_artifact_view is ACC" - "Six new domains in the first slice" - "LLM-as-judge gold" - "Pad unique leftover to a 128k bucket" - "Count packed parents or unaudited views as inventory" - "Auto-promote 4k/8k-window-answerable rows into the strict product"
 
 complexity_model:
 this_run: high

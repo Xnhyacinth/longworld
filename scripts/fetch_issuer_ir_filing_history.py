@@ -35,6 +35,7 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from longworld.core.filingworkflow import _EMAIL
 from longworld.core.provenance import (
     MAX_MANIFEST_BYTES,
     MAX_SOURCE_BYTES,
@@ -72,24 +73,55 @@ _ARTIFACTS = {
     "xbrl_zip": ("_ctrl0_ctl54_hrefItemXBRLDownload", ".zip"),
     "rendered_xbrl_html": ("_ctrl0_ctl54_hrefItemXBRLHTMLDownload", ".html"),
 }
+_EVERGREEN_ARTIFACT_FORMATS = {
+    "annual_report_pdf": "pdf",
+    "xbrl_zip": "zip",
+    "rendered_xbrl_html": "html",
+}
 _ISSUER_SOURCE_ALLOWLIST = {
     "0001018724": {
         "detail_host": "ir.aboutamazon.com",
         "detail_path": "/sec-filings/sec-filings-details/default.aspx",
         "artifact_host": "d18rn0p25nwr6d.cloudfront.net",
         "artifact_path_prefix": "/CIK-0001018724/",
+        "detail_control_prefix": "_ctrl0_ctl54_",
+        "ignore_subscribe_captcha": False,
     },
     "0001045810": {
         "detail_host": "investor.nvidia.com",
         "detail_path": ("/financial-info/sec-filings/sec-filings-details/default.aspx"),
         "artifact_host": "d18rn0p25nwr6d.cloudfront.net",
         "artifact_path_prefix": "/CIK-0001045810/",
+        "detail_control_prefix": "_ctrl0_ctl78_",
+        "ignore_subscribe_captcha": True,
     },
     "0001652044": {
         "detail_host": "abc.xyz",
         "detail_path": "/investor/sec-filings/sec-filings-details/default.aspx",
         "artifact_host": "d18rn0p25nwr6d.cloudfront.net",
         "artifact_path_prefix": "/CIK-0001652044/",
+        "detail_control_prefix": "_ctrl0_ctl33_",
+        "ignore_subscribe_captcha": False,
+    },
+    "0001326801": {
+        "detail_host": "investor.atmeta.com",
+        "detail_path": "/financials/sec-filings-details/default.aspx",
+        "artifact_host": "d18rn0p25nwr6d.cloudfront.net",
+        "artifact_path_prefix": "/CIK-0001326801/",
+        "detail_control_prefix": "_ctrl0_ctl51_",
+        "ignore_subscribe_captcha": False,
+    },
+    "0000723125": {
+        "detail_host": "investors.micron.com",
+        "detail_path": (
+            "/financials/sec-filings/sec-filings-details/default.aspx"
+        ),
+        "artifact_host": "d18rn0p25nwr6d.cloudfront.net",
+        "artifact_path_prefix": "/CIK-0000723125/",
+        "detail_control_prefix": "_ctrl0_ctl28_",
+        "ignore_subscribe_captcha": False,
+        "detail_widget": "evergreen_sec_filing_details",
+        "filing_date_strptime": "%B %d, %Y",
     },
 }
 
@@ -97,9 +129,14 @@ HttpGet = Callable[[str, dict[str, str], float], tuple[bytes, Mapping[str, str]]
 
 
 class _DetailParser(HTMLParser):
-    def __init__(self, control_prefix: str = "_ctrl0_ctl54_") -> None:
+    def __init__(
+        self,
+        control_prefix: str = "_ctrl0_ctl54_",
+        detail_widget: str = "item_download",
+    ) -> None:
         super().__init__(convert_charrefs=True)
         self.control_prefix = control_prefix
+        self.detail_widget = detail_widget
         self.form_parts: list[str] = []
         self.date_parts: list[str] = []
         self.artifact_urls: dict[str, str] = {}
@@ -108,6 +145,29 @@ class _DetailParser(HTMLParser):
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attributes = dict(attrs)
         identity = attributes.get("id")
+        if self.detail_widget == "evergreen_sec_filing_details":
+            if tag == "div" and identity == (
+                self.control_prefix + "divSecFilingDetailsType"
+            ):
+                self._capture = self.form_parts
+            elif tag == "div" and identity == (
+                self.control_prefix + "divSecFilingDetailsDate"
+            ):
+                self._capture = self.date_parts
+            elif tag == "a":
+                href = str(attributes.get("href") or "").strip()
+                label = str(attributes.get("aria-label") or "").casefold()
+                if not href or "download / view" not in label:
+                    return
+                for role, fmt in _EVERGREEN_ARTIFACT_FORMATS.items():
+                    if f"{fmt} format" not in label:
+                        continue
+                    if role in self.artifact_urls:
+                        raise ProvenanceError(
+                            "issuer IR detail page has invalid artifact URL"
+                        )
+                    self.artifact_urls[role] = href
+            return
         if tag == "span" and identity == self.control_prefix + "lblForm":
             self._capture = self.form_parts
         elif tag == "span" and identity == self.control_prefix + "lblDate":
@@ -125,7 +185,7 @@ class _DetailParser(HTMLParser):
                     self.artifact_urls[role] = href
 
     def handle_endtag(self, tag: str) -> None:
-        if tag == "span":
+        if tag in {"span", "div"}:
             self._capture = None
 
     def handle_data(self, data: str) -> None:
@@ -370,17 +430,32 @@ def _validate_request(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _challenge(body: bytes) -> bool:
+def _challenge(body: bytes, *, ignore_subscribe_captcha: bool = False) -> bool:
     sample = body[:64_000].lower()
-    return any(marker in sample for marker in _CHALLENGE_MARKERS)
+    if any(marker in sample for marker in _CHALLENGE_MARKERS[:-1]):
+        return True
+    if b"captcha" not in sample:
+        return False
+    if ignore_subscribe_captcha and (
+        b"uccaptcha" in sample or b"captchacontainer" in sample
+    ):
+        return False
+    return True
 
 
 def _sanitize_detail_page(body: bytes) -> tuple[bytes, int]:
-    """Remove volatile public-auth state while preserving filing link evidence."""
+    """Remove volatile public-auth state and email PII while preserving filing links."""
     sanitized, count = _VOLATILE_JWT.subn(b"[redacted-volatile-auth-state]", body)
     if _VOLATILE_JWT.search(sanitized):
         raise ProvenanceError("issuer IR detail page auth-state redaction failed")
-    return sanitized, count
+    try:
+        text = sanitized.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ProvenanceError("issuer IR detail page is not UTF-8") from exc
+    redacted, email_count = _EMAIL.subn("[redacted-email]", text)
+    if _EMAIL.search(redacted):
+        raise ProvenanceError("issuer IR detail page email redaction failed")
+    return redacted.encode("utf-8"), count + email_count
 
 
 def _parse_detail(
@@ -390,8 +465,14 @@ def _parse_detail(
     expected_filing_date: str,
     artifact_host: str,
     artifact_path_prefix: str,
+    control_prefix: str,
+    ignore_subscribe_captcha: bool = False,
+    detail_widget: str = "item_download",
+    filing_date_strptime: str | None = None,
 ) -> dict[str, str]:
     alphabet = artifact_path_prefix == "/CIK-0001652044/"
+    if detail_widget not in {"item_download", "evergreen_sec_filing_details"}:
+        raise ProvenanceError("issuer IR detail page widget is unsupported")
     # Alphabet's ordinary filing page contains an unrelated reCAPTCHA string
     # in navigation JavaScript. Ignore script contents only for this registered
     # page; visible challenge text and other challenge markers still fail.
@@ -405,13 +486,15 @@ def _parse_detail(
         )
         if any(marker in body.lower() for marker in _CHALLENGE_MARKERS[:-1]):
             raise ProvenanceError("issuer IR detail page returned a challenge page")
-    if _challenge(challenge_body):
+    if _challenge(
+        challenge_body, ignore_subscribe_captcha=ignore_subscribe_captcha
+    ):
         raise ProvenanceError("issuer IR detail page returned a challenge page")
     try:
         text = body.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise ProvenanceError("issuer IR detail page is not UTF-8") from exc
-    parser = _DetailParser("_ctrl0_ctl33_" if alphabet else "_ctrl0_ctl54_")
+    parser = _DetailParser(control_prefix, detail_widget=detail_widget)
     try:
         parser.feed(text)
     except Exception as exc:
@@ -420,10 +503,14 @@ def _parse_detail(
         raise ProvenanceError("issuer IR detail page is invalid HTML") from exc
     observed_form = " ".join(parser.form_parts).strip()
     observed_date = " ".join(parser.date_parts).strip()
+    if filing_date_strptime:
+        date_format = filing_date_strptime
+    elif alphabet:
+        date_format = "%m/%d/%Y"
+    else:
+        date_format = "%b %d, %Y"
     try:
-        parsed_time = time.strptime(
-            observed_date, "%m/%d/%Y" if alphabet else "%b %d, %Y"
-        )
+        parsed_time = time.strptime(observed_date, date_format)
         parsed_date = date(
             parsed_time.tm_year, parsed_time.tm_mon, parsed_time.tm_mday
         ).isoformat()
@@ -607,6 +694,14 @@ def fetch_issuer_ir_filing_history(
             expected_filing_date=filing["filing_date"],
             artifact_host=request["issuer"]["artifact_host"],
             artifact_path_prefix=request["source_policy"]["artifact_path_prefix"],
+            control_prefix=request["source_policy"]["detail_control_prefix"],
+            ignore_subscribe_captcha=bool(
+                request["source_policy"]["ignore_subscribe_captcha"]
+            ),
+            detail_widget=str(
+                request["source_policy"].get("detail_widget") or "item_download"
+            ),
+            filing_date_strptime=request["source_policy"].get("filing_date_strptime"),
         )
         stored_detail, detail_redactions = _sanitize_detail_page(detail_body)
         prefix = filing["filing_id"]

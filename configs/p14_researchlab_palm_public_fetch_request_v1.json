@@ -1,0 +1,25 @@
+{
+  "schema_version": "longworld.paper-fetch-request.v1",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P14-RESEARCHLAB-LOCAL-PROBE-ARXIV-20260902-PALM-01",
+    "scope": "bounded read-only export of public arXiv version metadata and source archives for one P14 ResearchLab PaLM capacity preflight",
+    "basis": "project owner authorized public-source LongWorld synthesis and local-probe preflight",
+    "reviewed_at": "2026-09-02T00:00:00Z",
+    "allowed_actions": [
+      "fetch_arxiv_metadata",
+      "fetch_arxiv_source"
+    ]
+  },
+  "arxiv_version_ids": [
+    "2204.02311v1",
+    "2204.02311v2",
+    "2204.02311v3",
+    "2204.02311v4",
+    "2204.02311v5"
+  ],
+  "openreview_forum_ids": [],
+  "fetch_arxiv_source": true,
+  "requests_per_second": 1,
+  "max_retries": 2
+}

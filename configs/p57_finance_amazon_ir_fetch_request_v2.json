@@ -1,0 +1,48 @@
+{
+  "schema_version": "longworld.issuer-ir-fetch-request.v1",
+  "user_agent": "LongWorld-P57/1.0 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P57-AMAZON-IR-HISTORY-2021-2024-20260906",
+    "scope": "Amazon issuer-owned calendar 2021 through 2024 annual filing artifacts and source-bound asset-trajectory local-probe synthesis",
+    "basis": "User-authorized authentic source synthesis and world expansion; source proof and all unchanged shared gates required. FY2025 tax-row layout is a separate parser profile.",
+    "reviewed_at": "2026-09-06T13:00:00Z"
+  },
+  "issuer": {
+    "name": "Amazon.com, Inc.",
+    "cik": "0001018724",
+    "detail_host": "ir.aboutamazon.com",
+    "artifact_host": "d18rn0p25nwr6d.cloudfront.net"
+  },
+  "filings": [
+    {
+      "filing_id": "amazon-2024-annual",
+      "detail_url": "https://ir.aboutamazon.com/sec-filings/sec-filings-details/default.aspx?FilingId=18165478",
+      "form": "10-K",
+      "filing_date": "2025-02-07",
+      "report_date": "2024-12-31"
+    },
+    {
+      "filing_id": "amazon-2023-annual",
+      "detail_url": "https://ir.aboutamazon.com/sec-filings/sec-filings-details/default.aspx?FilingId=17229449",
+      "form": "10-K",
+      "filing_date": "2024-02-02",
+      "report_date": "2023-12-31"
+    },
+    {
+      "filing_id": "amazon-2022-annual",
+      "detail_url": "https://ir.aboutamazon.com/sec-filings/sec-filings-details/default.aspx?FilingId=16361618",
+      "form": "10-K",
+      "filing_date": "2023-02-03",
+      "report_date": "2022-12-31"
+    },
+    {
+      "filing_id": "amazon-2021-annual",
+      "detail_url": "https://ir.aboutamazon.com/sec-filings/sec-filings-details/default.aspx?FilingId=15530776",
+      "form": "10-K",
+      "filing_date": "2022-02-04",
+      "report_date": "2021-12-31"
+    }
+  ],
+  "requests_per_second": 2,
+  "max_retries": 3
+}

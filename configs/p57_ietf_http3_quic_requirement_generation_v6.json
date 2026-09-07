@@ -1,0 +1,103 @@
+{
+  "schema_version": "longworld.ietf-http3-generation-config.v1",
+  "source_inventory_dir": "data/source_inventory/p57_ietf_http3_quic_requirement_graph_v1",
+  "fetch_inventory_file": "ietf_fetch_inventory.json",
+  "fetch_inventory_sha256": "de96d1c8ee143c87427539ac09a8c2dfa69bad5c5481b38f5011dc2ca1b41634",
+  "signed_workflow_file": "ietf_workflow_manifest.p57.http3-quic-requirement.v1.signed.json",
+  "signed_workflow_sha256": "0fac710151335c26e948d9e64917192d9c27497bf0019b132ada79a89fa2823f",
+  "predecessor_report_manifest_sha256": "0fac710151335c26e948d9e64917192d9c27497bf0019b132ada79a89fa2823f",
+  "predecessor_report_task_sha256": "6c5a0a758bd42f49fa1566e5367a8ad133c38f2914ce1aace4c7941fc6bb1a37",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "world_id": "ietf-http3-quic-requirement-v6",
+  "length_buckets": {
+    "16k": [16000, 16384],
+    "32k": [32000, 32768],
+    "64k": [64000, 65536],
+    "128k": [128000, 131072]
+  },
+  "packing": {
+    "target_margin_tokens": 256,
+    "unit_boundary": "source_blank_line_or_form_feed",
+    "record_ids_by_bucket": {
+      "16k": [
+        "ietf:draft:draft-ietf-quic-http-34",
+        "ietf:rfc:7301",
+        "ietf:rfc:8446",
+        "ietf:rfc:9000",
+        "ietf:rfc:9114",
+        "ietf:rfc:9204"
+      ],
+      "32k": [
+        "ietf:draft:draft-ietf-quic-http-34",
+        "ietf:rfc:7301",
+        "ietf:rfc:8446",
+        "ietf:rfc:9000",
+        "ietf:rfc:9114",
+        "ietf:rfc:9204"
+      ],
+      "64k": [
+        "ietf:draft:draft-ietf-quic-http-34",
+        "ietf:rfc:7301",
+        "ietf:rfc:8446",
+        "ietf:rfc:9000",
+        "ietf:rfc:9114",
+        "ietf:rfc:9204"
+      ],
+      "128k": [
+        "ietf:draft:draft-ietf-quic-http-34",
+        "ietf:rfc:7301",
+        "ietf:rfc:8446",
+        "ietf:rfc:9000",
+        "ietf:rfc:9114",
+        "ietf:rfc:9204"
+      ]
+    },
+    "chunked_record_ids": [
+      "ietf:rfc:7301",
+      "ietf:rfc:8446",
+      "ietf:rfc:9000",
+      "ietf:rfc:9114",
+      "ietf:rfc:9204"
+    ],
+    "chunk_max_tokens": 4096,
+    "isolate_evidence_ids": [
+      "transport_dependency",
+      "tls_dependency",
+      "alpn_current",
+      "alpn_dependency",
+      "qpack_current",
+      "qpack_dependency",
+      "settings_current"
+    ],
+    "published_draft_policy": "identity_paragraph_only",
+    "support_priority_record_ids": [
+      "ietf:rfc:7301",
+      "ietf:rfc:9204",
+      "ietf:rfc:9114",
+      "ietf:rfc:9000",
+      "ietf:rfc:8446",
+      "ietf:draft:draft-ietf-quic-http-34"
+    ],
+    "span_id_width": 7,
+    "counterfactual_companion_evidence_id": "tls_current",
+    "counterfactual_evidence_id": "transport_current",
+    "padding": false,
+    "cloned_artifacts": false,
+    "synthetic_filler": false
+  },
+  "workflow_id": "p57-ietf-http3-quic-requirement-v1",
+  "dense_model": {
+    "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+  },
+  "output_dir": "data/candidates/p57_ietf_http3_quic_requirement_v6",
+  "do_not_select": true,
+  "do_not_promote": true,
+  "do_not_count": true
+}

@@ -1,0 +1,55 @@
+{
+  "schema_version": "longworld.issuer-ir-fetch-request.v1",
+  "user_agent": "LongWorld-P55/1.0 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P55-ALPHABET-ASSET-TRAJECTORY-20260906",
+    "scope": "Alphabet issuer-owned 2020 through 2024 annual filing artifacts and source-bound asset-trajectory local-probe synthesis",
+    "basis": "User-authorized authentic source synthesis and world expansion; source proof and all unchanged shared gates required",
+    "reviewed_at": "2026-09-06T00:00:00Z"
+  },
+  "issuer": {
+    "name": "Alphabet Inc.",
+    "cik": "0001652044",
+    "detail_host": "abc.xyz",
+    "artifact_host": "d18rn0p25nwr6d.cloudfront.net"
+  },
+  "filings": [
+    {
+      "filing_id": "alphabet-fy2020-annual",
+      "detail_url": "https://abc.xyz/investor/sec-filings/sec-filings-details/default.aspx?FilingId=14665697",
+      "form": "10-K",
+      "filing_date": "2021-02-03",
+      "report_date": "2020-12-31"
+    },
+    {
+      "filing_id": "alphabet-fy2021-annual",
+      "detail_url": "https://abc.xyz/investor/sec-filings/sec-filings-details/default.aspx?FilingId=15521825",
+      "form": "10-K",
+      "filing_date": "2022-02-02",
+      "report_date": "2021-12-31"
+    },
+    {
+      "filing_id": "alphabet-fy2022-annual",
+      "detail_url": "https://abc.xyz/investor/sec-filings/sec-filings-details/default.aspx?FilingId=16361797",
+      "form": "10-K",
+      "filing_date": "2023-02-03",
+      "report_date": "2022-12-31"
+    },
+    {
+      "filing_id": "alphabet-fy2023-annual",
+      "detail_url": "https://abc.xyz/investor/sec-filings/sec-filings-details/default.aspx?FilingId=17221936",
+      "form": "10-K",
+      "filing_date": "2024-01-31",
+      "report_date": "2023-12-31"
+    },
+    {
+      "filing_id": "alphabet-fy2024-annual",
+      "detail_url": "https://abc.xyz/investor/sec-filings/sec-filings-details/default.aspx?FilingId=18158034",
+      "form": "10-K",
+      "filing_date": "2025-02-05",
+      "report_date": "2024-12-31"
+    }
+  ],
+  "requests_per_second": 2,
+  "max_retries": 2
+}

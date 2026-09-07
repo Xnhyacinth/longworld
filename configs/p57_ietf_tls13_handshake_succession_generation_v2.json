@@ -1,0 +1,100 @@
+{
+  "schema_version": "longworld.ietf-tls13-generation-config.v1",
+  "source_inventory_dir": "/workspace/wynckeliao/longworld/data/source_inventory/p57_ietf_tls13_handshake_graph_v1",
+  "fetch_inventory_file": "ietf_fetch_inventory.json",
+  "fetch_inventory_sha256": "c86bc411fe4e31382a729a63b451fff99251ebacc2b1323213b4fa8cba891c36",
+  "signed_workflow_file": "ietf_workflow_manifest.p57.tls13-handshake.v1.signed.json",
+  "signed_workflow_sha256": "3088401ebe3f9238fbfe2e0815f64a63a389224af715fef0db92dfbde8480e1b",
+  "predecessor_report_manifest_sha256": "287ca4031b223ad818d21781c575905d5ed30eb7e4e0e38fef196cf1ca1865b4",
+  "predecessor_report_task_sha256": "20be5be958afd13013d95c409be0d8c216e674ddbff00bca18dba17bee1a92a3",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "world_id": "ietf-tls13-handshake-succession-v2",
+  "length_buckets": {
+    "16k": [16000, 16384],
+    "32k": [32000, 32768],
+    "64k": [64000, 65536],
+    "128k": [128000, 131072]
+  },
+  "packing": {
+    "target_margin_tokens": 256,
+    "unit_boundary": "source_blank_line_or_form_feed",
+    "record_ids_by_bucket": {
+      "16k": [
+        "ietf:draft:draft-ietf-tls-tls13-28",
+        "ietf:rfc:5077",
+        "ietf:rfc:5246",
+        "ietf:rfc:5705",
+        "ietf:rfc:6066",
+        "ietf:rfc:6961",
+        "ietf:rfc:8446"
+      ],
+      "32k": [
+        "ietf:draft:draft-ietf-tls-tls13-28",
+        "ietf:rfc:5077",
+        "ietf:rfc:5246",
+        "ietf:rfc:5705",
+        "ietf:rfc:6066",
+        "ietf:rfc:6961",
+        "ietf:rfc:8446"
+      ],
+      "64k": [
+        "ietf:draft:draft-ietf-tls-tls13-28",
+        "ietf:rfc:5077",
+        "ietf:rfc:5246",
+        "ietf:rfc:5705",
+        "ietf:rfc:6066",
+        "ietf:rfc:6961",
+        "ietf:rfc:8446"
+      ],
+      "128k": [
+        "ietf:draft:draft-ietf-tls-tls13-28",
+        "ietf:rfc:5077",
+        "ietf:rfc:5246",
+        "ietf:rfc:5705",
+        "ietf:rfc:6066",
+        "ietf:rfc:6961",
+        "ietf:rfc:8446"
+      ]
+    },
+    "chunked_record_ids": [
+      "ietf:rfc:5246",
+      "ietf:rfc:8446"
+    ],
+    "chunk_max_tokens": 16384,
+    "chunk_max_tokens_by_bucket": {
+      "16k": 1024,
+      "32k": 2048,
+      "64k": 16384,
+      "128k": 16384
+    },
+    "published_draft_policy": "",
+    "support_priority_record_ids": [
+      "ietf:rfc:5077",
+      "ietf:rfc:5246",
+      "ietf:rfc:5705",
+      "ietf:rfc:6066",
+      "ietf:rfc:6961",
+      "ietf:rfc:8446"
+    ],
+    "span_id_width": 7,
+    "counterfactual_evidence_id": "current_protocol",
+    "padding": false,
+    "cloned_artifacts": false,
+    "synthetic_filler": false
+  },
+  "workflow_id": "p57-ietf-tls13-handshake-succession-v2",
+  "dense_model": {
+    "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+  },
+  "output_dir": "/workspace/wynckeliao/longworld/data/candidates/p57_ietf_tls13_handshake_succession_v2",
+  "do_not_select": true,
+  "do_not_promote": true,
+  "do_not_count": true
+}

@@ -1,0 +1,1784 @@
+{
+  "schema_version": "longworld.git-workflow.v1",
+  "repository_url": "https://github.com/bytecodealliance/wasmtime",
+  "source_origin": "real_public",
+  "revision": "ee611378b3c54fc0ad866e1c12d11392c820583b",
+  "license": "Apache-2.0",
+  "exported_at": "2026-09-02T21:56:18.588448Z",
+  "authorization": {
+    "record_id": "PUBLIC-GITHUB-TERMS-2026-08",
+    "scope": "read-only workflow export",
+    "basis": "public repository under recorded license",
+    "reviewed_at": "2026-08-26T15:00:00Z"
+  },
+  "public_policy": {
+    "record_id": "PUBLIC-GITHUB-TERMS-2026-08",
+    "sha256": "dd39cfef6803b01b08cc476acef805265a7f10d62378889e1d56cb8603cb4c60"
+  },
+  "source_client": {
+    "path": "/usr/bin/gh",
+    "sha256": "2fd925d68889746976958342fb749bf102bc7dc8bcba3abfa533a80ad7791673"
+  },
+  "privacy_review": {
+    "emails": "redacted",
+    "secrets": "fail_closed",
+    "scanner": "longworld-public-secret-patterns",
+    "scanner_revision": "v2"
+  },
+  "records": [
+    {
+      "id": "license:f9d81955f4bcb8f96a025e2ecc46f39ec536d465",
+      "kind": "license",
+      "occurred_at": "2018-10-30T20:08:42Z",
+      "text": "Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an example is provided in the Appendix below).\n\n      \"Derivative Works\" shall mean any work, whether in Source or Object\n      form, that is based on (or derived from) the Work and for which the\n      editorial revisions, annotations, elaborations, or other modifications\n      represent, as a whole, an original work of authorship. For the purposes\n      of this License, Derivative Works shall not include works that remain\n      separable from, or merely link (or bind by name) to the interfaces of,\n      the Work and Derivative Works thereof.\n\n      \"Contribution\" shall mean any work of authorship, including\n      the original version of the Work and any modifications or additions\n      to that Work or Derivative Works thereof, that is intentionally\n      submitted to Licensor for inclusion in the Work by the copyright owner\n      or by an individual or Legal Entity authorized to submit on behalf of\n      the copyright owner. For the purposes of this definition, \"submitted\"\n      means any form of electronic, verbal, or written communication sent\n      to the Licensor or its representatives, including but not limited to\n      communication on electronic mailing lists, source code control systems,\n      and issue tracking systems that are managed by, or on behalf of, the\n      Licensor for the purpose of discussing and improving the Work, but\n      excluding communication that is conspicuously marked or otherwise\n      designated in writing by the copyright owner as \"Not a Contribution.\"\n\n      \"Contributor\" shall mean Licensor and any individual or Legal Entity\n      on behalf of whom a Contribution has been received by Licensor and\n      subsequently incorporated within the Work.\n\n   2. Grant of Copyright License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      copyright license to reproduce, prepare Derivative Works of,\n      publicly display, publicly perform, sublicense, and distribute the\n      Work and such Derivative Works in Source or Object form.\n\n   3. Grant of Patent License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      (except as stated in this section) patent license to make, have made,\n      use, offer to sell, sell, import, and otherwise transfer the Work,\n      where such license applies only to those patent claims licensable\n      by such Contributor that are necessarily infringed by their\n      Contribution(s) alone or by combination of their Contribution(s)\n      with the Work to which such Contribution(s) was submitted. If You\n      institute patent litigation against any entity (including a\n      cross-claim or counterclaim in a lawsuit) alleging that the Work\n      or a Contribution incorporated within the Work constitutes direct\n      or contributory patent infringement, then any patent licenses\n      granted to You under this License for that Work shall terminate\n      as of the date such litigation is filed.\n\n   4. Redistribution. You may reproduce and distribute copies of the\n      Work or Derivative Works thereof in any medium, with or without\n      modifications, and in Source or Object form, provided that You\n      meet the following conditions:\n\n      (a) You must give any other recipients of the Work or\n          Derivative Works a copy of this License; and\n\n      (b) You must cause any modified files to carry prominent notices\n          stating that You changed the files; and\n\n      (c) You must retain, in the Source form of any Derivative Works\n          that You distribute, all copyright, patent, trademark, and\n          attribution notices from the Source form of the Work,\n          excluding those notices that do not pertain to any part of\n          the Derivative Works; and\n\n      (d) If the Work includes a \"NOTICE\" text file as part of its\n          distribution, then any Derivative Works that You distribute must\n          include a readable copy of the attribution notices contained\n          within such NOTICE file, excluding those notices that do not\n          pertain to any part of the Derivative Works, in at least one\n          of the following places: within a NOTICE text file distributed\n          as part of the Derivative Works; within the Source form or\n          documentation, if provided along with the Derivative Works; or,\n          within a display generated by the Derivative Works, if and\n          wherever such third-party notices normally appear. The contents\n          of the NOTICE file are for informational purposes only and\n          do not modify the License. You may add Your own attribution\n          notices within Derivative Works that You distribute, alongside\n          or as an addendum to the NOTICE text from the Work, provided\n          that such additional attribution notices cannot be construed\n          as modifying the License.\n\n      You may add Your own copyright statement to Your modifications and\n      may provide additional or different license terms and conditions\n      for use, reproduction, or distribution of Your modifications, or\n      for any such Derivative Works as a whole, provided Your use,\n      reproduction, and distribution of the Work otherwise complies with\n      the conditions stated in this License.\n\n   5. Submission of Contributions. Unless You explicitly state otherwise,\n      any Contribution intentionally submitted for inclusion in the Work\n      by You to the Licensor shall be under the terms and conditions of\n      this License, without any additional terms or conditions.\n      Notwithstanding the above, nothing herein shall supersede or modify\n      the terms of any separate license agreement you may have executed\n      with Licensor regarding such Contributions.\n\n   6. Trademarks. This License does not grant permission to use the trade\n      names, trademarks, service marks, or product names of the Licensor,\n      except as required for reasonable and customary use in describing the\n      origin of the Work and reproducing the content of the NOTICE file.\n\n   7. Disclaimer of Warranty. Unless required by applicable law or\n      agreed to in writing, Licensor provides the Work (and each\n      Contributor provides its Contributions) on an \"AS IS\" BASIS,\n      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or\n      implied, including, without limitation, any warranties or conditions\n      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A\n      PARTICULAR PURPOSE. You are solely responsible for determining the\n      appropriateness of using or redistributing the Work and assume any\n      risks associated with Your exercise of permissions under this License.\n\n   8. Limitation of Liability. In no event and under no legal theory,\n      whether in tort (including negligence), contract, or otherwise,\n      unless required by applicable law (such as deliberate and grossly\n      negligent acts) or agreed to in writing, shall any Contributor be\n      liable to You for damages, including any direct, indirect, special,\n      incidental, or consequential damages of any character arising as a\n      result of this License or out of the use or inability to use the\n      Work (including but not limited to damages for loss of goodwill,\n      work stoppage, computer failure or malfunction, or any and all\n      other commercial damages or losses), even if such Contributor\n      has been advised of the possibility of such damages.\n\n   9. Accepting Warranty or Additional Liability. While redistributing\n      the Work or Derivative Works thereof, You may choose to offer,\n      and charge a fee for, acceptance of support, warranty, indemnity,\n      or other liability obligations and/or rights consistent with this\n      License. However, in accepting such obligations, You may act only\n      on Your own behalf and on Your sole responsibility, not on behalf\n      of any other Contributor, and only if You agree to indemnify,\n      defend, and hold each Contributor harmless for any liability\n      incurred by, or claims asserted against, such Contributor by reason\n      of your accepting any such warranty or additional liability.\n\n   END OF TERMS AND CONDITIONS\n\n   APPENDIX: How to apply the Apache License to your work.\n\n      To apply the Apache License to your work, attach the following\n      boilerplate notice, with the fields enclosed by brackets \"[]\"\n      replaced with your own identifying information. (Don't include\n      the brackets!)  The text should be enclosed in the appropriate\n      comment syntax for the file format. We also recommend that a\n      file or class name and description of purpose be included on the\n      same \"printed page\" as the copyright notice for easier\n      identification within third-party archives.\n\n   Copyright [yyyy] [name of copyright owner]\n\n   Licensed under the Apache License, Version 2.0 (the \"License\");\n   you may not use this file except in compliance with the License.\n   You may obtain a copy of the License at\n\n       http://www.apache.org/licenses/LICENSE-2.0\n\n   Unless required by applicable law or agreed to in writing, software\n   distributed under the License is distributed on an \"AS IS\" BASIS,\n   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n   See the License for the specific language governing permissions and\n   limitations under the License.\n\n\n--- LLVM Exceptions to the Apache 2.0 License ----\n\nAs an exception, if, as a result of your compiling your source code, portions\nof this Software are embedded into an Object form of such source code, you\nmay redistribute such embedded portions in such Object form without complying\nwith the conditions of Sections 4(a), 4(b) and 4(d) of the License.\n\nIn addition, if you combine or link compiled forms of this Software with\nsoftware that is licensed under the GPLv2 (\"Combined Software\") and if a\ncourt of competent jurisdiction determines that the patent provision (Section\n3), the indemnity provision (Section 9) or other Section of the License\nconflicts with the conditions of the GPLv2, you may retroactively and\nprospectively choose to deem waived or otherwise exclude such Section(s) of\nthe License, but only in their entirety and only with respect to the Combined\nSoftware.",
+      "links": [],
+      "attributes": {
+        "spdx_id": "Apache-2.0"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/contents/LICENSE?ref=93d8a09bc173f7a66bd384b442ab4f103d118cd0"
+    },
+    {
+      "id": "pull_request:13580",
+      "kind": "pull_request",
+      "occurred_at": "2026-06-05T23:00:50Z",
+      "text": "Pull request #13580: Cranelift: Remove the `stack_{load,store}` instructions\n\nThese get immediately legalized to `stack_addr` and `load` or `store`, so frontends should just emit that pair directly. For convenience and backwards compat, we add `InstBuilder::stack_load` and `InstBuilder::stack_store` methods that emit the pair as a single operation. Unfortunately, these methods have to take an additional pointer-type parameter that the old version didn't have to take because the rewrite didn't happen until legalization time, so these new methods are not 100% backwards compatible. This also necessitated passing in a `TargetFrontendConfig` to `FuncBuilder::finalize`, which resulted in a bit of churn, but is fully mechanical.\r\n\r\n<!--\r\nPlease make sure you include the following information:\r\n\r\n- If this work has been discussed elsewhere, please include a link to that\r\n  conversation. If it was discussed in an issue, just mention \"issue #...\".\r\n\r\n- Explain why this change is needed. If the details are in an issue already,\r\n  this can be brief.\r\n\r\nOur development process is documented in the Wasmtime book:\r\nhttps://docs.wasmtime.dev/contributing-development-process.html\r\n\r\nPlease ensure all communication follows the code of conduct:\r\nhttps://github.com/bytecodealliance/wasmtime/blob/main/CODE_OF_CONDUCT.md\r\n-->",
+      "links": [
+        "license:f9d81955f4bcb8f96a025e2ecc46f39ec536d465"
+      ],
+      "attributes": {
+        "number": 13580,
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/pulls/13580"
+    },
+    {
+      "id": "review:4440381547",
+      "kind": "review",
+      "occurred_at": "2026-06-05T23:15:34Z",
+      "text": "review_id=4440381547 state=COMMENTED\nWould it be possible to avoid changing `finalize` by looking at the stack slot's `size` field and choosing an appropriate type based on that?",
+      "links": [
+        "pull_request:13580"
+      ],
+      "attributes": {
+        "state": "COMMENTED"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/pulls/13580/reviews/4440381547"
+    },
+    {
+      "id": "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+      "kind": "commit",
+      "occurred_at": "2026-06-08T17:42:03Z",
+      "text": "commit 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nCranelift: Remove the `stack_{load,store}` instructions\n\nThese get immediately legalized to `stack_addr` and `load` or `store`, so\nfrontends should just emit that pair directly. For convenience and backwards\ncompat, we add `InstBuilder::stack_load` and `InstBuilder::stack_store` methods\nthat emit the pair as a single operation. Unfortunately, these methods have to\ntake an additional pointer-type parameter that the old version didn't have to\ntake because the rewrite didn't happen until legalization time, so these new\nmethods are not 100% backwards compatible. This also necessitated passing in a\n`TargetFrontendConfig` to `FuncBuilder::finalize`, which resulted in a bit of\nchurn, but is fully mechanical.\n\n96 files changed (GitHub commit API summary):\ncranelift/codegen/meta/src/gen_inst.rs status=modified additions=86 deletions=0 changes=86 sha=c2780baf25119715e9345c407ee0089c569b291e\ncranelift/codegen/meta/src/shared/formats.rs status=modified additions=4 deletions=17 changes=21 sha=44d2338c482e7be49589dce1e7203c1d17709543\ncranelift/codegen/meta/src/shared/instructions.rs status=modified additions=2 deletions=82 changes=84 sha=f3eb5fe770cfd19d041cb67499dc0ea2adcc8ee9\ncranelift/codegen/src/inst_predicates.rs status=modified additions=0 deletions=1 changes=1 sha=3279644d558bcbd46ea43369538d62c7b453e75f\ncranelift/codegen/src/ir/function.rs status=modified additions=4 deletions=4 changes=8 sha=ee1d2debae1d7bc3cf77816c02c3c1c9218fbe25\ncranelift/codegen/src/ir/instructions.rs status=modified additions=11 deletions=13 changes=24 sha=636c5492577065f7a0697bb4aaed08c9416c8542\ncranelift/codegen/src/ir/stackslot.rs status=modified additions=4 deletions=4 changes=8 sha=e495812707b8687ee640cbb627ffafcd9b773c2e\ncranelift/codegen/src/legalizer/mod.rs status=modified additions=1 deletions=124 changes=125 sha=07fa6798364b7c65dc57fc6099139e09ba4d7fff\ncranelift/codegen/src/verifier/mod.rs status=modified additions=2 deletions=5 changes=7 sha=51485478e8b1610eed3de2b92ffc24f7d9a2e702\ncranelift/codegen/src/write.rs status=modified additions=2 deletions=13 changes=15 sha=5f5584209c9fdbb4ccd7c7c442dd4125fb2e0cdc\ncranelift/filetests/filetests/egraph/issue-5716.clif status=modified additions=2 deletions=1 changes=3 sha=1a7aac68312072b40497abcc7dfae4500adbfb9a\ncranelift/filetests/filetests/egraph/misc.clif status=modified additions=6 deletions=4 changes=10 sha=78c883cd8bd815106dc6648462073e0b98e642b3\ncranelift/filetests/filetests/inline/dynamic-stack-slots.clif status=modified additions=4 deletions=2 changes=6 sha=ac12b842ffec7b6707906cf390e50e14f9873089\ncranelift/filetests/filetests/inline/stack-maps-opt.clif status=modified additions=4 deletions=2 changes=6 sha=c8f376fc16baf8e0506c09de08c2ed6db7081805\ncranelift/filetests/filetests/inline/stack-maps.clif status=modified additions=24 deletions=12 changes=36 sha=8b333a7331591b59ca7eab8e1ab274f7274aca4b\ncranelift/filetests/filetests/inline/stack-slots.clif status=modified additions=4 deletions=2 changes=6 sha=e31fdca70a3738880fe93b5ebb5eef55058e4ebd\ncranelift/filetests/filetests/isa/aarch64/dynamic-slot.clif status=modified additions=10 deletions=5 changes=15 sha=5c938fe14e0f2b35eda959109412d0663ffbeb47\ncranelift/filetests/filetests/isa/aarch64/stack.clif status=modified additions=20 deletions=10 changes=30 sha=ab9cb8f9319e55fa591fb19d6097ad4466c46b29\ncranelift/filetests/filetests/isa/aarch64/stackslot.clif status=modified additions=20 deletions=10 changes=30 sha=5a3a4d189d4bb1d59675e3ab0f02b2ee3b986d96\ncranelift/filetests/filetests/isa/aarch64/user_stack_maps.clif status=modified additions=24 deletions=12 changes=36 sha=4eab2c2a8a9dde208fc880fd8ae9b1c6b124f39d\ncranelift/filetests/filetests/isa/riscv64/f16-memory.clif status=modified additions=12 deletions=6 changes=18 sha=8c48007910d7987e09a1ef52461b50d271ab0620\ncranelift/filetests/filetests/isa/riscv64/issue-6954.clif status=modified additions=62 deletions=31 changes=93 sha=04389ccd1f559b1b0cd83e948c2aa0879aaf2096\ncranelift/filetests/filetests/isa/riscv64/stack.clif status=modified additions=20 deletions=10 changes=30 sha=ece34391ebadd826ee7d25888da235b82c37499c\ncranelift/filetests/filetests/isa/riscv64/user_stack_maps.clif status=modified additions=24 deletions=12 changes=36 sha=06254c9783ba4d0e2feaee1a92531a76cdd97633\ncranelift/filetests/filetests/isa/riscv64/zca.clif status=modified additions=8 deletions=4 changes=12 sha=6fc99d678e87a3ea20f5a8026f292e69752a4c4e\ncranelift/filetests/filetests/isa/riscv64/zcb.clif status=modified additions=12 deletions=6 changes=18 sha=411e80be7e72ae7401174efb83a95ec74789df8e\ncranelift/filetests/filetests/isa/riscv64/zcd.clif status=modified additions=4 deletions=2 changes=6 sha=b49b94dfdf98c2b91c9fcd4a665d3c1d4f201636\ncranelift/filetests/filetests/isa/s390x/stack.clif status=modified additions=8 deletions=4 changes=12 sha=84dd169da36d8d983877eb76015727915c3cf492\ncranelift/filetests/filetests/isa/s390x/user_stack_maps.clif status=modified additions=24 deletions=12 changes=36 sha=a482622dbdcdf24e7dd9d6f44b8dad8f220bf237\ncranelift/filetests/filetests/isa/x64/atomic-cas-bug.clif status=modified additions=50 deletions=25 changes=75 sha=e7c931bebec9511c3e268b341aa41ddcf7d1ad54\ncranelift/filetests/filetests/isa/x64/stackslot.clif status=modified additions=20 deletions=10 changes=30 sha=da576e62845a66d0c6f66763470d30adca2e55fa\ncranelift/filetests/filetests/isa/x64/user_stack_maps.clif status=modified additions=24 deletions=12 changes=36 sha=217fb95becdc640f61253a053cbfee0e54291442\ncranelift/filetests/filetests/parser/tiny.clif status=modified additions=16 deletions=8 changes=24 sha=9e17cab4896c06f325a87412d1bac813db516c6b\ncranelift/filetests/filetests/parser/user_stack_maps.clif status=modified additions=12 deletions=6 changes=18 sha=9233d8324ad51b6748f5542b35f53c757c12c15d\ncranelift/filetests/filetests/runtests/atomic-128.clif status=modified additions=52 deletions=26 changes=78 sha=cdf018dbf9d4aa0a37495d867576f84f4e5ac849\ncranelift/filetests/filetests/runtests/atomic-cas.clif status=modified additions=8 deletions=4 changes=12 sha=cc3f58f55dc60ef71f628c2680196ebe76c4351b\ncranelift/filetests/filetests/runtests/f16-memory.clif status=modified additions=12 deletions=6 changes=18 sha=457bbd803167bdf212d80326d7346a1fe8ed0b7a\ncranelift/filetests/filetests/runtests/fma.clif status=modified additions=4 deletions=2 changes=6 sha=273391dfb4e8b68318ca34e1050443c8a43e7334\ncranelift/filetests/filetests/runtests/global_value.clif status=modified additions=2 deletions=1 changes=3 sha=59cf952e58692e167e6b45330750955b12c38257\ncranelift/filetests/filetests/runtests/i128-load-store.clif status=modified additions=12 deletions=6 changes=18 sha=658a2b54752dfce22d2fe1f8c30656597405abef\ncranelift/filetests/filetests/runtests/inline-probestack.clif status=modified additions=8 deletions=4 changes=12 sha=cff5a75c94cea598d8d2b399293ea8ca0ede7ab8\ncranelift/filetests/filetests/runtests/issue-6954.clif status=modified additions=62 deletions=31 changes=93 sha=a5f8164417c3e7bf83e9060ae88f224f43d1f2b9\ncranelift/filetests/filetests/runtests/issue5526.clif status=modified additions=136 deletions=68 changes=204 sha=979a31855af115641879657b332e68b95ebf868c\ncranelift/filetests/filetests/runtests/issue5569.clif status=modified additions=8 deletions=4 changes=12 sha=3651bdedae434ae73a47dde463652bb8180c4a25\ncranelift/filetests/filetests/runtests/riscv64-vstate.clif status=modified additions=12 deletions=6 changes=18 sha=dedb81047a0c18079c4fbc225d0ec1c49826a43f\ncranelift/filetests/filetests/runtests/simd-extractlane-32.clif status=added additions=54 deletions=0 changes=54 sha=f99b21ae23b43ac42933858954737a1d29b02d9a\ncranelift/filetests/filetests/runtests/simd-extractlane.clif status=modified additions=9 deletions=7 changes=16 sha=f5c4282e799f719b2af8665a20416184979d7455\ncranelift/filetests/filetests/runtests/simd-small.clif status=modified additions=24 deletions=12 changes=36 sha=1003bd85d9c5afee0cbe5c9574912d911e15d355\ncranelift/filetests/filetests/runtests/simd-splat-32.clif status=added additions=225 deletions=0 changes=225 sha=25f493cb4618ed73a55df3582ae4920d789af5dd\ncranelift/filetests/filetests/runtests/simd-splat.clif status=modified additions=24 deletions=14 changes=38 sha=642f3d3dea4f761198b91f7221250e48f6bae4f7\ncranelift/filetests/filetests/runtests/stack-32.clif status=added additions=124 deletions=0 changes=124 sha=cfd4d2a56b17866001ca80dc28b6943e828336e3\ncranelift/filetests/filetests/runtests/stack-addr-32.clif status=modified additions=8 deletions=4 changes=12 sha=8adbaace1702e20302f575c589a59a2b434feab5\ncranelift/filetests/filetests/runtests/stack-addr-64.clif status=modified additions=8 deletions=4 changes=12 sha=3ec4033c2800ad0a3d236251990b51e952fd518c\ncranelift/filetests/filetests/runtests/stack.clif status=modified additions=40 deletions=22 changes=62 sha=4f0ea8a74d6301aba8b9e7bb961c581f3b5ac8f3\ncranelift/filetests/filetests/runtests/tail-stack-limit.clif status=modified additions=2 deletions=1 changes=3 sha=f8ee42d4f3fab1fd45be5807157c35c62ca03555\ncranelift/filetests/filetests/verifier/pointer_width_32.clif status=modified additions=4 deletions=2 changes=6 sha=a2447d30a141989aaffcbac0d0a6e07997b0e90c\ncranelift/filetests/filetests/verifier/pointer_width_64.clif status=modified additions=4 deletions=2 changes=6 sha=53ed7f028d3e87ee20e694e352eba06fbb5204fd\ncranelift/filetests/src/function_runner.rs status=modified additions=1 deletions=1 changes=2 sha=1dbbcc2f302019127f21eee646eca0afcf911caa\ncranelift/frontend/src/frontend.rs status=modified additions=17 deletions=15 changes=32 sha=59df86cb82e023296bed7318c92681d9ad541e77\ncranelift/frontend/src/frontend/safepoints.rs status=modified additions=307 deletions=185 changes=492 sha=e10d84a1c5a1514c957a80ad3be6551c459f6b3d\ncranelift/frontend/src/lib.rs status=modified additions=7 deletions=2 changes=9 sha=eb1d55b5b12506ff5f706e16a687eb9298d4b5ff\ncranelift/frontend/src/switch.rs status=modified additions=10 deletions=1 changes=11 sha=252995d1a9fa82fc50b516355c8f35bd03738bd7\ncranelift/fuzzgen/src/function_generator.rs status=modified additions=3 deletions=71 changes=74 sha=ba8897143881a93fdf7c746a95eb54eb2066e479\ncranelift/interpreter/src/interpreter.rs status=modified additions=24 deletions=12 changes=36 sha=72521119492601743136054ae94a41f702031216\ncranelift/interpreter/src/step.rs status=modified additions=2 deletions=27 changes=29 sha=717cc486747a2c7ef528e5f2a4ad584258e2669f\ncranelift/jit/examples/jit-minimal.rs status=modified additions=2 deletions=2 changes=4 sha=8eb49d1b0e1b6b4300e84ecbde61b339971e49f8\ncranelift/jit/tests/basic.rs status=modified additions=5 deletions=1 changes=6 sha=064ab51646d3afa697b5ec0dae622df3b21e2947\ncranelift/object/tests/basic.rs status=modified additions=8 deletions=4 changes=12 sha=969ad3c5e80b5e41442a7fd1de275e1648345c61\ncranelift/reader/src/parser.rs status=modified additions=4 deletions=28 changes=32 sha=e03734c9524c5058b5fc656fedaaf2208e687381\ncranelift/src/bugpoint.rs status=modified additions=2 deletions=4 changes=6 sha=1a661d2bd5ebd8e478afbcd1c1b1cab7cce4303c\ncrates/cranelift/src/compiler.rs status=modified additions=3 deletions=3 changes=6 sha=e76278a519e6abe1755b6578c78d828c67259f49\ncrates/cranelift/src/compiler/component.rs status=modified additions=2 deletions=2 changes=4 sha=dd5bb708b618fd9c585aad53acb9c671b91c29cc\ncrates/cranelift/src/func_environ.rs status=modified additions=3 deletions=1 changes=4 sha=271d04c71894718ece384d8dc180d7fc5f4d054d\ncrates/cranelift/src/translate/func_translator.rs status=modified additions=2 deletions=2 changes=4 sha=7fba0b1c419967186337a7fd16fd27b56fd9c841\ntests/disas/array-fill-funcref.wat status=modified additions=8 deletions=8 changes=16 sha=dad9a41188d0db17e196d10673f760cf8793cdac\ntests/disas/gc/array-copy-with-fuel.wat status=modified additions=23 deletions=23 changes=46 sha=d6d5defbc284a5358e5e1993a20ee45c5864d3da\ntests/disas/gc/array-new-data.wat status=modified additions=4 deletions=4 changes=8 sha=b4d3a79d3ad221d8a715d6f0fdcaaf13e5e1edbd\ntests/disas/gc/array-new-default-f32.wat status=modified additions=4 deletions=4 changes=8 sha=2fe8c33f9b83b89ce6762d18720585f565aa9624\ntests/disas/gc/array-new-default-f64.wat status=modified additions=4 deletions=4 changes=8 sha=da45493e629b31286f918911e05523a5e2f13fe9\ntests/disas/gc/array-new-default-funcref.wat status=modified additions=4 deletions=4 changes=8 sha=28da4f0dfc796d77b4b0520287043da6c3d772bd\ntests/disas/gc/array-new-default-i16.wat status=modified additions=4 deletions=4 changes=8 sha=fab20b4bbfa7875c29b95e287fab576a9568de1d\ntests/disas/gc/array-new-default-i32.wat status=modified additions=4 deletions=4 changes=8 sha=8dad11119a51ad2f711992502cb5b916c223ee94\ntests/disas/gc/array-new-default-i64.wat status=modified additions=4 deletions=4 changes=8 sha=9dfd6995e0f1ec37ffb72d1f871460be6bfa5a89\ntests/disas/gc/array-new-default-i8.wat status=modified additions=4 deletions=4 changes=8 sha=3fc60f57c32207a689473d750fa8f7f29c1c8e0b\ntests/disas/gc/copying/array-new-fixed-of-gc-refs.wat status=modified additions=14 deletions=14 changes=28 sha=eaf9e91306b59bbb31fdda531e62a6f11317c653\ntests/disas/gc/copying/funcref-in-gc-heap-new.wat status=modified additions=2 deletions=2 changes=4 sha=69bb92eb726c70dc23a758511c90921a2c8f051b\ntests/disas/gc/copying/struct-new.wat status=modified additions=6 deletions=6 changes=12 sha=325817330219c12f71ad827b819ec33ee1f00dd4\ntests/disas/gc/drc/array-new-fixed-of-gc-refs.wat status=modified additions=29 deletions=29 changes=58 sha=47d96dd5c8d2692ecef3869ab4785de2c470eb7c\ntests/disas/gc/drc/externref-globals.wat status=modified additions=6 deletions=6 changes=12 sha=ba72f86e2aad63b1d46e5b85c2acd00093230367\ntests/disas/gc/drc/funcref-in-gc-heap-new.wat status=modified additions=6 deletions=6 changes=12 sha=9bf6dc40d4a0b648c413eb355f6eb75712625f04\ntests/disas/gc/drc/struct-get.wat status=modified additions=4 deletions=4 changes=8 sha=12011234a402300e5d4f3425ec8e5349f4cbd7ee\ntests/disas/gc/drc/struct-new.wat status=modified additions=9 deletions=9 changes=18 sha=6d99ad069ac5789f4fcc3196c36c1bec8c37f00e\ntests/disas/gc/null/array-new-fixed-of-gc-refs.wat status=modified additions=15 deletions=15 changes=30 sha=52c7e9ff6e57a1d1bec00a8f4aaabe199d549a19\ntests/disas/gc/null/struct-new.wat status=modified additions=7 deletions=7 changes=14 sha=7c7e9566f0631ef0cc6c25646fe2c89318d087d8\ntests/disas/gc/struct-new.wat status=modified additions=6 deletions=6 changes=12 sha=ddf45f1eb6f09b8dbf140d3ba68318841afdcd03\ntests/disas/gc/typed-select-and-stack-maps.wat status=modified additions=2 deletions=2 changes=4 sha=491392e8345eba479f164e960ececaa0dbe3fe75",
+      "links": [
+        "license:f9d81955f4bcb8f96a025e2ecc46f39ec536d465"
+      ],
+      "attributes": {
+        "sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/commits/13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+    },
+    {
+      "id": "ci:80166698956",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:06Z",
+      "text": "CI check Determine CI jobs to run for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166698956 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Determine CI jobs to run",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:25:06Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166698956"
+    },
+    {
+      "id": "ci:80166753432",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Test C-API ${{ matrix.name }} for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753432 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test C-API ${{ matrix.name }}",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753432"
+    },
+    {
+      "id": "ci:80166753453",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Test wasi-tls for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753453 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test wasi-tls",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753453"
+    },
+    {
+      "id": "ci:80166753482",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Cargo deny for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753482 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Cargo deny",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753482"
+    },
+    {
+      "id": "ci:80166753484",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Test guest debugging for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753484 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test guest debugging",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753484"
+    },
+    {
+      "id": "ci:80166753627",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check verify-publish for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753627 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "verify-publish",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753627"
+    },
+    {
+      "id": "ci:80166753651",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Platform: ${{ matrix.target }} for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753651 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Platform: ${{ matrix.target }}",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753651"
+    },
+    {
+      "id": "ci:80166753670",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Build wasi-preview1-component-adapter for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753670 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Build wasi-preview1-component-adapter",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753670"
+    },
+    {
+      "id": "ci:80166753854",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Cargo vet for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753854 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Cargo vet",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753854"
+    },
+    {
+      "id": "ci:80166753864",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Test DWARF debugging for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753864 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test DWARF debugging",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753864"
+    },
+    {
+      "id": "ci:80166753932",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Test the min-platform example for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753932 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test the min-platform example",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753932"
+    },
+    {
+      "id": "ci:80166753942",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check One-off special tests for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753942 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "One-off special tests",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753942"
+    },
+    {
+      "id": "ci:80166753978",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Meta deterministic check for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753978 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Meta deterministic check",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753978"
+    },
+    {
+      "id": "ci:80166753980",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Miri for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753980 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Miri",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753980"
+    },
+    {
+      "id": "ci:80166754040",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Run benchmarks for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754040 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Run benchmarks",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754040"
+    },
+    {
+      "id": "ci:80166754062",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Doc build for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754062 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Doc build",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754062"
+    },
+    {
+      "id": "ci:80166754102",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Cargo vet failed on a Pull Request for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754102 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Cargo vet failed on a Pull Request",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754102"
+    },
+    {
+      "id": "ci:80166754131",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Test wasmtime-fuzzing for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754131 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test wasmtime-fuzzing",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754131"
+    },
+    {
+      "id": "ci:80166754348",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Test wasi-nn (${{ matrix.feature }}, ${{ matrix.os }}) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754348 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test wasi-nn (${{ matrix.feature }}, ${{ matrix.os }})",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754348"
+    },
+    {
+      "id": "ci:80166754657",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Release build for ${{ matrix.build }} for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754657 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Release build for ${{ matrix.build }}",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754657"
+    },
+    {
+      "id": "ci:80166754880",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:07Z",
+      "text": "CI check Build wasi-preview1-component-adapter-provider for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754880 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Build wasi-preview1-component-adapter-provider",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:25:07Z",
+        "completed_at": "2026-06-08T18:25:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754880"
+    },
+    {
+      "id": "ci:80166698954",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:08Z",
+      "text": "CI check Clang format for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166698954 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Clang format",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:25:08Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166698954"
+    },
+    {
+      "id": "ci:80166698894",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:18Z",
+      "text": "CI check Check JS for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166698894 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Check JS",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:25:18Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166698894"
+    },
+    {
+      "id": "ci:80166698904",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:27Z",
+      "text": "CI check Rustfmt for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166698904 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Rustfmt",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:25:27Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166698904"
+    },
+    {
+      "id": "ci:80166699128",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:28Z",
+      "text": "CI check Check cranelift-entity for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166699128 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Check cranelift-entity",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:25:28Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166699128"
+    },
+    {
+      "id": "ci:80166699287",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:25:30Z",
+      "text": "CI check Check wasmtime-fiber for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166699287 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Check wasmtime-fiber",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:25:30Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166699287"
+    },
+    {
+      "id": "ci:80166699252",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:26:06Z",
+      "text": "CI check Check cranelift-codegen for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166699252 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Check cranelift-codegen",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:26:06Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166699252"
+    },
+    {
+      "id": "ci:80166699251",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:26:25Z",
+      "text": "CI check Check wasmtime-wasi-tls for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166699251 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Check wasmtime-wasi-tls",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:26:25Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166699251"
+    },
+    {
+      "id": "ci:80166699309",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:26:31Z",
+      "text": "CI check Check wasmtime-bench-api for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166699309 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Check wasmtime-bench-api",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:26:31Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166699309"
+    },
+    {
+      "id": "ci:80166699280",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:26:33Z",
+      "text": "CI check Check wasmtime-c-api for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166699280 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Check wasmtime-c-api",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:26:33Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166699280"
+    },
+    {
+      "id": "ci:80166699230",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:26:50Z",
+      "text": "CI check Check wasmtime-wasi for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166699230 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Check wasmtime-wasi",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:26:50Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166699230"
+    },
+    {
+      "id": "ci:80166699272",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:27:19Z",
+      "text": "CI check Check wasmtime-wizer for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166699272 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Check wasmtime-wizer",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:27:19Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166699272"
+    },
+    {
+      "id": "ci:80166753895",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:27:28Z",
+      "text": "CI check Test Linux arm64 (wasmtime) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753895 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux arm64 (wasmtime)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:13Z",
+        "completed_at": "2026-06-08T18:27:28Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753895"
+    },
+    {
+      "id": "ci:80166753801",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:27:39Z",
+      "text": "CI check Test Linux x86_64 (wasmtime) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753801 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux x86_64 (wasmtime)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:09Z",
+        "completed_at": "2026-06-08T18:27:39Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753801"
+    },
+    {
+      "id": "ci:80166753859",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:27:44Z",
+      "text": "CI check Test MPK (wasmtime) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753859 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test MPK (wasmtime)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:10Z",
+        "completed_at": "2026-06-08T18:27:44Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753859"
+    },
+    {
+      "id": "ci:80166699329",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:27:59Z",
+      "text": "CI check Check wasmtime-wasi-http for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166699329 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Check wasmtime-wasi-http",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:27:59Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166699329"
+    },
+    {
+      "id": "ci:80166699029",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:28:01Z",
+      "text": "CI check Monolith Checks for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166699029 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Monolith Checks",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:28:01Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166699029"
+    },
+    {
+      "id": "ci:80166753873",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:29:01Z",
+      "text": "CI check Test Linux arm64 (3/8) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753873 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux arm64 (3/8)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:12Z",
+        "completed_at": "2026-06-08T18:29:01Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753873"
+    },
+    {
+      "id": "ci:80166754078",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:29:02Z",
+      "text": "CI check Test Linux x86_64 (3/8) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754078 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux x86_64 (3/8)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:10Z",
+        "completed_at": "2026-06-08T18:29:02Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754078"
+    },
+    {
+      "id": "ci:80166753964",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:29:39Z",
+      "text": "CI check Test Linux arm64 (wasmtime-cli-other) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753964 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux arm64 (wasmtime-cli-other)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:12Z",
+        "completed_at": "2026-06-08T18:29:39Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753964"
+    },
+    {
+      "id": "ci:80166753899",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:30:18Z",
+      "text": "CI check Test Intel SDE for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753899 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Intel SDE",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:09Z",
+        "completed_at": "2026-06-08T18:30:18Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753899"
+    },
+    {
+      "id": "ci:80166754108",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:30:42Z",
+      "text": "CI check Test Linux s390x (wasmtime) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754108 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux s390x (wasmtime)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:10Z",
+        "completed_at": "2026-06-08T18:30:42Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754108"
+    },
+    {
+      "id": "ci:80166754042",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:30:50Z",
+      "text": "CI check Test Linux riscv64 (wasmtime) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754042 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux riscv64 (wasmtime)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:10Z",
+        "completed_at": "2026-06-08T18:30:50Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754042"
+    },
+    {
+      "id": "ci:80166754175",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:30:53Z",
+      "text": "CI check Test Linux arm64 (wasmtime-wasi) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754175 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux arm64 (wasmtime-wasi)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:13Z",
+        "completed_at": "2026-06-08T18:30:53Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754175"
+    },
+    {
+      "id": "ci:80166699016",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:31:02Z",
+      "text": "CI check MSRV check for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166699016 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "MSRV check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:31:02Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166699016"
+    },
+    {
+      "id": "ci:80166699149",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:31:11Z",
+      "text": "CI check Check wasmtime for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166699149 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Check wasmtime",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:31:11Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166699149"
+    },
+    {
+      "id": "ci:80166699186",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:31:34Z",
+      "text": "CI check Check wasmtime-cli for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166699186 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Check wasmtime-cli",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:31:34Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166699186"
+    },
+    {
+      "id": "ci:80166753892",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:31:46Z",
+      "text": "CI check Test Linux x86_64 (wasmtime-cli-other) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753892 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux x86_64 (wasmtime-cli-other)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:11Z",
+        "completed_at": "2026-06-08T18:31:46Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753892"
+    },
+    {
+      "id": "ci:80166754060",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:31:50Z",
+      "text": "CI check Test Linux arm64 (1/8) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754060 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux arm64 (1/8)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:13Z",
+        "completed_at": "2026-06-08T18:31:50Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754060"
+    },
+    {
+      "id": "ci:80166754013",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:31:51Z",
+      "text": "CI check Test Linux arm64 (2/8) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754013 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux arm64 (2/8)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:12Z",
+        "completed_at": "2026-06-08T18:31:51Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754013"
+    },
+    {
+      "id": "ci:80166698889",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:31:53Z",
+      "text": "CI check Clippy for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166698889 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Clippy",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:24:52Z",
+        "completed_at": "2026-06-08T18:31:53Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166698889"
+    },
+    {
+      "id": "ci:80166753872",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:31:57Z",
+      "text": "CI check Test Linux arm64 (wasmtime-cli-all) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753872 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux arm64 (wasmtime-cli-all)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:13Z",
+        "completed_at": "2026-06-08T18:31:57Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753872"
+    },
+    {
+      "id": "ci:80166754017",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:31:59Z",
+      "text": "CI check Test Linux x86_64 (wasmtime-wasi) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754017 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux x86_64 (wasmtime-wasi)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:10Z",
+        "completed_at": "2026-06-08T18:31:59Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754017"
+    },
+    {
+      "id": "ci:80166753908",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:32:23Z",
+      "text": "CI check Test Linux arm64 (wasmtime-cli-wast) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753908 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux arm64 (wasmtime-cli-wast)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:12Z",
+        "completed_at": "2026-06-08T18:32:23Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753908"
+    },
+    {
+      "id": "ci:80166753925",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:32:28Z",
+      "text": "CI check Test Linux x86_64 (2/8) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753925 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux x86_64 (2/8)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:10Z",
+        "completed_at": "2026-06-08T18:32:28Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753925"
+    },
+    {
+      "id": "ci:80166753813",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:32:34Z",
+      "text": "CI check Test Linux x86_64 (wasmtime-cli-all) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753813 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux x86_64 (wasmtime-cli-all)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:10Z",
+        "completed_at": "2026-06-08T18:32:34Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753813"
+    },
+    {
+      "id": "ci:80166754207",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:32:50Z",
+      "text": "CI check Test Linux riscv64 (3/8) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754207 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux riscv64 (3/8)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:09Z",
+        "completed_at": "2026-06-08T18:32:50Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754207"
+    },
+    {
+      "id": "ci:80166753832",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:33:28Z",
+      "text": "CI check Test Linux x86_64 (1/8) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753832 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux x86_64 (1/8)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:09Z",
+        "completed_at": "2026-06-08T18:33:28Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753832"
+    },
+    {
+      "id": "ci:80166753797",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:34:15Z",
+      "text": "CI check Test Linux x86_64 (wasmtime-cli-wast) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753797 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux x86_64 (wasmtime-cli-wast)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:09Z",
+        "completed_at": "2026-06-08T18:34:15Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753797"
+    },
+    {
+      "id": "ci:80166753085",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:34:44Z",
+      "text": "CI check GC Zeal Tests for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753085 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "GC Zeal Tests",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:10Z",
+        "completed_at": "2026-06-08T18:34:44Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753085"
+    },
+    {
+      "id": "ci:80166754063",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:34:48Z",
+      "text": "CI check Test Linux s390x (3/8) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754063 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux s390x (3/8)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:09Z",
+        "completed_at": "2026-06-08T18:34:48Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754063"
+    },
+    {
+      "id": "review:4452375665",
+      "kind": "review",
+      "occurred_at": "2026-06-08T18:35:17Z",
+      "text": "review_id=4452375665 state=APPROVED\nAh right, indeed. Would it make sense to take in an entire `&dyn TargetIsa` here instead of just the `TargetFrontendConfig`? Or alternatively just take the `pointer_type` instead of `TargetFrontendConfig`?",
+      "links": [
+        "pull_request:13580",
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "state": "APPROVED"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/pulls/13580/reviews/4452375665"
+    },
+    {
+      "id": "ci:80166753017",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:36:26Z",
+      "text": "CI check Nightly tests for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753017 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Nightly tests",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:10Z",
+        "completed_at": "2026-06-08T18:36:26Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753017"
+    },
+    {
+      "id": "ci:80166754088",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:36:39Z",
+      "text": "CI check Test Linux s390x (2/8) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754088 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux s390x (2/8)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:09Z",
+        "completed_at": "2026-06-08T18:36:39Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754088"
+    },
+    {
+      "id": "ci:80166754050",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:37:05Z",
+      "text": "CI check Test Linux riscv64 (wasmtime-cli-other) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754050 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux riscv64 (wasmtime-cli-other)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:10Z",
+        "completed_at": "2026-06-08T18:37:05Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754050"
+    },
+    {
+      "id": "ci:80166754071",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:37:13Z",
+      "text": "CI check Test Linux riscv64 (wasmtime-wasi) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754071 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux riscv64 (wasmtime-wasi)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:10Z",
+        "completed_at": "2026-06-08T18:37:13Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754071"
+    },
+    {
+      "id": "ci:80166754004",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:38:11Z",
+      "text": "CI check Test Linux riscv64 (2/8) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754004 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux riscv64 (2/8)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:10Z",
+        "completed_at": "2026-06-08T18:38:11Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754004"
+    },
+    {
+      "id": "ci:80166754014",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:38:11Z",
+      "text": "CI check Test Linux s390x (wasmtime-wasi) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754014 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux s390x (wasmtime-wasi)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:09Z",
+        "completed_at": "2026-06-08T18:38:11Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754014"
+    },
+    {
+      "id": "ci:80166753949",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:38:38Z",
+      "text": "CI check Test MPK (wasmtime-cli) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753949 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test MPK (wasmtime-cli)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:09Z",
+        "completed_at": "2026-06-08T18:38:38Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753949"
+    },
+    {
+      "id": "ci:80166754006",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:38:40Z",
+      "text": "CI check Test Linux s390x (wasmtime-cli-other) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754006 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux s390x (wasmtime-cli-other)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:09Z",
+        "completed_at": "2026-06-08T18:38:40Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754006"
+    },
+    {
+      "id": "ci:80166754007",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:39:27Z",
+      "text": "CI check Test Linux riscv64 (1/8) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754007 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux riscv64 (1/8)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:10Z",
+        "completed_at": "2026-06-08T18:39:27Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754007"
+    },
+    {
+      "id": "ci:80166754083",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:39:30Z",
+      "text": "CI check Test Linux riscv64 (wasmtime-cli-all) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754083 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux riscv64 (wasmtime-cli-all)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:11Z",
+        "completed_at": "2026-06-08T18:39:30Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754083"
+    },
+    {
+      "id": "ci:80166754000",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:39:52Z",
+      "text": "CI check Test Linux riscv64 (wasmtime-cli-wast) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754000 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux riscv64 (wasmtime-cli-wast)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:09Z",
+        "completed_at": "2026-06-08T18:39:52Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754000"
+    },
+    {
+      "id": "ci:80166753998",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:40:49Z",
+      "text": "CI check Test Linux s390x (wasmtime-cli-all) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166753998 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux s390x (wasmtime-cli-all)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:09Z",
+        "completed_at": "2026-06-08T18:40:49Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166753998"
+    },
+    {
+      "id": "ci:80166754061",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:40:59Z",
+      "text": "CI check Test Linux s390x (wasmtime-cli-wast) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754061 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux s390x (wasmtime-cli-wast)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:10Z",
+        "completed_at": "2026-06-08T18:40:59Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754061"
+    },
+    {
+      "id": "ci:80166754021",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:43:04Z",
+      "text": "CI check Test Linux s390x (1/8) for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80166754021 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Test Linux s390x (1/8)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:25:09Z",
+        "completed_at": "2026-06-08T18:43:04Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80166754021"
+    },
+    {
+      "id": "ci:80170103258",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:43:09Z",
+      "text": "CI check Record the result of testing and building steps for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80170103258 status=completed conclusion=success",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "Record the result of testing and building steps",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-06-08T18:43:06Z",
+        "completed_at": "2026-06-08T18:43:09Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80170103258"
+    },
+    {
+      "id": "ci:80170118403",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:43:09Z",
+      "text": "CI check File an issue if this build failed and was cron-triggered for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80170118403 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "File an issue if this build failed and was cron-triggered",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:43:09Z",
+        "completed_at": "2026-06-08T18:43:09Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80170118403"
+    },
+    {
+      "id": "ci:80170118466",
+      "kind": "ci_run",
+      "occurred_at": "2026-06-08T18:43:09Z",
+      "text": "CI check push-tag for 13b161a751dbbd9f49a61390ae0e7d9a36aa2555\nrun_id=80170118466 status=completed conclusion=skipped",
+      "links": [
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555"
+      ],
+      "attributes": {
+        "head_sha": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "name": "push-tag",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-06-08T18:43:09Z",
+        "completed_at": "2026-06-08T18:43:09Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/check-runs/80170118466"
+    },
+    {
+      "id": "merge:13580",
+      "kind": "merge",
+      "occurred_at": "2026-06-08T19:08:37Z",
+      "text": "Merged pull request #13580 from validated head commit 13b161a751dbbd9f49a61390ae0e7d9a36aa2555.",
+      "links": [
+        "pull_request:13580",
+        "commit:13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "license:f9d81955f4bcb8f96a025e2ecc46f39ec536d465",
+        "review:4452375665"
+      ],
+      "attributes": {
+        "commit": "13b161a751dbbd9f49a61390ae0e7d9a36aa2555",
+        "merge_commit_sha": "ee611378b3c54fc0ad866e1c12d11392c820583b"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/pulls/13580"
+    },
+    {
+      "id": "release:v47.0.0",
+      "kind": "release",
+      "occurred_at": "2026-07-20T15:12:30Z",
+      "text": "Release v47.0.0\n\n## 47.0.0\n\nReleased 2026-07-20.\n\n### Added\n\n* Wasmtime now has the WebAssembly GC proposal enabled by default.\n  [#13594](https://github.com/bytecodealliance/wasmtime/pull/13594)\n\n* Wasmtime now has the WebAssembly exception-handling proposal enabled by\n  default.\n  [#13603](https://github.com/bytecodealliance/wasmtime/pull/13603)\n\n* Cranelift now supports the compact unwind format on Mach-O platforms.\n  [#13586](https://github.com/bytecodealliance/wasmtime/pull/13586)\n\n* Wasmtime now supports bounds-checked unsafe intrinsics which take spectre\n  mitigations into account.\n  [#13597](https://github.com/bytecodealliance/wasmtime/pull/13597)\n\n* The `wasmtime::Engine` type now supports reflection to determine the value of\n  most `Config` options that were selected during creation.\n  [#13671](https://github.com/bytecodealliance/wasmtime/pull/13671)\n\n* Support for fibers on unsupported architectures is now supported through an\n  opt-in compile time Cargo feature defining a C API embedders can implement.\n  [#13620](https://github.com/bytecodealliance/wasmtime/pull/13620)\n\n* Embedders can now create an `ArrayRef` with a memcpy-style constructor.\n  [#13716](https://github.com/bytecodealliance/wasmtime/pull/13716)\n\n* A new `Accessor::poll_ready_for_concurrent_call` API can be used to detect\n  when backpressure indicates that a function is ready to be invoked.\n  [#13683](https://github.com/bytecodealliance/wasmtime/pull/13683)\n\n### Changed\n\n* Support for wasi-threads and Wasmtime's `wasi-common` crate have been removed.\n  For more information see the [associated RFC][rfc] in Wasmtime.\n  [#13558](https://github.com/bytecodealliance/wasmtime/pull/13558)\n\n* The `call_indirect` instruction of `final` super types has been optimized when\n  the GC proposal is enabled.\n  [#13572](https://github.com/bytecodealliance/wasmtime/pull/13572)\n\n* Cranelift's `*_imm` builder helpers have been deprecated in favor of\n  `*_imm_{s,u}` helpers.\n  [#13583](https://github.com/bytecodealliance/wasmtime/pull/13583)\n\n* The `wasmtime` CLI's syntax supported for `--invoke` with components now\n  supports fully qualified WIT interface names.\n  [#13564](https://github.com/bytecodealliance/wasmtime/pull/13564)\n\n* Cranelift's `stack_{load,store}` instructions have been removed.\n  [#13580](https://github.com/bytecodealliance/wasmtime/pull/13580)\n\n* Cranelift's `{band,bor,bxor}_not` instructions have been removed.\n  [#13590](https://github.com/bytecodealliance/wasmtime/pull/13590)\n\n* Cranelift's `global_value` instruction has been removed.\n  [#13682](https://github.com/bytecodealliance/wasmtime/pull/13682)\n\n* The `wasmtime wizer` subcommand now supports specifying the initialization\n  function with WAVE for components.\n  [#13582](https://github.com/bytecodealliance/wasmtime/pull/13582)\n\n* Wasmtime's codegen on aarch64 for the `i32x4.relaxed_dot_i8x16_i7x16_add_s`\n  wasm instruction now uses a single `sdot` instruction where possible.\n  [#13640](https://github.com/bytecodealliance/wasmtime/pull/13640)\n\n* Wasmtime's `.wasmtime{traps,addrmap}` sections in `*.cwasm` files are now\n  significantly smaller.\n  [#13628](https://github.com/bytecodealliance/wasmtime/pull/13628)\n\n* Wasmtime now supports removing symbols from `*.cwasm` files and additionally\n  has a documentation page about producing minimally-sized `*.cwasm` outputs.\n  [#13630](https://github.com/bytecodealliance/wasmtime/pull/13630)\n\n* Wasmtime now suports resources in the `named_imports` option of `bindgen!`.\n  [#13666](https://github.com/bytecodealliance/wasmtime/pull/13666)\n\n* Wasmtime now invokes the host's `socket_addr_check` callback for implicit\n  binds performed in WASIp3.\n  [#13677](https://github.com/bytecodealliance/wasmtime/pull/13677)\n\n* Wasmtime's component-to-component sync-to-sync fused adapters have been\n  optimized.\n  [#13695](https://github.com/bytecodealliance/wasmtime/pull/13695)\n\n* Cranelift now supports RISC-V's Zvbb extension.\n  [#13738](https://github.com/bytecodealliance/wasmtime/pull/13738)\n\n[rfc]: https://github.com/bytecodealliance/rfcs/blob/main/accepted/wasmtime-remove-wasi-threads.md\n\n### Fixed\n\n* The `IPV6_V6ONLY` option is now set for UDP sockets.\n  [#13596](https://github.com/bytecodealliance/wasmtime/pull/13596)\n\n* Uncaught wasm exceptions at component boundaries are now turned into traps to\n  prevent components catching exceptions from other components.\n  [#13613](https://github.com/bytecodealliance/wasmtime/pull/13613)\n\n* Addresses being sent do with WASIp3 and UDP are now validated as they are in\n  WASIp2.\n  [#13631](https://github.com/bytecodealliance/wasmtime/pull/13631)\n\n* GC roots on component model fiber stacks are now properly traced.\n  [#13693](https://github.com/bytecodealliance/wasmtime/pull/13693)\n\n* An unaligned load when reading debug state slot values has been fixed.\n  [#13791](https://github.com/bytecodealliance/wasmtime/pull/13791)",
+      "links": [
+        "pull_request:13580",
+        "merge:13580",
+        "ci:80166753670",
+        "ci:80166754880",
+        "ci:80166753482",
+        "ci:80166753854",
+        "ci:80166754102",
+        "ci:80166698894",
+        "ci:80166699252",
+        "ci:80166699128",
+        "ci:80166699149",
+        "ci:80166699309",
+        "ci:80166699280",
+        "ci:80166699186",
+        "ci:80166699287",
+        "ci:80166699230",
+        "ci:80166699329",
+        "ci:80166699251",
+        "ci:80166699272",
+        "ci:80166698954",
+        "ci:80166698889",
+        "ci:80166698956",
+        "ci:80166754062",
+        "ci:80170118403",
+        "ci:80166753085",
+        "ci:80166699016",
+        "ci:80166753978",
+        "ci:80166753980",
+        "ci:80166699029",
+        "ci:80166753017",
+        "ci:80166753942",
+        "ci:80166753651",
+        "ci:80170103258",
+        "ci:80166754657",
+        "ci:80166754040",
+        "ci:80166698904",
+        "ci:80166753432",
+        "ci:80166753864",
+        "ci:80166753899",
+        "ci:80166754060",
+        "ci:80166754013",
+        "ci:80166753873",
+        "ci:80166753895",
+        "ci:80166753872",
+        "ci:80166753964",
+        "ci:80166753908",
+        "ci:80166754175",
+        "ci:80166754007",
+        "ci:80166754004",
+        "ci:80166754207",
+        "ci:80166754042",
+        "ci:80166754083",
+        "ci:80166754050",
+        "ci:80166754000",
+        "ci:80166754071",
+        "ci:80166754021",
+        "ci:80166754088",
+        "ci:80166754063",
+        "ci:80166754108",
+        "ci:80166753998",
+        "ci:80166754006",
+        "ci:80166754061",
+        "ci:80166754014",
+        "ci:80166753832",
+        "ci:80166753925",
+        "ci:80166754078",
+        "ci:80166753801",
+        "ci:80166753813",
+        "ci:80166753892",
+        "ci:80166753797",
+        "ci:80166754017",
+        "ci:80166753859",
+        "ci:80166753949",
+        "ci:80166753484",
+        "ci:80166753932",
+        "ci:80166754348",
+        "ci:80166753453",
+        "ci:80166754131",
+        "ci:80170118466",
+        "ci:80166753627"
+      ],
+      "attributes": {
+        "tag": "v47.0.0",
+        "target_commitish": "main",
+        "tag_commit_sha": "39d67168cdb6911ffdc961381314b6fed62e3c93",
+        "merge_commit_sha": "ee611378b3c54fc0ad866e1c12d11392c820583b",
+        "ancestry_verified": true,
+        "compare_status": "ahead",
+        "compare_base_sha": "ee611378b3c54fc0ad866e1c12d11392c820583b",
+        "compare_head_sha": "39d67168cdb6911ffdc961381314b6fed62e3c93",
+        "compare_endpoint": "https://api.github.com/repos/bytecodealliance/wasmtime/compare/ee611378b3c54fc0ad866e1c12d11392c820583b...39d67168cdb6911ffdc961381314b6fed62e3c93",
+        "compare_response_sha256": "b9997c7fdf6f04ad185d1ef715a1f2fd071732cd103ecda818f5302c2f343603",
+        "ci_evidence_scope": "observed_selected_final_pre_merge_check_runs",
+        "required_check_policy_verified": false,
+        "required_check_policy_requirement": "external_signed_policy_required_for_production_eligibility"
+      },
+      "source_pointer": "https://api.github.com/repos/bytecodealliance/wasmtime/releases/356804908"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "git_workflow",
+    "role": "source",
+    "key_id": "probe-source-3a689228f9679b0522a18cadd07f1e97",
+    "environment": "probe",
+    "digest": "c9a5c641d8efc6df0291873fe3c0cc8b3d057a9f36b9f73f12f5417c3102aca7"
+  }
+}

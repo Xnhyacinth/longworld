@@ -1,0 +1,20 @@
+{
+  "schema_version": "longworld.public-github-export-request.v1",
+  "request_id": "p16-codeforge-duckdb-failure-recovery-v1",
+  "repository": "duckdb/duckdb",
+  "allowlist": "configs/public_repo_allowlist.yaml",
+  "episodes": [
+    {"pull": 19117, "release": "v1.4.1", "role": "failure_recovery_release_cycle"},
+    {"pull": 19318, "release": "v1.4.2", "role": "failure_recovery_release_cycle"},
+    {"pull": 19631, "release": "v1.4.2", "role": "failure_recovery_release_cycle"},
+    {"pull": 19716, "release": "v1.4.2", "role": "failure_recovery_release_cycle"},
+    {"pull": 19901, "release": "v1.4.3", "role": "failure_recovery_release_cycle"},
+    {"pull": 20348, "release": "v1.4.4", "role": "failure_recovery_release_cycle"},
+    {"pull": 22060, "release": "v1.5.3", "role": "failure_recovery_release_cycle"},
+    {"pull": 22425, "release": "v1.5.3", "role": "failure_recovery_release_cycle"}
+  ],
+  "composition": "chronological_causal_union",
+  "synthetic_filler_allowed": false,
+  "random_join_allowed": false,
+  "trust_scope": "local_probe"
+}

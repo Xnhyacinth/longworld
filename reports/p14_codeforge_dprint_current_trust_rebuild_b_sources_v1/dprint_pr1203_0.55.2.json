@@ -1,0 +1,1181 @@
+{
+  "schema_version": "longworld.git-workflow.v1",
+  "repository_url": "https://github.com/dprint/dprint",
+  "source_origin": "real_public",
+  "revision": "e203454807ac22b896416bd966acd54d5b76956f",
+  "license": "MIT",
+  "exported_at": "2026-09-02T21:55:27.571408Z",
+  "authorization": {
+    "record_id": "PUBLIC-GITHUB-TERMS-2026-08",
+    "scope": "read-only workflow export",
+    "basis": "public repository under recorded license",
+    "reviewed_at": "2026-08-27T04:00:00Z"
+  },
+  "public_policy": {
+    "record_id": "PUBLIC-GITHUB-TERMS-2026-08",
+    "sha256": "dd39cfef6803b01b08cc476acef805265a7f10d62378889e1d56cb8603cb4c60"
+  },
+  "source_client": {
+    "path": "/usr/bin/gh",
+    "sha256": "2fd925d68889746976958342fb749bf102bc7dc8bcba3abfa533a80ad7791673"
+  },
+  "privacy_review": {
+    "emails": "redacted",
+    "secrets": "fail_closed",
+    "scanner": "longworld-public-secret-patterns",
+    "scanner_revision": "v2"
+  },
+  "records": [
+    {
+      "id": "license:8c64c54183aaff2b0db2c632aac2eec1544513aa",
+      "kind": "license",
+      "occurred_at": "2025-05-18T22:09:27Z",
+      "text": "The MIT License (MIT)\n\nCopyright (c) 2019 David Sherret\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
+      "links": [],
+      "attributes": {
+        "spdx_id": "MIT"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/contents/LICENSE?ref=bd455f16e063cf975ea99c91ca2170627bfe2dd2"
+    },
+    {
+      "id": "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+      "kind": "commit",
+      "occurred_at": "2026-07-14T16:49:51Z",
+      "text": "commit 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nfix: build linux gnu binaries against glibc 2.17 with cargo-zigbuild\n\ndiff -- .github/workflows/ci.generated.yml\n@@ -28,76 +28,91 @@ jobs:\n             target: x86_64-apple-darwin\n             cross: \"false\"\n             musl_image: \"\"\n+            zigbuild_glibc: \"\"\n           - os: macOS-latest\n             run_tests: \"true\"\n             target: aarch64-apple-darwin\n             cross: \"false\"\n             musl_image: \"\"\n+            zigbuild_glibc: \"\"\n           - os: windows-latest\n             run_tests: \"true\"\n             target: x86_64-pc-windows-msvc\n             cross: \"false\"\n             musl_image: \"\"\n+            zigbuild_glibc: \"\"\n           - os: windows-11-arm\n             run_tests: \"true\"\n             target: aarch64-pc-windows-msvc\n             cross: \"false\"\n             musl_image: \"\"\n+            zigbuild_glibc: \"\"\n           - os: ubuntu-22.04\n             run_tests: \"true\"\n             target: x86_64-unknown-linux-gnu\n             cross: \"false\"\n             musl_image: \"\"\n+            zigbuild_glibc: \"2.17\"\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: x86_64-unknown-linux-musl\n             cross: \"false\"\n             musl_image: \"\"\n+            zigbuild_glibc: \"\"\n           - os: ubuntu-24.04-arm\n             run_tests: \"true\"\n             target: aarch64-unknown-linux-gnu\n             cross: \"false\"\n             musl_image: \"\"\n+            zigbuild_glibc: \"2.17\"\n           - os: ubuntu-24.04-arm\n             run_tests: \"false\"\n             target: aarch64-unknown-linux-musl\n             cross: \"false\"\n             musl_image: \"\"\n+            zigbuild_glibc: \"\"\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: riscv64gc-unknown-linux-gnu\n             cross: \"true\"\n             musl_image: \"\"\n+            zigbuild_glibc: \"\"\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: loongarch64-unknown-linux-gnu\n             cross: \"true\"\n             musl_image: \"\"\n+            zigbuild_glibc: \"\"\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: loongarch64-unknown-linux-musl\n             cross: \"true\"\n             musl_image: \"\"\n+            zigbuild_glibc: \"\"\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: powerpc64le-unknown-linux-gnu\n             cross: \"true\"\n             musl_image: \"\"\n+            zigbuild_glibc: \"\"\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: powerpc64le-unknown-linux-musl\n             cross: \"false\"\n             musl_image: \"ghcr.io/rust-cross/rust-musl-cross:powerpc64le-musl\"\n+            zigbuild_glibc: \"\"\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: aarch64-linux-android\n             cross: \"true\"\n             musl_image: \"\"\n+            zigbuild_glibc: \"\"\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: x86_64-linux-android\n             cross: \"true\"\n             musl_image: \"\"\n+            zigbuild_glibc: \"\"\n     env:\n       CARGO_INCREMENTAL: 0\n       RUST_BACKTRACE: full\n@@ -121,38 +136,46 @@ jobs:\n     steps:\n       - name: Checkout\n         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6\n-        if: '(((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != ''''))'\n+        if: '(((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.zigbuild_glibc != '''' || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''')'\n       - uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2\n         if: '((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')'\n         with:\n           deno-version: canary\n       - uses: dsherret/rust-toolchain-file@3551321aa44dd44a0393eb3b6bdfbc5d25ecf621 # v1\n-        if: '(((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != ''''))'\n+        if: '(((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.zigbuild_glibc != '''' || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''')'\n       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2\n-        if: '(((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != ''''))'\n+        if: '(((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.zigbuild_glibc != '''' || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''')'\n         with:\n           key: \"${{ matrix.target }}\"\n       - name: Setup (Linux x86_64-musl)\n-        if: '((((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != ''''))) && matrix.target == ''x86_64-unknown-linux-musl'''\n+        if: '((((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.zigbuild_glibc != '''' || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''')) && matrix.target == ''x86_64-unknown-linux-musl'''\n         run: |-\n           sudo apt update\n           sudo apt install musl musl-dev musl-tools\n           rustup target add x86_64-unknown-linux-musl\n       - name: Setup (Linux aarch64)\n-        if: '((((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != ''''))) && matrix.target == ''aarch64-unknown-linux-gnu'''\n+        if: '((((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.zigbuild_glibc != '''' || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''')) && matrix.target == ''aarch64-unknown-linux-gnu'''\n         run: |-\n           sudo apt update\n           sudo apt install gcc-aarch64-linux-gnu\n           rustup target add aarch64-unknown-linux-gnu\n       - name: Setup (Linux aarch64-musl)\n-        if: '((((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != ''''))) && matrix.target == ''aarch64-unknown-linux-musl'''\n+        if: '((((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.zigbuild_glibc != '''' || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''')) && matrix.target == ''aarch64-unknown-linux-musl'''\n         run: |-\n           sudo apt update\n           sudo apt install musl musl-dev musl-tools\n           rustup target add aarch64-unknown-linux-musl\n       - name: Setup cross\n-        if: '((((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''') || matrix.cross == ''true'' || matrix.musl_image != ''''))) && matrix.cross == ''true'''\n+        if: '((((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.zigbuild_glibc != '''' || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''')) && matrix.cross == ''true'''\n         run: \"cargo install cross --git https://github.com/cross-rs/cross --rev 36c0d7810ddde073f603c82d896c2a6c886ff7a4\"\n+      - name: Setup zig\n+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2\n+        if: '((((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.zigbuild_glibc != '''' || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''')) && matrix.zigbuild_glibc != '''''\n+        with:\n+          version: 0.15.1\n+      - name: Setup cargo-zigbuild\n+        if: '((((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')) || (((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.zigbuild_glibc != '''' || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-pc-windows-msvc'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''riscv64gc-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''loongarch64-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-gnu'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''powerpc64le-unknown-linux-musl'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''aarch64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''') || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && ((matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''') || matrix.cross == ''true'' || matrix.musl_image != '''')) || (matrix.target == ''x86_64-linux-android'' && startsWith(github.ref, ''refs/tags/'') && matrix.zigbuild_glibc != '''')) && matrix.zigbuild_glibc != '''''\n+        run: cargo install cargo-zigbuild --locked --version 0.23.0\n       - name: Clippy\n         if: '((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.target == ''x86_64-unknown-linux-gnu'' && !startsWith(github.ref, ''refs/tags/'')'\n         run: cargo clippy\n@@ -169,10 +192,19 @@ jobs:\n           ./.github/workflows/website.ts --lint\n           ./.github/workflows/release.ts --lint\n       - name: Build (Debug)\n-        if: '((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.cross != ''true'' && matrix.musl_image == '''''\n+        if: '((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''''\n         env:\n           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc\n         run: \"cargo build -p dprint --locked --target ${{ matrix.target }}\"\n+      - name: Build zigbuild (Debug)\n+        if: '((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.zigbuild_glibc != '''''\n+        run: \"cargo zigbuild -p dprint --locked --target ${{ matrix.target }}.${{ matrix.zigbuild_glibc }}\"\n+      - name: Check glibc requirement (Debug)\n+        if: '((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.zigbuild_glibc != '''''\n+        run: |-\n+          max_glibc=$(objdump -T target/${{ matrix.target }}/debug/dprint | grep -oE 'GLIBC_[0-9]+\\.[0-9]+' | sed 's/GLIBC_//' | sort -uV | tail -1)\n+          echo \"Binary requires glibc $max_glibc (max allowed: ${{ matrix.zigbuild_glibc }})\"\n+          test \"$(printf '%s\\n%s\\n' \"$max_glibc\" \"${{ matrix.zigbuild_glibc }}\" | sort -V | tail -1)\" = \"${{ matrix.zigbuild_glibc }}\"\n       - name: Build cross (Debug)\n         if: '((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.cross == ''true'''\n         run: \"cross build -p dprint --locked --target ${{ matrix.target }}\"\n@@ -191,7 +223,7 @@ jobs:\n         if: '((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.run_tests == ''true'' && !startsWith(github.ref, ''refs/tags/'') && matrix.target == ''x86_64-unknown-linux-gnu'''\n         run: \"cargo run -p dprint --locked --target ${{ matrix.target }} -- check\"\n       - name: Build (Release)\n-        if: 'startsWith(github.ref, ''refs/tags/'') && (matrix.run_tests == ''true'' || matrix.target == ''x86_64-apple-darwin'' || matrix.target == ''aarch64-apple-darwin'' || matrix.target == ''x86_64-pc-windows-msvc'' || matrix.target == ''aarch64-pc-windows-msvc'' || matrix.target == ''x86_64-unknown-linux-gnu'' || matrix.target == ''x86_64-unknown-linux-musl'' || matrix.target == ''aarch64-unknown-linux-gnu'' || matrix.target == ''aarch64-unknown-linux-musl'' || matrix.target == ''riscv64gc-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-musl'' || matrix.target == ''powerpc64le-unknown-linux-gnu'' || matrix.target == ''powerpc64le-unknown-linux-musl'' || matrix.target == ''aarch64-linux-android'' || matrix.target == ''x86_64-linux-android'') && matrix.cross != ''true'' && matrix.musl_image == '''''\n+        if: 'startsWith(github.ref, ''refs/tags/'') && (matrix.run_tests == ''true'' || matrix.target == ''x86_64-apple-darwin'' || matrix.target == ''aarch64-apple-darwin'' || matrix.target == ''x86_64-pc-windows-msvc'' || matrix.target == ''aarch64-pc-windows-msvc'' || matrix.target == ''x86_64-unknown-linux-gnu'' || matrix.target == ''x86_64-unknown-linux-musl'' || matrix.target == ''aarch64-unknown-linux-gnu'' || matrix.target == ''aarch64-unknown-linux-musl'' || matrix.target == ''riscv64gc-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-musl'' || matrix.target == ''powerpc64le-unknown-linux-gnu'' || matrix.target == ''powerpc64le-unknown-linux-musl'' || matrix.target == ''aarch64-linux-android'' || matrix.target == ''x86_64-linux-android'') && matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''''\n         env:\n           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc\n         run: \"cargo build -p dprint --locked --target ${{ matrix.target }} --release\"\n@@ -209,6 +241,15 @@ jobs:\n       - name: Test (Release)\n         if: 'matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'')'\n         run: \"cargo test --locked --target ${{ matrix.target }} --all-features --release\"\n+      - name: Build zigbuild (Release)\n+        if: 'startsWith(github.ref, ''refs/tags/'') && (matrix.target == ''x86_64-apple-darwin'' || matrix.target == ''aarch64-apple-darwin'' || matrix.target == ''x86_64-pc-windows-msvc'' || matrix.target == ''aarch64-pc-windows-msvc'' || matrix.target == ''x86_64-unknown-linux-gnu'' || matrix.target == ''x86_64-unknown-linux-musl'' || matrix.target == ''aarch64-unknown-linux-gnu'' || matrix.target == ''aarch64-unknown-linux-musl'' || matrix.target == ''riscv64gc-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-musl'' || matrix.target == ''powerpc64le-unknown-linux-gnu'' || matrix.target == ''powerpc64le-unknown-linux-musl'' || matrix.target == ''aarch64-linux-android'' || matrix.target == ''x86_64-linux-android'') && matrix.zigbuild_glibc != '''''\n+        run: \"cargo zigbuild -p dprint --locked --target ${{ matrix.target }}.${{ matrix.zigbuild_glibc }} --release\"\n+      - name: Check glibc requirement (Release)\n+        if: 'startsWith(github.ref, ''refs/tags/'') && (matrix.target == ''x86_64-apple-darwin'' || matrix.target == ''aarch64-apple-darwin'' || matrix.target == ''x86_64-pc-windows-msvc'' || matrix.target == ''aarch64-pc-windows-msvc'' || matrix.target == ''x86_64-unknown-linux-gnu'' || matrix.target == ''x86_64-unknown-linux-musl'' || matrix.target == ''aarch64-unknown-linux-gnu'' || matrix.target == ''aarch64-unknown-linux-musl'' || matrix.target == ''riscv64gc-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-musl'' || matrix.target == ''powerpc64le-unknown-linux-gnu'' || matrix.target == ''powerpc64le-unknown-linux-musl'' || matrix.target == ''aarch64-linux-android'' || matrix.target == ''x86_64-linux-android'') && matrix.zigbuild_glibc != '''''\n+        run: |-\n+          max_glibc=$(objdump -T target/${{ matrix.target }}/release/dprint | grep -oE 'GLIBC_[0-9]+\\.[0-9]+' | sed 's/GLIBC_//' | sort -uV | tail -1)\n+          echo \"Binary requires glibc $max_glibc (max allowed: ${{ matrix.zigbuild_glibc }})\"\n+          test \"$(printf '%s\\n%s\\n' \"$max_glibc\" \"${{ matrix.zigbuild_glibc }}\" | sort -V | tail -1)\" = \"${{ matrix.zigbuild_glibc }}\"\n       - name: Pre-release (x86_64-apple-darwin)\n         id: pre_release_x86_64_apple_darwin\n         if: 'matrix.target == ''x86_64-apple-darwin'' && startsWith(github.ref, ''refs/tags/'')'\n\ndiff -- .github/workflows/ci.ts\n@@ -23,6 +23,12 @@ interface ProfileData {\n    * already bundles the toolchain.\n    */\n   muslCrossImage?: string;\n+  /**\n+   * Build the release binary with cargo-zigbuild targeting this glibc version\n+   * so the published binary runs on older distros regardless of the runner's\n+   * glibc (dprint/dprint#796).\n+   */\n+  zigbuildGlibc?: string;\n }\n \n const profileDataItems: ProfileData[] = [{\n@@ -42,16 +48,19 @@ const profileDataItems: ProfileData[] = [{\n   target: \"aarch64-pc-windows-msvc\",\n   runTests: true,\n }, {\n+  // glibc 2.17 matches Rust's own minimum for this target (CentOS 7+)\n   os: OperatingSystem.Linux,\n   target: \"x86_64-unknown-linux-gnu\",\n   runTests: true,\n+  zigbuildGlibc: \"2.17\",\n }, {\n   os: OperatingSystem.Linux,\n   target: \"x86_64-unknown-linux-musl\",\n }, {\n   os: OperatingSystem.LinuxArm,\n   target: \"aarch64-unknown-linux-gnu\",\n   runTests: true,\n+  zigbuildGlibc: \"2.17\",\n }, {\n   os: OperatingSystem.LinuxArm,\n   target: \"aarch64-unknown-linux-musl\",\n@@ -125,13 +134,15 @@ const matrix = defineMatrix({\n     target: profile.target,\n     cross: (profile.cross ?? false).toString(),\n     musl_image: profile.muslCrossImage ?? \"\",\n+    zigbuild_glibc: profile.zigbuildGlibc ?? \"\",\n   })),\n });\n \n const runTests = matrix.run_tests.equals(\"true\");\n const runDebugTests = runTests.and(isNotTag);\n const isCross = matrix.cross.equals(\"true\");\n const isMuslImage = matrix.musl_image.notEquals(\"\");\n+const isZigbuild = matrix.zigbuild_glibc.notEquals(\"\");\n const isLinuxGnu = matrix.target.equals(\"x86_64-unknown-linux-gnu\");\n \n // === build job ===\n@@ -176,6 +187,15 @@ const setupRust = step({\n   name: \"Setup cross\",\n   if: isCross,\n   run: \"cargo install cross --git https://github.com/cross-rs/cross --rev 36c0d7810ddde073f603c82d896c2a6c886ff7a4\",\n+}, {\n+  name: \"Setup zig\",\n+  if: isZigbuild,\n+  uses: \"mlugg/setup-zig@v2\",\n+  with: { version: \"0.15.1\" },\n+}, {\n+  name: \"Setup cargo-zigbuild\",\n+  if: isZigbuild,\n+  run: \"cargo install cargo-zigbuild --locked --version 0.23.0\",\n }).dependsOn(checkout).comesAfter(setupDeno);\n \n const lint = step.if(isLinuxGnu.and(isNotTag))(\n@@ -218,11 +238,31 @@ function muslImageRun(releaseArgs: string): string[] {\n   ];\n }\n \n+// Verifies the binary only requires symbols up to the targeted glibc version\n+// so a too-new requirement never makes it into a release (dprint/dprint#796).\n+function glibcCheckRun(profileDir: \"debug\" | \"release\"): string[] {\n+  return [\n+    `max_glibc=$(objdump -T target/${matrix.target}/${profileDir}/dprint | grep -oE 'GLIBC_[0-9]+\\\\.[0-9]+' | sed 's/GLIBC_//' | sort -uV | tail -1)`,\n+    `echo \"Binary requires glibc $max_glibc (max allowed: ${matrix.zigbuild_glibc})\"`,\n+    `test \"$(printf '%s\\\\n%s\\\\n' \"$max_glibc\" \"${matrix.zigbuild_glibc}\" | sort -V | tail -1)\" = \"${matrix.zigbuild_glibc}\"`,\n+  ];\n+}\n+\n const buildDebug = step({\n   name: \"Build (Debug)\",\n-  if: isCross.not().and(isMuslImage.not()),\n+  if: isCross.not().and(isMuslImage.not()).and(isZigbuild.not()),\n   env: aarch64LinkerEnv,\n   run: `cargo build -p dprint --locked --target ${matrix.target}`,\n+}, {\n+  // build with zigbuild in debug too so PRs exercise the release toolchain\n+  // (the release build only runs on tags)\n+  name: \"Build zigbuild (Debug)\",\n+  if: isZigbuild,\n+  run: `cargo zigbuild -p dprint --locked --target ${matrix.target}.${matrix.zigbuild_glibc}`,\n+}, {\n+  name: \"Check glibc requirement (Debug)\",\n+  if: isZigbuild,\n+  run: glibcCheckRun(\"debug\"),\n }, {\n   name: \"Build cross (Debug)\",\n   if: isCross,\n@@ -234,7 +274,7 @@ const buildDebug = step({\n }).dependsOn(setupRust);\n const buildRelease = step({\n   name: \"Build (Release)\",\n-  if: isCross.not().and(isMuslImage.not()),\n+  if: isCross.not().and(isMuslImage.not()).and(isZigbuild.not()),\n   env: aarch64LinkerEnv,\n   run: `cargo build -p dprint --locked --target ${matrix.target} --release`,\n }, {\n@@ -277,6 +317,21 @@ const tests = step(\n   ),\n );\n \n+// Builds the published gnu binaries against an old glibc so they run on older\n+// distros (dprint/dprint#796) -- the runner's glibc doesn't matter with zigbuild.\n+// This runs after the tests because `cargo test --release` on tag builds\n+// rebuilds target/<target>/release/dprint natively, which would otherwise\n+// overwrite the zigbuild output with a binary requiring the runner's glibc.\n+const buildZigbuildRelease = step({\n+  name: \"Build zigbuild (Release)\",\n+  if: isZigbuild,\n+  run: `cargo zigbuild -p dprint --locked --target ${matrix.target}.${matrix.zigbuild_glibc} --release`,\n+}, {\n+  name: \"Check glibc requirement (Release)\",\n+  if: isZigbuild,\n+  run: glibcCheckRun(\"release\"),\n+}).dependsOn(setupRust).comesAfter(tests);\n+\n const createInstaller = step.dependsOn(buildRelease)({\n   name: \"Create installer (Windows x86_64)\",\n   uses: \"joncloud/makensis-action@v2.0\",\n@@ -322,7 +377,7 @@ function getPreReleaseStepForProfile(profile: typeof profiles[0]) {\n     id: `pre_release_${profile.target.replaceAll(\"-\", \"_\")}`,\n     run: getRunstep(),\n     outputs: [\"ZIP_CHECKSUM\", \"INSTALLER_CHECKSUM\"] as const,\n-  }).dependsOn(buildRelease);\n+  }).dependsOn(buildRelease).dependsOn(buildZigbuildRelease);\n   if (profile.os === OperatingSystem.Windows) {\n     return result.dependsOn(createInstaller);\n   } else {",
+      "links": [
+        "license:8c64c54183aaff2b0db2c632aac2eec1544513aa"
+      ],
+      "attributes": {
+        "sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/commits/6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+    },
+    {
+      "id": "pull_request:1203",
+      "kind": "pull_request",
+      "occurred_at": "2026-07-14T16:50:06Z",
+      "text": "Pull request #1203: fix: build linux gnu binaries against glibc 2.17\n\nFixes the raised glibc requirement of the published linux gnu binaries (#796).\n\n## Root cause\n\nThe glibc floor of the shipped binaries was raised twice by CI runner upgrades:\n\n- `x86_64-unknown-linux-gnu`: ubuntu-20.04 → ubuntu-22.04 (#979) raised it from glibc 2.31 to 2.35\n- `aarch64-unknown-linux-gnu`: buildjet ubuntu-22.04 → `ubuntu-24.04-arm` raised it to glibc 2.39 — the `GLIBC_2.39' not found` error reported on AWS CodeBuild (Graviton)\n\n## Fix\n\nBuild the two gnu release binaries with [cargo-zigbuild](https://github.com/rust-cross/cargo-zigbuild) targeting glibc **2.17** (Rust's own minimum for these targets, CentOS 7+), which makes the runner's glibc irrelevant. This covers every report in #796, including CentOS 8 (2.28) and Amazon Linux 2 (2.26). cross wasn't an option here because its aarch64 image is Ubuntu 20.04-based (glibc 2.31 — still too new).\n\nDetails:\n\n- The zigbuild release step is ordered **after** the release tests because `cargo test --release` on tag builds rebuilds `target/<target>/release/dprint` natively, which would otherwise silently overwrite the zigbuild artifact with a runner-glibc binary before zipping.\n- A guard step runs `objdump -T` on the built binary and fails if it requires any `GLIBC_` symbol newer than the targeted version, so this can't silently regress again.\n- The debug builds for these targets also use zigbuild so PRs exercise the toolchain and the glibc check (release builds only run on tags). Tests still build and run natively.\n- If glibc 2.17 turns out to be problematic for some dependency, bumping `zigbuildGlibc` to `\"2.26\"` would still fix every report in the issue.",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "number": 1203,
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/pulls/1203"
+    },
+    {
+      "id": "ci:87147818639",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:50:24Z",
+      "text": "CI check aarch64-unknown-linux-musl for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147818639 status=completed conclusion=success",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "aarch64-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T16:50:16Z",
+        "completed_at": "2026-07-14T16:50:24Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147818639"
+    },
+    {
+      "id": "ci:87147818686",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:50:26Z",
+      "text": "CI check aarch64-unknown-linux-gnu for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147818686 status=completed conclusion=success",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "aarch64-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T16:50:16Z",
+        "completed_at": "2026-07-14T16:50:26Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147818686"
+    },
+    {
+      "id": "ci:87147822739",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:50:59Z",
+      "text": "CI check build for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147822739 status=completed conclusion=success",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "build",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T16:50:14Z",
+        "completed_at": "2026-07-14T16:50:59Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147822739"
+    },
+    {
+      "id": "ci:87147818631",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:52:58Z",
+      "text": "CI check x86_64-unknown-linux-musl for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147818631 status=completed conclusion=success",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "x86_64-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T16:50:13Z",
+        "completed_at": "2026-07-14T16:52:58Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147818631"
+    },
+    {
+      "id": "ci:87147818682",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:53:28Z",
+      "text": "CI check powerpc64le-unknown-linux-gnu for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147818682 status=completed conclusion=success",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "powerpc64le-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T16:50:13Z",
+        "completed_at": "2026-07-14T16:53:28Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147818682"
+    },
+    {
+      "id": "ci:87147818675",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:53:33Z",
+      "text": "CI check powerpc64le-unknown-linux-musl for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147818675 status=completed conclusion=success",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "powerpc64le-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T16:50:14Z",
+        "completed_at": "2026-07-14T16:53:33Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147818675"
+    },
+    {
+      "id": "ci:87147818739",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:53:43Z",
+      "text": "CI check riscv64gc-unknown-linux-gnu for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147818739 status=completed conclusion=success",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "riscv64gc-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T16:50:13Z",
+        "completed_at": "2026-07-14T16:53:43Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147818739"
+    },
+    {
+      "id": "ci:87147818707",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:53:48Z",
+      "text": "CI check x86_64-linux-android for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147818707 status=completed conclusion=success",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "x86_64-linux-android",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T16:50:13Z",
+        "completed_at": "2026-07-14T16:53:48Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147818707"
+    },
+    {
+      "id": "ci:87147818692",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:53:53Z",
+      "text": "CI check loongarch64-unknown-linux-musl for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147818692 status=completed conclusion=success",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "loongarch64-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T16:50:13Z",
+        "completed_at": "2026-07-14T16:53:53Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147818692"
+    },
+    {
+      "id": "ci:87147818723",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:53:56Z",
+      "text": "CI check loongarch64-unknown-linux-gnu for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147818723 status=completed conclusion=success",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "loongarch64-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T16:50:13Z",
+        "completed_at": "2026-07-14T16:53:56Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147818723"
+    },
+    {
+      "id": "ci:87147818627",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:54:07Z",
+      "text": "CI check aarch64-linux-android for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147818627 status=completed conclusion=success",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "aarch64-linux-android",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T16:50:13Z",
+        "completed_at": "2026-07-14T16:54:07Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147818627"
+    },
+    {
+      "id": "ci:87147818921",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:54:42Z",
+      "text": "CI check x86_64-unknown-linux-gnu for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147818921 status=completed conclusion=failure",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "x86_64-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "failure",
+        "started_at": "2026-07-14T16:50:14Z",
+        "completed_at": "2026-07-14T16:54:42Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147818921"
+    },
+    {
+      "id": "ci:87147818669",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:54:56Z",
+      "text": "CI check aarch64-pc-windows-msvc for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147818669 status=completed conclusion=cancelled",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "aarch64-pc-windows-msvc",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-07-14T16:50:13Z",
+        "completed_at": "2026-07-14T16:54:56Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147818669"
+    },
+    {
+      "id": "ci:87147818618",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:54:58Z",
+      "text": "CI check x86_64-pc-windows-msvc for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147818618 status=completed conclusion=cancelled",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "x86_64-pc-windows-msvc",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-07-14T16:50:14Z",
+        "completed_at": "2026-07-14T16:54:58Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147818618"
+    },
+    {
+      "id": "ci:87147818666",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:55:01Z",
+      "text": "CI check x86_64-apple-darwin for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147818666 status=completed conclusion=cancelled",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "x86_64-apple-darwin",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-07-14T16:50:14Z",
+        "completed_at": "2026-07-14T16:55:01Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147818666"
+    },
+    {
+      "id": "ci:87147818659",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:55:03Z",
+      "text": "CI check aarch64-apple-darwin for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87147818659 status=completed conclusion=cancelled",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "aarch64-apple-darwin",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "started_at": "2026-07-14T16:50:14Z",
+        "completed_at": "2026-07-14T16:55:03Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87147818659"
+    },
+    {
+      "id": "ci:87148922723",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T16:55:03Z",
+      "text": "CI check draft_release for 6dce1f4cd14dac1ce52a30510dd6f13d658b7df7\nrun_id=87148922723 status=completed conclusion=skipped",
+      "links": [
+        "commit:6dce1f4cd14dac1ce52a30510dd6f13d658b7df7"
+      ],
+      "attributes": {
+        "head_sha": "6dce1f4cd14dac1ce52a30510dd6f13d658b7df7",
+        "name": "draft_release",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-07-14T16:55:03Z",
+        "completed_at": "2026-07-14T16:55:03Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87148922723"
+    },
+    {
+      "id": "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+      "kind": "commit",
+      "occurred_at": "2026-07-14T17:02:41Z",
+      "text": "commit 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nfix: statically link liblzma in zigbuild builds\n\ndiff -- .github/workflows/ci.generated.yml\n@@ -198,6 +198,8 @@ jobs:\n         run: \"cargo build -p dprint --locked --target ${{ matrix.target }}\"\n       - name: Build zigbuild (Debug)\n         if: '((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.zigbuild_glibc != '''''\n+        env:\n+          LZMA_API_STATIC: \"1\"\n         run: \"cargo zigbuild -p dprint --locked --target ${{ matrix.target }}.${{ matrix.zigbuild_glibc }}\"\n       - name: Check glibc requirement (Debug)\n         if: '((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.zigbuild_glibc != '''''\n@@ -243,6 +245,8 @@ jobs:\n         run: \"cargo test --locked --target ${{ matrix.target }} --all-features --release\"\n       - name: Build zigbuild (Release)\n         if: 'startsWith(github.ref, ''refs/tags/'') && (matrix.target == ''x86_64-apple-darwin'' || matrix.target == ''aarch64-apple-darwin'' || matrix.target == ''x86_64-pc-windows-msvc'' || matrix.target == ''aarch64-pc-windows-msvc'' || matrix.target == ''x86_64-unknown-linux-gnu'' || matrix.target == ''x86_64-unknown-linux-musl'' || matrix.target == ''aarch64-unknown-linux-gnu'' || matrix.target == ''aarch64-unknown-linux-musl'' || matrix.target == ''riscv64gc-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-musl'' || matrix.target == ''powerpc64le-unknown-linux-gnu'' || matrix.target == ''powerpc64le-unknown-linux-musl'' || matrix.target == ''aarch64-linux-android'' || matrix.target == ''x86_64-linux-android'') && matrix.zigbuild_glibc != '''''\n+        env:\n+          LZMA_API_STATIC: \"1\"\n         run: \"cargo zigbuild -p dprint --locked --target ${{ matrix.target }}.${{ matrix.zigbuild_glibc }} --release\"\n       - name: Check glibc requirement (Release)\n         if: 'startsWith(github.ref, ''refs/tags/'') && (matrix.target == ''x86_64-apple-darwin'' || matrix.target == ''aarch64-apple-darwin'' || matrix.target == ''x86_64-pc-windows-msvc'' || matrix.target == ''aarch64-pc-windows-msvc'' || matrix.target == ''x86_64-unknown-linux-gnu'' || matrix.target == ''x86_64-unknown-linux-musl'' || matrix.target == ''aarch64-unknown-linux-gnu'' || matrix.target == ''aarch64-unknown-linux-musl'' || matrix.target == ''riscv64gc-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-musl'' || matrix.target == ''powerpc64le-unknown-linux-gnu'' || matrix.target == ''powerpc64le-unknown-linux-musl'' || matrix.target == ''aarch64-linux-android'' || matrix.target == ''x86_64-linux-android'') && matrix.zigbuild_glibc != '''''\n\ndiff -- .github/workflows/ci.ts\n@@ -224,6 +224,12 @@ const aarch64LinkerEnv = {\n   CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: \"aarch64-linux-gnu-gcc\",\n };\n \n+const zigbuildEnv = {\n+  // force lzma-sys to build its bundled liblzma statically -- linking the\n+  // runner's liblzma.so fails because it requires the runner's newer glibc\n+  LZMA_API_STATIC: \"1\",\n+};\n+\n // Builds inside the rust-musl-cross image, which bundles the toolchain and runs\n // as root (so it can install the pinned toolchain into its own /root/.rustup --\n // the reason this can't go through cross, which runs as the non-root host user).\n@@ -258,6 +264,7 @@ const buildDebug = step({\n   // (the release build only runs on tags)\n   name: \"Build zigbuild (Debug)\",\n   if: isZigbuild,\n+  env: zigbuildEnv,\n   run: `cargo zigbuild -p dprint --locked --target ${matrix.target}.${matrix.zigbuild_glibc}`,\n }, {\n   name: \"Check glibc requirement (Debug)\",\n@@ -325,6 +332,7 @@ const tests = step(\n const buildZigbuildRelease = step({\n   name: \"Build zigbuild (Release)\",\n   if: isZigbuild,\n+  env: zigbuildEnv,\n   run: `cargo zigbuild -p dprint --locked --target ${matrix.target}.${matrix.zigbuild_glibc} --release`,\n }, {\n   name: \"Check glibc requirement (Release)\",",
+      "links": [
+        "license:8c64c54183aaff2b0db2c632aac2eec1544513aa"
+      ],
+      "attributes": {
+        "sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/commits/1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+    },
+    {
+      "id": "ci:87150716695",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:03:01Z",
+      "text": "CI check aarch64-unknown-linux-gnu for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150716695 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "aarch64-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:54Z",
+        "completed_at": "2026-07-14T17:03:01Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150716695"
+    },
+    {
+      "id": "ci:87150716640",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:03:03Z",
+      "text": "CI check aarch64-unknown-linux-musl for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150716640 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "aarch64-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:55Z",
+        "completed_at": "2026-07-14T17:03:03Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150716640"
+    },
+    {
+      "id": "ci:87150721465",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:03:31Z",
+      "text": "CI check build for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150721465 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "build",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:53Z",
+        "completed_at": "2026-07-14T17:03:31Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150721465"
+    },
+    {
+      "id": "ci:87150716625",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:04:11Z",
+      "text": "CI check riscv64gc-unknown-linux-gnu for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150716625 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "riscv64gc-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:51Z",
+        "completed_at": "2026-07-14T17:04:11Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150716625"
+    },
+    {
+      "id": "ci:87150716669",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:04:11Z",
+      "text": "CI check x86_64-linux-android for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150716669 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "x86_64-linux-android",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:50Z",
+        "completed_at": "2026-07-14T17:04:11Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150716669"
+    },
+    {
+      "id": "ci:87150716653",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:04:14Z",
+      "text": "CI check x86_64-unknown-linux-musl for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150716653 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "x86_64-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:51Z",
+        "completed_at": "2026-07-14T17:04:14Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150716653"
+    },
+    {
+      "id": "ci:87150716702",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:04:14Z",
+      "text": "CI check loongarch64-unknown-linux-gnu for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150716702 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "loongarch64-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:51Z",
+        "completed_at": "2026-07-14T17:04:14Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150716702"
+    },
+    {
+      "id": "ci:87150716683",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:04:18Z",
+      "text": "CI check loongarch64-unknown-linux-musl for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150716683 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "loongarch64-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:51Z",
+        "completed_at": "2026-07-14T17:04:18Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150716683"
+    },
+    {
+      "id": "ci:87150716665",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:04:20Z",
+      "text": "CI check aarch64-linux-android for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150716665 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "aarch64-linux-android",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:51Z",
+        "completed_at": "2026-07-14T17:04:20Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150716665"
+    },
+    {
+      "id": "ci:87150716651",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:04:36Z",
+      "text": "CI check powerpc64le-unknown-linux-gnu for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150716651 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "powerpc64le-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:51Z",
+        "completed_at": "2026-07-14T17:04:36Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150716651"
+    },
+    {
+      "id": "ci:87150716646",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:04:38Z",
+      "text": "CI check powerpc64le-unknown-linux-musl for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150716646 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "powerpc64le-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:51Z",
+        "completed_at": "2026-07-14T17:04:38Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150716646"
+    },
+    {
+      "id": "ci:87150716590",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:06:17Z",
+      "text": "CI check aarch64-apple-darwin for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150716590 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "aarch64-apple-darwin",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:52Z",
+        "completed_at": "2026-07-14T17:06:17Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150716590"
+    },
+    {
+      "id": "ci:87150716654",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:09:33Z",
+      "text": "CI check aarch64-pc-windows-msvc for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150716654 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "aarch64-pc-windows-msvc",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:51Z",
+        "completed_at": "2026-07-14T17:09:33Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150716654"
+    },
+    {
+      "id": "ci:87150716661",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:10:35Z",
+      "text": "CI check x86_64-unknown-linux-gnu for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150716661 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "x86_64-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:50Z",
+        "completed_at": "2026-07-14T17:10:35Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150716661"
+    },
+    {
+      "id": "ci:87150716730",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:10:41Z",
+      "text": "CI check x86_64-pc-windows-msvc for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150716730 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "x86_64-pc-windows-msvc",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:52Z",
+        "completed_at": "2026-07-14T17:10:41Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150716730"
+    },
+    {
+      "id": "ci:87150716652",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:15:11Z",
+      "text": "CI check x86_64-apple-darwin for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87150716652 status=completed conclusion=success",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "x86_64-apple-darwin",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T17:02:51Z",
+        "completed_at": "2026-07-14T17:15:11Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87150716652"
+    },
+    {
+      "id": "ci:87153593381",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T17:15:11Z",
+      "text": "CI check draft_release for 1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e\nrun_id=87153593381 status=completed conclusion=skipped",
+      "links": [
+        "commit:1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e"
+      ],
+      "attributes": {
+        "head_sha": "1e225c320b588d2d0db7d4ba2f3cecc8b42dda5e",
+        "name": "draft_release",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-07-14T17:15:12Z",
+        "completed_at": "2026-07-14T17:15:11Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87153593381"
+    },
+    {
+      "id": "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+      "kind": "commit",
+      "occurred_at": "2026-07-14T18:01:52Z",
+      "text": "commit 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nci: run test suite through cargo-zigbuild for glibc-targeted builds\n\ndiff -- .github/workflows/ci.generated.yml\n@@ -29,93 +29,124 @@ jobs:\n             cross: \"false\"\n             musl_image: \"\"\n             zigbuild_glibc: \"\"\n+            cargo: cargo\n+            cargo_target: x86_64-apple-darwin\n           - os: macOS-latest\n             run_tests: \"true\"\n             target: aarch64-apple-darwin\n             cross: \"false\"\n             musl_image: \"\"\n             zigbuild_glibc: \"\"\n+            cargo: cargo\n+            cargo_target: aarch64-apple-darwin\n           - os: windows-latest\n             run_tests: \"true\"\n             target: x86_64-pc-windows-msvc\n             cross: \"false\"\n             musl_image: \"\"\n             zigbuild_glibc: \"\"\n+            cargo: cargo\n+            cargo_target: x86_64-pc-windows-msvc\n           - os: windows-11-arm\n             run_tests: \"true\"\n             target: aarch64-pc-windows-msvc\n             cross: \"false\"\n             musl_image: \"\"\n             zigbuild_glibc: \"\"\n+            cargo: cargo\n+            cargo_target: aarch64-pc-windows-msvc\n           - os: ubuntu-22.04\n             run_tests: \"true\"\n             target: x86_64-unknown-linux-gnu\n             cross: \"false\"\n             musl_image: \"\"\n             zigbuild_glibc: \"2.17\"\n+            cargo: cargo-zigbuild\n+            cargo_target: x86_64-unknown-linux-gnu.2.17\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: x86_64-unknown-linux-musl\n             cross: \"false\"\n             musl_image: \"\"\n             zigbuild_glibc: \"\"\n+            cargo: cargo\n+            cargo_target: x86_64-unknown-linux-musl\n           - os: ubuntu-24.04-arm\n             run_tests: \"true\"\n             target: aarch64-unknown-linux-gnu\n             cross: \"false\"\n             musl_image: \"\"\n             zigbuild_glibc: \"2.17\"\n+            cargo: cargo-zigbuild\n+            cargo_target: aarch64-unknown-linux-gnu.2.17\n           - os: ubuntu-24.04-arm\n             run_tests: \"false\"\n             target: aarch64-unknown-linux-musl\n             cross: \"false\"\n             musl_image: \"\"\n             zigbuild_glibc: \"\"\n+            cargo: cargo\n+            cargo_target: aarch64-unknown-linux-musl\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: riscv64gc-unknown-linux-gnu\n             cross: \"true\"\n             musl_image: \"\"\n             zigbuild_glibc: \"\"\n+            cargo: cargo\n+            cargo_target: riscv64gc-unknown-linux-gnu\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: loongarch64-unknown-linux-gnu\n             cross: \"true\"\n             musl_image: \"\"\n             zigbuild_glibc: \"\"\n+            cargo: cargo\n+            cargo_target: loongarch64-unknown-linux-gnu\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: loongarch64-unknown-linux-musl\n             cross: \"true\"\n             musl_image: \"\"\n             zigbuild_glibc: \"\"\n+            cargo: cargo\n+            cargo_target: loongarch64-unknown-linux-musl\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: powerpc64le-unknown-linux-gnu\n             cross: \"true\"\n             musl_image: \"\"\n             zigbuild_glibc: \"\"\n+            cargo: cargo\n+            cargo_target: powerpc64le-unknown-linux-gnu\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: powerpc64le-unknown-linux-musl\n             cross: \"false\"\n             musl_image: \"ghcr.io/rust-cross/rust-musl-cross:powerpc64le-musl\"\n             zigbuild_glibc: \"\"\n+            cargo: cargo\n+            cargo_target: powerpc64le-unknown-linux-musl\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: aarch64-linux-android\n             cross: \"true\"\n             musl_image: \"\"\n             zigbuild_glibc: \"\"\n+            cargo: cargo\n+            cargo_target: aarch64-linux-android\n           - os: ubuntu-22.04\n             run_tests: \"false\"\n             target: x86_64-linux-android\n             cross: \"true\"\n             musl_image: \"\"\n             zigbuild_glibc: \"\"\n+            cargo: cargo\n+            cargo_target: x86_64-linux-android\n     env:\n       CARGO_INCREMENTAL: 0\n       RUST_BACKTRACE: full\n+      LZMA_API_STATIC: 1\n     outputs:\n       ZIP_CHECKSUM_X86_64_APPLE_DARWIN: \"${{ steps.pre_release_x86_64_apple_darwin.outputs.ZIP_CHECKSUM }}\"\n       ZIP_CHECKSUM_AARCH64_APPLE_DARWIN: \"${{ steps.pre_release_aarch64_apple_darwin.outputs.ZIP_CHECKSUM }}\"\n@@ -198,8 +229,6 @@ jobs:\n         run: \"cargo build -p dprint --locked --target ${{ matrix.target }}\"\n       - name: Build zigbuild (Debug)\n         if: '((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.zigbuild_glibc != '''''\n-        env:\n-          LZMA_API_STATIC: \"1\"\n         run: \"cargo zigbuild -p dprint --locked --target ${{ matrix.target }}.${{ matrix.zigbuild_glibc }}\"\n       - name: Check glibc requirement (Debug)\n         if: '((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.zigbuild_glibc != '''''\n@@ -217,13 +246,13 @@ jobs:\n           sudo chown -R \"$(id -u):$(id -g)\" \"$GITHUB_WORKSPACE/target\"\n       - name: Build test plugins (Debug)\n         if: '((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.run_tests == ''true'' && !startsWith(github.ref, ''refs/tags/'')'\n-        run: \"cargo build -p test-process-plugin --locked --target ${{ matrix.target }}\"\n+        run: \"${{ matrix.cargo }} build -p test-process-plugin --locked --target ${{ matrix.cargo_target }}\"\n       - name: Test (Debug)\n         if: '((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.run_tests == ''true'' && !startsWith(github.ref, ''refs/tags/'')'\n-        run: \"cargo test --locked --target ${{ matrix.target }} --all-features\"\n+        run: \"${{ matrix.cargo }} test --locked --target ${{ matrix.cargo_target }} --all-features\"\n       - name: Test integration\n         if: '((matrix.target != ''aarch64-unknown-linux-gnu'' && matrix.target != ''aarch64-unknown-linux-musl'') || github.ref == ''refs/heads/main'' || startsWith(github.ref, ''refs/tags/'')) && matrix.run_tests == ''true'' && !startsWith(github.ref, ''refs/tags/'') && matrix.target == ''x86_64-unknown-linux-gnu'''\n-        run: \"cargo run -p dprint --locked --target ${{ matrix.target }} -- check\"\n+        run: \"${{ matrix.cargo }} run -p dprint --locked --target ${{ matrix.cargo_target }} -- check\"\n       - name: Build (Release)\n         if: 'startsWith(github.ref, ''refs/tags/'') && (matrix.run_tests == ''true'' || matrix.target == ''x86_64-apple-darwin'' || matrix.target == ''aarch64-apple-darwin'' || matrix.target == ''x86_64-pc-windows-msvc'' || matrix.target == ''aarch64-pc-windows-msvc'' || matrix.target == ''x86_64-unknown-linux-gnu'' || matrix.target == ''x86_64-unknown-linux-musl'' || matrix.target == ''aarch64-unknown-linux-gnu'' || matrix.target == ''aarch64-unknown-linux-musl'' || matrix.target == ''riscv64gc-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-musl'' || matrix.target == ''powerpc64le-unknown-linux-gnu'' || matrix.target == ''powerpc64le-unknown-linux-musl'' || matrix.target == ''aarch64-linux-android'' || matrix.target == ''x86_64-linux-android'') && matrix.cross != ''true'' && matrix.musl_image == '''' && matrix.zigbuild_glibc == '''''\n         env:\n@@ -239,14 +268,12 @@ jobs:\n           sudo chown -R \"$(id -u):$(id -g)\" \"$GITHUB_WORKSPACE/target\"\n       - name: Build test plugins (Release)\n         if: 'matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'')'\n-        run: \"cargo build -p test-process-plugin --locked --target ${{ matrix.target }} --release\"\n+        run: \"${{ matrix.cargo }} build -p test-process-plugin --locked --target ${{ matrix.cargo_target }} --release\"\n       - name: Test (Release)\n         if: 'matrix.run_tests == ''true'' && startsWith(github.ref, ''refs/tags/'')'\n-        run: \"cargo test --locked --target ${{ matrix.target }} --all-features --release\"\n+        run: \"${{ matrix.cargo }} test --locked --target ${{ matrix.cargo_target }} --all-features --release\"\n       - name: Build zigbuild (Release)\n         if: 'startsWith(github.ref, ''refs/tags/'') && (matrix.target == ''x86_64-apple-darwin'' || matrix.target == ''aarch64-apple-darwin'' || matrix.target == ''x86_64-pc-windows-msvc'' || matrix.target == ''aarch64-pc-windows-msvc'' || matrix.target == ''x86_64-unknown-linux-gnu'' || matrix.target == ''x86_64-unknown-linux-musl'' || matrix.target == ''aarch64-unknown-linux-gnu'' || matrix.target == ''aarch64-unknown-linux-musl'' || matrix.target == ''riscv64gc-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-musl'' || matrix.target == ''powerpc64le-unknown-linux-gnu'' || matrix.target == ''powerpc64le-unknown-linux-musl'' || matrix.target == ''aarch64-linux-android'' || matrix.target == ''x86_64-linux-android'') && matrix.zigbuild_glibc != '''''\n-        env:\n-          LZMA_API_STATIC: \"1\"\n         run: \"cargo zigbuild -p dprint --locked --target ${{ matrix.target }}.${{ matrix.zigbuild_glibc }} --release\"\n       - name: Check glibc requirement (Release)\n         if: 'startsWith(github.ref, ''refs/tags/'') && (matrix.target == ''x86_64-apple-darwin'' || matrix.target == ''aarch64-apple-darwin'' || matrix.target == ''x86_64-pc-windows-msvc'' || matrix.target == ''aarch64-pc-windows-msvc'' || matrix.target == ''x86_64-unknown-linux-gnu'' || matrix.target == ''x86_64-unknown-linux-musl'' || matrix.target == ''aarch64-unknown-linux-gnu'' || matrix.target == ''aarch64-unknown-linux-musl'' || matrix.target == ''riscv64gc-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-gnu'' || matrix.target == ''loongarch64-unknown-linux-musl'' || matrix.target == ''powerpc64le-unknown-linux-gnu'' || matrix.target == ''powerpc64le-unknown-linux-musl'' || matrix.target == ''aarch64-linux-android'' || matrix.target == ''x86_64-linux-android'') && matrix.zigbuild_glibc != '''''\n\ndiff -- .github/workflows/ci.ts\n@@ -135,6 +135,10 @@ const matrix = defineMatrix({\n     cross: (profile.cross ?? false).toString(),\n     musl_image: profile.muslCrossImage ?? \"\",\n     zigbuild_glibc: profile.zigbuildGlibc ?? \"\",\n+    // build and test through cargo-zigbuild for zigbuild targets so the test\n+    // suite links (and runs) binaries the same way as the published ones\n+    cargo: profile.zigbuildGlibc != null ? \"cargo-zigbuild\" : \"cargo\",\n+    cargo_target: profile.zigbuildGlibc != null ? `${profile.target}.${profile.zigbuildGlibc}` : profile.target,\n   })),\n });\n \n@@ -224,12 +228,6 @@ const aarch64LinkerEnv = {\n   CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: \"aarch64-linux-gnu-gcc\",\n };\n \n-const zigbuildEnv = {\n-  // force lzma-sys to build its bundled liblzma statically -- linking the\n-  // runner's liblzma.so fails because it requires the runner's newer glibc\n-  LZMA_API_STATIC: \"1\",\n-};\n-\n // Builds inside the rust-musl-cross image, which bundles the toolchain and runs\n // as root (so it can install the pinned toolchain into its own /root/.rustup --\n // the reason this can't go through cross, which runs as the non-root host user).\n@@ -264,7 +262,6 @@ const buildDebug = step({\n   // (the release build only runs on tags)\n   name: \"Build zigbuild (Debug)\",\n   if: isZigbuild,\n-  env: zigbuildEnv,\n   run: `cargo zigbuild -p dprint --locked --target ${matrix.target}.${matrix.zigbuild_glibc}`,\n }, {\n   name: \"Check glibc requirement (Debug)\",\n@@ -299,40 +296,38 @@ const tests = step(\n   step.if(runDebugTests).dependsOn(buildDebug)(\n     step({\n       name: \"Build test plugins (Debug)\",\n-      run: `cargo build -p test-process-plugin --locked --target ${matrix.target}`,\n+      run: `${matrix.cargo} build -p test-process-plugin --locked --target ${matrix.cargo_target}`,\n     }),\n     step({\n       name: \"Test (Debug)\",\n-      run: `cargo test --locked --target ${matrix.target} --all-features`,\n+      run: `${matrix.cargo} test --locked --target ${matrix.cargo_target} --all-features`,\n     }),\n     step({\n       name: \"Test integration\",\n       if: isLinuxGnu,\n-      run: `cargo run -p dprint --locked --target ${matrix.target} -- check`,\n+      run: `${matrix.cargo} run -p dprint --locked --target ${matrix.cargo_target} -- check`,\n     }),\n   ),\n   // release\n   step.if(runTests.and(isTag)).dependsOn(buildRelease)(\n     step({\n       name: \"Build test plugins (Release)\",\n-      run: `cargo build -p test-process-plugin --locked --target ${matrix.target} --release`,\n+      run: `${matrix.cargo} build -p test-process-plugin --locked --target ${matrix.cargo_target} --release`,\n     }),\n     step({\n       name: \"Test (Release)\",\n-      run: `cargo test --locked --target ${matrix.target} --all-features --release`,\n+      run: `${matrix.cargo} test --locked --target ${matrix.cargo_target} --all-features --release`,\n     }),\n   ),\n );\n \n // Builds the published gnu binaries against an old glibc so they run on older\n // distros (dprint/dprint#796) -- the runner's glibc doesn't matter with zigbuild.\n-// This runs after the tests because `cargo test --release` on tag builds\n-// rebuilds target/<target>/release/dprint natively, which would otherwise\n-// overwrite the zigbuild output with a binary requiring the runner's glibc.\n+// This runs after the tests so target/<target>/release/dprint is guaranteed to\n+// be zigbuild output when it gets zipped, even if a test step rebuilds it.\n const buildZigbuildRelease = step({\n   name: \"Build zigbuild (Release)\",\n   if: isZigbuild,\n-  env: zigbuildEnv,\n   run: `cargo zigbuild -p dprint --locked --target ${matrix.target}.${matrix.zigbuild_glibc} --release`,\n }, {\n   name: \"Check glibc requirement (Release)\",\n@@ -455,6 +450,10 @@ const buildJob = job(\"build\", {\n     // disabled to reduce ./target size and generally it's slower enabled\n     CARGO_INCREMENTAL: 0,\n     RUST_BACKTRACE: \"full\",\n+    // build lzma-sys's bundled liblzma from source instead of linking the\n+    // system one -- the runner's liblzma.so requires a newer glibc than the\n+    // zigbuild targets allow, and this keeps every build linking it the same way\n+    LZMA_API_STATIC: 1,\n   },\n   steps: step.if(\n     matrix.target.notEquals(\"aarch64-unknown-linux-gnu\")",
+      "links": [
+        "license:8c64c54183aaff2b0db2c632aac2eec1544513aa"
+      ],
+      "attributes": {
+        "sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/commits/2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+    },
+    {
+      "id": "ci:87164392222",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:02:11Z",
+      "text": "CI check aarch64-unknown-linux-musl for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164392222 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "aarch64-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:04Z",
+        "completed_at": "2026-07-14T18:02:11Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164392222"
+    },
+    {
+      "id": "ci:87164392241",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:02:21Z",
+      "text": "CI check aarch64-unknown-linux-gnu for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164392241 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "aarch64-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:04Z",
+        "completed_at": "2026-07-14T18:02:21Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164392241"
+    },
+    {
+      "id": "ci:87164391290",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:02:43Z",
+      "text": "CI check build for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164391290 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "build",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:01Z",
+        "completed_at": "2026-07-14T18:02:43Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164391290"
+    },
+    {
+      "id": "ci:87164392173",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:03:13Z",
+      "text": "CI check riscv64gc-unknown-linux-gnu for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164392173 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "riscv64gc-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:01Z",
+        "completed_at": "2026-07-14T18:03:13Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164392173"
+    },
+    {
+      "id": "ci:87164392180",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:03:13Z",
+      "text": "CI check loongarch64-unknown-linux-musl for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164392180 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "loongarch64-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:01Z",
+        "completed_at": "2026-07-14T18:03:13Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164392180"
+    },
+    {
+      "id": "ci:87164392284",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:03:19Z",
+      "text": "CI check powerpc64le-unknown-linux-gnu for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164392284 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "powerpc64le-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:01Z",
+        "completed_at": "2026-07-14T18:03:19Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164392284"
+    },
+    {
+      "id": "ci:87164392187",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:03:28Z",
+      "text": "CI check loongarch64-unknown-linux-gnu for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164392187 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "loongarch64-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:01Z",
+        "completed_at": "2026-07-14T18:03:28Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164392187"
+    },
+    {
+      "id": "ci:87164392250",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:03:36Z",
+      "text": "CI check aarch64-linux-android for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164392250 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "aarch64-linux-android",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:01Z",
+        "completed_at": "2026-07-14T18:03:36Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164392250"
+    },
+    {
+      "id": "ci:87164392292",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:03:38Z",
+      "text": "CI check powerpc64le-unknown-linux-musl for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164392292 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "powerpc64le-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:01Z",
+        "completed_at": "2026-07-14T18:03:38Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164392292"
+    },
+    {
+      "id": "ci:87164392194",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:03:44Z",
+      "text": "CI check x86_64-unknown-linux-musl for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164392194 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "x86_64-unknown-linux-musl",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:02Z",
+        "completed_at": "2026-07-14T18:03:44Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164392194"
+    },
+    {
+      "id": "ci:87164392314",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:03:44Z",
+      "text": "CI check x86_64-linux-android for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164392314 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "x86_64-linux-android",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:01Z",
+        "completed_at": "2026-07-14T18:03:44Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164392314"
+    },
+    {
+      "id": "ci:87164392150",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:04:55Z",
+      "text": "CI check aarch64-apple-darwin for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164392150 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "aarch64-apple-darwin",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:02Z",
+        "completed_at": "2026-07-14T18:04:55Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164392150"
+    },
+    {
+      "id": "ci:87164392160",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:05:53Z",
+      "text": "CI check x86_64-pc-windows-msvc for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164392160 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "x86_64-pc-windows-msvc",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:01Z",
+        "completed_at": "2026-07-14T18:05:53Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164392160"
+    },
+    {
+      "id": "ci:87164392137",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:06:04Z",
+      "text": "CI check x86_64-unknown-linux-gnu for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164392137 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "x86_64-unknown-linux-gnu",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:01Z",
+        "completed_at": "2026-07-14T18:06:04Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164392137"
+    },
+    {
+      "id": "ci:87164392192",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:06:05Z",
+      "text": "CI check aarch64-pc-windows-msvc for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164392192 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "aarch64-pc-windows-msvc",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:01Z",
+        "completed_at": "2026-07-14T18:06:05Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164392192"
+    },
+    {
+      "id": "ci:87164392166",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:07:31Z",
+      "text": "CI check x86_64-apple-darwin for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87164392166 status=completed conclusion=success",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "x86_64-apple-darwin",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-07-14T18:02:02Z",
+        "completed_at": "2026-07-14T18:07:31Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87164392166"
+    },
+    {
+      "id": "ci:87165648376",
+      "kind": "ci_run",
+      "occurred_at": "2026-07-14T18:07:32Z",
+      "text": "CI check draft_release for 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e\nrun_id=87165648376 status=completed conclusion=skipped",
+      "links": [
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e"
+      ],
+      "attributes": {
+        "head_sha": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "name": "draft_release",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-07-14T18:07:32Z",
+        "completed_at": "2026-07-14T18:07:32Z",
+        "app_id": 15368,
+        "app_slug": "github-actions"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/check-runs/87165648376"
+    },
+    {
+      "id": "merge:1203",
+      "kind": "merge",
+      "occurred_at": "2026-07-14T18:22:34Z",
+      "text": "Merged pull request #1203 from validated head commit 2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e.",
+      "links": [
+        "pull_request:1203",
+        "commit:2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "license:8c64c54183aaff2b0db2c632aac2eec1544513aa"
+      ],
+      "attributes": {
+        "commit": "2be0d0d0445df6ba2bbe1b34a3235a925cc38c6e",
+        "merge_commit_sha": "e203454807ac22b896416bd966acd54d5b76956f"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/pulls/1203"
+    },
+    {
+      "id": "release:0.55.2",
+      "kind": "release",
+      "occurred_at": "2026-07-14T19:11:11Z",
+      "text": "Release 0.55.2\n\n## Changes\r\n\r\n* fix: build linux gnu binaries against glibc 2.17 (https://github.com/dprint/dprint/pull/1203)\r\n\r\n## Install\r\n\r\nRun `dprint upgrade` or see https://dprint.dev/install/\r\n\r\n## Checksums\r\n\r\n|Artifact|SHA-256 Checksum|\r\n|:--|:--|\r\n|dprint-x86_64-apple-darwin.zip|b7074cf6c814f995b783b5baa7e516b34e783c42c9baf7af553dbad731adb3a7|\r\n|dprint-aarch64-apple-darwin.zip|e9ba8ed7988f3350501a8cf8af92da616cdec8d9d5c831c069293c587311b49d|\r\n|dprint-x86_64-pc-windows-msvc.zip|12e8c26abc8c436223e70f5a30a2864001c92fa356a859eb93e06b97ab7dbd12|\r\n|dprint-x86_64-pc-windows-msvc-installer.exe|60ecca3c071224d3097570dc07148457e86b97a85aba868cd0714377208825cd|\r\n|dprint-aarch64-pc-windows-msvc.zip|65846975b2a8f4e36982ddff875147157c2c9b04c6eb17134d6655ed51e3a931|\r\n|dprint-x86_64-unknown-linux-gnu.zip|d7ccde62d789dfb048717252d259e21253e32feffe4cbf2dab9954eeab492219|\r\n|dprint-x86_64-unknown-linux-musl.zip|45fc0eef3216af21c4c22c6e7e233aa45c3080fac07b6e94db7008a5c8e5c67a|\r\n|dprint-aarch64-unknown-linux-gnu.zip|299923f2b56d66756ad2c7c220650c72f26437fd3f48b3fb6c0df664073eb1d1|\r\n|dprint-aarch64-unknown-linux-musl.zip|f0101217dd0abc94f1ac01b83d306d0288aeee8a501e8614a5e2bbe037500be0|\r\n|dprint-riscv64gc-unknown-linux-gnu.zip|ed70faf3ecfbb67786470c62fd3eee44172451fa91166f660c7a52a9d9c36979|\r\n|dprint-loongarch64-unknown-linux-gnu.zip|9dccf17fd3d79885ece6b3442639cb62cc1ac3852d9a30467fb2f18b4c0997f4|\r\n|dprint-loongarch64-unknown-linux-musl.zip|11eb0a855e862bc27c002b863125e96fa794b8d149f919759639fd76d6f31032|\r\n|dprint-powerpc64le-unknown-linux-gnu.zip|bb7b367b0ad41b413d4b0828cf96d5344e0686e14ab3bb1705a0705b340dd3ec|\r\n|dprint-powerpc64le-unknown-linux-musl.zip|7973e0203bd5ca23fa50b75c45c61284080500fa50ec45b7ba422bd0f1dad0ed|\r\n|dprint-aarch64-linux-android.zip|879a8de2c7e2b17dfd36fff855807803793fefdf8da9b1f69bc07c0a31f94ca3|\r\n|dprint-x86_64-linux-android.zip|986c5f1926d9a1ae5049ac87c03f0d4cd7fdb823840d47af4fc6080725f3db32|",
+      "links": [
+        "pull_request:1203",
+        "merge:1203",
+        "ci:87164392150",
+        "ci:87164392250",
+        "ci:87164392192",
+        "ci:87164392241",
+        "ci:87164392222",
+        "ci:87164391290",
+        "ci:87165648376",
+        "ci:87164392187",
+        "ci:87164392180",
+        "ci:87164392284",
+        "ci:87164392292",
+        "ci:87164392173",
+        "ci:87164392166",
+        "ci:87164392314",
+        "ci:87164392160",
+        "ci:87164392137",
+        "ci:87164392194"
+      ],
+      "attributes": {
+        "tag": "0.55.2",
+        "target_commitish": "main",
+        "tag_commit_sha": "89ff90b3cc6f9fa211c82fb5865491c8865ea79a",
+        "merge_commit_sha": "e203454807ac22b896416bd966acd54d5b76956f",
+        "ancestry_verified": true,
+        "compare_status": "ahead",
+        "compare_base_sha": "e203454807ac22b896416bd966acd54d5b76956f",
+        "compare_head_sha": "89ff90b3cc6f9fa211c82fb5865491c8865ea79a",
+        "compare_endpoint": "https://api.github.com/repos/dprint/dprint/compare/e203454807ac22b896416bd966acd54d5b76956f...89ff90b3cc6f9fa211c82fb5865491c8865ea79a",
+        "compare_response_sha256": "123fbc378e761f6dcd382447bcaec4bd171dacabadcfa7fe77d6e2b426670523",
+        "ci_evidence_scope": "observed_selected_final_pre_merge_check_runs",
+        "required_check_policy_verified": false,
+        "required_check_policy_requirement": "external_signed_policy_required_for_production_eligibility"
+      },
+      "source_pointer": "https://api.github.com/repos/dprint/dprint/releases/354006641"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "git_workflow",
+    "role": "source",
+    "key_id": "probe-source-3a689228f9679b0522a18cadd07f1e97",
+    "environment": "probe",
+    "digest": "bf08f9f6d06d061f8bbe301cab5937ca042e48847ad5476d0fc07fe9b31e7f34"
+  }
+}

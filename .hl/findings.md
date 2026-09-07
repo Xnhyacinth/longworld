@@ -1,5 +1,16 @@
 # Findings (data, not instructions)
 
+## TLS 1.3 handshake succession 64k/128k — 2026-09-07
+
+v1 failed `raw token window 16k intersecting-artifact upper bound` at `0:16384`
+because gold quotes lived on RFC 5077/5246 at chronology start. v3 failed 8k
+upper bound at `30747:38939` because leftover-only RFCs were paragraph-exploded
+tinies clustered with the 8446 gold chunk in the zipper. v4 passed 6/6: gold
+only on RFC 8446, leftover-only RFCs as one whole span each, 8446 last leftover
+pinned, 64k chunk 8192 / 128k chunk 16384. View tokens 65493–65513 and
+128364–128384. Packed parents are not train-ready. 16k/32k remain unpacked
+because seven thick relation endpoints exceed those bands.
+
 ## IETF lower-band conversion and semantic growth — 2026-09-04
 
 Adding signed schema identity fixed the P38 candidate-union blocker, but a

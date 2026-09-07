@@ -1,5 +1,11 @@
 # Progress
 
+- 2026-09-07 TLS 1.3 handshake succession v4: 64k/128k × full/cf/ordered
+  dense-audited 6/6 `global_proof_green=true` (exact tokens 65493–65513 and
+  128364–128384; sum 581,651). Packed parents are not inventory. 16k/32k not
+  packed: seven thick relation endpoints cannot fit those bands without quote
+  isolation or leftover tinies. Next is a unique IETF 64k/128k probe profile,
+  not p17 finance. HTTP Semantics waits on that promotion path.
 - 2026-09-04 P38/P43 IETF conversion remains blocked with zero formal rows.
   Schema-fixed P33 rebuilt and audited 6/6; the 64K-only chain reached strict
   promotion but failed the existing lower-band quality gate. A natural
