@@ -18,9 +18,17 @@ real-schema anchors
 Scale unit is **dependency topology**, not QA count.
 
 Current publication and qualification status is tracked in
-[`docs/CURRENT_RELEASE.md`](docs/CURRENT_RELEASE.md). The private HF dataset
-contains the historical 542-row P6 local-engineering release; no P7/P8 row is
-currently qualified under the stricter readable-source/raw-span gate.
+[`docs/CURRENT_RELEASE.md`](docs/CURRENT_RELEASE.md). Private Hugging Face
+artifacts:
+
+- `Xnhyacinth/LongWorld-Real-Workflows` — historical 542-row P6 LongWorld
+  product (plus later local-probe train-ready paths). No P7/P8 row is
+  currently qualified under the stricter readable-source/raw-span gate.
+- `Xnhyacinth/longworld-128k-sft-baselines` — ACC / LongTrace / LongMIT 128k
+  SFT in parquet (not LongWorld product rows).
+- `Xnhyacinth/Qwen3.5-4B-Base-ACC-128k-SFT` and
+  `Xnhyacinth/Qwen3.5-4B-Base-LongTrace-128k-SFT` — latest 4B-Base full-SFT
+  step-680 checkpoints (private, inference weights).
 
 Historical snapshot (p1.2, 2026-08-19): causal engine kept; **length is no
 longer a fill target**. p1.1 `data/p0` is frozen as a CausalTwin diagnostic dump

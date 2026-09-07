@@ -1,6 +1,6 @@
 # Current release status
 
-Last updated: 2026-09-06
+Last updated: 2026-09-07
 
 This file is the canonical publication-status summary. Historical receipts and
 `.hl/` logs remain useful for reproducibility, but they do not override this
@@ -8,6 +8,38 @@ status. The canonical project root is `/workspace/wynckeliao/longworld`;
 project code, source inventory, generated data, release receipts, reports, and
 durable progress records must live there. Tool caches may be reconstructed
 outside the repository, and credentials must remain outside Git.
+
+## 2026-09-07 128k related-work baselines on private Hugging Face
+
+ACC / LongTrace / LongMIT 128k SFT jsonl was **not** on Hub (private
+`Xnhyacinth/LongWorld-Real-Workflows` remains the P6 542-row LongWorld product
+and was left unchanged). A new private parquet dataset now holds the valid
+ms-swift 128k baselines:
+
+- Dataset: [`Xnhyacinth/longworld-128k-sft-baselines`](https://huggingface.co/datasets/Xnhyacinth/longworld-128k-sft-baselines) (private)
+- Hub commit: `72eecdd3f8774399c75c9b7ba1aa1d5e00453246`
+- Configs: `acc`, `longtrace`, `longmit` (each `train` + `validation` parquet)
+- Rows: ACC 10770/32, LongTrace 2783/32, LongMIT 10770/32
+
+Latest valid full-SFT checkpoints (Qwen3.5-4B-Base, step 680, inference
+weights only; optimizer/RNG omitted):
+
+| Condition | Private model | Local run | Train / eval loss |
+| --- | --- | --- | --- |
+| ACC | [`Xnhyacinth/Qwen3.5-4B-Base-ACC-128k-SFT`](https://huggingface.co/Xnhyacinth/Qwen3.5-4B-Base-ACC-128k-SFT) | `swift_ext_acc_base` ckpt-680 | 0.437 / 0.375 |
+| LongTrace | [`Xnhyacinth/Qwen3.5-4B-Base-LongTrace-128k-SFT`](https://huggingface.co/Xnhyacinth/Qwen3.5-4B-Base-LongTrace-128k-SFT) | `swift_ext_longtrace_base` ckpt-680 | — / 0.177 |
+
+Hub commits: ACC `2b4dae0e6c3cddeaf6dea4e07d9ec1b31a250ddb`, LongTrace
+`734d5a13211cdcf7a524d283e2fc982592cb09d9`. Recipe is GBS 16,
+SP 4 DP 1 micro 1 accum 16, lr 1e-5, max_length 133120, 680 steps. LongMIT is
+uploaded as data only; it was not trained on 4B-Base this round. Instruct-ACC
+is not republished here. These artifacts are related-work baselines, not
+LongWorld product rows; `production_eligible` is unchanged.
+
+P57 TLS 1.3 64k/128k extension profile
+`p57-ietf-tls13-64k-128k-extension-probe-1-v1` is now in-tree (one-world
+standards gate, length-view pair exemption). It is not yet a signed train-ready
+product and does not change inventory counts.
 
 ## 2026-09-06 Alphabet conversion and GovInfo six-relation hold
 
@@ -147,7 +179,8 @@ these partial tracks contributes inventory rows.
 ## Published private dataset
 
 - Repository: `Xnhyacinth/LongWorld-Real-Workflows` (private)
-- Hub commit: `32b5dcd274c301300826be20f7a698b4d9b09f7d`
+- Hub commit: `32b5dcd274c301300826be20f7a698b4d9b09f7d` (latest seen product
+  path SHA `02b4885f40b83495dcc4bf7dfb3ad4c9569b33ea` for P55 Alphabet)
 - Release profile: `p6-source-dependent-probe-12-v1`
 - Scope: local engineering only; not production-approved
 - Rows: 542 total (428 train, 114 eval)
@@ -156,6 +189,10 @@ these partial tracks contributes inventory rows.
 The remote contains 19 release payload files plus the Hub-managed
 `.gitattributes`; the payload matches the local immutable P6 v4 staging package.
 No P6 payload is missing; no P12 production upload is authorized.
+
+Related-work 128k SFT baselines live in a **separate** private dataset,
+`Xnhyacinth/longworld-128k-sft-baselines` (parquet). Do not overwrite
+`LongWorld-Real-Workflows` with ACC/LongTrace/LongMIT.
 
 ## 2026-09-01 task replay and baseline checkpoint
 

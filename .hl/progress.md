@@ -1,5 +1,13 @@
 # Progress
 
+- 2026-09-07 Related-work 128k baselines were not on Hub. Created private
+  parquet dataset `Xnhyacinth/longworld-128k-sft-baselines` (ACC 10770/32,
+  LongTrace 2783/32, LongMIT 10770/32; commit `72eecdd3f877`). Uploaded
+  latest valid 4B-Base ckpt-680 inference weights to private
+  `Xnhyacinth/Qwen3.5-4B-Base-ACC-128k-SFT` and
+  `Xnhyacinth/Qwen3.5-4B-Base-LongTrace-128k-SFT`. Did not overwrite
+  `LongWorld-Real-Workflows`. Landed leftover worlds P57 TLS 64k/128k
+  extension profile `p57-ietf-tls13-64k-128k-extension-probe-1-v1`.
 - 2026-09-07 TLS 1.3 handshake succession v4: 64k/128k × full/cf/ordered
   dense-audited 6/6 `global_proof_green=true` (exact tokens 65493–65513 and
   128364–128384; sum 581,651). Packed parents are not inventory. 16k/32k not
