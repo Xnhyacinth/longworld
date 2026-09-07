@@ -1,5 +1,12 @@
 # Progress
 
+- 2026-09-07 Private collection `Xnhyacinth/longworld`. Appended three P57
+  local-probe products to `LongWorld-Real-Workflows` (TLS 6 / NVIDIA 12 /
+  Micron 12; commit `cf28fcf07501`). Synthesis-Workspace gained 368 P57
+  intermediate files (~383MB, commit `4bc492923e26`). Uploaded Instruct ACC
+  ckpt-680 inference weights to `Xnhyacinth/Qwen3.5-4B-ACC-128k-SFT`. Landed
+  RFC header-column strip so Obsoletes continuations do not parse dates as
+  RFC ids. Did not upload optimizer/RNG or HMAC keys.
 - 2026-09-07 Related-work 128k baselines were not on Hub. Created private
   parquet dataset `Xnhyacinth/longworld-128k-sft-baselines` (ACC 10770/32,
   LongTrace 2783/32, LongMIT 10770/32; commit `72eecdd3f877`). Uploaded

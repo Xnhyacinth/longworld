@@ -21,25 +21,57 @@ ms-swift 128k baselines:
 - Configs: `acc`, `longtrace`, `longmit` (each `train` + `validation` parquet)
 - Rows: ACC 10770/32, LongTrace 2783/32, LongMIT 10770/32
 
-Latest valid full-SFT checkpoints (Qwen3.5-4B-Base, step 680, inference
-weights only; optimizer/RNG omitted):
+Latest valid full-SFT checkpoints (step 680, inference weights only;
+optimizer/RNG omitted):
 
 | Condition | Private model | Local run | Train / eval loss |
 | --- | --- | --- | --- |
-| ACC | [`Xnhyacinth/Qwen3.5-4B-Base-ACC-128k-SFT`](https://huggingface.co/Xnhyacinth/Qwen3.5-4B-Base-ACC-128k-SFT) | `swift_ext_acc_base` ckpt-680 | 0.437 / 0.375 |
-| LongTrace | [`Xnhyacinth/Qwen3.5-4B-Base-LongTrace-128k-SFT`](https://huggingface.co/Xnhyacinth/Qwen3.5-4B-Base-LongTrace-128k-SFT) | `swift_ext_longtrace_base` ckpt-680 | — / 0.177 |
+| Base ACC | [`Xnhyacinth/Qwen3.5-4B-Base-ACC-128k-SFT`](https://huggingface.co/Xnhyacinth/Qwen3.5-4B-Base-ACC-128k-SFT) | `swift_ext_acc_base` ckpt-680 | 0.437 / 0.375 |
+| Base LongTrace | [`Xnhyacinth/Qwen3.5-4B-Base-LongTrace-128k-SFT`](https://huggingface.co/Xnhyacinth/Qwen3.5-4B-Base-LongTrace-128k-SFT) | `swift_ext_longtrace_base` ckpt-680 | — / 0.177 |
+| Instruct ACC | [`Xnhyacinth/Qwen3.5-4B-ACC-128k-SFT`](https://huggingface.co/Xnhyacinth/Qwen3.5-4B-ACC-128k-SFT) | `swift_ext_acc` ckpt-680 | 0.365 / 0.375 |
 
-Hub commits: ACC `2b4dae0e6c3cddeaf6dea4e07d9ec1b31a250ddb`, LongTrace
-`734d5a13211cdcf7a524d283e2fc982592cb09d9`. Recipe is GBS 16,
-SP 4 DP 1 micro 1 accum 16, lr 1e-5, max_length 133120, 680 steps. LongMIT is
-uploaded as data only; it was not trained on 4B-Base this round. Instruct-ACC
-is not republished here. These artifacts are related-work baselines, not
-LongWorld product rows; `production_eligible` is unchanged.
+Hub commits: Base ACC `2b4dae0e6c3cddeaf6dea4e07d9ec1b31a250ddb`, Base
+LongTrace `734d5a13211cdcf7a524d283e2fc982592cb09d9`, Instruct ACC
+`ca665f6df393b31414b1ff2c286a3dcb8997bd9f`. Base recipe is GBS 16, SP 4 DP 1
+micro 1 accum 16, lr 1e-5, max_length 133120, 680 steps. Instruct ACC used 8
+GPU SP=4 DP=2. LongMIT is data only; it was not trained on 4B-Base this
+round. Instruct LongTrace stopped at ckpt-200 and is not published. These
+artifacts are related-work baselines, not LongWorld product rows;
+`production_eligible` is unchanged.
 
-P57 TLS 1.3 64k/128k extension profile
-`p57-ietf-tls13-64k-128k-extension-probe-1-v1` is now in-tree (one-world
-standards gate, length-view pair exemption). It is not yet a signed train-ready
-product and does not change inventory counts.
+Private collection (do not merge the repos):
+[`Xnhyacinth/longworld`](https://huggingface.co/collections/Xnhyacinth/longworld-6a9eb196a0c8cd67190ea7fd).
+
+## 2026-09-07 P57 local-probe products and synthesis delta
+
+Three independently signed local-probe products were appended under
+`local-probe-train-ready/` on `Xnhyacinth/LongWorld-Real-Workflows` (Hub
+commit `cf28fcf07501768e54ecaee2ef132c11951ce192`). The P6 542-row payload
+and its attested `release_inventory.json` were not rewritten.
+
+| Product | Rows | Exact tokens | Bands |
+| --- | ---: | ---: | --- |
+| `p57-ietf-tls13-handshake-succession-probe-1-v1-promoted-v1` | 6 | 581,651 | 3×64K + 3×128K |
+| `p57-finance-nvidia-market-segment-probe-1-v1-promoted-v1` | 12 | 728,085 | 3 each 16/32/64/128K |
+| `p57-finance-micron-asset-trajectory-probe-1-v1-promoted-v1` | 12 | 733,444 | 3 each 16/32/64/128K |
+
+Content-gated SFT inventory is now **ten** independently signed local-probe
+products: the previous seven plus these three. Together they contain
+**183 train rows / 10,045,500 exact Qwen context tokens** and **18 eval rows /
+682,032 tokens**. Total local inventory is **201 rows / 10,727,532 tokens**
+across 20 unique world IDs. Train length distribution is 45×16K, 48×32K,
+60×64K, and **30×128K**. `production_eligible` remains false.
+
+P57 TLS uses profile `p57-ietf-tls13-64k-128k-extension-probe-1-v1` (one-world
+standards gate, length-view pair exemption). NVIDIA and Micron reuse
+`p17-finance-128k-extension-probe-1-v1` on new issuers and separate probe
+trust roots. HTTP/3 QUIC remains a candidate track, not a product.
+
+Synthesis intermediates (candidates, signed source inventories, retained
+filing/RFC bytes, and the three product trees) were appended to private
+`Xnhyacinth/LongWorld-Synthesis-Workspace` (Hub commit
+`4bc492923e26f30aff93ef7064992a46c15eea6e`; 368 P57 files / ~383MB). HMAC
+keys stay off Hub and Git. Optimizer/RNG training states were not uploaded.
 
 ## 2026-09-06 Alphabet conversion and GovInfo six-relation hold
 
