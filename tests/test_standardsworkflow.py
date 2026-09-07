@@ -17,6 +17,7 @@ from longworld.core.standardsworkflow import (
     IETF_FETCH_INVENTORY_SCHEMA,
     IETF_WORKFLOW_MANIFEST_SCHEMA,
     _clean,
+    _rfc_relation_headers,
     _validate_rfc_target_closure,
     audit_ietf_normative_change_task,
     build_ietf_normative_change_task,
@@ -380,6 +381,43 @@ def test_redacts_digest_approved_credential_shaped_public_test_vector(
     assert private_key_count == 0
     assert credential_test_vector_count == 1
     assert observed_digests == frozenset({digest})
+
+
+def test_rfc_relation_headers_keep_author_column_continuations_and_drop_dates() -> None:
+    headers = _rfc_relation_headers(
+        "Request for Comments: 9110                                         Adobe\n"
+        "STD: 97                                               M. Nottingham, Ed.\n"
+        "Obsoletes: 2818, 7230, 7231, 7232, 7233, 7235,                    Fastly\n"
+        "           7538, 7615, 7694                              J. Reschke, Ed.\n"
+        "Updates: 3864                                                 greenbytes\n"
+        "Category: Standards Track                                      June 2022\n"
+    )
+    obsoletes = next(item for item in headers if item[0] == "obsoletes")
+    updates = next(item for item in headers if item[0] == "updates")
+
+    assert obsoletes[1] == [2818, 7230, 7231, 7232, 7233, 7235, 7538, 7615, 7694]
+    assert updates[1] == [3864]
+    assert "Fastly" in obsoletes[2]
+    assert "7538, 7615, 7694" in obsoletes[2]
+
+    dated = _rfc_relation_headers(
+        "Request for Comments: 7538                                    greenbytes\n"
+        "Obsoletes: 7238                                               April 2015\n"
+        "Category: Standards Track\n"
+    )
+    assert dated == [
+        (
+            "obsoletes",
+            [7238],
+            "Obsoletes: 7238                                               April 2015",
+        )
+    ]
+
+    tls = _rfc_relation_headers(
+        "Obsoletes: 5077, 5246, 6961                                  August 2018\n"
+        "Updates: 5705, 6066                                 IETF\n"
+    )
+    assert [item[1] for item in tls] == [[5077, 5246, 6961], [5705, 6066]]
 
 
 def test_rfc_target_closure_allows_published_target_overlap() -> None:

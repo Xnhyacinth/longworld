@@ -98,6 +98,7 @@ from longworld.core.taskreplaysidecar import (
     IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER,
     IETF_OAUTH_TASK_REPLAY_ADAPTER,
     IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER,
+    IETF_HTTP_SEMANTICS_TASK_REPLAY_ADAPTER,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     SOURCE_TOKEN_MEASUREMENT_BASIS,
     SOURCE_TOKEN_MEASUREMENT_RECEIPT_SCHEMA,
@@ -203,6 +204,7 @@ def _ietf_requirement_adapter(adapter_key: tuple[str, str, str]) -> bool:
         IETF_OAUTH_TASK_REPLAY_ADAPTER[:2],
         IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER[:2],
         IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER[:2],
+        IETF_HTTP_SEMANTICS_TASK_REPLAY_ADAPTER[:2],
     }
 
 
@@ -942,6 +944,8 @@ def _task_selection_metrics(
         group_suffix = "ietf-http3-quic-requirement"
     elif _sidecar_uses(sidecar, IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER):
         group_suffix = "ietf-tls13-handshake-succession"
+    elif _sidecar_uses(sidecar, IETF_HTTP_SEMANTICS_TASK_REPLAY_ADAPTER):
+        group_suffix = "ietf-http-semantics-succession"
     elif _sidecar_uses(sidecar, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER):
         group_suffix = "govinfo-bill-disposition"
     elif _sidecar_uses(sidecar, EURLEX_PMS_TASK_REPLAY_ADAPTER):
@@ -1789,6 +1793,21 @@ def _canonical_task_identifiers(
             "select_cutoff_sources",
             "resolve_publication_obsoletes_and_updates",
             "evaluate_tls13_succession_branches",
+        )
+        answer_program_id = str(task["answer_program_id"])
+    elif family == IETF_HTTP_SEMANTICS_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("ietf_requirement_task")
+        if (
+            not isinstance(task, Mapping)
+            or task.get("answer_program_id") != "ietf.http_semantics_succession.v1"
+            or candidate.get("answer_program_id") != task.get("answer_program_id")
+        ):
+            raise PromotionError("IETF HTTP Semantics answer program is unsupported")
+        motif = "http_semantics_succession+obsoletes_updates_closure"
+        program_ops = (
+            "select_cutoff_sources",
+            "resolve_publication_obsoletes_and_updates",
+            "evaluate_http_semantics_succession_branches",
         )
         answer_program_id = str(task["answer_program_id"])
     elif family == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]:
@@ -3023,6 +3042,7 @@ def build_task_candidate_view_projections(
         IETF_OAUTH_TASK_REPLAY_ADAPTER,
         IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER,
         IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER,
+        IETF_HTTP_SEMANTICS_TASK_REPLAY_ADAPTER,
         GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
         EURLEX_PMS_TASK_REPLAY_ADAPTER,
     }:

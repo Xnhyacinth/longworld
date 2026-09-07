@@ -58,6 +58,11 @@ _RFC_RELATION_CONTINUATION = re.compile(
     r"(?i)^[ \t]+(?P<value>(?:RFC[ \t]+)?[1-9]\d*"
     r"(?:[ \t]*,[ \t]*(?:RFC[ \t]+)?[1-9]\d*)*[ \t]*,?)[ \t]*$"
 )
+_RFC_RELATION_NUMBER_LIST = re.compile(
+    r"(?i)^(?:RFC[ \t]+)?[1-9]\d*"
+    r"(?:[ \t]*,[ \t]*(?:RFC[ \t]+)?[1-9]\d*)*[ \t]*,?$"
+)
+_RFC_HEADER_RIGHT_GAP = re.compile(r"[ \t]{2,}")
 _RFC_RELATION_NUMBER = re.compile(
     r"(?<![A-Za-z0-9])(?:RFC[ \t]+)?(?P<number>[1-9]\d*)(?![A-Za-z0-9])",
     re.IGNORECASE,
@@ -249,12 +254,28 @@ def _rfc_first_page_identity_pattern(text: str, number: int) -> re.Pattern[str]:
     return re.compile(rf"(?m)^{re.escape(matches[0])}$")
 
 
+def _strip_rfc_header_right_column(line: str) -> str:
+    """Drop the RFC page-header author/date column; keep left-hand RFC ids."""
+    stripped = line.rstrip()
+    last_gap = None
+    for candidate in _RFC_HEADER_RIGHT_GAP.finditer(stripped):
+        if stripped[: candidate.start()].strip():
+            last_gap = candidate
+    if last_gap is None:
+        return stripped
+    right = stripped[last_gap.end() :]
+    if _RFC_RELATION_NUMBER_LIST.fullmatch(right):
+        return stripped
+    return stripped[: last_gap.start()].rstrip()
+
+
 def _rfc_relation_headers(text: str) -> list[tuple[str, list[int], str]]:
     lines = text.splitlines()[:80]
     headers: list[tuple[str, list[int], str]] = []
     index = 0
     while index < len(lines):
-        match = _RFC_RELATION_LINE.fullmatch(lines[index])
+        parsed_line = _strip_rfc_header_right_column(lines[index])
+        match = _RFC_RELATION_LINE.fullmatch(parsed_line)
         if match is None:
             index += 1
             continue
@@ -263,7 +284,8 @@ def _rfc_relation_headers(text: str) -> list[tuple[str, list[int], str]]:
         values = [match.group("value")]
         cursor = index + 1
         while cursor < len(lines):
-            continuation = _RFC_RELATION_CONTINUATION.fullmatch(lines[cursor])
+            parsed_continuation = _strip_rfc_header_right_column(lines[cursor])
+            continuation = _RFC_RELATION_CONTINUATION.fullmatch(parsed_continuation)
             if continuation is None:
                 break
             quote_lines.append(lines[cursor])
@@ -4057,6 +4079,504 @@ def materialize_ietf_tls13_handshake_counterfactual(
         if item.get("evidence_id") != evidence["evidence_id"]
     ]
     answer = replay_ietf_tls13_handshake_succession_task(
+        task, evidence_ids=selected_evidence
+    )
+    return {
+        "record_id": record["record_id"],
+        "parent_text": parent,
+        "text": child,
+        "answer": answer,
+        "counterfactual_twin": {
+            "provenance_operation": "exclude_exact_source_span",
+            "source_origin": "synthetic_counterfactual",
+            "record_id": record["record_id"],
+            "evidence_id": evidence["evidence_id"],
+            "char_start": char_start,
+            "char_end": char_end,
+            "byte_start": byte_start,
+            "byte_end": byte_end,
+            "parent_value": parent_value,
+            "value": value,
+            "parent_text_sha256": hashlib.sha256(parent.encode()).hexdigest(),
+            "text_sha256": hashlib.sha256(child.encode()).hexdigest(),
+            "parent_source_sha256": record["source_sha256"],
+            "source_manifest_sha256": task["source_manifest_sha256"],
+        },
+    }
+
+
+IETF_HTTP_SEMANTICS_SUCCESSION_TASK_SCHEMA = (
+    "longworld.ietf-http-semantics-succession-task.v1"
+)
+_HTTP_SEMANTICS_SUCCESSION_ANSWERS = {
+    "current_protocol": "HTTP_SEMANTICS_RFC9110",
+    "obsoletes_http_over_tls": "RFC2818",
+    "obsoletes_http11_message": "RFC7230",
+    "obsoletes_semantics_content": "RFC7231",
+    "obsoletes_conditional": "RFC7232",
+    "obsoletes_range": "RFC7233",
+    "obsoletes_authentication": "RFC7235",
+    "updates_header_registration": "RFC3864",
+}
+_HTTP_SEMANTICS_SUCCESSION_CODEBOOK = {
+    "current_protocol": {
+        "code": "HTTP_SEMANTICS_RFC9110",
+        "meaning": "RFC 9110 is HTTP Semantics",
+    },
+    "obsoletes_http_over_tls": {
+        "code": "RFC2818",
+        "meaning": "RFC 9110 obsoletes HTTP Over TLS",
+    },
+    "obsoletes_http11_message": {
+        "code": "RFC7230",
+        "meaning": "RFC 9110 obsoletes HTTP/1.1 message syntax portions",
+    },
+    "obsoletes_semantics_content": {
+        "code": "RFC7231",
+        "meaning": "RFC 9110 obsoletes HTTP/1.1 semantics and content",
+    },
+    "obsoletes_conditional": {
+        "code": "RFC7232",
+        "meaning": "RFC 9110 obsoletes HTTP/1.1 conditional requests",
+    },
+    "obsoletes_range": {
+        "code": "RFC7233",
+        "meaning": "RFC 9110 obsoletes HTTP/1.1 range requests",
+    },
+    "obsoletes_authentication": {
+        "code": "RFC7235",
+        "meaning": "RFC 9110 obsoletes HTTP/1.1 authentication",
+    },
+    "updates_header_registration": {
+        "code": "RFC3864",
+        "meaning": "RFC 9110 updates HTTP header field registration",
+    },
+}
+_HTTP_SEMANTICS_SUCCESSION_SCENARIO = {
+    "protocol": "http",
+    "publication": "rfc9110",
+    "semantics": "http_semantics",
+    "succession": "obsoletes_and_updates",
+}
+_HTTP_SEMANTICS_SUCCESSION_EVIDENCE = {
+    "current_protocol": (
+        9110,
+        r"This document describes the overall architecture of HTTP,\s+"
+        r"establishes common terminology, and defines aspects of the protocol\s+"
+        r"that are shared by all versions\.",
+    ),
+    "obsoletes_http_over_tls": (
+        9110,
+        r"\| HTTP Over TLS\s+\| \[RFC2818\] \| B\.1 \|",
+    ),
+    "obsoletes_http11_message": (
+        9110,
+        r"\| HTTP/1\.1 Message Syntax and Routing \[\*\]\s+\| \[RFC7230\] \| B\.2 \|",
+    ),
+    "obsoletes_semantics_content": (
+        9110,
+        r"\| HTTP/1\.1 Semantics and Content\s+\| \[RFC7231\] \| B\.3 \|",
+    ),
+    "obsoletes_conditional": (
+        9110,
+        r"\| HTTP/1\.1 Conditional Requests\s+\| \[RFC7232\] \| B\.4 \|",
+    ),
+    "obsoletes_range": (
+        9110,
+        r"\| HTTP/1\.1 Range Requests\s+\| \[RFC7233\] \| B\.5 \|",
+    ),
+    "obsoletes_authentication": (
+        9110,
+        r"\| HTTP/1\.1 Authentication\s+\| \[RFC7235\] \| B\.6 \|",
+    ),
+    "updates_header_registration": (
+        9110,
+        r"This specification updates the HTTP-related aspects of the existing\s+"
+        r"registration procedures for message header fields defined in\s+"
+        r"\[RFC3864\]\.",
+    ),
+}
+_HTTP_SEMANTICS_SUCCESSION_BRANCHES = {
+    "current_protocol": ("current_protocol", None, None, None),
+    "obsoletes_http_over_tls": (
+        "obsoletes_http_over_tls",
+        None,
+        "obsoletes",
+        2818,
+    ),
+    "obsoletes_http11_message": (
+        "obsoletes_http11_message",
+        None,
+        "obsoletes",
+        7230,
+    ),
+    "obsoletes_semantics_content": (
+        "obsoletes_semantics_content",
+        None,
+        "obsoletes",
+        7231,
+    ),
+    "obsoletes_conditional": ("obsoletes_conditional", None, "obsoletes", 7232),
+    "obsoletes_range": ("obsoletes_range", None, "obsoletes", 7233),
+    "obsoletes_authentication": (
+        "obsoletes_authentication",
+        None,
+        "obsoletes",
+        7235,
+    ),
+    "updates_header_registration": (
+        "updates_header_registration",
+        None,
+        "updates",
+        3864,
+    ),
+}
+_HTTP_SEMANTICS_RFC_NUMBERS = {
+    2818,
+    3864,
+    7230,
+    7231,
+    7232,
+    7233,
+    7235,
+    7538,
+    7615,
+    7694,
+    9110,
+}
+
+
+def _http_semantics_succession_question() -> str:
+    return (
+        "Resolve the effective HTTP Semantics protocol succession at "
+        "2026-01-31T00:00:00Z for this scenario (canonical JSON): "
+        + json.dumps(
+            _HTTP_SEMANTICS_SUCCESSION_SCENARIO,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + ". Return exactly one JSON object with these keys in this order: "
+        + json.dumps(
+            tuple(_HTTP_SEMANTICS_SUCCESSION_CODEBOOK), separators=(",", ":")
+        )
+        + ". Use this exact per-field output codebook (canonical JSON): "
+        + json.dumps(
+            _HTTP_SEMANTICS_SUCCESSION_CODEBOOK,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + ". Resolve each field independently from the supplied RFC graph; use "
+        'the string "UNKNOWN" only for a field whose required evidence or relation '
+        "is absent."
+    )
+
+
+def _http_semantics_rfc_records(manifest: dict[str, Any]) -> dict[int, dict[str, Any]]:
+    records: dict[int, dict[str, Any]] = {}
+    for record in manifest["records"]:
+        number = record.get("rfc_number")
+        if isinstance(number, int):
+            if number in records:
+                raise ProvenanceError("IETF HTTP Semantics RFC identity is duplicated")
+            records[number] = record
+    if set(records) != _HTTP_SEMANTICS_RFC_NUMBERS:
+        raise ProvenanceError("IETF HTTP Semantics RFC graph is incomplete")
+    return records
+
+
+def _http_semantics_succession_relation(
+    manifest: dict[str, Any], *, kind: str, target_number: int
+) -> dict[str, Any]:
+    matches = [
+        relation
+        for relation in manifest["relations"]
+        if relation.get("kind") == kind
+        and relation.get("source_record_id") == "ietf:rfc:9110"
+        and relation.get("target_record_id") == f"ietf:rfc:{target_number}"
+    ]
+    if len(matches) != 1:
+        raise ProvenanceError("IETF HTTP Semantics succession relation is not unique")
+    return matches[0]
+
+
+def _http_semantics_predecessor_update(manifest: dict[str, Any]) -> dict[str, Any]:
+    matches = [
+        relation
+        for relation in manifest["relations"]
+        if relation.get("kind") == "updates"
+        and relation.get("source_record_id") == "ietf:rfc:7230"
+        and relation.get("target_record_id") == "ietf:rfc:2818"
+    ]
+    if len(matches) != 1:
+        raise ProvenanceError("IETF HTTP Semantics predecessor update is not unique")
+    return matches[0]
+
+
+def _http_semantics_succession_evidence(
+    records: dict[int, dict[str, Any]], evidence_id: str, specification: tuple[int, str]
+) -> dict[str, Any]:
+    number, pattern = specification
+    record = records[number]
+    matches = list(re.finditer(pattern, record["text"], re.MULTILINE | re.DOTALL))
+    if len(matches) != 1:
+        raise ProvenanceError("IETF HTTP Semantics succession evidence is not unique")
+    match = matches[0]
+    quote = match.group(0)
+    return {
+        "evidence_id": evidence_id,
+        "record_id": record["record_id"],
+        "evidence_quote": quote,
+        "char_start": match.start(),
+        "char_end": match.end(),
+        "quote_sha256": hashlib.sha256(quote.encode()).hexdigest(),
+        "source_sha256": record["source_sha256"],
+    }
+
+
+def build_ietf_http_semantics_succession_task(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Compile HTTP Semantics succession from RFC 9110 Obsoletes/Updates."""
+    audit_ietf_workflow_manifest(manifest)
+    records = _http_semantics_rfc_records(manifest)
+    _http_semantics_predecessor_update(manifest)
+    evidence = [
+        _http_semantics_succession_evidence(records, evidence_id, specification)
+        for evidence_id, specification in _HTTP_SEMANTICS_SUCCESSION_EVIDENCE.items()
+    ]
+    succession_relations = [
+        _http_semantics_succession_relation(
+            manifest, kind=kind, target_number=target_number
+        )
+        for _field, (_current, _dependency, kind, target_number) in (
+            _HTTP_SEMANTICS_SUCCESSION_BRANCHES.items()
+        )
+        if kind is not None and target_number is not None
+    ]
+    publication = [
+        relation
+        for relation in manifest["relations"]
+        if relation.get("kind") == "published_as"
+        and relation.get("target_record_id") == "ietf:rfc:9110"
+    ]
+    if len(publication) != 1:
+        raise ProvenanceError("IETF HTTP Semantics publication relation is not unique")
+    task = {
+        "schema_version": IETF_HTTP_SEMANTICS_SUCCESSION_TASK_SCHEMA,
+        "query_type": "protocol_succession_resolution",
+        "answer_program_id": "ietf.http_semantics_succession.v1",
+        "question": _http_semantics_succession_question(),
+        "cutoff": "2026-01-31T00:00:00Z",
+        "scenario": dict(_HTTP_SEMANTICS_SUCCESSION_SCENARIO),
+        "source_manifest": deepcopy(manifest),
+        "source_manifest_sha256": _canonical_sha256(manifest),
+        "evidence_items": evidence,
+        "essential_evidence_ids": list(_HTTP_SEMANTICS_SUCCESSION_EVIDENCE),
+        "essential_relation_ids": [
+            publication[0]["relation_id"],
+            *(relation["relation_id"] for relation in succession_relations),
+        ],
+        "answer": dict(_HTTP_SEMANTICS_SUCCESSION_ANSWERS),
+    }
+    replay_ietf_http_semantics_succession_task(task)
+    return task
+
+
+def replay_ietf_http_semantics_succession_task(
+    task: dict[str, Any],
+    *,
+    evidence_ids: list[str] | None = None,
+    relation_ids: list[str] | None = None,
+) -> dict[str, str]:
+    """Replay HTTP Semantics succession with optional evidence or relation removal."""
+    required_fields = {
+        "schema_version",
+        "query_type",
+        "answer_program_id",
+        "question",
+        "cutoff",
+        "scenario",
+        "source_manifest",
+        "source_manifest_sha256",
+        "evidence_items",
+        "essential_evidence_ids",
+        "essential_relation_ids",
+        "answer",
+    }
+    if (
+        not isinstance(task, dict)
+        or set(task) != required_fields
+        or task.get("schema_version") != IETF_HTTP_SEMANTICS_SUCCESSION_TASK_SCHEMA
+        or task.get("query_type") != "protocol_succession_resolution"
+        or task.get("answer_program_id") != "ietf.http_semantics_succession.v1"
+        or task.get("question") != _http_semantics_succession_question()
+        or task.get("cutoff") != "2026-01-31T00:00:00Z"
+        or task.get("scenario") != _HTTP_SEMANTICS_SUCCESSION_SCENARIO
+        or task.get("essential_evidence_ids") != list(_HTTP_SEMANTICS_SUCCESSION_EVIDENCE)
+        or task.get("answer") != _HTTP_SEMANTICS_SUCCESSION_ANSWERS
+    ):
+        raise ProvenanceError("IETF HTTP Semantics task contract is invalid")
+    manifest = task.get("source_manifest")
+    if not isinstance(manifest, dict):
+        raise ProvenanceError("IETF HTTP Semantics source manifest is missing")
+    audit_ietf_workflow_manifest(manifest)
+    if task.get("source_manifest_sha256") != _canonical_sha256(manifest):
+        raise ProvenanceError("IETF HTTP Semantics source manifest binding is invalid")
+    records = _http_semantics_rfc_records(manifest)
+    _http_semantics_predecessor_update(manifest)
+    raw_evidence = task.get("evidence_items")
+    if not isinstance(raw_evidence, list):
+        raise ProvenanceError("IETF HTTP Semantics evidence is invalid")
+    items = {
+        str(item.get("evidence_id") or ""): item
+        for item in raw_evidence
+        if isinstance(item, dict)
+    }
+    if set(items) != set(_HTTP_SEMANTICS_SUCCESSION_EVIDENCE) or len(items) != len(
+        raw_evidence
+    ):
+        raise ProvenanceError("IETF HTTP Semantics evidence identity is invalid")
+    for evidence_id, specification in _HTTP_SEMANTICS_SUCCESSION_EVIDENCE.items():
+        expected = _http_semantics_succession_evidence(
+            records, evidence_id, specification
+        )
+        if items[evidence_id] != expected:
+            raise ProvenanceError("IETF HTTP Semantics evidence binding is invalid")
+    all_evidence = set(items)
+    selected_evidence = all_evidence if evidence_ids is None else set(evidence_ids)
+    if (
+        not isinstance(evidence_ids, (list, type(None)))
+        or len(selected_evidence) != len(evidence_ids or selected_evidence)
+        or not selected_evidence.issubset(all_evidence)
+    ):
+        raise ProvenanceError("IETF HTTP Semantics evidence selection is invalid")
+    relations = {
+        str(relation["relation_id"]): relation for relation in manifest["relations"]
+    }
+    essential_relations = task.get("essential_relation_ids")
+    if (
+        not isinstance(essential_relations, list)
+        or len(set(essential_relations)) != len(essential_relations)
+        or any(item not in relations for item in essential_relations)
+    ):
+        raise ProvenanceError("IETF HTTP Semantics relation identity is invalid")
+    selected_relations = (
+        set(essential_relations) if relation_ids is None else set(relation_ids)
+    )
+    if (
+        not isinstance(relation_ids, (list, type(None)))
+        or len(selected_relations) != len(relation_ids or selected_relations)
+        or not selected_relations.issubset(set(essential_relations))
+    ):
+        raise ProvenanceError("IETF HTTP Semantics relation selection is invalid")
+    publication = next(
+        relation
+        for relation in manifest["relations"]
+        if relation.get("kind") == "published_as"
+        and relation.get("target_record_id") == "ietf:rfc:9110"
+    )
+    expected_essential_relations = [
+        publication["relation_id"],
+        *(
+            _http_semantics_succession_relation(
+                manifest, kind=kind, target_number=target_number
+            )["relation_id"]
+            for _field, (_current, _dependency, kind, target_number) in (
+                _HTTP_SEMANTICS_SUCCESSION_BRANCHES.items()
+            )
+            if kind is not None and target_number is not None
+        ),
+    ]
+    if essential_relations != expected_essential_relations:
+        raise ProvenanceError("IETF HTTP Semantics task contract is invalid")
+    result: dict[str, str] = {}
+    publication_present = publication["relation_id"] in selected_relations
+    for field, (current, dependency, kind, target_number) in (
+        _HTTP_SEMANTICS_SUCCESSION_BRANCHES.items()
+    ):
+        needed = {current} if dependency is None else {current, dependency}
+        relations_present = publication_present
+        if kind is not None and target_number is not None:
+            relation = _http_semantics_succession_relation(
+                manifest, kind=kind, target_number=target_number
+            )
+            relations_present = (
+                publication_present and relation["relation_id"] in selected_relations
+            )
+        if needed.issubset(selected_evidence) and relations_present:
+            result[field] = _HTTP_SEMANTICS_SUCCESSION_ANSWERS[field]
+        else:
+            result[field] = "UNKNOWN"
+    return result
+
+
+def audit_ietf_http_semantics_succession_task(task: dict[str, Any]) -> dict[str, bool]:
+    """Audit strict replay plus every remove-one evidence and relation replay."""
+    answer = task.get("answer")
+    evidence = list(task.get("essential_evidence_ids") or [])
+    relations = list(task.get("essential_relation_ids") or [])
+    return {
+        "strict_replay": replay_ietf_http_semantics_succession_task(task) == answer,
+        "remove_one_evidence_fails": bool(evidence)
+        and all(
+            replay_ietf_http_semantics_succession_task(
+                task,
+                evidence_ids=[item for item in evidence if item != removed],
+            )
+            != answer
+            for removed in evidence
+        ),
+        "remove_one_relation_fails": bool(relations)
+        and all(
+            replay_ietf_http_semantics_succession_task(
+                task,
+                relation_ids=[item for item in relations if item != removed],
+            )
+            != answer
+            for removed in relations
+        ),
+    }
+
+
+def materialize_ietf_http_semantics_counterfactual(
+    task: dict[str, Any],
+    *,
+    evidence_id: str = "current_protocol",
+) -> dict[str, Any]:
+    """Exclude one byte-bound HTTP Semantics succession quote without invented text."""
+    replay_ietf_http_semantics_succession_task(task)
+    evidence = next(
+        (
+            item
+            for item in task["evidence_items"]
+            if item.get("evidence_id") == evidence_id
+        ),
+        None,
+    )
+    if not isinstance(evidence, dict):
+        raise ProvenanceError("IETF HTTP Semantics counterfactual requirement is invalid")
+    manifest = task["source_manifest"]
+    record = next(
+        item
+        for item in manifest["records"]
+        if item.get("record_id") == evidence.get("record_id")
+    )
+    parent = str(record["text"])
+    parent_value = str(evidence["evidence_quote"])
+    char_start = int(evidence["char_start"])
+    char_end = int(evidence["char_end"])
+    if parent[char_start:char_end] != parent_value:
+        raise ProvenanceError(
+            "IETF HTTP Semantics counterfactual requirement span is invalid"
+        )
+    value = " " * len(parent_value)
+    child = parent[:char_start] + value + parent[char_end:]
+    byte_start = len(parent[:char_start].encode())
+    byte_end = byte_start + len(parent_value.encode())
+    selected_evidence = [
+        item["evidence_id"]
+        for item in task["evidence_items"]
+        if item.get("evidence_id") != evidence["evidence_id"]
+    ]
+    answer = replay_ietf_http_semantics_succession_task(
         task, evidence_ids=selected_evidence
     )
     return {

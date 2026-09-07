@@ -1284,6 +1284,7 @@ def _task_sidecar_matches_candidate(
             "standards.ietf_oauth_requirement.v1": "standards",
             "standards.ietf_http3_quic_requirement.v1": "standards",
             "standards.ietf_tls13_handshake_succession.v1": "standards",
+            "standards.ietf_http_semantics_succession.v1": "standards",
         }
         return bool(
             key[0] in expected_domains

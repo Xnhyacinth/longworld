@@ -54,10 +54,12 @@ from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
 from longworld.core.standardsworkflow import (
     IETF_HTTP3_QUIC_REQUIREMENT_TASK_SCHEMA,
     IETF_TLS13_HANDSHAKE_SUCCESSION_TASK_SCHEMA,
+    IETF_HTTP_SEMANTICS_SUCCESSION_TASK_SCHEMA,
     render_ietf_cross_spec_prompt,
     replay_ietf_cross_spec_requirement_task,
     replay_ietf_http3_quic_requirement_task,
     replay_ietf_tls13_handshake_succession_task,
+    replay_ietf_http_semantics_succession_task,
 )
 from longworld.core.taskreplaysidecar import (
     CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
@@ -68,6 +70,7 @@ from longworld.core.taskreplaysidecar import (
     IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER,
     IETF_OAUTH_TASK_REPLAY_ADAPTER,
     IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER,
+    IETF_HTTP_SEMANTICS_TASK_REPLAY_ADAPTER,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     SOURCE_TOKEN_MEASUREMENT_BASIS,
     SOURCE_TOKEN_MEASUREMENT_RECEIPT_SCHEMA,
@@ -87,6 +90,7 @@ _IETF_REQUIREMENT_FAMILIES = {
     IETF_OAUTH_TASK_REPLAY_ADAPTER[:2],
     IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER[:2],
     IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER[:2],
+    IETF_HTTP_SEMANTICS_TASK_REPLAY_ADAPTER[:2],
 }
 
 
@@ -371,6 +375,12 @@ def replay_ietf_cross_spec_candidate(
             evidence_ids=evidence_ids,
             relation_ids=replay_relation_ids,
         )
+    elif task.get("schema_version") == IETF_HTTP_SEMANTICS_SUCCESSION_TASK_SCHEMA:
+        answer = replay_ietf_http_semantics_succession_task(
+            task,
+            evidence_ids=evidence_ids,
+            relation_ids=replay_relation_ids,
+        )
     else:
         answer = replay_ietf_cross_spec_requirement_task(
             task,
@@ -600,6 +610,14 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
             isinstance(task, dict)
             and task.get("schema_version") == IETF_TLS13_HANDSHAKE_SUCCESSION_TASK_SCHEMA
             and task.get("answer_program_id") == "ietf.tls13_handshake_succession.v1"
+            and candidate.get("answer_program_id") == task.get("answer_program_id")
+        )
+    elif family == IETF_HTTP_SEMANTICS_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("ietf_requirement_task")
+        replay_identity_valid = bool(
+            isinstance(task, dict)
+            and task.get("schema_version") == IETF_HTTP_SEMANTICS_SUCCESSION_TASK_SCHEMA
+            and task.get("answer_program_id") == "ietf.http_semantics_succession.v1"
             and candidate.get("answer_program_id") == task.get("answer_program_id")
         )
     elif family == EURLEX_PMS_TASK_REPLAY_ADAPTER[:2]:
