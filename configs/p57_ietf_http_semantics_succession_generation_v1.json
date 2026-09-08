@@ -1,0 +1,79 @@
+{
+  "schema_version": "longworld.ietf-http-semantics-generation-config.v1",
+  "source_inventory_dir": "/workspace/wynckeliao/longworld/data/source_inventory/p57_ietf_http_semantics_graph_v1",
+  "fetch_inventory_file": "ietf_fetch_inventory.json",
+  "fetch_inventory_sha256": "8dd8cacbb884a856ceb67af99b7ae0626cbac3a0076d364fdd2a5f9ae3fd2f5e",
+  "signed_workflow_file": "ietf_workflow_manifest.p57.http-semantics.v1.signed.json",
+  "signed_workflow_sha256": "51a09ec21061cdb7a1385cf670e1a9e4199145b2f1acef12a994a0ffee40b907",
+  "predecessor_report_manifest_sha256": "51a09ec21061cdb7a1385cf670e1a9e4199145b2f1acef12a994a0ffee40b907",
+  "predecessor_report_task_sha256": "76273540b7c8a35f0d58b7b064827d7f0122ef293208c856bcf9a24d754345cd",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "world_id": "ietf-http-semantics-succession-v1",
+  "length_buckets": {
+    "128k": [128000, 131072]
+  },
+  "packing": {
+    "target_margin_tokens": 256,
+    "unit_boundary": "source_blank_line_or_form_feed",
+    "record_ids_by_bucket": {
+      "128k": [
+        "ietf:draft:draft-ietf-httpbis-semantics-19",
+        "ietf:rfc:2818",
+        "ietf:rfc:3864",
+        "ietf:rfc:7230",
+        "ietf:rfc:7231",
+        "ietf:rfc:7232",
+        "ietf:rfc:7233",
+        "ietf:rfc:7235",
+        "ietf:rfc:7538",
+        "ietf:rfc:7615",
+        "ietf:rfc:9110"
+      ]
+    },
+    "chunked_record_ids": [
+      "ietf:rfc:7230",
+      "ietf:rfc:7231",
+      "ietf:rfc:9110"
+    ],
+    "chunk_max_tokens": 16384,
+    "chunk_max_tokens_by_bucket": {
+      "128k": 16384
+    },
+    "published_draft_policy": "",
+    "support_priority_record_ids": [
+      "ietf:rfc:2818",
+      "ietf:rfc:3864",
+      "ietf:rfc:7230",
+      "ietf:rfc:7231",
+      "ietf:rfc:7232",
+      "ietf:rfc:7233",
+      "ietf:rfc:7235",
+      "ietf:rfc:7538",
+      "ietf:rfc:7615",
+      "ietf:rfc:9110"
+    ],
+    "pin_last_leftover_record_ids": [
+      "ietf:rfc:9110"
+    ],
+    "span_id_width": 7,
+    "counterfactual_evidence_id": "current_protocol",
+    "padding": false,
+    "cloned_artifacts": false,
+    "synthetic_filler": false
+  },
+  "workflow_id": "p57-ietf-http-semantics-succession-v1",
+  "dense_model": {
+    "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+  },
+  "output_dir": "/workspace/wynckeliao/longworld/data/candidates/p57_ietf_http_semantics_succession_v1",
+  "do_not_select": true,
+  "do_not_promote": true,
+  "do_not_count": true
+}

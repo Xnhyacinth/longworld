@@ -1,0 +1,30 @@
+{
+  "schema_version": "longworld.micron-dual-partition-generation.v1",
+  "signed_issuer_manifest": "/workspace/wynckeliao/longworld/data/source_inventory/p57_finance_micron_ir_fy2022_2025_v1/issuer_ir_manifest.signed.json",
+  "signed_issuer_manifest_sha256": "b72d1742da7dfb13145867bd8d98394a7b829e109c7abdc62d52a5a7c77077bd",
+  "isolated_trust": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/micron/",
+  "answer_program_id": "micron.dual_partition_identity.v1",
+  "world_id": "finance_micron_dual_partition_identity_fy2022_2025_v1",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "length_buckets": {
+    "32k": [32000, 32768]
+  },
+  "packing": {
+    "pack_parent": true,
+    "padding": false,
+    "cloned_artifacts": false,
+    "synthetic_filler": false,
+    "unrelated_statement_fill": false
+  },
+  "output_dir": "/workspace/wynckeliao/longworld-worlds/reports/p57_finance_micron_dual_partition_v1",
+  "production_eligible": false,
+  "do_not_select": true,
+  "do_not_promote": true,
+  "do_not_count": true
+}

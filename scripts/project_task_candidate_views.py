@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import multiprocessing
 import os
 import sys
 import tempfile
@@ -43,6 +44,8 @@ MANIFEST_SCHEMA = "longworld.task-view-projection-manifest.v1"
 COMMITMENT_INPUT_SCHEMA = "longworld.task-view-source-commitment-input.v1"
 AUDIT_MANIFEST_SCHEMA = "longworld.task-view-dense-audit-manifest.v1"
 MAX_INPUT_BYTES = 512_000_000
+_MAX_AUDIT_WORKERS = 16
+_AUDIT_WORKER_STATE: dict[str, Any] = {}
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -325,7 +328,26 @@ def project(
     return manifest
 
 
-def audit_projections(output_dir: Path, ranking_path: Path) -> dict[str, Any]:
+def _audit_one_projection(item: tuple[dict[str, Any], dict[str, Any]]) -> dict[str, Any]:
+    candidate, ranking = item
+    return create_task_dense_audit(
+        candidate,
+        ranking,
+        _AUDIT_WORKER_STATE["sidecar"],
+        candidate_attestation_key=_AUDIT_WORKER_STATE["candidate_key"],
+        ranking_attestation_key=_AUDIT_WORKER_STATE["ranking_key"],
+        audit_attestation_key=_AUDIT_WORKER_STATE["audit_key"],
+        source_attestation_key=_AUDIT_WORKER_STATE["source_key"],
+    )
+
+
+def audit_projections(
+    output_dir: Path,
+    ranking_path: Path,
+    *,
+    workers: int = 1,
+    length_buckets: set[str] | None = None,
+) -> dict[str, Any]:
     """Replay one independently signed dense ranking for every projection."""
     output_dir = output_dir.resolve()
     candidate_key = attestation_key_from_env(CANDIDATE_ATTESTATION_PURPOSE)
@@ -352,7 +374,21 @@ def audit_projections(output_dir: Path, ranking_path: Path) -> dict[str, Any]:
     )
     if sidecar.sidecar_schema_version != TASK_REPLAY_SIDECAR_SCHEMA_V3:
         raise ValueError("projected task replay sidecar is not v3")
+    if (
+        isinstance(workers, bool)
+        or not isinstance(workers, int)
+        or not 1 <= workers <= _MAX_AUDIT_WORKERS
+    ):
+        raise ValueError(f"audit workers must be between 1 and {_MAX_AUDIT_WORKERS}")
     candidates = _read_jsonl(output_dir / "candidates.jsonl")
+    if length_buckets:
+        candidates = [
+            row
+            for row in candidates
+            if str(row.get("length_bucket") or "") in length_buckets
+        ]
+        if not candidates:
+            raise ValueError("no projection candidates remain after length-bucket filter")
     rankings = _read_jsonl(ranking_path)
     ranking_by_query: dict[str, dict[str, Any]] = {}
     for ranking in rankings:
@@ -361,20 +397,45 @@ def audit_projections(output_dir: Path, ranking_path: Path) -> dict[str, Any]:
             raise ValueError("dense rankings have missing or duplicate query ids")
         ranking_by_query[query_id] = ranking
     candidate_queries = {str(row.get("query_id") or "") for row in candidates}
-    if "" in candidate_queries or set(ranking_by_query) != candidate_queries:
+    if "" in candidate_queries:
         raise ValueError("dense rankings do not exactly cover projection candidates")
-    audits = [
-        create_task_dense_audit(
-            candidate,
-            ranking_by_query[str(candidate["query_id"])],
-            sidecar,
-            candidate_attestation_key=candidate_key,
-            ranking_attestation_key=ranking_key,
-            audit_attestation_key=audit_key,
-            source_attestation_key=source_key,
-        )
+    missing = candidate_queries - set(ranking_by_query)
+    if missing:
+        raise ValueError("dense rankings do not exactly cover projection candidates")
+    ranking_by_query = {
+        query_id: ranking_by_query[query_id] for query_id in candidate_queries
+    }
+    items = [
+        (candidate, ranking_by_query[str(candidate["query_id"])])
         for candidate in candidates
     ]
+    worker_count = 1 if workers <= 1 else min(workers, len(items), _MAX_AUDIT_WORKERS)
+    if worker_count <= 1:
+        audits = [
+            create_task_dense_audit(
+                candidate,
+                ranking,
+                sidecar,
+                candidate_attestation_key=candidate_key,
+                ranking_attestation_key=ranking_key,
+                audit_attestation_key=audit_key,
+                source_attestation_key=source_key,
+            )
+            for candidate, ranking in items
+        ]
+    else:
+        _AUDIT_WORKER_STATE.update(
+            {
+                "sidecar": sidecar,
+                "candidate_key": candidate_key,
+                "ranking_key": ranking_key,
+                "audit_key": audit_key,
+                "source_key": source_key,
+            }
+        )
+        context = multiprocessing.get_context("fork")
+        with context.Pool(worker_count) as pool:
+            audits = pool.map(_audit_one_projection, items, chunksize=1)
     audits.sort(key=lambda row: (str(row["query_id"]), str(row["candidate_sha256"])))
     audit_bytes = _jsonl_bytes(audits)
     ranking_bytes = _read_regular_file(ranking_path, MAX_INPUT_BYTES)
@@ -417,11 +478,28 @@ def main() -> int:
         action="store_true",
         help="audit existing projections without rebuilding them",
     )
+    parser.add_argument(
+        "--audit-workers",
+        type=int,
+        default=1,
+        help="process-pool workers for independent dense-audit views",
+    )
     args = parser.parse_args()
+    if (
+        isinstance(args.audit_workers, bool)
+        or not isinstance(args.audit_workers, int)
+        or not 1 <= args.audit_workers <= _MAX_AUDIT_WORKERS
+    ):
+        raise SystemExit(f"--audit-workers must be between 1 and {_MAX_AUDIT_WORKERS}")
     if args.audit_only:
         if args.rankings is None:
             raise SystemExit("--audit-only requires --rankings")
-        audit_projections(args.output_dir, args.rankings)
+        audit_projections(
+            args.output_dir,
+            args.rankings,
+            workers=args.audit_workers,
+            length_buckets=set(args.length_bucket) if args.length_bucket else None,
+        )
         return 0
     project(
         args.candidates,
@@ -430,7 +508,12 @@ def main() -> int:
         length_buckets=set(args.length_bucket) if args.length_bucket else None,
     )
     if args.rankings is not None:
-        audit_projections(args.output_dir, args.rankings)
+        audit_projections(
+            args.output_dir,
+            args.rankings,
+            workers=args.audit_workers,
+            length_buckets=set(args.length_bucket) if args.length_bucket else None,
+        )
     return 0
 
 

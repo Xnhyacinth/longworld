@@ -406,6 +406,475 @@ def test_builds_distinct_multi_filing_asset_trajectory_program() -> None:
         assert all(audit_financial_history_candidate(row).values())
 
 
+_NVIDIA_MARKET_AXIS = {
+    "market_data_center": "srt_ProductOrServiceAxis=nvda_DataCenterMember",
+    "market_gaming": "srt_ProductOrServiceAxis=nvda_GamingMember",
+    "market_professional_visualization": (
+        "srt_ProductOrServiceAxis=nvda_ProfessionalVisualizationMember"
+    ),
+    "market_automotive": "srt_ProductOrServiceAxis=nvda_AutomotiveMember",
+    "market_oem_other": "srt_ProductOrServiceAxis=nvda_OEMAndOtherMember",
+}
+
+
+def _crossover_filings() -> tuple[FinancialFiling, ...]:
+    years = (
+        ("2022-01-30", 10_613, 12_462, 2_111, 566, 1_162, 26_914, True),
+        ("2023-01-29", 15_005, 9_067, 1_544, 903, 455, 26_974, False),
+        ("2024-01-28", 47_525, 10_447, 1_553, 1_091, 306, 60_922, False),
+        ("2025-01-26", 115_186, 11_350, 1_878, 1_694, 389, 130_497, False),
+    )
+    filings: list[FinancialFiling] = []
+    for year_index, (
+        report_date,
+        data_center,
+        gaming,
+        professional,
+        automotive,
+        oem_other,
+        revenue,
+        fy2022_concept,
+    ) in enumerate(years):
+        concept = (
+            "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax"
+            if fy2022_concept
+            else "defref_us-gaap_Revenues"
+        )
+        values = {
+            "revenue": revenue,
+            "market_data_center": data_center,
+            "market_gaming": gaming,
+            "market_professional_visualization": professional,
+            "market_automotive": automotive,
+            "market_oem_other": oem_other,
+        }
+        rows: list[FinancialSourceRow] = []
+        for row_index, (role, value) in enumerate(values.items()):
+            quote = f"{value:,}"
+            if role == "revenue":
+                prefix = f"{concept} | >Revenues</a> | fiscal {report_date} | "
+            else:
+                prefix = (
+                    f"{_NVIDIA_MARKET_AXIS[role]} | {concept} | >Revenue</a> | "
+                    f"fiscal {report_date} | "
+                )
+            text = prefix + quote + " | " + (f"market row {report_date} {role} " * 8)
+            rows.append(
+                FinancialSourceRow(
+                    record_id=f"nvidia-{report_date}:row:{row_index}",
+                    filing_record_id=f"nvidia-{report_date}",
+                    report_date=report_date,
+                    source_url=f"https://investor.nvidia.com/{report_date}",
+                    source_sha256=f"{year_index + 1}" * 64,
+                    section="Segment Information - Schedule of Revenue by Market (Details)",
+                    source_char_start=row_index * 2_000,
+                    source_char_end=row_index * 2_000 + len(text),
+                    source_text=text,
+                    facts=(
+                        FinancialFact(
+                            role=role,
+                            evidence_quote=quote,
+                            relative_start=len(prefix),
+                        ),
+                    ),
+                )
+            )
+        for support_index in range(40):
+            text = f"supporting note {report_date} {support_index} | " + (
+                f"distinct disclosed term {report_date}-{support_index} " * 10
+            )
+            start = 30_000 + support_index * 1_000
+            rows.append(
+                FinancialSourceRow(
+                    record_id=f"nvidia-{report_date}:support:{support_index}",
+                    filing_record_id=f"nvidia-{report_date}",
+                    report_date=report_date,
+                    source_url=f"https://investor.nvidia.com/{report_date}",
+                    source_sha256=f"{year_index + 1}" * 64,
+                    section=f"note-{support_index // 8}",
+                    source_char_start=start,
+                    source_char_end=start + len(text),
+                    source_text=text,
+                    facts=(),
+                )
+            )
+        year = int(report_date[:4])
+        filings.append(
+            FinancialFiling(
+                record_id=f"nvidia-{report_date}",
+                filing_date=f"{year}-02-18",
+                report_date=report_date,
+                source_url=f"https://investor.nvidia.com/{report_date}",
+                source_sha256=f"{year_index + 1}" * 64,
+                rows=tuple(rows),
+            )
+        )
+    return tuple(filings)
+
+
+def _dual_partition_filings() -> tuple[FinancialFiling, ...]:
+    years = (
+        (
+            "2022-09-01",
+            15_540,
+            11_315,
+            3_434,
+            791,
+            {"us": 10_175, "taiwan": 2_683, "other": 2_682},
+        ),
+        (
+            "2023-08-31",
+            15_540,
+            7_431,
+            6_161,
+            1_948,
+            {
+                "us": 6_698,
+                "taiwan": 2_176,
+                "europe": 1_398,
+                "other": 5_268,
+            },
+        ),
+        (
+            "2024-08-29",
+            25_111,
+            15_476,
+            6_775,
+            2_860,
+            {
+                "us": 10_123,
+                "taiwan": 3_012,
+                "europe": 2_226,
+                "other": 9_750,
+            },
+        ),
+        (
+            "2025-08-28",
+            37_378,
+            28_578,
+            6_223,
+            2_577,
+            {
+                "us": 14_012,
+                "taiwan": 4_201,
+                "europe": 3_334,
+                "other": 15_831,
+            },
+        ),
+    )
+    filings: list[FinancialFiling] = []
+    for year_index, (report_date, revenue, dram, nand, other, geography) in enumerate(
+        years
+    ):
+        values: dict[str, int] = {
+            "revenue": revenue,
+            "category_dram": dram,
+            "category_nand": nand,
+            "category_other": other,
+            **{f"geo_{name}": value for name, value in geography.items()},
+        }
+        rows: list[FinancialSourceRow] = []
+        for row_index, (role, value) in enumerate(values.items()):
+            quote = f"{value:,}"
+            if role == "revenue":
+                prefix = (
+                    "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax"
+                    " | Total net sales | "
+                    f"fiscal {report_date} | "
+                )
+            else:
+                prefix = (
+                    "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax | "
+                    f"fiscal {report_date} {role} | "
+                )
+            text = prefix + quote + " | " + (f"mix row {report_date} {role} " * 8)
+            rows.append(
+                FinancialSourceRow(
+                    record_id=f"micron-{report_date}:row:{row_index}",
+                    filing_record_id=f"micron-{report_date}",
+                    report_date=report_date,
+                    source_url=f"https://investors.micron.com/{report_date}",
+                    source_sha256=f"{year_index + 1}" * 64,
+                    section=(
+                        "CONSOLIDATED STATEMENTS OF OPERATIONS"
+                        if role == "revenue"
+                        else (
+                            "Revenue by Technology (Details)"
+                            if role.startswith("category_")
+                            else "Geographic Information - Revenue (Details)"
+                        )
+                    ),
+                    source_char_start=row_index * 2_000,
+                    source_char_end=row_index * 2_000 + len(text),
+                    source_text=text,
+                    facts=(
+                        FinancialFact(
+                            role=role,
+                            evidence_quote=quote,
+                            relative_start=len(prefix),
+                        ),
+                    ),
+                )
+            )
+        year = int(report_date[:4])
+        filings.append(
+            FinancialFiling(
+                record_id=f"micron-{report_date}",
+                filing_date=f"{year}-10-16",
+                report_date=report_date,
+                source_url=f"https://investors.micron.com/{report_date}",
+                source_sha256=f"{year_index + 1}" * 64,
+                rows=tuple(rows),
+            )
+        )
+    return tuple(filings)
+
+
+def test_builds_distinct_nvidia_market_mix_crossover_program() -> None:
+    rows = build_financial_history_candidates(
+        _crossover_filings(),
+        world_id="finance-nvidia-market-mix-crossover-test",
+        issuer_name="NVIDIA Corporation",
+        cik="0001045810",
+        source_binding={
+            "signed_manifest_sha256": "a" * 64,
+            "source_family": "issuer_ir_rendered_xbrl",
+            "authorization_record_id": "AUTH-NVIDIA-CROSSOVER",
+        },
+        bands=(HistoryBand("64k", 5_000, 200_000),),
+        token_counter=len,
+        tokenizer_model_id="Qwen/Qwen3.5-4B",
+        tokenizer_revision="b" * 40,
+        answer_program_id="nvidia.market_mix_crossover.v1",
+    )
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["length_bucket"] == "64k"
+    assert row["query_type"] == "nvidia_market_mix_crossover"
+    assert row["answer_program_id"] == "nvidia.market_mix_crossover.v1"
+    assert row["selected_filing_count"] == 4
+    assert "cross_filing_asset_trajectory" not in row["answer_program_operations"]
+    answer = json.loads(row["answer"])
+    assert answer["crossover"] == {
+        "prior_report_date": "2022-01-30",
+        "first_data_center_led_report_date": "2023-01-29",
+        "later_years_remain_data_center_led": True,
+    }
+    assert [obs["report_date"] for obs in answer["annual_observations"]] == [
+        "2022-01-30",
+        "2023-01-29",
+        "2024-01-28",
+        "2025-01-26",
+    ]
+    assert [obs["data_center_exceeds_gaming"] for obs in answer["annual_observations"]] == [
+        False,
+        True,
+        True,
+        True,
+    ]
+    assert all(obs["market_mix_reconciled"] is True for obs in answer["annual_observations"])
+    assert answer["annual_observations"][0]["market_revenue_concept"] == (
+        "RevenueFromContractWithCustomerExcludingAssessedTax"
+    )
+    assert {obs["market_revenue_concept"] for obs in answer["annual_observations"][1:]} == {
+        "Revenues"
+    }
+    essential_roles = {
+        fact["role"]
+        for line in row["context"].splitlines()
+        if json.loads(line).get("record_type") == "financial_source_row"
+        and json.loads(line).get("source_record_id") in row["essential_evidence_ids"]
+        for fact in json.loads(line).get("facts") or []
+    }
+    assert {
+        "revenue",
+        "market_data_center",
+        "market_gaming",
+        "market_professional_visualization",
+        "market_automotive",
+        "market_oem_other",
+    } <= essential_roles
+    assert "assets" not in essential_roles
+    quotes = [
+        fact["evidence_quote"]
+        for line in row["context"].splitlines()
+        if json.loads(line).get("record_type") == "financial_source_row"
+        for fact in json.loads(line).get("facts") or []
+        if fact.get("role") == "market_data_center"
+    ]
+    assert quotes == ["10,613", "15,005", "47,525", "115,186"]
+    assert all(audit_financial_history_candidate(row).values())
+
+
+def test_nvidia_market_mix_crossover_refuses_16k_32k_clones() -> None:
+    with pytest.raises(ProvenanceError, match="materialization identity is invalid"):
+        build_financial_history_candidates(
+            _crossover_filings(),
+            world_id="finance-nvidia-market-mix-crossover-clone-test",
+            issuer_name="NVIDIA Corporation",
+            cik="0001045810",
+            source_binding={
+                "signed_manifest_sha256": "a" * 64,
+                "source_family": "issuer_ir_rendered_xbrl",
+                "authorization_record_id": "AUTH-NVIDIA-CROSSOVER",
+            },
+            bands=_bands(),
+            token_counter=len,
+            tokenizer_model_id="Qwen/Qwen3.5-4B",
+            tokenizer_revision="b" * 40,
+            answer_program_id="nvidia.market_mix_crossover.v1",
+        )
+
+
+def test_nvidia_market_mix_crossover_pipeline_binds_distinct_program() -> None:
+    [row] = build_financial_history_candidates(
+        _crossover_filings(),
+        world_id="finance-nvidia-market-mix-crossover-pipeline-test",
+        issuer_name="NVIDIA Corporation",
+        cik="0001045810",
+        source_binding={
+            "signed_manifest_sha256": "a" * 64,
+            "source_family": "issuer_ir_rendered_xbrl",
+            "authorization_record_id": "AUTH-NVIDIA-CROSSOVER",
+        },
+        bands=(HistoryBand("64k", 5_000, 200_000),),
+        token_counter=len,
+        tokenizer_model_id="Qwen/Qwen3.5-4B",
+        tokenizer_revision="b" * 40,
+        answer_program_id="nvidia.market_mix_crossover.v1",
+    )
+    candidate = build_finance_pipeline_candidate(row)
+    assert candidate["finance_task"] == {
+        "query_type": "nvidia_market_mix_crossover",
+        "answer_program_id": "nvidia.market_mix_crossover.v1",
+        "answer_program_operations": [
+            "source_span_parse",
+            "per_year_data_center_gaming_compare",
+            "crossover_year_resolution",
+            "later_year_data_center_lead_certification",
+            "market_mix_identity",
+        ],
+    }
+    assert candidate["production_eligible"] is False
+    assert all(audit_finance_pipeline_candidate(candidate).values())
+
+
+def test_builds_distinct_micron_dual_partition_program() -> None:
+    rows = build_financial_history_candidates(
+        _dual_partition_filings(),
+        world_id="finance-micron-dual-partition-test",
+        issuer_name="Micron Technology, Inc.",
+        cik="0000723125",
+        source_binding={
+            "signed_manifest_sha256": "a" * 64,
+            "source_family": "issuer_ir_rendered_xbrl",
+            "authorization_record_id": "AUTH-MICRON-DUAL",
+        },
+        bands=(HistoryBand("32k", 5_000, 200_000),),
+        token_counter=len,
+        tokenizer_model_id="Qwen/Qwen3.5-4B",
+        tokenizer_revision="b" * 40,
+        answer_program_id="micron.dual_partition_identity.v1",
+    )
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["length_bucket"] == "32k"
+    assert row["query_type"] == "micron_dual_partition_identity"
+    assert row["answer_program_id"] == "micron.dual_partition_identity.v1"
+    assert row["selected_filing_count"] == 4
+    assert "cross_filing_asset_trajectory" not in row["answer_program_operations"]
+    answer = json.loads(row["answer"])
+    assert answer["dual_partition_identity"] is True
+    assert [item["report_date"] for item in answer["annual_partitions"]] == [
+        "2022-09-01",
+        "2023-08-31",
+        "2024-08-29",
+        "2025-08-28",
+    ]
+    assert [item["europe_present"] for item in answer["annual_partitions"]] == [
+        False,
+        True,
+        True,
+        True,
+    ]
+    assert all(item["technology_identity"] is True for item in answer["annual_partitions"])
+    assert all(item["geography_identity"] is True for item in answer["annual_partitions"])
+    cf = json.loads(row["cf_answer"])
+    assert cf["dual_partition_identity"] is False
+    assert row["counterfactual_twin"]["role"] == "category_dram"
+    essential_roles = {
+        fact["role"]
+        for line in row["context"].splitlines()
+        if json.loads(line).get("record_type") == "financial_source_row"
+        and json.loads(line).get("source_record_id") in row["essential_evidence_ids"]
+        for fact in json.loads(line).get("facts") or []
+    }
+    assert {
+        "revenue",
+        "category_dram",
+        "category_nand",
+        "category_other",
+        "geo_us",
+    } <= essential_roles
+    assert "geo_europe" in essential_roles
+    assert "assets" not in essential_roles
+    assert all(audit_financial_history_candidate(row).values())
+
+
+def test_micron_dual_partition_refuses_16k_64k_clones() -> None:
+    with pytest.raises(ProvenanceError, match="materialization identity is invalid"):
+        build_financial_history_candidates(
+            _dual_partition_filings(),
+            world_id="finance-micron-dual-partition-clone-test",
+            issuer_name="Micron Technology, Inc.",
+            cik="0000723125",
+            source_binding={
+                "signed_manifest_sha256": "a" * 64,
+                "source_family": "issuer_ir_rendered_xbrl",
+                "authorization_record_id": "AUTH-MICRON-DUAL",
+            },
+            bands=_bands(),
+            token_counter=len,
+            tokenizer_model_id="Qwen/Qwen3.5-4B",
+            tokenizer_revision="b" * 40,
+            answer_program_id="micron.dual_partition_identity.v1",
+        )
+
+
+def test_micron_dual_partition_pipeline_binds_distinct_program() -> None:
+    [row] = build_financial_history_candidates(
+        _dual_partition_filings(),
+        world_id="finance-micron-dual-partition-pipeline-test",
+        issuer_name="Micron Technology, Inc.",
+        cik="0000723125",
+        source_binding={
+            "signed_manifest_sha256": "a" * 64,
+            "source_family": "issuer_ir_rendered_xbrl",
+            "authorization_record_id": "AUTH-MICRON-DUAL",
+        },
+        bands=(HistoryBand("32k", 5_000, 200_000),),
+        token_counter=len,
+        tokenizer_model_id="Qwen/Qwen3.5-4B",
+        tokenizer_revision="b" * 40,
+        answer_program_id="micron.dual_partition_identity.v1",
+    )
+    candidate = build_finance_pipeline_candidate(row)
+    assert candidate["finance_task"] == {
+        "query_type": "micron_dual_partition_identity",
+        "answer_program_id": "micron.dual_partition_identity.v1",
+        "answer_program_operations": [
+            "source_span_parse",
+            "technology_revenue_identity",
+            "geography_revenue_identity",
+            "europe_presence",
+        ],
+    }
+    assert candidate["production_eligible"] is False
+    assert all(audit_finance_pipeline_candidate(candidate).values())
+
+
 def _filings_with_128k_tables() -> tuple[FinancialFiling, ...]:
     filings: list[FinancialFiling] = []
     for filing in _filings():

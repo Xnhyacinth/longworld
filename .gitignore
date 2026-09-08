@@ -40,6 +40,7 @@ saves/
 .longworld-local-probe-private/
 .longworld-scaleout-*-private/
 .longworld_probe_keys/
+.local-probe-env/
 
 # Local planning state (canonical project status lives in .hl/)
 .planning/

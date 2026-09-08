@@ -464,19 +464,49 @@ then centralized shared-gate review and inventory binding.
 | P54 EUR-Lex | partial aggregate preflight: six official MDR sources and natural 32K/64K/128K capacity, but only corrected-by is parsed; 0 candidates | bind exact relation spans and selected-document rights, register task replay, then run candidate-level exact-band and raw-token windows |
 | Integration | complete after review: train inventory remains 141 rows; B5 training-condition sample remains 80 examples | preserve immutable products; scale through new executable worlds, not view or length multiplication |
 
+## Source-to-training execution wave — 2026-09-06
+
+User requested continued rapid parallel execution, especially authentic effective
+data synthesis and world expansion. Execute the approved design in
+`reports/world_task_scaleout_plan_20260906.md`; this supersedes the old pending
+states above, without changing immutable gate profiles.
+
+| Track | Owner | Status | Current bounded deliverable |
+| --- | --- | --- | --- |
+| P54 exact-source oracle | p54 agent | in_progress | source spans, per-document reuse evidence, actual clause-transition oracle, reduced-evidence tests, then candidate adapter if justified |
+| P52 alternative transition | govinfo agent | in_progress | predeclared two-transition geometry batch, at most 12 combinations each, compatible builder and authentic parents if shared lengths/windows pass |
+| P46 public cap chain | worlds agent | in_progress | frozen public cap tables and Decimal temporal oracle; pivot to bounded NTSB branch evidence if short-source rejection holds |
+| Shared integration | root | in_progress | review oracle interfaces, shared candidate audit, source-bound conversion and inventory delta; no GPU training or publication |
+
+Execution refinements: the P52 2-key geometry and subsequent 2→6→12 growth
+layouts failed shared raw upper-bound checks. The 4→8→16 and 6→12→24 request
+expansions passed 32K raw proof and all-band growth prechecks; root is auditing
+the first complete set. Their all-M factual labels remain a content shortcut,
+so P56 now tests at most three frozen mixed R/M tasks with non-fixed CF anchor
+codes, without relaxing source dedup or any shared gate. Alphabet v3 has four
+source-bound bands and twelve standard views under the existing Finance
+profile. P54 is limited to one source-driven PMS/risk-reference chain after
+rejecting the qualification and single-reference shortcuts.
+
 ## Next Step
 
 P57 dual-track conversion 2026-09-07: Canonical remains 7 products / 17 worlds
-/ 153 train / 8,002,320 tokens. Local NVIDIA v5 + Micron v1 add two finance
-worlds (24 train / 1,461,529 exact tokens) not on CURRENT_RELEASE.
-`production_eligible=false`. TLS v4 is 6/6 green at 64k/128k and is not
-inventory until a unique IETF 2-band probe profile promotes it.
+/ 153 train / 8,002,320 tokens. Local extras not on CURRENT_RELEASE:
+NVIDIA v5 (12), Micron v1 (12), TLS v4 (6), HTTP Semantics v1 (3). Combined
+local+canonical is 11 products / 21 worlds / 186 train / 10,431,993 exact
+tokens. `production_eligible=false`. Production/KMS remains 0.
+
+TLS v4 counts as N_source-world=1, N_semantic-task=1, N_proof-family=1,
+N_training-view=6 under unique IETF 2-band profile
+`p57-ietf-tls13-64k-128k-extension-probe-1-v1`. HTTP Semantics v1 counts as
+1/1/1/3 under unique IETF 128k-only profile
+`p57-ietf-http-semantics-128k-extension-probe-1-v1`.
 
 Scale unit is verified independent semantic tasks from signed source graphs,
 not four-bucket world products. Strict 4k/8k/16k windows stay for the
 long-dependency profile. Retrieval/integration profiles are new versioned
-products, not a silent gate drop. Next conversion: (1) register and promote
-TLS 64k/128k on an IETF 2-band profile; (2) batch extra Finance/IETF queries
-from existing NVIDIA/Micron/TLS/HTTP-Semantics graphs; (3) keep Amazon/Meta/
-HTTP/3 fail-closed until window class is labeled. Do not rematerialize
-NVIDIA/Alphabet/Microsoft. Do not pad HTTP/2, DNSSEC, or ACME to 128k.
+products, not a silent gate drop. Next conversion: batch extra Finance/IETF
+queries from existing NVIDIA/Micron/TLS/HTTP-Semantics graphs; keep
+Amazon/Meta/HTTP/3 fail-closed until window class is labeled. Do not
+rematerialize NVIDIA/Alphabet/Microsoft. Do not pad HTTP/2, DNSSEC, or ACME
+to 128k.

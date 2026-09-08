@@ -1,5 +1,9 @@
 # Rejected or blocked directions
 
+- Do not explode SSH RFC 4251/4252/4254 into 299 blank-line artifacts to
+  clear the zipper 16k bound. Intersecting enumeration is pathological and
+  the pipeline caps parents at 80. Coarsen only the pin-last RFC 4254
+  leftover into 12–24 groups.
 - Do not clone HTTP/3 isolate-evidence / 5-field packing onto TLS succession.
   TLS v1 failed 16k-from-start because gold sat on chronology-start RFCs; v3
   failed 8k because leftover-only RFCs exploded into zipper tinies.

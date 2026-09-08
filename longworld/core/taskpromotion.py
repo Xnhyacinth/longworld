@@ -99,6 +99,11 @@ from longworld.core.taskreplaysidecar import (
     IETF_OAUTH_TASK_REPLAY_ADAPTER,
     IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER,
     IETF_HTTP_SEMANTICS_TASK_REPLAY_ADAPTER,
+    IETF_ACME_ISSUANCE_TASK_REPLAY_ADAPTER,
+    IETF_SSH_ARCHITECTURE_TASK_REPLAY_ADAPTER,
+    IETF_HTTP2_TASK_REPLAY_ADAPTER,
+    IETF_PKIX_PATH_TASK_REPLAY_ADAPTER,
+    IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     SOURCE_TOKEN_MEASUREMENT_BASIS,
     SOURCE_TOKEN_MEASUREMENT_RECEIPT_SCHEMA,
@@ -205,6 +210,11 @@ def _ietf_requirement_adapter(adapter_key: tuple[str, str, str]) -> bool:
         IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER[:2],
         IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER[:2],
         IETF_HTTP_SEMANTICS_TASK_REPLAY_ADAPTER[:2],
+        IETF_ACME_ISSUANCE_TASK_REPLAY_ADAPTER[:2],
+        IETF_SSH_ARCHITECTURE_TASK_REPLAY_ADAPTER[:2],
+        IETF_HTTP2_TASK_REPLAY_ADAPTER[:2],
+        IETF_PKIX_PATH_TASK_REPLAY_ADAPTER[:2],
+        IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER[:2],
     }
 
 
@@ -946,6 +956,16 @@ def _task_selection_metrics(
         group_suffix = "ietf-tls13-handshake-succession"
     elif _sidecar_uses(sidecar, IETF_HTTP_SEMANTICS_TASK_REPLAY_ADAPTER):
         group_suffix = "ietf-http-semantics-succession"
+    elif _sidecar_uses(sidecar, IETF_ACME_ISSUANCE_TASK_REPLAY_ADAPTER):
+        group_suffix = "ietf-acme-issuance-succession"
+    elif _sidecar_uses(sidecar, IETF_SSH_ARCHITECTURE_TASK_REPLAY_ADAPTER):
+        group_suffix = "ietf-ssh-architecture-succession"
+    elif _sidecar_uses(sidecar, IETF_HTTP2_TASK_REPLAY_ADAPTER):
+        group_suffix = "ietf-http2-succession"
+    elif _sidecar_uses(sidecar, IETF_PKIX_PATH_TASK_REPLAY_ADAPTER):
+        group_suffix = "ietf-pkix-path-succession"
+    elif _sidecar_uses(sidecar, IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER):
+        group_suffix = "ietf-dnssec-succession"
     elif _sidecar_uses(sidecar, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER):
         group_suffix = "govinfo-bill-disposition"
     elif _sidecar_uses(sidecar, EURLEX_PMS_TASK_REPLAY_ADAPTER):
@@ -1694,6 +1714,37 @@ def _canonical_task_identifiers(
                     "verify_balance_sheet",
                 ),
             ),
+            "nvidia.market_mix_crossover.v1": (
+                "market_mix_crossover+later_year_data_center_lead+mix_identity",
+                "nvidia_market_mix_crossover",
+                (
+                    "source_span_parse",
+                    "per_year_data_center_gaming_compare",
+                    "crossover_year_resolution",
+                    "later_year_data_center_lead_certification",
+                    "market_mix_identity",
+                ),
+                (
+                    "select_filing_chain",
+                    "compare_data_center_and_gaming",
+                    "verify_crossover_and_mix_identity",
+                ),
+            ),
+            "micron.dual_partition_identity.v1": (
+                "dual_partition_identity+europe_presence+mix_identity",
+                "micron_dual_partition_identity",
+                (
+                    "source_span_parse",
+                    "technology_revenue_identity",
+                    "geography_revenue_identity",
+                    "europe_presence",
+                ),
+                (
+                    "select_filing_chain",
+                    "reconcile_technology_and_geography",
+                    "verify_dual_partition_identity",
+                ),
+            ),
         }
         program = finance_programs.get(answer_program_id)
         if (
@@ -1808,6 +1859,81 @@ def _canonical_task_identifiers(
             "select_cutoff_sources",
             "resolve_publication_obsoletes_and_updates",
             "evaluate_http_semantics_succession_branches",
+        )
+        answer_program_id = str(task["answer_program_id"])
+    elif family == IETF_ACME_ISSUANCE_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("ietf_requirement_task")
+        if (
+            not isinstance(task, Mapping)
+            or task.get("answer_program_id") != "ietf.acme_issuance_succession.v1"
+            or candidate.get("answer_program_id") != task.get("answer_program_id")
+        ):
+            raise PromotionError("IETF ACME issuance answer program is unsupported")
+        motif = "acme_issuance_succession+gold_rfc_evidence"
+        program_ops = (
+            "select_cutoff_sources",
+            "resolve_publication_identity",
+            "evaluate_acme_issuance_succession_branches",
+        )
+        answer_program_id = str(task["answer_program_id"])
+    elif family == IETF_SSH_ARCHITECTURE_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("ietf_requirement_task")
+        if (
+            not isinstance(task, Mapping)
+            or task.get("answer_program_id") != "ietf.ssh_architecture_succession.v1"
+            or candidate.get("answer_program_id") != task.get("answer_program_id")
+        ):
+            raise PromotionError("IETF SSH architecture answer program is unsupported")
+        motif = "ssh_architecture_succession+gold_rfc_evidence"
+        program_ops = (
+            "select_cutoff_sources",
+            "resolve_publication_identity",
+            "evaluate_ssh_architecture_succession_branches",
+        )
+        answer_program_id = str(task["answer_program_id"])
+    elif family == IETF_HTTP2_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("ietf_requirement_task")
+        if (
+            not isinstance(task, Mapping)
+            or task.get("answer_program_id") != "ietf.http2_succession.v1"
+            or candidate.get("answer_program_id") != task.get("answer_program_id")
+        ):
+            raise PromotionError("IETF HTTP/2 answer program is unsupported")
+        motif = "http2_succession+obsoletes_closure"
+        program_ops = (
+            "select_cutoff_sources",
+            "resolve_publication_obsoletes_and_updates",
+            "evaluate_http2_succession_branches",
+        )
+        answer_program_id = str(task["answer_program_id"])
+    elif family == IETF_PKIX_PATH_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("ietf_requirement_task")
+        if (
+            not isinstance(task, Mapping)
+            or task.get("answer_program_id") != "ietf.pkix_path_succession.v1"
+            or candidate.get("answer_program_id") != task.get("answer_program_id")
+        ):
+            raise PromotionError("IETF PKIX path answer program is unsupported")
+        motif = "pkix_path_succession+obsoletes_closure"
+        program_ops = (
+            "select_cutoff_sources",
+            "resolve_publication_obsoletes_and_updates",
+            "evaluate_pkix_path_succession_branches",
+        )
+        answer_program_id = str(task["answer_program_id"])
+    elif family == IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("ietf_requirement_task")
+        if (
+            not isinstance(task, Mapping)
+            or task.get("answer_program_id") != "ietf.dnssec_succession.v1"
+            or candidate.get("answer_program_id") != task.get("answer_program_id")
+        ):
+            raise PromotionError("IETF DNSSEC answer program is unsupported")
+        motif = "dnssec_succession+obsoletes_and_updates"
+        program_ops = (
+            "select_cutoff_sources",
+            "resolve_publication_obsoletes_and_updates",
+            "evaluate_dnssec_succession_branches",
         )
         answer_program_id = str(task["answer_program_id"])
     elif family == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]:
@@ -3043,6 +3169,11 @@ def build_task_candidate_view_projections(
         IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER,
         IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER,
         IETF_HTTP_SEMANTICS_TASK_REPLAY_ADAPTER,
+        IETF_ACME_ISSUANCE_TASK_REPLAY_ADAPTER,
+        IETF_SSH_ARCHITECTURE_TASK_REPLAY_ADAPTER,
+        IETF_HTTP2_TASK_REPLAY_ADAPTER,
+        IETF_PKIX_PATH_TASK_REPLAY_ADAPTER,
+        IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER,
         GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
         EURLEX_PMS_TASK_REPLAY_ADAPTER,
     }:

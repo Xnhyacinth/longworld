@@ -29,6 +29,7 @@ from longworld.core.issuerfilingworkflow import (
     META_SEGMENT_SECTION,
     MICRON_GEO_SECTIONS,
     MICRON_TECHNOLOGY_SECTIONS,
+    NVIDIA_MARKET_SECTION,
     parse_issuer_ir_rendered_metrics,
 )
 from longworld.core.pack import SEP
@@ -141,11 +142,59 @@ def _task_view_wrap_headroom(band_name: str) -> int:
     )
 
 
+def _bands_match_program(
+    answer_program_id: str, bands: Sequence[HistoryBand]
+) -> bool:
+    names = [band.name for band in bands]
+    if not names or len(names) != len(set(names)):
+        return False
+    if answer_program_id == NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM:
+        allowed = list(_NATURAL_LENGTH_BANDS)
+        return names == [name for name in allowed if name in names]
+    if answer_program_id == MICRON_DUAL_PARTITION_PROGRAM:
+        return names == list(_MICRON_DUAL_PARTITION_BANDS)
+    return names == list(_EXPECTED_BANDS[: len(bands)])
+
+
+def _market_revenue_concept(source_text: str) -> str | None:
+    if "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax" in source_text:
+        return "RevenueFromContractWithCustomerExcludingAssessedTax"
+    if "defref_us-gaap_Revenues" in source_text:
+        return "Revenues"
+    return None
+
+
 _LEFTOVER_EXCLUDED_SECTIONS = frozenset({"Cover Page"})
 _RELATION_RECORD_TYPES = frozenset(
     {"filing_relation", "table_branch_relation", "year_join_relation"}
 )
 _DEFAULT_ANSWER_PROGRAM_ID = "finance.multi_filing_reconstruction.v1"
+NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM = "nvidia.market_mix_crossover.v1"
+MICRON_DUAL_PARTITION_PROGRAM = "micron.dual_partition_identity.v1"
+_NATURAL_LENGTH_BANDS = ("64k", "128k")
+_MICRON_DUAL_PARTITION_BANDS = ("32k",)
+_UNIQUE_LENGTH_PROGRAMS = frozenset(
+    {
+        NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM,
+        MICRON_DUAL_PARTITION_PROGRAM,
+    }
+)
+_NVIDIA_MARKET_ROLES = (
+    "market_data_center",
+    "market_gaming",
+    "market_professional_visualization",
+    "market_automotive",
+    "market_oem_other",
+)
+_NVIDIA_MARKET_AXIS_MARKERS = {
+    "market_data_center": "srt_ProductOrServiceAxis=nvda_DataCenterMember",
+    "market_gaming": "srt_ProductOrServiceAxis=nvda_GamingMember",
+    "market_professional_visualization": (
+        "srt_ProductOrServiceAxis=nvda_ProfessionalVisualizationMember"
+    ),
+    "market_automotive": "srt_ProductOrServiceAxis=nvda_AutomotiveMember",
+    "market_oem_other": "srt_ProductOrServiceAxis=nvda_OEMAndOtherMember",
+}
 _ANSWER_PROGRAMS = {
     _DEFAULT_ANSWER_PROGRAM_ID: {
         "query_type": "multi_filing_financial_reconstruction",
@@ -183,6 +232,51 @@ _ANSWER_PROGRAMS = {
             "Using the exact annual statement rows and the complete prior-filing "
             "chain, report earliest-to-latest revenue, asset, and operating-cash "
             "changes and certify the balance-sheet identity for every filing."
+        ),
+    },
+    NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM: {
+        "query_type": "nvidia_market_mix_crossover",
+        "operations": (
+            "source_span_parse",
+            "per_year_data_center_gaming_compare",
+            "crossover_year_resolution",
+            "later_year_data_center_lead_certification",
+            "market_mix_identity",
+        ),
+        "roles": ("revenue", *_NVIDIA_MARKET_ROLES),
+        "question": (
+            "Using each annual Schedule of Revenue by Market, identify the fiscal "
+            "year when Data Center first exceeded Gaming, certify that later years "
+            "remain Data Center-led, and reconcile market mix to stated revenue."
+        ),
+    },
+    MICRON_DUAL_PARTITION_PROGRAM: {
+        "query_type": "micron_dual_partition_identity",
+        "operations": (
+            "source_span_parse",
+            "technology_revenue_identity",
+            "geography_revenue_identity",
+            "europe_presence",
+        ),
+        "roles": (
+            "revenue",
+            "category_dram",
+            "category_nand",
+            "category_other",
+            "geo_us",
+            "geo_taiwan",
+            "geo_mainland_china",
+            "geo_other_asia_pacific",
+            "geo_hong_kong",
+            "geo_japan",
+            "geo_europe",
+            "geo_other",
+        ),
+        "question": (
+            "Using the exact annual technology and customer-headquarters geography "
+            "rows, certify that DRAM+NAND+Other and the geography partition each "
+            "equal stated revenue for every FY2022–FY2025 filing, and report "
+            "whether Europe is present in the geography table."
         ),
     },
 }
@@ -387,6 +481,15 @@ def _role_marker_options(role: str) -> tuple[tuple[str, ...], ...]:
             (
                 "defref_us-gaap_LiabilitiesAndStockholdersEquity",
                 "Total liabilities and equity",
+            )
+        )
+    if role in _NVIDIA_MARKET_AXIS_MARKERS:
+        axis = _NVIDIA_MARKET_AXIS_MARKERS[role]
+        options.extend(
+            (axis, concept)
+            for concept in (
+                "defref_us-gaap_Revenues",
+                "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax",
             )
         )
     if role.startswith(_TABLE_ROLE_PREFIXES):
@@ -780,6 +883,140 @@ def _filing_chain(
     return order
 
 
+def _crossover_answer(
+    ledger: Sequence[dict[str, Any]],
+    filing_chain: Sequence[str],
+    by_year: dict[str, dict[str, int | str]],
+) -> str:
+    required = {"revenue", *_NVIDIA_MARKET_ROLES}
+    observations: list[dict[str, Any]] = []
+    annual_checks: list[dict[str, Any]] = []
+    for report_date, values in sorted(by_year.items()):
+        if not required <= values.keys():
+            raise ProvenanceError("NVIDIA market mix crossover is missing operands")
+        if any(not isinstance(values[role], int) for role in required):
+            raise ProvenanceError("NVIDIA market mix crossover values are not numeric")
+        market_sum = sum(int(values[role]) for role in _NVIDIA_MARKET_ROLES)
+        mix_reconciled = market_sum == int(values["revenue"])
+        concepts = {
+            _market_revenue_concept(str(fact.get("source_text") or ""))
+            for fact in ledger
+            if fact["report_date"] == report_date
+            and fact["role"] in _NVIDIA_MARKET_ROLES
+        }
+        if len(concepts) != 1 or None in concepts:
+            raise ProvenanceError("NVIDIA market revenue concept is missing or mixed")
+        concept = next(iter(concepts))
+        data_center = int(values["market_data_center"])
+        gaming = int(values["market_gaming"])
+        observations.append(
+            {
+                "report_date": report_date,
+                "revenue": int(values["revenue"]),
+                "market_data_center": data_center,
+                "market_gaming": gaming,
+                "market_professional_visualization": int(
+                    values["market_professional_visualization"]
+                ),
+                "market_automotive": int(values["market_automotive"]),
+                "market_oem_other": int(values["market_oem_other"]),
+                "data_center_exceeds_gaming": data_center > gaming,
+                "market_mix_reconciled": mix_reconciled,
+                "market_revenue_concept": concept,
+            }
+        )
+        annual_checks.append(
+            {
+                "report_date": report_date,
+                "market_mix_reconciled": mix_reconciled,
+                "data_center_exceeds_gaming": data_center > gaming,
+            }
+        )
+    if len(observations) < 3:
+        raise ProvenanceError("NVIDIA market mix crossover requires three annual filings")
+    first_dc = next(
+        (
+            index
+            for index, observation in enumerate(observations)
+            if observation["data_center_exceeds_gaming"]
+        ),
+        None,
+    )
+    if first_dc is None or first_dc == 0:
+        raise ProvenanceError("NVIDIA market mix has no Data Center over Gaming crossover")
+    later = observations[first_dc + 1 :]
+    if not later or not all(item["data_center_exceeds_gaming"] for item in later):
+        raise ProvenanceError("later years do not remain Data Center-led")
+    if any(item["data_center_exceeds_gaming"] for item in observations[:first_dc]):
+        raise ProvenanceError("Data Center lead is not a single crossover")
+    return _canonical_json(
+        {
+            "annual_checks": annual_checks,
+            "annual_observations": observations,
+            "crossover": {
+                "prior_report_date": observations[first_dc - 1]["report_date"],
+                "first_data_center_led_report_date": observations[first_dc][
+                    "report_date"
+                ],
+                "later_years_remain_data_center_led": True,
+            },
+            "filing_chain": list(filing_chain),
+        }
+    )
+
+
+def _dual_partition_answer(
+    filing_chain: Sequence[str],
+    by_year: dict[str, dict[str, int | str]],
+) -> str:
+    tech_roles = ("category_dram", "category_nand", "category_other")
+    partitions: list[dict[str, Any]] = []
+    identity = True
+    for report_date, values in sorted(by_year.items()):
+        if "revenue" not in values or any(role not in values for role in tech_roles):
+            raise ProvenanceError("Micron dual-partition is missing operands")
+        if any(not isinstance(values[role], int) for role in ("revenue", *tech_roles)):
+            raise ProvenanceError("Micron dual-partition values are not numeric")
+        revenue = int(values["revenue"])
+        technology = {
+            role.removeprefix("category_"): int(values[role]) for role in tech_roles
+        }
+        geography = {
+            role.removeprefix("geo_"): int(value)
+            for role, value in sorted(values.items())
+            if role.startswith("geo_")
+        }
+        if any(not isinstance(value, int) for value in geography.values()):
+            raise ProvenanceError("Micron dual-partition geography is not numeric")
+        tech_ok = sum(technology.values()) == revenue
+        geo_ok = bool(geography) and sum(geography.values()) == revenue
+        europe_present = "europe" in geography
+        europe_ok = (
+            not europe_present if report_date < "2023-08-01" else europe_present
+        )
+        identity = identity and tech_ok and geo_ok and europe_ok
+        partitions.append(
+            {
+                "report_date": report_date,
+                "revenue": revenue,
+                "technology": technology,
+                "technology_identity": tech_ok,
+                "geography": geography,
+                "geography_identity": geo_ok,
+                "europe_present": europe_present,
+            }
+        )
+    if len(partitions) < 4:
+        raise ProvenanceError("Micron dual-partition requires four annual filings")
+    return _canonical_json(
+        {
+            "annual_partitions": partitions,
+            "dual_partition_identity": identity,
+            "filing_chain": list(filing_chain),
+        }
+    )
+
+
 def _answer(
     facts: Sequence[dict[str, Any]],
     filing_chain: Sequence[str],
@@ -799,6 +1036,10 @@ def _answer(
     by_year: dict[str, dict[str, int | str]] = {}
     for fact in ledger:
         by_year.setdefault(fact["report_date"], {})[fact["role"]] = fact["value"]
+    if answer_program_id == NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM:
+        return _crossover_answer(ledger, filing_chain, by_year)
+    if answer_program_id == MICRON_DUAL_PARTITION_PROGRAM:
+        return _dual_partition_answer(filing_chain, by_year)
     annual_checks: list[dict[str, Any]] = []
     for report_date, values in sorted(by_year.items()):
         check: dict[str, Any] = {"report_date": report_date}
@@ -1055,6 +1296,7 @@ def replay_financial_history(
                         "report_date": record["report_date"],
                         "role": role,
                         "value": numeric if numeric is not None else quote,
+                        "source_text": source_text,
                     }
                 )
                 row_is_essential = True
@@ -1278,6 +1520,11 @@ def _candidate_rows(
             and row.section in (*MICRON_TECHNOLOGY_SECTIONS, *MICRON_GEO_SECTIONS)
             and not any(role.startswith(_TABLE_ROLE_PREFIXES) for role in active_roles)
         )
+        and not (
+            filing.record_id.startswith("issuer-ir:0001045810:")
+            and row.section == NVIDIA_MARKET_SECTION
+            and not any(role.startswith(_TABLE_ROLE_PREFIXES) for role in active_roles)
+        )
         and (
             filing.record_id not in earliest_used_fact
             or (
@@ -1324,7 +1571,7 @@ def build_financial_history_candidates(
         or not tokenizer_model_id
         or answer_program_id not in _ANSWER_PROGRAMS
         or _COMMIT_SHA.fullmatch(tokenizer_revision) is None
-        or [band.name for band in bands] != list(_EXPECTED_BANDS[: len(bands)])
+        or not _bands_match_program(answer_program_id, bands)
     ):
         raise ProvenanceError("financial history materialization identity is invalid")
     if (
@@ -1356,11 +1603,24 @@ def build_financial_history_candidates(
     output: list[dict[str, Any]] = []
     for band_index, band in enumerate(bands):
         band_roles = _band_active_roles(answer_program_id, band.name, filings)
-        required_filing_count = min(len(filings), band_index + 2)
-        if required_filing_count < 2 or (
-            band.name != "128k" and required_filing_count < band_index + 2
-        ):
-            raise ProvenanceError(f"cannot fill exact {band.name}: too few filings")
+        if answer_program_id == NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM:
+            required_filing_count = len(filings)
+            if required_filing_count < 3:
+                raise ProvenanceError(
+                    "NVIDIA market mix crossover requires at least three filings"
+                )
+        elif answer_program_id == MICRON_DUAL_PARTITION_PROGRAM:
+            required_filing_count = len(filings)
+            if required_filing_count < 4:
+                raise ProvenanceError(
+                    "Micron dual-partition identity requires four filings"
+                )
+        else:
+            required_filing_count = min(len(filings), band_index + 2)
+            if required_filing_count < 2 or (
+                band.name != "128k" and required_filing_count < band_index + 2
+            ):
+                raise ProvenanceError(f"cannot fill exact {band.name}: too few filings")
         newly_selected = filings[:required_filing_count]
         for filing_index, filing in enumerate(newly_selected):
             if filing.record_id in selected_filing_ids:
@@ -1382,7 +1642,10 @@ def build_financial_history_candidates(
                 records.append(_row_record(row))
                 used_row_ids.add(row.record_id)
         extra_sections_by_filing: dict[str, set[str]] = {}
-        if band.name == "128k":
+        if (
+            band.name == "128k"
+            and answer_program_id not in _UNIQUE_LENGTH_PROGRAMS
+        ):
             base_roles = set(_ANSWER_PROGRAMS[answer_program_id]["roles"])
             extra_rows = sorted(
                 (
@@ -1526,24 +1789,29 @@ def build_financial_history_candidates(
         replay = replay_financial_history(task)
         if replay["answer"] == "unknown":
             raise ProvenanceError("financial history base replay failed")
+        cf_role = (
+            "category_dram"
+            if answer_program_id == MICRON_DUAL_PARTITION_PROGRAM
+            else "revenue"
+        )
         revenue_records = [
             record
             for record in records
             if record.get("record_type") == "financial_source_row"
             and any(
-                isinstance(fact, dict) and fact.get("role") == "revenue"
+                isinstance(fact, dict) and fact.get("role") == cf_role
                 for fact in record.get("facts") or []
             )
         ]
         if not revenue_records:
-            raise ProvenanceError("financial history has no revenue fact")
+            raise ProvenanceError("financial history has no counterfactual fact")
         target = revenue_records[-1]
         target_fact = next(
-            fact for fact in target["facts"] if fact.get("role") == "revenue"
+            fact for fact in target["facts"] if fact.get("role") == cf_role
         )
         task["counterfactual_twin"] = {
             "record_id": target["source_record_id"],
-            "role": "revenue",
+            "role": cf_role,
             "source_origin": "synthetic_counterfactual",
             "provenance_operation": "replace_exact_span",
             "parent_value": target_fact["evidence_quote"],
@@ -1597,11 +1865,13 @@ def build_financial_history_candidates(
                 + ",".join(failed)
             )
         output.append(task)
-    cumulative_errors = audit_cumulative_history(output)
-    if cumulative_errors:
-        raise ProvenanceError(
-            "financial history failed cumulative growth: " + ",".join(cumulative_errors)
-        )
+    if answer_program_id not in _UNIQUE_LENGTH_PROGRAMS:
+        cumulative_errors = audit_cumulative_history(output)
+        if cumulative_errors:
+            raise ProvenanceError(
+                "financial history failed cumulative growth: "
+                + ",".join(cumulative_errors)
+            )
     return output
 
 

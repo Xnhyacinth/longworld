@@ -1,5 +1,81 @@
 # Progress
 
+- 2026-09-08 Unique-profile land (not CURRENT_RELEASE / HF): ACME 32k
+  3/3 gate ok, B5 n=3 / 98339, motif `acme_issuance_succession+gold_rfc_evidence`.
+  Authentic 8555-only (no leftover RFC Updates padding); 5 gold quotes /
+  4 gold artifacts; between-gold leftover trimmed to exact band 32734.
+  `production_eligible=false`. DNSSEC 64k already landed (B5 n=3 / 196643).
+  Watch is already running; do not start a second execute. Do not pad or
+  auto-promote.
+- 2026-09-08 Unique-profile land (not CURRENT_RELEASE / HF): DNSSEC 64k
+  3/3 gate ok, B5 n=3 / 196643, motif `dnssec_succession+obsoletes_and_updates`.
+  Authentic `draft-ietf-dnsext-dnssec-protocol-09` → RFC 4035; 5 gold quotes;
+  zipper-tail 33 artifacts at 65501 then packed 64k. `production_eligible=false`.
+  ACME 8555-only 32k is packed (5 quotes / 4 gold artifacts, between-gold
+  leftover) but dense audit is still open. Watch is already running; do not
+  start a second execute. Do not pad or auto-promote.
+- 2026-09-08 Unique-profile land (not CURRENT_RELEASE / HF): Amazon 128k
+  3/3 gate ok, B5 n=3 / 395617. Meta 128k 3/3 gate ok, B5 n=3 / 393780.
+  Honest 128k-only products; 16k full/cf stay 8k-zipper retrieval. SSH 32k
+  rematerialized with coarsened RFC 4254 zipper tail (64 artifacts, 32359
+  tokens) and dense-audited 3/3 `strict_long_dependency`; unique-profile
+  gate ok, B5 n=3 / 97169. `production_eligible=false`. ACME export still
+  fails `requested RFC relation target is not grounded`. DNSSEC still
+  lacks a signed graph (draft became RFC 6840). Restart one watch after
+  this land; do not start a second execute.
+- 2026-09-08 Unique-profile land (not CURRENT_RELEASE / HF): HTTP/2 64k
+  3/3 gate ok, B5 n=3 / 195480, motif `http2_succession+obsoletes_closure`.
+  PKIX-path 64k 3/3 gate ok, B5 n=3 / 195555, motif
+  `pkix_path_succession+obsoletes_closure`. Micron dual-partition 32k
+  rematerialized through `financehistory` (32538 exact, structured CF JSON)
+  3/3 `strict_long_dependency`, gate ok, B5 n=3 / 99206, motif
+  `dual_partition_identity+europe_presence+mix_identity`.
+  `production_eligible=false`. SSH 32k dense audit is in flight: RFC 4251 is
+  only 16.6k tokens, so two-end gold fails the 16k intersecting bound unless
+  leftover 4252/4254 are chunk-exploded after 4251 (`_dossier_spread` zippers
+  chronology tails together). ACME stays 8555-only (48577 below 64k; unique
+  82082 must not pad). DNSSEC has no signed
+  `ietf_workflow_manifest.p57.dnssec.v1.signed.json`. Amazon/Meta keep the
+  16k full/cf 8k zipper; do not promote 128k. Watch still running; do not
+  start a second execute.
+- 2026-09-08 Amazon v3 and Meta v1 128k-only dense audit 3/3
+  `strict_long_dependency` (`global_proof_green`, 4k/8k insufficient, MiniLM
+  top-k insufficient). `auto_promote=false`. World-atomic still blocked by
+  the 16k full/cf 8k zipper (retrieval after re-validation, not auto-admit).
+  Packed/audited 128k rows are not inventory.
+  grounded targets; unique 82082 not padded). SSH packed 32k (32268) × 3
+  views; official dense audit blocked (`essential_artifact_ids == 1`).
+  Packed parents are not inventory.
+  `market_mix_crossover` is a unique 64k local-probe (3 train / 195631 exact,
+  `production_eligible=false`, not CURRENT_RELEASE). HTTP Semantics graph v2
+  now compiles 9110 obsoletes 7538/7615/7694 (v1 left pinned). HTTP/2 and
+  PKIX packed at natural 64k but V3 adapters are unregistered. Micron
+  dual-partition packed 32k only. DNSSEC sign blocked (draft became RFC 6840).
+  Amazon/Meta 8k zipper is 16k full/cf retrieval-after-revalidation, not a
+  128k class; 12-view dense audit still running. ACME/SSH compiler track
+  still open. Operator remains
+  `scripts/run_p57_task_pipeline.py --catalog configs/p57_task_pipeline_v1.json
+  --workers 4 --audit-workers 2 --watch`. Never pads or auto-promotes.
+  Ledger `reports/p57_pipeline/ledger.jsonl`.
+- 2026-09-08 Parallel synthesis restarted: NVIDIA extra mix task + Micron
+  mix/geo design already running; added HTTP/2 64k, PKIX-path 64k, DNSSEC 64k,
+  ACME 64k + SSH 32k, Amazon/Meta 8k-zipper classify, HTTP Semantics graph
+  re-export. Shared `longworld/core` left to the NVIDIA adapter track. Do not
+  pad HTTP/2 (103810), DNSSEC (126639), ACME (82082), PKIX-path (82943) to
+  128k. SSH unique 52837 stays 32k. Packed parents still not inventory.
+- 2026-09-07 HTTP Semantics succession v1 promoted as unique local-probe
+  product `p57-ietf-http-semantics-128k-extension-probe-1-v1` (3 train / 0 eval,
+  386,493 exact tokens). N_source-world=1, N_semantic-task=1, N_proof-family=1,
+  N_training-view=3. Natural 128k only; 16/32/64 never packed. Dense audit 3/3
+  with 4k/8k windows and MiniLM top-k insufficient. `production_eligible=false`.
+  Not on CURRENT_RELEASE / HF. Next: extra independent Finance/IETF tasks from
+  signed NVIDIA/Micron graphs.
+- 2026-09-07 TLS 1.3 handshake succession v4 promoted as unique local-probe
+  product `p57-ietf-tls13-64k-128k-extension-probe-1-v1` (6 train / 0 eval,
+  581,651 exact tokens). N_source-world=1, N_semantic-task=1, N_proof-family=1,
+  N_training-view=6. Length-view pairing, not nested 64k→128k relation growth.
+  `production_eligible=false`. Not on CURRENT_RELEASE / HF. Next: extra
+  independent tasks from signed NVIDIA/Micron/TLS/HTTP-Semantics graphs.
 - 2026-09-07 Private collection `Xnhyacinth/longworld`. Appended three P57
   local-probe products to `LongWorld-Real-Workflows` (TLS 6 / NVIDIA 12 /
   Micron 12; commit `cf28fcf07501`). Synthesis-Workspace gained 368 P57
@@ -19,8 +95,8 @@
   dense-audited 6/6 `global_proof_green=true` (exact tokens 65493–65513 and
   128364–128384; sum 581,651). Packed parents are not inventory. 16k/32k not
   packed: seven thick relation endpoints cannot fit those bands without quote
-  isolation or leftover tinies. Next is a unique IETF 64k/128k probe profile,
-  not p17 finance. HTTP Semantics waits on that promotion path.
+  isolation or leftover tinies. HTTP Semantics can now follow this 2-band
+  promotion path. No HF.
 - 2026-09-04 P38/P43 IETF conversion remains blocked with zero formal rows.
   Schema-fixed P33 rebuilt and audited 6/6; the 64K-only chain reached strict
   promotion but failed the existing lower-band quality gate. A natural
@@ -991,3 +1067,57 @@ in`; no private-repository or upload claim was made.
   scoped. The report now marks topology `PARTIAL`, executable minimal evidence
   `UNVERIFIED`, and rights `NEEDS_CANDIDATE_REVIEW`; the corrected metadata
   projection retains only the structurally parsed corrected-by edge.
+
+## 2026-09-06 execution checkpoint
+
+- User requested sustained parallel synthesis and world expansion; three workers
+  now execute P54 exact-source oracles, P52 alternative transitions, and Ofgem
+  public tables with a subsequent Alphabet entity track. Root owns shared audit
+  and inventory integration. No gate/profile relaxation or GPU training.
+- Existing trust loader rejected two old private roots because their parent
+  directories no longer have mode 0700. Left shared roots and signed products
+  unchanged; created separate per-track local-probe roots outside Git through
+  the existing initializer, then validated mode/ACL/role isolation with the
+  existing loader. They remain local diagnostic trust, not production KMS.
+- P52 froze 21 combinations from two actual bills, rejected nine 32K geometry
+  cases, and materialized 36 signed candidate parents. These are neither 36
+  worlds nor train-ready rows. HR815 has flat necessary support at 64K→128K;
+  HR4366 needs a shared-formula proof-growth precheck before dense computation.
+- Root projected HR4366 EAS→EAH trial 01 into nine standard candidates and
+  verified shared structural preflight 9/9. The candidate file digest is
+  `1ba404afdb46f856fadee19128ac6f8cbc96c402b120c3e5da232e8b90b57ae7`.
+  Dense/raw-window/selection/promotion remain pending, not implied by preflight.
+- P54 rebuilt proposal→act qualification values and an exact metadata adoption
+  edge from official bytes. Its first 32K pack exposes a 16K shortcut; preserve
+  that rejection and test a different real cross-reference dependency program.
+- Ofgem's public table delta is answerable from 483 tokens; three NTSB final
+  statuses also have short evidence. Those probes do not produce long tasks.
+  Alphabet's current issuer index yielded five genuine annual filing bundles;
+  explicit source-parser compatibility is being implemented before parents.
+- Actual B5 content/answer identity matches the corresponding product rows via
+  the existing four-field training identity. Current B5 spans 14 train world IDs,
+  32 dossiers, and seven domain labels; counts remain 80. The P14 B5 reduction
+  follows the frozen equal-token ablation export, so it is not a dropped-row bug
+  or an invitation to relax that profile to inflate training inventory.
+- P52 growth 01 was directly rejected by shared raw-window upper-bound replay
+  at ordered 32K offsets 4258:20642. Existing frozen bases 04/05 also failed in
+  full/CF. New necessary-request schedules 4→8→16 and 6→12→24 passed 32K
+  shared raw proof across all views and exact proof-growth checks. Root's full
+  shared signed audit has completed 32K/64K for the first schedule; 128K is
+  running. All-M factual labels imply a separate analytical shortcut, so these
+  remain diagnostic while P56 creates bounded mixed R/M tasks.
+- Alphabet v3 supplies four authentic parent bands and twelve exact standard
+  views. The 128K task consumes source-bound segment/geography revenue and
+  hedge reconciliation; lower bands exclude these tables. Independent review
+  reproduced and then verified fixes for annual-duration, axis/member, and
+  hedge-concept substitution bugs. All 48 source/finance tests pass; original
+  v1/v2/v3 signed manifests still validate without re-signing. Root's full
+  shared signed audits have passed 16K/32K/64K; 128K is running.
+- Shared audits use the existing `create_task_dense_audit` function in separate
+  CPU-bounded processes by length band, retaining the same candidate, ranker,
+  source, and auditor bindings. Partial audit files do not enter inventory;
+  full profile selection and promotion remain mandatory.
+- P54's first PMS parent is superseded diagnostic evidence pending a corrected
+  source-driven Article83 scope and updated selected-span rights coverage.
+  Independent review also rejected requiring an unrelated neighboring sentence
+  after the complete risk-control list. No P54 train-ready claim is made.

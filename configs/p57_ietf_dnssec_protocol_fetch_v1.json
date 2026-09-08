@@ -1,0 +1,37 @@
+{
+  "schema_version": "longworld.ietf-fetch-request.v1",
+  "user_agent": "LongWorld-P57/1.0 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "p57-ietf-dnssec-protocol-v1",
+    "scope": "public IETF Datatracker, Internet-Draft archive, and RFC Editor records for RFC 4035 DNSSEC protocol succession",
+    "basis": "IETF open-records research export for the authentic draft-ietf-dnsext-dnssec-protocol-09 published_as RFC 4035 graph, with RFC 1034/1035 Updates targets and RFC 4033/4034 family leftovers. Not draft-ietf-dnsext-dnssec-bis-updates (RFC 6840).",
+    "reviewed_at": "2026-09-08T12:00:00Z",
+    "allowed_actions": [
+      "fetch_datatracker_document",
+      "fetch_datatracker_relation",
+      "fetch_draft_revision",
+      "fetch_rfc"
+    ]
+  },
+  "drafts": [
+    {
+      "name": "draft-ietf-dnsext-dnssec-protocol",
+      "revisions": [
+        "09"
+      ]
+    }
+  ],
+  "rfc_numbers": [
+    1034,
+    1035,
+    4033,
+    4034,
+    4035
+  ],
+  "rfc_datatracker_sources": [
+    4035
+  ],
+  "approved_public_test_vector_sha256": [],
+  "requests_per_second": 1.0,
+  "max_retries": 2
+}
