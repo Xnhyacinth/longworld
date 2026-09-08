@@ -1,0 +1,65 @@
+{
+  "schema_version": "longworld.ietf-dnssec-generation-config.v1",
+  "source_inventory_dir": "/workspace/wynckeliao/longworld/data/source_inventory/p57_ietf_dnssec_family_v1",
+  "fetch_inventory_file": "ietf_fetch_inventory.json",
+  "fetch_inventory_sha256": "19ad4005dd14446b2202a99605da29a27f1cc567e4623f72f12f540874bf3420",
+  "signed_workflow_file": "ietf_workflow_manifest.p57.dnssec.v1.signed.json",
+  "signed_workflow_sha256": "",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "world_id": "ietf-dnssec-succession-v1",
+  "length_buckets": {
+    "64k": [64000, 65536]
+  },
+  "packing": {
+    "target_margin_tokens": 256,
+    "unit_boundary": "source_blank_line_or_form_feed",
+    "record_ids_by_bucket": {
+      "64k": [
+        "ietf:draft:draft-ietf-dnsext-dnssec-bis-updates-11",
+        "ietf:rfc:1034",
+        "ietf:rfc:1035",
+        "ietf:rfc:4033",
+        "ietf:rfc:4034",
+        "ietf:rfc:4035"
+      ]
+    },
+    "chunked_record_ids": [
+      "ietf:rfc:4035"
+    ],
+    "chunk_max_tokens": 8192,
+    "chunk_max_tokens_by_bucket": {
+      "64k": 8192
+    },
+    "published_draft_policy": "identity_paragraph_only",
+    "support_priority_record_ids": [
+      "ietf:rfc:1034",
+      "ietf:rfc:1035",
+      "ietf:rfc:4033",
+      "ietf:rfc:4034",
+      "ietf:rfc:4035"
+    ],
+    "pin_last_leftover_record_ids": [
+      "ietf:rfc:4035"
+    ],
+    "span_id_width": 7,
+    "counterfactual_evidence_id": "current_protocol",
+    "padding": false,
+    "cloned_artifacts": false,
+    "synthetic_filler": false
+  },
+  "workflow_id": "p57-ietf-dnssec-succession-v1",
+  "dense_model": {
+    "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+  },
+  "output_dir": "/workspace/wynckeliao/longworld/data/candidates/p57_ietf_dnssec_succession_v1",
+  "do_not_select": true,
+  "do_not_promote": true,
+  "do_not_count": true
+}

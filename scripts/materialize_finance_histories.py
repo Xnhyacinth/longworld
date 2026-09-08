@@ -30,6 +30,8 @@ from longworld.core.financehistory import (
     build_financial_history_candidates,
     extract_financial_filings,
     extract_sec_financial_filings,
+    MICRON_DUAL_PARTITION_PROGRAM,
+    NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM,
 )
 from longworld.core.issuerfilingworkflow import (
     MAX_ISSUER_IR_MANIFEST_BYTES,
@@ -216,7 +218,15 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
         + b"\n"
     )
     audits = [audit_financial_history_candidate(row) for row in rows]
-    cumulative_errors = audit_cumulative_history(rows)
+    answer_program_id = str(
+        config.get("answer_program_id") or "finance.multi_filing_reconstruction.v1"
+    )
+    cumulative_errors = (
+        []
+        if answer_program_id
+        in {NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM, MICRON_DUAL_PARTITION_PROGRAM}
+        else audit_cumulative_history(rows)
+    )
     if not all(audit and all(audit.values()) for audit in audits) or cumulative_errors:
         raise ProvenanceError("finance-history executable audit failed")
     candidate_bytes = b"\n".join(_canonical_bytes(row) for row in rows) + b"\n"

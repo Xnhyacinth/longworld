@@ -373,6 +373,143 @@ def test_p57_ietf_tls13_64k_128k_extension_is_a_one_world_standards_gate() -> No
     assert profile.profile_id in LENGTH_VIEW_PAIR_PROFILE_IDS
 
 
+def test_p57_ietf_http_semantics_128k_extension_is_a_one_world_standards_gate() -> None:
+    profile = release_profile("p57-ietf-http-semantics-128k-extension-probe-1-v1")
+
+    assert profile.environment == "probe"
+    assert profile.predecessor_profile_id is None
+    assert profile.expected_promoted_worlds == 1
+    assert (profile.min_train_worlds, profile.min_eval_worlds) == (1, 0)
+    assert (profile.min_real_train_worlds, profile.min_real_eval_worlds) == (1, 0)
+    assert profile.training_conditions == ("B5",)
+    assert profile.training_length_buckets == ("128k",)
+    assert profile.required_exact_length_buckets == ("128k",)
+    assert profile.required_view_timings == (
+        ("full", "first"),
+        ("cf", "first"),
+        ("ordered_artifact_view", "first"),
+    )
+    assert dict(profile.promoted_domain_world_quotas) == {"standards": 1}
+    assert profile.min_exact_64k_rows_by_domain == ()
+    assert profile.min_real_exact_64k_rows_by_domain == ()
+    assert profile.min_real_exact_64k_worlds_by_domain == ()
+    assert profile.min_real_64k_rows == 0
+    assert dict(profile.min_train_worlds_by_domain) == {"standards": 1}
+    assert profile.min_unique_executable_proofs == 1
+    assert profile.min_unique_answer_programs == 1
+    assert profile.require_all_rows_source_bound is True
+    assert profile.profile_id in RELATION_PROVENANCE_SPLIT_PROFILE_IDS
+    assert profile.profile_id in SUBSTANTIAL_REAL_PROOF_GROWTH_PROFILE_IDS
+    assert profile.profile_id in CURRENT_RELEASE_GATE_ONLY_PROFILE_IDS
+    assert profile.profile_id in LENGTH_VIEW_PAIR_PROFILE_IDS
+
+
+def test_p57_nvidia_market_mix_crossover_is_a_one_world_finance_64k_gate() -> None:
+    profile = release_profile(
+        "p57-finance-nvidia-market-mix-crossover-64k-probe-1-v1"
+    )
+
+    assert profile.environment == "probe"
+    assert profile.predecessor_profile_id is None
+    assert profile.expected_promoted_worlds == 1
+    assert (profile.min_train_worlds, profile.min_eval_worlds) == (1, 0)
+    assert (profile.min_real_train_worlds, profile.min_real_eval_worlds) == (1, 0)
+    assert profile.training_conditions == ("B5",)
+    assert profile.training_length_buckets == ("64k",)
+    assert profile.required_exact_length_buckets == ("64k",)
+    assert profile.required_view_timings == (
+        ("full", "first"),
+        ("cf", "first"),
+        ("ordered_artifact_view", "first"),
+    )
+    assert dict(profile.promoted_domain_world_quotas) == {"finance": 1}
+    assert dict(profile.min_exact_64k_rows_by_domain) == {"finance": 3}
+    assert dict(profile.min_real_exact_64k_rows_by_domain) == {"finance": 3}
+    assert dict(profile.min_real_exact_64k_worlds_by_domain) == {"finance": 1}
+    assert dict(profile.min_train_worlds_by_domain) == {"finance": 1}
+    assert profile.min_real_64k_rows == 3
+    assert profile.min_unique_executable_proofs == 1
+    assert profile.min_unique_answer_programs == 1
+    assert profile.require_all_rows_source_bound is True
+    assert profile.profile_id in RELATION_PROVENANCE_SPLIT_PROFILE_IDS
+    assert profile.profile_id in SUBSTANTIAL_REAL_PROOF_GROWTH_PROFILE_IDS
+    assert profile.profile_id in CURRENT_RELEASE_GATE_ONLY_PROFILE_IDS
+    assert profile.profile_id in LENGTH_VIEW_PAIR_PROFILE_IDS
+
+
+def test_p57_http2_is_a_one_world_standards_64k_gate() -> None:
+    profile = release_profile("p57-ietf-http2-64k-probe-1-v1")
+
+    assert profile.environment == "probe"
+    assert profile.predecessor_profile_id is None
+    assert profile.expected_promoted_worlds == 1
+    assert (profile.min_train_worlds, profile.min_eval_worlds) == (1, 0)
+    assert profile.training_conditions == ("B5",)
+    assert profile.training_length_buckets == ("64k",)
+    assert profile.required_exact_length_buckets == ("64k",)
+    assert dict(profile.promoted_domain_world_quotas) == {"standards": 1}
+    assert dict(profile.min_exact_64k_rows_by_domain) == {"standards": 3}
+    assert dict(profile.min_real_exact_64k_rows_by_domain) == {"standards": 3}
+    assert profile.min_real_64k_rows == 3
+    assert profile.min_unique_executable_proofs == 1
+    assert profile.require_all_rows_source_bound is True
+    assert profile.profile_id in LENGTH_VIEW_PAIR_PROFILE_IDS
+    assert profile.profile_id in CURRENT_RELEASE_GATE_ONLY_PROFILE_IDS
+
+
+def test_p57_pkix_path_is_a_one_world_standards_64k_gate() -> None:
+    profile = release_profile("p57-ietf-pkix-path-64k-probe-1-v1")
+
+    assert profile.environment == "probe"
+    assert profile.training_length_buckets == ("64k",)
+    assert profile.required_exact_length_buckets == ("64k",)
+    assert dict(profile.promoted_domain_world_quotas) == {"standards": 1}
+    assert dict(profile.min_exact_64k_rows_by_domain) == {"standards": 3}
+    assert profile.min_real_64k_rows == 3
+    assert profile.profile_id in LENGTH_VIEW_PAIR_PROFILE_IDS
+
+
+def test_p57_ssh_architecture_is_a_one_world_standards_32k_gate() -> None:
+    profile = release_profile("p57-ietf-ssh-architecture-32k-probe-1-v1")
+
+    assert profile.environment == "probe"
+    assert profile.training_length_buckets == ("32k",)
+    assert profile.required_exact_length_buckets == ("32k",)
+    assert dict(profile.promoted_domain_world_quotas) == {"standards": 1}
+    assert profile.min_real_64k_rows == 0
+    assert profile.min_exact_64k_rows_by_domain == ()
+    assert profile.profile_id in LENGTH_VIEW_PAIR_PROFILE_IDS
+    assert profile.profile_id in CURRENT_RELEASE_GATE_ONLY_PROFILE_IDS
+
+
+def test_p57_micron_dual_partition_is_a_one_world_finance_32k_gate() -> None:
+    profile = release_profile("p57-finance-micron-dual-partition-32k-probe-1-v1")
+
+    assert profile.environment == "probe"
+    assert profile.training_length_buckets == ("32k",)
+    assert profile.required_exact_length_buckets == ("32k",)
+    assert dict(profile.promoted_domain_world_quotas) == {"finance": 1}
+    assert profile.min_real_64k_rows == 0
+    assert profile.min_exact_64k_rows_by_domain == ()
+    assert profile.profile_id in LENGTH_VIEW_PAIR_PROFILE_IDS
+    assert profile.profile_id in CURRENT_RELEASE_GATE_ONLY_PROFILE_IDS
+
+
+def test_p57_amazon_and_meta_are_one_world_finance_128k_gates() -> None:
+    amazon = release_profile("p57-finance-amazon-128k-probe-1-v1")
+    meta = release_profile("p57-finance-meta-128k-probe-1-v1")
+
+    for profile in (amazon, meta):
+        assert profile.environment == "probe"
+        assert profile.training_length_buckets == ("128k",)
+        assert profile.required_exact_length_buckets == ("128k",)
+        assert dict(profile.promoted_domain_world_quotas) == {"finance": 1}
+        assert profile.min_real_64k_rows == 0
+        assert profile.min_exact_64k_rows_by_domain == ()
+        assert profile.profile_id in LENGTH_VIEW_PAIR_PROFILE_IDS
+        assert profile.profile_id in CURRENT_RELEASE_GATE_ONLY_PROFILE_IDS
+
+
 def test_p40_ietf_semantic_growth_requires_nested_32k_64k_and_128k() -> None:
     profile = release_profile("p40-ietf-oauth-semantic-growth-probe-1-v1")
 
@@ -552,6 +689,14 @@ def test_p12_sec_slice_adds_128k_without_changing_historical_training_buckets() 
             "p40-ietf-oauth-semantic-growth-probe-1-v1",
             "p52-govinfo-bill-disposition-probe-1-v1",
             "p57-ietf-tls13-64k-128k-extension-probe-1-v1",
+            "p57-ietf-http-semantics-128k-extension-probe-1-v1",
+            "p57-finance-nvidia-market-mix-crossover-64k-probe-1-v1",
+            "p57-ietf-http2-64k-probe-1-v1",
+            "p57-ietf-pkix-path-64k-probe-1-v1",
+            "p57-ietf-ssh-architecture-32k-probe-1-v1",
+            "p57-finance-micron-dual-partition-32k-probe-1-v1",
+            "p57-finance-amazon-128k-probe-1-v1",
+            "p57-finance-meta-128k-probe-1-v1",
         }
     )
     assert historical.training_length_buckets == ("16k", "32k", "64k")

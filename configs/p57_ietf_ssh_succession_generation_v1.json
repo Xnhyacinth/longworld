@@ -1,0 +1,63 @@
+{
+  "schema_version": "longworld.ietf-ssh-generation-config.v1",
+  "source_inventory_dir": "/workspace/wynckeliao/longworld/data/source_inventory/p57_ietf_ssh_family_v1",
+  "fetch_inventory_file": "ietf_fetch_inventory.json",
+  "fetch_inventory_sha256": "08c83c5f17c1cb5912ebdf93d0138926e93acbe5fe1cd17001166b0b63d99ff7",
+  "signed_workflow_file": "ietf_workflow_manifest.p57.ssh.v1.signed.json",
+  "signed_workflow_sha256": "76072351691c5fc08678b22e5c9628c510b115309dbc11d351d19d53c14dab46",
+  "predecessor_report_manifest_sha256": "76072351691c5fc08678b22e5c9628c510b115309dbc11d351d19d53c14dab46",
+  "predecessor_report_task_sha256": "76072351691c5fc08678b22e5c9628c510b115309dbc11d351d19d53c14dab46",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "world_id": "ietf-ssh-architecture-succession-v1",
+  "length_buckets": {
+    "32k": [32000, 32768]
+  },
+  "packing": {
+    "target_margin_tokens": 256,
+    "unit_boundary": "source_blank_line_or_form_feed",
+    "record_ids_by_bucket": {
+      "32k": [
+        "ietf:draft:draft-ietf-secsh-architecture-22",
+        "ietf:rfc:4251",
+        "ietf:rfc:4252",
+        "ietf:rfc:4254"
+      ]
+    },
+    "chunked_record_ids": [
+      "ietf:rfc:4254"
+    ],
+    "chunk_max_tokens": 8192,
+    "chunk_max_tokens_by_bucket": {
+      "32k": 8192
+    },
+    "published_draft_policy": "identity_paragraph_only",
+    "support_priority_record_ids": [
+      "ietf:rfc:4251",
+      "ietf:rfc:4252",
+      "ietf:rfc:4254"
+    ],
+    "pin_last_leftover_record_ids": [
+      "ietf:rfc:4254"
+    ],
+    "span_id_width": 7,
+    "counterfactual_evidence_id": "current_protocol",
+    "padding": false,
+    "cloned_artifacts": false,
+    "synthetic_filler": false
+  },
+  "workflow_id": "p57-ietf-ssh-architecture-succession-v1",
+  "dense_model": {
+    "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+  },
+  "output_dir": "/workspace/wynckeliao/longworld/data/candidates/p57_ietf_ssh_succession_v1",
+  "do_not_select": true,
+  "do_not_promote": true,
+  "do_not_count": true
+}

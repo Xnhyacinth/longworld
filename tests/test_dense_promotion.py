@@ -90,6 +90,9 @@ from longworld.core.taskreplaysidecar import (
     IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER_V3,
     IETF_OAUTH_TASK_REPLAY_ADAPTER_V3,
     IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER_V3,
+    IETF_HTTP_SEMANTICS_TASK_REPLAY_ADAPTER_V3,
+    IETF_HTTP2_TASK_REPLAY_ADAPTER_V3,
+    IETF_PKIX_PATH_TASK_REPLAY_ADAPTER_V3,
     TASK_VIEW_DERIVATION_REVISION,
     task_candidate_content_commitment,
 )
@@ -5233,6 +5236,9 @@ def test_ietf_tls13_and_http3_v3_projection_bindings_accept_standards_domain() -
     for adapter in (
         IETF_TLS13_HANDSHAKE_TASK_REPLAY_ADAPTER_V3,
         IETF_HTTP3_QUIC_TASK_REPLAY_ADAPTER_V3,
+        IETF_HTTP_SEMANTICS_TASK_REPLAY_ADAPTER_V3,
+        IETF_HTTP2_TASK_REPLAY_ADAPTER_V3,
+        IETF_PKIX_PATH_TASK_REPLAY_ADAPTER_V3,
     ):
         adapter_id, adapter_revision, sidecar_schema_version = adapter
         binding = {

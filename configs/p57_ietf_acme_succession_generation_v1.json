@@ -1,0 +1,68 @@
+{
+  "schema_version": "longworld.ietf-acme-generation-config.v1",
+  "source_inventory_dir": "/workspace/wynckeliao/longworld/data/source_inventory/p57_ietf_acme_family_v1",
+  "fetch_inventory_file": "ietf_fetch_inventory.json",
+  "fetch_inventory_sha256": "46f4dbb8c6171d98a4812608f9b0bcb81aba186bc66ced30c60a716822ce28aa",
+  "signed_workflow_file": "ietf_workflow_manifest.p57.acme.v1.signed.json",
+  "signed_workflow_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "predecessor_report_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "predecessor_report_task_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "world_id": "ietf-acme-issuance-succession-v1",
+  "length_buckets": {
+    "64k": [64000, 65536]
+  },
+  "packing": {
+    "target_margin_tokens": 256,
+    "unit_boundary": "source_blank_line_or_form_feed",
+    "record_ids_by_bucket": {
+      "64k": [
+        "ietf:rfc:8555",
+        "ietf:rfc:8737",
+        "ietf:rfc:8738",
+        "ietf:rfc:8823",
+        "ietf:rfc:9444",
+        "ietf:rfc:9773"
+      ]
+    },
+    "chunked_record_ids": [
+      "ietf:rfc:8555"
+    ],
+    "chunk_max_tokens": 8192,
+    "chunk_max_tokens_by_bucket": {
+      "64k": 8192
+    },
+    "published_draft_policy": "",
+    "support_priority_record_ids": [
+      "ietf:rfc:8737",
+      "ietf:rfc:8738",
+      "ietf:rfc:8823",
+      "ietf:rfc:9444",
+      "ietf:rfc:9773",
+      "ietf:rfc:8555"
+    ],
+    "pin_last_leftover_record_ids": [
+      "ietf:rfc:8555"
+    ],
+    "span_id_width": 7,
+    "counterfactual_evidence_id": "current_protocol",
+    "padding": false,
+    "cloned_artifacts": false,
+    "synthetic_filler": false
+  },
+  "workflow_id": "p57-ietf-acme-issuance-succession-v1",
+  "dense_model": {
+    "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+  },
+  "output_dir": "/workspace/wynckeliao/longworld/data/candidates/p57_ietf_acme_succession_v1",
+  "do_not_select": true,
+  "do_not_promote": true,
+  "do_not_count": true
+}

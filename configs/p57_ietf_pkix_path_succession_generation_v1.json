@@ -1,0 +1,66 @@
+{
+  "schema_version": "longworld.ietf-pkix-path-generation-config.v1",
+  "source_inventory_dir": "/workspace/wynckeliao/longworld/data/source_inventory/p57_ietf_pkix_path_graph_v1",
+  "fetch_inventory_file": "ietf_fetch_inventory.json",
+  "fetch_inventory_sha256": "bb570466e2a2939b6d779238c1084bf34cb117bc7a8ddb278e079f097c32cc72",
+  "signed_workflow_file": "ietf_workflow_manifest.p57.pkix-path.v1.signed.json",
+  "signed_workflow_sha256": "c9157e4041ca67073ddcb2b7090bc2c8c382b0e1807bc61fa0627739de8a7742",
+  "predecessor_report_manifest_sha256": "c9157e4041ca67073ddcb2b7090bc2c8c382b0e1807bc61fa0627739de8a7742",
+  "predecessor_report_task_sha256": "54120c1b5f327a23859ad67920bd9aa0e4c744800f031f9678e681f4e60bc223",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "local_files_only": true,
+    "add_special_tokens": false
+  },
+  "world_id": "ietf-pkix-path-succession-v1",
+  "length_buckets": {
+    "64k": [64000, 65536]
+  },
+  "packing": {
+    "target_margin_tokens": 256,
+    "unit_boundary": "source_blank_line_or_form_feed",
+    "record_ids_by_bucket": {
+      "64k": [
+        "ietf:draft:draft-ietf-pkix-rfc3280bis-11",
+        "ietf:rfc:3280",
+        "ietf:rfc:4325",
+        "ietf:rfc:4630",
+        "ietf:rfc:5280"
+      ]
+    },
+    "chunked_record_ids": [
+      "ietf:rfc:3280",
+      "ietf:rfc:5280"
+    ],
+    "chunk_max_tokens": 8192,
+    "chunk_max_tokens_by_bucket": {
+      "64k": 8192
+    },
+    "published_draft_policy": "identity_paragraph_only",
+    "support_priority_record_ids": [
+      "ietf:rfc:3280",
+      "ietf:rfc:4325",
+      "ietf:rfc:4630",
+      "ietf:rfc:5280"
+    ],
+    "pin_last_leftover_record_ids": [
+      "ietf:rfc:5280"
+    ],
+    "span_id_width": 7,
+    "counterfactual_evidence_id": "current_protocol",
+    "padding": false,
+    "cloned_artifacts": false,
+    "synthetic_filler": false
+  },
+  "workflow_id": "p57-ietf-pkix-path-succession-v1",
+  "dense_model": {
+    "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+  },
+  "output_dir": "/workspace/wynckeliao/longworld/data/candidates/p57_ietf_pkix_path_succession_v1",
+  "do_not_select": true,
+  "do_not_promote": true,
+  "do_not_count": true
+}
