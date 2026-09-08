@@ -1,5 +1,61 @@
 # Progress
 
+- 2026-09-08 Unique-profile land (not CURRENT_RELEASE / HF): Amazon 128k
+  3/3 gate ok, B5 n=3 / 395617. Meta 128k 3/3 gate ok, B5 n=3 / 393780.
+  Honest 128k-only products; 16k full/cf stay 8k-zipper retrieval. SSH 32k
+  rematerialized with coarsened RFC 4254 zipper tail (64 artifacts, 32359
+  tokens) and dense-audited 3/3 `strict_long_dependency`; unique-profile
+  gate ok, B5 n=3 / 97169. `production_eligible=false`. ACME export still
+  fails `requested RFC relation target is not grounded`. DNSSEC still
+  lacks a signed graph (draft became RFC 6840). Restart one watch after
+  this land; do not start a second execute.
+- 2026-09-08 Unique-profile land (not CURRENT_RELEASE / HF): HTTP/2 64k
+  3/3 gate ok, B5 n=3 / 195480, motif `http2_succession+obsoletes_closure`.
+  PKIX-path 64k 3/3 gate ok, B5 n=3 / 195555, motif
+  `pkix_path_succession+obsoletes_closure`. Micron dual-partition 32k
+  rematerialized through `financehistory` (32538 exact, structured CF JSON)
+  3/3 `strict_long_dependency`, gate ok, B5 n=3 / 99206, motif
+  `dual_partition_identity+europe_presence+mix_identity`.
+  `production_eligible=false`. SSH 32k dense audit is in flight: RFC 4251 is
+  only 16.6k tokens, so two-end gold fails the 16k intersecting bound unless
+  leftover 4252/4254 are chunk-exploded after 4251 (`_dossier_spread` zippers
+  chronology tails together). ACME stays 8555-only (48577 below 64k; unique
+  82082 must not pad). DNSSEC has no signed
+  `ietf_workflow_manifest.p57.dnssec.v1.signed.json`. Amazon/Meta keep the
+  16k full/cf 8k zipper; do not promote 128k. Watch still running; do not
+  start a second execute.
+- 2026-09-08 Amazon v3 and Meta v1 128k-only dense audit 3/3
+  `strict_long_dependency` (`global_proof_green`, 4k/8k insufficient, MiniLM
+  top-k insufficient). `auto_promote=false`. World-atomic still blocked by
+  the 16k full/cf 8k zipper (retrieval after re-validation, not auto-admit).
+  Packed/audited 128k rows are not inventory.
+  grounded targets; unique 82082 not padded). SSH packed 32k (32268) × 3
+  views; official dense audit blocked (`essential_artifact_ids == 1`).
+  Packed parents are not inventory.
+  `market_mix_crossover` is a unique 64k local-probe (3 train / 195631 exact,
+  `production_eligible=false`, not CURRENT_RELEASE). HTTP Semantics graph v2
+  now compiles 9110 obsoletes 7538/7615/7694 (v1 left pinned). HTTP/2 and
+  PKIX packed at natural 64k but V3 adapters are unregistered. Micron
+  dual-partition packed 32k only. DNSSEC sign blocked (draft became RFC 6840).
+  Amazon/Meta 8k zipper is 16k full/cf retrieval-after-revalidation, not a
+  128k class; 12-view dense audit still running. ACME/SSH compiler track
+  still open. Operator remains
+  `scripts/run_p57_task_pipeline.py --catalog configs/p57_task_pipeline_v1.json
+  --workers 4 --audit-workers 2 --watch`. Never pads or auto-promotes.
+  Ledger `reports/p57_pipeline/ledger.jsonl`.
+- 2026-09-08 Parallel synthesis restarted: NVIDIA extra mix task + Micron
+  mix/geo design already running; added HTTP/2 64k, PKIX-path 64k, DNSSEC 64k,
+  ACME 64k + SSH 32k, Amazon/Meta 8k-zipper classify, HTTP Semantics graph
+  re-export. Shared `longworld/core` left to the NVIDIA adapter track. Do not
+  pad HTTP/2 (103810), DNSSEC (126639), ACME (82082), PKIX-path (82943) to
+  128k. SSH unique 52837 stays 32k. Packed parents still not inventory.
+- 2026-09-07 HTTP Semantics succession v1 promoted as unique local-probe
+  product `p57-ietf-http-semantics-128k-extension-probe-1-v1` (3 train / 0 eval,
+  386,493 exact tokens). N_source-world=1, N_semantic-task=1, N_proof-family=1,
+  N_training-view=3. Natural 128k only; 16/32/64 never packed. Dense audit 3/3
+  with 4k/8k windows and MiniLM top-k insufficient. `production_eligible=false`.
+  Not on CURRENT_RELEASE / HF. Next: extra independent Finance/IETF tasks from
+  signed NVIDIA/Micron graphs.
 - 2026-09-07 TLS 1.3 handshake succession v4 promoted as unique local-probe
   product `p57-ietf-tls13-64k-128k-extension-probe-1-v1` (6 train / 0 eval,
   581,651 exact tokens). N_source-world=1, N_semantic-task=1, N_proof-family=1,

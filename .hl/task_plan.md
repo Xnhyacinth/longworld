@@ -492,13 +492,15 @@ rejecting the qualification and single-reference shortcuts.
 
 P57 dual-track conversion 2026-09-07: Canonical remains 7 products / 17 worlds
 / 153 train / 8,002,320 tokens. Local extras not on CURRENT_RELEASE:
-NVIDIA v5 (12), Micron v1 (12), TLS v4 (6). Combined local+canonical is
-10 products / 20 worlds / 183 train / 10,045,500 exact tokens.
-`production_eligible=false`. Production/KMS remains 0.
+NVIDIA v5 (12), Micron v1 (12), TLS v4 (6), HTTP Semantics v1 (3). Combined
+local+canonical is 11 products / 21 worlds / 186 train / 10,431,993 exact
+tokens. `production_eligible=false`. Production/KMS remains 0.
 
 TLS v4 counts as N_source-world=1, N_semantic-task=1, N_proof-family=1,
 N_training-view=6 under unique IETF 2-band profile
-`p57-ietf-tls13-64k-128k-extension-probe-1-v1`.
+`p57-ietf-tls13-64k-128k-extension-probe-1-v1`. HTTP Semantics v1 counts as
+1/1/1/3 under unique IETF 128k-only profile
+`p57-ietf-http-semantics-128k-extension-probe-1-v1`.
 
 Scale unit is verified independent semantic tasks from signed source graphs,
 not four-bucket world products. Strict 4k/8k/16k windows stay for the

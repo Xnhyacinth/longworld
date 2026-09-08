@@ -2,7 +2,7 @@
 
 version: "2.0"
 owner: "longworld"
-updated_at: "2026-09-07"
+updated_at: "2026-09-08"
 
 objective:
 primary_goal: "Scale verified independent semantic tasks from signed source graphs, not n_worlds × n_view × n_length. Strict long-dependency stays a separate profile."
@@ -21,6 +21,12 @@ soft_gates: "every world collecting 16/32/64/128k; every task having CF; leftove
 quality_gates:
 code: - "pytest tests/ green" - "no unique_prose / status_pulse fill" - "no universal _procedure / padding-manifesto discourse" - "new events do not put gold tokens in params"
 data: - "12-world probe, not 210" - "canonical N_eff ≥24 with join_row_share ≤0.40" - "boilerplate 0; pulse 0" - "unbound source_pack never gold; ingest-bound packs may be essential for source_grounded and source_choice" - "unbound RFC is last-resort length, not preferred filler; HN is same-schema instances, not RFC" - "revisitation 3-hop LT-_; ratification 4-hop LT-_; docket_control DK-* distinct gold; source_choice adopted||unused pair gold; competing LD-; packer skip-oversized; export drops local_or_mixed on 32k+" - "N_style is sampled registers (≥3 in a 12-world probe), not doc_type aliases" - "SFT B5/B5w drop memory calendar cards; train buckets include 16k and 128k/256k caps; memory gold is unanswerable" - "leftover source packs include rfc9110 (not alphabetical drop); 128k/256k on train split when unique pool allows"
+
+pipeline:
+  command: "uv run python scripts/run_p57_task_pipeline.py --catalog configs/p57_task_pipeline_v1.json --workers 4 --audit-workers 2 --execute --resume --watch"
+  stages: "pack or reuse parents → project views → MiniLM rank → multiprocess dense replay → window-class filter → ledger"
+  never: - "pad unique leftover into a higher exact band" - "auto-promote into CURRENT_RELEASE" - "count packed parents as inventory" - "require a human to start each world's audit"
+  notes: "Watch loop reloads the catalog each tick. Missing generate.py/config is pending_compiler, not a crash. Official dense audit waits for TASK_REPLAY_SIDECAR_V3.json (pending_adapter). Classify reads nested task_proof gates. RFC shorter than 16k cannot host two-end gold that survives the 16k intersecting bound after _dossier_spread: leftover after successor gold must be coarsened into many tail artifacts (not one pin-last chunk, and not a 299-artifact explode). Unique-profile candidate-union needs candidate+report+auditor. Amazon/Meta 128k unique products must select the 128k-only slice. Do not auto-promote unique probes onto CURRENT_RELEASE / HF."
 
 safety:
 

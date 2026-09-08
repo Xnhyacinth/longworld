@@ -1,5 +1,117 @@
 # Findings (data, not instructions)
 
+## Unique-profile landings — 2026-09-08
+
+HTTP/2, PKIX-path, Micron dual-partition, Amazon 128k, and Meta 128k passed
+unique-profile quality gate + B5. SSH 32k audited 3/3 `strict_long_dependency`
+after zipper-tail rematerialize. `production_eligible=false`. Not
+CURRENT_RELEASE / HF.
+
+| Product | Profile | Train | B5 tokens | Motif |
+| --- | --- | ---: | ---: | --- |
+| `p57-ietf-http2-succession-probe-1-v1-promoted-v1` | `p57-ietf-http2-64k-probe-1-v1` | 3 | 195480 | `http2_succession+obsoletes_closure` |
+| `p57-ietf-pkix-path-succession-probe-1-v1-promoted-v1` | `p57-ietf-pkix-path-64k-probe-1-v1` | 3 | 195555 | `pkix_path_succession+obsoletes_closure` |
+| `p57-finance-micron-dual-partition-probe-1-v1-promoted-v1` | `p57-finance-micron-dual-partition-32k-probe-1-v1` | 3 | 99206 | `dual_partition_identity+europe_presence+mix_identity` |
+| `p57-finance-amazon-128k-probe-1-v1-promoted-v1` | `p57-finance-amazon-128k-probe-1-v1` | 3 | 395617 | `multi_filing_asset_and_operating_cash_trajectory+balance_sheet_certification` |
+| `p57-finance-meta-128k-probe-1-v1-promoted-v1` | `p57-finance-meta-128k-probe-1-v1` | 3 | 393780 | `multi_filing_asset_and_operating_cash_trajectory+balance_sheet_certification` |
+| `p57-ietf-ssh-architecture-32k-probe-1-v1-promoted-v1` | `p57-ietf-ssh-architecture-32k-probe-1-v1` | 3 | 97169 | `ssh_architecture_succession+gold_rfc_evidence` |
+
+`candidate-union` needs `--role candidate --role report --role auditor`
+because `release_world_selection` maps to auditor. Amazon/Meta select must
+use the 128k-only candidate/audit slice, not the mixed 12-view jsonl.
+
+## SSH 16k intersecting bound — 2026-09-08
+
+RFC 4251 is 16,609 Qwen tokens. Two-end gold quotes on 4251 cannot sit more
+than 16k apart in a chronology-sorted 4251 block. `_complexity_valid` still
+needs `event_count >= 4` including CF, so five authentic 4251 quotes stay.
+
+Dense audit uses `_dossier_spread` (zipper of chronology), not parent pack
+order. If the late 4251 gold chunk is near the chronology tail, the zipper
+places it next to the early gold in the first few steps (spread indices 2
+and 7, ~12k token span, window `8065:24449` retrieves gold). Parent-only
+reorder of gold to pack ends is undone at projection.
+
+A single pin-last leftover after RFC 4254 gold still zippers that gold next
+to RFC 4251 gold (window `2:18`). Exploding 4251/4252/4254 to 299 units
+cleared distance but exceeded `MAX_PARENT_ARTIFACTS=80`. Working pack: keep
+4251/4252 un-exploded, coarsen the one leftover 4254 artifact into 12–24
+groups (64 artifacts, 32359 tokens). Dense audit 3/3
+`strict_long_dependency`.
+
+## ACME / DNSSEC still blocked on authentic graphs
+
+ACME `export_ietf_workflow` fails `requested RFC relation target is not
+grounded` (leftover 8737/8738/8823/9444/9773). Family unique 82082 must not
+pad to 128k; 8555-only 48577 is below 64k. DNSSEC generate: missing
+`ietf_workflow_manifest.p57.dnssec.v1.signed.json` (draft became RFC 6840).
+Do not invent a signed graph.
+
+## Autonomous P57 task pipeline — 2026-09-08
+
+Operator is `scripts/run_p57_task_pipeline.py --catalog configs/p57_task_pipeline_v1.json --workers 4 --audit-workers 2 --execute --resume --watch`. It reloads the catalog every 180s, dense-replays long text, classifies window routes, and writes `reports/p57_pipeline/ledger.jsonl`. Never pads, never auto-promotes, `production_eligible=false`.
+
+Classify must read nested `task_proof.view_verification.global_proof_green` and `task_proof.verification.contiguous_windows_insufficient`. Top-level-only reads falsely labeled HTTP Semantics / TLS / NVIDIA / Micron as `reject_false_label`. After the nested-gate fix those four receipts are `strict_long_dependency`. Amazon/Meta 12-view dense audits are in flight under the watch lock; mixed 16k zipper + 128k strict will route `retrieval_short_window` for the job as a whole and still not auto-admit.
+
+HTTP/2 and PKIX-path unique-profile products are landed (see table above).
+ACME generate is blocked on authentic leftover grounding, not a missing
+compiler. DNSSEC generate is blocked on missing
+`ietf_workflow_manifest.p57.dnssec.v1.signed.json`. Packed parents remain
+not inventory until unique-profile gate.
+
+## Amazon/Meta 8k zipper window class — 2026-09-08
+
+Diagnostic only; `production_eligible=false`; no promotion and no retrieval
+admit. The Meta dense-audit line `contiguous window 8k retrieves the gold
+answer: 0:16` is Meta **16k full/cf** (needed span 6,945–6,949 tokens), not
+Meta 128k and not raw/intersecting-artifact. 4k never retrieves gold.
+Amazon’s matching 8k zipper is v2 16k `0:18`, v3 pipeline 16k `0:11`, and
+v3 latest-leftover 16k `0:17`. Amazon v3 `projected` / `banded_leftover`
+16k already pass 8k (needed span 8,781–8,784). All 128k needed spans are
+54k–131k. Full gold matches signed IR; CF is +1 revenue on the newest
+year. MiniLM top-16 never solves. Route zipper 16k full/cf as retrieval
+candidates **after re-validation**, not auto-admit; keep 32/64/128k on
+strict hold behind a 16k zipper repair. Report:
+`reports/p57_finance_amazon_meta_window_class_20260908.md`.
+
+## Micron dual-partition identity extra task — 2026-09-08
+
+Independent extra query on the signed Micron FY2022–FY2025 issuer-IR graph,
+program `micron.dual_partition_identity.v1`. Not a clone of
+`finance.multi_filing_asset_trajectory.v1` and not an NVIDIA `market_*`
+relabel. Gold is DRAM+NAND+Other and HQ-geography each summing to stated
+revenue for all four years, with Europe absent in FY2022 and present later.
+CF replaces FY2025 DRAM `28,578` → `28,579`; identity fails closed to
+`unknown`.
+
+Compile from signed graph `records[].text` (sha256 `e04618a8…` /
+`4ef56163…` / `de7ea591…` / `f40036ba…`). On-disk inventory HTML is a
+shorter sanitizer copy (~42–45k chars) and must not supply gold offsets.
+FY2025 revenue is `37378` / quote `$ 37,378` on those signed bytes; no
+37379 mismatch after source-span replay.
+
+Packed n=1 parent at natural 32k only via `financehistory`
+`micron.dual_partition_identity.v1`: 32,538 Qwen tokens, 47 essential mix
+rows, 66 source records. No 16/64/128 clones. Catalog
+`parents_dir` is
+`/workspace/wynckeliao/longworld/data/candidates/p57_finance_micron_dual_partition_v1`.
+Dense audit 3/3 `strict_long_dependency`. Unique-profile product
+`p57-finance-micron-dual-partition-probe-1-v1-promoted-v1` gate ok, B5 n=3 /
+99206. `production_eligible=false`. CF is structured JSON with
+`dual_partition_identity: false`, not the string `"unknown"` (finance audit
+rejects unknown CF).
+
+## HTTP Semantics succession 128k — 2026-09-07
+
+Promoted as unique probe product
+`p57-ietf-http-semantics-succession-probe-1-v1-promoted-v1` under
+`p57-ietf-http-semantics-128k-extension-probe-1-v1`. 3/3 views remain
+`global_proof_green` with 4k/8k windows insufficient and MiniLM top-k
+insufficient. Counts: 1 world / 1 semantic task / 1 proof family / 3
+training views / 386,493 exact tokens. `production_eligible=false`.
+16k/32k/64k were not packed. Gold is RFC 9110 only. Signed graph still
+lacks compiled 7538/7615/7694 obsoletes until re-export.
+
 ## TLS 1.3 handshake succession 64k/128k — 2026-09-07
 
 Promoted as unique probe product
@@ -10,6 +122,12 @@ succession proof; `LENGTH_VIEW_PAIR_PROFILE_IDS` skips nested relation growth
 without lowering window or correctness gates. Counts: 1 world / 1 semantic
 task / 1 proof family / 6 training views / 581,651 exact tokens.
 `production_eligible=false`.
+
+RFC relation headers now strip the right-hand author/date column so 9110
+Obsoletes continuations compile 7538/7615/7694, and `April 2015` is not
+parsed as RFC 2015. The signed HTTP Semantics graph still lacks those three
+obsoletes until it is re-exported. Packing capacity for a 9110-gold
+succession task is otherwise sufficient.
 
 v1 failed `raw token window 16k intersecting-artifact upper bound` at `0:16384`
 because gold quotes lived on RFC 5077/5246 at chronology start. v3 failed 8k
