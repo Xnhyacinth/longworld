@@ -1,0 +1,30 @@
+{
+  "schema_version": "longworld.ietf-fetch-request.v1",
+  "user_agent": "LongWorld-P57/1.0 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "p57-ietf-acme-issuance-v1",
+    "scope": "public IETF Datatracker, Internet-Draft archive, and RFC Editor records for RFC 8555 ACME issuance",
+    "basis": "IETF open-records research export for the authentic RFC 8555 issuance protocol graph. Leftover ACME RFCs 8737/8738/8823/9444/9773 are not 8555 Updates/Obsoletes targets and are excluded rather than invented.",
+    "reviewed_at": "2026-09-08T12:00:00Z",
+    "allowed_actions": [
+      "fetch_datatracker_document",
+      "fetch_datatracker_relation",
+      "fetch_draft_revision",
+      "fetch_rfc"
+    ]
+  },
+  "drafts": [
+    {
+      "name": "draft-ietf-acme-acme",
+      "revisions": [
+        "18"
+      ]
+    }
+  ],
+  "rfc_numbers": [
+    8555
+  ],
+  "approved_public_test_vector_sha256": [],
+  "requests_per_second": 1.0,
+  "max_retries": 2
+}

@@ -42,8 +42,7 @@ def _acme_inventory(tmp_path: Path) -> dict[str, object]:
             ],
         },
         "drafts": [{"name": "draft-ietf-acme-acme", "revisions": ["18"]}],
-        "rfc_numbers": [8555, *_LEFTOVER_RFCS],
-        "rfc_datatracker_sources": [8555],
+        "rfc_numbers": [8555],
         "approved_public_test_vector_sha256": [],
         "requests_per_second": 1.0,
         "max_retries": 2,
@@ -51,7 +50,6 @@ def _acme_inventory(tmp_path: Path) -> dict[str, object]:
     request_path = tmp_path / "ietf_fetch_request.json"
     request_raw = (json.dumps(request, sort_keys=True) + "\n").encode()
     request_path.write_bytes(request_raw)
-    leftover_targets = ", ".join(f"rfc{number}" for number in _LEFTOVER_RFCS)
     bodies = {
         "datatracker-draft-ietf-acme-acme.json": json.dumps(
             {
@@ -79,7 +77,7 @@ def _acme_inventory(tmp_path: Path) -> dict[str, object]:
         ),
         "rfc8555.txt": (
             b"Request for Comments: 8555\n"
-            b"Updates: 8737, 8738, 8823, 9444, 9773                  March 2019\n"
+            b"March 2019\n"
             b"Automatic Certificate Management Environment (ACME)\n"
             b"This document describes a protocol\n"
             b"that a CA and an applicant can use to automate the process of\n"
@@ -87,36 +85,11 @@ def _acme_inventory(tmp_path: Path) -> dict[str, object]:
             b"The protocol also provides\n"
             b"facilities for other certificate management functions, such as\n"
             b"certificate revocation.\n"
+            b"Section 8 describes a set of challenges for domain name validation.\n"
+            b"A certificate resource represents a single, immutable certificate.\n"
+            b'The server MUST provide "directory" and "newNonce" resources.\n'
         ),
-        "datatracker-rfc8555.json": json.dumps(
-            {
-                "name": "rfc8555",
-                "rfc": "8555",
-                "rev": "",
-                "time": "2019-03-01T00:00:00Z",
-            },
-            sort_keys=True,
-        ).encode(),
-        "datatracker-rfc8555-relations.json": json.dumps(
-            {
-                "meta": {"total_count": len(_LEFTOVER_RFCS)},
-                "objects": [
-                    {
-                        "relationship": "/api/v1/name/docrelationshipname/refinfo/",
-                        "source": "/api/v1/doc/document/rfc8555/",
-                        "target": f"/api/v1/doc/document/{name}/",
-                    }
-                    for name in leftover_targets.split(", ")
-                ],
-            },
-            sort_keys=True,
-        ).encode(),
     }
-    for number in _LEFTOVER_RFCS:
-        bodies[f"rfc{number}.txt"] = (
-            f"Request for Comments: {number}\nMarch 2020\n"
-            f"ACME leftover RFC {number} whole span.\n"
-        ).encode()
     specifications = [
         (
             "datatracker_document",
@@ -134,20 +107,6 @@ def _acme_inventory(tmp_path: Path) -> dict[str, object]:
             "https://www.ietf.org/archive/id/draft-ietf-acme-acme-18.txt",
         ),
         ("rfc", "rfc8555.txt", "https://www.rfc-editor.org/rfc/rfc8555.txt"),
-        *(
-            ("rfc", f"rfc{number}.txt", f"https://www.rfc-editor.org/rfc/rfc{number}.txt")
-            for number in _LEFTOVER_RFCS
-        ),
-        (
-            "datatracker_document",
-            "datatracker-rfc8555.json",
-            "https://datatracker.ietf.org/api/v1/doc/document/rfc8555/",
-        ),
-        (
-            "datatracker_relation",
-            "datatracker-rfc8555-relations.json",
-            "https://datatracker.ietf.org/api/v1/doc/relateddocument/?source__name=rfc8555&limit=100",
-        ),
     ]
     retrievals = []
     for kind, filename, url in specifications:
@@ -207,6 +166,9 @@ def test_acme_issuance_succession_task_replays_and_fails_closed_on_remove_one(
     assert task["answer"] == {
         "current_protocol": "ACME_RFC8555",
         "certificate_management": "ISSUANCE_AND_REVOCATION",
+        "domain_validation": "DOMAIN_NAME_CHALLENGES",
+        "certificate_resource": "IMMUTABLE_CERTIFICATE",
+        "directory_nonce": "DIRECTORY_AND_NEWNONCE",
     }
     assert all(item["record_id"] == "ietf:rfc:8555" for item in task["evidence_items"])
     assert replay_ietf_acme_issuance_succession_task(task) == task["answer"]
@@ -227,6 +189,9 @@ def test_acme_issuance_succession_task_replays_and_fails_closed_on_remove_one(
     assert materialized["counterfactual_twin"]["evidence_id"] == "current_protocol"
     assert materialized["answer"]["current_protocol"] == "UNKNOWN"
     assert materialized["answer"]["certificate_management"] == "ISSUANCE_AND_REVOCATION"
+    assert materialized["answer"]["domain_validation"] == "DOMAIN_NAME_CHALLENGES"
+    assert materialized["answer"]["certificate_resource"] == "IMMUTABLE_CERTIFICATE"
+    assert materialized["answer"]["directory_nonce"] == "DIRECTORY_AND_NEWNONCE"
 
 
 def test_acme_official_family_cannot_compile_signed_graph() -> None:
@@ -329,7 +294,41 @@ def test_acme_packing_keeps_leftover_only_record_as_one_span() -> None:
     assert last in leftover[0]["text"]
 
 
-def test_acme_generate_refuses_isolate_evidence_and_128k(tmp_path: Path) -> None:
+def test_acme_family_leftover_inventory_cannot_compile(tmp_path: Path) -> None:
+    inventory = _acme_inventory(tmp_path)
+    request = json.loads((tmp_path / "ietf_fetch_request.json").read_text())
+    request["rfc_numbers"] = [8555, *_LEFTOVER_RFCS]
+    request_raw = (json.dumps(request, sort_keys=True) + "\n").encode()
+    (tmp_path / "ietf_fetch_request.json").write_bytes(request_raw)
+    inventory["request_sha256"] = hashlib.sha256(request_raw).hexdigest()
+    inventory["fetch_receipt"]["request_sha256"] = inventory["request_sha256"]
+    for index, number in enumerate(_LEFTOVER_RFCS, start=7):
+        filename = f"rfc{number}.txt"
+        body = (
+            f"Request for Comments: {number}\nMarch 2020\n"
+            f"ACME leftover RFC {number} whole span.\n"
+        ).encode()
+        item = _write(tmp_path / filename, body)
+        item.update(
+            {
+                "kind": "rfc",
+                "requested_url": f"https://www.rfc-editor.org/rfc/rfc{number}.txt",
+                "final_url": f"https://www.rfc-editor.org/rfc/rfc{number}.txt",
+                "observed_at": f"2026-08-29T01:00:{index:02d}Z",
+            }
+        )
+        inventory["fetch_receipt"]["retrievals"].append(item)
+    inventory["n_retrievals"] = len(inventory["fetch_receipt"]["retrievals"])
+    with pytest.raises(ProvenanceError, match="not grounded"):
+        build_ietf_workflow_from_fetch_inventory(
+            inventory,
+            tmp_path,
+            generated_at="2026-08-29T02:00:00Z",
+            fetch_inventory_sha256="a" * 64,
+        )
+
+
+def test_acme_generate_refuses_isolate_evidence_and_64k(tmp_path: Path) -> None:
     from reports.p57_ietf_acme_succession_generate import build
 
     config_path = tmp_path / "bad.json"

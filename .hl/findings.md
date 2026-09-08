@@ -2,10 +2,10 @@
 
 ## Unique-profile landings — 2026-09-08
 
-HTTP/2, PKIX-path, Micron dual-partition, Amazon 128k, and Meta 128k passed
-unique-profile quality gate + B5. SSH 32k audited 3/3 `strict_long_dependency`
-after zipper-tail rematerialize. `production_eligible=false`. Not
-CURRENT_RELEASE / HF.
+HTTP/2, PKIX-path, Micron dual-partition, Amazon 128k, Meta 128k, SSH 32k,
+DNSSEC 64k, and ACME 32k passed unique-profile quality gate + B5.
+`production_eligible=false`. Not CURRENT_RELEASE / HF. Watch does not pad
+or auto-promote.
 
 | Product | Profile | Train | B5 tokens | Motif |
 | --- | --- | ---: | ---: | --- |
@@ -15,6 +15,8 @@ CURRENT_RELEASE / HF.
 | `p57-finance-amazon-128k-probe-1-v1-promoted-v1` | `p57-finance-amazon-128k-probe-1-v1` | 3 | 395617 | `multi_filing_asset_and_operating_cash_trajectory+balance_sheet_certification` |
 | `p57-finance-meta-128k-probe-1-v1-promoted-v1` | `p57-finance-meta-128k-probe-1-v1` | 3 | 393780 | `multi_filing_asset_and_operating_cash_trajectory+balance_sheet_certification` |
 | `p57-ietf-ssh-architecture-32k-probe-1-v1-promoted-v1` | `p57-ietf-ssh-architecture-32k-probe-1-v1` | 3 | 97169 | `ssh_architecture_succession+gold_rfc_evidence` |
+| `p57-ietf-dnssec-64k-probe-1-v1-promoted-v1` | `p57-ietf-dnssec-64k-probe-1-v1` | 3 | 196643 | `dnssec_succession+obsoletes_and_updates` |
+| `p57-ietf-acme-issuance-32k-probe-1-v1-promoted-v1` | `p57-ietf-acme-issuance-32k-probe-1-v1` | 3 | 98339 | `acme_issuance_succession+gold_rfc_evidence` |
 
 `candidate-union` needs `--role candidate --role report --role auditor`
 because `release_world_selection` maps to auditor. Amazon/Meta select must
@@ -39,13 +41,20 @@ cleared distance but exceeded `MAX_PARENT_ARTIFACTS=80`. Working pack: keep
 groups (64 artifacts, 32359 tokens). Dense audit 3/3
 `strict_long_dependency`.
 
-## ACME / DNSSEC still blocked on authentic graphs
+## ACME / DNSSEC authentic-graph land — 2026-09-08
 
-ACME `export_ietf_workflow` fails `requested RFC relation target is not
-grounded` (leftover 8737/8738/8823/9444/9773). Family unique 82082 must not
-pad to 128k; 8555-only 48577 is below 64k. DNSSEC generate: missing
-`ietf_workflow_manifest.p57.dnssec.v1.signed.json` (draft became RFC 6840).
-Do not invent a signed graph.
+DNSSEC unique-profile landed: `p57-ietf-dnssec-64k-probe-1-v1`, B5 n=3 /
+196643, motif `dnssec_succession+obsoletes_and_updates`. Honest path is
+`draft-ietf-dnsext-dnssec-protocol-09` → RFC 4035 (not bis-updates/6840),
+5 authentic 4035 quotes so CF `event_count >= 4`, natural 64k (65501 then
+zipper-tail 33 artifacts). Do not pad unique 126639 to 128k.
+
+ACME official family leftovers 8737/8738/8823/9444/9773 are not 8555
+Updates/Obsoletes targets; 8555-only 48577 is the honest 32k product. Core
+task now has 5 authentic 8555 quotes. Dense audit still needs leftover
+*between* golds in chronology (full/cf concat is not the zipper) plus 4
+gold artifacts so BM25 top-3 cannot solve; do not pad to 64k/128k and do
+not fake `Updates:` leftover RFCs.
 
 ## Autonomous P57 task pipeline — 2026-09-08
 

@@ -59,6 +59,7 @@ from longworld.core.standardsworkflow import (
     IETF_SSH_ARCHITECTURE_SUCCESSION_TASK_SCHEMA,
     IETF_HTTP2_SUCCESSION_TASK_SCHEMA,
     IETF_PKIX_PATH_SUCCESSION_TASK_SCHEMA,
+    IETF_DNSSEC_SUCCESSION_TASK_SCHEMA,
     render_ietf_cross_spec_prompt,
     replay_ietf_cross_spec_requirement_task,
     replay_ietf_http3_quic_requirement_task,
@@ -68,6 +69,7 @@ from longworld.core.standardsworkflow import (
     replay_ietf_ssh_architecture_succession_task,
     replay_ietf_http2_succession_task,
     replay_ietf_pkix_path_succession_task,
+    replay_ietf_dnssec_succession_task,
 )
 from longworld.core.taskreplaysidecar import (
     CYBER_CROSS_CVE_TASK_REPLAY_ADAPTER,
@@ -83,6 +85,7 @@ from longworld.core.taskreplaysidecar import (
     IETF_SSH_ARCHITECTURE_TASK_REPLAY_ADAPTER,
     IETF_HTTP2_TASK_REPLAY_ADAPTER,
     IETF_PKIX_PATH_TASK_REPLAY_ADAPTER,
+    IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     SOURCE_TOKEN_MEASUREMENT_BASIS,
     SOURCE_TOKEN_MEASUREMENT_RECEIPT_SCHEMA,
@@ -107,6 +110,7 @@ _IETF_REQUIREMENT_FAMILIES = {
     IETF_SSH_ARCHITECTURE_TASK_REPLAY_ADAPTER[:2],
     IETF_HTTP2_TASK_REPLAY_ADAPTER[:2],
     IETF_PKIX_PATH_TASK_REPLAY_ADAPTER[:2],
+    IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER[:2],
 }
 
 
@@ -419,6 +423,12 @@ def replay_ietf_cross_spec_candidate(
             evidence_ids=evidence_ids,
             relation_ids=replay_relation_ids,
         )
+    elif task.get("schema_version") == IETF_DNSSEC_SUCCESSION_TASK_SCHEMA:
+        answer = replay_ietf_dnssec_succession_task(
+            task,
+            evidence_ids=evidence_ids,
+            relation_ids=replay_relation_ids,
+        )
     else:
         answer = replay_ietf_cross_spec_requirement_task(
             task,
@@ -688,6 +698,14 @@ def _adapter_key(candidate: dict[str, Any]) -> TaskReplayRegistryKey:
             isinstance(task, dict)
             and task.get("schema_version") == IETF_PKIX_PATH_SUCCESSION_TASK_SCHEMA
             and task.get("answer_program_id") == "ietf.pkix_path_succession.v1"
+            and candidate.get("answer_program_id") == task.get("answer_program_id")
+        )
+    elif family == IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("ietf_requirement_task")
+        replay_identity_valid = bool(
+            isinstance(task, dict)
+            and task.get("schema_version") == IETF_DNSSEC_SUCCESSION_TASK_SCHEMA
+            and task.get("answer_program_id") == "ietf.dnssec_succession.v1"
             and candidate.get("answer_program_id") == task.get("answer_program_id")
         )
     elif family == EURLEX_PMS_TASK_REPLAY_ADAPTER[:2]:

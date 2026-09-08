@@ -5463,9 +5463,13 @@ IETF_ACME_ISSUANCE_SUCCESSION_TASK_SCHEMA = (
 IETF_SSH_ARCHITECTURE_SUCCESSION_TASK_SCHEMA = (
     "longworld.ietf-ssh-architecture-succession-task.v1"
 )
+IETF_DNSSEC_SUCCESSION_TASK_SCHEMA = "longworld.ietf-dnssec-succession-task.v1"
 _ACME_SUCCESSION_ANSWERS = {
     "current_protocol": "ACME_RFC8555",
     "certificate_management": "ISSUANCE_AND_REVOCATION",
+    "domain_validation": "DOMAIN_NAME_CHALLENGES",
+    "certificate_resource": "IMMUTABLE_CERTIFICATE",
+    "directory_nonce": "DIRECTORY_AND_NEWNONCE",
 }
 _ACME_SUCCESSION_CODEBOOK = {
     "current_protocol": {
@@ -5475,6 +5479,18 @@ _ACME_SUCCESSION_CODEBOOK = {
     "certificate_management": {
         "code": "ISSUANCE_AND_REVOCATION",
         "meaning": "RFC 8555 automates issuance and other certificate management",
+    },
+    "domain_validation": {
+        "code": "DOMAIN_NAME_CHALLENGES",
+        "meaning": "RFC 8555 Section 8 challenges validate domain names",
+    },
+    "certificate_resource": {
+        "code": "IMMUTABLE_CERTIFICATE",
+        "meaning": "An ACME certificate resource is a single immutable certificate",
+    },
+    "directory_nonce": {
+        "code": "DIRECTORY_AND_NEWNONCE",
+        "meaning": "An ACME server must provide directory and newNonce resources",
     },
 }
 _ACME_SUCCESSION_SCENARIO = {
@@ -5495,8 +5511,20 @@ _ACME_SUCCESSION_EVIDENCE = {
         r"facilities for other certificate management functions, such as\s+"
         r"certificate revocation\.",
     ),
+    "domain_validation": (
+        8555,
+        r"Section 8 describes a set of challenges for domain name validation\.",
+    ),
+    "certificate_resource": (
+        8555,
+        r"A certificate resource represents a single, immutable certificate\.",
+    ),
+    "directory_nonce": (
+        8555,
+        r'The server MUST provide "directory" and "newNonce" resources\.',
+    ),
 }
-_ACME_RFC_NUMBERS = {8555, 8737, 8738, 8823, 9444, 9773}
+_ACME_RFC_NUMBERS = {8555}
 _SSH_SUCCESSION_ANSWERS = {
     "current_protocol": "SSH_ARCHITECTURE_RFC4251",
     "transport_layer": "SSH_TRANS",
@@ -6030,3 +6058,357 @@ def _materialize_gold_rfc_counterfactual(
             "source_manifest_sha256": task["source_manifest_sha256"],
         },
     }
+
+
+_DNSSEC_SUCCESSION_ANSWERS = {
+    "current_protocol": "DNSSEC_PROTOCOL_RFC4035",
+    "updates_dns_concepts": "RFC1034",
+    "updates_dns_implementation": "RFC1035",
+    "signed_zone_example": "COMPLETE_SIGNED_ZONE",
+    "rrsig_unsigned": "RRSIG_MUST_NOT_BE_SIGNED",
+}
+_DNSSEC_SUCCESSION_CODEBOOK = {
+    "current_protocol": {
+        "code": "DNSSEC_PROTOCOL_RFC4035",
+        "meaning": "RFC 4035 is DNSSEC protocol modifications",
+    },
+    "updates_dns_concepts": {
+        "code": "RFC1034",
+        "meaning": "RFC 4035 updates DNS concepts and facilities",
+    },
+    "updates_dns_implementation": {
+        "code": "RFC1035",
+        "meaning": "RFC 4035 updates DNS implementation and specification",
+    },
+    "signed_zone_example": {
+        "code": "COMPLETE_SIGNED_ZONE",
+        "meaning": "RFC 4035 includes a complete signed zone example",
+    },
+    "rrsig_unsigned": {
+        "code": "RRSIG_MUST_NOT_BE_SIGNED",
+        "meaning": "An RRSIG RR itself must not be signed",
+    },
+}
+_DNSSEC_SUCCESSION_SCENARIO = {
+    "protocol": "dnssec",
+    "publication": "rfc4035",
+    "succession": "obsoletes_and_updates",
+}
+_DNSSEC_SUCCESSION_EVIDENCE = {
+    "current_protocol": (
+        4035,
+        r"This document defines the DNSSEC protocol operations\.",
+    ),
+    "updates_dns_concepts": (
+        4035,
+        r"Updates: 1034, 1035",
+    ),
+    "updates_dns_implementation": (
+        4035,
+        r"described in \[RFC1034\], \[RFC1035\], and the subsequent documents that\s+"
+        r"update them",
+    ),
+    "signed_zone_example": (
+        4035,
+        r"The following example shows a \(small\) complete signed zone\.",
+    ),
+    "rrsig_unsigned": (
+        4035,
+        r"An RRSIG RR itself MUST NOT be signed, as signing an RRSIG RR would\s+"
+        r"add no value and would create an infinite loop in the signing\s+"
+        r"process\.",
+    ),
+}
+_DNSSEC_SUCCESSION_BRANCHES = {
+    "current_protocol": ("current_protocol", None, None, None),
+    "updates_dns_concepts": ("updates_dns_concepts", None, "updates", 1034),
+    "updates_dns_implementation": (
+        "updates_dns_implementation",
+        None,
+        "updates",
+        1035,
+    ),
+    "signed_zone_example": ("signed_zone_example", None, None, None),
+    "rrsig_unsigned": ("rrsig_unsigned", None, None, None),
+}
+_DNSSEC_RFC_NUMBERS = {1034, 1035, 4033, 4034, 4035}
+
+
+def _dnssec_succession_question() -> str:
+    return (
+        "Resolve the effective DNSSEC protocol succession at "
+        "2026-01-31T00:00:00Z for this scenario (canonical JSON): "
+        + json.dumps(
+            _DNSSEC_SUCCESSION_SCENARIO, sort_keys=True, separators=(",", ":")
+        )
+        + ". Return exactly one JSON object with these keys in this order: "
+        + json.dumps(tuple(_DNSSEC_SUCCESSION_CODEBOOK), separators=(",", ":"))
+        + ". Use this exact per-field output codebook (canonical JSON): "
+        + json.dumps(
+            _DNSSEC_SUCCESSION_CODEBOOK, sort_keys=True, separators=(",", ":")
+        )
+        + ". Resolve each field independently from the supplied RFC graph; use "
+        'the string "UNKNOWN" only for a field whose required evidence or relation '
+        "is absent."
+    )
+
+
+def _dnssec_rfc_records(manifest: dict[str, Any]) -> dict[int, dict[str, Any]]:
+    records: dict[int, dict[str, Any]] = {}
+    for record in manifest["records"]:
+        number = record.get("rfc_number")
+        if isinstance(number, int):
+            if number in records:
+                raise ProvenanceError("IETF DNSSEC RFC identity is duplicated")
+            records[number] = record
+    if set(records) != _DNSSEC_RFC_NUMBERS:
+        raise ProvenanceError("IETF DNSSEC RFC graph is incomplete")
+    return records
+
+
+def _dnssec_succession_relation(
+    manifest: dict[str, Any], *, kind: str, target_number: int
+) -> dict[str, Any]:
+    matches = [
+        relation
+        for relation in manifest["relations"]
+        if relation.get("kind") == kind
+        and relation.get("source_record_id") == "ietf:rfc:4035"
+        and relation.get("target_record_id") == f"ietf:rfc:{target_number}"
+    ]
+    if len(matches) != 1:
+        raise ProvenanceError("IETF DNSSEC succession relation is not unique")
+    return matches[0]
+
+
+def _dnssec_succession_evidence(
+    records: dict[int, dict[str, Any]], evidence_id: str, specification: tuple[int, str]
+) -> dict[str, Any]:
+    number, pattern = specification
+    record = records[number]
+    matches = list(re.finditer(pattern, record["text"], re.MULTILINE | re.DOTALL))
+    if len(matches) != 1:
+        raise ProvenanceError("IETF DNSSEC succession evidence is not unique")
+    match = matches[0]
+    quote = match.group(0)
+    return {
+        "evidence_id": evidence_id,
+        "record_id": record["record_id"],
+        "evidence_quote": quote,
+        "char_start": match.start(),
+        "char_end": match.end(),
+        "quote_sha256": hashlib.sha256(quote.encode()).hexdigest(),
+        "source_sha256": record["source_sha256"],
+    }
+
+
+def build_ietf_dnssec_succession_task(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Compile DNSSEC succession from RFC 4035 Updates of RFC 1034/1035."""
+    audit_ietf_workflow_manifest(manifest)
+    records = _dnssec_rfc_records(manifest)
+    evidence = [
+        _dnssec_succession_evidence(records, evidence_id, specification)
+        for evidence_id, specification in _DNSSEC_SUCCESSION_EVIDENCE.items()
+    ]
+    succession_relations = [
+        _dnssec_succession_relation(manifest, kind=kind, target_number=target_number)
+        for _field, (_current, _dependency, kind, target_number) in (
+            _DNSSEC_SUCCESSION_BRANCHES.items()
+        )
+        if kind is not None and target_number is not None
+    ]
+    publication = [
+        relation
+        for relation in manifest["relations"]
+        if relation.get("kind") == "published_as"
+        and relation.get("target_record_id") == "ietf:rfc:4035"
+    ]
+    if len(publication) != 1:
+        raise ProvenanceError("IETF DNSSEC publication relation is not unique")
+    task = {
+        "schema_version": IETF_DNSSEC_SUCCESSION_TASK_SCHEMA,
+        "query_type": "protocol_succession_resolution",
+        "answer_program_id": "ietf.dnssec_succession.v1",
+        "question": _dnssec_succession_question(),
+        "cutoff": "2026-01-31T00:00:00Z",
+        "scenario": dict(_DNSSEC_SUCCESSION_SCENARIO),
+        "source_manifest": deepcopy(manifest),
+        "source_manifest_sha256": _canonical_sha256(manifest),
+        "evidence_items": evidence,
+        "essential_evidence_ids": list(_DNSSEC_SUCCESSION_EVIDENCE),
+        "essential_relation_ids": [
+            publication[0]["relation_id"],
+            *(relation["relation_id"] for relation in succession_relations),
+        ],
+        "answer": dict(_DNSSEC_SUCCESSION_ANSWERS),
+    }
+    replay_ietf_dnssec_succession_task(task)
+    return task
+
+
+def replay_ietf_dnssec_succession_task(
+    task: dict[str, Any],
+    *,
+    evidence_ids: list[str] | None = None,
+    relation_ids: list[str] | None = None,
+) -> dict[str, str]:
+    """Replay DNSSEC succession with optional evidence or relation removal."""
+    required_fields = {
+        "schema_version",
+        "query_type",
+        "answer_program_id",
+        "question",
+        "cutoff",
+        "scenario",
+        "source_manifest",
+        "source_manifest_sha256",
+        "evidence_items",
+        "essential_evidence_ids",
+        "essential_relation_ids",
+        "answer",
+    }
+    if (
+        not isinstance(task, dict)
+        or set(task) != required_fields
+        or task.get("schema_version") != IETF_DNSSEC_SUCCESSION_TASK_SCHEMA
+        or task.get("query_type") != "protocol_succession_resolution"
+        or task.get("answer_program_id") != "ietf.dnssec_succession.v1"
+        or task.get("question") != _dnssec_succession_question()
+        or task.get("cutoff") != "2026-01-31T00:00:00Z"
+        or task.get("scenario") != _DNSSEC_SUCCESSION_SCENARIO
+        or task.get("essential_evidence_ids") != list(_DNSSEC_SUCCESSION_EVIDENCE)
+        or task.get("answer") != _DNSSEC_SUCCESSION_ANSWERS
+    ):
+        raise ProvenanceError("IETF DNSSEC task contract is invalid")
+    manifest = task.get("source_manifest")
+    if not isinstance(manifest, dict):
+        raise ProvenanceError("IETF DNSSEC source manifest is missing")
+    audit_ietf_workflow_manifest(manifest)
+    if task.get("source_manifest_sha256") != _canonical_sha256(manifest):
+        raise ProvenanceError("IETF DNSSEC source manifest binding is invalid")
+    records = _dnssec_rfc_records(manifest)
+    raw_evidence = task.get("evidence_items")
+    if not isinstance(raw_evidence, list):
+        raise ProvenanceError("IETF DNSSEC evidence is invalid")
+    items = {
+        str(item.get("evidence_id") or ""): item
+        for item in raw_evidence
+        if isinstance(item, dict)
+    }
+    if set(items) != set(_DNSSEC_SUCCESSION_EVIDENCE) or len(items) != len(
+        raw_evidence
+    ):
+        raise ProvenanceError("IETF DNSSEC evidence identity is invalid")
+    for evidence_id, specification in _DNSSEC_SUCCESSION_EVIDENCE.items():
+        expected = _dnssec_succession_evidence(records, evidence_id, specification)
+        if items[evidence_id] != expected:
+            raise ProvenanceError("IETF DNSSEC evidence binding is invalid")
+    all_evidence = set(items)
+    selected_evidence = all_evidence if evidence_ids is None else set(evidence_ids)
+    if (
+        not isinstance(evidence_ids, (list, type(None)))
+        or len(selected_evidence) != len(evidence_ids or selected_evidence)
+        or not selected_evidence.issubset(all_evidence)
+    ):
+        raise ProvenanceError("IETF DNSSEC evidence selection is invalid")
+    relations = {
+        str(relation["relation_id"]): relation for relation in manifest["relations"]
+    }
+    essential_relations = task.get("essential_relation_ids")
+    if (
+        not isinstance(essential_relations, list)
+        or len(set(essential_relations)) != len(essential_relations)
+        or any(item not in relations for item in essential_relations)
+    ):
+        raise ProvenanceError("IETF DNSSEC relation identity is invalid")
+    selected_relations = (
+        set(essential_relations) if relation_ids is None else set(relation_ids)
+    )
+    if (
+        not isinstance(relation_ids, (list, type(None)))
+        or len(selected_relations) != len(relation_ids or selected_relations)
+        or not selected_relations.issubset(set(essential_relations))
+    ):
+        raise ProvenanceError("IETF DNSSEC relation selection is invalid")
+    publication = next(
+        relation
+        for relation in manifest["relations"]
+        if relation.get("kind") == "published_as"
+        and relation.get("target_record_id") == "ietf:rfc:4035"
+    )
+    expected_essential_relations = [
+        publication["relation_id"],
+        *(
+            _dnssec_succession_relation(
+                manifest, kind=kind, target_number=target_number
+            )["relation_id"]
+            for _field, (_current, _dependency, kind, target_number) in (
+                _DNSSEC_SUCCESSION_BRANCHES.items()
+            )
+            if kind is not None and target_number is not None
+        ),
+    ]
+    if essential_relations != expected_essential_relations:
+        raise ProvenanceError("IETF DNSSEC task contract is invalid")
+    result: dict[str, str] = {}
+    publication_present = publication["relation_id"] in selected_relations
+    for field, (current, dependency, kind, target_number) in (
+        _DNSSEC_SUCCESSION_BRANCHES.items()
+    ):
+        needed = {current} if dependency is None else {current, dependency}
+        relations_present = publication_present
+        if kind is not None and target_number is not None:
+            relation = _dnssec_succession_relation(
+                manifest, kind=kind, target_number=target_number
+            )
+            relations_present = (
+                publication_present and relation["relation_id"] in selected_relations
+            )
+        if needed.issubset(selected_evidence) and relations_present:
+            result[field] = _DNSSEC_SUCCESSION_ANSWERS[field]
+        else:
+            result[field] = "UNKNOWN"
+    return result
+
+
+def audit_ietf_dnssec_succession_task(task: dict[str, Any]) -> dict[str, bool]:
+    """Audit strict replay plus every remove-one evidence and relation replay."""
+    answer = task.get("answer")
+    evidence = list(task.get("essential_evidence_ids") or [])
+    relations = list(task.get("essential_relation_ids") or [])
+    return {
+        "strict_replay": replay_ietf_dnssec_succession_task(task) == answer,
+        "remove_one_evidence_fails": bool(evidence)
+        and all(
+            replay_ietf_dnssec_succession_task(
+                task,
+                evidence_ids=[item for item in evidence if item != removed],
+            )
+            != answer
+            for removed in evidence
+        ),
+        "remove_one_relation_fails": bool(relations)
+        and all(
+            replay_ietf_dnssec_succession_task(
+                task,
+                relation_ids=[item for item in relations if item != removed],
+            )
+            != answer
+            for removed in relations
+        ),
+    }
+
+
+def materialize_ietf_dnssec_counterfactual(
+    task: dict[str, Any],
+    *,
+    evidence_id: str = "current_protocol",
+) -> dict[str, Any]:
+    """Exclude one byte-bound DNSSEC succession quote without invented text."""
+    return _materialize_gold_rfc_counterfactual(
+        task,
+        evidence_id=evidence_id,
+        replay=replay_ietf_dnssec_succession_task,
+        label="DNSSEC",
+    )
+

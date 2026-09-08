@@ -482,6 +482,32 @@ def test_p57_ssh_architecture_is_a_one_world_standards_32k_gate() -> None:
     assert profile.profile_id in CURRENT_RELEASE_GATE_ONLY_PROFILE_IDS
 
 
+def test_p57_acme_issuance_is_a_one_world_standards_32k_gate() -> None:
+    profile = release_profile("p57-ietf-acme-issuance-32k-probe-1-v1")
+
+    assert profile.environment == "probe"
+    assert profile.training_length_buckets == ("32k",)
+    assert profile.required_exact_length_buckets == ("32k",)
+    assert dict(profile.promoted_domain_world_quotas) == {"standards": 1}
+    assert profile.min_real_64k_rows == 0
+    assert profile.min_exact_64k_rows_by_domain == ()
+    assert profile.profile_id in LENGTH_VIEW_PAIR_PROFILE_IDS
+    assert profile.profile_id in CURRENT_RELEASE_GATE_ONLY_PROFILE_IDS
+
+
+def test_p57_dnssec_is_a_one_world_standards_64k_gate() -> None:
+    profile = release_profile("p57-ietf-dnssec-64k-probe-1-v1")
+
+    assert profile.environment == "probe"
+    assert profile.training_length_buckets == ("64k",)
+    assert profile.required_exact_length_buckets == ("64k",)
+    assert dict(profile.promoted_domain_world_quotas) == {"standards": 1}
+    assert dict(profile.min_exact_64k_rows_by_domain) == {"standards": 3}
+    assert profile.min_real_64k_rows == 3
+    assert profile.profile_id in LENGTH_VIEW_PAIR_PROFILE_IDS
+    assert profile.profile_id in CURRENT_RELEASE_GATE_ONLY_PROFILE_IDS
+
+
 def test_p57_micron_dual_partition_is_a_one_world_finance_32k_gate() -> None:
     profile = release_profile("p57-finance-micron-dual-partition-32k-probe-1-v1")
 
@@ -694,6 +720,8 @@ def test_p12_sec_slice_adds_128k_without_changing_historical_training_buckets() 
             "p57-ietf-http2-64k-probe-1-v1",
             "p57-ietf-pkix-path-64k-probe-1-v1",
             "p57-ietf-ssh-architecture-32k-probe-1-v1",
+            "p57-ietf-acme-issuance-32k-probe-1-v1",
+            "p57-ietf-dnssec-64k-probe-1-v1",
             "p57-finance-micron-dual-partition-32k-probe-1-v1",
             "p57-finance-amazon-128k-probe-1-v1",
             "p57-finance-meta-128k-probe-1-v1",

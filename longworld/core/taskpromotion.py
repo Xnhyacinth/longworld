@@ -103,6 +103,7 @@ from longworld.core.taskreplaysidecar import (
     IETF_SSH_ARCHITECTURE_TASK_REPLAY_ADAPTER,
     IETF_HTTP2_TASK_REPLAY_ADAPTER,
     IETF_PKIX_PATH_TASK_REPLAY_ADAPTER,
+    IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER,
     MACRO_VINTAGE_TASK_REPLAY_ADAPTER,
     SOURCE_TOKEN_MEASUREMENT_BASIS,
     SOURCE_TOKEN_MEASUREMENT_RECEIPT_SCHEMA,
@@ -213,6 +214,7 @@ def _ietf_requirement_adapter(adapter_key: tuple[str, str, str]) -> bool:
         IETF_SSH_ARCHITECTURE_TASK_REPLAY_ADAPTER[:2],
         IETF_HTTP2_TASK_REPLAY_ADAPTER[:2],
         IETF_PKIX_PATH_TASK_REPLAY_ADAPTER[:2],
+        IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER[:2],
     }
 
 
@@ -962,6 +964,8 @@ def _task_selection_metrics(
         group_suffix = "ietf-http2-succession"
     elif _sidecar_uses(sidecar, IETF_PKIX_PATH_TASK_REPLAY_ADAPTER):
         group_suffix = "ietf-pkix-path-succession"
+    elif _sidecar_uses(sidecar, IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER):
+        group_suffix = "ietf-dnssec-succession"
     elif _sidecar_uses(sidecar, GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER):
         group_suffix = "govinfo-bill-disposition"
     elif _sidecar_uses(sidecar, EURLEX_PMS_TASK_REPLAY_ADAPTER):
@@ -1915,6 +1919,21 @@ def _canonical_task_identifiers(
             "select_cutoff_sources",
             "resolve_publication_obsoletes_and_updates",
             "evaluate_pkix_path_succession_branches",
+        )
+        answer_program_id = str(task["answer_program_id"])
+    elif family == IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER[:2]:
+        task = candidate.get("ietf_requirement_task")
+        if (
+            not isinstance(task, Mapping)
+            or task.get("answer_program_id") != "ietf.dnssec_succession.v1"
+            or candidate.get("answer_program_id") != task.get("answer_program_id")
+        ):
+            raise PromotionError("IETF DNSSEC answer program is unsupported")
+        motif = "dnssec_succession+obsoletes_and_updates"
+        program_ops = (
+            "select_cutoff_sources",
+            "resolve_publication_obsoletes_and_updates",
+            "evaluate_dnssec_succession_branches",
         )
         answer_program_id = str(task["answer_program_id"])
     elif family == GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER[:2]:
@@ -3154,6 +3173,7 @@ def build_task_candidate_view_projections(
         IETF_SSH_ARCHITECTURE_TASK_REPLAY_ADAPTER,
         IETF_HTTP2_TASK_REPLAY_ADAPTER,
         IETF_PKIX_PATH_TASK_REPLAY_ADAPTER,
+        IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER,
         GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
         EURLEX_PMS_TASK_REPLAY_ADAPTER,
     }:

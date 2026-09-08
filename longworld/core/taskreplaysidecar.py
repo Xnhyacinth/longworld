@@ -96,6 +96,11 @@ IETF_PKIX_PATH_TASK_REPLAY_ADAPTER = (
     "longworld.ietf-pkix-path-succession-replay.v1",
     TASK_REPLAY_SIDECAR_SCHEMA,
 )
+IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER = (
+    "standards.ietf_dnssec_succession.v1",
+    "longworld.ietf-dnssec-succession-replay.v1",
+    TASK_REPLAY_SIDECAR_SCHEMA,
+)
 ELIFE_REVIEW_REVISION_TASK_REPLAY_ADAPTER = (
     "researchlab.elife_review_revision.v1",
     "longworld.elife-review-revision-replay.v1",
@@ -154,6 +159,11 @@ IETF_HTTP2_TASK_REPLAY_ADAPTER_V3 = (
 IETF_PKIX_PATH_TASK_REPLAY_ADAPTER_V3 = (
     IETF_PKIX_PATH_TASK_REPLAY_ADAPTER[0],
     IETF_PKIX_PATH_TASK_REPLAY_ADAPTER[1],
+    TASK_REPLAY_SIDECAR_SCHEMA_V3,
+)
+IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER_V3 = (
+    IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER[0],
+    IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER[1],
     TASK_REPLAY_SIDECAR_SCHEMA_V3,
 )
 GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER_V3 = (
@@ -376,6 +386,7 @@ def _contract(key: TaskReplayRegistryKey) -> TaskReplayAdapterContract:
         IETF_SSH_ARCHITECTURE_TASK_REPLAY_ADAPTER[:2],
         IETF_HTTP2_TASK_REPLAY_ADAPTER[:2],
         IETF_PKIX_PATH_TASK_REPLAY_ADAPTER[:2],
+        IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER[:2],
     }:
         payload_fields = frozenset(
             {
@@ -478,6 +489,7 @@ TASK_REPLAY_ADAPTER_REGISTRY: Mapping[
             IETF_SSH_ARCHITECTURE_TASK_REPLAY_ADAPTER,
             IETF_HTTP2_TASK_REPLAY_ADAPTER,
             IETF_PKIX_PATH_TASK_REPLAY_ADAPTER,
+            IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER,
             ELIFE_REVIEW_REVISION_TASK_REPLAY_ADAPTER,
             GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER,
             EURLEX_PMS_TASK_REPLAY_ADAPTER,
@@ -497,6 +509,7 @@ TASK_REPLAY_ADAPTER_REGISTRY: Mapping[
             IETF_SSH_ARCHITECTURE_TASK_REPLAY_ADAPTER_V3,
             IETF_HTTP2_TASK_REPLAY_ADAPTER_V3,
             IETF_PKIX_PATH_TASK_REPLAY_ADAPTER_V3,
+            IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER_V3,
             GOVINFO_DISPOSITION_TASK_REPLAY_ADAPTER_V3,
             EURLEX_PMS_TASK_REPLAY_ADAPTER_V3,
         )
@@ -913,6 +926,33 @@ def _verify_replay_payload(
             )
         )
         or (
+            contract.adapter_id == IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER[0]
+            and (
+                not isinstance(ietf_task, dict)
+                or ietf_task.get("schema_version")
+                != "longworld.ietf-dnssec-succession-task.v1"
+                or replay_payload.get("task_sha256")
+                != hashlib.sha256(
+                    json.dumps(
+                        ietf_task,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ).encode()
+                ).hexdigest()
+                or replay_payload.get("source_manifest_sha256")
+                != ietf_task.get("source_manifest_sha256")
+                or replay_payload.get("fetch_inventory_sha256")
+                != (ietf_task.get("source_manifest") or {}).get(
+                    "fetch_inventory_sha256"
+                )
+                or replay_payload.get("authorization_record_id")
+                != (
+                    (ietf_task.get("source_manifest") or {}).get("authorization") or {}
+                ).get("record_id")
+            )
+        )
+        or (
             contract.adapter_id == IETF_PKIX_PATH_TASK_REPLAY_ADAPTER[0]
             and (
                 not isinstance(ietf_task, dict)
@@ -990,6 +1030,7 @@ def _verify_replay_payload(
                         IETF_SSH_ARCHITECTURE_TASK_REPLAY_ADAPTER[0],
                         IETF_HTTP2_TASK_REPLAY_ADAPTER[0],
                         IETF_PKIX_PATH_TASK_REPLAY_ADAPTER[0],
+                        IETF_DNSSEC_SUCCESSION_TASK_REPLAY_ADAPTER[0],
                     }
                     else ()
                 ),

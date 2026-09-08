@@ -1,5 +1,19 @@
 # Progress
 
+- 2026-09-08 Unique-profile land (not CURRENT_RELEASE / HF): ACME 32k
+  3/3 gate ok, B5 n=3 / 98339, motif `acme_issuance_succession+gold_rfc_evidence`.
+  Authentic 8555-only (no leftover RFC Updates padding); 5 gold quotes /
+  4 gold artifacts; between-gold leftover trimmed to exact band 32734.
+  `production_eligible=false`. DNSSEC 64k already landed (B5 n=3 / 196643).
+  Watch is already running; do not start a second execute. Do not pad or
+  auto-promote.
+- 2026-09-08 Unique-profile land (not CURRENT_RELEASE / HF): DNSSEC 64k
+  3/3 gate ok, B5 n=3 / 196643, motif `dnssec_succession+obsoletes_and_updates`.
+  Authentic `draft-ietf-dnsext-dnssec-protocol-09` → RFC 4035; 5 gold quotes;
+  zipper-tail 33 artifacts at 65501 then packed 64k. `production_eligible=false`.
+  ACME 8555-only 32k is packed (5 quotes / 4 gold artifacts, between-gold
+  leftover) but dense audit is still open. Watch is already running; do not
+  start a second execute. Do not pad or auto-promote.
 - 2026-09-08 Unique-profile land (not CURRENT_RELEASE / HF): Amazon 128k
   3/3 gate ok, B5 n=3 / 395617. Meta 128k 3/3 gate ok, B5 n=3 / 393780.
   Honest 128k-only products; 16k full/cf stay 8k-zipper retrieval. SSH 32k

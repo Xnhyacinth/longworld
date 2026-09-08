@@ -9,7 +9,11 @@ import pytest
 from longworld.core.provenance import ProvenanceError
 from longworld.core.standardsworkflow import (
     IETF_FETCH_INVENTORY_SCHEMA,
+    audit_ietf_dnssec_succession_task,
+    build_ietf_dnssec_succession_task,
     build_ietf_workflow_from_fetch_inventory,
+    materialize_ietf_dnssec_counterfactual,
+    replay_ietf_dnssec_succession_task,
 )
 from tests.test_standardsworkflow import _write
 
@@ -101,6 +105,10 @@ def _dnssec_inventory(tmp_path: Path) -> dict[str, object]:
             b"The reader is also assumed to be familiar with the basic DNS concepts\n"
             b"   described in [RFC1034], [RFC1035], and the subsequent documents that\n"
             b"   update them.\n"
+            b"The following example shows a (small) complete signed zone.\n"
+            b"An RRSIG RR itself MUST NOT be signed, as signing an RRSIG RR would\n"
+            b"   add no value and would create an infinite loop in the signing\n"
+            b"   process.\n"
         ),
         "datatracker-rfc4035.json": json.dumps(
             {
@@ -220,13 +228,6 @@ def test_dnssec_family_inventory_cannot_ground_published_as() -> None:
 def test_dnssec_succession_task_replays_and_fails_closed_on_remove_one(
     tmp_path: Path,
 ) -> None:
-    from reports.p57_ietf_dnssec_succession_generate import (
-        audit_ietf_dnssec_succession_task,
-        build_ietf_dnssec_succession_task,
-        materialize_ietf_dnssec_counterfactual,
-        replay_ietf_dnssec_succession_task,
-    )
-
     inventory = _dnssec_inventory(tmp_path)
     manifest = build_ietf_workflow_from_fetch_inventory(
         inventory,
@@ -241,6 +242,8 @@ def test_dnssec_succession_task_replays_and_fails_closed_on_remove_one(
         "current_protocol": "DNSSEC_PROTOCOL_RFC4035",
         "updates_dns_concepts": "RFC1034",
         "updates_dns_implementation": "RFC1035",
+        "signed_zone_example": "COMPLETE_SIGNED_ZONE",
+        "rrsig_unsigned": "RRSIG_MUST_NOT_BE_SIGNED",
     }
     assert all(item["record_id"] == "ietf:rfc:4035" for item in task["evidence_items"])
     assert replay_ietf_dnssec_succession_task(task) == task["answer"]
@@ -264,14 +267,11 @@ def test_dnssec_succession_task_replays_and_fails_closed_on_remove_one(
     assert materialized["counterfactual_twin"]["evidence_id"] == "current_protocol"
     assert materialized["answer"]["current_protocol"] == "UNKNOWN"
     assert materialized["answer"]["updates_dns_concepts"] == "RFC1034"
+    assert materialized["answer"]["signed_zone_example"] == "COMPLETE_SIGNED_ZONE"
+    assert materialized["answer"]["rrsig_unsigned"] == "RRSIG_MUST_NOT_BE_SIGNED"
 
 
 def test_dnssec_succession_task_binds_official_bytes_when_present() -> None:
-    from reports.p57_ietf_dnssec_succession_generate import (
-        audit_ietf_dnssec_succession_task,
-        build_ietf_dnssec_succession_task,
-    )
-
     if not DNSSEC_SIGNED_MANIFEST.is_file():
         return
     manifest = json.loads(DNSSEC_SIGNED_MANIFEST.read_text())

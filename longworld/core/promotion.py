@@ -1289,6 +1289,7 @@ def _task_sidecar_matches_candidate(
             "standards.ietf_ssh_architecture_succession.v1": "standards",
             "standards.ietf_http2_succession.v1": "standards",
             "standards.ietf_pkix_path_succession.v1": "standards",
+            "standards.ietf_dnssec_succession.v1": "standards",
         }
         return bool(
             key[0] in expected_domains

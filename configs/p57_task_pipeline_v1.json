@@ -132,7 +132,8 @@
       "primary_buckets": ["64k"],
       "unique_tokens": 126639,
       "auto_promote": false,
-      "production_eligible": false
+      "production_eligible": false,
+      "already_promoted": true
     },
     {
       "job_id": "ietf-acme-succession-v1",
@@ -141,10 +142,11 @@
       "generate_config": "configs/p57_ietf_acme_succession_generation_v1.json",
       "parents_dir": "/workspace/wynckeliao/longworld/data/candidates/p57_ietf_acme_succession_v1",
       "projected_dir": "reports/p57_ietf_acme_succession_v1/projected",
-      "primary_buckets": ["64k"],
-      "unique_tokens": 82082,
+      "primary_buckets": ["32k"],
+      "unique_tokens": 48577,
       "auto_promote": false,
-      "production_eligible": false
+      "production_eligible": false,
+      "already_promoted": true
     },
     {
       "job_id": "ietf-ssh-succession-v1",
