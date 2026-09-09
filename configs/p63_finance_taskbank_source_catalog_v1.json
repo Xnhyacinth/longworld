@@ -1,0 +1,83 @@
+{
+  "schema_version": "longworld.p63-finance-taskbank-source-catalog.v1",
+  "jobs": [
+    {
+      "issuer": "amazon",
+      "config": "configs/p63_finance_taskbank_amazon_v1.json",
+      "config_sha256": "0a172b50bffe30c6ad82b6e772e98b1c9fc86f39d9b729dbffdab091779c9aa9",
+      "source_manifest": "data/source_inventory/p57_finance_amazon_ir_fy2021_2024_v1/issuer_ir_manifest.signed.json",
+      "source_manifest_sha256": "8e48f6c0688ae3bcbd9b9e9eade195e8ba70e297f7bf806573e2d95c90645bb6",
+      "source_schema": "longworld.issuer-ir-filing-manifest.v1",
+      "split_group_id": "0001018724",
+      "split": "train",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/amazon/local_probe_trust.json",
+      "source_trust_key_id_matches": true
+    },
+    {
+      "issuer": "meta",
+      "config": "configs/p63_finance_taskbank_meta_v1.json",
+      "config_sha256": "0dea96bbb966447e143e6b6f724a0c6ec39385aae54e85b67f83ab2bfb9862d4",
+      "source_manifest": "data/source_inventory/p58_finance_meta_reconstruction_v1/issuer_ir_manifest.signed.json",
+      "source_manifest_sha256": "7871f9310cc39bb94a465c7f960b538ebbf53ae752ecc1b439e641cebb4f2b5d",
+      "source_schema": "longworld.issuer-ir-filing-manifest.v1",
+      "split_group_id": "0001326801",
+      "split": "train",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/meta/local_probe_trust.json",
+      "source_trust_key_id_matches": true
+    },
+    {
+      "issuer": "micron",
+      "config": "configs/p63_finance_taskbank_micron_v1.json",
+      "config_sha256": "2b956cefa6f6a8081b92fa23f07c020b6f848633c19f10b7fd0960b9d0bdd4e7",
+      "source_manifest": "data/source_inventory/p59_finance_micron_reconstruction_v1/issuer_ir_manifest.signed.json",
+      "source_manifest_sha256": "d85ebdb650cb37a9b7e7d0fddc783cf167e4d1b7c5f38109b80236d843cd15cd",
+      "source_schema": "longworld.issuer-ir-filing-manifest.v1",
+      "split_group_id": "0000723125",
+      "split": "train",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/micron/local_probe_trust.json",
+      "source_trust_key_id_matches": true
+    },
+    {
+      "issuer": "alphabet",
+      "config": "configs/p63_finance_taskbank_alphabet_v1.json",
+      "config_sha256": "85ee20ba57cc968d2c8864cab056687ce02c5cc74adeb4a4b3eef40b44e64443",
+      "source_manifest": "data/source_inventory/p59_finance_alphabet_reconstruction_v1/issuer_ir_manifest.signed.json",
+      "source_manifest_sha256": "4028a54d58dca726657487ee1b4238e3213c3c0b59c5044cb2e1cc50faf31e3c",
+      "source_schema": "longworld.issuer-ir-filing-manifest.v1",
+      "split_group_id": "0001652044",
+      "split": "train",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/alphabet/local_probe_trust.json",
+      "source_trust_key_id_matches": true
+    },
+    {
+      "issuer": "nvidia",
+      "config": "configs/p63_finance_taskbank_nvidia_v1.json",
+      "config_sha256": "68e228b19ae4713f44cdd1f59d7722b4a81040dd63b2773ba879db4c445bbc27",
+      "source_manifest": "data/source_inventory/p59_finance_nvidia_reconstruction_v1/issuer_ir_manifest.signed.json",
+      "source_manifest_sha256": "5bb796cc5d1d69fee06bf7ecdde7b86d165738c40f9f688a72aaf7cd0070b793",
+      "source_schema": "longworld.issuer-ir-filing-manifest.v1",
+      "split_group_id": "0001045810",
+      "split": "train",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/nvidia/local_probe_trust.json",
+      "source_trust_key_id_matches": true
+    },
+    {
+      "issuer": "amd",
+      "config": "configs/p63_finance_taskbank_amd_v1.json",
+      "config_sha256": "ac2c52a64124f7ffe294a00eb061a46bdc4c837a444520817b4032b63b12a047",
+      "source_manifest": "data/source_inventory/p60_finance_amd_inline_fy2021_2024_v1/issuer_inline_manifest.signed.json",
+      "source_manifest_sha256": "4b8756fa1819883bbb706fb520516a64c17516cf1c44dbcfe018a5ebdfd67258",
+      "source_schema": "longworld.issuer-inline-xbrl-manifest.v1",
+      "split_group_id": "0000002488",
+      "split": "eval",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/amd/local_probe_trust.json",
+      "source_trust_key_id_matches": true
+    }
+  ],
+  "scope": "New isolated taskbank; train five issuers, compiler-unseen AMD eval. All six sources have prior legacy training exposure.",
+  "legacy_union_allowed": false,
+  "transfer_label": "compiler-unseen / cross-provider AMD, not source-new or held-out against legacy training",
+  "legacy_holds_receipt": "reports/p60_reading_readiness_audit_20260908_v2.json",
+  "holds_policy": "Explicit {} for this new taskbank config; old row/family holds were not loaded into new task IDs. Known legacy finance row holds are empty under that finite detector, not a clean certificate.",
+  "production_eligible": false
+}

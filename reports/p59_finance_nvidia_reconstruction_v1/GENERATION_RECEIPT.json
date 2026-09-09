@@ -1,0 +1,9 @@
+{
+  "world_id": "finance_nvidia_reconstruction_fy2022_2025_p59_v1",
+  "source_successor_sha256": "5bb796cc5d1d69fee06bf7ecdde7b86d165738c40f9f688a72aaf7cd0070b793",
+  "parents": 3,
+  "primary_bucket": "64k",
+  "finance_executable_audits": 3,
+  "production_eligible": false,
+  "train_ready": false
+}

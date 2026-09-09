@@ -1,0 +1,18 @@
+{
+  "schema_version": "longworld.clinical-fetch-request.v1",
+  "user_agent": "LongWorld/0.2 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "p59-clinical-leqembi-v1",
+    "scope": "bounded public ClinicalTrials.gov and openFDA export",
+    "basis": "public-source research authorization",
+    "reviewed_at": "2026-09-08T00:00:00Z",
+    "allowed_actions": [
+      "fetch_clinical_trial",
+      "fetch_fda_application",
+      "fetch_fda_label"
+    ]
+  },
+  "nct_id": "NCT03887455",
+  "fda_application_number": "BLA761269",
+  "max_retries": 2
+}

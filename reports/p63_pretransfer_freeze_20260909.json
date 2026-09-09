@@ -1,0 +1,23 @@
+{
+  "schema_version": "longworld.p63-pretransfer-code-freeze.v1",
+  "created_at": "2026-09-09T03:57:36.153038+00:00",
+  "files": {
+    "longworld/core/finance_taskbank.py": "943b8e4d80baf5937599fe53d0432c560785586771e1437a3b7fbd1b327228c3",
+    "longworld/core/taskbank_context.py": "2720171270f1bbe9983bf423156334a85cfea3e6e31c40d2533be1ba739fe2b1",
+    "longworld/core/issuerfilingworkflow.py": "5aadaf3ff4f55328a51377b0bf5ce153d12d3c4b7fbdd124930a914f0e35cee3",
+    "longworld/core/issuerinlineworkflow.py": "0c45a936304d8f78ea7cb4451810bd1e5f9f4688efcfaaa3718485c42468b4db",
+    "longworld/core/attestation.py": "12d0b762e86a6f14f21665f4f3152f3c93aa909b2efc41def209fe1233b80fa8",
+    "longworld/core/provenance.py": "361248fc1e1737bfac88e0bed9b01c15aa883a241dfe53b32bd155c79572290b",
+    "longworld/core/tokenizer_assets.py": "792ab0ffe4b77439dda2f5ccaf90b63aa327c760464a2e272a9b9bb4b74179f6",
+    "scripts/materialize_finance_histories.py": "e441bcb922d29f10c4c2339125a082e7b1d460c8f72de7d1ed8d9893f05dd797",
+    "scripts/materialize_finance_taskbank.py": "582982f8dfd34e086a6a46cd316778d27650ccf18a6b6541ec682075f95c5867",
+    "pyproject.toml": "222a003027a49cdb02965c30940d05d40e0890b75ec9c706331124662966c730",
+    "uv.lock": "b8518611546a53105169cb3d8d508cfab352b4ac0f29088f7be01b4a6f3bfc7a",
+    "scripts/run_finance_taskbank_batch.py": "a22ede72101c6cb8e2e33dbbb7c6a8ec8a9e9ec802fe650296425b4b6be810d7",
+    "configs/p63_finance_taskbank_source_catalog_v1.json": "66a29a7925efe315c5a531b5d0e6ee4d87d6dcc519c208cbf73d5f26f9b3ece0"
+  },
+  "pretransfer_tests": "117 passed in23.43s; new and existing finance focused suite",
+  "amd_taskbank_executed_before_freeze": false,
+  "scope": "prospective compiler cross-provider reuse; AMD already exists in legacy training; not source-new",
+  "production_eligible": false
+}

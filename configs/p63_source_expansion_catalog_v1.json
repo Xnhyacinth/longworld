@@ -1,0 +1,32 @@
+{
+  "schema_version": "longworld.p63-source-expansion-catalog.v1",
+  "current_numeric_compiler_schemas": [
+    "longworld.issuer-ir-filing-manifest.v1",
+    "longworld.issuer-inline-xbrl-manifest.v1"
+  ],
+  "current_batch_catalog": "configs/p63_finance_taskbank_source_catalog_v1.json",
+  "transfer": {
+    "development": "amazon plus meta/micron/alphabet/nvidia",
+    "eval": "amd",
+    "label": "compiler-unseen cross-provider within NEW isolated batch",
+    "source_new": false,
+    "legacy_train_union_allowed": false
+  },
+  "new_to_admission_source_candidate": {
+    "issuer": "Berkshire Hathaway Inc.",
+    "cik": "0001067983",
+    "manifest": "data/source_inventory/p14_company_berkshire_official_annuals_v1/berkshire_annual_report_inventory.signed.json",
+    "existing_fetch_request": "configs/p14_company_berkshire_annual_reports_fetch_request_v1.json",
+    "existing_fetch_script": "scripts/export_berkshire_annual_reports.py",
+    "source_present": true,
+    "current_numeric_compiler_compatible": false,
+    "reason": "PDF inventory has a different schema and no field/numeric_value verified-role list matching the IR/inline compiler; requires reusable evidence extraction, not issuer-specific invented facts.",
+    "blindness": "Previously source-curated; not globally unseen. Do not use as transfer until a compatible generic adapter and frozen protocol exist."
+  },
+  "arbitrary_new_issuer_fetch": {
+    "q4_provider": "Only five registered issuers; cannot swap arbitrary CIK/hosts.",
+    "inline_provider": "AMD-specific host/profile; cannot relabel as generic new issuer.",
+    "generic_sec_fetcher": "Accepts CIK requests but local failed-directions forbids retries against the established blocked sec.gov route. No new accession or approval fabricated.",
+    "action": "Prefer existing frozen sources now; add a reusable authenticated provider/evidence extractor before declaring a new issuer executable."
+  }
+}

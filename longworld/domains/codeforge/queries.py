@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
+from dataclasses import replace
 from typing import Any
 
 from longworld.core.asof import find_event, world_as_of
@@ -36,10 +38,23 @@ def eval_answer(
     world: SimulatedWorld, spec: QuerySpec, state_values: dict[str, Any]
 ) -> str:
     val = state_values.get(spec.answer_key)
-    if spec.query_type == "patch_review_test_ancestry":
+    if spec.query_type in {
+        "patch_review_test_ancestry",
+        "patch_files_review_test_ancestry",
+        "patch_files_review_test_release_v2",
+    }:
+        reading_release = spec.query_type == "patch_files_review_test_release_v2"
+        readable = spec.query_type != "patch_review_test_ancestry"
+        op_name = (
+            "JOIN_PATCH_FILES_REVIEW_TEST_RELEASE_V2"
+            if reading_release
+            else "JOIN_PATCH_FILES_REVIEW_TEST_ANCESTRY"
+            if readable
+            else "JOIN_PATCH_REVIEW_TEST_ANCESTRY"
+        )
         selections: list[str] = []
         for op in spec.program_ops:
-            if op.get("op") != "JOIN_PATCH_REVIEW_TEST_ANCESTRY":
+            if op.get("op") != op_name:
                 continue
             patch_key = str(op["patch_record_key"])
             review_key = str(op["review_record_key"])
@@ -48,7 +63,9 @@ def eval_answer(
             release_key = str(op["release_record_key"])
             patch_prefix = f"repo:{patch_key}"
             release_prefix = f"real:release:{release_key}"
-            patch_sha256 = state_values.get(f"real:patch:{patch_key}:sha256")
+            patch_value = state_values.get(
+                f"real:patch:{patch_key}:{'files' if readable else 'sha256'}"
+            )
             patch_commit = state_values.get(f"{patch_prefix}:commit")
             review = state_values.get(f"real:review:{review_key}:decision")
             test = state_values.get(f"repo:{ci_key}:test")
@@ -63,30 +80,32 @@ def eval_answer(
             compare_status = state_values.get(
                 f"{release_prefix}:ancestry:compare_status"
             )
+            required = (patch_value, patch_commit, test, test_commit, merge_head, tag)
+            if not reading_release:
+                required += (merge_sha, tag_sha)
             if (
-                not all(
-                    (
-                        patch_sha256,
-                        patch_commit,
-                        test,
-                        test_commit,
-                        merge_head,
-                        tag,
-                        merge_sha,
-                        tag_sha,
-                    )
-                )
+                not all(required)
                 or review not in {"approved", "rejected"}
                 or test_result not in {"passed", "failed"}
-                or compare_status not in {"ahead", "identical"}
+                or (
+                    not reading_release and compare_status not in {"ahead", "identical"}
+                )
                 or patch_commit != test_commit
                 or patch_commit != merge_head
             ):
                 return "unknown"
-            selections.append(
-                f"tag={tag};patch={patch_sha256};review={review};"
-                f"test={test}:{test_result};ancestry={merge_sha}->{tag_sha}"
+            patch_output = (
+                "files="
+                + json.dumps(patch_value, ensure_ascii=False, separators=(",", ":"))
+                if readable
+                else f"patch={patch_value}"
             )
+            selection = (
+                f"tag={tag};{patch_output};review={review};test={test}:{test_result}"
+            )
+            if not reading_release:
+                selection += f";ancestry={merge_sha}->{tag_sha}"
+            selections.append(selection)
         return " | ".join(selections) if selections else "unknown"
     if spec.query_type == "fork_join":
         flake = state_values.get("flake_token")
@@ -922,6 +941,8 @@ def build_code_queries(world: SimulatedWorld) -> list[QuerySpec]:
         q.cf_answer = cf_from_full(world, q)
         if q.query_type in {
             "patch_review_test_ancestry",
+            "patch_files_review_test_ancestry",
+            "patch_files_review_test_release_v2",
             "version_selection",
             "release_supersession_trace",
             "ci_regression_origin",
@@ -1245,6 +1266,94 @@ def _build_real_repo_queries(
                 ),
             )
         )
+        if all(
+            world.state.values.get(f"real:patch:{op['patch_record_key']}:files")
+            for _release, _events, op in selected_cycles
+        ):
+            queries.append(
+                replace(
+                    queries[-1],
+                    query_id=(
+                        f"{qid}:patch_files_review_test_ancestry:{cycle_count}_cycles:"
+                        f"{selected_release.params['record_id']}"
+                    ),
+                    query_type="patch_files_review_test_ancestry",
+                    question=(
+                        f"For the latest {cycle_count} real {repo} release cycle"
+                        f"{'s' if cycle_count != 1 else ''}, join the merged patch's "
+                        "explicit diff-header file paths to its recorded review decision, "
+                        "selected final pre-merge test, and verified merge-to-tag "
+                        "ancestry. List unique paths in lexicographic order as a "
+                        "compact JSON array. For "
+                        "diff --git headers remove the a/ and b/ prefixes and "
+                        "include both paths when they differ. Report cycles as "
+                        "`tag=...;files=[...];review=decision;test=name:result;"
+                        "ancestry=merge_sha->tag_sha`, separated by ` | `."
+                    ),
+                    gold_expression=(
+                        "JOIN(diff_header_paths, recorded_review, "
+                        "selected_pre_merge_test, verified_release_ancestry)"
+                    ),
+                    motif="patch_files_review_test_ancestry",
+                    topology_id=instance_topology(
+                        "code.real_patch_files_review_test_ancestry",
+                        *[
+                            cycle_release.params["record_id"]
+                            for cycle_release, _events, _op in selected_cycles
+                        ],
+                    ),
+                    program_ops=[
+                        {**op, "op": "JOIN_PATCH_FILES_REVIEW_TEST_ANCESTRY"}
+                        for _release, _events, op in selected_cycles
+                    ],
+                    semantic_growth_group=(
+                        f"{selected_release.params.get('source_url') or repo}|"
+                        "patch_files_review_test_ancestry"
+                    ),
+                )
+            )
+            queries.append(
+                replace(
+                    queries[-1],
+                    query_id=(
+                        f"{qid}:patch_files_review_test_release_v2:{cycle_count}_cycles:"
+                        f"{selected_release.params['record_id']}"
+                    ),
+                    query_type="patch_files_review_test_release_v2",
+                    question=(
+                        f"For the latest {cycle_count} source-admitted {repo} release "
+                        "snapshots, join each merged patch's explicit diff-header "
+                        "file paths, recorded review decision, and selected final "
+                        "pre-merge test using the recorded commit and merge links. "
+                        "Release ancestry is already verified at source admission. "
+                        "List unique paths in lexicographic order as a compact JSON "
+                        "array; for diff --git headers remove a/ and b/ prefixes "
+                        "and include both paths when they differ. Report snapshots "
+                        "chronologically as `tag=...;files=[...];review=decision;"
+                        "test=name:result`, separated by ` | `."
+                    ),
+                    gold_expression=(
+                        "JOIN(diff_header_paths, recorded_review, "
+                        "selected_pre_merge_test, source_admitted_release)"
+                    ),
+                    motif="patch_files_review_test_release_v2",
+                    topology_id=instance_topology(
+                        "code.real_patch_files_review_test_release_v2",
+                        *[
+                            cycle_release.params["record_id"]
+                            for cycle_release, _events, _op in selected_cycles
+                        ],
+                    ),
+                    program_ops=[
+                        {**op, "op": "JOIN_PATCH_FILES_REVIEW_TEST_RELEASE_V2"}
+                        for _release, _events, op in selected_cycles
+                    ],
+                    semantic_growth_group=(
+                        f"{selected_release.params.get('source_url') or repo}|"
+                        "patch_files_review_test_release_v2"
+                    ),
+                )
+            )
     recovery_cycles = recovery_cycles[-8:]
     for cycle_count in (1, 2, 4, 8):
         if cycle_count > len(recovery_cycles):

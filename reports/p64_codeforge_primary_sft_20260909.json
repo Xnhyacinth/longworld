@@ -1,0 +1,90 @@
+{
+  "status": "SHARED_SOURCE_REGISTRY_VALIDATED",
+  "receipt_path": "data/candidates/p64_codeforge_sft_v1/BUILD_RECEIPT.json",
+  "receipt_sha256": "6a90bddcf6a96a2654329c35e425efb76c0c5e3af26c4bf0593faf3ac0ae463b",
+  "counts": {
+    "eval": 147,
+    "rejected_overflow": 1,
+    "short": 13,
+    "train": 657
+  },
+  "full_message_capacity_counts": {
+    "cap128k": 305,
+    "cap256k": 358,
+    "cap64k": 141
+  },
+  "exact_context_token_range_sample_counts": {
+    "128k": 9,
+    "256k": 16,
+    "64k": 12,
+    "other_long": 767
+  },
+  "exact_full_message_token_range_sample_counts": {
+    "other_long": 768,
+    "64k": 12,
+    "128k": 8,
+    "256k": 16
+  },
+  "max_full_message_tokens": 261954,
+  "max_observed_full_message_tokens": 263244,
+  "full_message_token_sums": {
+    "eval": 18157501,
+    "train": 84185668
+  },
+  "repo_counts": {
+    "https://github.com/astral-sh/ruff": 124,
+    "https://github.com/oxc-project/oxc": 281,
+    "https://github.com/dprint/dprint": 47,
+    "https://github.com/astral-sh/uv": 98,
+    "https://github.com/pulumi/pulumi": 101,
+    "https://github.com/huggingface/transformers": 104,
+    "https://github.com/opensearch-project/opensearch-php": 49
+  },
+  "files": [
+    {
+      "bytes": 242682477,
+      "path": "train.jsonl",
+      "sha256": "4547ea4692dd32148636b04f01d0cdf400bf3c00e330eed3bd9cc5cf03f828ff"
+    },
+    {
+      "bytes": 56646863,
+      "path": "eval.jsonl",
+      "sha256": "7d25be28abf066d10d51d2c37f4ed6abe97211270f8288a154dd069f21302333"
+    },
+    {
+      "bytes": 1151560,
+      "path": "short.jsonl",
+      "sha256": "52ce5df60e1bf7820aaf7b9e208acdc7019e5a33052bb16308c5e9680b4eb89c"
+    },
+    {
+      "bytes": 947784,
+      "path": "metadata.jsonl",
+      "sha256": "cc9b17cba2fbba045b9ee2863ff73a2529faa06b0c094e1d745878c5f6c6496d"
+    },
+    {
+      "bytes": 1327,
+      "path": "rejects.jsonl",
+      "sha256": "451777457585d705cd8c50a17732462bac01cc270431b81ea1573e548fd887db"
+    },
+    {
+      "bytes": 454,
+      "path": "dataset_info.json",
+      "sha256": "fded4de52642a51c898f216abbb5ed39fe038fe2699f5532965653cbc79e59e6"
+    }
+  ],
+  "tests_passed": 8,
+  "source_bank_replay": "all7 PASS in build",
+  "rendered_only_oracle_replay": "818/818 PASS",
+  "model_or_gpu_launched": false,
+  "primary_validator": {
+    "status": "PASS",
+    "path": "data/sft/p64_primary_training_v1/source_validation/codeforge.stdout.txt",
+    "sha256": "f03387e6a1fea8fb09e5c540567217baaa1ce10b0dc117ec8fff6d3cc55fb9c4",
+    "counts": {
+      "train": 657,
+      "eval": 147,
+      "short": 13,
+      "rejected_overflow": 1
+    }
+  }
+}

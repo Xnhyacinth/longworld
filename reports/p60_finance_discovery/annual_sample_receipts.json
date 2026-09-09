@@ -1,0 +1,16 @@
+[
+  {
+    "name": "amd_2024",
+    "url": "https://ir.amd.com/financial-information/sec-filings/content/0000002488-25-000012/amd-20241228.htm",
+    "status": 200,
+    "bytes": 2111977,
+    "sha256": "593d146d29e9296d2525a834f7b78e71696b4ddc63d56db3084b29ff6422b99d"
+  },
+  {
+    "name": "intel_2024",
+    "url": "https://www.intc.com/filings-reports/all-sec-filings/content/0000050863-25-000009/intc-20241228.htm",
+    "status": 200,
+    "bytes": 3334219,
+    "sha256": "60e9b3e88bb1cf3fabc0ea34c6bf6fcfd481979080a97755bb2d168788b6affc"
+  }
+]

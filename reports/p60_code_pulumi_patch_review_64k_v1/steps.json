@@ -1,0 +1,66 @@
+[
+  {
+    "step": "generate",
+    "argv": [
+      "/workspace/wynckeliao/longworld-worlds/.venv/bin/python",
+      "/workspace/wynckeliao/longworld-worlds/scripts/generate.py",
+      "--config",
+      "/workspace/wynckeliao/longworld-worlds/configs/p60_code_pulumi_patch_review_64k_v1.yaml",
+      "--seed-start",
+      "160",
+      "--out-dir",
+      "/workspace/wynckeliao/longworld-worlds/reports/p60_code_pulumi_patch_review_64k_v1/candidate",
+      "--workers",
+      "2"
+    ],
+    "exit_code": 0,
+    "log": "/workspace/wynckeliao/longworld-worlds/reports/p60_code_pulumi_patch_review_64k_v1/generate.log"
+  },
+  {
+    "step": "rank",
+    "argv": [
+      "/workspace/wynckeliao/longworld-worlds/.venv/bin/python",
+      "/workspace/wynckeliao/longworld-worlds/scripts/rank_candidates_dense.py",
+      "--candidates",
+      "/workspace/wynckeliao/longworld-worlds/reports/p60_code_pulumi_patch_review_64k_v1/candidate/train.jsonl",
+      "--output",
+      "/workspace/wynckeliao/longworld-worlds/reports/p60_code_pulumi_patch_review_64k_v1/audit/rankings.jsonl",
+      "--model-id",
+      "sentence-transformers/all-MiniLM-L6-v2",
+      "--revision",
+      "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+      "--batch-size",
+      "32"
+    ],
+    "exit_code": 0,
+    "log": "/workspace/wynckeliao/longworld-worlds/reports/p60_code_pulumi_patch_review_64k_v1/rank.log"
+  },
+  {
+    "step": "audit",
+    "argv": [
+      "/workspace/wynckeliao/longworld-worlds/.venv/bin/python",
+      "/workspace/wynckeliao/longworld-worlds/scripts/promote_candidates.py",
+      "audit",
+      "--candidates",
+      "/workspace/wynckeliao/longworld-worlds/reports/p60_code_pulumi_patch_review_64k_v1/candidate/train.jsonl",
+      "--rankings",
+      "/workspace/wynckeliao/longworld-worlds/reports/p60_code_pulumi_patch_review_64k_v1/audit/rankings.jsonl",
+      "--output",
+      "/workspace/wynckeliao/longworld-worlds/reports/p60_code_pulumi_patch_review_64k_v1/audit/audits.jsonl",
+      "--accepted-candidates",
+      "/workspace/wynckeliao/longworld-worlds/reports/p60_code_pulumi_patch_review_64k_v1/audit/accepted.jsonl",
+      "--rejects",
+      "/workspace/wynckeliao/longworld-worlds/reports/p60_code_pulumi_patch_review_64k_v1/audit/rejects.jsonl",
+      "--top-k",
+      "3",
+      "--release-profile",
+      "p7-github-source-slice-1-v1",
+      "--episode-bundle",
+      "/workspace/wynckeliao/longworld-worlds/configs/p16_codeforge_pulumi_failure_recovery_v1_bundle.json",
+      "--workers",
+      "2"
+    ],
+    "exit_code": 0,
+    "log": "/workspace/wynckeliao/longworld-worlds/reports/p60_code_pulumi_patch_review_64k_v1/audit.log"
+  }
+]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
@@ -17,9 +18,29 @@ ROUTE_STRICT_LONG_DEPENDENCY = "strict_long_dependency"
 ROUTE_BLOCKED_INSUFFICIENT_UNIQUE = "blocked_insufficient_unique_tokens"
 ROUTE_BLOCKED_INSUFFICIENT_PROOF = "blocked_insufficient_proof"
 ROUTE_BLOCKED_PARENT_EXPLOSION = "blocked_parent_artifact_explosion"
+ROUTE_BLOCKED_QUESTION_ONLY = "blocked_question_only_shortcut"
+QUESTION_ONLY_CHECK_REVISION = "longworld.question-only-codebook.v1"
 MAX_PARENT_ARTIFACTS = 80
 
 _BAND_ORDER = ("16k", "32k", "64k", "128k")
+
+
+def question_only_codebook_prediction(question: str) -> dict[str, str] | None:
+    """Predict from the public singleton codebook, without context or gold."""
+    marker = "Use this exact per-field output codebook (canonical JSON): "
+    if marker not in question:
+        return None
+    codebook, _ = json.JSONDecoder().raw_decode(question.split(marker, 1)[1])
+    if not isinstance(codebook, dict) or not codebook:
+        return None
+    if any(
+        not isinstance(value, dict)
+        or not isinstance(value.get("code"), str)
+        or not set(value).issubset({"code", "meaning"})
+        for value in codebook.values()
+    ):
+        return None
+    return {key: value["code"] for key, value in codebook.items()}
 
 
 def feasible_exact_buckets(unique_tokens: int) -> tuple[str, ...]:

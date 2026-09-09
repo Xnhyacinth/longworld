@@ -12,6 +12,25 @@ if [[ -f "$ROOT/.env" ]]; then
 fi
 COND="${1:-B5}"
 shift || true
+TASKBANK_PREPARE_ONLY=0
+if [[ "$COND" == "TASKBANK" ]]; then
+  TASKBANK_ARGS=()
+  for arg in "$@"; do
+    case "$arg" in
+      --prepare-only) TASKBANK_PREPARE_ONLY=1 ;;
+      eval_dataset=*|tokenized_path=*|model_name_or_path=*|model_revision=*|template=*|cutoff_len=*|packing=*|neat_packing=*|train_on_prompt=*|val_size=*|trust_remote_code=*|--eval_dataset|--eval_dataset=*|--tokenized_path|--tokenized_path=*|--model_name_or_path|--model_name_or_path=*|--model_revision|--model_revision=*|--template|--template=*|--cutoff_len|--cutoff_len=*|--packing|--packing=*|--neat_packing|--neat_packing=*|--train_on_prompt|--train_on_prompt=*|--val_size|--val_size=*|--trust_remote_code|--trust_remote_code=*)
+        echo "TASKBANK source/tokenizer/template overrides require new validated preparation: $arg" >&2
+        exit 1
+        ;;
+      output_dir=*|logging_steps=*|save_steps=*|save_total_limit=*|per_device_train_batch_size=*|gradient_accumulation_steps=*|learning_rate=*|num_train_epochs=*|max_steps=*|lr_scheduler_type=*|warmup_ratio=*|warmup_steps=*|bf16=*|flash_attn=*|gradient_checkpointing=*|ddp_timeout=*|report_to=*|run_name=*) TASKBANK_ARGS+=("$arg") ;;
+      *)
+        echo "unsupported TASKBANK override; use a validated recipe for data changes: $arg" >&2
+        exit 1
+        ;;
+    esac
+  done
+  set -- "${TASKBANK_ARGS[@]}"
+fi
 case "$COND" in
   "B2"|"B4"|"B5_8k")
     echo "$COND is unsupported for the signed long-context release; minimal contexts are a separate curriculum" >&2
@@ -39,9 +58,48 @@ if [[ ! -f "$CFG" ]]; then
   echo "missing $CFG" >&2
   exit 1
 fi
-if [[ ! -d "$LF_ROOT" ]]; then
+if [[ "$COND" != "TASKBANK" && ! -d "$LF_ROOT" ]]; then
   echo "LLaMA-Factory not found. Run: bash scripts/setup_llamafactory.sh" >&2
   exit 1
+fi
+
+if [[ "$COND" == "TASKBANK" ]]; then
+  : "${LONGWORLD_TASKBANK_MANIFEST:?LONGWORLD_TASKBANK_MANIFEST is required}"
+  : "${LONGWORLD_TASKBANK_REPORT_TRUST:?LONGWORLD_TASKBANK_REPORT_TRUST is required}"
+  VERIFY_PY="$ROOT/.venv/bin/python"
+  if [[ ! -x "$VERIFY_PY" ]]; then
+    echo "TASKBANK requires the owning project .venv" >&2
+    exit 1
+  fi
+  SNAPSHOT_ROOT="${LONGWORLD_TASKBANK_SNAPSHOT_ROOT:-}"
+  if [[ -z "$SNAPSHOT_ROOT" ]]; then
+    SNAPSHOT_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/longworld-taskbank-training.XXXXXX")"
+    chmod 700 "$SNAPSHOT_ROOT"
+  fi
+  # Persist immutable snapshots, including caller-supplied roots; do not delete
+  # another run's reusable snapshot tree on exit.
+  VALIDATION_JSON="$(
+    "$VERIFY_PY" "$ROOT/scripts/run_with_local_probe_trust.py" \
+      --trust-file "$LONGWORLD_TASKBANK_REPORT_TRUST" --role report -- \
+      "$VERIFY_PY" "$ROOT/scripts/prepare_taskbank_training.py" validate \
+      --manifest "$LONGWORLD_TASKBANK_MANIFEST" --snapshot-root "$SNAPSHOT_ROOT"
+  )"
+  VALIDATED_SNAPSHOT="$(
+    "$VERIFY_PY" -c 'import json,sys
+value = json.load(sys.stdin)
+if value.get("ok") is not True or not value.get("snapshot_dir"):
+    raise SystemExit("taskbank validator did not return a verified snapshot")
+print(value["snapshot_dir"])
+' <<<"$VALIDATION_JSON"
+  )"
+  case "$VALIDATED_SNAPSHOT" in
+    "$SNAPSHOT_ROOT"/*) ;;
+    *) echo "taskbank validator returned an invalid snapshot path" >&2; exit 1 ;;
+  esac
+  if [[ ! -d "$VALIDATED_SNAPSHOT" || -L "$VALIDATED_SNAPSHOT" ]]; then
+    echo "TASKBANK validated snapshot is missing or unsafe" >&2
+    exit 1
+  fi
 fi
 
 if [[ "$COND" =~ ^B(1|2|3|4|5|5w)$ ]]; then
@@ -114,6 +172,16 @@ unset LONGWORLD_AUDITOR_ATTESTATION_KEY LONGWORLD_AUDITOR_ATTESTATION_KEY_ID
 unset LONGWORLD_PROMOTION_ATTESTATION_KEY LONGWORLD_PROMOTION_ATTESTATION_KEY_ID
 unset LONGWORLD_REPORT_ATTESTATION_KEY LONGWORLD_REPORT_ATTESTATION_KEY_ID
 unset LONGWORLD_PREDECESSOR_GATE_ATTESTATION_KEY LONGWORLD_PREDECESSOR_GATE_ATTESTATION_KEY_ID
+unset LONGWORLD_TASKBANK_REPORT_TRUST
+
+if [[ "$COND" == "TASKBANK" && "$TASKBANK_PREPARE_ONLY" == "1" ]]; then
+  printf '%s\n' "$VALIDATION_JSON"
+  exit 0
+fi
+if [[ "$COND" == "TASKBANK" && ! -d "$LF_ROOT" ]]; then
+  echo "LLaMA-Factory not found; taskbank input preparation succeeded but training needs LLAMA_FACTORY_ROOT" >&2
+  exit 1
+fi
 
 export DISABLE_VERSION_CHECK="${DISABLE_VERSION_CHECK:-1}"
 export FORCE_TORCHRUN="${FORCE_TORCHRUN:-1}"
@@ -193,6 +261,9 @@ if [[ "$COND" == v1_* ]]; then
 fi
 if [[ "$COND" == "B5w" ]]; then
   USE_V1=1
+fi
+if [[ "$COND" == "TASKBANK" ]]; then
+  USE_V1=0
 fi
 export USE_V1
 if [[ "$USE_V1" == "1" ]]; then

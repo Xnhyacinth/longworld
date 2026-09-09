@@ -1,0 +1,1796 @@
+{
+  "status": "SUPERSEDED_DIAGNOSTIC_NOT_IN_INVENTORY",
+  "reason": "v2 adds full tokenization credential isolation and conserved combined compiler funnel",
+  "source_directory": "/workspace/wynckeliao/longworld/data/candidates/p64_finance_taskbank_v1",
+  "replacement": "/workspace/wynckeliao/longworld/data/candidates/p64_finance_taskbank_v2",
+  "receipts": {
+    "siriusxm/BUILD_RECEIPT.json": {
+      "accepted_semantic_tasks": 192,
+      "capacity_bins": {
+        "131072": 126,
+        "262144": 66
+      },
+      "code_sha256": {
+        "longworld/core/attestation.py": "12d0b762e86a6f14f21665f4f3152f3c93aa909b2efc41def209fe1233b80fa8",
+        "longworld/core/finance_taskbank.py": "943b8e4d80baf5937599fe53d0432c560785586771e1437a3b7fbd1b327228c3",
+        "longworld/core/finance_taskbank_v2.py": "8aab8c69259cb43501a13a41d07ad61a3e0e04f9ca9e3bb800cedb125c7af7a5",
+        "longworld/core/issuer_generic_inline.py": "bf506eefb942fec2baa975eee95489117f651d6587359b6209286ad8b9950480",
+        "longworld/core/issuerfilingworkflow.py": "5aadaf3ff4f55328a51377b0bf5ce153d12d3c4b7fbdd124930a914f0e35cee3",
+        "longworld/core/issuerinlineworkflow.py": "0c45a936304d8f78ea7cb4451810bd1e5f9f4688efcfaaa3718485c42468b4db",
+        "longworld/core/provenance.py": "361248fc1e1737bfac88e0bed9b01c15aa883a241dfe53b32bd155c79572290b",
+        "longworld/core/taskbank_context.py": "2720171270f1bbe9983bf423156334a85cfea3e6e31c40d2533be1ba739fe2b1",
+        "longworld/core/taskbank_long_context.py": "596650b7726c4da8b90e54d7887b1917fb29f5d4b5d125de1c444797a2981dba",
+        "longworld/core/tokenizer_assets.py": "792ab0ffe4b77439dda2f5ccaf90b63aa327c760464a2e272a9b9bb4b74179f6",
+        "pyproject.toml": "222a003027a49cdb02965c30940d05d40e0890b75ec9c706331124662966c730",
+        "scripts/materialize_finance_histories.py": "e441bcb922d29f10c4c2339125a082e7b1d460c8f72de7d1ed8d9893f05dd797",
+        "scripts/materialize_finance_taskbank.py": "582982f8dfd34e086a6a46cd316778d27650ccf18a6b6541ec682075f95c5867",
+        "scripts/materialize_finance_taskbank_v2.py": "a15d6e877afca3552a0a4c463e15ac7e964d20ab5aa7a2949f995b1da716c907",
+        "uv.lock": "b8518611546a53105169cb3d8d508cfab352b4ac0f29088f7be01b4a6f3bfc7a"
+      },
+      "compiler_metrics": {
+        "accepted_tasks": 192,
+        "applicability_rejections": 4,
+        "attempted_programs": 364,
+        "base_accepted_tasks": 184,
+        "by_applicability_rejection": {
+          "missing_required_metric": 4
+        },
+        "by_fact_count": {
+          "1": 32,
+          "2": 86,
+          "3": 41,
+          "4": 25
+        },
+        "by_family": {
+          "aggregate": 44,
+          "cash_reconciliation": 4,
+          "conditional_cross_metric_sum": 2,
+          "delta": 48,
+          "filter": 18,
+          "filtered_aggregate": 6,
+          "lookup": 32,
+          "margin_extremes_cashflow_difference": 3,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 24,
+          "ratio": 8
+        },
+        "by_rejection": {
+          "nonadditive_metric": 12,
+          "redundant_singleton_or_unsupported_aggregate": 12,
+          "vacuous_filter": 156
+        },
+        "cross_filing_tasks": 132,
+        "dependent_accepted": 8,
+        "dependent_attempted": 24,
+        "dependent_rejected": 16,
+        "draft_candidates": 368,
+        "normalization_rejections": 0,
+        "rejected_tasks": 180,
+        "source_documents": 4,
+        "source_facts": 32,
+        "stages": {
+          "applicability": {
+            "input": 368,
+            "passed": 364,
+            "rejected": 4
+          },
+          "program_validation_and_dedup": {
+            "input": 364,
+            "passed": 184,
+            "rejected": 180
+          }
+        },
+        "train_ready_tasks": 0,
+        "uninstantiated_templates": 4,
+        "within_filing_tasks": 52
+      },
+      "compiler_revisions": {
+        "longworld.finance-taskbank-dependent-selection.v1": 8,
+        "longworld.finance-taskbank.v1": 184
+      },
+      "config_sha256": "84e448f337573008fcfb2fa7cea069ee17bdc0b5bfce6d083b40421b811ce14a",
+      "context_limit_with_headroom": 261120,
+      "context_tokens": 25681623,
+      "elapsed_seconds": 35.787,
+      "exact_token_ranges": {},
+      "families": {
+        "aggregate": 44,
+        "cash_reconciliation": 4,
+        "conditional_cross_metric_sum": 2,
+        "delta": 48,
+        "filter": 18,
+        "filtered_aggregate": 6,
+        "lookup": 32,
+        "margin_extremes_cashflow_difference": 3,
+        "max_margin_selected_cashflow": 3,
+        "maximum": 24,
+        "ratio": 8
+      },
+      "files": {
+        "contexts/1b2db7db658cebc9bca047e9439fed92af6862fc21582df0ff3b1dd3fb96fd26.txt": "1b2db7db658cebc9bca047e9439fed92af6862fc21582df0ff3b1dd3fb96fd26",
+        "contexts/408f77f0a8ccb940cf6b014244cae03ce0f56e07427ab0f903e124c6f5cc14bc.txt": "408f77f0a8ccb940cf6b014244cae03ce0f56e07427ab0f903e124c6f5cc14bc",
+        "contexts/469b7500510a65c3656953bb3c8becfca18f9c0f92440d139c07460e4b447369.txt": "469b7500510a65c3656953bb3c8becfca18f9c0f92440d139c07460e4b447369",
+        "contexts/49711ee0105f6f24e2c7c8532adbddfa4d454fef910b9ea88c18d5c451843373.txt": "49711ee0105f6f24e2c7c8532adbddfa4d454fef910b9ea88c18d5c451843373",
+        "contexts/5171071832cdd87ce91d13ab685305b81f4b3081233582ab53f475315940c517.txt": "5171071832cdd87ce91d13ab685305b81f4b3081233582ab53f475315940c517",
+        "contexts/59aadaa31d2d07ebed807d1bac9daae57737c2dcc3c22651b72f005ebc7099a6.txt": "59aadaa31d2d07ebed807d1bac9daae57737c2dcc3c22651b72f005ebc7099a6",
+        "contexts/752a9701280c2e1e62684a1619dc749d84ac39de065fdf2e378d12e97480fd0a.txt": "752a9701280c2e1e62684a1619dc749d84ac39de065fdf2e378d12e97480fd0a",
+        "contexts/77927889247d6ceac48c8753a7b5e22130c688b7ad411d2811abb28833f42f39.txt": "77927889247d6ceac48c8753a7b5e22130c688b7ad411d2811abb28833f42f39",
+        "contexts/8f7dd7c369e937c93b4e4cb765cb2b76b3f98311f286adf595d3079d0016f32c.txt": "8f7dd7c369e937c93b4e4cb765cb2b76b3f98311f286adf595d3079d0016f32c",
+        "contexts/9d57886c8a8f16bbad1e6e16375a50ec013b50237ecc3f3c2d255732bc9dd144.txt": "9d57886c8a8f16bbad1e6e16375a50ec013b50237ecc3f3c2d255732bc9dd144",
+        "contexts/c8f905a15498d964d029665db896185101dce35e1deaa703b89b64cd0cb0dc3d.txt": "c8f905a15498d964d029665db896185101dce35e1deaa703b89b64cd0cb0dc3d",
+        "contexts/e1049abdffa19f2ca2e40b5a4d3c2d551431986edb21332fd4ceea970bc7deb8.txt": "e1049abdffa19f2ca2e40b5a4d3c2d551431986edb21332fd4ceea970bc7deb8",
+        "contexts/fc46eb798e8980db5151ca03695ca388dee18ec24e07d8986d8341a649c38f47.txt": "fc46eb798e8980db5151ca03695ca388dee18ec24e07d8986d8341a649c38f47",
+        "rejections.json": "32148c14592f85d9655be54719abf2759662eaafaf902593b22dfb3a0b49e702",
+        "sft_candidates.jsonl": "1d238241417fefc49691316a296fa29a8fd27cef80a3e03baeb66a33538e4bc2",
+        "tasks.jsonl": "7da706f484ecb216d3ba6a3328e320dc77274647f50561ba63537db137049ad3"
+      },
+      "production_eligible": false,
+      "schema_version": "longworld.finance-taskbank-long-receipt.v1",
+      "source_manifest": {
+        "path": "/workspace/wynckeliao/longworld-worlds/data/finance_sources/p64_siriusxm_generic_v1/source_manifest.json",
+        "schema_version": "longworld.generic-issuer-inline-manifest.v1",
+        "sha256": "8685060409f294a173fa176b6031fbab21a39ad4cf01cfe6640731792fe2e8c2",
+        "source_family": "registered_issuer_owned_inline_xbrl"
+      },
+      "split": "eval",
+      "split_group_id": "0000908937",
+      "tokenizer": {
+        "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+      },
+      "training_release_eligible": false,
+      "training_views": 192,
+      "world_instance_id": "d9695b5e967d4fee1a201a2c3870c5fcb43eb46b5b34e789f5235e592f698432"
+    },
+    "intel/BUILD_RECEIPT.json": {
+      "accepted_semantic_tasks": 199,
+      "capacity_bins": {
+        "131072": 128,
+        "262144": 71
+      },
+      "code_sha256": {
+        "longworld/core/attestation.py": "12d0b762e86a6f14f21665f4f3152f3c93aa909b2efc41def209fe1233b80fa8",
+        "longworld/core/finance_taskbank.py": "943b8e4d80baf5937599fe53d0432c560785586771e1437a3b7fbd1b327228c3",
+        "longworld/core/finance_taskbank_v2.py": "8aab8c69259cb43501a13a41d07ad61a3e0e04f9ca9e3bb800cedb125c7af7a5",
+        "longworld/core/issuer_generic_inline.py": "bf506eefb942fec2baa975eee95489117f651d6587359b6209286ad8b9950480",
+        "longworld/core/issuerfilingworkflow.py": "5aadaf3ff4f55328a51377b0bf5ce153d12d3c4b7fbdd124930a914f0e35cee3",
+        "longworld/core/issuerinlineworkflow.py": "0c45a936304d8f78ea7cb4451810bd1e5f9f4688efcfaaa3718485c42468b4db",
+        "longworld/core/provenance.py": "361248fc1e1737bfac88e0bed9b01c15aa883a241dfe53b32bd155c79572290b",
+        "longworld/core/taskbank_context.py": "2720171270f1bbe9983bf423156334a85cfea3e6e31c40d2533be1ba739fe2b1",
+        "longworld/core/taskbank_long_context.py": "596650b7726c4da8b90e54d7887b1917fb29f5d4b5d125de1c444797a2981dba",
+        "longworld/core/tokenizer_assets.py": "792ab0ffe4b77439dda2f5ccaf90b63aa327c760464a2e272a9b9bb4b74179f6",
+        "pyproject.toml": "222a003027a49cdb02965c30940d05d40e0890b75ec9c706331124662966c730",
+        "scripts/materialize_finance_histories.py": "e441bcb922d29f10c4c2339125a082e7b1d460c8f72de7d1ed8d9893f05dd797",
+        "scripts/materialize_finance_taskbank.py": "582982f8dfd34e086a6a46cd316778d27650ccf18a6b6541ec682075f95c5867",
+        "scripts/materialize_finance_taskbank_v2.py": "a15d6e877afca3552a0a4c463e15ac7e964d20ab5aa7a2949f995b1da716c907",
+        "uv.lock": "b8518611546a53105169cb3d8d508cfab352b4ac0f29088f7be01b4a6f3bfc7a"
+      },
+      "compiler_metrics": {
+        "accepted_tasks": 202,
+        "applicability_rejections": 4,
+        "attempted_programs": 364,
+        "base_accepted_tasks": 192,
+        "by_applicability_rejection": {
+          "missing_required_metric": 4
+        },
+        "by_fact_count": {
+          "1": 32,
+          "2": 88,
+          "3": 44,
+          "4": 28
+        },
+        "by_family": {
+          "aggregate": 44,
+          "cash_reconciliation": 4,
+          "conditional_cross_metric_sum": 4,
+          "delta": 48,
+          "filter": 24,
+          "filtered_aggregate": 8,
+          "lookup": 32,
+          "margin_extremes_cashflow_difference": 3,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 24,
+          "ratio": 8
+        },
+        "by_rejection": {
+          "nonadditive_metric": 12,
+          "redundant_singleton_or_unsupported_aggregate": 16,
+          "vacuous_filter": 144
+        },
+        "cross_filing_tasks": 140,
+        "dependent_accepted": 10,
+        "dependent_attempted": 24,
+        "dependent_rejected": 14,
+        "draft_candidates": 368,
+        "normalization_rejections": 0,
+        "rejected_tasks": 172,
+        "source_documents": 4,
+        "source_facts": 32,
+        "stages": {
+          "applicability": {
+            "input": 368,
+            "passed": 364,
+            "rejected": 4
+          },
+          "program_validation_and_dedup": {
+            "input": 364,
+            "passed": 192,
+            "rejected": 172
+          }
+        },
+        "train_ready_tasks": 0,
+        "uninstantiated_templates": 4,
+        "within_filing_tasks": 52
+      },
+      "compiler_revisions": {
+        "longworld.finance-taskbank-dependent-selection.v1": 7,
+        "longworld.finance-taskbank.v1": 192
+      },
+      "config_sha256": "382a20c11211a0640d2cf6c341311735e08286c8d7119d7c0fc49d4c136ae983",
+      "context_limit_with_headroom": 261120,
+      "context_tokens": 30741534,
+      "elapsed_seconds": 40.927,
+      "exact_token_ranges": {},
+      "families": {
+        "aggregate": 44,
+        "cash_reconciliation": 4,
+        "conditional_cross_metric_sum": 4,
+        "delta": 48,
+        "filter": 24,
+        "filtered_aggregate": 8,
+        "lookup": 32,
+        "max_margin_selected_cashflow": 3,
+        "maximum": 24,
+        "ratio": 8
+      },
+      "files": {
+        "contexts/0fe5fcf882ee39eb26140f7ace258ef73721bf6ba8912aba4a99fef982539206.txt": "0fe5fcf882ee39eb26140f7ace258ef73721bf6ba8912aba4a99fef982539206",
+        "contexts/18e7415f0fee766c56acf1401f2b5f49ebbb2abb3f74cf4a370cf555a27b8012.txt": "18e7415f0fee766c56acf1401f2b5f49ebbb2abb3f74cf4a370cf555a27b8012",
+        "contexts/2d778c955a4e36f37279a36231fc48df29b385dbc92492e0ca3b44b7095b949b.txt": "2d778c955a4e36f37279a36231fc48df29b385dbc92492e0ca3b44b7095b949b",
+        "contexts/47f2c3b156f36aa907f6cc64ff90c465fe8f9c656d036f77edc8efd089efd062.txt": "47f2c3b156f36aa907f6cc64ff90c465fe8f9c656d036f77edc8efd089efd062",
+        "contexts/509090fd119d65b0f2d53cd76cb6869790db986d13bf15e31ab4deb51c759515.txt": "509090fd119d65b0f2d53cd76cb6869790db986d13bf15e31ab4deb51c759515",
+        "contexts/712034bb82f54d01c07a8e9a5c8f78ce22dd934fe6060c9a7c62222e66fa5cc2.txt": "712034bb82f54d01c07a8e9a5c8f78ce22dd934fe6060c9a7c62222e66fa5cc2",
+        "contexts/7160a8761039df6462802461b899ae7674cf56e4e5e08d0c1d4a304fb5e1a7c4.txt": "7160a8761039df6462802461b899ae7674cf56e4e5e08d0c1d4a304fb5e1a7c4",
+        "contexts/7f28ebf52c2d18efba81b01c8e30e7c283b152a5b068803892004ecf20f62bf7.txt": "7f28ebf52c2d18efba81b01c8e30e7c283b152a5b068803892004ecf20f62bf7",
+        "contexts/98c243f24e02183e752ef9642aadebc20a85a027a8bbb8f3f751038e94f25610.txt": "98c243f24e02183e752ef9642aadebc20a85a027a8bbb8f3f751038e94f25610",
+        "contexts/a4b989117d67e9b31a95c5b05e8138bca39f7411c147ced417ecc546e4bcf786.txt": "a4b989117d67e9b31a95c5b05e8138bca39f7411c147ced417ecc546e4bcf786",
+        "contexts/b9a9eb7ab86d14791695238b3dd57e753e3f7751dc6dc1be311d35d01872599a.txt": "b9a9eb7ab86d14791695238b3dd57e753e3f7751dc6dc1be311d35d01872599a",
+        "contexts/baac012fdaf754957b30260b81b1193ee13c04cdffffd3e63e53299f16a42019.txt": "baac012fdaf754957b30260b81b1193ee13c04cdffffd3e63e53299f16a42019",
+        "contexts/cb4f17d19453df18acf28ceb619378d8ddfd5bd8ffe3abca1254a96a0a7f270f.txt": "cb4f17d19453df18acf28ceb619378d8ddfd5bd8ffe3abca1254a96a0a7f270f",
+        "rejections.json": "32d50aab04db9523d7e83ce10a1078bdf0224ecee924f1ecf23755c7b0895c1a",
+        "sft_candidates.jsonl": "b9fb2b4b55a87a76cde6897821f1ed241a326bd222755ca7f5141268a0c1d40b",
+        "tasks.jsonl": "624b196f793cac0c72812582431d65ea487a3d838deed2727f0c691fcc976536"
+      },
+      "production_eligible": false,
+      "schema_version": "longworld.finance-taskbank-long-receipt.v1",
+      "source_manifest": {
+        "path": "/workspace/wynckeliao/longworld-worlds/data/finance_sources/p64_intel_generic_v1/source_manifest.json",
+        "schema_version": "longworld.generic-issuer-inline-manifest.v1",
+        "sha256": "10a717b252973dc50e5578c6964401f23c8b355a5a2dae7af83b2dff15cea2f9",
+        "source_family": "registered_issuer_owned_inline_xbrl"
+      },
+      "split": "train",
+      "split_group_id": "0000050863",
+      "tokenizer": {
+        "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+      },
+      "training_release_eligible": false,
+      "training_views": 199,
+      "world_instance_id": "16015a4ba00310b798e4299c5d5895ae3380e3a00fd0828b964ec3f8682f02a8"
+    },
+    "amazon/BUILD_RECEIPT.json": {
+      "accepted_semantic_tasks": 249,
+      "capacity_bins": {
+        "131072": 163,
+        "262144": 86
+      },
+      "code_sha256": {
+        "longworld/core/attestation.py": "12d0b762e86a6f14f21665f4f3152f3c93aa909b2efc41def209fe1233b80fa8",
+        "longworld/core/finance_taskbank.py": "943b8e4d80baf5937599fe53d0432c560785586771e1437a3b7fbd1b327228c3",
+        "longworld/core/finance_taskbank_v2.py": "8aab8c69259cb43501a13a41d07ad61a3e0e04f9ca9e3bb800cedb125c7af7a5",
+        "longworld/core/issuer_generic_inline.py": "bf506eefb942fec2baa975eee95489117f651d6587359b6209286ad8b9950480",
+        "longworld/core/issuerfilingworkflow.py": "5aadaf3ff4f55328a51377b0bf5ce153d12d3c4b7fbdd124930a914f0e35cee3",
+        "longworld/core/issuerinlineworkflow.py": "0c45a936304d8f78ea7cb4451810bd1e5f9f4688efcfaaa3718485c42468b4db",
+        "longworld/core/provenance.py": "361248fc1e1737bfac88e0bed9b01c15aa883a241dfe53b32bd155c79572290b",
+        "longworld/core/taskbank_context.py": "2720171270f1bbe9983bf423156334a85cfea3e6e31c40d2533be1ba739fe2b1",
+        "longworld/core/taskbank_long_context.py": "596650b7726c4da8b90e54d7887b1917fb29f5d4b5d125de1c444797a2981dba",
+        "longworld/core/tokenizer_assets.py": "792ab0ffe4b77439dda2f5ccaf90b63aa327c760464a2e272a9b9bb4b74179f6",
+        "pyproject.toml": "222a003027a49cdb02965c30940d05d40e0890b75ec9c706331124662966c730",
+        "scripts/materialize_finance_histories.py": "e441bcb922d29f10c4c2339125a082e7b1d460c8f72de7d1ed8d9893f05dd797",
+        "scripts/materialize_finance_taskbank.py": "582982f8dfd34e086a6a46cd316778d27650ccf18a6b6541ec682075f95c5867",
+        "scripts/materialize_finance_taskbank_v2.py": "a15d6e877afca3552a0a4c463e15ac7e964d20ab5aa7a2949f995b1da716c907",
+        "uv.lock": "b8518611546a53105169cb3d8d508cfab352b4ac0f29088f7be01b4a6f3bfc7a"
+      },
+      "compiler_metrics": {
+        "accepted_tasks": 252,
+        "applicability_rejections": 0,
+        "attempted_programs": 497,
+        "base_accepted_tasks": 242,
+        "by_applicability_rejection": {},
+        "by_fact_count": {
+          "1": 44,
+          "2": 107,
+          "3": 55,
+          "4": 32,
+          "5": 4
+        },
+        "by_family": {
+          "aggregate": 54,
+          "cash_reconciliation": 4,
+          "conditional_cross_metric_sum": 4,
+          "delta": 66,
+          "filter": 24,
+          "filtered_aggregate": 9,
+          "lookup": 44,
+          "margin_extremes_cashflow_difference": 3,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 33,
+          "ratio": 8
+        },
+        "by_rejection": {
+          "nonadditive_metric": 24,
+          "redundant_singleton_or_unsupported_aggregate": 15,
+          "vacuous_filter": 216
+        },
+        "cross_filing_tasks": 174,
+        "dependent_accepted": 10,
+        "dependent_attempted": 24,
+        "dependent_rejected": 14,
+        "draft_candidates": 497,
+        "normalization_rejections": 184,
+        "rejected_tasks": 255,
+        "source_documents": 4,
+        "source_facts": 44,
+        "stages": {
+          "applicability": {
+            "input": 497,
+            "passed": 497,
+            "rejected": 0
+          },
+          "program_validation_and_dedup": {
+            "input": 497,
+            "passed": 242,
+            "rejected": 255
+          }
+        },
+        "train_ready_tasks": 0,
+        "uninstantiated_templates": 0,
+        "within_filing_tasks": 68
+      },
+      "compiler_revisions": {
+        "longworld.finance-taskbank-dependent-selection.v1": 7,
+        "longworld.finance-taskbank.v1": 242
+      },
+      "config_sha256": "d12a2846f7ad26f4eabff1a9688513a3ac6d591699cde188559f4432deec76d4",
+      "context_limit_with_headroom": 261120,
+      "context_tokens": 35085405,
+      "elapsed_seconds": 37.097,
+      "exact_token_ranges": {},
+      "families": {
+        "aggregate": 54,
+        "cash_reconciliation": 4,
+        "conditional_cross_metric_sum": 4,
+        "delta": 66,
+        "filter": 24,
+        "filtered_aggregate": 9,
+        "lookup": 44,
+        "max_margin_selected_cashflow": 3,
+        "maximum": 33,
+        "ratio": 8
+      },
+      "files": {
+        "contexts/0632def39a5833143266a2ca455e0b00f5630113e958b555f2f586f092aa0dbf.txt": "0632def39a5833143266a2ca455e0b00f5630113e958b555f2f586f092aa0dbf",
+        "contexts/1e562c17a48d348b6d5ad1b0aba9e7e34d226a278351d97839650c7084851ab7.txt": "1e562c17a48d348b6d5ad1b0aba9e7e34d226a278351d97839650c7084851ab7",
+        "contexts/29f96fe64c8390eff076eea810b08661a2bbf23feebd44d6b30b64fd940fd93b.txt": "29f96fe64c8390eff076eea810b08661a2bbf23feebd44d6b30b64fd940fd93b",
+        "contexts/307b3490ffe95ad74d9b7619f2b18fab0c7d1919fd1d8c44317faf91fe9ded85.txt": "307b3490ffe95ad74d9b7619f2b18fab0c7d1919fd1d8c44317faf91fe9ded85",
+        "contexts/37919f816651d50bf7222787ce63c7212b7d98eaa896c70039a2873d34882fbe.txt": "37919f816651d50bf7222787ce63c7212b7d98eaa896c70039a2873d34882fbe",
+        "contexts/3cc05a1fc51020bbb9174f4ce2c9742777ace87064284ea49cc1e767a4ddcf94.txt": "3cc05a1fc51020bbb9174f4ce2c9742777ace87064284ea49cc1e767a4ddcf94",
+        "contexts/4dfdd7cafeed8282cc4c928b070b09e56c101115edbd47e41e3d78dc1c05f2f7.txt": "4dfdd7cafeed8282cc4c928b070b09e56c101115edbd47e41e3d78dc1c05f2f7",
+        "contexts/6653a3a7d73e650d07a12252afb82b485844e2fd45f89348ac2623fdfbe37661.txt": "6653a3a7d73e650d07a12252afb82b485844e2fd45f89348ac2623fdfbe37661",
+        "contexts/83ada2118cffbaeeafb5ab369dd42dce9b47a3a74b096ac4fd8d0acfb99bfdb9.txt": "83ada2118cffbaeeafb5ab369dd42dce9b47a3a74b096ac4fd8d0acfb99bfdb9",
+        "contexts/bf4d5242c8e976c042f0af4acc44166c6db621c1b7cd94b4b135177d3a38a5e1.txt": "bf4d5242c8e976c042f0af4acc44166c6db621c1b7cd94b4b135177d3a38a5e1",
+        "contexts/c3a2fd4c51be6fac062adad576bbddf2af272f961e8b6c95b319c36fef637988.txt": "c3a2fd4c51be6fac062adad576bbddf2af272f961e8b6c95b319c36fef637988",
+        "contexts/e34de302d303e045ca84eab9af36fe728b7469dbbe2ffa2f8e890dbcc4f3ebe3.txt": "e34de302d303e045ca84eab9af36fe728b7469dbbe2ffa2f8e890dbcc4f3ebe3",
+        "contexts/f6faf8116be02c41fb4dc317d45e422f369cc0ff535fff45b5160830bc5340d8.txt": "f6faf8116be02c41fb4dc317d45e422f369cc0ff535fff45b5160830bc5340d8",
+        "rejections.json": "cc3708c686967f1e8ef8ff6e4adbd447e7b6812fd23256bd6f3b18574111ce9c",
+        "sft_candidates.jsonl": "22c9728ff464dafa7a51b2cb81af4649885c8cb29d5d5e43ef3573e7418a8a7d",
+        "tasks.jsonl": "2cd06e8daddfee36dcefbbbe512c447949fa767c3ae33ae575428fc748ce8991"
+      },
+      "production_eligible": false,
+      "schema_version": "longworld.finance-taskbank-long-receipt.v1",
+      "source_manifest": {
+        "path": "/workspace/wynckeliao/longworld-worlds/data/source_inventory/p57_finance_amazon_ir_fy2021_2024_v1/issuer_ir_manifest.signed.json",
+        "schema_version": "longworld.issuer-ir-filing-manifest.v1",
+        "sha256": "8e48f6c0688ae3bcbd9b9e9eade195e8ba70e297f7bf806573e2d95c90645bb6",
+        "source_family": "issuer_ir_rendered_xbrl"
+      },
+      "split": "train",
+      "split_group_id": "0001018724",
+      "tokenizer": {
+        "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+      },
+      "training_release_eligible": false,
+      "training_views": 249,
+      "world_instance_id": "77017a04ea17c37cd293c8e26a4c1c3fcf94ce344b66fc9a1dd52eb34b65c750"
+    },
+    "meta/BUILD_RECEIPT.json": {
+      "accepted_semantic_tasks": 216,
+      "capacity_bins": {
+        "131072": 145,
+        "262144": 71
+      },
+      "code_sha256": {
+        "longworld/core/attestation.py": "12d0b762e86a6f14f21665f4f3152f3c93aa909b2efc41def209fe1233b80fa8",
+        "longworld/core/finance_taskbank.py": "943b8e4d80baf5937599fe53d0432c560785586771e1437a3b7fbd1b327228c3",
+        "longworld/core/finance_taskbank_v2.py": "8aab8c69259cb43501a13a41d07ad61a3e0e04f9ca9e3bb800cedb125c7af7a5",
+        "longworld/core/issuer_generic_inline.py": "bf506eefb942fec2baa975eee95489117f651d6587359b6209286ad8b9950480",
+        "longworld/core/issuerfilingworkflow.py": "5aadaf3ff4f55328a51377b0bf5ce153d12d3c4b7fbdd124930a914f0e35cee3",
+        "longworld/core/issuerinlineworkflow.py": "0c45a936304d8f78ea7cb4451810bd1e5f9f4688efcfaaa3718485c42468b4db",
+        "longworld/core/provenance.py": "361248fc1e1737bfac88e0bed9b01c15aa883a241dfe53b32bd155c79572290b",
+        "longworld/core/taskbank_context.py": "2720171270f1bbe9983bf423156334a85cfea3e6e31c40d2533be1ba739fe2b1",
+        "longworld/core/taskbank_long_context.py": "596650b7726c4da8b90e54d7887b1917fb29f5d4b5d125de1c444797a2981dba",
+        "longworld/core/tokenizer_assets.py": "792ab0ffe4b77439dda2f5ccaf90b63aa327c760464a2e272a9b9bb4b74179f6",
+        "pyproject.toml": "222a003027a49cdb02965c30940d05d40e0890b75ec9c706331124662966c730",
+        "scripts/materialize_finance_histories.py": "e441bcb922d29f10c4c2339125a082e7b1d460c8f72de7d1ed8d9893f05dd797",
+        "scripts/materialize_finance_taskbank.py": "582982f8dfd34e086a6a46cd316778d27650ccf18a6b6541ec682075f95c5867",
+        "scripts/materialize_finance_taskbank_v2.py": "a15d6e877afca3552a0a4c463e15ac7e964d20ab5aa7a2949f995b1da716c907",
+        "uv.lock": "b8518611546a53105169cb3d8d508cfab352b4ac0f29088f7be01b4a6f3bfc7a"
+      },
+      "compiler_metrics": {
+        "accepted_tasks": 219,
+        "applicability_rejections": 0,
+        "attempted_programs": 411,
+        "base_accepted_tasks": 213,
+        "by_applicability_rejection": {},
+        "by_fact_count": {
+          "1": 36,
+          "2": 97,
+          "3": 48,
+          "4": 28,
+          "5": 4
+        },
+        "by_family": {
+          "aggregate": 54,
+          "cash_reconciliation": 4,
+          "delta": 54,
+          "filter": 22,
+          "filtered_aggregate": 8,
+          "lookup": 36,
+          "margin_extremes_cashflow_difference": 3,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 27,
+          "ratio": 8
+        },
+        "by_rejection": {
+          "nonadditive_metric": 12,
+          "redundant_singleton_or_unsupported_aggregate": 14,
+          "vacuous_filter": 172
+        },
+        "cross_filing_tasks": 153,
+        "dependent_accepted": 6,
+        "dependent_attempted": 24,
+        "dependent_rejected": 18,
+        "draft_candidates": 411,
+        "normalization_rejections": 8,
+        "rejected_tasks": 198,
+        "source_documents": 4,
+        "source_facts": 36,
+        "stages": {
+          "applicability": {
+            "input": 411,
+            "passed": 411,
+            "rejected": 0
+          },
+          "program_validation_and_dedup": {
+            "input": 411,
+            "passed": 213,
+            "rejected": 198
+          }
+        },
+        "train_ready_tasks": 0,
+        "uninstantiated_templates": 0,
+        "within_filing_tasks": 60
+      },
+      "compiler_revisions": {
+        "longworld.finance-taskbank-dependent-selection.v1": 3,
+        "longworld.finance-taskbank.v1": 213
+      },
+      "config_sha256": "5bb660c2bde8eb61f67ab8b1749c3715bc2e70dd54ea825c13978c66a9d1aa46",
+      "context_limit_with_headroom": 261120,
+      "context_tokens": 25861718,
+      "elapsed_seconds": 29.716,
+      "exact_token_ranges": {},
+      "families": {
+        "aggregate": 54,
+        "cash_reconciliation": 4,
+        "delta": 54,
+        "filter": 22,
+        "filtered_aggregate": 8,
+        "lookup": 36,
+        "max_margin_selected_cashflow": 3,
+        "maximum": 27,
+        "ratio": 8
+      },
+      "files": {
+        "contexts/1409620bb96634a441fa0d2ff5b852ffdf2c59a1e75593062d5ef8f30ccad641.txt": "1409620bb96634a441fa0d2ff5b852ffdf2c59a1e75593062d5ef8f30ccad641",
+        "contexts/1f0b6d7e72196d8ee02d590ecd5d7f6383f7495597d6a0abff2f703fa5e09c28.txt": "1f0b6d7e72196d8ee02d590ecd5d7f6383f7495597d6a0abff2f703fa5e09c28",
+        "contexts/24239ce1eb422cee8cb5a0adf2538e8df300308df664faaeabd53d183be384d1.txt": "24239ce1eb422cee8cb5a0adf2538e8df300308df664faaeabd53d183be384d1",
+        "contexts/2d2965cbc54c07b1eb0df3f4ce7ae42aa83724a1bfed415eca0e0a66c9ab7b1e.txt": "2d2965cbc54c07b1eb0df3f4ce7ae42aa83724a1bfed415eca0e0a66c9ab7b1e",
+        "contexts/71c8a3f488196eedbd962fa000a6e563304a0b460b3cb786a826127c475f7c16.txt": "71c8a3f488196eedbd962fa000a6e563304a0b460b3cb786a826127c475f7c16",
+        "contexts/8cb6cedeae2ae5552c03623d3a40a05ecaff6bcb00cf7eb56a1bce78c7d93bd2.txt": "8cb6cedeae2ae5552c03623d3a40a05ecaff6bcb00cf7eb56a1bce78c7d93bd2",
+        "contexts/8cbf1d6546470e661a71850c540bda6a053681dc6e7dd810c43be8dfc867c60b.txt": "8cbf1d6546470e661a71850c540bda6a053681dc6e7dd810c43be8dfc867c60b",
+        "contexts/aba6f83d394ff463cec02caec6bae25c8bde103180b65a6a3b9c55b2fd3aff3a.txt": "aba6f83d394ff463cec02caec6bae25c8bde103180b65a6a3b9c55b2fd3aff3a",
+        "contexts/bd5cadf836f8ed39e0f3200cce7a5a78dfc8c36838abd22732d020e22d9016a7.txt": "bd5cadf836f8ed39e0f3200cce7a5a78dfc8c36838abd22732d020e22d9016a7",
+        "contexts/c23de6700996101b559a6ef80a3c31e04a7ff77252cd8d9db0dd1861a2548ddd.txt": "c23de6700996101b559a6ef80a3c31e04a7ff77252cd8d9db0dd1861a2548ddd",
+        "contexts/e53be3c61f6a80023b896d1701777c8259071eb015394442ce2857a512b81321.txt": "e53be3c61f6a80023b896d1701777c8259071eb015394442ce2857a512b81321",
+        "contexts/ec48cdae156bed15aaa756198b498862dca8090673cc548850fc4c1b0fe6630b.txt": "ec48cdae156bed15aaa756198b498862dca8090673cc548850fc4c1b0fe6630b",
+        "contexts/f10e67788aa3ccd4963f03508eed256453e645da412222f685cd5b2ca13314ba.txt": "f10e67788aa3ccd4963f03508eed256453e645da412222f685cd5b2ca13314ba",
+        "rejections.json": "1e6e1179096b06ae4ce1d2e5f995cc7452885dce5342d5afa501b2b7a389f2cc",
+        "sft_candidates.jsonl": "09d85cc147784cbd2f294f49e7c6e60be76b0f23d1f3aff847475b724abc5f5f",
+        "tasks.jsonl": "3add7cb0d9f78fd223bcf5c61fe34e490e654983f36b6711d8b0a4334e725df3"
+      },
+      "production_eligible": false,
+      "schema_version": "longworld.finance-taskbank-long-receipt.v1",
+      "source_manifest": {
+        "path": "/workspace/wynckeliao/longworld-worlds/data/source_inventory/p58_finance_meta_reconstruction_v1/issuer_ir_manifest.signed.json",
+        "schema_version": "longworld.issuer-ir-filing-manifest.v1",
+        "sha256": "7871f9310cc39bb94a465c7f960b538ebbf53ae752ecc1b439e641cebb4f2b5d",
+        "source_family": "issuer_ir_rendered_xbrl"
+      },
+      "split": "train",
+      "split_group_id": "0001326801",
+      "tokenizer": {
+        "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+      },
+      "training_release_eligible": false,
+      "training_views": 216,
+      "world_instance_id": "f570f88d8932606f7230be9923f1a9d230574c180145323726c7c13f2311020d"
+    },
+    "nvidia/BUILD_RECEIPT.json": {
+      "accepted_semantic_tasks": 189,
+      "capacity_bins": {
+        "131072": 72,
+        "262144": 65,
+        "65536": 52
+      },
+      "code_sha256": {
+        "longworld/core/attestation.py": "12d0b762e86a6f14f21665f4f3152f3c93aa909b2efc41def209fe1233b80fa8",
+        "longworld/core/finance_taskbank.py": "943b8e4d80baf5937599fe53d0432c560785586771e1437a3b7fbd1b327228c3",
+        "longworld/core/finance_taskbank_v2.py": "8aab8c69259cb43501a13a41d07ad61a3e0e04f9ca9e3bb800cedb125c7af7a5",
+        "longworld/core/issuer_generic_inline.py": "bf506eefb942fec2baa975eee95489117f651d6587359b6209286ad8b9950480",
+        "longworld/core/issuerfilingworkflow.py": "5aadaf3ff4f55328a51377b0bf5ce153d12d3c4b7fbdd124930a914f0e35cee3",
+        "longworld/core/issuerinlineworkflow.py": "0c45a936304d8f78ea7cb4451810bd1e5f9f4688efcfaaa3718485c42468b4db",
+        "longworld/core/provenance.py": "361248fc1e1737bfac88e0bed9b01c15aa883a241dfe53b32bd155c79572290b",
+        "longworld/core/taskbank_context.py": "2720171270f1bbe9983bf423156334a85cfea3e6e31c40d2533be1ba739fe2b1",
+        "longworld/core/taskbank_long_context.py": "596650b7726c4da8b90e54d7887b1917fb29f5d4b5d125de1c444797a2981dba",
+        "longworld/core/tokenizer_assets.py": "792ab0ffe4b77439dda2f5ccaf90b63aa327c760464a2e272a9b9bb4b74179f6",
+        "pyproject.toml": "222a003027a49cdb02965c30940d05d40e0890b75ec9c706331124662966c730",
+        "scripts/materialize_finance_histories.py": "e441bcb922d29f10c4c2339125a082e7b1d460c8f72de7d1ed8d9893f05dd797",
+        "scripts/materialize_finance_taskbank.py": "582982f8dfd34e086a6a46cd316778d27650ccf18a6b6541ec682075f95c5867",
+        "scripts/materialize_finance_taskbank_v2.py": "a15d6e877afca3552a0a4c463e15ac7e964d20ab5aa7a2949f995b1da716c907",
+        "uv.lock": "b8518611546a53105169cb3d8d508cfab352b4ac0f29088f7be01b4a6f3bfc7a"
+      },
+      "compiler_metrics": {
+        "accepted_tasks": 192,
+        "applicability_rejections": 4,
+        "attempted_programs": 364,
+        "base_accepted_tasks": 181,
+        "by_applicability_rejection": {
+          "missing_required_metric": 4
+        },
+        "by_fact_count": {
+          "1": 32,
+          "2": 84,
+          "3": 41,
+          "4": 24
+        },
+        "by_family": {
+          "aggregate": 44,
+          "cash_reconciliation": 4,
+          "conditional_cross_metric_sum": 5,
+          "delta": 48,
+          "filter": 16,
+          "filtered_aggregate": 5,
+          "lookup": 32,
+          "margin_extremes_cashflow_difference": 3,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 24,
+          "ratio": 8
+        },
+        "by_rejection": {
+          "nonadditive_metric": 12,
+          "redundant_singleton_or_unsupported_aggregate": 11,
+          "vacuous_filter": 160
+        },
+        "cross_filing_tasks": 129,
+        "dependent_accepted": 11,
+        "dependent_attempted": 24,
+        "dependent_rejected": 13,
+        "draft_candidates": 368,
+        "normalization_rejections": 20,
+        "rejected_tasks": 183,
+        "source_documents": 4,
+        "source_facts": 32,
+        "stages": {
+          "applicability": {
+            "input": 368,
+            "passed": 364,
+            "rejected": 4
+          },
+          "program_validation_and_dedup": {
+            "input": 364,
+            "passed": 181,
+            "rejected": 183
+          }
+        },
+        "train_ready_tasks": 0,
+        "uninstantiated_templates": 4,
+        "within_filing_tasks": 52
+      },
+      "compiler_revisions": {
+        "longworld.finance-taskbank-dependent-selection.v1": 8,
+        "longworld.finance-taskbank.v1": 181
+      },
+      "config_sha256": "5bcca736d11447f2131f56d9974c0f469235b9c971eb647172f9b6a7811ca245",
+      "context_limit_with_headroom": 261120,
+      "context_tokens": 25433408,
+      "elapsed_seconds": 27.18,
+      "exact_token_ranges": {
+        "65536": 13
+      },
+      "families": {
+        "aggregate": 44,
+        "cash_reconciliation": 4,
+        "conditional_cross_metric_sum": 5,
+        "delta": 48,
+        "filter": 16,
+        "filtered_aggregate": 5,
+        "lookup": 32,
+        "max_margin_selected_cashflow": 3,
+        "maximum": 24,
+        "ratio": 8
+      },
+      "files": {
+        "contexts/23e46e6920784fbfa766fee79a8506644ec3f61ac570acb5abbab871e7e96a1a.txt": "23e46e6920784fbfa766fee79a8506644ec3f61ac570acb5abbab871e7e96a1a",
+        "contexts/36e5a18b2c5c860221f41e2572cd51891b5cf9b33e0e52d77ba213d98fa37cdc.txt": "36e5a18b2c5c860221f41e2572cd51891b5cf9b33e0e52d77ba213d98fa37cdc",
+        "contexts/4bfc587827a33b7154a97e36cabb668e6efb1f1ac947ecf793067e33ca1e8bf9.txt": "4bfc587827a33b7154a97e36cabb668e6efb1f1ac947ecf793067e33ca1e8bf9",
+        "contexts/4e030a8a451fc6c43286f9909a15ca845c451f3983df1eb4aadca70cc1c7b4c0.txt": "4e030a8a451fc6c43286f9909a15ca845c451f3983df1eb4aadca70cc1c7b4c0",
+        "contexts/6d8e60958839292df2c6cb5bce79848a9ebb6a277236a7392bd761d6a2e8be23.txt": "6d8e60958839292df2c6cb5bce79848a9ebb6a277236a7392bd761d6a2e8be23",
+        "contexts/72b2e4eac6de9360c73ab106eae565072e2484e8ce7cba64a18de61ed0b3dbd8.txt": "72b2e4eac6de9360c73ab106eae565072e2484e8ce7cba64a18de61ed0b3dbd8",
+        "contexts/7bfee258f50525e164d22f046596adfb2736b9f8b5f44d23410df729755bfdd6.txt": "7bfee258f50525e164d22f046596adfb2736b9f8b5f44d23410df729755bfdd6",
+        "contexts/7ffd1e559dd278614b516ab27fb12a4855f75f8950f97e559559ea90f4e93e42.txt": "7ffd1e559dd278614b516ab27fb12a4855f75f8950f97e559559ea90f4e93e42",
+        "contexts/85cbb0fa0b3c5ffcb37025f6e68ece45fda913f615d6bb8f098e3088312da0aa.txt": "85cbb0fa0b3c5ffcb37025f6e68ece45fda913f615d6bb8f098e3088312da0aa",
+        "contexts/b033f71f145509f44854677befd31abacca41e15aef8788c1952c46263506f14.txt": "b033f71f145509f44854677befd31abacca41e15aef8788c1952c46263506f14",
+        "contexts/b6d8e0735daa89d6c015f8c8b78b182d123307a22cf8e07ab925385512fd7d32.txt": "b6d8e0735daa89d6c015f8c8b78b182d123307a22cf8e07ab925385512fd7d32",
+        "contexts/bfb3958beb465efd44eabd711783f8d3a718e1d1c366addf13fa6a160ac45a78.txt": "bfb3958beb465efd44eabd711783f8d3a718e1d1c366addf13fa6a160ac45a78",
+        "contexts/d65b3e28c82c6c98647ea7ad6364387d87d2f739f4a22dc952a36d80c53048e1.txt": "d65b3e28c82c6c98647ea7ad6364387d87d2f739f4a22dc952a36d80c53048e1",
+        "rejections.json": "52d42c3f01a9f20f8d93f4c2c57aeb89ec6dae57817d7409217cfc2d1399f5b2",
+        "sft_candidates.jsonl": "2815791f1d4071ced06ca2994c43b2d8163a95aa4f2516c23fbf0370a4efed5c",
+        "tasks.jsonl": "ee97904cb08c893e64e00f1e787ba648de154d25bcacdba30b8c39775caa950c"
+      },
+      "production_eligible": false,
+      "schema_version": "longworld.finance-taskbank-long-receipt.v1",
+      "source_manifest": {
+        "path": "/workspace/wynckeliao/longworld-worlds/data/source_inventory/p59_finance_nvidia_reconstruction_v1/issuer_ir_manifest.signed.json",
+        "schema_version": "longworld.issuer-ir-filing-manifest.v1",
+        "sha256": "5bb796cc5d1d69fee06bf7ecdde7b86d165738c40f9f688a72aaf7cd0070b793",
+        "source_family": "issuer_ir_rendered_xbrl"
+      },
+      "split": "train",
+      "split_group_id": "0001045810",
+      "tokenizer": {
+        "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+      },
+      "training_release_eligible": false,
+      "training_views": 189,
+      "world_instance_id": "c51cc69a203e8a92b510893502177897ca126237315929cc0654d3fbbcccb95f"
+    },
+    "micron/BUILD_RECEIPT.json": {
+      "accepted_semantic_tasks": 243,
+      "capacity_bins": {
+        "131072": 149,
+        "262144": 94
+      },
+      "code_sha256": {
+        "longworld/core/attestation.py": "12d0b762e86a6f14f21665f4f3152f3c93aa909b2efc41def209fe1233b80fa8",
+        "longworld/core/finance_taskbank.py": "943b8e4d80baf5937599fe53d0432c560785586771e1437a3b7fbd1b327228c3",
+        "longworld/core/finance_taskbank_v2.py": "8aab8c69259cb43501a13a41d07ad61a3e0e04f9ca9e3bb800cedb125c7af7a5",
+        "longworld/core/issuer_generic_inline.py": "bf506eefb942fec2baa975eee95489117f651d6587359b6209286ad8b9950480",
+        "longworld/core/issuerfilingworkflow.py": "5aadaf3ff4f55328a51377b0bf5ce153d12d3c4b7fbdd124930a914f0e35cee3",
+        "longworld/core/issuerinlineworkflow.py": "0c45a936304d8f78ea7cb4451810bd1e5f9f4688efcfaaa3718485c42468b4db",
+        "longworld/core/provenance.py": "361248fc1e1737bfac88e0bed9b01c15aa883a241dfe53b32bd155c79572290b",
+        "longworld/core/taskbank_context.py": "2720171270f1bbe9983bf423156334a85cfea3e6e31c40d2533be1ba739fe2b1",
+        "longworld/core/taskbank_long_context.py": "596650b7726c4da8b90e54d7887b1917fb29f5d4b5d125de1c444797a2981dba",
+        "longworld/core/tokenizer_assets.py": "792ab0ffe4b77439dda2f5ccaf90b63aa327c760464a2e272a9b9bb4b74179f6",
+        "pyproject.toml": "222a003027a49cdb02965c30940d05d40e0890b75ec9c706331124662966c730",
+        "scripts/materialize_finance_histories.py": "e441bcb922d29f10c4c2339125a082e7b1d460c8f72de7d1ed8d9893f05dd797",
+        "scripts/materialize_finance_taskbank.py": "582982f8dfd34e086a6a46cd316778d27650ccf18a6b6541ec682075f95c5867",
+        "scripts/materialize_finance_taskbank_v2.py": "a15d6e877afca3552a0a4c463e15ac7e964d20ab5aa7a2949f995b1da716c907",
+        "uv.lock": "b8518611546a53105169cb3d8d508cfab352b4ac0f29088f7be01b4a6f3bfc7a"
+      },
+      "compiler_metrics": {
+        "accepted_tasks": 246,
+        "applicability_rejections": 0,
+        "attempted_programs": 411,
+        "base_accepted_tasks": 234,
+        "by_applicability_rejection": {},
+        "by_fact_count": {
+          "1": 36,
+          "2": 101,
+          "3": 60,
+          "4": 33,
+          "5": 4
+        },
+        "by_family": {
+          "aggregate": 54,
+          "cash_reconciliation": 4,
+          "conditional_cross_metric_sum": 6,
+          "delta": 54,
+          "filter": 38,
+          "filtered_aggregate": 13,
+          "lookup": 36,
+          "margin_extremes_cashflow_difference": 3,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 27,
+          "ratio": 8
+        },
+        "by_rejection": {
+          "nonadditive_metric": 12,
+          "redundant_singleton_or_unsupported_aggregate": 25,
+          "vacuous_filter": 140
+        },
+        "cross_filing_tasks": 174,
+        "dependent_accepted": 12,
+        "dependent_attempted": 24,
+        "dependent_rejected": 12,
+        "draft_candidates": 411,
+        "normalization_rejections": 43,
+        "rejected_tasks": 177,
+        "source_documents": 4,
+        "source_facts": 36,
+        "stages": {
+          "applicability": {
+            "input": 411,
+            "passed": 411,
+            "rejected": 0
+          },
+          "program_validation_and_dedup": {
+            "input": 411,
+            "passed": 234,
+            "rejected": 177
+          }
+        },
+        "train_ready_tasks": 0,
+        "uninstantiated_templates": 0,
+        "within_filing_tasks": 60
+      },
+      "compiler_revisions": {
+        "longworld.finance-taskbank-dependent-selection.v1": 9,
+        "longworld.finance-taskbank.v1": 234
+      },
+      "config_sha256": "78dc57f5056f3d3b8c008a529844607b374ef805cc27cb6c7ccc99a0f640b7b2",
+      "context_limit_with_headroom": 261120,
+      "context_tokens": 31373322,
+      "elapsed_seconds": 30.804,
+      "exact_token_ranges": {},
+      "families": {
+        "aggregate": 54,
+        "cash_reconciliation": 4,
+        "conditional_cross_metric_sum": 6,
+        "delta": 54,
+        "filter": 38,
+        "filtered_aggregate": 13,
+        "lookup": 36,
+        "max_margin_selected_cashflow": 3,
+        "maximum": 27,
+        "ratio": 8
+      },
+      "files": {
+        "contexts/02b831ba0c9ef57a27e79a8dc553009e9c03c3f3fb43de386d2d3c11492a0761.txt": "02b831ba0c9ef57a27e79a8dc553009e9c03c3f3fb43de386d2d3c11492a0761",
+        "contexts/0531bffdeefcda1e6fe8e61633c0ada4a318f4023844d2da634d6c7471f984fb.txt": "0531bffdeefcda1e6fe8e61633c0ada4a318f4023844d2da634d6c7471f984fb",
+        "contexts/12112d1f10abd53a2a33c661077e248edc610b1b46b1bf104aafccebe507b2b1.txt": "12112d1f10abd53a2a33c661077e248edc610b1b46b1bf104aafccebe507b2b1",
+        "contexts/15368484810fa291fc8b27d8645bd1dc477db50839ca1f58d5a5386530bd4118.txt": "15368484810fa291fc8b27d8645bd1dc477db50839ca1f58d5a5386530bd4118",
+        "contexts/49de1d040b5b40c2cc560237d6802556cbe73fb842f891c7f8af25d6c0ec4b2d.txt": "49de1d040b5b40c2cc560237d6802556cbe73fb842f891c7f8af25d6c0ec4b2d",
+        "contexts/515d1a6bef4877d8ce4f1d800e8856336aca2d54f61a8a7107f416d4b9b9d421.txt": "515d1a6bef4877d8ce4f1d800e8856336aca2d54f61a8a7107f416d4b9b9d421",
+        "contexts/54873b601347cf5c1955dc1633fe646e10e20e5fd9f05f96c3749c92517e06ac.txt": "54873b601347cf5c1955dc1633fe646e10e20e5fd9f05f96c3749c92517e06ac",
+        "contexts/59215993c1c553bd70fd6eaae6b259cc0cbff0276ed8fc9adf7d1fff5484d039.txt": "59215993c1c553bd70fd6eaae6b259cc0cbff0276ed8fc9adf7d1fff5484d039",
+        "contexts/79e6077675db888e504aea5a0896f97c59393812cbaeb2bc61e9f596f584ca96.txt": "79e6077675db888e504aea5a0896f97c59393812cbaeb2bc61e9f596f584ca96",
+        "contexts/93358faeff4273f33b19d59cea9f7ccb8568b90f09f78dd96f16f3fca1359ca8.txt": "93358faeff4273f33b19d59cea9f7ccb8568b90f09f78dd96f16f3fca1359ca8",
+        "contexts/a80ede423100486eeb7e153db6da086d6f7da95e8f61b5fc73e83459165113fa.txt": "a80ede423100486eeb7e153db6da086d6f7da95e8f61b5fc73e83459165113fa",
+        "contexts/b468dfca7ad2b2f3590418c3a82a4105b2b7be50d9ac95408f9468a0d32e9c05.txt": "b468dfca7ad2b2f3590418c3a82a4105b2b7be50d9ac95408f9468a0d32e9c05",
+        "contexts/bffecd8eb4e5fd80c472b76f82433a37cbe9212faef375241b1ae9979a45d462.txt": "bffecd8eb4e5fd80c472b76f82433a37cbe9212faef375241b1ae9979a45d462",
+        "rejections.json": "70bbdcda4a29c9ff42b114edcf2fec422d83c94566b594b3c1cd67ef88b8f7ff",
+        "sft_candidates.jsonl": "a3c806ce050b0f1451cc3bad5d56467f1d10445ec5b95ba925e63d471390bc4f",
+        "tasks.jsonl": "73a9b3fb0b4acc3f30358729cb964d4c5b7329c1df829101c685df2dfcc3bce8"
+      },
+      "production_eligible": false,
+      "schema_version": "longworld.finance-taskbank-long-receipt.v1",
+      "source_manifest": {
+        "path": "/workspace/wynckeliao/longworld-worlds/data/source_inventory/p59_finance_micron_reconstruction_v1/issuer_ir_manifest.signed.json",
+        "schema_version": "longworld.issuer-ir-filing-manifest.v1",
+        "sha256": "d85ebdb650cb37a9b7e7d0fddc783cf167e4d1b7c5f38109b80236d843cd15cd",
+        "source_family": "issuer_ir_rendered_xbrl"
+      },
+      "split": "train",
+      "split_group_id": "0000723125",
+      "tokenizer": {
+        "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+      },
+      "training_release_eligible": false,
+      "training_views": 243,
+      "world_instance_id": "7ebeaa23ca6a55bc86c3343ba296d40a09ea07d117b0b6f17ee15922951bd107"
+    },
+    "alphabet/BUILD_RECEIPT.json": {
+      "accepted_semantic_tasks": 200,
+      "capacity_bins": {
+        "131072": 139,
+        "262144": 61
+      },
+      "code_sha256": {
+        "longworld/core/attestation.py": "12d0b762e86a6f14f21665f4f3152f3c93aa909b2efc41def209fe1233b80fa8",
+        "longworld/core/finance_taskbank.py": "943b8e4d80baf5937599fe53d0432c560785586771e1437a3b7fbd1b327228c3",
+        "longworld/core/finance_taskbank_v2.py": "8aab8c69259cb43501a13a41d07ad61a3e0e04f9ca9e3bb800cedb125c7af7a5",
+        "longworld/core/issuer_generic_inline.py": "bf506eefb942fec2baa975eee95489117f651d6587359b6209286ad8b9950480",
+        "longworld/core/issuerfilingworkflow.py": "5aadaf3ff4f55328a51377b0bf5ce153d12d3c4b7fbdd124930a914f0e35cee3",
+        "longworld/core/issuerinlineworkflow.py": "0c45a936304d8f78ea7cb4451810bd1e5f9f4688efcfaaa3718485c42468b4db",
+        "longworld/core/provenance.py": "361248fc1e1737bfac88e0bed9b01c15aa883a241dfe53b32bd155c79572290b",
+        "longworld/core/taskbank_context.py": "2720171270f1bbe9983bf423156334a85cfea3e6e31c40d2533be1ba739fe2b1",
+        "longworld/core/taskbank_long_context.py": "596650b7726c4da8b90e54d7887b1917fb29f5d4b5d125de1c444797a2981dba",
+        "longworld/core/tokenizer_assets.py": "792ab0ffe4b77439dda2f5ccaf90b63aa327c760464a2e272a9b9bb4b74179f6",
+        "pyproject.toml": "222a003027a49cdb02965c30940d05d40e0890b75ec9c706331124662966c730",
+        "scripts/materialize_finance_histories.py": "e441bcb922d29f10c4c2339125a082e7b1d460c8f72de7d1ed8d9893f05dd797",
+        "scripts/materialize_finance_taskbank.py": "582982f8dfd34e086a6a46cd316778d27650ccf18a6b6541ec682075f95c5867",
+        "scripts/materialize_finance_taskbank_v2.py": "a15d6e877afca3552a0a4c463e15ac7e964d20ab5aa7a2949f995b1da716c907",
+        "uv.lock": "b8518611546a53105169cb3d8d508cfab352b4ac0f29088f7be01b4a6f3bfc7a"
+      },
+      "compiler_metrics": {
+        "accepted_tasks": 203,
+        "applicability_rejections": 0,
+        "attempted_programs": 411,
+        "base_accepted_tasks": 197,
+        "by_applicability_rejection": {},
+        "by_fact_count": {
+          "1": 36,
+          "2": 91,
+          "3": 42,
+          "4": 24,
+          "5": 4
+        },
+        "by_family": {
+          "aggregate": 54,
+          "cash_reconciliation": 4,
+          "delta": 54,
+          "filter": 10,
+          "filtered_aggregate": 4,
+          "lookup": 36,
+          "margin_extremes_cashflow_difference": 3,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 27,
+          "ratio": 8
+        },
+        "by_rejection": {
+          "nonadditive_metric": 12,
+          "redundant_singleton_or_unsupported_aggregate": 6,
+          "vacuous_filter": 196
+        },
+        "cross_filing_tasks": 137,
+        "dependent_accepted": 6,
+        "dependent_attempted": 24,
+        "dependent_rejected": 18,
+        "draft_candidates": 411,
+        "normalization_rejections": 36,
+        "rejected_tasks": 214,
+        "source_documents": 4,
+        "source_facts": 36,
+        "stages": {
+          "applicability": {
+            "input": 411,
+            "passed": 411,
+            "rejected": 0
+          },
+          "program_validation_and_dedup": {
+            "input": 411,
+            "passed": 197,
+            "rejected": 214
+          }
+        },
+        "train_ready_tasks": 0,
+        "uninstantiated_templates": 0,
+        "within_filing_tasks": 60
+      },
+      "compiler_revisions": {
+        "longworld.finance-taskbank-dependent-selection.v1": 3,
+        "longworld.finance-taskbank.v1": 197
+      },
+      "config_sha256": "37b41f8d73bb8e9f9b7330befc9e5899a0c2d7b501a2a59f84584998c0e1418d",
+      "context_limit_with_headroom": 261120,
+      "context_tokens": 25798982,
+      "elapsed_seconds": 31.022,
+      "exact_token_ranges": {},
+      "families": {
+        "aggregate": 54,
+        "cash_reconciliation": 4,
+        "delta": 54,
+        "filter": 10,
+        "filtered_aggregate": 4,
+        "lookup": 36,
+        "max_margin_selected_cashflow": 3,
+        "maximum": 27,
+        "ratio": 8
+      },
+      "files": {
+        "contexts/154e09d6e4c237af30cff5dadc2a891340432572b1d315096b57824d0d5b66d1.txt": "154e09d6e4c237af30cff5dadc2a891340432572b1d315096b57824d0d5b66d1",
+        "contexts/2dcedd0caf9cd18d9013ba85880580b22a3d8969b51e27a305f6eaf34191ca6e.txt": "2dcedd0caf9cd18d9013ba85880580b22a3d8969b51e27a305f6eaf34191ca6e",
+        "contexts/3a0996291839ebe9371cd550499923e30d9bca2086c7ea9acc6d9fd43fa6fb9f.txt": "3a0996291839ebe9371cd550499923e30d9bca2086c7ea9acc6d9fd43fa6fb9f",
+        "contexts/4eb5304fff1054c1f7aaf5bb03eef7e98d2bc493a8ae9e85c6ac9e5d0bf21a51.txt": "4eb5304fff1054c1f7aaf5bb03eef7e98d2bc493a8ae9e85c6ac9e5d0bf21a51",
+        "contexts/5cee07fd60d85988a7b983a72d4c569377370035c69c5d1d95ad270657cebfe9.txt": "5cee07fd60d85988a7b983a72d4c569377370035c69c5d1d95ad270657cebfe9",
+        "contexts/738d4240d33665554d603213ff613f18fba704e434675e62a2e6da772aa6708a.txt": "738d4240d33665554d603213ff613f18fba704e434675e62a2e6da772aa6708a",
+        "contexts/797ff6d8b623e8ce33edc43bcbb6743cf674ec7ef7f418065640e4dc9038abc1.txt": "797ff6d8b623e8ce33edc43bcbb6743cf674ec7ef7f418065640e4dc9038abc1",
+        "contexts/84db9f14e644fa1b78d035512438699341a2df3c32b6a2ff6c134d4b20a17e68.txt": "84db9f14e644fa1b78d035512438699341a2df3c32b6a2ff6c134d4b20a17e68",
+        "contexts/d5a456f882b7a581770ca204ce751402a7981eff5c9efaf3eec1848bc9ce2ca2.txt": "d5a456f882b7a581770ca204ce751402a7981eff5c9efaf3eec1848bc9ce2ca2",
+        "contexts/d6dec4f613fc2cea14de35b3e8b741d429edfcafb80e4fda78c588f29903f3da.txt": "d6dec4f613fc2cea14de35b3e8b741d429edfcafb80e4fda78c588f29903f3da",
+        "contexts/edd2b66ab221e24cb3e4e95fa92ca32d69fd4e8f9aed8ef006a55902bd898e90.txt": "edd2b66ab221e24cb3e4e95fa92ca32d69fd4e8f9aed8ef006a55902bd898e90",
+        "contexts/f37780863cbb857250dab5f98304bf4772588ae84962486aae13baf0cf3215db.txt": "f37780863cbb857250dab5f98304bf4772588ae84962486aae13baf0cf3215db",
+        "contexts/ffc2ed4cbddd229ca16aa1a49b787f14bd9309b70c0b4b7c11f13521cca40440.txt": "ffc2ed4cbddd229ca16aa1a49b787f14bd9309b70c0b4b7c11f13521cca40440",
+        "rejections.json": "984763fe3dfc7ae0911fa528fd497ba70d62e3d2bc08ac6e5d4e6f1cb15e7b78",
+        "sft_candidates.jsonl": "c7ece52b99f3be549b6e4eecdae3b39cd4b5fd0ba24e2c7d27ad49139053603f",
+        "tasks.jsonl": "f4531a5325846bb25e2f81023d452c9e9c6bc462b7f6aace8f1020deda0a07be"
+      },
+      "production_eligible": false,
+      "schema_version": "longworld.finance-taskbank-long-receipt.v1",
+      "source_manifest": {
+        "path": "/workspace/wynckeliao/longworld-worlds/data/source_inventory/p59_finance_alphabet_reconstruction_v1/issuer_ir_manifest.signed.json",
+        "schema_version": "longworld.issuer-ir-filing-manifest.v1",
+        "sha256": "4028a54d58dca726657487ee1b4238e3213c3c0b59c5044cb2e1cc50faf31e3c",
+        "source_family": "issuer_ir_rendered_xbrl"
+      },
+      "split": "train",
+      "split_group_id": "0001652044",
+      "tokenizer": {
+        "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+      },
+      "training_release_eligible": false,
+      "training_views": 200,
+      "world_instance_id": "cdb711a7778154f49f4e1a19faf5f7c8bf1aad4c36f645c72c66c2f4f82bad57"
+    },
+    "amd/BUILD_RECEIPT.json": {
+      "accepted_semantic_tasks": 194,
+      "capacity_bins": {
+        "131072": 124,
+        "262144": 70
+      },
+      "code_sha256": {
+        "longworld/core/attestation.py": "12d0b762e86a6f14f21665f4f3152f3c93aa909b2efc41def209fe1233b80fa8",
+        "longworld/core/finance_taskbank.py": "943b8e4d80baf5937599fe53d0432c560785586771e1437a3b7fbd1b327228c3",
+        "longworld/core/finance_taskbank_v2.py": "8aab8c69259cb43501a13a41d07ad61a3e0e04f9ca9e3bb800cedb125c7af7a5",
+        "longworld/core/issuer_generic_inline.py": "bf506eefb942fec2baa975eee95489117f651d6587359b6209286ad8b9950480",
+        "longworld/core/issuerfilingworkflow.py": "5aadaf3ff4f55328a51377b0bf5ce153d12d3c4b7fbdd124930a914f0e35cee3",
+        "longworld/core/issuerinlineworkflow.py": "0c45a936304d8f78ea7cb4451810bd1e5f9f4688efcfaaa3718485c42468b4db",
+        "longworld/core/provenance.py": "361248fc1e1737bfac88e0bed9b01c15aa883a241dfe53b32bd155c79572290b",
+        "longworld/core/taskbank_context.py": "2720171270f1bbe9983bf423156334a85cfea3e6e31c40d2533be1ba739fe2b1",
+        "longworld/core/taskbank_long_context.py": "596650b7726c4da8b90e54d7887b1917fb29f5d4b5d125de1c444797a2981dba",
+        "longworld/core/tokenizer_assets.py": "792ab0ffe4b77439dda2f5ccaf90b63aa327c760464a2e272a9b9bb4b74179f6",
+        "pyproject.toml": "222a003027a49cdb02965c30940d05d40e0890b75ec9c706331124662966c730",
+        "scripts/materialize_finance_histories.py": "e441bcb922d29f10c4c2339125a082e7b1d460c8f72de7d1ed8d9893f05dd797",
+        "scripts/materialize_finance_taskbank.py": "582982f8dfd34e086a6a46cd316778d27650ccf18a6b6541ec682075f95c5867",
+        "scripts/materialize_finance_taskbank_v2.py": "a15d6e877afca3552a0a4c463e15ac7e964d20ab5aa7a2949f995b1da716c907",
+        "uv.lock": "b8518611546a53105169cb3d8d508cfab352b4ac0f29088f7be01b4a6f3bfc7a"
+      },
+      "compiler_metrics": {
+        "accepted_tasks": 194,
+        "applicability_rejections": 4,
+        "attempted_programs": 364,
+        "base_accepted_tasks": 185,
+        "by_applicability_rejection": {
+          "missing_required_metric": 4
+        },
+        "by_fact_count": {
+          "1": 32,
+          "2": 84,
+          "3": 44,
+          "4": 25
+        },
+        "by_family": {
+          "aggregate": 44,
+          "cash_reconciliation": 4,
+          "conditional_cross_metric_sum": 3,
+          "delta": 48,
+          "filter": 18,
+          "filtered_aggregate": 7,
+          "lookup": 32,
+          "margin_extremes_cashflow_difference": 3,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 24,
+          "ratio": 8
+        },
+        "by_rejection": {
+          "nonadditive_metric": 12,
+          "redundant_singleton_or_unsupported_aggregate": 11,
+          "vacuous_filter": 156
+        },
+        "cross_filing_tasks": 133,
+        "dependent_accepted": 9,
+        "dependent_attempted": 24,
+        "dependent_rejected": 15,
+        "draft_candidates": 368,
+        "normalization_rejections": 0,
+        "rejected_tasks": 179,
+        "source_documents": 4,
+        "source_facts": 32,
+        "stages": {
+          "applicability": {
+            "input": 368,
+            "passed": 364,
+            "rejected": 4
+          },
+          "program_validation_and_dedup": {
+            "input": 364,
+            "passed": 185,
+            "rejected": 179
+          }
+        },
+        "train_ready_tasks": 0,
+        "uninstantiated_templates": 4,
+        "within_filing_tasks": 52
+      },
+      "compiler_revisions": {
+        "longworld.finance-taskbank-dependent-selection.v1": 9,
+        "longworld.finance-taskbank.v1": 185
+      },
+      "config_sha256": "664ac3f5c92af21fcc47a18b4e9884c38745a37d4a477894c591132b4c97f67c",
+      "context_limit_with_headroom": 261120,
+      "context_tokens": 27490618,
+      "elapsed_seconds": 34.996,
+      "exact_token_ranges": {
+        "262144": 47
+      },
+      "families": {
+        "aggregate": 44,
+        "cash_reconciliation": 4,
+        "conditional_cross_metric_sum": 3,
+        "delta": 48,
+        "filter": 18,
+        "filtered_aggregate": 7,
+        "lookup": 32,
+        "margin_extremes_cashflow_difference": 3,
+        "max_margin_selected_cashflow": 3,
+        "maximum": 24,
+        "ratio": 8
+      },
+      "files": {
+        "contexts/1cdb9111ecd6c4d21b949556278d36bdcde0a2087c6e1906e4bdd3d1d74a588b.txt": "1cdb9111ecd6c4d21b949556278d36bdcde0a2087c6e1906e4bdd3d1d74a588b",
+        "contexts/43fec308edae3c6a728e567560ddca3946fd435d25b432d24409ba07c4d6ad05.txt": "43fec308edae3c6a728e567560ddca3946fd435d25b432d24409ba07c4d6ad05",
+        "contexts/48222c28b5835cd14ef2be9e6167c4430b1998f2f91f0a20b260e0f6e90bc9b3.txt": "48222c28b5835cd14ef2be9e6167c4430b1998f2f91f0a20b260e0f6e90bc9b3",
+        "contexts/8f4b08522043e0e27a94b7636f7ac8c053e84ddc509a331619af973644d2d403.txt": "8f4b08522043e0e27a94b7636f7ac8c053e84ddc509a331619af973644d2d403",
+        "contexts/9e16fa165616150878dfac4805ebb2afb73162f2656d11460f0ebdcfdc16d254.txt": "9e16fa165616150878dfac4805ebb2afb73162f2656d11460f0ebdcfdc16d254",
+        "contexts/a5497b5cd96887fb3f2d3fb486e044bdbd5381a1856f465c2c868b067bbef80e.txt": "a5497b5cd96887fb3f2d3fb486e044bdbd5381a1856f465c2c868b067bbef80e",
+        "contexts/d8b27164be72bdc8aba4ed271004543c58bae6e66e9fbc16228d1b93c2ec7abb.txt": "d8b27164be72bdc8aba4ed271004543c58bae6e66e9fbc16228d1b93c2ec7abb",
+        "contexts/dbfbe018c9ab9e8655fe882d853fcd91bf5143322e100cae6da0de2db5dcc705.txt": "dbfbe018c9ab9e8655fe882d853fcd91bf5143322e100cae6da0de2db5dcc705",
+        "contexts/dc4c37f3ed30da834bc73e4a0cc6b88b42e0cec01e9754b91748ed073a735fe9.txt": "dc4c37f3ed30da834bc73e4a0cc6b88b42e0cec01e9754b91748ed073a735fe9",
+        "contexts/f1ba4c1acbf0c8f8d35705c6d6f65ce05dfbc9b696e87076ad6d4fe9e7464b5a.txt": "f1ba4c1acbf0c8f8d35705c6d6f65ce05dfbc9b696e87076ad6d4fe9e7464b5a",
+        "contexts/f4d0291a1c134ad466300db27612e42d7d30d5de08842516c5312b20663d0685.txt": "f4d0291a1c134ad466300db27612e42d7d30d5de08842516c5312b20663d0685",
+        "contexts/fc5e876f21ee068dbdcf9f6496574fe5f36e9dbee7cef0d69bfd3e59add6be54.txt": "fc5e876f21ee068dbdcf9f6496574fe5f36e9dbee7cef0d69bfd3e59add6be54",
+        "contexts/fcb4719410a5e317c51dcfb9a2d9c580de812e90af0c719d702833320b0d932a.txt": "fcb4719410a5e317c51dcfb9a2d9c580de812e90af0c719d702833320b0d932a",
+        "rejections.json": "dc1cde31ff2d5486b01acc2e652a5c6da563cd06fc12982c6a8e3c34a5a34f00",
+        "sft_candidates.jsonl": "5d66d8f0b325677cdfff2a3abeaf5f482c5ee0a710167515788edc67676588cb",
+        "tasks.jsonl": "846c5021c75d14c50b09abe98b1e2a4d5ecca88633861e0b8c5a9a5c035b4c3f"
+      },
+      "production_eligible": false,
+      "schema_version": "longworld.finance-taskbank-long-receipt.v1",
+      "source_manifest": {
+        "path": "/workspace/wynckeliao/longworld-worlds/data/source_inventory/p60_finance_amd_inline_fy2021_2024_v1/issuer_inline_manifest.signed.json",
+        "schema_version": "longworld.issuer-inline-xbrl-manifest.v1",
+        "sha256": "4b8756fa1819883bbb706fb520516a64c17516cf1c44dbcfe018a5ebdfd67258",
+        "source_family": "issuer_owned_inline_xbrl"
+      },
+      "split": "eval",
+      "split_group_id": "0000002488",
+      "tokenizer": {
+        "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+      },
+      "training_release_eligible": false,
+      "training_views": 194,
+      "world_instance_id": "a9d7e4f1ac27b57a5b5c5b4fb40e759ce8448e8d071c463b5dd98581042c50df"
+    }
+  },
+  "batch": {
+    "schema_version": "longworld.finance-taskbank-long-batch-receipt.v1",
+    "catalog_sha256": "eccac00ade1d286ffedee91e53e5c41ea93c6e44f69f2d013871df3f4ecaec9b",
+    "jobs": [
+      {
+        "name": "alphabet",
+        "status": "verified_local_candidates",
+        "receipt_sha256": "e80b7b5f5154d9e6813994035d6f227bdc0412ae2aa9561c7ecd18a2ef900a58",
+        "semantic_tasks": 200,
+        "training_views": 200,
+        "split": "train",
+        "split_group_id": "0001652044",
+        "task_families": {
+          "aggregate": 54,
+          "cash_reconciliation": 4,
+          "delta": 54,
+          "filter": 10,
+          "filtered_aggregate": 4,
+          "lookup": 36,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 27,
+          "ratio": 8
+        },
+        "capacity_bins": {
+          "131072": 139,
+          "262144": 61
+        },
+        "exact_token_ranges": {},
+        "compiler_metrics": {
+          "accepted_tasks": 203,
+          "applicability_rejections": 0,
+          "attempted_programs": 411,
+          "base_accepted_tasks": 197,
+          "by_applicability_rejection": {},
+          "by_fact_count": {
+            "1": 36,
+            "2": 91,
+            "3": 42,
+            "4": 24,
+            "5": 4
+          },
+          "by_family": {
+            "aggregate": 54,
+            "cash_reconciliation": 4,
+            "delta": 54,
+            "filter": 10,
+            "filtered_aggregate": 4,
+            "lookup": 36,
+            "margin_extremes_cashflow_difference": 3,
+            "max_margin_selected_cashflow": 3,
+            "maximum": 27,
+            "ratio": 8
+          },
+          "by_rejection": {
+            "nonadditive_metric": 12,
+            "redundant_singleton_or_unsupported_aggregate": 6,
+            "vacuous_filter": 196
+          },
+          "cross_filing_tasks": 137,
+          "dependent_accepted": 6,
+          "dependent_attempted": 24,
+          "dependent_rejected": 18,
+          "draft_candidates": 411,
+          "normalization_rejections": 36,
+          "rejected_tasks": 214,
+          "source_documents": 4,
+          "source_facts": 36,
+          "stages": {
+            "applicability": {
+              "input": 411,
+              "passed": 411,
+              "rejected": 0
+            },
+            "program_validation_and_dedup": {
+              "input": 411,
+              "passed": 197,
+              "rejected": 214
+            }
+          },
+          "train_ready_tasks": 0,
+          "uninstantiated_templates": 0,
+          "within_filing_tasks": 60
+        },
+        "unique_contexts": 13
+      },
+      {
+        "name": "amazon",
+        "status": "verified_local_candidates",
+        "receipt_sha256": "7c49a0fbeb3abba90e3b16d07c8d56507c4b279cc944f2a26830f4fc6e9b1f63",
+        "semantic_tasks": 249,
+        "training_views": 249,
+        "split": "train",
+        "split_group_id": "0001018724",
+        "task_families": {
+          "aggregate": 54,
+          "cash_reconciliation": 4,
+          "conditional_cross_metric_sum": 4,
+          "delta": 66,
+          "filter": 24,
+          "filtered_aggregate": 9,
+          "lookup": 44,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 33,
+          "ratio": 8
+        },
+        "capacity_bins": {
+          "131072": 163,
+          "262144": 86
+        },
+        "exact_token_ranges": {},
+        "compiler_metrics": {
+          "accepted_tasks": 252,
+          "applicability_rejections": 0,
+          "attempted_programs": 497,
+          "base_accepted_tasks": 242,
+          "by_applicability_rejection": {},
+          "by_fact_count": {
+            "1": 44,
+            "2": 107,
+            "3": 55,
+            "4": 32,
+            "5": 4
+          },
+          "by_family": {
+            "aggregate": 54,
+            "cash_reconciliation": 4,
+            "conditional_cross_metric_sum": 4,
+            "delta": 66,
+            "filter": 24,
+            "filtered_aggregate": 9,
+            "lookup": 44,
+            "margin_extremes_cashflow_difference": 3,
+            "max_margin_selected_cashflow": 3,
+            "maximum": 33,
+            "ratio": 8
+          },
+          "by_rejection": {
+            "nonadditive_metric": 24,
+            "redundant_singleton_or_unsupported_aggregate": 15,
+            "vacuous_filter": 216
+          },
+          "cross_filing_tasks": 174,
+          "dependent_accepted": 10,
+          "dependent_attempted": 24,
+          "dependent_rejected": 14,
+          "draft_candidates": 497,
+          "normalization_rejections": 184,
+          "rejected_tasks": 255,
+          "source_documents": 4,
+          "source_facts": 44,
+          "stages": {
+            "applicability": {
+              "input": 497,
+              "passed": 497,
+              "rejected": 0
+            },
+            "program_validation_and_dedup": {
+              "input": 497,
+              "passed": 242,
+              "rejected": 255
+            }
+          },
+          "train_ready_tasks": 0,
+          "uninstantiated_templates": 0,
+          "within_filing_tasks": 68
+        },
+        "unique_contexts": 13
+      },
+      {
+        "name": "amd",
+        "status": "verified_local_candidates",
+        "receipt_sha256": "9f2d99c9e1e4558e18b6ff35ef737f824a7a268ea730c9fb4c415843ed0bcdf7",
+        "semantic_tasks": 194,
+        "training_views": 194,
+        "split": "eval",
+        "split_group_id": "0000002488",
+        "task_families": {
+          "aggregate": 44,
+          "cash_reconciliation": 4,
+          "conditional_cross_metric_sum": 3,
+          "delta": 48,
+          "filter": 18,
+          "filtered_aggregate": 7,
+          "lookup": 32,
+          "margin_extremes_cashflow_difference": 3,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 24,
+          "ratio": 8
+        },
+        "capacity_bins": {
+          "131072": 124,
+          "262144": 70
+        },
+        "exact_token_ranges": {
+          "262144": 47
+        },
+        "compiler_metrics": {
+          "accepted_tasks": 194,
+          "applicability_rejections": 4,
+          "attempted_programs": 364,
+          "base_accepted_tasks": 185,
+          "by_applicability_rejection": {
+            "missing_required_metric": 4
+          },
+          "by_fact_count": {
+            "1": 32,
+            "2": 84,
+            "3": 44,
+            "4": 25
+          },
+          "by_family": {
+            "aggregate": 44,
+            "cash_reconciliation": 4,
+            "conditional_cross_metric_sum": 3,
+            "delta": 48,
+            "filter": 18,
+            "filtered_aggregate": 7,
+            "lookup": 32,
+            "margin_extremes_cashflow_difference": 3,
+            "max_margin_selected_cashflow": 3,
+            "maximum": 24,
+            "ratio": 8
+          },
+          "by_rejection": {
+            "nonadditive_metric": 12,
+            "redundant_singleton_or_unsupported_aggregate": 11,
+            "vacuous_filter": 156
+          },
+          "cross_filing_tasks": 133,
+          "dependent_accepted": 9,
+          "dependent_attempted": 24,
+          "dependent_rejected": 15,
+          "draft_candidates": 368,
+          "normalization_rejections": 0,
+          "rejected_tasks": 179,
+          "source_documents": 4,
+          "source_facts": 32,
+          "stages": {
+            "applicability": {
+              "input": 368,
+              "passed": 364,
+              "rejected": 4
+            },
+            "program_validation_and_dedup": {
+              "input": 364,
+              "passed": 185,
+              "rejected": 179
+            }
+          },
+          "train_ready_tasks": 0,
+          "uninstantiated_templates": 4,
+          "within_filing_tasks": 52
+        },
+        "unique_contexts": 13
+      },
+      {
+        "name": "intel",
+        "status": "verified_local_candidates",
+        "receipt_sha256": "50e8f40dcf3761ab01cbc074125e35116ad3da881d1c460eeac0db7c3fc2e766",
+        "semantic_tasks": 199,
+        "training_views": 199,
+        "split": "train",
+        "split_group_id": "0000050863",
+        "task_families": {
+          "aggregate": 44,
+          "cash_reconciliation": 4,
+          "conditional_cross_metric_sum": 4,
+          "delta": 48,
+          "filter": 24,
+          "filtered_aggregate": 8,
+          "lookup": 32,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 24,
+          "ratio": 8
+        },
+        "capacity_bins": {
+          "131072": 128,
+          "262144": 71
+        },
+        "exact_token_ranges": {},
+        "compiler_metrics": {
+          "accepted_tasks": 202,
+          "applicability_rejections": 4,
+          "attempted_programs": 364,
+          "base_accepted_tasks": 192,
+          "by_applicability_rejection": {
+            "missing_required_metric": 4
+          },
+          "by_fact_count": {
+            "1": 32,
+            "2": 88,
+            "3": 44,
+            "4": 28
+          },
+          "by_family": {
+            "aggregate": 44,
+            "cash_reconciliation": 4,
+            "conditional_cross_metric_sum": 4,
+            "delta": 48,
+            "filter": 24,
+            "filtered_aggregate": 8,
+            "lookup": 32,
+            "margin_extremes_cashflow_difference": 3,
+            "max_margin_selected_cashflow": 3,
+            "maximum": 24,
+            "ratio": 8
+          },
+          "by_rejection": {
+            "nonadditive_metric": 12,
+            "redundant_singleton_or_unsupported_aggregate": 16,
+            "vacuous_filter": 144
+          },
+          "cross_filing_tasks": 140,
+          "dependent_accepted": 10,
+          "dependent_attempted": 24,
+          "dependent_rejected": 14,
+          "draft_candidates": 368,
+          "normalization_rejections": 0,
+          "rejected_tasks": 172,
+          "source_documents": 4,
+          "source_facts": 32,
+          "stages": {
+            "applicability": {
+              "input": 368,
+              "passed": 364,
+              "rejected": 4
+            },
+            "program_validation_and_dedup": {
+              "input": 364,
+              "passed": 192,
+              "rejected": 172
+            }
+          },
+          "train_ready_tasks": 0,
+          "uninstantiated_templates": 4,
+          "within_filing_tasks": 52
+        },
+        "unique_contexts": 13
+      },
+      {
+        "name": "meta",
+        "status": "verified_local_candidates",
+        "receipt_sha256": "c49bd438e01ade2a4528d4d00fab852b367c9dbf5fa39e1ef99fd6df72a1df41",
+        "semantic_tasks": 216,
+        "training_views": 216,
+        "split": "train",
+        "split_group_id": "0001326801",
+        "task_families": {
+          "aggregate": 54,
+          "cash_reconciliation": 4,
+          "delta": 54,
+          "filter": 22,
+          "filtered_aggregate": 8,
+          "lookup": 36,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 27,
+          "ratio": 8
+        },
+        "capacity_bins": {
+          "131072": 145,
+          "262144": 71
+        },
+        "exact_token_ranges": {},
+        "compiler_metrics": {
+          "accepted_tasks": 219,
+          "applicability_rejections": 0,
+          "attempted_programs": 411,
+          "base_accepted_tasks": 213,
+          "by_applicability_rejection": {},
+          "by_fact_count": {
+            "1": 36,
+            "2": 97,
+            "3": 48,
+            "4": 28,
+            "5": 4
+          },
+          "by_family": {
+            "aggregate": 54,
+            "cash_reconciliation": 4,
+            "delta": 54,
+            "filter": 22,
+            "filtered_aggregate": 8,
+            "lookup": 36,
+            "margin_extremes_cashflow_difference": 3,
+            "max_margin_selected_cashflow": 3,
+            "maximum": 27,
+            "ratio": 8
+          },
+          "by_rejection": {
+            "nonadditive_metric": 12,
+            "redundant_singleton_or_unsupported_aggregate": 14,
+            "vacuous_filter": 172
+          },
+          "cross_filing_tasks": 153,
+          "dependent_accepted": 6,
+          "dependent_attempted": 24,
+          "dependent_rejected": 18,
+          "draft_candidates": 411,
+          "normalization_rejections": 8,
+          "rejected_tasks": 198,
+          "source_documents": 4,
+          "source_facts": 36,
+          "stages": {
+            "applicability": {
+              "input": 411,
+              "passed": 411,
+              "rejected": 0
+            },
+            "program_validation_and_dedup": {
+              "input": 411,
+              "passed": 213,
+              "rejected": 198
+            }
+          },
+          "train_ready_tasks": 0,
+          "uninstantiated_templates": 0,
+          "within_filing_tasks": 60
+        },
+        "unique_contexts": 13
+      },
+      {
+        "name": "micron",
+        "status": "verified_local_candidates",
+        "receipt_sha256": "9098d59230192f73238e053bba232da163ae32aabf576061f46077165e79093a",
+        "semantic_tasks": 243,
+        "training_views": 243,
+        "split": "train",
+        "split_group_id": "0000723125",
+        "task_families": {
+          "aggregate": 54,
+          "cash_reconciliation": 4,
+          "conditional_cross_metric_sum": 6,
+          "delta": 54,
+          "filter": 38,
+          "filtered_aggregate": 13,
+          "lookup": 36,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 27,
+          "ratio": 8
+        },
+        "capacity_bins": {
+          "131072": 149,
+          "262144": 94
+        },
+        "exact_token_ranges": {},
+        "compiler_metrics": {
+          "accepted_tasks": 246,
+          "applicability_rejections": 0,
+          "attempted_programs": 411,
+          "base_accepted_tasks": 234,
+          "by_applicability_rejection": {},
+          "by_fact_count": {
+            "1": 36,
+            "2": 101,
+            "3": 60,
+            "4": 33,
+            "5": 4
+          },
+          "by_family": {
+            "aggregate": 54,
+            "cash_reconciliation": 4,
+            "conditional_cross_metric_sum": 6,
+            "delta": 54,
+            "filter": 38,
+            "filtered_aggregate": 13,
+            "lookup": 36,
+            "margin_extremes_cashflow_difference": 3,
+            "max_margin_selected_cashflow": 3,
+            "maximum": 27,
+            "ratio": 8
+          },
+          "by_rejection": {
+            "nonadditive_metric": 12,
+            "redundant_singleton_or_unsupported_aggregate": 25,
+            "vacuous_filter": 140
+          },
+          "cross_filing_tasks": 174,
+          "dependent_accepted": 12,
+          "dependent_attempted": 24,
+          "dependent_rejected": 12,
+          "draft_candidates": 411,
+          "normalization_rejections": 43,
+          "rejected_tasks": 177,
+          "source_documents": 4,
+          "source_facts": 36,
+          "stages": {
+            "applicability": {
+              "input": 411,
+              "passed": 411,
+              "rejected": 0
+            },
+            "program_validation_and_dedup": {
+              "input": 411,
+              "passed": 234,
+              "rejected": 177
+            }
+          },
+          "train_ready_tasks": 0,
+          "uninstantiated_templates": 0,
+          "within_filing_tasks": 60
+        },
+        "unique_contexts": 13
+      },
+      {
+        "name": "nvidia",
+        "status": "verified_local_candidates",
+        "receipt_sha256": "e7afb0a25f70707db8e2fbde063f28ebb50cbccd72c9a8767f4f5a7154231baf",
+        "semantic_tasks": 189,
+        "training_views": 189,
+        "split": "train",
+        "split_group_id": "0001045810",
+        "task_families": {
+          "aggregate": 44,
+          "cash_reconciliation": 4,
+          "conditional_cross_metric_sum": 5,
+          "delta": 48,
+          "filter": 16,
+          "filtered_aggregate": 5,
+          "lookup": 32,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 24,
+          "ratio": 8
+        },
+        "capacity_bins": {
+          "131072": 72,
+          "262144": 65,
+          "65536": 52
+        },
+        "exact_token_ranges": {
+          "65536": 13
+        },
+        "compiler_metrics": {
+          "accepted_tasks": 192,
+          "applicability_rejections": 4,
+          "attempted_programs": 364,
+          "base_accepted_tasks": 181,
+          "by_applicability_rejection": {
+            "missing_required_metric": 4
+          },
+          "by_fact_count": {
+            "1": 32,
+            "2": 84,
+            "3": 41,
+            "4": 24
+          },
+          "by_family": {
+            "aggregate": 44,
+            "cash_reconciliation": 4,
+            "conditional_cross_metric_sum": 5,
+            "delta": 48,
+            "filter": 16,
+            "filtered_aggregate": 5,
+            "lookup": 32,
+            "margin_extremes_cashflow_difference": 3,
+            "max_margin_selected_cashflow": 3,
+            "maximum": 24,
+            "ratio": 8
+          },
+          "by_rejection": {
+            "nonadditive_metric": 12,
+            "redundant_singleton_or_unsupported_aggregate": 11,
+            "vacuous_filter": 160
+          },
+          "cross_filing_tasks": 129,
+          "dependent_accepted": 11,
+          "dependent_attempted": 24,
+          "dependent_rejected": 13,
+          "draft_candidates": 368,
+          "normalization_rejections": 20,
+          "rejected_tasks": 183,
+          "source_documents": 4,
+          "source_facts": 32,
+          "stages": {
+            "applicability": {
+              "input": 368,
+              "passed": 364,
+              "rejected": 4
+            },
+            "program_validation_and_dedup": {
+              "input": 364,
+              "passed": 181,
+              "rejected": 183
+            }
+          },
+          "train_ready_tasks": 0,
+          "uninstantiated_templates": 4,
+          "within_filing_tasks": 52
+        },
+        "unique_contexts": 13
+      },
+      {
+        "name": "siriusxm",
+        "status": "verified_local_candidates",
+        "receipt_sha256": "8607a12fabe9138f5b36d4ab5b3d93bbb236f9e07908c9ca42bc2b8b1b5f4c2e",
+        "semantic_tasks": 192,
+        "training_views": 192,
+        "split": "eval",
+        "split_group_id": "0000908937",
+        "task_families": {
+          "aggregate": 44,
+          "cash_reconciliation": 4,
+          "conditional_cross_metric_sum": 2,
+          "delta": 48,
+          "filter": 18,
+          "filtered_aggregate": 6,
+          "lookup": 32,
+          "margin_extremes_cashflow_difference": 3,
+          "max_margin_selected_cashflow": 3,
+          "maximum": 24,
+          "ratio": 8
+        },
+        "capacity_bins": {
+          "131072": 126,
+          "262144": 66
+        },
+        "exact_token_ranges": {},
+        "compiler_metrics": {
+          "accepted_tasks": 192,
+          "applicability_rejections": 4,
+          "attempted_programs": 364,
+          "base_accepted_tasks": 184,
+          "by_applicability_rejection": {
+            "missing_required_metric": 4
+          },
+          "by_fact_count": {
+            "1": 32,
+            "2": 86,
+            "3": 41,
+            "4": 25
+          },
+          "by_family": {
+            "aggregate": 44,
+            "cash_reconciliation": 4,
+            "conditional_cross_metric_sum": 2,
+            "delta": 48,
+            "filter": 18,
+            "filtered_aggregate": 6,
+            "lookup": 32,
+            "margin_extremes_cashflow_difference": 3,
+            "max_margin_selected_cashflow": 3,
+            "maximum": 24,
+            "ratio": 8
+          },
+          "by_rejection": {
+            "nonadditive_metric": 12,
+            "redundant_singleton_or_unsupported_aggregate": 12,
+            "vacuous_filter": 156
+          },
+          "cross_filing_tasks": 132,
+          "dependent_accepted": 8,
+          "dependent_attempted": 24,
+          "dependent_rejected": 16,
+          "draft_candidates": 368,
+          "normalization_rejections": 0,
+          "rejected_tasks": 180,
+          "source_documents": 4,
+          "source_facts": 32,
+          "stages": {
+            "applicability": {
+              "input": 368,
+              "passed": 364,
+              "rejected": 4
+            },
+            "program_validation_and_dedup": {
+              "input": 364,
+              "passed": 184,
+              "rejected": 180
+            }
+          },
+          "train_ready_tasks": 0,
+          "uninstantiated_templates": 4,
+          "within_filing_tasks": 52
+        },
+        "unique_contexts": 13
+      }
+    ],
+    "statuses": {
+      "verified_local_candidates": 8
+    },
+    "accepted_semantic_tasks": 1682,
+    "verified_source_entities": 8,
+    "production_eligible": false,
+    "training_release_eligible": false,
+    "split_scope": "isolated taskbank; do not union legacy training sources with this evaluation split"
+  }
+}

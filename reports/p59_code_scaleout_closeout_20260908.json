@@ -1,0 +1,86 @@
+{
+  "scope": "P59 independent CodeForge tracks: one newly admitted repository plus new-query/source-chain attempts on an existing admitted repository.",
+  "pulumi": {
+    "status": "qualified_local_probe",
+    "product": "data/releases/p59-code-pulumi-recovery-64k-probe-1-v1-promoted-v1",
+    "new_admitted_worlds": 1,
+    "new_domains": 0,
+    "train_rows": 3,
+    "eval_rows": 0,
+    "exact_context_tokens": 196599,
+    "b5_examples": 3,
+    "b5_estimated_tokens": 197373,
+    "base_tasks": 1,
+    "proofs": 1,
+    "views": [
+      "full",
+      "cf",
+      "ordered_artifact_view"
+    ],
+    "world_ids": [
+      "code000160-ashloftkit-53:focal"
+    ],
+    "gate_ok": true,
+    "production_eligible": false,
+    "profile_sha256": "f54b4c473164fc5a859a93e0207c720803e6260050624083c6be971e7abee44e",
+    "deterministic_export_validation": "passed",
+    "source_scope": "P16 eight-release frozen bundle; 64K proof uses final four release cycles #23245/#23425/#23450/#23831. Not the rejected #24184/#24226 single-episode construction. Historical 128K out-of-range is not retried."
+  },
+  "wasmtime_first_chain": {
+    "status": "rejected_exact_band",
+    "candidate_rows": 0,
+    "reason": "exact_64k_out_of_range:63977",
+    "source_chain": "v45-v46-v47 selected by existing compiler from four-release bundle",
+    "evidence": "reports/p59_code_wasmtime_supersession_64k_v1/candidate/reject_log.jsonl"
+  },
+  "wasmtime_latest_chain": {
+    "status": "rejected_generation",
+    "source_chain": "v46-v47-v48",
+    "bundle": "configs/p59_code_wasmtime_latest3_v1_bundle.json",
+    "new_worlds": 0,
+    "preflight_ok": true,
+    "unique_source_tokens": 109829,
+    "essential_events": 144,
+    "source_workflows": 3,
+    "candidate_rows": 0,
+    "rejects": [
+      {
+        "seed": 130,
+        "query_id": "code000130-sablewoodkit-44:release_supersession_trace:3_of_3",
+        "reason": "exact_64k_out_of_range:49176",
+        "view": "full",
+        "timing": "first",
+        "bucket": "64k"
+      }
+    ],
+    "evidence": "reports/p59_code_wasmtime_latest3_supersession_64k_v1/candidate/reject_log.jsonl"
+  },
+  "limitations": [
+    "Three Pulumi views are one task, not three independent worlds.",
+    "Question-only preflight checks native empty replay and exact answer/codebook leakage, not an LLM question-only benchmark.",
+    "Source capacity counts do not equal packed-context tokens or proof tokens.",
+    "Local-probe only; CURRENT_RELEASE/HF unchanged."
+  ],
+  "sha256": {
+    "data/releases/p59-code-pulumi-recovery-64k-probe-1-v1-promoted-v1/train.jsonl": "093e5e8a1fb27915e8b9b866c8a082d9cf3658eb8cdc1e8c42dcc981002e863a",
+    "data/releases/p59-code-pulumi-recovery-64k-probe-1-v1-promoted-v1/eval.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data/releases/p59-code-pulumi-recovery-64k-probe-1-v1-promoted-v1/quality_report.json": "a6a008cd73a054ac2ae00ae06b3e9b40360642236ff07fbe45d2608e0145b1a2",
+    "data/releases/p59-code-pulumi-recovery-64k-probe-1-v1-promoted-v1/release_gate_receipt.json": "5b784d690c798dd515bdf98e81f6b617f84d7c8d43e791771657fcb47cdeb3cf",
+    "data/releases/p59-code-pulumi-recovery-64k-probe-1-v1-promoted-v1/llamafactory/B5.json": "e674081145055bbfad8c47133605137bec4a6ca597f6b49848e05d8ce219345b",
+    "data/releases/p59-code-pulumi-recovery-64k-probe-1-v1-promoted-v1/llamafactory/B5.meta.json": "64d02e77cecce7ea4134357ecb81dc8d97a377082ce2899c275a086eef0ab191",
+    "data/releases/p59-code-pulumi-recovery-64k-probe-1-v1-promoted-v1/llamafactory/training_export_manifest.json": "235388799b3841845ca411bf47e1d24cf0bb710d2262d46213e854606be8472f"
+  },
+  "qualified_delta": {
+    "train_rows": 3,
+    "exact_context_tokens": 196599,
+    "eval_rows": 0,
+    "new_worlds": 1,
+    "new_domains": 0,
+    "b5_examples": 3,
+    "b5_estimated_tokens": 197373
+  },
+  "checks": {
+    "focused_ruff_F": "passed for four helper scripts",
+    "active_owned_jobs": 0
+  }
+}

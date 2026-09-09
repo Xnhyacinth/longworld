@@ -1,0 +1,125 @@
+{
+  "reading_contract_checks": [
+    {
+      "view": "full",
+      "query_id": "code000160-ashloftkit-53:patch_files_review_test_release_v2:4_cycles:release:v3.252.0:first:middle:64k",
+      "cycles": [
+        {
+          "tag_visible": true,
+          "files_visible": true,
+          "review_visible_casefold": true,
+          "test_name_visible": true,
+          "test_result_visible": true
+        },
+        {
+          "tag_visible": true,
+          "files_visible": true,
+          "review_visible_casefold": true,
+          "test_name_visible": true,
+          "test_result_visible": true
+        },
+        {
+          "tag_visible": true,
+          "files_visible": true,
+          "review_visible_casefold": true,
+          "test_name_visible": true,
+          "test_result_visible": true
+        },
+        {
+          "tag_visible": true,
+          "files_visible": true,
+          "review_visible_casefold": true,
+          "test_name_visible": true,
+          "test_result_visible": true
+        }
+      ],
+      "all_visible": true
+    },
+    {
+      "view": "cf",
+      "query_id": "code000160-ashloftkit-53:patch_files_review_test_release_v2:4_cycles:release:v3.252.0:first:middle:64k",
+      "cycles": [
+        {
+          "tag_visible": true,
+          "files_visible": true,
+          "review_visible_casefold": true,
+          "test_name_visible": true,
+          "test_result_visible": true
+        },
+        {
+          "tag_visible": true,
+          "files_visible": true,
+          "review_visible_casefold": true,
+          "test_name_visible": true,
+          "test_result_visible": true
+        },
+        {
+          "tag_visible": true,
+          "files_visible": true,
+          "review_visible_casefold": true,
+          "test_name_visible": true,
+          "test_result_visible": true
+        },
+        {
+          "tag_visible": true,
+          "files_visible": true,
+          "review_visible_casefold": true,
+          "test_name_visible": true,
+          "test_result_visible": true
+        }
+      ],
+      "all_visible": true
+    },
+    {
+      "view": "ordered_artifact_view",
+      "query_id": "code000160-ashloftkit-53:patch_files_review_test_release_v2:4_cycles:release:v3.252.0:first:back:64k",
+      "cycles": [
+        {
+          "tag_visible": true,
+          "files_visible": true,
+          "review_visible_casefold": true,
+          "test_name_visible": true,
+          "test_result_visible": true
+        },
+        {
+          "tag_visible": true,
+          "files_visible": true,
+          "review_visible_casefold": true,
+          "test_name_visible": true,
+          "test_result_visible": true
+        },
+        {
+          "tag_visible": true,
+          "files_visible": true,
+          "review_visible_casefold": true,
+          "test_name_visible": true,
+          "test_result_visible": true
+        },
+        {
+          "tag_visible": true,
+          "files_visible": true,
+          "review_visible_casefold": true,
+          "test_name_visible": true,
+          "test_result_visible": true
+        }
+      ],
+      "all_visible": true
+    }
+  ],
+  "factual_cf_questions_equal": true,
+  "factual_cf_answers_differ": true,
+  "visible_cf_diff": [
+    "--- ",
+    "+++ ",
+    "@@ -3938,7 +3938,7 @@",
+    " Occurred: 2026-07-08",
+    " Source body (verbatim unless this is a counterfactual view):",
+    " CI check Lint / Generate Go SDK for 5391f0c648d2cca8fced9fda0dc2f24908af1387",
+    "-run_id=85891972006 status=completed conclusion=success",
+    "+run_id=85891972006 status=completed conclusion=failed",
+    " ",
+    " ===== DOCUMENT =====",
+    " "
+  ],
+  "reading_gate_ok": true
+}

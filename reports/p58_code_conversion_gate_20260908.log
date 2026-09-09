@@ -1,0 +1,53 @@
+{
+  "ok": true,
+  "errors": [],
+  "n_rows": 6,
+  "n_worlds_observed": 1,
+  "n_unique_conversations": 6,
+  "n_exact_duplicate_rows": 0,
+  "n_conflicting_answer_prompts": 0,
+  "by_length": {
+    "64k": 3,
+    "128k": 3
+  },
+  "by_domain": {
+    "codeforge": 6
+  },
+  "worlds_by_domain": {
+    "codeforge": 1
+  },
+  "exact_64k_rows_by_domain": {
+    "codeforge": 3
+  },
+  "by_motif": {
+    "patch_review_test_ancestry": 6
+  },
+  "n_unique_base_tasks": 1,
+  "n_unique_semantic_base_tasks": 2,
+  "n_unique_executable_proofs": 2,
+  "n_unique_source_relations": 4,
+  "n_real_source_relations": 4,
+  "n_hybrid_causal_relations": 4,
+  "n_real_source_families": 1,
+  "n_unique_real_source_workflows": 8,
+  "n_real_base_tasks": 1,
+  "n_real_exact_64k_rows": 3,
+  "real_exact_64k_rows_by_domain": {
+    "codeforge": 3
+  },
+  "real_exact_64k_worlds_by_domain": {
+    "codeforge": 1
+  },
+  "real_worlds_by_split": {
+    "train": 1,
+    "eval": 0
+  },
+  "release_profile_id": "p58-code-transformers-review-ancestry-probe-1-v1",
+  "release_profile_sha256": "20c21842783c643d9105ed89db254a72c96d9a1bd0d10086954c3ba0fc4a3768",
+  "n_promotion_ready": 6,
+  "n_unique_answer_programs": 2,
+  "retention": 1.0,
+  "mean_boilerplate": 0.0,
+  "mean_pulse": 0.0,
+  "mean_near_dup_sentence_ratio": 0.005549999999999999
+}

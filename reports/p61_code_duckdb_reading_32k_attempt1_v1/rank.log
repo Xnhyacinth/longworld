@@ -1,0 +1,4 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 9205.48it/s]
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (2254 > 256). Running this sequence through the model will result in indexing errors
+{"rows": 3, "output": "/workspace/wynckeliao/longworld-worlds/reports/p61_code_duckdb_reading_32k_attempt1_v1/audit/rankings.jsonl"}

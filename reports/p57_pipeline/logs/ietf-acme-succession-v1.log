@@ -1,0 +1,228 @@
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/ietf-acme/local_probe_trust.json --role source --role candidate --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py --config /workspace/wynckeliao/longworld-worlds/configs/p57_ietf_acme_succession_generation_v1.json
+Traceback (most recent call last):
+  File "/workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py", line 378, in <module>
+    main()
+  File "/workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py", line 374, in main
+    print(json.dumps(build(parser.parse_args().config), sort_keys=True))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py", line 66, in build
+    raise ValueError(_COMPILE_BLOCKER)
+ValueError: ACME 64k is blocked: official RFC target closure cannot ground leftover RFCs 8737/8738/8823/9444/9773 from RFC 8555-only published_as; unique 82082 must not pad to 128k and 8555-only 48577 is below the 64k band
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/ietf-acme/local_probe_trust.json --role source --role candidate --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py --config /workspace/wynckeliao/longworld-worlds/configs/p57_ietf_acme_succession_generation_v1.json
+Traceback (most recent call last):
+  File "/workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py", line 560, in <module>
+    main()
+  File "/workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py", line 556, in main
+    print(json.dumps(build(parser.parse_args().config), sort_keys=True))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py", line 235, in build
+    raise ValueError("ACME fetch inventory hash changed")
+ValueError: ACME fetch inventory hash changed
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/ietf-acme/local_probe_trust.json --role source --role candidate --role ranker --role auditor --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py --candidates /workspace/wynckeliao/longworld/data/candidates/p57_ietf_acme_succession_v1/parents.jsonl --sidecar /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_v1/projected/TASK_REPLAY_SIDECAR_V3.json --output-dir /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_v1/projected --audit-only --rankings /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_v1/projected/rankings.jsonl --audit-workers 2 --length-bucket 32k
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskpromotion.py", line 1051, in create_task_dense_audit
+    task_proof = compute_task_proof(
+                 ^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskproof.py", line 2378, in compute_task_proof
+    raise TaskProofError("task proof complexity is insufficient")
+longworld.core.taskproof.TaskProofError: task proof complexity is insufficient
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+                    ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+           ^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 333, in _audit_one_projection
+    return create_task_dense_audit(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskpromotion.py", line 1057, in create_task_dense_audit
+    raise PromotionError(f"task upstream proof replay failed: {error}") from error
+longworld.core.promotion.PromotionError: task upstream proof replay failed: task proof complexity is insufficient
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 521, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 497, in main
+    audit_projections(
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 438, in audit_projections
+    audits = pool.map(_audit_one_projection, items, chunksize=1)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 367, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 774, in get
+    raise self._value
+longworld.core.promotion.PromotionError: task upstream proof replay failed: task proof complexity is insufficient
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/ietf-acme/local_probe_trust.json --role source --role candidate --role ranker --role auditor --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py --candidates /workspace/wynckeliao/longworld/data/candidates/p57_ietf_acme_succession_v1/parents.jsonl --sidecar /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_v1/projected/TASK_REPLAY_SIDECAR_V3.json --output-dir /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_v1/projected --audit-only --rankings /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_v1/projected/rankings.jsonl --audit-workers 2 --length-bucket 32k
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskpromotion.py", line 1051, in create_task_dense_audit
+    task_proof = compute_task_proof(
+                 ^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskproof.py", line 2393, in compute_task_proof
+    raw_windows, has_raw_window_evidence, raw_spans = _raw_token_window_proof(
+                                                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskproof.py", line 2135, in _raw_token_window_proof
+    raise TaskProofError(
+longworld.core.taskproof.TaskProofError: raw token window 16k intersecting-artifact upper bound retrieves the gold answer: 2575:18959
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+                    ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+           ^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 333, in _audit_one_projection
+    return create_task_dense_audit(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskpromotion.py", line 1057, in create_task_dense_audit
+    raise PromotionError(f"task upstream proof replay failed: {error}") from error
+longworld.core.promotion.PromotionError: task upstream proof replay failed: raw token window 16k intersecting-artifact upper bound retrieves the gold answer: 2575:18959
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 521, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 497, in main
+    audit_projections(
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 438, in audit_projections
+    audits = pool.map(_audit_one_projection, items, chunksize=1)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 367, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 774, in get
+    raise self._value
+longworld.core.promotion.PromotionError: task upstream proof replay failed: raw token window 16k intersecting-artifact upper bound retrieves the gold answer: 2575:18959
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/ietf-acme/local_probe_trust.json --role source --role candidate --role ranker --role auditor --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py --candidates /workspace/wynckeliao/longworld/data/candidates/p57_ietf_acme_succession_v1/parents.jsonl --sidecar /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_v1/projected/TASK_REPLAY_SIDECAR_V3.json --output-dir /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_v1/projected --audit-only --rankings /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_v1/projected/rankings.jsonl --audit-workers 2 --length-bucket 32k
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskpromotion.py", line 1051, in create_task_dense_audit
+    task_proof = compute_task_proof(
+                 ^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskproof.py", line 2408, in compute_task_proof
+    bm25 = _retrieval_proof(
+           ^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskproof.py", line 1781, in _retrieval_proof
+    raise TaskProofError(f"{name} top-{solved_at} retrieves the gold answer")
+longworld.core.taskproof.TaskProofError: BM25 top-3 retrieves the gold answer
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+                    ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+           ^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 333, in _audit_one_projection
+    return create_task_dense_audit(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskpromotion.py", line 1057, in create_task_dense_audit
+    raise PromotionError(f"task upstream proof replay failed: {error}") from error
+longworld.core.promotion.PromotionError: task upstream proof replay failed: BM25 top-3 retrieves the gold answer
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 521, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 497, in main
+    audit_projections(
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 438, in audit_projections
+    audits = pool.map(_audit_one_projection, items, chunksize=1)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 367, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 774, in get
+    raise self._value
+longworld.core.promotion.PromotionError: task upstream proof replay failed: BM25 top-3 retrieves the gold answer
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/ietf-acme/local_probe_trust.json --role source --role candidate --role ranker --role auditor --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py --candidates /workspace/wynckeliao/longworld/data/candidates/p57_ietf_acme_succession_v1/parents.jsonl --sidecar /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_v1/projected/TASK_REPLAY_SIDECAR_V3.json --output-dir /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_v1/projected --audit-only --rankings /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_v1/projected/rankings.jsonl --audit-workers 2 --length-bucket 32k
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskpromotion.py", line 1051, in create_task_dense_audit
+    task_proof = compute_task_proof(
+                 ^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskproof.py", line 2393, in compute_task_proof
+    raw_windows, has_raw_window_evidence, raw_spans = _raw_token_window_proof(
+                                                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskproof.py", line 2135, in _raw_token_window_proof
+    raise TaskProofError(
+longworld.core.taskproof.TaskProofError: raw token window 16k intersecting-artifact upper bound retrieves the gold answer: 123:16507
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+                    ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+           ^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 333, in _audit_one_projection
+    return create_task_dense_audit(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskpromotion.py", line 1057, in create_task_dense_audit
+    raise PromotionError(f"task upstream proof replay failed: {error}") from error
+longworld.core.promotion.PromotionError: task upstream proof replay failed: raw token window 16k intersecting-artifact upper bound retrieves the gold answer: 123:16507
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 521, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 497, in main
+    audit_projections(
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 438, in audit_projections
+    audits = pool.map(_audit_one_projection, items, chunksize=1)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 367, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 774, in get
+    raise self._value
+longworld.core.promotion.PromotionError: task upstream proof replay failed: raw token window 16k intersecting-artifact upper bound retrieves the gold answer: 123:16507
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/ietf-acme/local_probe_trust.json --role source --role candidate --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py --config /workspace/wynckeliao/longworld-worlds/configs/p57_ietf_acme_succession_generation_v1.json
+Traceback (most recent call last):
+  File "/workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py", line 1019, in <module>
+    (output_dir / "GENERATION_RECEIPT.json").write_bytes(_canonical_bytes(receipt))
+    ^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py", line 1015, in main
+    "parents_sha256": hashlib.sha256(candidates_raw).hexdigest(),
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py", line 798, in build
+    artifacts = deduped
+                    ^^^
+  File "/workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py", line 604, in _merge_acme_adjacent_leftover
+    raise ValueError("ACME cannot merge leftover without dropping below zipper tail")
+ValueError: ACME cannot merge leftover without dropping below zipper tail
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/ietf-acme/local_probe_trust.json --role source --role candidate --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py --config /workspace/wynckeliao/longworld-worlds/configs/p57_ietf_acme_succession_generation_v1.json
+  File "/workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py", line 706
+    ) -> list[dict[str, Any]]:
+    ^
+SyntaxError: unmatched ')'

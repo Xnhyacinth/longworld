@@ -1,0 +1,33 @@
+{
+  "schema_version": "longworld.finance-history-materialization.v1",
+  "world_id": "finance_micron_reconstruction_fy2022_2025_p59_v1",
+  "signed_issuer_manifest": "data/source_inventory/p59_finance_micron_reconstruction_v1/issuer_ir_manifest.signed.json",
+  "answer_program_id": "finance.multi_filing_reconstruction.v1",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "bands": [
+    {
+      "name": "16k",
+      "lower_tokens": 16000,
+      "upper_tokens": 16384
+    },
+    {
+      "name": "32k",
+      "lower_tokens": 32000,
+      "upper_tokens": 32768
+    },
+    {
+      "name": "64k",
+      "lower_tokens": 64000,
+      "upper_tokens": 65536
+    }
+  ],
+  "source_parent_manifest": "data/source_inventory/p57_finance_micron_ir_fy2022_2025_v1/issuer_ir_manifest.signed.json",
+  "source_parent_sha256": "b72d1742da7dfb13145867bd8d98394a7b829e109c7abdc62d52a5a7c77077bd",
+  "source_inventory": "data/source_inventory/p57_finance_micron_ir_fy2022_2025_v1/issuer_ir_inventory.json",
+  "source_profile": "micron.financial-reconstruction.v1",
+  "source_generated_at": "2026-09-08T16:10:26.263236Z",
+  "output_dir": "reports/p59_finance_micron_reconstruction_v1"
+}

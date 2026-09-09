@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.codeforge-taskbank-config.v1",
+  "source_bundle": "configs/p16_codeforge_pulumi_failure_recovery_v1_bundle.json",
+  "source_bundle_sha256": "d23382ce6922a1415ee6dec685c8796632a71c93c55eb3137c69f68a97803418",
+  "source_group_id": "https://github.com/pulumi/pulumi",
+  "split": "train",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true
+  }
+}

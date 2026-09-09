@@ -1,0 +1,98 @@
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/nvidia/local_probe_trust.json --role candidate --role auditor --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python scripts/promote_candidates.py select --candidates /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/primary_candidates.jsonl --audits /workspace/wynckeliao/longworld-worlds/reports/p59_finance_nvidia_reconstruction_v1/projected/audits.jsonl --release-profile p59-finance-nvidia-cash-components-64k-probe-1-v1 --train-candidates /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/train_candidates.jsonl --eval-candidates /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/eval_candidates.jsonl --train-audits /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/train_audits.jsonl --eval-audits /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/eval_audits.jsonl --receipt /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/release_selection.json
+{"command": "select", "rows": 3, "output": "/workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/release_selection.json"}
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/nvidia/local_probe_trust.json --role source --role candidate --role ranker --role auditor --role promotion --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python scripts/promote_candidates.py promote --candidates /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/train_candidates.jsonl --audits /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/train_audits.jsonl --output /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/train.jsonl --expected-split train --release-selection /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/release_selection.json --replay-registry /workspace/wynckeliao/longworld-worlds/reports/p59_finance_nvidia_reconstruction_v1/projected/REPLAY_PATH_REGISTRY.json --workers 3
+{"command": "promote", "rows": 3, "output": "/workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/train.jsonl"}
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/nvidia/local_probe_trust.json --role source --role candidate --role ranker --role auditor --role promotion --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python scripts/promote_candidates.py promote --candidates /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/eval_candidates.jsonl --audits /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/eval_audits.jsonl --output /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/eval.jsonl --expected-split eval --release-selection /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/release_selection.json --replay-registry /workspace/wynckeliao/longworld-worlds/reports/p59_finance_nvidia_reconstruction_v1/projected/REPLAY_PATH_REGISTRY.json --workers 3
+{"command": "promote", "rows": 0, "output": "/workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/eval.jsonl"}
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/nvidia/local_probe_trust.json --role candidate --role report --role auditor --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python scripts/promote_candidates.py candidate-union --candidates /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/primary_candidates.jsonl --release-selection /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/release_selection.json --output /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/candidate_report.json
+{"command": "candidate-union", "rows": 3, "output": "/workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/candidate_report.json"}
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/nvidia/local_probe_trust.json --role candidate --role promotion --role report --role auditor --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python scripts/promote_candidates.py report --candidate-report /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/candidate_report.json --candidates /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/primary_candidates.jsonl --rows /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/train.jsonl /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/eval.jsonl --output /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/quality_report.json --release-selection /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/release_selection.json
+{"command": "report", "rows": 3, "output": "/workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/quality_report.json"}
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/nvidia/local_probe_trust.json --role source --role candidate --role ranker --role auditor --role promotion --role report --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python scripts/quality_gate.py --data /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1 --release-profile p59-finance-nvidia-cash-components-64k-probe-1-v1 --gate-receipt /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/release_gate_receipt.json
+{
+  "ok": true,
+  "errors": [],
+  "n_rows": 3,
+  "n_worlds_observed": 1,
+  "n_unique_conversations": 3,
+  "n_exact_duplicate_rows": 0,
+  "n_conflicting_answer_prompts": 0,
+  "by_length": {
+    "64k": 3
+  },
+  "by_domain": {
+    "finance": 3
+  },
+  "worlds_by_domain": {
+    "finance": 1
+  },
+  "exact_64k_rows_by_domain": {
+    "finance": 3
+  },
+  "by_motif": {
+    "cash_components_sum+disclosed_net_change+operating_margin+balance_sheet_certification": 3
+  },
+  "n_unique_base_tasks": 1,
+  "n_unique_semantic_base_tasks": 1,
+  "n_unique_executable_proofs": 1,
+  "n_unique_source_relations": 2,
+  "n_real_source_relations": 2,
+  "n_hybrid_causal_relations": 0,
+  "n_real_source_families": 1,
+  "n_unique_real_source_workflows": 1,
+  "n_real_base_tasks": 1,
+  "n_real_exact_64k_rows": 3,
+  "real_exact_64k_rows_by_domain": {
+    "finance": 3
+  },
+  "real_exact_64k_worlds_by_domain": {
+    "finance": 1
+  },
+  "real_worlds_by_split": {
+    "train": 1,
+    "eval": 0
+  },
+  "release_profile_id": "p59-finance-nvidia-cash-components-64k-probe-1-v1",
+  "release_profile_sha256": "87d901b73b864b8d5ac9463830c150109550202e3c801f8ac01c87575b6eba80",
+  "n_promotion_ready": 3,
+  "n_unique_answer_programs": 1,
+  "retention": 1.0,
+  "mean_boilerplate": 0.0,
+  "mean_pulse": 0.0,
+  "mean_near_dup_sentence_ratio": 0.0
+}
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/nvidia/local_probe_trust.json --role source --role candidate --role ranker --role auditor --role promotion --role report --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python scripts/export_llamafactory.py --data /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1 --out-dir /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/llamafactory --release-root /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1 --release-profile p59-finance-nvidia-cash-components-64k-probe-1-v1 --conditions B5 --train-buckets 64k
+{
+  "conditions": [
+    {
+      "n": 3,
+      "weighted_n": 3,
+      "tokens_est": 197116,
+      "path": "B5.json",
+      "by_view": {
+        "full": 1,
+        "cf": 1,
+        "ordered_artifact_view": 1
+      },
+      "by_length": {
+        "64k": 3
+      },
+      "by_timing": {
+        "first": 3
+      },
+      "by_view_length": {
+        "full|64k": 1,
+        "cf|64k": 1,
+        "ordered_artifact_view|64k": 1
+      },
+      "upsample": false,
+      "duplicates_dropped": 0,
+      "contract_rejects": 0,
+      "condition": "B5"
+    }
+  ],
+  "token_spread": 0.0,
+  "b5w_sampler": null
+}
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/nvidia/local_probe_trust.json --role source --role candidate --role ranker --role auditor --role promotion --role report --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python scripts/validate_training_export.py --manifest /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/llamafactory/training_export_manifest.json --release-profile p59-finance-nvidia-cash-components-64k-probe-1-v1 --expected-transform-revision longworld-llamafactory-sharegpt-v4 --required-output B5.json --expected-output-path /workspace/wynckeliao/longworld/data/releases/p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1/llamafactory/B5.json --dataset-info-key causaltwin_b5 --dataset-file B5.json
+{"ok": true, "release_profile_id": "p59-finance-nvidia-cash-components-64k-probe-1-v1", "source_rows": 3, "outputs": 4, "snapshot_dir": null}

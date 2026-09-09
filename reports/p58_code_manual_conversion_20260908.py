@@ -1,0 +1,56 @@
+"""Manually authorized P58 CodeForge conversion, using frozen existing gates."""
+from pathlib import Path
+import json
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+PROFILE = 'p58-code-transformers-review-ancestry-probe-1-v1'
+BASE = ROOT / 'reports/p58_code_transformers_review_ancestry_v1'
+OUT = ROOT / 'data/releases/p58-code-transformers-review-ancestry-probe-1-v1-promoted-v1'
+LOG = ROOT / 'reports/p58_code_conversion_steps_20260908.json'
+BUNDLE = ROOT / 'configs/p17_codeforge_transformers_failure_recovery_v1_bundle.json'
+
+def main():
+    OUT.mkdir(parents=True, exist_ok=False)
+    steps = []
+    def run(name, script, *args):
+        argv = [sys.executable, str(ROOT / 'scripts' / script), *map(str,args)]
+        log_path = ROOT / f'reports/p58_code_conversion_{name}_20260908.log'
+        with log_path.open('w') as handle:
+            result = subprocess.run(argv, cwd=ROOT, stdout=handle, stderr=subprocess.STDOUT)
+        steps.append({'step':name,'argv':argv,'exit_code':result.returncode,'log':str(log_path)})
+        LOG.write_text(json.dumps(steps,indent=2)+'\n')
+        print(json.dumps(steps[-1]),flush=True)
+        if result.returncode:
+            print(log_path.read_text()[-5000:],flush=True)
+            raise SystemExit(result.returncode)
+    run('select','promote_candidates.py','select',
+        '--candidates',BASE/'audit/accepted.jsonl','--audits',BASE/'audit/audits.jsonl',
+        '--release-profile',PROFILE,'--train-candidates',OUT/'train_candidates.jsonl',
+        '--eval-candidates',OUT/'eval_candidates.jsonl','--train-audits',OUT/'train_audits.jsonl',
+        '--eval-audits',OUT/'eval_audits.jsonl','--receipt',OUT/'release_selection.json')
+    run('candidate_union','promote_candidates.py','candidate-union',
+        '--candidates',OUT/'train_candidates.jsonl',OUT/'eval_candidates.jsonl',
+        '--release-selection',OUT/'release_selection.json','--output',OUT/'candidate_report.json')
+    for split in ['train','eval']:
+        run('promote_'+split,'promote_candidates.py','promote',
+            '--candidates',OUT/f'{split}_candidates.jsonl','--audits',OUT/f'{split}_audits.jsonl',
+            '--output',OUT/f'{split}.jsonl','--episode-bundle',BUNDLE,
+            '--expected-split',split,'--release-selection',OUT/'release_selection.json','--workers','2')
+    run('report','promote_candidates.py','report','--candidate-report',OUT/'candidate_report.json',
+        '--candidates',OUT/'train_candidates.jsonl',OUT/'eval_candidates.jsonl',
+        '--rows',OUT/'train.jsonl',OUT/'eval.jsonl','--output',OUT/'quality_report.json',
+        '--release-selection',OUT/'release_selection.json')
+    run('gate','quality_gate.py','--data',OUT,'--release-profile',PROFILE,
+        '--gate-receipt',OUT/'release_gate_receipt.json')
+    run('b5','export_llamafactory.py','--data',OUT,'--out-dir',OUT/'llamafactory',
+        '--release-root',OUT,'--train-buckets','64k,128k','--conditions','B5',
+        '--seed','0','--release-profile',PROFILE)
+    run('validate_b5','validate_training_export.py','--manifest',OUT/'llamafactory/training_export_manifest.json',
+        '--release-profile',PROFILE,'--expected-transform-revision','longworld-llamafactory-sharegpt-v4',
+        '--required-output','B5.json','--required-output','B5.meta.json','--required-output','dataset_info.json',
+        '--required-output','export_summary.json','--dataset-info-key','causaltwin_b5','--dataset-file','B5.json')
+
+if __name__ == '__main__':
+    main()

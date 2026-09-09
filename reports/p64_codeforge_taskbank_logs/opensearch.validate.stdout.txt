@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "world_id": "89ee9c0c68a72ff11f0bdf061c37347365a3ca16cbef4eae89b6430183f45a23",
+  "source_group_id": "https://github.com/opensearch-project/opensearch-php",
+  "source_episode_count": 6,
+  "eligible_episode_count": 6,
+  "semantic_task_count": 53,
+  "context_count": 13,
+  "accepted_context_count": 11,
+  "context_capacity_counts": {
+    "cap64k": 5,
+    "cap128k": 3,
+    "cap256k": 3
+  },
+  "legacy_exact_band_context_counts": {
+    "64k": 0,
+    "128k": 0,
+    "256k": 1
+  },
+  "max_exact_context_tokens": 316447,
+  "production_eligible": false,
+  "local_training_eligible": false
+}

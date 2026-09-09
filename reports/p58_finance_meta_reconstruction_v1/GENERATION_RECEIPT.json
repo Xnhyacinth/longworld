@@ -1,0 +1,10 @@
+{
+  "source_parent_sha256": "dee73fdc1d0937e698f2d61d5814ef3b3aacf0729fe3a1f77e75c58b6ff3110b",
+  "source_successor_sha256": "7871f9310cc39bb94a465c7f960b538ebbf53ae752ecc1b439e641cebb4f2b5d",
+  "source_bytes_unchanged": true,
+  "profile": "meta.financial-reconstruction.v1",
+  "parent_count": 3,
+  "primary_bucket": "64k",
+  "production_eligible": false,
+  "train_ready": false
+}

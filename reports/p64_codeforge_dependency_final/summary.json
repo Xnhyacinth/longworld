@@ -1,0 +1,87 @@
+{
+  "all_bound_records_and_scope_fit": {
+    "16384": 0,
+    "4096": 0,
+    "8192": 0
+  },
+  "all_oracle_located_heads_fit": {
+    "16384": 50,
+    "4096": 3,
+    "8192": 3
+  },
+  "code_sha256": {
+    "longworld/core/codeforge_taskbank.py": "bbcd4c8fd7f6ce3201d16bca116b3b380ee6d279a79fa9dda56851510b61df42",
+    "longworld/core/taskbank_dependency_audit.py": "47295f90347473d6508cd2df5cc02714c2d51558777e84bb89422c840923931b",
+    "reports/audit_p64_codeforge_dependency.py": "cc595750aa6372de3002a9351d89d29827f0dcafdbc46018e8508183bc4ee1ec"
+  },
+  "contexts": 197,
+  "inputs": {
+    "dprint": {
+      "BUILD_RECEIPT.json": "dd8331fa8d11f30d617e7cb5aef1b016800650c68e2b94bc67dda8532a6ae1d2",
+      "contexts.jsonl": "7039e5d8c0952eb625483095df7afc0d7c6904fffa79942f6e69af46283f31fe",
+      "tasks.jsonl": "30564dea9d936e722e2a7391d32e954497aa7fb8ff69ac22bd3a8a18281ee4dc",
+      "world.json": "37553dcad5e1c7901eed02fdc0dddc03ee1c758f32a8599d25ef31a8809b1547"
+    },
+    "opensearch": {
+      "BUILD_RECEIPT.json": "a03cb642b4a9f1fc581eb58ba2316589d94dbe45d25f33b039db14b5f92acfba",
+      "contexts.jsonl": "7ebe740c38c342ec14bde3baa699482267b04b0748cb8800e405d4eb6e1854f3",
+      "tasks.jsonl": "5f3c5091573cd1f7097e7e5eda7f3d1257a39c72ce8b88d80f0ae33fd74021b1",
+      "world.json": "2f42f8ac5152da249c8a7f1da166fa03a5fe1522858d6d5e83170b5c57593d06"
+    },
+    "oxc": {
+      "BUILD_RECEIPT.json": "d458cb35029bb8f43ed2a7fd19940936ab31aceb073930030ef9683112362a46",
+      "contexts.jsonl": "0f0e2ba184f78a1e4c071832b7fe3eb4206f390080dd6c9f81412e5da8aa3b67",
+      "tasks.jsonl": "d6cc7c276115de12b88830ebe3673f706c6f50c4827188fa1205f9a9df2ea8dc",
+      "world.json": "0853ef80ad822a0b5813a912bfe3f3f720e3f9bf6ed721d7aad6932a1ef93165"
+    },
+    "pulumi": {
+      "BUILD_RECEIPT.json": "44c68a88e69910827163ad0a683ba4dd642c2fce1cc23a7ebf5f390b1dde2490",
+      "contexts.jsonl": "464e8e1e2d9442da0466c8a6dae3ef61591db9502ee6f0f87451dc7c55b3446e",
+      "tasks.jsonl": "a219e5ee9f8403480c542439af44f13afacf9322e96d2b41c5dbaba1a5764a66",
+      "world.json": "87c3a1ba957161d15011d796d2ed47989e063c607b739ddbe0f76d4fe5224b8c"
+    },
+    "ruff": {
+      "BUILD_RECEIPT.json": "5a7f0f31eb4115028eefe36439183dab5d4835b426dbd981210066f9638bb66d",
+      "contexts.jsonl": "f9cd95d6ec96a81edb5c240cb86d6692ee66ff81f2391d05d747602219453f26",
+      "tasks.jsonl": "7b68704d2ee69f0588c7e66056fda048fb178b15578bebc0758415c72ac1db82",
+      "world.json": "ad89b8c60338d8ad57419c5a7376ce7ffb8ad6353bbbcb9911722c4d7effec21"
+    },
+    "transformers": {
+      "BUILD_RECEIPT.json": "51307df0624fde249ec3f677e05b33b66926b6a60ec99c9097706a9777ccd1de",
+      "contexts.jsonl": "50abbdf8476b6cbf25e45682de175c25a38b9f9109d3e860a39c789ad4784e0f",
+      "tasks.jsonl": "f316d78c9645838c885c74e45b749d8c1089dd9eb2b6914d278768782cf53488",
+      "world.json": "c9dbb3149825721d30c1702198474a107cf329b2880d18516903be7ff9392932"
+    },
+    "uv": {
+      "BUILD_RECEIPT.json": "e120122624321643b3d2ccb4bd20a05f7d41c8939611bbfe7e3c2e44378f213f",
+      "contexts.jsonl": "9237b27355ac1dc0ec9223850cc5fb046510e527a3471bc4a6ee3cc5c7908edb",
+      "tasks.jsonl": "1b8e0868b132c6dded710d8485381a29cc8318119f6a3c3afd641635fd34e086",
+      "world.json": "52c48186dd2658709ce64a2f78db12b1959b27a0690e15d4a6dac0cd5e55de04"
+    }
+  },
+  "limits": "Bound records are over-approximate finite-evaluator evidence. Complete-head-only geometry omits graph selection/scope proof. Neither is a minimal alternative proof or model success/failure.",
+  "neural_baselines": "unmeasured",
+  "programs": {
+    "approved_merge_files": 116,
+    "common_successful_ci_checks": 197,
+    "largest_changed_file_set": 197,
+    "merged_files_union": 197,
+    "recovered_ci_checks": 104,
+    "shared_changed_files": 7
+  },
+  "rows": 818,
+  "samples_sha256": "307215392bdf9836ca6f4a3336b96072b4d2c965ad86130710ab7f7370e77023",
+  "schema_version": "longworld.codeforge-support-geometry-audit.v1",
+  "scope": "All bank candidates including later short/overflow SFT exclusions; intersect primary metadata before primary accounting.",
+  "semantic_tasks": 818,
+  "split": {
+    "eval": 151,
+    "train": 667
+  },
+  "strict_verified": 0,
+  "tokenizer": {
+    "asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  }
+}

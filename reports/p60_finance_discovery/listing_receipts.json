@@ -1,0 +1,16 @@
+[
+  {
+    "name": "amd_listing",
+    "url": "https://ir.amd.com/financial-information/sec-filings?form_type=10-K",
+    "status": 200,
+    "bytes": 50892,
+    "sha256": "6d5e649cea2ab6c4a72191b85d7ff7dbc8a9ecb0a0b3371e6185e1f4c133ab42"
+  },
+  {
+    "name": "intel_listing",
+    "url": "https://www.intc.com/filings-reports/annual-reports",
+    "status": 200,
+    "bytes": 61881,
+    "sha256": "ef308beedf1a758a996ff1d6ae28b3fe977c7bddc3111c2ee7340c323755435b"
+  }
+]

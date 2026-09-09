@@ -1,0 +1,111 @@
+worlds=1/1 rows=3 questions=1 rejects=0
+{
+  "schema_version": "p3.0",
+  "data_product": "worldlong_p60_code_pulumi_patch_files_64k_v1",
+  "data_stage": "candidate",
+  "trust_scope": "local_probe",
+  "release_profile_id": "p7-github-source-slice-1-v1",
+  "release_profile_sha256": "9118b164b7be4fc8a8d4f97ac065df2e7d2170b3a312b59bfae9c9fe0e53719c",
+  "n_worlds": 1,
+  "target_promoted_worlds": 1,
+  "n_world_ids": 1,
+  "n_rows": 3,
+  "candidate_row_set_sha256": "c2efe45a7fee9ef8f90ffa8253d6f119493efd8002c4fadb2098c065561cf9fa",
+  "n_questions": 1,
+  "n_question_slots": 1,
+  "n_rejects": 0,
+  "n_attempts": 5,
+  "n_kept_slots": 1,
+  "retention": 0.2,
+  "n_clones": 0,
+  "unique_full_answers": 1,
+  "n_unique_base_tasks": 1,
+  "n_unique_executable_proofs": 1,
+  "n_unique_source_relations": 2,
+  "n_unique_answer_programs": 1,
+  "n_unique_content_hashes": 3,
+  "n_exact_duplicate_rows": 0,
+  "n_topologies": 1,
+  "n_topology_families": 1,
+  "n_canonical_topologies": 1,
+  "canonical_neff": 1.0,
+  "max_canonical_share": 1.0,
+  "mean_boilerplate_token_ratio": 0.0,
+  "mean_pulse_doc_ratio": 0.0,
+  "mean_hard_negative_doc_ratio": 0.003,
+  "mean_real_source_token_ratio": 0.9978,
+  "n_source_grounded_full": 0,
+  "n_source_choice_full": 0,
+  "n_revisitation_full": 0,
+  "n_ratification_full": 0,
+  "n_docket_control_full": 0,
+  "n_deep_dependency_full": 1,
+  "n_long_range_retrieval_full": 0,
+  "by_dependency_class": {
+    "deep_dependency": 1
+  },
+  "mean_evidence_distance": 65224.0,
+  "n_registers": 1,
+  "register_neff": 1.0,
+  "by_register": {
+    "audit_trail": 1
+  },
+  "n_style_clusters": 1,
+  "style_cluster_neff": 1.0,
+  "by_style_cluster": {
+    "audit_trail:json": 1
+  },
+  "mean_near_dup_sentence_ratio": 0.0033,
+  "n_cross_workstream_full": 0,
+  "motif_composition_rate": 0.0,
+  "join_row_share": 0.0,
+  "n_motifs": 1,
+  "n_domains": 1,
+  "planned_worlds_by_domain": {
+    "codeforge": 1
+  },
+  "attempted_worlds_by_domain": {
+    "codeforge": 1
+  },
+  "emitting_worlds_by_domain": {
+    "codeforge": 1
+  },
+  "train_questions": 1,
+  "eval_questions": 0,
+  "train_question_slots": 1,
+  "eval_question_slots": 0,
+  "by_query_type": {
+    "patch_files_review_test_ancestry": 3
+  },
+  "by_view": {
+    "full": 1,
+    "cf": 1,
+    "ordered_artifact_view": 1
+  },
+  "by_length": {
+    "64k": 3
+  },
+  "by_motif": {
+    "patch_files_review_test_ancestry": 3
+  },
+  "by_domain": {
+    "codeforge": 3
+  },
+  "by_topology_family": {
+    "code.real_patch_files_review_test_ancestry": 3
+  },
+  "by_canonical_topology": {
+    "codeforge|patch_files_review_test_ancestry|patch_files_review_test_ancestry|real+real+real+real+real+real+real+real+real+real+real+real+real+real+real+real+real+real+real+real|d6|n20": 1
+  },
+  "reject_reasons": {},
+  "gold_cfr": 1.0,
+  "local_probe_trust_isolation": "non_independent_local_diagnostic",
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "quality_report",
+    "role": "report",
+    "key_id": "probe-report-2fbb800845853561169702f481d8e5ff",
+    "environment": "probe",
+    "digest": "9dfca8db1e63f586d508e7b435f5ea9a96953f43aa2b12a9d9ba353c201f3d31"
+  }
+}

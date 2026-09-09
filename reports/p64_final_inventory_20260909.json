@@ -1,0 +1,110 @@
+{
+  "schema_version": "longworld.p64-final-inventory.v1",
+  "rows": 2486,
+  "canonical_tasks": 2486,
+  "source_worlds": 15,
+  "unique_contexts": 298,
+  "domains": {
+    "finance": 1682,
+    "codeforge": 804
+  },
+  "splits": {
+    "train": {
+      "rows": 1953,
+      "context_token_sum": 258312802,
+      "capacity_bins": {
+        "262144": 750,
+        "131072": 1038,
+        "65536": 165
+      },
+      "exact_numeric_ranges": {
+        "64k": 25,
+        "128k": 4,
+        "256k": 11
+      },
+      "min_context_tokens": 33032,
+      "max_context_tokens": 261680
+    },
+    "eval": {
+      "rows": 533,
+      "context_token_sum": 71291623,
+      "capacity_bins": {
+        "131072": 314,
+        "262144": 191,
+        "65536": 28
+      },
+      "exact_numeric_ranges": {
+        "64k": 0,
+        "128k": 5,
+        "256k": 52
+      },
+      "min_context_tokens": 45741,
+      "max_context_tokens": 259729
+    },
+    "all": {
+      "rows": 2486,
+      "context_token_sum": 329604425,
+      "capacity_bins": {
+        "131072": 1352,
+        "262144": 941,
+        "65536": 193
+      },
+      "exact_numeric_ranges": {
+        "64k": 25,
+        "128k": 9,
+        "256k": 63
+      },
+      "min_context_tokens": 33032,
+      "max_context_tokens": 261680
+    }
+  },
+  "new_canonical_tasks_vs_p63": 1234,
+  "newly_fetched_source_entities": [
+    "Intel",
+    "SiriusXM",
+    "opensearch-project/opensearch-php"
+  ],
+  "newly_represented_vs_p62_qualified_sources": [
+    "Intel",
+    "SiriusXM",
+    "opensearch-project/opensearch-php",
+    "astral-sh/ruff",
+    "oxc-project/oxc"
+  ],
+  "strict_dependency_certified": 0,
+  "gold_blind_latest_table_exact_matches": 518,
+  "single_filing_local_table_routes": 170,
+  "multi_filing_latest_table_scope_mismatches": 348,
+  "old_tasks_geometry_only_strict_candidate_shift": 276,
+  "short_diagnostics_excluded": 13,
+  "full_chat_overflow_rejected": 1,
+  "training_manifest": "/workspace/wynckeliao/longworld/data/sft/p64_primary_training_v2/P64_TRAINING_MANIFEST.json",
+  "training_manifest_sha256": "8e2c0aeb220f2117699af7bfec3cdb355567434dddc26b61b026b1db830ac459",
+  "readonly_snapshot": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/p64-training-snapshots/bb92e3b1c37f482d26d8697cec481dde75dae274a0b7eacca8bcaff20a9bd3bc",
+  "full_chat_token_sum": 330352112,
+  "max_full_chat_tokens": 261954,
+  "local_training_eligible": true,
+  "production_eligible": false,
+  "framework_preprocessing_verified": false,
+  "gpu_training_run": false,
+  "checks": {
+    "new_tests_passed": 75,
+    "ruff": "PASS",
+    "root_signature_and_snapshot_validation": "PASS",
+    "p63_freeze_unchanged": true
+  },
+  "bindings": {
+    "data/candidates/p64_finance_taskbank_v2/BATCH_RECEIPT.json": "f76d81f492c205c1068981ce3844bb354cfd9edc31992b5f75b65d4029bd4da9",
+    "data/candidates/p64_codeforge_sft_v1/BUILD_RECEIPT.json": "6a90bddcf6a96a2654329c35e425efb76c0c5e3af26c4bf0593faf3ac0ae463b",
+    "reports/p64_curriculum_audit_overlay_20260909.jsonl": "e5d88f8f369668b49249bf6520f33d41a0717efa9f830ae1040418aa8b98f6ac"
+  },
+  "retained_p63_tasks": 1252,
+  "unchanged_p63_samples": 744,
+  "recontextualized_p63_tasks": 508,
+  "curriculum_overlay_counts": {
+    "same_filing_local_table_exact_match": 170,
+    "latest_table_exact_match_with_original_scope_mismatch": 348,
+    "reader_unsupported_dependency_unresolved": 1164,
+    "conservative_record_support_not_minimal_proof": 804
+  }
+}

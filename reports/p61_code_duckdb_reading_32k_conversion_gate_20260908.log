@@ -1,0 +1,52 @@
+{
+  "ok": true,
+  "errors": [],
+  "n_rows": 3,
+  "n_worlds_observed": 1,
+  "n_unique_conversations": 3,
+  "n_exact_duplicate_rows": 0,
+  "n_conflicting_answer_prompts": 0,
+  "by_length": {
+    "32k": 3
+  },
+  "by_domain": {
+    "codeforge": 3
+  },
+  "worlds_by_domain": {
+    "codeforge": 1
+  },
+  "exact_64k_rows_by_domain": {
+    "codeforge": 0
+  },
+  "by_motif": {
+    "patch_files_review_test_release_v2": 3
+  },
+  "n_unique_base_tasks": 1,
+  "n_unique_semantic_base_tasks": 1,
+  "n_unique_executable_proofs": 1,
+  "n_unique_source_relations": 2,
+  "n_real_source_relations": 2,
+  "n_hybrid_causal_relations": 2,
+  "n_real_source_families": 1,
+  "n_unique_real_source_workflows": 2,
+  "n_real_base_tasks": 1,
+  "n_real_exact_64k_rows": 0,
+  "real_exact_64k_rows_by_domain": {
+    "codeforge": 0
+  },
+  "real_exact_64k_worlds_by_domain": {
+    "codeforge": 0
+  },
+  "real_worlds_by_split": {
+    "train": 1,
+    "eval": 0
+  },
+  "release_profile_id": "p61-code-duckdb-reading-32k-probe-1-v1",
+  "release_profile_sha256": "82aa2c6a994324903b39dbd6fe8c7f67e3d06f2bee6e5a8e1d126b3388537603",
+  "n_promotion_ready": 3,
+  "n_unique_answer_programs": 1,
+  "retention": 1.0,
+  "mean_boilerplate": 0.0,
+  "mean_pulse": 0.0,
+  "mean_near_dup_sentence_ratio": 0.0037
+}

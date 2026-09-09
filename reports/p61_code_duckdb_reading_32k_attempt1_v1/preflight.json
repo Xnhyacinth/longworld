@@ -1,0 +1,140 @@
+{
+  "job": {
+    "job_id": "attempt1",
+    "repository": "duckdb/duckdb",
+    "seed": 161,
+    "new_admitted_entity_candidate": true,
+    "bundle": "configs/p60_code_duckdb_four_tag_v2_bundle.json",
+    "template": "configs/p16_codeforge_duckdb_failure_recovery_v1.yaml",
+    "query_type": "patch_files_review_test_release_v2",
+    "bands": [
+      "32k"
+    ],
+    "scope": "One native 32k two-cycle reading-v2 attempt; same frozen P60 source/PRs/seed161, no cap search or source switch."
+  },
+  "bundle_sha256": "3ab17cdb2f500e779c8087f541a169182f452d5703a5717b90d82c2c7ab6d3f7",
+  "source_checks": [
+    {
+      "path": "reports/p16_codeforge_duckdb_failure_recovery_sources_v1/duckdb_pr19117_v1.4.1.json",
+      "sha256": "9d71958d152f7563d2fca0aaf2d8f8f464f7c90b75512d643ffd71517e091847",
+      "matches": true,
+      "repository": "https://github.com/duckdb/duckdb"
+    },
+    {
+      "path": "reports/p16_codeforge_duckdb_failure_recovery_sources_v1/duckdb_pr19318_v1.4.2.json",
+      "sha256": "5377fe0662a77a4940e74d4a8a755381e412757393a3662709d4a12ea9650f20",
+      "matches": true,
+      "repository": "https://github.com/duckdb/duckdb"
+    },
+    {
+      "path": "reports/p16_codeforge_duckdb_failure_recovery_sources_v1/duckdb_pr20348_v1.4.4.json",
+      "sha256": "8c335b9f674d93174887830140047a3db3b207715044cb6c8a0b358542e5a1ae",
+      "matches": true,
+      "repository": "https://github.com/duckdb/duckdb"
+    },
+    {
+      "path": "reports/p16_codeforge_duckdb_failure_recovery_sources_v1/duckdb_pr22060_v1.5.3.json",
+      "sha256": "7fed7ee0608732168c50c02dae7bdf52eb305342ee9ce2535ac1b9e08eaa7854",
+      "matches": true,
+      "repository": "https://github.com/duckdb/duckdb"
+    }
+  ],
+  "unique_text_bodies": 850,
+  "exact_unique_source_tokens": 84838,
+  "native_query_types": {
+    "current_state": 1,
+    "fork_join": 1,
+    "delayed_effect": 1,
+    "contradiction": 1,
+    "hidden_bridge": 1,
+    "counterfactual": 1,
+    "rollback_state": 1,
+    "cross_stream": 1,
+    "patch_review_test_ancestry": 3,
+    "patch_files_review_test_ancestry": 3,
+    "patch_files_review_test_release_v2": 3,
+    "failure_recovery_release_trace": 3,
+    "version_selection": 1,
+    "release_supersession_trace": 2,
+    "ci_regression_origin": 2,
+    "source_grounded": 1,
+    "source_choice": 1,
+    "revisitation": 1,
+    "ratification": 1,
+    "docket_control": 1
+  },
+  "selected_query_count": 1,
+  "replay": [
+    {
+      "query_id": "code000161-calyxkit-80:patch_files_review_test_release_v2:2_cycles:release:v1.5.3",
+      "bands": [
+        "32k"
+      ],
+      "full_matches": true,
+      "cf_changes": true,
+      "empty_replay_matches": false,
+      "question_contains_full_answer": false,
+      "has_single_code_per_field_marker": false,
+      "essential_events": 10,
+      "remove_essential_event_changes": {
+        "focal.real_00545": true,
+        "focal.real_00386": true,
+        "focal.real_00575": true,
+        "focal.real_00610": true,
+        "focal.real_00611": true,
+        "focal.real_00779": true,
+        "focal.real_00661": true,
+        "focal.real_00829": true,
+        "focal.real_00848": true,
+        "focal.real_00849": true
+      },
+      "remove_source_workflow_changes": {
+        "git:7958756c92369572": true,
+        "git:2cea5494fcccf7cb": true
+      }
+    }
+  ],
+  "materialization": "shared sampler materialize including causal closure and rendered artifact integrity",
+  "script_sha256": "7aa0091a5dcf61c191a7c8cbcb354381479688b6a22091b9de806928b09cc9ae",
+  "limitation": "Native no-evidence replay and exact answer-in-question checks are not a measured LLM question-only evaluation. Source capacity is not packed candidate capacity.",
+  "preflight_ok": true,
+  "readable_path_checks": [
+    {
+      "query_id": "code000161-calyxkit-80:patch_files_review_test_release_v2:2_cycles:release:v1.5.3",
+      "n_output_paths": 4,
+      "all_paths_visible_in_source": true,
+      "no_digest_output": true,
+      "paths": [
+        "src/include/duckdb.h",
+        "third_party/utf8proc/utf8proc_wrapper.cpp",
+        "src/common/enum_util.cpp",
+        "src/include/duckdb/common/enum_util.hpp"
+      ]
+    }
+  ],
+  "reading_output_contract_checks": [
+    {
+      "query_id": "code000161-calyxkit-80:patch_files_review_test_release_v2:2_cycles:release:v1.5.3",
+      "cycles": [
+        {
+          "tag_visible": true,
+          "review_visible_casefold": true,
+          "test_name_visible": true,
+          "test_result_visible": true
+        },
+        {
+          "tag_visible": true,
+          "review_visible_casefold": true,
+          "test_name_visible": true,
+          "test_result_visible": true
+        }
+      ],
+      "no_ancestry_target": true,
+      "all_output_identifier_tokens_visible": true,
+      "cf_event_kind": "ci_run",
+      "cf_visible_fact_changed": true,
+      "cf_replay_matches_changed_answer": true
+    }
+  ],
+  "existing_query_comparison": []
+}

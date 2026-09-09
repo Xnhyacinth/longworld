@@ -1,0 +1,12 @@
+# Local P64 primary handoff. Default separate Finance; CodeForge and combined dataset aliases are manifest-bound.
+model_name_or_path: Qwen/Qwen3.5-4B
+model_revision: a7b0d22b993d71000cf2eadfb37222a67cee521e
+trust_remote_code: false
+stage: sft
+dataset: p64_finance_train
+template: qwen3_5_nothink
+cutoff_len: 262144
+packing: false
+neat_packing: false
+train_on_prompt: false
+val_size: 0.0

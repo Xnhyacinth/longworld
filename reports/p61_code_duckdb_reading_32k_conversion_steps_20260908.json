@@ -1,0 +1,180 @@
+[
+  {
+    "step": "select",
+    "argv": [
+      "/workspace/wynckeliao/longworld-worlds/.venv/bin/python",
+      "/workspace/wynckeliao/longworld-worlds/scripts/promote_candidates.py",
+      "select",
+      "--candidates",
+      "/workspace/wynckeliao/longworld-worlds/reports/p61_code_duckdb_reading_32k_attempt1_v1/audit/accepted.jsonl",
+      "--audits",
+      "/workspace/wynckeliao/longworld-worlds/reports/p61_code_duckdb_reading_32k_attempt1_v1/audit/audits.jsonl",
+      "--release-profile",
+      "p61-code-duckdb-reading-32k-probe-1-v1",
+      "--train-candidates",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/train_candidates.jsonl",
+      "--eval-candidates",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/eval_candidates.jsonl",
+      "--train-audits",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/train_audits.jsonl",
+      "--eval-audits",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/eval_audits.jsonl",
+      "--receipt",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/release_selection.json"
+    ],
+    "exit_code": 0,
+    "log": "/workspace/wynckeliao/longworld-worlds/reports/p61_code_duckdb_reading_32k_conversion_select_20260908.log"
+  },
+  {
+    "step": "candidate_union",
+    "argv": [
+      "/workspace/wynckeliao/longworld-worlds/.venv/bin/python",
+      "/workspace/wynckeliao/longworld-worlds/scripts/promote_candidates.py",
+      "candidate-union",
+      "--candidates",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/train_candidates.jsonl",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/eval_candidates.jsonl",
+      "--release-selection",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/release_selection.json",
+      "--output",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/candidate_report.json"
+    ],
+    "exit_code": 0,
+    "log": "/workspace/wynckeliao/longworld-worlds/reports/p61_code_duckdb_reading_32k_conversion_candidate_union_20260908.log"
+  },
+  {
+    "step": "promote_train",
+    "argv": [
+      "/workspace/wynckeliao/longworld-worlds/.venv/bin/python",
+      "/workspace/wynckeliao/longworld-worlds/scripts/promote_candidates.py",
+      "promote",
+      "--candidates",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/train_candidates.jsonl",
+      "--audits",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/train_audits.jsonl",
+      "--output",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/train.jsonl",
+      "--episode-bundle",
+      "/workspace/wynckeliao/longworld-worlds/configs/p60_code_duckdb_four_tag_v2_bundle.json",
+      "--expected-split",
+      "train",
+      "--release-selection",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/release_selection.json",
+      "--workers",
+      "2"
+    ],
+    "exit_code": 0,
+    "log": "/workspace/wynckeliao/longworld-worlds/reports/p61_code_duckdb_reading_32k_conversion_promote_train_20260908.log"
+  },
+  {
+    "step": "promote_eval",
+    "argv": [
+      "/workspace/wynckeliao/longworld-worlds/.venv/bin/python",
+      "/workspace/wynckeliao/longworld-worlds/scripts/promote_candidates.py",
+      "promote",
+      "--candidates",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/eval_candidates.jsonl",
+      "--audits",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/eval_audits.jsonl",
+      "--output",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/eval.jsonl",
+      "--episode-bundle",
+      "/workspace/wynckeliao/longworld-worlds/configs/p60_code_duckdb_four_tag_v2_bundle.json",
+      "--expected-split",
+      "eval",
+      "--release-selection",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/release_selection.json",
+      "--workers",
+      "2"
+    ],
+    "exit_code": 0,
+    "log": "/workspace/wynckeliao/longworld-worlds/reports/p61_code_duckdb_reading_32k_conversion_promote_eval_20260908.log"
+  },
+  {
+    "step": "report",
+    "argv": [
+      "/workspace/wynckeliao/longworld-worlds/.venv/bin/python",
+      "/workspace/wynckeliao/longworld-worlds/scripts/promote_candidates.py",
+      "report",
+      "--candidate-report",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/candidate_report.json",
+      "--candidates",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/train_candidates.jsonl",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/eval_candidates.jsonl",
+      "--rows",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/train.jsonl",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/eval.jsonl",
+      "--output",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/quality_report.json",
+      "--release-selection",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/release_selection.json"
+    ],
+    "exit_code": 0,
+    "log": "/workspace/wynckeliao/longworld-worlds/reports/p61_code_duckdb_reading_32k_conversion_report_20260908.log"
+  },
+  {
+    "step": "gate",
+    "argv": [
+      "/workspace/wynckeliao/longworld-worlds/.venv/bin/python",
+      "/workspace/wynckeliao/longworld-worlds/scripts/quality_gate.py",
+      "--data",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1",
+      "--release-profile",
+      "p61-code-duckdb-reading-32k-probe-1-v1",
+      "--gate-receipt",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/release_gate_receipt.json"
+    ],
+    "exit_code": 0,
+    "log": "/workspace/wynckeliao/longworld-worlds/reports/p61_code_duckdb_reading_32k_conversion_gate_20260908.log"
+  },
+  {
+    "step": "b5",
+    "argv": [
+      "/workspace/wynckeliao/longworld-worlds/.venv/bin/python",
+      "/workspace/wynckeliao/longworld-worlds/scripts/export_llamafactory.py",
+      "--data",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1",
+      "--out-dir",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/llamafactory",
+      "--release-root",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1",
+      "--train-buckets",
+      "32k",
+      "--conditions",
+      "B5",
+      "--seed",
+      "0",
+      "--release-profile",
+      "p61-code-duckdb-reading-32k-probe-1-v1"
+    ],
+    "exit_code": 0,
+    "log": "/workspace/wynckeliao/longworld-worlds/reports/p61_code_duckdb_reading_32k_conversion_b5_20260908.log"
+  },
+  {
+    "step": "validate_b5",
+    "argv": [
+      "/workspace/wynckeliao/longworld-worlds/.venv/bin/python",
+      "/workspace/wynckeliao/longworld-worlds/scripts/validate_training_export.py",
+      "--manifest",
+      "/workspace/wynckeliao/longworld-worlds/data/releases/p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1/llamafactory/training_export_manifest.json",
+      "--release-profile",
+      "p61-code-duckdb-reading-32k-probe-1-v1",
+      "--expected-transform-revision",
+      "longworld-llamafactory-sharegpt-v4",
+      "--required-output",
+      "B5.json",
+      "--required-output",
+      "B5.meta.json",
+      "--required-output",
+      "dataset_info.json",
+      "--required-output",
+      "export_summary.json",
+      "--dataset-info-key",
+      "causaltwin_b5",
+      "--dataset-file",
+      "B5.json"
+    ],
+    "exit_code": 0,
+    "log": "/workspace/wynckeliao/longworld-worlds/reports/p61_code_duckdb_reading_32k_conversion_validate_b5_20260908.log"
+  }
+]

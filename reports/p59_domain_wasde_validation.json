@@ -1,0 +1,18 @@
+{
+  "wrong_unit": {
+    "rejected": true,
+    "reason": "wrong units"
+  },
+  "wrong_marketing_year": {
+    "rejected": true,
+    "reason": "wrong marketing-year columns"
+  },
+  "duplicate_numeric_row": {
+    "rejected": true,
+    "reason": "missing or ambiguous operand: ending_stocks"
+  },
+  "unreconciled_single_cell_change": {
+    "rejected": true,
+    "reason": "reported supply identity does not reconcile: Jun"
+  }
+}

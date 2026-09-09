@@ -1,0 +1,18 @@
+{
+  "schema_version": "longworld.p61-code-reading32-job.v1",
+  "jobs": [
+    {
+      "job_id": "attempt1",
+      "repository": "duckdb/duckdb",
+      "seed": 161,
+      "new_admitted_entity_candidate": true,
+      "bundle": "configs/p60_code_duckdb_four_tag_v2_bundle.json",
+      "template": "configs/p16_codeforge_duckdb_failure_recovery_v1.yaml",
+      "query_type": "patch_files_review_test_release_v2",
+      "bands": [
+        "32k"
+      ],
+      "scope": "One native 32k two-cycle reading-v2 attempt; same frozen P60 source/PRs/seed161, no cap search or source switch."
+    }
+  ]
+}

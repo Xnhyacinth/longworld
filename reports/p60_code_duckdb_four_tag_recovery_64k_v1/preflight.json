@@ -1,0 +1,120 @@
+{
+  "job": {
+    "job_id": "duckdb_four_tag_recovery_64k",
+    "repository": "duckdb/duckdb",
+    "seed": 161,
+    "new_admitted_entity_candidate": true,
+    "bundle": "configs/p60_code_duckdb_four_tag_v1_bundle.json",
+    "template": "configs/p16_codeforge_duckdb_failure_recovery_v1.yaml",
+    "query_type": "failure_recovery_release_trace",
+    "bands": [
+      "64k"
+    ],
+    "identity_reason": "Historical DuckDB template reused Pulumi seed160; seed161 is unused by existing qualified CodeForge products, yaml seed declarations and live seed-start commands. New repo/source identity, not repeated same source under a new seed."
+  },
+  "bundle_sha256": "25020baa17bd2eb90157bc9b464acc72fced92b01ad5bd9d9051e9f3faa8b975",
+  "source_checks": [
+    {
+      "path": "reports/p16_codeforge_duckdb_failure_recovery_sources_v1/duckdb_pr19117_v1.4.1.json",
+      "sha256": "9d71958d152f7563d2fca0aaf2d8f8f464f7c90b75512d643ffd71517e091847",
+      "matches": true,
+      "repository": "https://github.com/duckdb/duckdb"
+    },
+    {
+      "path": "reports/p16_codeforge_duckdb_failure_recovery_sources_v1/duckdb_pr19318_v1.4.2.json",
+      "sha256": "5377fe0662a77a4940e74d4a8a755381e412757393a3662709d4a12ea9650f20",
+      "matches": true,
+      "repository": "https://github.com/duckdb/duckdb"
+    },
+    {
+      "path": "reports/p16_codeforge_duckdb_failure_recovery_sources_v1/duckdb_pr20348_v1.4.4.json",
+      "sha256": "8c335b9f674d93174887830140047a3db3b207715044cb6c8a0b358542e5a1ae",
+      "matches": true,
+      "repository": "https://github.com/duckdb/duckdb"
+    },
+    {
+      "path": "reports/p16_codeforge_duckdb_failure_recovery_sources_v1/duckdb_pr22425_v1.5.3.json",
+      "sha256": "e135277bed9ae35dca8302cd1e6bd370abda5316c048beabfc217ac4811228c9",
+      "matches": true,
+      "repository": "https://github.com/duckdb/duckdb"
+    }
+  ],
+  "unique_text_bodies": 1005,
+  "exact_unique_source_tokens": 132394,
+  "native_query_types": {
+    "current_state": 1,
+    "fork_join": 1,
+    "delayed_effect": 1,
+    "contradiction": 1,
+    "hidden_bridge": 1,
+    "counterfactual": 1,
+    "rollback_state": 1,
+    "cross_stream": 1,
+    "patch_review_test_ancestry": 3,
+    "failure_recovery_release_trace": 3,
+    "version_selection": 1,
+    "release_supersession_trace": 2,
+    "ci_regression_origin": 2,
+    "source_grounded": 1,
+    "source_choice": 1,
+    "revisitation": 1,
+    "ratification": 1,
+    "docket_control": 1
+  },
+  "selected_query_count": 1,
+  "replay": [
+    {
+      "query_id": "code000161-calyxkit-80:failure_recovery_release_trace:4_cycles:release:v1.5.3",
+      "bands": [
+        "64k"
+      ],
+      "full_matches": true,
+      "cf_changes": true,
+      "empty_replay_matches": false,
+      "question_contains_full_answer": false,
+      "has_single_code_per_field_marker": false,
+      "essential_events": 28,
+      "remove_essential_event_changes": {
+        "focal.real_00004": true,
+        "focal.real_00027": true,
+        "focal.real_00091": true,
+        "focal.real_00006": true,
+        "focal.real_00147": true,
+        "focal.real_00188": true,
+        "focal.real_00189": true,
+        "focal.real_00192": true,
+        "focal.real_00209": true,
+        "focal.real_00249": true,
+        "focal.real_00295": true,
+        "focal.real_00310": true,
+        "focal.real_00324": true,
+        "focal.real_00325": true,
+        "focal.real_00326": true,
+        "focal.real_00343": true,
+        "focal.real_00545": true,
+        "focal.real_00386": true,
+        "focal.real_00583": true,
+        "focal.real_00610": true,
+        "focal.real_00611": true,
+        "focal.real_00745": true,
+        "focal.real_00785": true,
+        "focal.real_00878": true,
+        "focal.real_00766": true,
+        "focal.real_00977": true,
+        "focal.real_01003": true,
+        "focal.real_01004": true
+      },
+      "remove_source_workflow_changes": {
+        "git:52c4878cf945d8d4": true,
+        "git:0d2f279d18b42d3d": true,
+        "git:2cea5494fcccf7cb": true,
+        "git:ee923947dcd3f44c": true
+      }
+    }
+  ],
+  "materialization": "shared sampler materialize including causal closure and rendered artifact integrity",
+  "script_sha256": "51cc265fc1d59012ba135df490468e5c14945796883717a24c84bb6a1b8e4e68",
+  "limitation": "Native no-evidence replay and exact answer-in-question checks are not a measured LLM question-only evaluation. Source capacity is not packed candidate capacity.",
+  "preflight_ok": true,
+  "existing_query_comparison": []
+}

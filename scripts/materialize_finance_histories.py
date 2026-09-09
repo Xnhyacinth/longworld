@@ -32,6 +32,7 @@ from longworld.core.financehistory import (
     extract_sec_financial_filings,
     MICRON_DUAL_PARTITION_PROGRAM,
     NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM,
+    CASH_COMPONENTS_PROGRAM,
 )
 from longworld.core.issuerfilingworkflow import (
     MAX_ISSUER_IR_MANIFEST_BYTES,
@@ -224,7 +225,7 @@ def materialize(config_path: Path, output_dir: Path) -> dict[str, Any]:
     cumulative_errors = (
         []
         if answer_program_id
-        in {NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM, MICRON_DUAL_PARTITION_PROGRAM}
+        in {NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM, MICRON_DUAL_PARTITION_PROGRAM, CASH_COMPONENTS_PROGRAM}
         else audit_cumulative_history(rows)
     )
     if not all(audit and all(audit.values()) for audit in audits) or cumulative_errors:

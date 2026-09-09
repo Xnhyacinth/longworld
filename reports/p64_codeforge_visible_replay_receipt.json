@@ -1,0 +1,48 @@
+{
+  "status": "PASS",
+  "scope": "same finite oracle replayed on only compact reader fields; not an independent scientific quality audit",
+  "repositories": [
+    {
+      "repository": "ruff",
+      "checked_tasks": 128,
+      "checked_contexts": 31,
+      "rendered_only_answer_matches": true
+    },
+    {
+      "repository": "oxc",
+      "checked_tasks": 282,
+      "checked_contexts": 80,
+      "rendered_only_answer_matches": true
+    },
+    {
+      "repository": "dprint",
+      "checked_tasks": 47,
+      "checked_contexts": 12,
+      "rendered_only_answer_matches": true
+    },
+    {
+      "repository": "uv",
+      "checked_tasks": 98,
+      "checked_contexts": 21,
+      "rendered_only_answer_matches": true
+    },
+    {
+      "repository": "pulumi",
+      "checked_tasks": 101,
+      "checked_contexts": 20,
+      "rendered_only_answer_matches": true
+    },
+    {
+      "repository": "transformers",
+      "checked_tasks": 109,
+      "checked_contexts": 22,
+      "rendered_only_answer_matches": true
+    },
+    {
+      "repository": "opensearch",
+      "checked_tasks": 53,
+      "checked_contexts": 11,
+      "rendered_only_answer_matches": true
+    }
+  ]
+}

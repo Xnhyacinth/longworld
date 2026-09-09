@@ -1,0 +1,60 @@
+{
+  "schema_version": "longworld.p58-domain-nasa-caib-preflight.v1",
+  "data_root": "data/p58_domain_nasa_caib_v1",
+  "frozen_at": "2026-09-08",
+  "tokenizer": "data/models/Qwen3.5-4B/tokenizer.json",
+  "sources": [
+    {
+      "file": "volume1.pdf",
+      "url": "https://www.nasa.gov/wp-content/uploads/static/history/columbia/reports/CAIBreportv1.pdf",
+      "bytes": 8229281,
+      "sha256": "2f1aca1f35a0c507ac930c5cee6c578fb549372234c700f68ffb64f462cf433b"
+    },
+    {
+      "file": "ntrs_volume1.pdf",
+      "url": "https://ntrs.nasa.gov/api/citations/20030066167/downloads/20030066167.pdf",
+      "bytes": 180234092,
+      "sha256": "29385de4ae51ec96c4efa191d132f16e1e3d8c3bc8a12f092fb698300e493928"
+    },
+    {
+      "file": "report.pdf",
+      "url": "https://www.nasa.gov/wp-content/uploads/static/history/columbia/reports/CAIBreportv3.pdf",
+      "bytes": 30641809,
+      "sha256": "dd55aa829f911b5dc99eb196394438223a84accaf6dc4075360e7e31495e42f5"
+    },
+    {
+      "file": "ntrs_metadata.json",
+      "url": "https://ntrs.nasa.gov/api/citations/20030066167",
+      "bytes": 6335,
+      "sha256": "7675f7e9dd474c64f58ee19a81ada200574d44ea365c0430dfb14d4510b001d1"
+    },
+    {
+      "file": "rtf_final.pdf",
+      "url": "https://ntrs.nasa.gov/api/citations/20050201800/downloads/20050201800.pdf",
+      "bytes": 4969375,
+      "sha256": "4b24d875f869d9382edcdff6eb18d5e24a09d93d015f8ad5b6d6bdb4bcf9c65e"
+    },
+    {
+      "file": "rtf_metadata.json",
+      "url": "https://ntrs.nasa.gov/api/citations/20050201800",
+      "bytes": 4006,
+      "sha256": "93dab5e79f0ed4d3b0e71b039096a3bb32d4e2140d8a4eb848fe18d324d4b0e8"
+    },
+    {
+      "file": "rights.html",
+      "url": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+      "bytes": 310583,
+      "sha256": "e6f1c9c08434a817a853c7caaa1ed091ad1befc026c8b329bffd8319017e976c"
+    }
+  ],
+  "candidate_policy": "diagnostics only; no shared adapter or dense audit; zero inventory",
+  "task": "Original requirement and final majority versus minority assessment for external tank debris shedding",
+  "proof_design": [
+    "CAIB original R3.2-1",
+    "NASA implementation and RTF TG interpretation",
+    "June 27 2005 majority assessment",
+    "technical-panel minority opinion"
+  ],
+  "source_dependency_question": "Is the original CAIB necessary once the RTF report repeats its requirement?",
+  "tokenizer_sha256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42"
+}

@@ -1,0 +1,44 @@
+{
+  "schema_version": "longworld.p59-clinical-shortcut-preflight.v1",
+  "source_manifest_sha256": "fc8574c338903aa78a2d76228ab57ca1604b9b2ac94c0268c9e6c9834dd888a5",
+  "candidate_sha256": "9d47c3c09c8c7578eadb19832e1dee08b29337927e89a661099fa0871eb97c87",
+  "task_audit": {
+    "audit": {
+      "counterfactual_changes_answer": true,
+      "counterfactual_replay_sufficient": true,
+      "essential_single_doc_insufficient": true,
+      "essential_surface_gold_free": true,
+      "essential_text_grounded": true,
+      "receipt_binding_valid": true,
+      "remove_one_fails": true,
+      "source_attestation_verified": true,
+      "strict_replay_sufficient": true
+    },
+    "candidate_sha256": "9d47c3c09c8c7578eadb19832e1dee08b29337927e89a661099fa0871eb97c87",
+    "complete_world": false,
+    "data_stage": "candidate_task_audit",
+    "generation_integration": "disabled",
+    "n": 1,
+    "production_eligible": false,
+    "promoted": false,
+    "promotion_eligible": false,
+    "promotion_status": "ignored_non_world_candidate",
+    "schema_version": "longworld.clinical-task-audit.v2",
+    "signed": false,
+    "source_attestation_verified": true,
+    "source_manifest_sha256": "fc8574c338903aa78a2d76228ab57ca1604b9b2ac94c0268c9e6c9834dd888a5",
+    "train_ready": false
+  },
+  "full_projected_source_join_tokens": 3108,
+  "essential_surface_join_tokens": 199,
+  "per_source_tokens": {
+    "clinical_trial": 316,
+    "fda_application": 92,
+    "fda_label": 2698
+  },
+  "classification": "short_window_integration_candidate",
+  "strict_long_dependency": false,
+  "complete_world": false,
+  "qualified_training_rows": 0,
+  "note": "All source-projected text fits a 4K context. Existing executable strict_replay_sufficient means deterministic replay only, not strict_long_dependency."
+}

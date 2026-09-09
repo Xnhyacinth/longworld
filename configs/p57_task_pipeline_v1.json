@@ -160,6 +160,74 @@
       "auto_promote": false,
       "production_eligible": false,
       "already_promoted": true
+    },
+    {
+      "job_id": "finance-meta-reconstruction-v1",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/meta/local_probe_trust.json",
+      "generate_script": "reports/p58_finance_meta_reconstruction_generate.py",
+      "generate_config": "configs/p58_finance_meta_reconstruction_v1.json",
+      "parents_dir": "reports/p58_finance_meta_reconstruction_v1/parents",
+      "projected_dir": "reports/p58_finance_meta_reconstruction_v1/projected",
+      "primary_buckets": ["64k"],
+      "auto_promote": false,
+      "production_eligible": false,
+      "already_promoted": true
+    },
+    {
+      "job_id": "finance-alphabet-reconstruction-p59-v1",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/alphabet/local_probe_trust.json",
+      "generate_script": "reports/p59_finance_reconstruction_generate.py",
+      "generate_config": "configs/p59_finance_alphabet_reconstruction_v1.json",
+      "parents_dir": "reports/p59_finance_alphabet_reconstruction_v1/parents",
+      "projected_dir": "reports/p59_finance_alphabet_reconstruction_v1/projected",
+      "primary_buckets": [
+        "64k"
+      ],
+      "auto_promote": false,
+      "production_eligible": false,
+      "already_promoted": true
+    },
+    {
+      "job_id": "finance-micron-reconstruction-p59-v1",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/micron/local_probe_trust.json",
+      "generate_script": "reports/p59_finance_reconstruction_generate.py",
+      "generate_config": "configs/p59_finance_micron_reconstruction_v1.json",
+      "parents_dir": "reports/p59_finance_micron_reconstruction_v1/parents",
+      "projected_dir": "reports/p59_finance_micron_reconstruction_v1/projected",
+      "primary_buckets": [
+        "64k"
+      ],
+      "auto_promote": false,
+      "production_eligible": false,
+      "already_promoted": true
+    },
+    {
+      "job_id": "finance-nvidia-reconstruction-p59-v1",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/nvidia/local_probe_trust.json",
+      "generate_script": "reports/p59_finance_reconstruction_generate.py",
+      "generate_config": "configs/p59_finance_nvidia_reconstruction_v1.json",
+      "parents_dir": "reports/p59_finance_nvidia_reconstruction_v1/parents",
+      "projected_dir": "reports/p59_finance_nvidia_reconstruction_v1/projected",
+      "primary_buckets": [
+        "64k"
+      ],
+      "auto_promote": false,
+      "production_eligible": false,
+      "already_promoted": true
+    },
+    {
+      "job_id": "finance-amd-inline-cash-components-p60-v1",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/amd/local_probe_trust.json",
+      "generate_script": "reports/p60_finance_amd_generate.py",
+      "generate_config": "configs/p60_finance_amd_inline_cash_components_v1.json",
+      "parents_dir": "reports/p60_finance_amd_inline_cash_components_v1/parents",
+      "projected_dir": "reports/p60_finance_amd_inline_cash_components_v1/projected",
+      "primary_buckets": [
+        "64k"
+      ],
+      "auto_promote": false,
+      "production_eligible": false,
+      "already_promoted": true
     }
   ]
 }

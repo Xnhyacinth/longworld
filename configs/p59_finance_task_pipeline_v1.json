@@ -1,0 +1,52 @@
+{
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "python": "/workspace/wynckeliao/longworld-worlds/.venv/bin/python",
+  "hf_home": "/workspace/wynckeliao/.cache/huggingface",
+  "minilm_model_id": "sentence-transformers/all-MiniLM-L6-v2",
+  "minilm_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+  "ledger": "reports/p59_finance_pipeline/ledger.jsonl",
+  "jobs": [
+    {
+      "job_id": "finance-alphabet-reconstruction-p59-v1",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/alphabet/local_probe_trust.json",
+      "generate_script": "reports/p59_finance_reconstruction_generate.py",
+      "generate_config": "configs/p59_finance_alphabet_reconstruction_v1.json",
+      "parents_dir": "reports/p59_finance_alphabet_reconstruction_v1/parents",
+      "projected_dir": "reports/p59_finance_alphabet_reconstruction_v1/projected",
+      "primary_buckets": [
+        "64k"
+      ],
+      "auto_promote": false,
+      "production_eligible": false,
+      "already_promoted": true
+    },
+    {
+      "job_id": "finance-micron-reconstruction-p59-v1",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/micron/local_probe_trust.json",
+      "generate_script": "reports/p59_finance_reconstruction_generate.py",
+      "generate_config": "configs/p59_finance_micron_reconstruction_v1.json",
+      "parents_dir": "reports/p59_finance_micron_reconstruction_v1/parents",
+      "projected_dir": "reports/p59_finance_micron_reconstruction_v1/projected",
+      "primary_buckets": [
+        "64k"
+      ],
+      "auto_promote": false,
+      "production_eligible": false,
+      "already_promoted": true
+    },
+    {
+      "job_id": "finance-nvidia-reconstruction-p59-v1",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/nvidia/local_probe_trust.json",
+      "generate_script": "reports/p59_finance_reconstruction_generate.py",
+      "generate_config": "configs/p59_finance_nvidia_reconstruction_v1.json",
+      "parents_dir": "reports/p59_finance_nvidia_reconstruction_v1/parents",
+      "projected_dir": "reports/p59_finance_nvidia_reconstruction_v1/projected",
+      "primary_buckets": [
+        "64k"
+      ],
+      "auto_promote": false,
+      "production_eligible": false,
+      "already_promoted": true
+    }
+  ]
+}

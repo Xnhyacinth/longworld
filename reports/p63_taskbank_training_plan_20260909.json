@@ -1,0 +1,105 @@
+{
+  "schema_version": "longworld.p63-matched-training-plan.v1",
+  "status": "design_only_no_gpu_or_model_results",
+  "claim": "Additional semantic tasks per fixed source/context improve transfer beyond repetition at matched exposure and compute.",
+  "source_catalog": "configs/p63_finance_taskbank_source_catalog_v1.json",
+  "arms": [
+    {
+      "id": "base",
+      "training": "none; same frozen checkpoint"
+    },
+    {
+      "id": "single",
+      "training": "one preselected canonical task per eligible world/context stratum, repeated"
+    },
+    {
+      "id": "multi",
+      "training": "multiple semantic tasks from the same token-matched strata"
+    }
+  ],
+  "paired_training_seeds": [
+    0,
+    1,
+    2
+  ],
+  "matching": {
+    "stratum": [
+      "world_instance_id",
+      "context_sha256",
+      "full_chat_prefix_nonpadding_token_count",
+      "assistant_target_token_count"
+    ],
+    "source_schedule": "identical issuer/context ordering and occurrence counts",
+    "multi_task_K": "up to 8, actual common K >=2 frozen from training-only feasibility before evaluation",
+    "single_selection": "deterministic seed selection with family balancing, never eval outcomes",
+    "budget": "derive exact tokens and steps from frozen paired schedule; no numerical budget/results assigned here",
+    "must_match": [
+      "real input tokens",
+      "supervised target tokens",
+      "padded batch geometry",
+      "optimizer steps",
+      "gradient accumulation",
+      "attention backend",
+      "trainable parameters",
+      "checkpoint and chat template",
+      "learning-rate schedule and stopping rule"
+    ],
+    "must_measure": [
+      "nonpadding input/target tokens",
+      "allocated tokens",
+      "accelerator time",
+      "throughput"
+    ],
+    "no_support_action": "Do not train/claim this comparison if matching support is insufficient; no text padding or question editing to force matches.",
+    "scope_limit": "Controlled matched cohort is not automatically representative of the complete task bank."
+  },
+  "evaluation_cells": [
+    {
+      "id": "issuer_transfer",
+      "split": "new five-issuer train -> AMD eval",
+      "limitation": "AMD already in legacy train; isolated batch only, one issuer is a case study, not population-wide generalization."
+    },
+    {
+      "id": "snapshot_transfer",
+      "split": "future separate source-snapshot protocol with disjoint source/vintage/content components",
+      "status": "not established by current catalog; no ID-only pseudo instances"
+    },
+    {
+      "id": "program_composition",
+      "holdout": "aggregate(sum, filter(collect(...))) skeleton with eligible source-bound tasks; keep primitive filter/aggregate in train",
+      "rule": "hold all matching structure/argument-role cases and variants, not question hashes"
+    },
+    {
+      "id": "joint_source_and_composition",
+      "split": "AMD plus held-out program composition",
+      "rule": "report separately from single-axis cells"
+    }
+  ],
+  "metrics": {
+    "primary": "structured JSON exact match under compiler unit/period/tie/rounding contract",
+    "secondary": [
+      "family-macro accuracy",
+      "invalid-output rate",
+      "sign/unit/period/operand/tie component errors"
+    ],
+    "diagnostics": [
+      "question-only baseline",
+      "source-evidence-only baseline"
+    ],
+    "uncertainty": "report paired seed variation; cluster related task views; one AMD issuer cannot support cross-issuer confidence intervals"
+  },
+  "prerequisites": [
+    "completed per-issuer --validate receipts",
+    "explicit compatible trainer messages adapter; old B5/v4 is not automatically compatible",
+    "actual model/checkpoint availability and full-message sequence-limit check",
+    "freeze optimizer/precision/adapters/hyperparameters and budget before AMD evaluation",
+    "source-rights and independent KMS/production/package approval remain separate unresolved release gates"
+  ],
+  "results": null,
+  "gpu_actions_executed": false,
+  "evaluation_decoding": {
+    "policy": "same deterministic decoding policy and frozen generation cap for every arm",
+    "format": "value-free output-schema instruction shared across arms; no gold values or answer-dependent array lengths",
+    "parsing": "predeclared strict JSON parsing and compiler semantics, not post-hoc answer substring extraction"
+  }
+}

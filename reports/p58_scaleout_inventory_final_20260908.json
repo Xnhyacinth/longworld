@@ -1,0 +1,81 @@
+{
+  "baseline_path": "/workspace/wynckeliao/longworld-worlds/reports/p58_inventory_audit_20260908.json",
+  "baseline_sha256": "1da69b072fe1bdc660ac6df5ce00e647f6b14740f987a19a78fd147cab7fdb5a",
+  "current_physical_local_probe_inventory": {
+    "b5_estimated_tokens": 10859485,
+    "b5_examples": 161,
+    "eval_exact_context_tokens": 682032,
+    "eval_rows": 18,
+    "production_eligible_rows": 0,
+    "products": 22,
+    "train_exact_context_tokens": 13077132,
+    "train_rows": 222
+  },
+  "delta": {
+    "b5_estimated_tokens": 788172,
+    "b5_examples": 9,
+    "exact_context_tokens": 785331,
+    "new_domains": 0,
+    "new_source_entities": 0,
+    "new_tasks_on_existing_sources": 2,
+    "products": 2,
+    "train_rows": 9
+  },
+  "limitations": [
+    "Existing gate-qualified local diagnostic products, not a new signed union or production release.",
+    "Exact-token values are summed from hash-verified rows, not fresh retokenization.",
+    "Conversion validators separately verified new export bindings; this script checks hashes and counts, not HMAC signatures.",
+    "Baseline IETF shortcut findings remain unresolved; the inventory is not certified shortcut-free.",
+    "Cross-product near-dedup and split leakage were not rerun.",
+    "World IDs and view/length counts do not establish independent source entities."
+  ],
+  "products": [
+    {
+      "b5_estimated_tokens": 196563,
+      "b5_examples": 3,
+      "eval_rows": 0,
+      "exact_context_tokens": 195966,
+      "gate_ok": true,
+      "hash_checks": {
+        "eval.jsonl": true,
+        "llamafactory/B5.json": true,
+        "llamafactory/B5.meta.json": true,
+        "llamafactory/dataset_info.json": true,
+        "llamafactory/export_summary.json": true,
+        "quality_report.json": true,
+        "train.jsonl": true
+      },
+      "product": "p58-finance-meta-reconstruction-64k-probe-1-v1-promoted-v1",
+      "production_eligible": false,
+      "release_profile_sha256": "58ae9417a1c601467ce7ad16cfdb2884c77498f66a1cce57443cbf0a7e51f646",
+      "train_rows": 3,
+      "world_ids": [
+        "finance_meta_reconstruction_fy2022_2025_v1"
+      ]
+    },
+    {
+      "b5_estimated_tokens": 591609,
+      "b5_examples": 6,
+      "eval_rows": 0,
+      "exact_context_tokens": 589365,
+      "gate_ok": true,
+      "hash_checks": {
+        "eval.jsonl": true,
+        "llamafactory/B5.json": true,
+        "llamafactory/B5.meta.json": true,
+        "llamafactory/dataset_info.json": true,
+        "llamafactory/export_summary.json": true,
+        "quality_report.json": true,
+        "train.jsonl": true
+      },
+      "product": "p58-code-transformers-review-ancestry-probe-1-v1-promoted-v1",
+      "production_eligible": false,
+      "release_profile_sha256": "20c21842783c643d9105ed89db254a72c96d9a1bd0d10086954c3ba0fc4a3768",
+      "train_rows": 6,
+      "world_ids": [
+        "code000170-fenlightkit-50:focal"
+      ]
+    }
+  ],
+  "schema_version": "longworld.p58-final-inventory-delta.v1"
+}

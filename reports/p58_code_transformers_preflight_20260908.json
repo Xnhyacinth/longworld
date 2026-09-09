@@ -1,0 +1,56 @@
+{
+  "source_bundle_sha256": "1bd7c439f2bc3f3483b6334a3bfae024ffc0575749bc3ba37689eb166445a166",
+  "source_checks": [
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr40744_v4.57.0.json",
+      "sha256_ok": true,
+      "n_records": 26
+    },
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr45921_v5.9.0.json",
+      "sha256_ok": true,
+      "n_records": 27
+    },
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr46142_v5.10.1.json",
+      "sha256_ok": true,
+      "n_records": 41
+    },
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr44907_v5.12.0.json",
+      "sha256_ok": true,
+      "n_records": 66
+    },
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr46830_v5.13.0.json",
+      "sha256_ok": true,
+      "n_records": 70
+    },
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr46965_v5.14.0.json",
+      "sha256_ok": true,
+      "n_records": 101
+    },
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr47727_v5.15.0.json",
+      "sha256_ok": true,
+      "n_records": 97
+    },
+    {
+      "path": "reports/p17_codeforge_transformers_failure_recovery_sources_v1/transformers_pr48023_v5.16.0.json",
+      "sha256_ok": true,
+      "n_records": 133
+    }
+  ],
+  "unique_text_bodies": 554,
+  "exact_unique_source_tokens": 158545,
+  "requested_bands": [
+    "64k",
+    "128k"
+  ],
+  "new_entity": false,
+  "new_answer_program_for_entity": true,
+  "candidates": 0,
+  "audited": 0,
+  "new_inventory": 0
+}
