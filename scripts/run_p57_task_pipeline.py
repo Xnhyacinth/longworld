@@ -15,6 +15,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -23,22 +24,31 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from longworld.core import p57pipeline as pipeline_rules
 from longworld.core.p57pipeline import (  # noqa: E402
     FILTER_RECEIPT_SCHEMA,
     LEDGER_SCHEMA,
     PIPELINE_SCHEMA,
-    ROUTE_BLOCKED_INSUFFICIENT_UNIQUE,
+    QUESTION_ONLY_CHECK_REVISION,
     ROUTE_BLOCKED_INSUFFICIENT_PROOF,
+    ROUTE_BLOCKED_INSUFFICIENT_UNIQUE,
     ROUTE_BLOCKED_PARENT_EXPLOSION,
+    ROUTE_BLOCKED_QUESTION_ONLY,
     classify_job_audits,
     job_pad_errors,
     parent_artifact_explosion_error,
+    question_only_codebook_prediction,
 )
+from longworld.core.promotion import candidate_sha256
+from longworld.core.record_contract import EXACT_TOKEN_BAND_RANGES
 
 MINILM_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 MINILM_REVISION = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
 _MAX_WORKERS = 16
 _MAX_CATALOG_BYTES = 4 * 1024 * 1024
+_FILTER_RULES_SHA256 = hashlib.sha256(
+    Path(pipeline_rules.__file__).read_bytes()
+).hexdigest()
 
 
 class PipelineCatalogError(ValueError):
@@ -105,6 +115,8 @@ def load_catalog(path: Path) -> dict[str, Any]:
         buckets = job.get("primary_buckets")
         if not isinstance(buckets, list) or not buckets:
             raise PipelineCatalogError(f"{job_id}: primary_buckets required")
+        if any(not isinstance(bucket, str) or bucket not in EXACT_TOKEN_BAND_RANGES for bucket in buckets):
+            raise PipelineCatalogError(f"{job_id}: invalid primary length bucket")
         for field in (
             "trust_file",
             "projected_dir",
@@ -148,16 +160,28 @@ def filter_receipt_complete(
 
 def _job_input_sha256(job: dict[str, Any]) -> str | None:
     projected = Path(job["projected_dir"])
+    inputs = {}
     for name in ("audits.jsonl", "candidates.jsonl"):
         path = projected / name
         if path.is_file() and not path.is_symlink():
-            return _sha256_file(path)
+            inputs[name] = _sha256_file(path)
     parents = job.get("parents_dir")
     if parents:
         path = Path(parents) / "parents.jsonl"
         if path.is_file() and not path.is_symlink():
-            return _sha256_file(path)
-    return None
+            inputs["parents.jsonl"] = _sha256_file(path)
+    if not inputs:
+        return None
+    return hashlib.sha256(
+        _canonical_bytes(
+            {
+                "files": inputs,
+                "primary_buckets": sorted(set(job["primary_buckets"])),
+                "question_only_check_revision": QUESTION_ONLY_CHECK_REVISION,
+                "filter_rules_sha256": _FILTER_RULES_SHA256,
+            }
+        )
+    ).hexdigest()
 
 
 def _trust_command(
@@ -297,19 +321,153 @@ def _write_filter_receipt(job: dict[str, Any], receipt: dict[str, Any]) -> Path:
     projected = Path(job["projected_dir"])
     projected.mkdir(parents=True, exist_ok=True)
     path = projected / "FILTER_RECEIPT.json"
-    path.write_bytes(_canonical_bytes(receipt) + b"\n")
+    if path.is_symlink() or (path.exists() and not path.is_file()):
+        raise ValueError("filter receipt destination is not a regular file")
+    payload = (
+        _canonical_bytes(
+            {
+                **receipt,
+                "question_only_check_revision": QUESTION_ONLY_CHECK_REVISION,
+                "filter_rules_sha256": _FILTER_RULES_SHA256,
+                "primary_buckets": sorted(set(job["primary_buckets"])),
+            }
+        )
+        + b"\n"
+    )
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=".FILTER_RECEIPT.", dir=projected
+    )
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_name, path)
+    finally:
+        Path(temporary_name).unlink(missing_ok=True)
     return path
+
+
+def _checked_primary_candidates(job: dict[str, Any]) -> list[dict[str, Any]]:
+    path = Path(job["projected_dir"]) / "candidates.jsonl"
+    if not path.is_file():
+        if (
+            path.exists()
+            or path.is_symlink()
+            or (path.parent / "audits.jsonl").exists()
+        ):
+            raise ValueError(
+                "question-only check requires readable projected candidates"
+            )
+        receipt_path = path.parent / "FILTER_RECEIPT.json"
+        if receipt_path.is_file():
+            old_receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            if not isinstance(old_receipt, dict):
+                raise ValueError("existing filter receipt is not an object")
+            if old_receipt.get("strict_eligible") is True:
+                raise ValueError(
+                    "question-only check requires readable projected candidates"
+                )
+        return []
+    if path.is_symlink():
+        raise ValueError("projected candidates must be a regular file")
+    buckets = set(job["primary_buckets"])
+    selected = []
+    query_ids = set()
+    for row in _read_jsonl(path):
+        band = row.get("length_bucket")
+        if not isinstance(band, str) or band not in EXACT_TOKEN_BAND_RANGES:
+            raise ValueError("candidate has an invalid length bucket")
+        if band not in buckets:
+            continue
+        query_id = row.get("query_id")
+        if not isinstance(query_id, str) or not query_id or query_id in query_ids:
+            raise ValueError("primary candidate query ids are missing or duplicated")
+        if not isinstance(row.get("question"), str) or not row["question"].strip():
+            raise ValueError("primary candidate question must be a nonempty string")
+        if not isinstance(row.get("answer"), (str, dict)):
+            raise TypeError("primary candidate answer is unavailable")
+        selected.append(row)
+        query_ids.add(query_id)
+    missing = buckets - {row["length_bucket"] for row in selected}
+    if missing:
+        raise ValueError(
+            "no candidates for primary length buckets: " + ",".join(sorted(missing))
+        )
+    return selected
+
+
+def _question_only_shortcut_queries(job: dict[str, Any]) -> list[str]:
+    matches = []
+    for row in _checked_primary_candidates(job):
+        prediction = question_only_codebook_prediction(row["question"])
+        if prediction is None:
+            continue
+        answer = row.get("answer")
+        if isinstance(answer, str):
+            answer = json.loads(answer)
+        if prediction == answer:
+            matches.append(str(row.get("query_id") or ""))
+    return matches
+
+
+def _record_question_only_block(
+    job: dict[str, Any],
+    matches: list[str],
+    *,
+    ledger_path: Path,
+    execute: bool,
+) -> dict[str, Any]:
+    row = {
+        "schema_version": LEDGER_SCHEMA,
+        "job_id": job["job_id"],
+        "status": "blocked",
+        "route": ROUTE_BLOCKED_QUESTION_ONLY,
+        "strict_eligible": False,
+        "question_only_query_ids": matches,
+        "question_only_check_revision": QUESTION_ONLY_CHECK_REVISION,
+        "production_eligible": False,
+    }
+    if execute:
+        audits = Path(job["projected_dir"]) / "audits.jsonl"
+        _write_filter_receipt(
+            job,
+            {
+                **row,
+                "schema_version": FILTER_RECEIPT_SCHEMA,
+                "auto_promote": False,
+                "input_sha256": _job_input_sha256(job) or "",
+                "n_audits": len(_read_jsonl(audits)) if audits.is_file() else 0,
+            },
+        )
+        _append_ledger(ledger_path, row)
+    return row
 
 
 def _classify_existing_audits(job: dict[str, Any], input_sha256: str) -> dict[str, Any]:
     audits_path = Path(job["projected_dir"]) / "audits.jsonl"
-    rows = _read_jsonl(audits_path)
+    candidates = {row["query_id"]: row for row in _checked_primary_candidates(job)}
+    rows = []
+    seen = set()
+    for audit in _read_jsonl(audits_path):
+        query_id = audit.get("query_id")
+        if query_id not in candidates:
+            continue
+        if query_id in seen or audit.get("candidate_sha256") != candidate_sha256(
+            candidates[query_id]
+        ):
+            raise ValueError("dense audit does not bind the current primary candidate")
+        rows.append(audit)
+        seen.add(query_id)
+    if seen != set(candidates):
+        raise ValueError("dense audits do not cover every primary candidate")
     classified = classify_job_audits(rows)
     classified.update(
         {
             "job_id": job["job_id"],
             "input_sha256": input_sha256,
             "already_promoted": bool(job.get("already_promoted")),
+            "question_only_check_revision": QUESTION_ONLY_CHECK_REVISION,
         }
     )
     _write_filter_receipt(job, classified)
@@ -326,7 +484,7 @@ def _run_synthesis_stages(
     minilm_revision: str,
     ledger_path: Path,
     audit_workers: int,
-) -> None:
+) -> list[str] | None:
     projected = Path(job["projected_dir"])
     projected.mkdir(parents=True, exist_ok=True)
     parents_dir = Path(job["parents_dir"]) if job.get("parents_dir") else None
@@ -385,12 +543,20 @@ def _run_synthesis_stages(
                     str(parent_sidecar),
                     "--output-dir",
                     str(projected),
+                    *[
+                        item
+                        for bucket in job.get("primary_buckets") or []
+                        for item in ("--length-bucket", str(bucket))
+                    ],
                 ],
             ),
             env=env,
             timeout=timeout,
             log_path=log_path,
         )
+    shortcut_queries = _question_only_shortcut_queries(job)
+    if shortcut_queries:
+        return shortcut_queries
     rankings = projected / "rankings.jsonl"
     if candidates.is_file() and not rankings.is_file():
         _run_command(
@@ -504,6 +670,11 @@ def _execute_job(
             _append_ledger(ledger_path, row)
         return row
     input_sha256 = _job_input_sha256(job)
+    shortcut_queries = _question_only_shortcut_queries(job)
+    if shortcut_queries:
+        return _record_question_only_block(
+            job, shortcut_queries, ledger_path=ledger_path, execute=execute
+        )
     n_parent_artifacts = _parent_artifact_count(job)
     if n_parent_artifacts is not None:
         explosion = parent_artifact_explosion_error(n_parent_artifacts)
@@ -551,7 +722,7 @@ def _execute_job(
         compiler_missing = _signed_workflow_missing(str(generate_config))
     if execute and not audits_path.is_file() and not compiler_missing:
         try:
-            _run_synthesis_stages(
+            shortcut_queries = _run_synthesis_stages(
                 job,
                 python=python,
                 env=env,
@@ -561,6 +732,10 @@ def _execute_job(
                 ledger_path=ledger_path,
                 audit_workers=audit_workers,
             )
+            if shortcut_queries:
+                return _record_question_only_block(
+                    job, shortcut_queries, ledger_path=ledger_path, execute=execute
+                )
         except (OSError, subprocess.SubprocessError, ValueError) as error:
             blocker = _log_blocker(_job_log_path(ledger_path, job_id))
             if blocker is not None:
@@ -597,7 +772,7 @@ def _execute_job(
             return row
     audits_path = Path(job["projected_dir"]) / "audits.jsonl"
     if audits_path.is_file():
-        input_sha256 = _sha256_file(audits_path)
+        input_sha256 = _job_input_sha256(job) or ""
         if execute:
             classified = _classify_existing_audits(job, input_sha256)
             row = {
@@ -725,7 +900,33 @@ def run_pipeline(
             for job in jobs
         }
         for future in as_completed(futures):
-            results.append(future.result())
+            try:
+                results.append(future.result())
+            except (OSError, ValueError, TypeError) as error:
+                row = {
+                    "schema_version": LEDGER_SCHEMA,
+                    "job_id": futures[future],
+                    "status": "failed",
+                    "error": str(error),
+                    "production_eligible": False,
+                }
+                if execute:
+                    failed_job = next(job for job in jobs if job["job_id"] == futures[future])
+                    try:
+                        _write_filter_receipt(
+                            failed_job,
+                            {
+                                **row,
+                                "schema_version": FILTER_RECEIPT_SCHEMA,
+                                "strict_eligible": False,
+                                "auto_promote": False,
+                                "question_only_check_revision": QUESTION_ONLY_CHECK_REVISION,
+                            },
+                        )
+                    except (OSError, ValueError) as receipt_error:
+                        row["filter_receipt_error"] = str(receipt_error)
+                    _append_ledger(ledger_path, row)
+                results.append(row)
     results.sort(key=lambda item: str(item.get("job_id") or ""))
     statuses = {str(item.get("status") or "") for item in results}
     pending = {

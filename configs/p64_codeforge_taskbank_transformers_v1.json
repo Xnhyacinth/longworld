@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.codeforge-taskbank-config.v1",
+  "source_bundle": "configs/p17_codeforge_transformers_failure_recovery_v1_bundle.json",
+  "source_bundle_sha256": "1bd7c439f2bc3f3483b6334a3bfae024ffc0575749bc3ba37689eb166445a166",
+  "source_group_id": "https://github.com/huggingface/transformers",
+  "split": "train",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true
+  }
+}

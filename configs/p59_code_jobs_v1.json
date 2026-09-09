@@ -1,0 +1,29 @@
+{
+  "schema_version": "longworld.p59-code-jobs.v1",
+  "jobs": [
+    {
+      "job_id": "pulumi_failure_recovery_64k",
+      "repository": "pulumi/pulumi",
+      "seed": 160,
+      "new_admitted_entity_candidate": true,
+      "bundle": "configs/p16_codeforge_pulumi_failure_recovery_v1_bundle.json",
+      "template": "configs/p16_codeforge_pulumi_failure_recovery_v1.yaml",
+      "query_type": "failure_recovery_release_trace",
+      "bands": [
+        "64k"
+      ]
+    },
+    {
+      "job_id": "wasmtime_supersession_64k",
+      "repository": "bytecodealliance/wasmtime",
+      "seed": 130,
+      "new_admitted_entity_candidate": false,
+      "bundle": "configs/p14_codeforge_wasmtime_patch_review_test_v2_bundle.json",
+      "template": "configs/p14_codeforge_wasmtime_patch_review_test_v2.yaml",
+      "query_type": "release_supersession_trace",
+      "bands": [
+        "64k"
+      ]
+    }
+  ]
+}

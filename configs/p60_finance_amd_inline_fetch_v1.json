@@ -1,0 +1,50 @@
+{
+  "schema_version": "longworld.issuer-inline-xbrl-fetch-request.v1",
+  "source_provider": "equisolve.issuer-host-inline-xbrl.v1",
+  "source_profile": "amd.inline-cash-components.v1",
+  "user_agent": "LongWorld-P60/1.0 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P60-AMD-ISSUER-INLINE-HISTORY-20260908",
+    "scope": "AMD issuer-owned FY2021-FY2024 annual inline-XBRL source acquisition and source-bound local-probe cash-component synthesis",
+    "basis": "User-authorized authentic new issuer/world expansion; unchanged source and release gates",
+    "reviewed_at": "2026-09-08T17:04:03.725036Z"
+  },
+  "issuer": {
+    "name": "ADVANCED MICRO DEVICES, INC.",
+    "cik": "0000002488",
+    "host": "ir.amd.com"
+  },
+  "listing_url": "https://ir.amd.com/financial-information/sec-filings?form_type=10-K",
+  "filings": [
+    {
+      "filing_id": "amd-fy2021-annual",
+      "form": "10-K",
+      "filing_date": "2022-02-03",
+      "report_date": "2021-12-25",
+      "source_url": "https://ir.amd.com/financial-information/sec-filings/content/0000002488-22-000016/amd-20211225.htm"
+    },
+    {
+      "filing_id": "amd-fy2022-annual",
+      "form": "10-K",
+      "filing_date": "2023-02-27",
+      "report_date": "2022-12-31",
+      "source_url": "https://ir.amd.com/financial-information/sec-filings/content/0000002488-23-000047/amd-20221231.htm"
+    },
+    {
+      "filing_id": "amd-fy2023-annual",
+      "form": "10-K",
+      "filing_date": "2024-01-31",
+      "report_date": "2023-12-30",
+      "source_url": "https://ir.amd.com/financial-information/sec-filings/content/0000002488-24-000012/amd-20231230.htm"
+    },
+    {
+      "filing_id": "amd-fy2024-annual",
+      "form": "10-K",
+      "filing_date": "2025-02-05",
+      "report_date": "2024-12-28",
+      "source_url": "https://ir.amd.com/financial-information/sec-filings/content/0000002488-25-000012/amd-20241228.htm"
+    }
+  ],
+  "requests_per_second": 2,
+  "max_retries": 2
+}

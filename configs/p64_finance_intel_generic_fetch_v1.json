@@ -1,0 +1,44 @@
+{
+  "schema_version": "longworld.generic-issuer-inline-request.v1",
+  "issuer_key": "intel",
+  "issuer": {
+    "name": "INTEL CORPORATION",
+    "cik": "0000050863",
+    "host": "www.intc.com",
+    "listing_path": "/filings-reports/all-sec-filings"
+  },
+  "listing_url": "https://www.intc.com/filings-reports/all-sec-filings?form_type=10-K",
+  "user_agent": "LongWorld-P64/1.0 xnhyacinth@users.noreply.github.com",
+  "authorization": {
+    "record_id": "P64-GENERIC-INTEL-20260909",
+    "scope": "Official Intel annual filing source acquisition and local candidate task synthesis",
+    "basis": "User explicitly authorizes genuine issuer expansion and continued synthesis",
+    "reviewed_at": "2026-09-09T00:00:00Z"
+  },
+  "filings": [
+    {
+      "form": "10-K",
+      "report_date": "2021-12-25",
+      "filing_date": "2022-01-27",
+      "source_url": "https://www.intc.com/filings-reports/all-sec-filings/content/0000050863-22-000007/intc-20211225.htm"
+    },
+    {
+      "form": "10-K",
+      "report_date": "2022-12-31",
+      "filing_date": "2023-01-27",
+      "source_url": "https://www.intc.com/filings-reports/all-sec-filings/content/0000050863-23-000006/intc-20221231.htm"
+    },
+    {
+      "form": "10-K",
+      "report_date": "2023-12-30",
+      "filing_date": "2024-01-26",
+      "source_url": "https://www.intc.com/filings-reports/all-sec-filings/content/0000050863-24-000010/intc-20231230.htm"
+    },
+    {
+      "form": "10-K",
+      "report_date": "2024-12-28",
+      "filing_date": "2025-01-31",
+      "source_url": "https://www.intc.com/filings-reports/all-sec-filings/content/0000050863-25-000009/intc-20241228.htm"
+    }
+  ]
+}

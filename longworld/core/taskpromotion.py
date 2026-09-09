@@ -1682,6 +1682,42 @@ def _canonical_task_identifiers(
             raise PromotionError("finance answer program is unsupported")
         answer_program_id = str(finance_task.get("answer_program_id") or "")
         finance_programs = {
+            "finance.cash_components_identity.v1": (
+                "cash_components_sum+disclosed_net_change+operating_margin+balance_sheet_certification",
+                "cash_components_identity",
+                (
+                    "source_span_parse",
+                    "cross_filing_revenue_trajectory",
+                    "annual_cash_components_sum",
+                    "disclosed_net_cash_change_compare",
+                    "operating_margin_reconciliation",
+                    "balance_sheet_certification",
+                ),
+                (
+                    "select_filing_chain",
+                    "read_annual_cash_components_and_disclosed_change",
+                    "compute_margin_and_component_sum",
+                    "compare_disclosed_cash_and_balance_identity",
+                ),
+            ),
+            "nvidia.cash_components_identity.v1": (
+                "cash_components_sum+disclosed_net_change+operating_margin+balance_sheet_certification",
+                "nvidia_cash_components_identity",
+                (
+                    "source_span_parse",
+                    "cross_filing_revenue_trajectory",
+                    "annual_cash_components_sum",
+                    "disclosed_net_cash_change_compare",
+                    "operating_margin_reconciliation",
+                    "balance_sheet_certification",
+                ),
+                (
+                    "select_filing_chain",
+                    "read_annual_cash_components_and_disclosed_change",
+                    "compute_margin_and_component_sum",
+                    "compare_disclosed_cash_and_balance_identity",
+                ),
+            ),
             "finance.multi_filing_reconstruction.v1": (
                 "multi_filing_trajectory+certification+cross_statement_reconciliation",
                 "multi_filing_financial_reconstruction",

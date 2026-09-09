@@ -285,9 +285,23 @@ def bind_cumulative_patch_review_test_history(
     world: SimulatedWorld, queries: list[QuerySpec]
 ) -> None:
     """Validate nested patch/review/test/ancestry programs across exact bands."""
-    groups: dict[str, list[QuerySpec]] = {}
+    families = {
+        "patch_review_test_ancestry": (
+            "JOIN_PATCH_REVIEW_TEST_ANCESTRY",
+            "codeforge.patch_review_test",
+        ),
+        "patch_files_review_test_ancestry": (
+            "JOIN_PATCH_FILES_REVIEW_TEST_ANCESTRY",
+            "codeforge.patch_files_review_test",
+        ),
+        "patch_files_review_test_release_v2": (
+            "JOIN_PATCH_FILES_REVIEW_TEST_RELEASE_V2",
+            "codeforge.patch_files_review_test_release_v2",
+        ),
+    }
+    groups: dict[tuple[str, str], list[QuerySpec]] = {}
     for query in queries:
-        if query.query_type != "patch_review_test_ancestry":
+        if query.query_type not in families:
             continue
         if (
             len(query.preferred_length_buckets) != 1
@@ -295,7 +309,9 @@ def bind_cumulative_patch_review_test_history(
             or not query.semantic_growth_group
         ):
             raise ValueError("patch-review-test query has no exact growth binding")
-        groups.setdefault(query.semantic_growth_group, []).append(query)
+        groups.setdefault((query.query_type, query.semantic_growth_group), []).append(
+            query
+        )
 
     events_by_record = {
         str(event.params.get("record_key")): event
@@ -303,6 +319,7 @@ def bind_cumulative_patch_review_test_history(
         if event.type == "repo_record"
     }
     for group in groups.values():
+        op_name, base_task_prefix = families[group[0].query_type]
         group.sort(key=lambda item: _BAND_ORDER[item.preferred_length_buckets[0]])
         bands = [query.preferred_length_buckets[0] for query in group]
         if bands != ["16k", "32k", "64k", "128k"][: len(group)]:
@@ -311,11 +328,7 @@ def bind_cumulative_patch_review_test_history(
             )
         programs: list[list[dict[str, object]]] = []
         for query, band in zip(group, bands, strict=True):
-            ops = [
-                op
-                for op in query.program_ops
-                if op.get("op") == "JOIN_PATCH_REVIEW_TEST_ANCESTRY"
-            ]
+            ops = [op for op in query.program_ops if op.get("op") == op_name]
             if len(ops) != _PATCH_REVIEW_TEST_BAND_CYCLE_COUNT[band]:
                 raise ValueError("patch-review-test band has the wrong cycle count")
             programs.append(ops)
@@ -360,9 +373,7 @@ def bind_cumulative_patch_review_test_history(
                 raise ValueError(
                     "patch-review-test authentic source relations do not grow"
                 )
-        base_task_group = (
-            f"codeforge.patch_review_test|{group[0].semantic_growth_group}"
-        )
+        base_task_group = f"{base_task_prefix}|{group[0].semantic_growth_group}"
         for query in group:
             query.base_task_group = base_task_group
 

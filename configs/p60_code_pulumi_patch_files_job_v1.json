@@ -1,0 +1,19 @@
+{
+  "schema_version": "longworld.p60-code-jobs.v1",
+  "jobs": [
+    {
+      "job_id": "pulumi_patch_files_64k",
+      "repository": "pulumi/pulumi",
+      "seed": 160,
+      "new_admitted_entity_candidate": false,
+      "bundle": "configs/p16_codeforge_pulumi_failure_recovery_v1_bundle.json",
+      "template": "configs/p16_codeforge_pulumi_failure_recovery_v1.yaml",
+      "query_type": "patch_files_review_test_ancestry",
+      "bands": [
+        "64k"
+      ],
+      "successor_of": "patch_review_test_ancestry (tool-computation diagnostic)",
+      "answer_contract": "Readable diff-header file paths, recorded review decision, selected CI name/result and merge/tag ancestry; no computed digest output."
+    }
+  ]
+}

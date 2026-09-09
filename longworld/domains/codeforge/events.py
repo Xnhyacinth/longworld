@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import shlex
 from typing import Any
 
 from longworld.core.cascade import apply_cascade, check_cascade
@@ -13,6 +14,37 @@ from longworld.domains.codeforge.schema import materialize_grounded_repo_record
 _PATCH_EVIDENCE = re.compile(
     r"(?m)^(?:diff --(?:git )?|\d+ files changed \(GitHub commit API summary\):)"
 )
+
+
+def _patch_file_paths(body: str) -> tuple[str, ...]:
+    """Read explicit exporter/git diff headers without inventing missing paths."""
+    paths: set[str] = set()
+    for line in body.splitlines():
+        if line.startswith("diff --git "):
+            # Git's C-style escaped paths need a separate decoding contract.
+            if "\\" in line:
+                return ()
+            try:
+                parts = shlex.split(line)
+            except ValueError:
+                return ()
+            if (
+                len(parts) != 4
+                or not parts[2].startswith("a/")
+                or not parts[3].startswith("b/")
+                or not parts[2][2:]
+                or not parts[3][2:]
+            ):
+                return ()
+            paths.update((parts[2][2:], parts[3][2:]))
+        elif line.startswith("diff -- "):
+            path = line.removeprefix("diff -- ")
+            if not path or path != path.strip():
+                return ()
+            paths.add(path)
+        elif line.startswith("diff --"):
+            return ()
+    return tuple(sorted(paths))
 
 
 def init_values(project: dict[str, Any]) -> dict[str, Any]:
@@ -309,6 +341,12 @@ def _apply_repo_record(state: WorldState, ev: Event) -> None:
             state.set(
                 f"real:patch:{record_id}:sha256",
                 hashlib.sha256(patch.encode()).hexdigest(),
+                ev.id,
+                ev.time,
+            )
+            state.set(
+                f"real:patch:{record_id}:files",
+                _patch_file_paths(patch),
                 ev.id,
                 ev.time,
             )

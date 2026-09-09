@@ -1,0 +1,21 @@
+{
+  "schema_version": "longworld.finance-taskbank-long-build.v1",
+  "source_manifest": "data/source_inventory/p60_finance_amd_inline_fy2021_2024_v1/issuer_inline_manifest.signed.json",
+  "split_group_id": "0000002488",
+  "split": "eval",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "excluded_split_group_ids": [
+    "0000050863",
+    "0000723125",
+    "0001018724",
+    "0001045810",
+    "0001326801",
+    "0001652044"
+  ],
+  "holds": {},
+  "source_kind": "issuer_ir",
+  "excluded_families": []
+}

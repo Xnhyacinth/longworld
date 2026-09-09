@@ -29,10 +29,17 @@ from longworld.core.issuerfilingworkflow import (
     META_SEGMENT_SECTION,
     MICRON_GEO_SECTIONS,
     MICRON_TECHNOLOGY_SECTIONS,
+    NVIDIA_CIK,
     NVIDIA_MARKET_SECTION,
     parse_issuer_ir_rendered_metrics,
 )
 from longworld.core.pack import SEP
+from longworld.core.issuerinlineworkflow import (
+    ISSUER_INLINE_MANIFEST_SCHEMA,
+    ISSUER_INLINE_SOURCE_FAMILY,
+    inline_row_value,
+    parse_issuer_inline_metrics,
+)
 from longworld.core.provenance import ProvenanceError
 from longworld.core.secxbrl import parse_sec_financial_program
 
@@ -91,6 +98,7 @@ _SEMANTIC_ROLE_MARKERS = {
     "service_revenue": ("service_revenue", "Service"),
 }
 _SEC_SEMANTIC_ROLE_MARKERS = {
+    "operating_income": ("us-gaap:OperatingIncomeLoss",),
     "revenue": ("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",),
     "assets": ("us-gaap:Assets",),
     "liabilities_and_equity": ("us-gaap:LiabilitiesAndStockholdersEquity",),
@@ -148,6 +156,8 @@ def _bands_match_program(
     names = [band.name for band in bands]
     if not names or len(names) != len(set(names)):
         return False
+    if answer_program_id == CASH_COMPONENTS_PROGRAM:
+        return len(names) == 1 and names[0] in _NATURAL_LENGTH_BANDS
     if answer_program_id == NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM:
         allowed = list(_NATURAL_LENGTH_BANDS)
         return names == [name for name in allowed if name in names]
@@ -169,12 +179,15 @@ _RELATION_RECORD_TYPES = frozenset(
     {"filing_relation", "table_branch_relation", "year_join_relation"}
 )
 _DEFAULT_ANSWER_PROGRAM_ID = "finance.multi_filing_reconstruction.v1"
+CASH_COMPONENTS_PROGRAM = "finance.cash_components_identity.v1"
+NVIDIA_CASH_COMPONENTS_PROGRAM = "nvidia.cash_components_identity.v1"
 NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM = "nvidia.market_mix_crossover.v1"
 MICRON_DUAL_PARTITION_PROGRAM = "micron.dual_partition_identity.v1"
 _NATURAL_LENGTH_BANDS = ("64k", "128k")
 _MICRON_DUAL_PARTITION_BANDS = ("32k",)
 _UNIQUE_LENGTH_PROGRAMS = frozenset(
     {
+        CASH_COMPONENTS_PROGRAM,
         NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM,
         MICRON_DUAL_PARTITION_PROGRAM,
     }
@@ -196,6 +209,40 @@ _NVIDIA_MARKET_AXIS_MARKERS = {
     "market_oem_other": "srt_ProductOrServiceAxis=nvda_OEMAndOtherMember",
 }
 _ANSWER_PROGRAMS = {
+    CASH_COMPONENTS_PROGRAM: {
+        "query_type": "cash_components_identity",
+        "operations": (
+            "source_span_parse", "cross_filing_revenue_trajectory",
+            "annual_cash_components_sum", "disclosed_net_cash_change_compare",
+            "operating_margin_reconciliation", "balance_sheet_certification",
+        ),
+        "roles": tuple(sorted(_CORE_ROLES - {"cash_fx_effect"})),
+        "question": (
+            "Using the annual issuer statement rows and complete prior-filing chain, "
+            "report each year's revenue, operating income, assets, liabilities and "
+            "equity, operating/investing/financing cash, and disclosed net cash change "
+            "in USD millions. Compute operating margin in basis points, compare the "
+            "sum of the three cash components with disclosed net change, certify "
+            "the balance sheet, and report earliest-to-latest revenue change."
+        ),
+    },
+    NVIDIA_CASH_COMPONENTS_PROGRAM: {
+        "query_type": "nvidia_cash_components_identity",
+        "operations": (
+            "source_span_parse", "cross_filing_revenue_trajectory",
+            "annual_cash_components_sum", "disclosed_net_cash_change_compare",
+            "operating_margin_reconciliation", "balance_sheet_certification",
+        ),
+        "roles": tuple(sorted(_CORE_ROLES - {"cash_fx_effect"})),
+        "question": (
+            "Using the annual NVIDIA statement rows and complete prior-filing chain, "
+            "report each year's revenue, operating income, assets, liabilities and "
+            "equity, operating/investing/financing cash, and disclosed net cash change "
+            "in USD millions. Compute operating margin in basis points, compare the "
+            "sum of the three cash components with disclosed net change, certify "
+            "the balance sheet, and report earliest-to-latest revenue change."
+        ),
+    },
     _DEFAULT_ANSWER_PROGRAM_ID: {
         "query_type": "multi_filing_financial_reconstruction",
         "operations": (
@@ -461,6 +508,32 @@ def _role_marker_options(role: str) -> tuple[tuple[str, ...], ...]:
         options.append(_SEMANTIC_ROLE_MARKERS[role])
     if role in _SEC_SEMANTIC_ROLE_MARKERS:
         options.append(_SEC_SEMANTIC_ROLE_MARKERS[role])
+    if role == "operating_income":
+        options.extend(
+            ("'defref_us-gaap_OperatingIncomeLoss'", label)
+            for label in (">Income from operations</a>", ">Income (loss) from operations</a>")
+        )
+    if role == "cash_fx_effect":
+        options.append((
+            "'defref_us-gaap_EffectOfExchangeRateOnCashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents'",
+            ">Effect of exchange rate changes on cash, cash equivalents, and restricted cash",
+        ))
+        options.extend(
+            ("'defref_us-gaap_EffectOfExchangeRateOnCashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents'", label)
+            for label in (
+                ">Effect of exchange rate changes on cash and cash equivalents</a>",
+                ">Effect of changes in currency exchange rates on cash, cash equivalents, and restricted cash</a>",
+            )
+        )
+    if role == "cash_period_change":
+        options.append((
+            "'defref_us-gaap_CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect'",
+            ">Net decrease in cash, cash equivalents, and restricted cash</a>",
+        ))
+        options.append((
+            "'defref_us-gaap_CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect'",
+            ">Change in cash and cash equivalents</a>",
+        ))
     if role == "revenue":
         options.extend(
             (concept, label)
@@ -580,7 +653,7 @@ def extract_financial_filings(manifest: dict[str, Any]) -> tuple[FinancialFiling
     issuer = manifest.get("issuer")
     records = manifest.get("records")
     if (
-        manifest.get("schema_version") != "longworld.issuer-ir-filing-manifest.v1"
+        manifest.get("schema_version") not in {"longworld.issuer-ir-filing-manifest.v1", ISSUER_INLINE_MANIFEST_SCHEMA}
         or not isinstance(issuer, dict)
         or not isinstance(records, list)
         or len(records) < 2
@@ -595,12 +668,19 @@ def extract_financial_filings(manifest: dict[str, Any]) -> tuple[FinancialFiling
         report_date = str(record.get("report_date") or "")
         if not isinstance(source_text, str) or not source_text:
             raise ProvenanceError("issuer financial source text is missing")
-        program = parse_issuer_ir_rendered_metrics(
-            source_text,
-            report_date=report_date,
-            issuer_cik=str(issuer.get("cik") or ""),
-            metric_profile=manifest.get("financial_metric_profile"),
-        )
+        if manifest.get("schema_version") == ISSUER_INLINE_MANIFEST_SCHEMA:
+            program = parse_issuer_inline_metrics(
+                source_text, report_date=report_date,
+                issuer_cik=str(issuer.get("cik") or ""),
+                metric_profile=str(manifest.get("source_profile") or ""),
+            )
+        else:
+            program = parse_issuer_ir_rendered_metrics(
+                source_text,
+                report_date=report_date,
+                issuer_cik=str(issuer.get("cik") or ""),
+                metric_profile=manifest.get("financial_metric_profile"),
+            )
         facts_by_span = sorted(program.facts, key=lambda fact: fact.char_start)
         source_rows: list[FinancialSourceRow] = []
         local_row_indexes: dict[str, int] = {}
@@ -1017,6 +1097,53 @@ def _dual_partition_answer(
     )
 
 
+def _nvidia_cash_components_answer(
+    filing_chain: Sequence[str], by_year: dict[str, dict[str, int | str]]
+) -> str:
+    required = set(_ANSWER_PROGRAMS[NVIDIA_CASH_COMPONENTS_PROGRAM]["roles"])
+    observations: list[dict[str, Any]] = []
+    for report_date, values in sorted(by_year.items()):
+        if (
+            not required <= values.keys()
+            or any(not isinstance(values[role], int) for role in required)
+            or not values["revenue"]
+        ):
+            raise ProvenanceError("NVIDIA cash components are missing numeric operands")
+        cash_sum = sum(
+            int(values[role])
+            for role in (
+                "cash_from_operations",
+                "cash_from_investing",
+                "cash_from_financing",
+            )
+        )
+        observations.append(
+            {
+                "report_date": report_date,
+                **{role: values[role] for role in sorted(required)},
+                "cash_components_sum": cash_sum,
+                "cash_components_equal_net_change": cash_sum
+                == values["cash_period_change"],
+                "operating_margin_basis_points": int(values["operating_income"])
+                * 10_000
+                // int(values["revenue"]),
+                "balance_sheet_certified": values["assets"]
+                == values["liabilities_and_equity"],
+            }
+        )
+    if not observations:
+        raise ProvenanceError("NVIDIA cash components have no annual observations")
+    return _canonical_json(
+        {
+            "unit": "USD millions",
+            "annual_observations": observations,
+            "filing_chain": list(filing_chain),
+            "cross_filing_revenue_change": observations[-1]["revenue"]
+            - observations[0]["revenue"],
+        }
+    )
+
+
 def _answer(
     facts: Sequence[dict[str, Any]],
     filing_chain: Sequence[str],
@@ -1040,6 +1167,8 @@ def _answer(
         return _crossover_answer(ledger, filing_chain, by_year)
     if answer_program_id == MICRON_DUAL_PARTITION_PROGRAM:
         return _dual_partition_answer(filing_chain, by_year)
+    if answer_program_id in {NVIDIA_CASH_COMPONENTS_PROGRAM, CASH_COMPONENTS_PROGRAM}:
+        return _nvidia_cash_components_answer(filing_chain, by_year)
     annual_checks: list[dict[str, Any]] = []
     for report_date, values in sorted(by_year.items()):
         check: dict[str, Any] = {"report_date": report_date}
@@ -1197,6 +1326,8 @@ def replay_financial_history(
             header.get("answer_program_id") not in (None, answer_program_id)
         ):
             raise ProvenanceError("financial history answer program binding mismatch")
+        if answer_program_id == NVIDIA_CASH_COMPONENTS_PROGRAM and header.get("cik") != NVIDIA_CIK:
+            raise ProvenanceError("NVIDIA cash components require the NVIDIA issuer")
         if (
             header.get("answer_program_id") is None
             and answer_program_id != _DEFAULT_ANSWER_PROGRAM_ID
@@ -1288,7 +1419,11 @@ def replay_financial_history(
                         "financial replay has a duplicate annual role"
                     )
                 roles_by_report.add(identity)
-                numeric = _parse_number(quote)
+                numeric = (
+                    inline_row_value(source_text, start, quote, role)
+                    if task.get("source_binding", {}).get("source_family") == ISSUER_INLINE_SOURCE_FAMILY
+                    else _parse_number(quote)
+                )
                 fact_ledger.append(
                     {
                         "record_id": record["source_record_id"],
@@ -1572,6 +1707,7 @@ def build_financial_history_candidates(
         or answer_program_id not in _ANSWER_PROGRAMS
         or _COMMIT_SHA.fullmatch(tokenizer_revision) is None
         or not _bands_match_program(answer_program_id, bands)
+        or (answer_program_id == NVIDIA_CASH_COMPONENTS_PROGRAM and cik != NVIDIA_CIK)
     ):
         raise ProvenanceError("financial history materialization identity is invalid")
     if (
@@ -1603,7 +1739,11 @@ def build_financial_history_candidates(
     output: list[dict[str, Any]] = []
     for band_index, band in enumerate(bands):
         band_roles = _band_active_roles(answer_program_id, band.name, filings)
-        if answer_program_id == NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM:
+        if answer_program_id == CASH_COMPONENTS_PROGRAM:
+            required_filing_count = len(filings)
+            if required_filing_count < 4:
+                raise ProvenanceError("cash components require four annual filings")
+        elif answer_program_id == NVIDIA_MARKET_MIX_CROSSOVER_PROGRAM:
             required_filing_count = len(filings)
             if required_filing_count < 3:
                 raise ProvenanceError(

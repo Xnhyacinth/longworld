@@ -1,0 +1,23 @@
+{
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "python": "/workspace/wynckeliao/longworld-worlds/.venv/bin/python",
+  "hf_home": "/workspace/wynckeliao/.cache/huggingface",
+  "minilm_model_id": "sentence-transformers/all-MiniLM-L6-v2",
+  "minilm_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+  "ledger": "reports/p58_finance_meta_reconstruction_v1/ledger.jsonl",
+  "jobs": [
+    {
+      "job_id": "finance-meta-reconstruction-v1",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/meta/local_probe_trust.json",
+      "generate_script": "reports/p58_finance_meta_reconstruction_generate.py",
+      "generate_config": "configs/p58_finance_meta_reconstruction_v1.json",
+      "parents_dir": "reports/p58_finance_meta_reconstruction_v1/parents",
+      "projected_dir": "reports/p58_finance_meta_reconstruction_v1/projected",
+      "primary_buckets": [
+        "64k"
+      ],
+      "auto_promote": false,
+      "production_eligible": false
+    }
+  ]
+}

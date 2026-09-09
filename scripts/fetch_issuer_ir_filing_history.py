@@ -657,6 +657,127 @@ def _filing_relations(filings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
+def _fetch_issuer_inline_history(
+    payload: dict[str, Any],
+    output_directory: Path,
+    *,
+    http_get: HttpGet,
+    sleep: Callable[[float], None],
+    generated_at: str | None,
+) -> Path:
+    from longworld.core.issuerinlineworkflow import (
+        AMD_CIK,
+        AMD_INLINE_PROFILE,
+        ISSUER_INLINE_INVENTORY_SCHEMA,
+        build_issuer_inline_manifest,
+        normalize_inline_source,
+        parse_issuer_inline_metrics,
+        validate_inline_listing,
+        validate_inline_request,
+    )
+
+    request = validate_inline_request(payload)
+    user_agent = str(request.get("user_agent") or "").strip()
+    rate, retries = request.get("requests_per_second", 2), request.get("max_retries", 3)
+    if (
+        len(user_agent) > 256
+        or _CONTACT_USER_AGENT.fullmatch(user_agent) is None
+        or any(
+            domain in user_agent.lower()
+            for domain in ("example.com", "example.net", "example.org")
+        )
+    ):
+        raise ProvenanceError(
+            "inline fetch requires a declared organization/contact User-Agent"
+        )
+    if (
+        isinstance(rate, bool)
+        or not isinstance(rate, (int, float))
+        or not 0 < rate <= MAX_REQUESTS_PER_SECOND
+        or isinstance(retries, bool)
+        or not isinstance(retries, int)
+        or not 0 <= retries <= MAX_RETRIES
+    ):
+        raise ProvenanceError("inline fetch rate or retry policy is invalid")
+    output_path = output_directory / "issuer_inline_inventory.json"
+    if output_path.exists():
+        cached = json.loads(
+            _read_regular_file(output_path, MAX_MANIFEST_BYTES).decode()
+        )
+        if (
+            not isinstance(cached, dict)
+            or cached.get("request") != request
+            or (generated_at is not None and cached.get("generated_at") != generated_at)
+        ):
+            raise ProvenanceError(
+                "inline inventory already freezes different acquisition inputs"
+            )
+        build_issuer_inline_manifest(
+            cached, output_directory, generated_at=str(cached.get("generated_at") or "")
+        )
+        return output_path
+    downloader = _Downloader(
+        user_agent=user_agent,
+        requests_per_second=rate,
+        max_retries=retries,
+        http_get=http_get,
+        sleep=sleep,
+    )
+    output_directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+
+    def acquire(url: str, prefix: str) -> tuple[bytes, dict[str, Any]]:
+        raw, headers = downloader.get(url)
+        # Equisolve embeds a public form-site key; it is not an access challenge.
+        challenge_sample = (
+            raw[:64_000].lower().replace(b"hcaptchasitekey", b"publicformsitekey")
+        )
+        if _challenge(challenge_sample) or b"<html" not in raw[:16_000].lower():
+            raise ProvenanceError("inline issuer returned a challenge or non-HTML body")
+        text, normalization = normalize_inline_source(raw)
+        raw_name, source_name = prefix + ".raw.html", prefix + ".html"
+        _atomic_write(output_directory / raw_name, raw)
+        _atomic_write(output_directory / source_name, text)
+        return text, {
+            "source_url": url,
+            "raw_source_file": raw_name,
+            "source_file": source_name,
+            "retrieval_bytes": len(raw),
+            "bytes": len(text),
+            "normalization": normalization,
+            "content_type": _header(headers, "Content-Type"),
+        }
+
+    listing_text, listing = acquire(request["listing_url"], "issuer_listing")
+    validate_inline_listing(listing_text.decode(), request["filings"])
+    filings = []
+    for filing in request["filings"]:
+        text, receipt = acquire(
+            filing["source_url"], filing["filing_id"] + ".inline_xbrl"
+        )
+        parse_issuer_inline_metrics(
+            text.decode(),
+            report_date=filing["report_date"],
+            issuer_cik=AMD_CIK,
+            metric_profile=AMD_INLINE_PROFILE,
+        )
+        filings.append({"filing_id": filing["filing_id"], **receipt})
+    inventory = {
+        "schema_version": ISSUER_INLINE_INVENTORY_SCHEMA,
+        "data_stage": "source_inventory",
+        "production_eligible": False,
+        "generation_integration": "disabled",
+        "generated_at": generated_at or _timestamp(),
+        "request": request,
+        "listing": listing,
+        "filings": filings,
+    }
+    encoded = json.dumps(inventory, ensure_ascii=False, indent=2).encode()
+    if len(encoded) > MAX_MANIFEST_BYTES:
+        raise ProvenanceError("inline inventory exceeds manifest size limit")
+    _atomic_write(output_path, encoded)
+    return output_path
+
+
 def fetch_issuer_ir_filing_history(
     request_path: Path,
     output_directory: Path,
@@ -673,6 +794,8 @@ def fetch_issuer_ir_filing_history(
         raise ProvenanceError(f"cannot read issuer IR fetch request: {exc}") from exc
     if not isinstance(payload, dict):
         raise ProvenanceError("issuer IR fetch request must be an object")
+    if payload.get("schema_version") == "longworld.issuer-inline-xbrl-fetch-request.v1":
+        return _fetch_issuer_inline_history(payload, output_directory, http_get=http_get, sleep=sleep, generated_at=generated_at)
     request = _validate_request(payload)
     timestamp = generated_at or _timestamp()
     _parse_timestamp(timestamp, "generated_at")

@@ -720,11 +720,21 @@ def test_p12_sec_slice_adds_128k_without_changing_historical_training_buckets() 
             "p57-ietf-http2-64k-probe-1-v1",
             "p57-ietf-pkix-path-64k-probe-1-v1",
             "p57-ietf-ssh-architecture-32k-probe-1-v1",
+            "p61-code-duckdb-reading-32k-probe-1-v1",
             "p57-ietf-acme-issuance-32k-probe-1-v1",
             "p57-ietf-dnssec-64k-probe-1-v1",
             "p57-finance-micron-dual-partition-32k-probe-1-v1",
             "p57-finance-amazon-128k-probe-1-v1",
             "p57-finance-meta-128k-probe-1-v1",
+            "p58-finance-meta-reconstruction-64k-probe-1-v1",
+            "p59-finance-alphabet-reconstruction-64k-probe-1-v1",
+            "p59-finance-micron-reconstruction-64k-probe-1-v1",
+            "p59-finance-nvidia-cash-components-64k-probe-1-v1",
+            "p60-finance-amd-inline-cash-components-64k-probe-1-v1",
+            "p59-code-pulumi-recovery-64k-probe-1-v1",
+            "p60-code-pulumi-patch-files-reading-v2-64k-probe-1-v1",
+            "p60-code-pulumi-patch-review-64k-probe-1-v1",
+            "p58-code-transformers-review-ancestry-probe-1-v1",
         }
     )
     assert historical.training_length_buckets == ("16k", "32k", "64k")
@@ -825,3 +835,23 @@ def test_p7_github_slice_is_an_explicit_one_world_engineering_gate() -> None:
     assert profile.min_unique_real_source_workflows == 1
     assert profile.min_real_exact_64k_rows_by_domain == (("codeforge", 1),)
     assert profile.min_real_exact_64k_worlds_by_domain == (("codeforge", 1),)
+
+
+@pytest.mark.parametrize(
+    ("profile_id", "template_id", "length_view_pair"),
+    (
+        ("p58-finance-meta-reconstruction-64k-probe-1-v1",
+         "p57-finance-nvidia-market-mix-crossover-64k-probe-1-v1", True),
+        ("p58-code-transformers-review-ancestry-probe-1-v1",
+         "p17-codeforge-128k-extension-probe-1-v1", False),
+    ),
+)
+def test_p58_profiles_preserve_template_gates(profile_id, template_id, length_view_pair):
+    actual = asdict(release_profile(profile_id))
+    expected = asdict(release_profile(template_id))
+    actual.pop("profile_id")
+    expected.pop("profile_id")
+    assert actual == expected
+    assert profile_id in RELATION_PROVENANCE_SPLIT_PROFILE_IDS
+    assert profile_id in CURRENT_RELEASE_GATE_ONLY_PROFILE_IDS
+    assert (profile_id in LENGTH_VIEW_PAIR_PROFILE_IDS) is length_view_pair

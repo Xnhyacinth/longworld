@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.codeforge-taskbank-config.v1",
+  "source_bundle": "configs/p15_codeforge_uv_release_validation_v1_bundle.json",
+  "source_bundle_sha256": "17bd6cccd8abcd929c4b25dde48944ea175c13be689ac67c87a37b243f11bfa6",
+  "source_group_id": "https://github.com/astral-sh/uv",
+  "split": "eval",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true
+  }
+}

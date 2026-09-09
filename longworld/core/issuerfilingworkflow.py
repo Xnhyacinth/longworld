@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from itertools import pairwise
 from pathlib import Path
@@ -732,7 +732,9 @@ def _policy_fact(
 
 
 ALPHABET_ASSET_BREAKDOWN_PROFILE = "alphabet.asset-revenue-breakdown.v1"
+ALPHABET_RECONSTRUCTION_PROFILE = "alphabet.financial-reconstruction.v1"
 NVIDIA_MARKET_SEGMENT_PROFILE = "nvidia.income-market-segment.v1"
+NVIDIA_CASH_COMPONENTS_PROFILE = "nvidia.cash-components-reconstruction.v1"
 NVIDIA_CIK = "0001045810"
 NVIDIA_MARKET_SECTION = (
     "Segment Information - Schedule of Revenue by Market (Details)"
@@ -753,6 +755,7 @@ META_SEGMENT_MEMBERS = (
     ),
 )
 MICRON_CIK = "0000723125"
+MICRON_RECONSTRUCTION_PROFILE = "micron.financial-reconstruction.v1"
 MICRON_CORE_METRICS = (
     (
         "revenue",
@@ -899,6 +902,7 @@ NVIDIA_CORE_METRICS = (
     ),
 )
 META_CIK = "0001326801"
+META_RECONSTRUCTION_PROFILE = "meta.financial-reconstruction.v1"
 META_CORE_METRICS = (
     (
         "revenue",
@@ -1397,6 +1401,157 @@ def _meta_segment_facts(
     return tuple(facts), (start, end)
 
 
+def _parse_meta_reconstruction_metrics(
+    source_text: str, *, report_date: str
+) -> IssuerIrRenderedProgram:
+    """Opt in to annual cash reconciliation without changing the asset profile."""
+    program = _parse_meta_asset_metrics(source_text, report_date=report_date)
+    extra_roles = {
+        "operating_income",
+        "cash_from_investing",
+        "cash_from_financing",
+        "cash_fx_effect",
+        "cash_period_change",
+    }
+    facts = list(program.facts)
+    required_roles = extra_roles | {role for role, _, _ in META_CORE_METRICS}
+    for role, _, concept, _ in _METRICS:
+        if role not in required_roles:
+            continue
+        if role == "cash_fx_effect":
+            concept = (
+                "defref_us-gaap_EffectOfExchangeRateOnCashCashEquivalents"
+                "RestrictedCashAndRestrictedCashEquivalents"
+            )
+        title = (
+            "Consolidated Statements of Income"
+            if role in {"revenue", "operating_income"}
+            else "Consolidated Balance Sheets"
+            if role in {"assets", "liabilities_and_equity"}
+            else "Consolidated Statements of Cash Flows"
+        )
+        start, end = _statement_table(source_text, title)
+        table = source_text[start:end]
+        # These tables already passed the asset profile's USD-millions check.
+        exact_concepts = tuple(
+            f"'{item}'" for item in (concept, *_CONCEPT_ALIASES.get(role, ()))
+        )
+        if (
+            sum(
+                any(item in row.group() for item in exact_concepts)
+                for row in _ROW.finditer(table)
+            )
+            != 1
+        ):
+            raise ProvenanceError(
+                f"Meta reconstruction {role} operand is missing or ambiguous"
+            )
+        if role not in extra_roles:
+            continue
+        facts.append(
+            _metric_fact(
+                source_text,
+                role=role,
+                title=title,
+                concept=concept,
+                table_start=start,
+                table_end=end,
+                occurrence=0,
+                value_cell_index=_alphabet_annual_value_index(
+                    table, program.report_date_display
+                ),
+                display_date=program.report_date_display,
+            )
+        )
+    values = {fact.role: fact.numeric_value for fact in facts}
+    if (
+        sum(
+            values[role]
+            for role in (
+                "cash_from_operations",
+                "cash_from_investing",
+                "cash_from_financing",
+                "cash_fx_effect",
+            )
+        )
+        != values["cash_period_change"]
+    ):
+        raise ProvenanceError("Meta cash-flow identity fails")
+    return replace(program, facts=tuple(facts))
+
+
+def _extend_cash_reconstruction(
+    source_text: str,
+    program: IssuerIrRenderedProgram,
+    *,
+    revenue_concept: str,
+    include_fx: bool,
+) -> IssuerIrRenderedProgram:
+    """Bind distinct annual cash operands from already unit-verified statements."""
+    extra_roles = {
+        "operating_income",
+        "cash_from_investing",
+        "cash_from_financing",
+        "cash_period_change",
+    }
+    if include_fx:
+        extra_roles.add("cash_fx_effect")
+    required = extra_roles | {
+        "revenue",
+        "assets",
+        "liabilities_and_equity",
+        "cash_from_operations",
+    }
+    sections = {fact.role: fact.section for fact in program.facts}
+    facts = list(program.facts)
+    for role, _, concept, _ in _METRICS:
+        if role not in required:
+            continue
+        if role == "revenue":
+            concept = revenue_concept
+        elif role == "cash_fx_effect":
+            concept = (
+                "defref_us-gaap_EffectOfExchangeRateOnCashCashEquivalents"
+                "RestrictedCashAndRestrictedCashEquivalents"
+            )
+        title = (
+            sections.get(role)
+            or sections[
+                "revenue" if role == "operating_income" else "cash_from_operations"
+            ]
+        )
+        start, end = _statement_table(source_text, title)
+        table = source_text[start:end]
+        if sum(f"'{concept}'" in row.group() for row in _ROW.finditer(table)) != 1:
+            raise ProvenanceError(
+                f"reconstruction {role} operand is missing or ambiguous"
+            )
+        if role not in extra_roles:
+            continue
+        facts.append(
+            _metric_fact(
+                source_text,
+                role=role,
+                title=title,
+                concept=concept,
+                table_start=start,
+                table_end=end,
+                occurrence=0,
+                value_cell_index=_alphabet_annual_value_index(
+                    table, program.report_date_display
+                ),
+                display_date=program.report_date_display,
+            )
+        )
+    values = {fact.role: fact.numeric_value for fact in facts}
+    cash_roles = ["cash_from_operations", "cash_from_investing", "cash_from_financing"]
+    if include_fx:
+        cash_roles.append("cash_fx_effect")
+    if sum(values[role] for role in cash_roles) != values["cash_period_change"]:
+        raise ProvenanceError("reconstruction cash component identity fails")
+    return replace(program, facts=tuple(facts))
+
+
 def _parse_meta_asset_metrics(
     source_text: str, *, report_date: str
 ) -> IssuerIrRenderedProgram:
@@ -1681,25 +1836,52 @@ def parse_issuer_ir_rendered_metrics(
         raise ProvenanceError("issuer IR rendered XBRL text is missing")
     allowed_profiles = {
         ("0001652044", ALPHABET_ASSET_BREAKDOWN_PROFILE),
+        ("0001652044", ALPHABET_RECONSTRUCTION_PROFILE),
         (NVIDIA_CIK, NVIDIA_MARKET_SEGMENT_PROFILE),
+        (NVIDIA_CIK, NVIDIA_CASH_COMPONENTS_PROFILE),
+        (META_CIK, META_RECONSTRUCTION_PROFILE),
+        (MICRON_CIK, MICRON_RECONSTRUCTION_PROFILE),
     }
     if metric_profile is not None and (issuer_cik, metric_profile) not in allowed_profiles:
         raise ProvenanceError("unsupported issuer financial metric profile")
     if issuer_cik == "0001652044":
+        if metric_profile == ALPHABET_RECONSTRUCTION_PROFILE:
+            base = _parse_alphabet_asset_metrics(
+                source_text, report_date=report_date,
+                metric_profile=ALPHABET_ASSET_BREAKDOWN_PROFILE,
+            )
+            return _extend_cash_reconstruction(
+                source_text, base, include_fx=True,
+                revenue_concept=("defref_us-gaap_Revenues" if report_date < "2022-01-01"
+                    else "defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax"),
+            )
         return _parse_alphabet_asset_metrics(
             source_text, report_date=report_date, metric_profile=metric_profile
         )
     if issuer_cik == NVIDIA_CIK:
+        if metric_profile == NVIDIA_CASH_COMPONENTS_PROFILE:
+            base = _parse_nvidia_asset_metrics(
+                source_text, report_date=report_date,
+                metric_profile=NVIDIA_MARKET_SEGMENT_PROFILE,
+            )
+            return _extend_cash_reconstruction(
+                source_text, base, include_fx=False,
+                revenue_concept="defref_us-gaap_Revenues",
+            )
         return _parse_nvidia_asset_metrics(
             source_text, report_date=report_date, metric_profile=metric_profile
         )
     if issuer_cik == META_CIK:
-        if metric_profile is not None:
-            raise ProvenanceError("unsupported issuer financial metric profile")
+        if metric_profile == META_RECONSTRUCTION_PROFILE:
+            return _parse_meta_reconstruction_metrics(source_text, report_date=report_date)
         return _parse_meta_asset_metrics(source_text, report_date=report_date)
     if issuer_cik == MICRON_CIK:
-        if metric_profile is not None:
-            raise ProvenanceError("unsupported issuer financial metric profile")
+        if metric_profile == MICRON_RECONSTRUCTION_PROFILE:
+            return _extend_cash_reconstruction(
+                source_text, _parse_micron_asset_metrics(source_text, report_date=report_date),
+                include_fx=True,
+                revenue_concept="defref_us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax",
+            )
         return _parse_micron_asset_metrics(source_text, report_date=report_date)
     try:
         display_date = _display_date(report_date)
@@ -2615,6 +2797,9 @@ def load_issuer_ir_filing_manifest_bytes(
         raise ProvenanceError(f"cannot read issuer IR filing manifest: {exc}") from exc
     if not isinstance(payload, dict):
         raise ProvenanceError("issuer IR filing manifest must be an object")
+    if payload.get("schema_version") == "longworld.issuer-inline-xbrl-manifest.v1":
+        from longworld.core.issuerinlineworkflow import load_issuer_inline_manifest_bytes
+        return load_issuer_inline_manifest_bytes(raw, attestation_key=attestation_key)
     if not verify_attestation(
         payload,
         attestation_key or attestation_key_from_env("source_manifest"),

@@ -1,0 +1,27 @@
+{
+  "schema_version": "longworld.p60-code-jobs.v1",
+  "jobs": [
+    {
+      "job_id": "pulumi_patch_review_64k",
+      "repository": "pulumi/pulumi",
+      "seed": 160,
+      "new_admitted_entity_candidate": false,
+      "bundle": "configs/p16_codeforge_pulumi_failure_recovery_v1_bundle.json",
+      "template": "configs/p16_codeforge_pulumi_failure_recovery_v1.yaml",
+      "query_type": "patch_review_test_ancestry",
+      "compare_query_type": "failure_recovery_release_trace",
+      "bands": ["64k"]
+    },
+    {
+      "job_id": "duckdb_four_tag_recovery_64k",
+      "repository": "duckdb/duckdb",
+      "seed": 161,
+      "new_admitted_entity_candidate": true,
+      "bundle": "configs/p60_code_duckdb_four_tag_v1_bundle.json",
+      "template": "configs/p16_codeforge_duckdb_failure_recovery_v1.yaml",
+      "query_type": "failure_recovery_release_trace",
+      "bands": ["64k"],
+      "identity_reason": "Historical DuckDB template reused Pulumi seed160; seed161 is unused by existing qualified CodeForge products, yaml seed declarations and live seed-start commands. New repo/source identity, not repeated same source under a new seed."
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.codeforge-taskbank-config.v1",
+  "source_bundle": "configs/p13_codeforge_dprint_three_release_recovery_workspace_v2_bundle.json",
+  "source_bundle_sha256": "7520312ccc079e25a7b40e19957ea7e9b318991a9acec5f56bd00d0a4921aa78",
+  "source_group_id": "https://github.com/dprint/dprint",
+  "split": "train",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true
+  }
+}

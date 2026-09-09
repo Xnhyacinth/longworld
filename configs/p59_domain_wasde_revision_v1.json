@@ -1,0 +1,96 @@
+{
+  "schema_version": "longworld.p59-wasde-revision-preflight.v1",
+  "answer_program_id": "agriculture.wasde_stock_flow_revision_path.v1",
+  "data_root": "data/p59_domain_wasde_v1",
+  "tokenizer": "data/models/Qwen3.5-4B/tokenizer.json",
+  "target": {
+    "geography": "United States",
+    "commodity": "corn",
+    "marketing_year": "2025/26",
+    "unit": "Million Bushels",
+    "vintages": [
+      "May",
+      "Jun",
+      "Jul",
+      "Aug"
+    ]
+  },
+  "question": "For U.S. corn marketing year 2025/26, reconstruct the May through August 2025 WASDE projection revisions. Report each ending-stock revision with its beginning-stock, production, import, domestic-use and export contributions; report total absolute ending-stock revisions and net change. Do not substitute the latest forecast for the revision path.",
+  "sources": [
+    {
+      "file": "wasde0625.txt",
+      "url": "https://esmis.nal.usda.gov/sites/default/release-files/3t945q76s/g732g751w/2z10zp14d/wasde0625.txt",
+      "publication_date": "2025-06-12",
+      "projection_months": [
+        "May",
+        "Jun"
+      ],
+      "sha256": "f058d42b02f3e75e6b613dfde44db388fa1492131e13437790ca6831877b3a73",
+      "bytes": 121467
+    },
+    {
+      "file": "wasde0725.txt",
+      "url": "https://esmis.nal.usda.gov/sites/default/release-files/3t945q76s/tx31sh59w/vq281m71g/wasde0725.txt",
+      "publication_date": "2025-07-11",
+      "projection_months": [
+        "Jun",
+        "Jul"
+      ],
+      "sha256": "6b455ec8635429a643cc130ef8fe03c7ac3c3252c1c2fe06c8ed0ef0388d2a0b",
+      "bytes": 122373
+    },
+    {
+      "file": "wasde0825.txt",
+      "url": "https://esmis.nal.usda.gov/sites/default/release-files/3t945q76s/wd377v73w/6395z6313/wasde0825.txt",
+      "publication_date": "2025-08-12",
+      "projection_months": [
+        "Jul",
+        "Aug"
+      ],
+      "sha256": "059744a6cce31b9dc1cb33b87a7b440f846443f86707d35e60bbf180e1cc72a0",
+      "bytes": 122376
+    },
+    {
+      "file": "wasde0925.txt",
+      "url": "https://esmis.nal.usda.gov/sites/default/release-files/3t945q76s/z890tt821/g732g907r/wasde0925.txt",
+      "publication_date": "2025-09-12",
+      "projection_months": [
+        "Aug",
+        "Sep"
+      ],
+      "sha256": "16a92312b2f5d9a8b7b8dff7ca147c27613c05e0efa93e4f8f51c6b96669a863",
+      "bytes": 122380
+    }
+  ],
+  "trajectory_sources": [
+    "wasde0625.txt",
+    "wasde0825.txt"
+  ],
+  "adjacent_pair_sources": [
+    "wasde0625.txt",
+    "wasde0725.txt"
+  ],
+  "admission": "source_preflight_only_no_shared_adapter_no_inventory",
+  "tokenizer_sha256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+  "rights": {
+    "file": "rights.html",
+    "url": "https://www.nal.usda.gov/web-policies-and-important-links",
+    "sha256": "f5be2f66b81a29fb990a31169263f01f9b0133f20705b9b6a3e3a142f7f8f120",
+    "basis": "NAL government-created information CC0; selected USDA-authored numeric tables, attribution USDA"
+  },
+  "rejected_extension": {
+    "vintages": [
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep"
+    ],
+    "sources": [
+      "wasde0625.txt",
+      "wasde0825.txt",
+      "wasde0925.txt"
+    ],
+    "reason": "September rounded displayed supply operands sum 18164 but printed supply is 18165; no tolerance added"
+  }
+}

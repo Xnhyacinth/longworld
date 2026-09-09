@@ -47,3 +47,6 @@ saves/
 
 # Local source-bundle construction intermediates
 configs/public_repo_episodes_v2_pre_*.json
+
+# Agent planning notes stay on the worlds worktree
+.hl/

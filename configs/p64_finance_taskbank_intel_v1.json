@@ -1,0 +1,19 @@
+{
+  "schema_version": "longworld.finance-taskbank-long-build.v1",
+  "source_kind": "generic_inline",
+  "source_manifest": "data/finance_sources/p64_intel_generic_v1/source_manifest.json",
+  "split_group_id": "0000050863",
+  "split": "train",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "holds": {},
+  "excluded_split_group_ids": [
+    "0000002488",
+    "0000908937"
+  ],
+  "excluded_families": [
+    "margin_extremes_cashflow_difference"
+  ]
+}

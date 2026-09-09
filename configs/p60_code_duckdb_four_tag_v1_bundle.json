@@ -1,0 +1,31 @@
+{
+  "schema_version": "longworld.episode-replay-bundle.v1",
+  "composition": "chronological_causal_union",
+  "path_base": "repository_root",
+  "episodes": [
+    {
+      "path": "reports/p16_codeforge_duckdb_failure_recovery_sources_v1/duckdb_pr19117_v1.4.1.json",
+      "sha256": "9d71958d152f7563d2fca0aaf2d8f8f464f7c90b75512d643ffd71517e091847"
+    },
+    {
+      "path": "reports/p16_codeforge_duckdb_failure_recovery_sources_v1/duckdb_pr19318_v1.4.2.json",
+      "sha256": "5377fe0662a77a4940e74d4a8a755381e412757393a3662709d4a12ea9650f20"
+    },
+    {
+      "path": "reports/p16_codeforge_duckdb_failure_recovery_sources_v1/duckdb_pr20348_v1.4.4.json",
+      "sha256": "8c335b9f674d93174887830140047a3db3b207715044cb6c8a0b358542e5a1ae"
+    },
+    {
+      "path": "reports/p16_codeforge_duckdb_failure_recovery_sources_v1/duckdb_pr22425_v1.5.3.json",
+      "sha256": "e135277bed9ae35dca8302cd1e6bd370abda5316c048beabfc217ac4811228c9"
+    }
+  ],
+  "attestation": {
+    "scheme": "hmac-sha256-v2",
+    "purpose": "episode_replay_bundle",
+    "role": "source",
+    "key_id": "probe-source-e4bac7778cdcfa3808f3c373b474e85f",
+    "environment": "probe",
+    "digest": "1ca26891f50a3d0cb0ee2c1c8d3eb8973bdbf59d3def9ba19a90de5ff0381608"
+  }
+}

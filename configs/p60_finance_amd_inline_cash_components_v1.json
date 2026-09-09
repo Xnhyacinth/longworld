@@ -1,0 +1,21 @@
+{
+  "schema_version": "longworld.finance-history-materialization.v1",
+  "world_id": "finance_amd_inline_cash_components_fy2021_2024_p60_v1",
+  "signed_issuer_manifest": "data/source_inventory/p60_finance_amd_inline_fy2021_2024_v1/issuer_inline_manifest.signed.json",
+  "source_inventory": "data/source_inventory/p60_finance_amd_inline_fy2021_2024_v1/issuer_inline_inventory.json",
+  "source_inventory_sha256": "58cf669447ed35a4f38c911c3bf56d12322004755f2fc8ba78e23c18a02f5781",
+  "source_generated_at": "2026-09-08T17:12:39.454068Z",
+  "answer_program_id": "finance.cash_components_identity.v1",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "bands": [
+    {
+      "name": "64k",
+      "lower_tokens": 64000,
+      "upper_tokens": 65536
+    }
+  ],
+  "output_dir": "reports/p60_finance_amd_inline_cash_components_v1"
+}
