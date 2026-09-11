@@ -378,6 +378,8 @@ GPUS=0,1,2,3,4,5,6,7 bash scripts/train_baselines_128k.sh
 # 4B-Base ablation on 4 GPUs (still GBS 16: SP=4 DP=1 accum=16):
 # GPUS=4,5,6,7 CONDS="ext_acc ext_longtrace" MODEL=data/models/Qwen3.5-4B-Base \
 #   bash scripts/train_baselines_128k.sh
+# P64 LongWorld primary on the same 4B-Base recipe (eval kept; cutoff 256k):
+# SKIP_HOLD=1 GPUS=4,5,6,7 bash scripts/train_swift.sh ext_p64
 
 # cutoff 256k is the native cap; signed B5 samples are 16k/32k/64k (packing off).
 LONGWORLD_RELEASE_PROFILE=p3-probe-12-v1 \

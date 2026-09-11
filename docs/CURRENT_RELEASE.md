@@ -1,6 +1,6 @@
 # Current release status
 
-Last updated: 2026-09-07
+Last updated: 2026-09-11
 
 This file is the canonical publication-status summary. Historical receipts and
 `.hl/` logs remain useful for reproducibility, but they do not override this
@@ -8,6 +8,21 @@ status. The canonical project root is `/workspace/wynckeliao/longworld`;
 project code, source inventory, generated data, release receipts, reports, and
 durable progress records must live there. Tool caches may be reconstructed
 outside the repository, and credentials must remain outside Git.
+
+## 2026-09-11 P64 4B-Base SFT (not a LongWorld product release)
+
+ACC and LongTrace already have held-out val sets (32 rows each), so the signed
+P64 eval split stays eval and is **not** folded into train. Local product is
+`data/sft/p64_primary_training_v2/` (finance+codeforge: 1953 train / 533 eval;
+max chat tokens 261,954; Hub copy under
+`Xnhyacinth/LongWorld-Real-Workflows` `local-probe-train-ready/p64-primary-training-v2/`).
+`production_eligible` remains false.
+
+The run reuses the latest 4B-Base ACC/LongTrace ms-swift recipe on GPUs 4–7
+only (GBS 16, SP=4, DP=1, micro=1, accum=16, lr 1e-5 cosine, 680 steps, FA2+FLA,
+DeepSpeed none, packing off, `SKIP_HOLD=1`). Cutoff is native 262144 so those
+rows are not truncated. Related-work Base ACC/LongTrace checkpoints stay 128k
+baselines, not this product. Config: `configs/swift/ext_p64.yaml`.
 
 ## 2026-09-07 128k related-work baselines on private Hugging Face
 

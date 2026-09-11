@@ -1,0 +1,57 @@
+### P64 finance+codeforge primary local-probe SFT, aligned to 4B-Base ACC/LongTrace.
+### Same optimizer/GBS/steps/SP/FA2/FLA/no-DeepSpeed; cutoff 262144 so LongWorld rows are not truncated.
+### 4x H200: GBS 16 = SP=4, DP=1, micro=1, accum=16. Eval kept (ACC/LongTrace also have val).
+### wandb: wyncke/longworld, group longworld-p64-sft-4gpu-base.
+model: data/models/Qwen3.5-4B-Base
+use_hf: true
+torch_dtype: bfloat16
+tuner_type: full
+freeze_llm: false
+freeze_vit: true
+freeze_aligner: true
+add_non_thinking_prefix: true
+loss_scale: ignore_empty_think
+attn_impl: flash_attn
+sequence_parallel_size: 4
+
+dataset:
+  - data/sft/p64_primary_training_v2/finance_train.jsonl
+  - data/sft/p64_primary_training_v2/codeforge_train.jsonl
+val_dataset:
+  - data/sft/p64_primary_training_v2/finance_eval.jsonl
+  - data/sft/p64_primary_training_v2/codeforge_eval.jsonl
+load_from_cache_file: true
+lazy_tokenize: true
+packing: false
+padding_free: true
+use_logits_to_keep: false
+max_length: 262144
+dataset_num_proc: 32
+dataloader_num_workers: 4
+dataloader_persistent_workers: true
+dataloader_pin_memory: true
+split_dataset_ratio: 0.0
+
+output_dir: data/sft/swift_ext_p64_base
+logging_steps: 5
+save_steps: 100
+eval_strategy: steps
+eval_steps: 100
+save_total_limit: 2
+save_only_model: false
+load_best_model_at_end: true
+metric_for_best_model: loss
+report_to: wandb
+run_name: longworld-p64-qwen35-4b-base-256k-sp4-4gpu
+seed: 42
+
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 16
+learning_rate: 1.0e-5
+num_train_epochs: 1.0
+max_steps: 680
+lr_scheduler_type: cosine
+warmup_ratio: 0.05
+gradient_checkpointing: true
+max_grad_norm: 1.0

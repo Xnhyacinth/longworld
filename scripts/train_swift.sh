@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Full-parameter SFT with latest ms-swift + Ulysses SP.
 # Usage: GPUS=6,7 bash scripts/train_swift.sh ext_acc
+# P64 4B-Base (keep eval, 256k cutoff): SKIP_HOLD=1 GPUS=4,5,6,7 bash scripts/train_swift.sh ext_p64
 # Extra CLI overrides: bash scripts/train_swift.sh ext_acc --learning_rate 1e-5
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -130,9 +131,15 @@ export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 
 ALIGN_128K=0
 case "$COND" in
-  ext_acc|ext_longtrace|ext_longmit)
+  ext_acc|ext_longtrace|ext_longmit|ext_p64)
     ALIGN_128K=1
-    export WANDB_RUN_GROUP="${WANDB_RUN_GROUP:-${WANDB_RUN_GROUP_128K:-longworld-128k-sft-8gpu}}"
+    if [[ "$COND" == "ext_p64" ]]; then
+      export WANDB_RUN_GROUP="${WANDB_RUN_GROUP:-longworld-p64-sft-4gpu-base}"
+      # recipe.env defaults related-work cutoff to 133120; P64 keeps native 256k.
+      MAX_LENGTH_128K="${MAX_LENGTH_P64:-262144}"
+    else
+      export WANDB_RUN_GROUP="${WANDB_RUN_GROUP:-${WANDB_RUN_GROUP_128K:-longworld-128k-sft-8gpu}}"
+    fi
     ;;
   B*)
     export WANDB_RUN_GROUP="${WANDB_RUN_GROUP:-longworld-causaltwin}"
