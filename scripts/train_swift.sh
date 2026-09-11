@@ -134,7 +134,7 @@ case "$COND" in
   ext_acc|ext_longtrace|ext_longmit|ext_p64)
     ALIGN_128K=1
     if [[ "$COND" == "ext_p64" ]]; then
-      export WANDB_RUN_GROUP="${WANDB_RUN_GROUP:-longworld-p64-sft-4gpu-base}"
+      export WANDB_RUN_GROUP="${WANDB_RUN_GROUP_P64:-longworld-p64-sft-4gpu-base}"
       # recipe.env defaults related-work cutoff to 133120; P64 keeps native 256k.
       MAX_LENGTH_128K="${MAX_LENGTH_P64:-262144}"
     else
