@@ -305,6 +305,13 @@ MODELS=(
   "b0_qwen35_4b|$ROOT/data/models/Qwen3.5-4B"
   "acc_ckpt680|$ROOT/data/sft/swift_ext_acc/v6-20260825-153450/checkpoint-680"
 )
+if [[ -n "${EVAL_MODELS:-}" ]]; then
+  MODELS=()
+  while IFS= read -r spec; do
+    [[ -z "${spec}" ]] && continue
+    MODELS+=("${spec}")
+  done <<< "${EVAL_MODELS}"
+fi
 
 fail=0
 for spec in "${MODELS[@]}"; do

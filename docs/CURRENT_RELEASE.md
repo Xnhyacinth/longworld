@@ -1,6 +1,6 @@
 # Current release status
 
-Last updated: 2026-09-11
+Last updated: 2026-09-12
 
 This file is the canonical publication-status summary. Historical receipts and
 `.hl/` logs remain useful for reproducibility, but they do not override this
@@ -8,6 +8,23 @@ status. The canonical project root is `/workspace/wynckeliao/longworld`;
 project code, source inventory, generated data, release receipts, reports, and
 durable progress records must live there. Tool caches may be reconstructed
 outside the repository, and credentials must remain outside Git.
+
+## 2026-09-12 sync: P64 product on Hub, P65 adapters on GitHub
+
+LongWorld **training rows** for the current P64 primary set are on private
+`Xnhyacinth/LongWorld-Real-Workflows` at
+`local-probe-train-ready/p64-primary-training-v2/` (Hub `30f4a0194bad`, 1953
+train / 533 eval jsonl; sizes match the local snapshot). They are
+`local_training_eligible` and **not** `production_eligible`. Synthesis
+intermediates for P64/P65 (candidates, signed source inventories, retained
+filings) belong on `Xnhyacinth/LongWorld-Synthesis-Workspace`; HMAC keys stay
+off Hub and Git. There is still **no** P64/LongWorld 256k full-SFT checkpoint
+(the 4-GPU 256k run OOM'd after step 1).
+
+P65 taskbank adapters (CodeForge reading-proof, finance disclosure versions,
+GovInfo HR4366) landed on `main` from the worlds worktree without probe-trust
+files or report jsonl dumps. P65 candidates are synthesis intermediates, not a
+new Real-Workflows product.
 
 ## 2026-09-11 P64 4B-Base SFT (not a LongWorld product release)
 

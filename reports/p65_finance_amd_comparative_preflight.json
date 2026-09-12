@@ -1,0 +1,101 @@
+{
+  "issuer": "amd",
+  "claims": 88,
+  "rejected": [],
+  "conflicts": [
+    {
+      "key": [
+        "cash_from_investing",
+        "2020-12-27",
+        "2021-12-25"
+      ],
+      "claims": [
+        {
+          "role": "cash_from_investing",
+          "valid_start": "2020-12-27",
+          "valid_end": "2021-12-25",
+          "value": -686,
+          "available": "2022-02-03",
+          "filing_report_date": "2021-12-25",
+          "record_id": "issuer-inline:0000002488:2021-12-25",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 970191,
+          "quote": "686"
+        },
+        {
+          "role": "cash_from_investing",
+          "valid_start": "2020-12-27",
+          "valid_end": "2021-12-25",
+          "value": -686,
+          "available": "2023-02-27",
+          "filing_report_date": "2022-12-31",
+          "record_id": "issuer-inline:0000002488:2022-12-31",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1124330,
+          "quote": "686"
+        },
+        {
+          "role": "cash_from_investing",
+          "valid_start": "2020-12-27",
+          "valid_end": "2021-12-25",
+          "value": 686,
+          "available": "2024-01-31",
+          "filing_report_date": "2023-12-30",
+          "record_id": "issuer-inline:0000002488:2023-12-30",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1003892,
+          "quote": "686"
+        }
+      ]
+    },
+    {
+      "key": [
+        "cash_from_financing",
+        "2020-12-27",
+        "2021-12-25"
+      ],
+      "claims": [
+        {
+          "role": "cash_from_financing",
+          "valid_start": "2020-12-27",
+          "valid_end": "2021-12-25",
+          "value": -1895,
+          "available": "2022-02-03",
+          "filing_report_date": "2021-12-25",
+          "record_id": "issuer-inline:0000002488:2021-12-25",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 995884,
+          "quote": "1,895"
+        },
+        {
+          "role": "cash_from_financing",
+          "valid_start": "2020-12-27",
+          "valid_end": "2021-12-25",
+          "value": -1895,
+          "available": "2023-02-27",
+          "filing_report_date": "2022-12-31",
+          "record_id": "issuer-inline:0000002488:2022-12-31",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1147038,
+          "quote": "1,895"
+        },
+        {
+          "role": "cash_from_financing",
+          "valid_start": "2020-12-27",
+          "valid_end": "2021-12-25",
+          "value": 1895,
+          "available": "2024-01-31",
+          "filing_report_date": "2023-12-30",
+          "record_id": "issuer-inline:0000002488:2023-12-30",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1018643,
+          "quote": "1,895"
+        }
+      ]
+    }
+  ],
+  "status": "raw_inline_preflight_not_admitted",
+  "requires_visible_column_and_sign_validation": true,
+  "liabilities_and_equity_alias_included_in_raw_counts": true,
+  "warning": "Both raw conflict groups were rejected by the visible-sign check; these are not admitted disclosure revisions."
+}

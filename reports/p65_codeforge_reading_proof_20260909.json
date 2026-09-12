@@ -1,0 +1,105 @@
+{
+  "schema_version": "longworld.p65-codeforge-proof-closeout.v1",
+  "status": "BUILD_AND_VALIDATE_PASS",
+  "receipt_path": "data/candidates/p65_codeforge_reading_proof_v1/BUILD_RECEIPT.json",
+  "receipt_sha256": "1b3c3951743de3aecde7af94d4ea458a1f6580e1b3acf520da068c36b204c4fd",
+  "pipeline_receipt": "reports/p65_pipeline_wave2/PIPELINE_RECEIPT.json",
+  "input_primary_rows": 804,
+  "filename_grammar_rows": 313,
+  "raw_scoped_certificates": 179,
+  "content_backed_subset": 130,
+  "raw_only": 49,
+  "counts": {
+    "eval": 34,
+    "train": 96
+  },
+  "programs": {
+    "merged_files_union": 109,
+    "approved_merge_files": 21
+  },
+  "repositories": {
+    "https://github.com/astral-sh/ruff": 8,
+    "https://github.com/astral-sh/uv": 24,
+    "https://github.com/dprint/dprint": 11,
+    "https://github.com/huggingface/transformers": 22,
+    "https://github.com/opensearch-project/opensearch-php": 10,
+    "https://github.com/oxc-project/oxc": 50,
+    "https://github.com/pulumi/pulumi": 5
+  },
+  "context_capacity_bins": {
+    "cap128k": 47,
+    "cap256k": 71,
+    "cap64k": 12
+  },
+  "exact_context_token_ranges": {
+    "128k": 2,
+    "256k": 2,
+    "64k": 1,
+    "other_long": 125
+  },
+  "raw_minimum_cover_range": [
+    17653,
+    244741
+  ],
+  "content_control_minimum_cover_range": [
+    16750,
+    177071
+  ],
+  "whole_latest_episode_gold_alias_opportunities": 1,
+  "any_single_head_gold_alias_opportunities": 0,
+  "latest_head_exact_set_successes": 0,
+  "any_single_head_exact_set_successes": 0,
+  "new_source_worlds": 0,
+  "new_semantic_tasks": 0,
+  "new_counterfactual_views": 0,
+  "tests_passed": 8,
+  "strict_long_dependency_verified": false,
+  "canonical_strict_production_eligible": false,
+  "examples": [
+    {
+      "semantic_task_id": "0d558cbc031c674623f82415807b4c6dfa0ac4a4fcc5389b85758dbf7bde542a",
+      "repository": "https://github.com/huggingface/transformers",
+      "program_id": "merged_files_union",
+      "context_tokens": 64728,
+      "full_message_tokens": 65027,
+      "raw_minimum_cover": 41029,
+      "content_control_minimum_cover": 21858
+    },
+    {
+      "semantic_task_id": "29e83bc3ae96e6e21ecf43454c5b270f99db09f378158404b9e7f48bc16f6071",
+      "repository": "https://github.com/opensearch-project/opensearch-php",
+      "program_id": "merged_files_union",
+      "context_tokens": 257979,
+      "full_message_tokens": 258555,
+      "raw_minimum_cover": 244741,
+      "content_control_minimum_cover": 177071
+    },
+    {
+      "semantic_task_id": "8ccb3719219596ae6e7ec025f7895a63cf07f388046494c571672503eefa7f54",
+      "repository": "https://github.com/oxc-project/oxc",
+      "program_id": "merged_files_union",
+      "context_tokens": 129143,
+      "full_message_tokens": 130541,
+      "raw_minimum_cover": 72510,
+      "content_control_minimum_cover": 39591
+    },
+    {
+      "semantic_task_id": "bb1b22f99f01ddae1c347ae887e3fa5741d6d77337bd2e5f0c5202d4d2103279",
+      "repository": "https://github.com/astral-sh/uv",
+      "program_id": "merged_files_union",
+      "context_tokens": 130621,
+      "full_message_tokens": 130872,
+      "raw_minimum_cover": 81292,
+      "content_control_minimum_cover": 45300
+    },
+    {
+      "semantic_task_id": "c654e1c75084aa425cfa4de27c3a03f8f05b39d14a094b8324136ac12d10eb33",
+      "repository": "https://github.com/dprint/dprint",
+      "program_id": "merged_files_union",
+      "context_tokens": 258393,
+      "full_message_tokens": 258694,
+      "raw_minimum_cover": 138647,
+      "content_control_minimum_cover": 99863
+    }
+  ]
+}

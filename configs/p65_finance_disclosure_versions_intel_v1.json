@@ -1,0 +1,7 @@
+{
+  "schema_version": "longworld.finance-disclosure-build.v1",
+  "source_config": "configs/p64_finance_taskbank_intel_v1.json",
+  "source_config_sha256": "382a20c11211a0640d2cf6c341311735e08286c8d7119d7c0fc49d4c136ae983",
+  "source_manifest_sha256": "10a717b252973dc50e5578c6964401f23c8b355a5a2dae7af83b2dff15cea2f9",
+  "admission_policy": "version_integration_candidates_with_separate_raw_and_compact_controls"
+}

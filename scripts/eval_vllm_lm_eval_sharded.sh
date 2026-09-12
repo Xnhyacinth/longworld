@@ -282,6 +282,13 @@ MODELS=(
   "acc_ckpt680|$ROOT/data/sft/swift_ext_acc/v6-20260825-153450/checkpoint-680"
   "longtrace_ckpt200|$ROOT/data/sft/swift_ext_longtrace/v0-20260825-235057/checkpoint-200"
 )
+if [[ -n "${EVAL_MODELS:-}" ]]; then
+  MODELS=()
+  while IFS= read -r spec; do
+    [[ -z "${spec}" ]] && continue
+    MODELS+=("${spec}")
+  done <<< "${EVAL_MODELS}"
+fi
 
 fail=0
 for spec in "${MODELS[@]}"; do

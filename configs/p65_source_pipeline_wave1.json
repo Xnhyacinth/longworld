@@ -1,0 +1,85 @@
+{
+  "schema_version": "longworld.source-taskbank-pipeline.v1",
+  "jobs": [
+    {
+      "job_id": "disclosure-intel",
+      "script": "scripts/materialize_finance_disclosure_versions.py",
+      "config": "configs/p65_finance_disclosure_versions_intel_v1.json",
+      "output": "data/candidates/p65_finance_disclosure_versions_v1/intel",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/intel-p64/local_probe_trust.json",
+      "receipt_schema": "longworld.finance-disclosure-receipt.v1",
+      "input_files": [
+        "longworld/core/finance_disclosure_versions.py",
+        "configs/p64_finance_taskbank_intel_v1.json",
+        "data/finance_sources/p64_intel_generic_v1/source_manifest.json"
+      ],
+      "input_sha256": {
+        "/workspace/wynckeliao/longworld-worlds/scripts/materialize_finance_disclosure_versions.py": "ef96d85690e60da4ef552696fde5e0a79ab54117a918ead334df86aead33cc53",
+        "/workspace/wynckeliao/longworld-worlds/configs/p65_finance_disclosure_versions_intel_v1.json": "fc957ea76bcf2ffc05c89709de42add2770ee966c6be9b76556d10c1de4c860b",
+        "/workspace/wynckeliao/longworld-worlds/longworld/core/finance_disclosure_versions.py": "7ff799b31b6c01f9d93149cdd585e1542425140ea5ce2133529d2016181f1f01",
+        "/workspace/wynckeliao/longworld-worlds/configs/p64_finance_taskbank_intel_v1.json": "382a20c11211a0640d2cf6c341311735e08286c8d7119d7c0fc49d4c136ae983",
+        "/workspace/wynckeliao/longworld/data/finance_sources/p64_intel_generic_v1/source_manifest.json": "10a717b252973dc50e5578c6964401f23c8b355a5a2dae7af83b2dff15cea2f9"
+      }
+    },
+    {
+      "job_id": "disclosure-siriusxm",
+      "script": "scripts/materialize_finance_disclosure_versions.py",
+      "config": "configs/p65_finance_disclosure_versions_siriusxm_v1.json",
+      "output": "data/candidates/p65_finance_disclosure_versions_v1/siriusxm",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/siriusxm-p64/local_probe_trust.json",
+      "receipt_schema": "longworld.finance-disclosure-receipt.v1",
+      "input_files": [
+        "longworld/core/finance_disclosure_versions.py",
+        "configs/p64_finance_taskbank_siriusxm_v1.json",
+        "data/finance_sources/p64_siriusxm_generic_v1/source_manifest.json"
+      ],
+      "input_sha256": {
+        "/workspace/wynckeliao/longworld-worlds/scripts/materialize_finance_disclosure_versions.py": "ef96d85690e60da4ef552696fde5e0a79ab54117a918ead334df86aead33cc53",
+        "/workspace/wynckeliao/longworld-worlds/configs/p65_finance_disclosure_versions_siriusxm_v1.json": "1d9bfc7cac7f7be9faed78b9dc88cc91a5a2d950250d70539aa9a232a448d550",
+        "/workspace/wynckeliao/longworld-worlds/longworld/core/finance_disclosure_versions.py": "7ff799b31b6c01f9d93149cdd585e1542425140ea5ce2133529d2016181f1f01",
+        "/workspace/wynckeliao/longworld-worlds/configs/p64_finance_taskbank_siriusxm_v1.json": "84e448f337573008fcfb2fa7cea069ee17bdc0b5bfce6d083b40421b811ce14a",
+        "/workspace/wynckeliao/longworld/data/finance_sources/p64_siriusxm_generic_v1/source_manifest.json": "8685060409f294a173fa176b6031fbab21a39ad4cf01cfe6640731792fe2e8c2"
+      }
+    },
+    {
+      "job_id": "disclosure-amd",
+      "script": "scripts/materialize_finance_disclosure_versions.py",
+      "config": "configs/p65_finance_disclosure_versions_amd_v1.json",
+      "output": "data/candidates/p65_finance_disclosure_versions_v1/amd",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/amd/local_probe_trust.json",
+      "receipt_schema": "longworld.finance-disclosure-receipt.v1",
+      "input_files": [
+        "longworld/core/finance_disclosure_versions.py",
+        "configs/p64_finance_taskbank_amd_v1.json",
+        "data/source_inventory/p60_finance_amd_inline_fy2021_2024_v1/issuer_inline_manifest.signed.json"
+      ],
+      "input_sha256": {
+        "/workspace/wynckeliao/longworld-worlds/scripts/materialize_finance_disclosure_versions.py": "ef96d85690e60da4ef552696fde5e0a79ab54117a918ead334df86aead33cc53",
+        "/workspace/wynckeliao/longworld-worlds/configs/p65_finance_disclosure_versions_amd_v1.json": "4a82b8352919478e717eb35434f5bbafb611d64560973ab37782227c3158fb5f",
+        "/workspace/wynckeliao/longworld-worlds/longworld/core/finance_disclosure_versions.py": "7ff799b31b6c01f9d93149cdd585e1542425140ea5ce2133529d2016181f1f01",
+        "/workspace/wynckeliao/longworld-worlds/configs/p64_finance_taskbank_amd_v1.json": "664ac3f5c92af21fcc47a18b4e9884c38745a37d4a477894c591132b4c97f67c",
+        "/workspace/wynckeliao/longworld/data/source_inventory/p60_finance_amd_inline_fy2021_2024_v1/issuer_inline_manifest.signed.json": "4b8756fa1819883bbb706fb520516a64c17516cf1c44dbcfe018a5ebdfd67258"
+      }
+    },
+    {
+      "job_id": "govinfo-hr4366",
+      "script": "scripts/materialize_p65_govinfo_taskbank.py",
+      "config": "configs/p65_govinfo_taskbank_hr4366_v1.json",
+      "output": "data/candidates/p65_govinfo_taskbank_v2",
+      "source_authority": "official_hash_pinned",
+      "receipt_schema": "longworld.p65-govinfo-taskbank-receipt.v1",
+      "input_files": [
+        "longworld/core/p65_govinfo_taskbank.py",
+        "data/source_inventory/p65_govinfo_derivatives_v1/118-HR-4366.json",
+        "configs/p49_govinfo_bill_text_disposition_preflight_v1.json"
+      ],
+      "input_sha256": {
+        "/workspace/wynckeliao/longworld-worlds/scripts/materialize_p65_govinfo_taskbank.py": "aa07ac186fa40522d50db5951d4f511ce0a6fbdba68f40f2de28bfcfbefe66ca",
+        "/workspace/wynckeliao/longworld-worlds/configs/p65_govinfo_taskbank_hr4366_v1.json": "f8c07ac9d06677a62c78de5818de4967f1b368b5f344cb80999a5f5f1a3352cb",
+        "/workspace/wynckeliao/longworld-worlds/longworld/core/p65_govinfo_taskbank.py": "7af583283ce4f82e7f38bd2ea785d67a83baaac8b9e537e16f9d7d18479c5112",
+        "/workspace/wynckeliao/longworld/data/source_inventory/p65_govinfo_derivatives_v1/118-HR-4366.json": "db67486d860577276a58c0e7d4b578a1e956d1ce3105d85920b63931efe8e28b",
+        "/workspace/wynckeliao/longworld-worlds/configs/p49_govinfo_bill_text_disposition_preflight_v1.json": "f465d2eef69e330e2216ef1a32a4bfeb314cfa5f5c6b94c01a9ed334c2d55c67"
+      }
+    }
+  ]
+}
