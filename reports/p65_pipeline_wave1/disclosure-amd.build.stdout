@@ -1,0 +1,20 @@
+{
+  "status": "PASS",
+  "receipt_path": "/workspace/wynckeliao/longworld/data/candidates/p65_finance_disclosure_versions_v1/amd/BUILD_RECEIPT.json",
+  "semantic_tasks": 0,
+  "short_local_candidates": 0,
+  "long_local_candidates": 0,
+  "long_dependency_eligible": 0,
+  "compact_all_statement_context_tokens": 11097,
+  "yield_funnel": {
+    "native_source_documents": 4,
+    "comparative_claims": 78,
+    "actual_conflicting_metric_periods": 0,
+    "version_sensitive_tasks": 0,
+    "compact_controls_below_32k": 0,
+    "primary_natural_long_candidates": 0,
+    "primary_short_candidates": 0,
+    "long_dependency_qualified": 0
+  },
+  "by_family": {}
+}

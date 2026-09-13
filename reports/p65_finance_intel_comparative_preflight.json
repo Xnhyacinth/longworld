@@ -1,0 +1,334 @@
+{
+  "issuer": "intel",
+  "claims": 88,
+  "rejected": [],
+  "conflicts": [
+    {
+      "key": [
+        "cash_from_operations",
+        "2020-12-27",
+        "2021-12-25"
+      ],
+      "claims": [
+        {
+          "role": "cash_from_operations",
+          "valid_start": "2020-12-27",
+          "valid_end": "2021-12-25",
+          "value": 29991,
+          "available": "2022-01-27",
+          "filing_report_date": "2021-12-25",
+          "record_id": "generic-inline:0000050863:2021-12-25",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1678813,
+          "quote": "29,991"
+        },
+        {
+          "role": "cash_from_operations",
+          "valid_start": "2020-12-27",
+          "valid_end": "2021-12-25",
+          "value": 29456,
+          "available": "2023-01-27",
+          "filing_report_date": "2022-12-31",
+          "record_id": "generic-inline:0000050863:2022-12-31",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1688823,
+          "quote": "29,456"
+        },
+        {
+          "role": "cash_from_operations",
+          "valid_start": "2020-12-27",
+          "valid_end": "2021-12-25",
+          "value": 29456,
+          "available": "2024-01-26",
+          "filing_report_date": "2023-12-30",
+          "record_id": "generic-inline:0000050863:2023-12-30",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1528409,
+          "quote": "29,456"
+        }
+      ]
+    },
+    {
+      "key": [
+        "cash_from_operations",
+        "2019-12-29",
+        "2020-12-26"
+      ],
+      "claims": [
+        {
+          "role": "cash_from_operations",
+          "valid_start": "2019-12-29",
+          "valid_end": "2020-12-26",
+          "value": 35384,
+          "available": "2022-01-27",
+          "filing_report_date": "2021-12-25",
+          "record_id": "generic-inline:0000050863:2021-12-25",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1679896,
+          "quote": "35,384"
+        },
+        {
+          "role": "cash_from_operations",
+          "valid_start": "2019-12-29",
+          "valid_end": "2020-12-26",
+          "value": 35864,
+          "available": "2023-01-27",
+          "filing_report_date": "2022-12-31",
+          "record_id": "generic-inline:0000050863:2022-12-31",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1689908,
+          "quote": "35,864"
+        }
+      ]
+    },
+    {
+      "key": [
+        "cash_from_investing",
+        "2020-12-27",
+        "2021-12-25"
+      ],
+      "claims": [
+        {
+          "role": "cash_from_investing",
+          "valid_start": "2020-12-27",
+          "valid_end": "2021-12-25",
+          "value": -25167,
+          "available": "2022-01-27",
+          "filing_report_date": "2021-12-25",
+          "record_id": "generic-inline:0000050863:2021-12-25",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1714135,
+          "quote": "25,167"
+        },
+        {
+          "role": "cash_from_investing",
+          "valid_start": "2020-12-27",
+          "valid_end": "2021-12-25",
+          "value": -24449,
+          "available": "2023-01-27",
+          "filing_report_date": "2022-12-31",
+          "record_id": "generic-inline:0000050863:2022-12-31",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1718593,
+          "quote": "24,449"
+        },
+        {
+          "role": "cash_from_investing",
+          "valid_start": "2020-12-27",
+          "valid_end": "2021-12-25",
+          "value": -24283,
+          "available": "2024-01-26",
+          "filing_report_date": "2023-12-30",
+          "record_id": "generic-inline:0000050863:2023-12-30",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1549378,
+          "quote": "24,283"
+        }
+      ]
+    },
+    {
+      "key": [
+        "cash_from_investing",
+        "2019-12-29",
+        "2020-12-26"
+      ],
+      "claims": [
+        {
+          "role": "cash_from_investing",
+          "valid_start": "2019-12-29",
+          "valid_end": "2020-12-26",
+          "value": -20796,
+          "available": "2022-01-27",
+          "filing_report_date": "2021-12-25",
+          "record_id": "generic-inline:0000050863:2021-12-25",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1715110,
+          "quote": "20,796"
+        },
+        {
+          "role": "cash_from_investing",
+          "valid_start": "2019-12-29",
+          "valid_end": "2020-12-26",
+          "value": -21524,
+          "available": "2023-01-27",
+          "filing_report_date": "2022-12-31",
+          "record_id": "generic-inline:0000050863:2022-12-31",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1719570,
+          "quote": "21,524"
+        }
+      ]
+    },
+    {
+      "key": [
+        "cash_from_financing",
+        "2020-12-27",
+        "2021-12-25"
+      ],
+      "claims": [
+        {
+          "role": "cash_from_financing",
+          "valid_start": "2020-12-27",
+          "valid_end": "2021-12-25",
+          "value": -5862,
+          "available": "2022-01-27",
+          "filing_report_date": "2021-12-25",
+          "record_id": "generic-inline:0000050863:2021-12-25",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1738171,
+          "quote": "5,862"
+        },
+        {
+          "role": "cash_from_financing",
+          "valid_start": "2020-12-27",
+          "valid_end": "2021-12-25",
+          "value": -6045,
+          "available": "2023-01-27",
+          "filing_report_date": "2022-12-31",
+          "record_id": "generic-inline:0000050863:2022-12-31",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1754197,
+          "quote": "6,045"
+        },
+        {
+          "role": "cash_from_financing",
+          "valid_start": "2020-12-27",
+          "valid_end": "2021-12-25",
+          "value": -6211,
+          "available": "2024-01-26",
+          "filing_report_date": "2023-12-30",
+          "record_id": "generic-inline:0000050863:2023-12-30",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1574006,
+          "quote": "6,211"
+        }
+      ]
+    },
+    {
+      "key": [
+        "cash_from_financing",
+        "2019-12-29",
+        "2020-12-26"
+      ],
+      "claims": [
+        {
+          "role": "cash_from_financing",
+          "valid_start": "2019-12-29",
+          "valid_end": "2020-12-26",
+          "value": -12917,
+          "available": "2022-01-27",
+          "filing_report_date": "2021-12-25",
+          "record_id": "generic-inline:0000050863:2021-12-25",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1739145,
+          "quote": "12,917"
+        },
+        {
+          "role": "cash_from_financing",
+          "valid_start": "2019-12-29",
+          "valid_end": "2020-12-26",
+          "value": -12669,
+          "available": "2023-01-27",
+          "filing_report_date": "2022-12-31",
+          "record_id": "generic-inline:0000050863:2022-12-31",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1755173,
+          "quote": "12,669"
+        }
+      ]
+    },
+    {
+      "key": [
+        "cash_from_investing",
+        "2021-12-26",
+        "2022-12-31"
+      ],
+      "claims": [
+        {
+          "role": "cash_from_investing",
+          "valid_start": "2021-12-26",
+          "valid_end": "2022-12-31",
+          "value": -10477,
+          "available": "2023-01-27",
+          "filing_report_date": "2022-12-31",
+          "record_id": "generic-inline:0000050863:2022-12-31",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1717616,
+          "quote": "10,477"
+        },
+        {
+          "role": "cash_from_investing",
+          "valid_start": "2021-12-26",
+          "valid_end": "2022-12-31",
+          "value": -10231,
+          "available": "2024-01-26",
+          "filing_report_date": "2023-12-30",
+          "record_id": "generic-inline:0000050863:2023-12-30",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1548789,
+          "quote": "10,231"
+        },
+        {
+          "role": "cash_from_investing",
+          "valid_start": "2021-12-26",
+          "valid_end": "2022-12-31",
+          "value": -10231,
+          "available": "2025-01-31",
+          "filing_report_date": "2024-12-28",
+          "record_id": "generic-inline:0000050863:2024-12-28",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1401351,
+          "quote": "10,231"
+        }
+      ]
+    },
+    {
+      "key": [
+        "cash_from_financing",
+        "2021-12-26",
+        "2022-12-31"
+      ],
+      "claims": [
+        {
+          "role": "cash_from_financing",
+          "valid_start": "2021-12-26",
+          "valid_end": "2022-12-31",
+          "value": 1361,
+          "available": "2023-01-27",
+          "filing_report_date": "2022-12-31",
+          "record_id": "generic-inline:0000050863:2022-12-31",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1753103,
+          "quote": "1,361"
+        },
+        {
+          "role": "cash_from_financing",
+          "valid_start": "2021-12-26",
+          "valid_end": "2022-12-31",
+          "value": 1115,
+          "available": "2024-01-26",
+          "filing_report_date": "2023-12-30",
+          "record_id": "generic-inline:0000050863:2023-12-30",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1573300,
+          "quote": "1,115"
+        },
+        {
+          "role": "cash_from_financing",
+          "valid_start": "2021-12-26",
+          "valid_end": "2022-12-31",
+          "value": 1115,
+          "available": "2025-01-31",
+          "filing_report_date": "2024-12-28",
+          "record_id": "generic-inline:0000050863:2024-12-28",
+          "section": "Consolidated Statements of Cash Flows",
+          "start": 1425798,
+          "quote": "1,115"
+        }
+      ]
+    }
+  ],
+  "status": "raw_inline_preflight_not_admitted",
+  "requires_visible_column_and_sign_validation": true,
+  "liabilities_and_equity_alias_included_in_raw_counts": true
+}

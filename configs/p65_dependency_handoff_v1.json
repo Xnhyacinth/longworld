@@ -1,0 +1,33 @@
+{
+  "schema_version": "longworld.p65-dependency-handoff-config.v1",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "sources": {
+    "codeforge": {
+      "path": "data/candidates/p65_codeforge_reading_proof_v1",
+      "receipt_sha256": "1b3c3951743de3aecde7af94d4ea458a1f6580e1b3acf520da068c36b204c4fd"
+    },
+    "finance": [
+      {
+        "name": "intel",
+        "path": "data/candidates/p65_finance_disclosure_versions_v1/intel",
+        "receipt_sha256": "f38bf1bcd6fd6761eecbec39f985a06318274ed9c650d181fead03fd243f1e74"
+      },
+      {
+        "name": "siriusxm",
+        "path": "data/candidates/p65_finance_disclosure_versions_v1/siriusxm",
+        "receipt_sha256": "59eb3972dc460114934e0f48f67594b663b39350954fcce85edffbf94c1a10f5"
+      }
+    ],
+    "quarantined_govinfo": {
+      "path": "data/candidates/p65_govinfo_taskbank_v2",
+      "receipt_sha256": "2815a643b11391ce414a0b106723ed113c34586e3d8c7dbf1f5093ebea20a3c5"
+    }
+  },
+  "expected_counts": {
+    "codeforge": 130,
+    "finance_disclosure": 34
+  }
+}

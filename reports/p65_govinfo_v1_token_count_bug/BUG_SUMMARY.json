@@ -1,0 +1,149 @@
+{
+  "status": "superseded_not_training_eligible",
+  "reason": "len(BatchEncoding) counted two dictionary keys, not chat token IDs; fixed by existing tokenize_assistant_only helper",
+  "rows": [
+    {
+      "sample_id": "d0608399736430f340d791a1d9d1adc61f58387f6b6b1ab018e0c6c326375bb4",
+      "context_tokens": 59765,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "e0fcb87f37fba7e5d6734e2588fc6654f0cdfd7a2d05766e0356a3af98497ab6",
+      "context_tokens": 59765,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "65670d2a17ca910704060a0cf9a6338329818eccf3a65a3b69bc58e3cdcf2d76",
+      "context_tokens": 59765,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "81917c235b66654867a1c6eaa6e3fc21f12be1e164ce197019e534cf088063db",
+      "context_tokens": 59765,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "3455f8580fa96350d3baad8309b8ce5e8dd7c1c988faff51a48ba7dd1e45d966",
+      "context_tokens": 59765,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "cb90bf443d0869d929508b4784aac7cc32ab15c7d014df114600ca145d4b42b5",
+      "context_tokens": 59765,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "35697b167bafad3c64c2484f1c786d14d2ba17f6a1926133dfc179d316314328",
+      "context_tokens": 59765,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "6d275b178d3ad21f5345613186bbd285955986ce64e187bc0c1eab7c0fc301fa",
+      "context_tokens": 8139,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "260642ae6d9b9255cd747f4f7406264803476da4cb895847e624563b57cf0aec",
+      "context_tokens": 8139,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "299e5e3b81356e577ed6ed00b35406aa115f51da0bfaf3699eb57c588b83e598",
+      "context_tokens": 8139,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "c57a2b2e25fc07159f240eb7681cf1cf15ca045b28dfec2f7bb2b85e17659a85",
+      "context_tokens": 8139,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "63aeddb50190e6069ac63ec73e9b7faec8c7fa605080cbaaacfb2086c6b03441",
+      "context_tokens": 8139,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "ac5f959cac6dae7506b1947e53520e07fd454ea36642331bb32f8ef42f5bb156",
+      "context_tokens": 11582,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "4ba8390716b56cba50854ff9d6ddb2a7d4b98dae339c86e04ab018dba5154ef8",
+      "context_tokens": 11582,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "74cece1a5cbfee35c6dbb1e01f63cee00d5409ae913c45993358fbadd979139c",
+      "context_tokens": 11582,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "85293ecc73123ef6a0a9e61a3797aa6996bb05dea31668c7cffae97e5bd9c032",
+      "context_tokens": 11582,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "50962a4d3b24dd5f94c529f0dfd5d1da55335d7cb092451c8abf2319ed269e7d",
+      "context_tokens": 11582,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "de65520273405bc516e94b91f69ce6b4630c737b92df2b28856551709fbec725",
+      "context_tokens": 11889,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "64ab52ca590d955e63f62ebc1922253e76751753300bd81d670e7f8d567fc479",
+      "context_tokens": 11889,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "c8181368c3565089c40aa56326611b225277707d4177a43d8e31db2a2f8231dc",
+      "context_tokens": 11889,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "fe83bc995fae36297acfb930e458e61a6ade98e31b2b5347007546a022ad0280",
+      "context_tokens": 7440,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "44f1f5edc5c7b734ac487819c846dbca508fecd6ab5b1c3419fc43554c8ce501",
+      "context_tokens": 7440,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "93e3443ec3e577b39ae379bbed55cfad9aab4428dbfb233f76af34e69346c9d7",
+      "context_tokens": 1315,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "ac3872518522285f66f608778461443fbe7d061ef6b7ae972071af367886c667",
+      "context_tokens": 1315,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "87bc575d40091bd4ee867f0d9dd61c15d9581da9a9d4b0d70ed388e58f0ac390",
+      "context_tokens": 6740,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "cd289b9ba96c7a4e00a5e9e3a4c116b7e2233dc7d7b8d074ed91f37042a6dc40",
+      "context_tokens": 6740,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "ea5f51807f7202e25eed1cb2b419083046b028964f25e12eae577660f2670a5e",
+      "context_tokens": 13598,
+      "invalid_full_hf_chat_tokens": 2
+    },
+    {
+      "sample_id": "7a4306031602d77c83e015219976a35de604fa66bf05fec3d0b46f6fdbb81a49",
+      "context_tokens": 13598,
+      "invalid_full_hf_chat_tokens": 2
+    }
+  ],
+  "regression": "test_full_chat_count_counts_ids_not_batch_encoding_keys failed before fix; full12-test file passes afterward",
+  "final_output": "data/candidates/p65_govinfo_taskbank_v2",
+  "unused_payloads_removed": true
+}

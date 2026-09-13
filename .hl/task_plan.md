@@ -488,7 +488,7 @@ source-bound bands and twelve standard views under the existing Finance
 profile. P54 is limited to one source-driven PMS/risk-reference chain after
 rejecting the qualification and single-reference shortcuts.
 
-## Next Step
+## Historical next step (P57)
 
 P57 dual-track conversion 2026-09-07: Canonical remains 7 products / 17 worlds
 / 153 train / 8,002,320 tokens. Local extras not on CURRENT_RELEASE:
@@ -510,3 +510,26 @@ queries from existing NVIDIA/Micron/TLS/HTTP-Semantics graphs; keep
 Amazon/Meta/HTTP/3 fail-closed until window class is labeled. Do not
 rematerialize NVIDIA/Alphabet/Microsoft. Do not pad HTTP/2, DNSSEC, or ACME
 to 128k.
+
+## Capability-first execution — 2026-09-13
+
+Approved scope: execute `.hl/longworld_capability_reassessment.md`, with independent
+review. This first implementation milestone closes recall/binding, dense
+aggregation, and state-transition generation, visible-input solving, causal
+interventions, and local 64K/128K/256K exports. L4/L5 and measured training utility
+remain subsequent milestones, not inferred from compiler checks.
+
+| Track | Owner | Status | Done check |
+| --- | --- | --- | --- |
+| Executable compiler | capability_compiler | complete | three recipes, independent solver, native-range interventions; 23 compiler tests |
+| Parallel materialization | root | complete | 3 worker PIDs, 18 shards, 108 local rows; 72 train / 36 eval |
+| Independent review | capability_review | complete | blockers fixed; 39 focused tests; exported 108/108 answers independently reproduced; hashes and masks checked |
+| Evidence report | root | complete | reports/capability_pilot_20260913.md and stats JSON; one family, no training utility claim |
+
+## Next Step
+
+Implement independent multi-query supervision and additional rule/transition
+families before large scale-out: first pilot has only 1,354 supervised tokens in
+16,096,348 chat tokens (0.00841%). Then add matched compact/retrieval/model controls
+and the planned training ablations. Existing historical strict/release flags stay
+unchanged; L4/L5 and measured utility remain unfinished research milestones.

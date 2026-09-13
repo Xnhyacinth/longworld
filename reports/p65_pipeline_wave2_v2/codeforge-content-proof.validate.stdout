@@ -1,0 +1,35 @@
+{
+  "status": "PASS",
+  "primary_rows": 804,
+  "filename_grammar_rows": 313,
+  "qualified_existing_semantic_tasks": 130,
+  "raw_scoped_qualified_existing_tasks": 179,
+  "raw_only_qualified_existing_tasks": 49,
+  "counts": {
+    "train": 96,
+    "eval": 34
+  },
+  "classifications": {
+    "literal_copy_opportunity_retrieval_or_integration": 67,
+    "outside_filename_copy_grammar": 491,
+    "scoped_long_input_file_aggregation_certificate": 179,
+    "no_effect_approval_strict_hold": 49,
+    "redundant_source_strict_hold": 18
+  },
+  "qualified_context_capacity_bins": {
+    "cap128k": 47,
+    "cap64k": 12,
+    "cap256k": 71
+  },
+  "qualified_exact_context_token_ranges": {
+    "other_long": 125,
+    "64k": 1,
+    "256k": 2,
+    "128k": 2
+  },
+  "window_all_aliases_fit": {
+    "4096": 43,
+    "8192": 53,
+    "16384": 79
+  }
+}

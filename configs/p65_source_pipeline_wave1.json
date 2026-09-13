@@ -1,0 +1,89 @@
+{
+  "schema_version": "longworld.source-taskbank-pipeline.v1",
+  "jobs": [
+    {
+      "job_id": "disclosure-intel",
+      "script": "scripts/materialize_finance_disclosure_versions.py",
+      "config": "configs/p65_finance_disclosure_versions_intel_v1.json",
+      "output": "data/candidates/p65_finance_disclosure_versions_v1/intel",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/intel-p64/local_probe_trust.json",
+      "receipt_schema": "longworld.finance-disclosure-receipt.v1",
+      "input_files": [
+        "longworld/core/finance_disclosure_versions.py",
+        "configs/p64_finance_taskbank_intel_v1.json",
+        "data/finance_sources/p64_intel_generic_v1/source_manifest.json"
+      ],
+      "input_sha256": {
+        "/workspace/wynckeliao/longworld-worlds/scripts/materialize_finance_disclosure_versions.py": "ef96d85690e60da4ef552696fde5e0a79ab54117a918ead334df86aead33cc53",
+        "/workspace/wynckeliao/longworld-worlds/configs/p65_finance_disclosure_versions_intel_v1.json": "fc957ea76bcf2ffc05c89709de42add2770ee966c6be9b76556d10c1de4c860b",
+        "/workspace/wynckeliao/longworld-worlds/longworld/core/finance_disclosure_versions.py": "7ff799b31b6c01f9d93149cdd585e1542425140ea5ce2133529d2016181f1f01",
+        "/workspace/wynckeliao/longworld-worlds/configs/p64_finance_taskbank_intel_v1.json": "382a20c11211a0640d2cf6c341311735e08286c8d7119d7c0fc49d4c136ae983",
+        "/workspace/wynckeliao/longworld/data/finance_sources/p64_intel_generic_v1/source_manifest.json": "10a717b252973dc50e5578c6964401f23c8b355a5a2dae7af83b2dff15cea2f9",
+        "/workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py": "a1ae2ac1ae54a3e3858406629637be8c3d49e4122d12d1df12d54278bf1212df"
+      },
+      "trust_identity": {
+        "schema_version": "longworld-local-probe-trust-v1",
+        "environment": "probe",
+        "probe_id": "local-probe-e40aef8c08654505f1cea7eac3feb218",
+        "role": "source",
+        "key_id": "probe-source-b20c97fb2249afdb76f4e76c7fdcc7d6"
+      }
+    },
+    {
+      "job_id": "disclosure-siriusxm",
+      "script": "scripts/materialize_finance_disclosure_versions.py",
+      "config": "configs/p65_finance_disclosure_versions_siriusxm_v1.json",
+      "output": "data/candidates/p65_finance_disclosure_versions_v1/siriusxm",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/siriusxm-p64/local_probe_trust.json",
+      "receipt_schema": "longworld.finance-disclosure-receipt.v1",
+      "input_files": [
+        "longworld/core/finance_disclosure_versions.py",
+        "configs/p64_finance_taskbank_siriusxm_v1.json",
+        "data/finance_sources/p64_siriusxm_generic_v1/source_manifest.json"
+      ],
+      "input_sha256": {
+        "/workspace/wynckeliao/longworld-worlds/scripts/materialize_finance_disclosure_versions.py": "ef96d85690e60da4ef552696fde5e0a79ab54117a918ead334df86aead33cc53",
+        "/workspace/wynckeliao/longworld-worlds/configs/p65_finance_disclosure_versions_siriusxm_v1.json": "1d9bfc7cac7f7be9faed78b9dc88cc91a5a2d950250d70539aa9a232a448d550",
+        "/workspace/wynckeliao/longworld-worlds/longworld/core/finance_disclosure_versions.py": "7ff799b31b6c01f9d93149cdd585e1542425140ea5ce2133529d2016181f1f01",
+        "/workspace/wynckeliao/longworld-worlds/configs/p64_finance_taskbank_siriusxm_v1.json": "84e448f337573008fcfb2fa7cea069ee17bdc0b5bfce6d083b40421b811ce14a",
+        "/workspace/wynckeliao/longworld/data/finance_sources/p64_siriusxm_generic_v1/source_manifest.json": "8685060409f294a173fa176b6031fbab21a39ad4cf01cfe6640731792fe2e8c2",
+        "/workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py": "a1ae2ac1ae54a3e3858406629637be8c3d49e4122d12d1df12d54278bf1212df"
+      },
+      "trust_identity": {
+        "schema_version": "longworld-local-probe-trust-v1",
+        "environment": "probe",
+        "probe_id": "local-probe-a303e938722612de3d436f052dd03a9e",
+        "role": "source",
+        "key_id": "probe-source-687fb58145ff72d23f57f3e1d63c9993"
+      }
+    },
+    {
+      "job_id": "disclosure-amd",
+      "script": "scripts/materialize_finance_disclosure_versions.py",
+      "config": "configs/p65_finance_disclosure_versions_amd_v1.json",
+      "output": "data/candidates/p65_finance_disclosure_versions_v1/amd",
+      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/amd/local_probe_trust.json",
+      "receipt_schema": "longworld.finance-disclosure-receipt.v1",
+      "input_files": [
+        "longworld/core/finance_disclosure_versions.py",
+        "configs/p64_finance_taskbank_amd_v1.json",
+        "data/source_inventory/p60_finance_amd_inline_fy2021_2024_v1/issuer_inline_manifest.signed.json"
+      ],
+      "input_sha256": {
+        "/workspace/wynckeliao/longworld-worlds/scripts/materialize_finance_disclosure_versions.py": "ef96d85690e60da4ef552696fde5e0a79ab54117a918ead334df86aead33cc53",
+        "/workspace/wynckeliao/longworld-worlds/configs/p65_finance_disclosure_versions_amd_v1.json": "4a82b8352919478e717eb35434f5bbafb611d64560973ab37782227c3158fb5f",
+        "/workspace/wynckeliao/longworld-worlds/longworld/core/finance_disclosure_versions.py": "7ff799b31b6c01f9d93149cdd585e1542425140ea5ce2133529d2016181f1f01",
+        "/workspace/wynckeliao/longworld-worlds/configs/p64_finance_taskbank_amd_v1.json": "664ac3f5c92af21fcc47a18b4e9884c38745a37d4a477894c591132b4c97f67c",
+        "/workspace/wynckeliao/longworld/data/source_inventory/p60_finance_amd_inline_fy2021_2024_v1/issuer_inline_manifest.signed.json": "4b8756fa1819883bbb706fb520516a64c17516cf1c44dbcfe018a5ebdfd67258",
+        "/workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py": "a1ae2ac1ae54a3e3858406629637be8c3d49e4122d12d1df12d54278bf1212df"
+      },
+      "trust_identity": {
+        "schema_version": "longworld-local-probe-trust-v1",
+        "environment": "probe",
+        "probe_id": "local-probe-e021f8d9506f007e7b802e82b5439720",
+        "role": "source",
+        "key_id": "probe-source-54837b155906727fe9d5b443fb546719"
+      }
+    }
+  ]
+}

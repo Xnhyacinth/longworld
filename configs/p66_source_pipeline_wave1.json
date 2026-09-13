@@ -1,0 +1,22 @@
+{
+  "schema_version": "longworld.source-taskbank-pipeline.v1",
+  "jobs": [
+    {
+      "job_id": "p66-cyber-osv",
+      "script": "scripts/materialize_p66_cyber_taskbank.py",
+      "config": "configs/p66_cyber_osv_taskbank_v1.json",
+      "output": "data/candidates/p66_cyber_osv_taskbank_v1",
+      "source_authority": "local_hash_pinned",
+      "receipt_schema": "longworld.p66-cyber-osv-taskbank-receipt.v1",
+      "stage_workers": 4,
+      "input_files": [
+        "longworld/core/p66_cyber_taskbank.py"
+      ],
+      "input_sha256": {
+        "/workspace/wynckeliao/longworld-worlds/scripts/materialize_p66_cyber_taskbank.py": "25f3fd234c0e3df7fd71d0a6ba43205f2332b721b42806f63c5da6a14de60e10",
+        "/workspace/wynckeliao/longworld-worlds/configs/p66_cyber_osv_taskbank_v1.json": "7d0d6828d688e5e9f54a7db3452bdc388a112fb5aae271cd12bd0dac0b198fb6",
+        "/workspace/wynckeliao/longworld-worlds/longworld/core/p66_cyber_taskbank.py": "1019edda1944c0bff941fe546ed44952962c214b0c0e5d8187243be15469f9aa"
+      }
+    }
+  ]
+}

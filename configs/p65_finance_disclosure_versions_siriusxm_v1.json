@@ -1,0 +1,7 @@
+{
+  "schema_version": "longworld.finance-disclosure-build.v1",
+  "source_config": "configs/p64_finance_taskbank_siriusxm_v1.json",
+  "source_config_sha256": "84e448f337573008fcfb2fa7cea069ee17bdc0b5bfce6d083b40421b811ce14a",
+  "source_manifest_sha256": "8685060409f294a173fa176b6031fbab21a39ad4cf01cfe6640731792fe2e8c2",
+  "admission_policy": "version_integration_candidates_with_separate_raw_and_compact_controls"
+}

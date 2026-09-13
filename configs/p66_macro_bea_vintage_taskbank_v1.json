@@ -1,0 +1,36 @@
+{
+  "schema_version": "longworld.p66-macro-vintage-taskbank-build.v1",
+  "source": {
+    "manifest_path": "data/source_cache/macro/bea_gdp_gdi_vintage_20260831/workflow_manifest.json",
+    "manifest_sha256": "d7b699557fb6ff63fdeabb2fd3e1a28502b8335f88fa279041d6c4b621ae7b27",
+    "raw_path": "data/source_cache/macro/bea_gdp_gdi_vintage_20260831/bea-gdp-gdi-vintage-history.xlsx",
+    "raw_sha256": "c6b10cc799e213974cb73fb7083221e71b8298e98cb5c3b36153a42cd09af3fe"
+  },
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "workers": 4,
+  "periods": [
+    "2003Q1",
+    "2003Q2",
+    "2003Q3",
+    "2003Q4",
+    "2004Q1",
+    "2004Q2",
+    "2004Q3",
+    "2004Q4",
+    "2005Q1"
+  ],
+  "split_by_series": {
+    "BEA_GDP_CURRENT_DOLLARS": "train",
+    "BEA_REAL_GDP_PERCENT_CHANGE": "train",
+    "BEA_GDI_CURRENT_DOLLARS": "train",
+    "BEA_REAL_GDI_PERCENT_CHANGE": "eval"
+  },
+  "bands": [
+    {"name": "64k", "lower_tokens": 64000, "upper_tokens": 65536},
+    {"name": "128k", "lower_tokens": 128000, "upper_tokens": 131072},
+    {"name": "256k", "lower_tokens": 256000, "upper_tokens": 260000}
+  ]
+}

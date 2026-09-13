@@ -1,0 +1,151 @@
+{
+  "capacity_bins": {
+    "131072": 16,
+    "262144": 13,
+    "65536": 19
+  },
+  "code_sha256": {
+    "longworld/core/p66_researchlab_taskbank.py": "651fe6b74c7d982895aa54fd1767f148db5df6305a5a8387c6a61977ccfbf6f0",
+    "scripts/materialize_p66_researchlab_taskbank.py": "56b172a806116d581ca6600969fd94d4731b03dbf164430b542014c51728ca46"
+  },
+  "config_sha256": "80d901df4a95f4cb36ade8df13c5db5079e3e1e762e743263b675da2bbe37776",
+  "controls": {
+    "complete_child_4k_8k_16k": "measured from exact tokenizer; admitted rows exceed 16k",
+    "latest_revision_only": "missing old complete records; UNKNOWN",
+    "neural": "unmeasured",
+    "question_only": "deterministic UNKNOWN baseline measured",
+    "remove_one": "every required complete record removed in turn"
+  },
+  "eval_rows": 1,
+  "exact_numeric_ranges": {
+    "none": 48
+  },
+  "family_splits": {
+    "elife-94586": "eval",
+    "llama3-arxiv-2407.21783": "eval",
+    "sparks-arxiv-2303.12712": "train"
+  },
+  "files": {
+    "candidates.jsonl": "543161fc81a0241bc19403ac336dc3dd2b7499cf8d935ce53d62754748bbf666",
+    "contexts/0105c713a6af9bc5c33c2794b6000b9483836ed363c9cf3ae86e2ecbb7328587.txt": "0105c713a6af9bc5c33c2794b6000b9483836ed363c9cf3ae86e2ecbb7328587",
+    "contexts/01c5da37903e695a7b8fc3affd4b27961afc084b0ae0683ec02f3a14ca1b844f.txt": "01c5da37903e695a7b8fc3affd4b27961afc084b0ae0683ec02f3a14ca1b844f",
+    "contexts/038f90c92a31899e47af96762212185728bec4360a17f85366f12b11add0d5d7.txt": "038f90c92a31899e47af96762212185728bec4360a17f85366f12b11add0d5d7",
+    "contexts/0ddce02eca09deb9298eb74c478e6c433d4842d847ded75d79b4587609e04fb0.txt": "0ddce02eca09deb9298eb74c478e6c433d4842d847ded75d79b4587609e04fb0",
+    "contexts/102701ec796a8ab8428f79b26cd503df652210a8cd8fd953fcb4d3824a0e0066.txt": "102701ec796a8ab8428f79b26cd503df652210a8cd8fd953fcb4d3824a0e0066",
+    "contexts/121fa873ed65637d683ecbdcfb13d598991c50d4a1df4904daf073e8d5b51a91.txt": "121fa873ed65637d683ecbdcfb13d598991c50d4a1df4904daf073e8d5b51a91",
+    "contexts/1591b8041895485b952245d73fc3dd10ad50e8c8e901aa6eb040fb4d052dd5bb.txt": "1591b8041895485b952245d73fc3dd10ad50e8c8e901aa6eb040fb4d052dd5bb",
+    "contexts/163127825f0f64154523913badf21814d31720d9d4d8ec7fa1756ff5a6aa2fd3.txt": "163127825f0f64154523913badf21814d31720d9d4d8ec7fa1756ff5a6aa2fd3",
+    "contexts/195b8e937fbe670936921bd46461f81c2deb439b75987313e96dbde72d088779.txt": "195b8e937fbe670936921bd46461f81c2deb439b75987313e96dbde72d088779",
+    "contexts/1c96658d57126cf0adb58aeabf0c7394d0adbf582038588687d19235a6014008.txt": "1c96658d57126cf0adb58aeabf0c7394d0adbf582038588687d19235a6014008",
+    "contexts/3197e0c331918fc404ca1f8f760ce00cbd71f0b58b4a1ff1df07d8af79dac95c.txt": "3197e0c331918fc404ca1f8f760ce00cbd71f0b58b4a1ff1df07d8af79dac95c",
+    "contexts/3ff221f0fc227545ec1ae4304838b31c4fa18e376622e3ca9288e02844fe2b0c.txt": "3ff221f0fc227545ec1ae4304838b31c4fa18e376622e3ca9288e02844fe2b0c",
+    "contexts/404320e74d286e26675115a582c8c455fa9b945f877e6ccc263c59aa49d2c795.txt": "404320e74d286e26675115a582c8c455fa9b945f877e6ccc263c59aa49d2c795",
+    "contexts/47bdeae52b9885c61bd510613bb0c6ce007f23624d929970309f1afdcfe55ae7.txt": "47bdeae52b9885c61bd510613bb0c6ce007f23624d929970309f1afdcfe55ae7",
+    "contexts/5274bb6bd749a65818b49b9a3c73c158b83e9b9945c71713cc0a2984517b4be9.txt": "5274bb6bd749a65818b49b9a3c73c158b83e9b9945c71713cc0a2984517b4be9",
+    "contexts/5b986ee6c64ddc409e8f3db9c6f4c4aa81ec24774f11aa490332e7d8aee813b3.txt": "5b986ee6c64ddc409e8f3db9c6f4c4aa81ec24774f11aa490332e7d8aee813b3",
+    "contexts/5ccc3faf02127226a7f2c15b85efc565d733969255c8e232bd7fa30d129de17c.txt": "5ccc3faf02127226a7f2c15b85efc565d733969255c8e232bd7fa30d129de17c",
+    "contexts/769ae65de85d29b36d17a4d34945e0092b22d711a248af65fdfd6dab476a290e.txt": "769ae65de85d29b36d17a4d34945e0092b22d711a248af65fdfd6dab476a290e",
+    "contexts/78c8ee80d3d1555412a912d349385f3d6b22dc8d60cf59dbdee9d4bb24cf40bb.txt": "78c8ee80d3d1555412a912d349385f3d6b22dc8d60cf59dbdee9d4bb24cf40bb",
+    "contexts/80b1c327b15b2c504677342d5d4a412101182e17bf86c519a350606795449bf1.txt": "80b1c327b15b2c504677342d5d4a412101182e17bf86c519a350606795449bf1",
+    "contexts/84c7fcac3a3373948642affbb694cdb778cb07a65cbe9c7108322c4659ca0f82.txt": "84c7fcac3a3373948642affbb694cdb778cb07a65cbe9c7108322c4659ca0f82",
+    "contexts/84cd6103fb0ee8df8eb4d02c8c1e34ae501c3d2f58deeeec7e7c1553899e87e5.txt": "84cd6103fb0ee8df8eb4d02c8c1e34ae501c3d2f58deeeec7e7c1553899e87e5",
+    "contexts/8525bbe682efd8c8eedf9714e4fb01fa7faa4ae8e0a1b6514682cc493b9f5ba2.txt": "8525bbe682efd8c8eedf9714e4fb01fa7faa4ae8e0a1b6514682cc493b9f5ba2",
+    "contexts/860f661c997f5ecda5279f9f98d310ec485f20a6c9e81885c419dc7e063000da.txt": "860f661c997f5ecda5279f9f98d310ec485f20a6c9e81885c419dc7e063000da",
+    "contexts/8912ef5131c0c56a45608bae593ca8bf23c53356520896829165198fb696efd5.txt": "8912ef5131c0c56a45608bae593ca8bf23c53356520896829165198fb696efd5",
+    "contexts/9bd7dde8ab97900206588e872d6d117da61c80bd09c22d8b5dc74e5efd414738.txt": "9bd7dde8ab97900206588e872d6d117da61c80bd09c22d8b5dc74e5efd414738",
+    "contexts/9f9d613afcfbffb8ccf4a92e54c78315a311b578420e5a6a346918bb8643c1a9.txt": "9f9d613afcfbffb8ccf4a92e54c78315a311b578420e5a6a346918bb8643c1a9",
+    "contexts/ab4f4fe12f1984f7ecc092c31a0278d90d595ab08bb8eccf30dc376592357d9e.txt": "ab4f4fe12f1984f7ecc092c31a0278d90d595ab08bb8eccf30dc376592357d9e",
+    "contexts/b15c23882883c4af6f3ed9a7f3eaa3ca5de9e88ca10fafd9c9c33b6dbf383cff.txt": "b15c23882883c4af6f3ed9a7f3eaa3ca5de9e88ca10fafd9c9c33b6dbf383cff",
+    "contexts/b2462ccbccfd4219a1621faf029735e7c2d7f5ac539859b685dfe9c4635d57fa.txt": "b2462ccbccfd4219a1621faf029735e7c2d7f5ac539859b685dfe9c4635d57fa",
+    "contexts/b5401776ce2c4841d9f2cc2feb8844724ab892987d2022b0700866d37db1b871.txt": "b5401776ce2c4841d9f2cc2feb8844724ab892987d2022b0700866d37db1b871",
+    "contexts/b6f8ed34363ebb180e8f47579e3c88af66e96a4ea6765b05d39e7b3ac92f3fd7.txt": "b6f8ed34363ebb180e8f47579e3c88af66e96a4ea6765b05d39e7b3ac92f3fd7",
+    "contexts/b757264d6ad44419307b372885361cd6f4ac405409e890729695ad2e8f445de1.txt": "b757264d6ad44419307b372885361cd6f4ac405409e890729695ad2e8f445de1",
+    "contexts/b9f0624909f5e6e3bd0c98adb46b33c9f7a773120d137014113a977d3b11ed0a.txt": "b9f0624909f5e6e3bd0c98adb46b33c9f7a773120d137014113a977d3b11ed0a",
+    "contexts/bafcb4561831043b1c730258616834e68f102477aade173804b96bb991865c1f.txt": "bafcb4561831043b1c730258616834e68f102477aade173804b96bb991865c1f",
+    "contexts/bc8cf9084b32b4db56835d5ae391a99be2ac9480052f7aa3f6fe6a02c55b87f9.txt": "bc8cf9084b32b4db56835d5ae391a99be2ac9480052f7aa3f6fe6a02c55b87f9",
+    "contexts/bdada292df6679d7ab32b6a8304d2ab089413b52610748c3d24ea841759d6ce4.txt": "bdada292df6679d7ab32b6a8304d2ab089413b52610748c3d24ea841759d6ce4",
+    "contexts/bf0b77e2735d4946097e1e1e3875d04bb010d78194d01356e9584b9ea6b8b3fe.txt": "bf0b77e2735d4946097e1e1e3875d04bb010d78194d01356e9584b9ea6b8b3fe",
+    "contexts/c7f165ac01c666213b95358b4bdf6d61e69e7d57d32dea3e5331a9ec94744e78.txt": "c7f165ac01c666213b95358b4bdf6d61e69e7d57d32dea3e5331a9ec94744e78",
+    "contexts/c9952ad37584abf5d3acf283bd89648d52b632e4d86d8b760a1a05a7a5ac9232.txt": "c9952ad37584abf5d3acf283bd89648d52b632e4d86d8b760a1a05a7a5ac9232",
+    "contexts/cd4248c939f919962d7e5510b8e409d1924ecd1b0372221871f150d124431432.txt": "cd4248c939f919962d7e5510b8e409d1924ecd1b0372221871f150d124431432",
+    "contexts/cf34c2d37c975427a1fcbd203e2a09d8a6231bf2d216170b7580f271aa61d268.txt": "cf34c2d37c975427a1fcbd203e2a09d8a6231bf2d216170b7580f271aa61d268",
+    "contexts/d2e814b477080882a37d498537e8db438ee7a5b84c1c907291c940fdd5f9ba51.txt": "d2e814b477080882a37d498537e8db438ee7a5b84c1c907291c940fdd5f9ba51",
+    "contexts/d60bc507fc66b1c8a6fad1499aa1a5fd1d1c4609a6c3ca933c41757329526aeb.txt": "d60bc507fc66b1c8a6fad1499aa1a5fd1d1c4609a6c3ca933c41757329526aeb",
+    "contexts/d856e9b53905c832541a0d6111d12474c3ac778d1f5bd6d8a2ffe7419fdd2f3f.txt": "d856e9b53905c832541a0d6111d12474c3ac778d1f5bd6d8a2ffe7419fdd2f3f",
+    "contexts/dc4b3d8cb72bfe95b274293ef0b77049584fde56e3b72dce2605ceaccf8c8a3d.txt": "dc4b3d8cb72bfe95b274293ef0b77049584fde56e3b72dce2605ceaccf8c8a3d",
+    "contexts/e4ea944089605fd5f5f3cded0ef2c372756af10a26856db812f301b6efa5e2d8.txt": "e4ea944089605fd5f5f3cded0ef2c372756af10a26856db812f301b6efa5e2d8",
+    "contexts/f00dedee66f93ee6dcb8c32ed04f648661354e796beaae8ee5b13e6ef75f1e33.txt": "f00dedee66f93ee6dcb8c32ed04f648661354e796beaae8ee5b13e6ef75f1e33",
+    "eval.jsonl": "5468594f5bbcf873c0d9f4ae1b38e72c8036410670737c5f9b6f874a91ba7211",
+    "rejects.jsonl": "ccc409c6a1534d83513862356d67be03bcd4e7107b37760327fd449ba2fa01fe",
+    "train.jsonl": "cb90ca5469ce745f8116d6c58f12736998762759ee43e8d68b4c6570935e8a17"
+  },
+  "input_bindings": [
+    {
+      "path": "data/source_inventory/p14_paper_llama3_revision_preflight_v1/arxiv-2407.21783v1.source.tar",
+      "sha256": "76edebee16d35fcbf94f07f50f0ddc083023c80e78473a58d20c39821637c5a8"
+    },
+    {
+      "path": "data/source_inventory/p14_paper_llama3_revision_preflight_v1/arxiv-2407.21783v2.source.tar",
+      "sha256": "eaa11ed93bb5449a05ecff8c91384a17ad4fbe56c22a29c4b4594e245e151ea6"
+    },
+    {
+      "path": "data/source_inventory/p14_paper_llama3_revision_preflight_v1/arxiv-2407.21783v3.source.tar",
+      "sha256": "da6dc9f7b180ba164d002239c8e0af5a181c07ae5f9af093743d4d2b99f02430"
+    },
+    {
+      "path": "data/source_inventory/p14_paper_sparks_revision_v1/arxiv-2303.12712v1.source.tar",
+      "sha256": "83a0605c77c0fa53c08f87612449d4e8a77f8745427179d3d2bc7b8ce419ba21"
+    },
+    {
+      "path": "data/source_inventory/p14_paper_sparks_revision_v1/arxiv-2303.12712v2.source.tar",
+      "sha256": "b4298a6c254b6ea6e540c16469f52a6db0200400043b7d5443bdd4077ca1d9e2"
+    },
+    {
+      "path": "data/source_inventory/p14_paper_sparks_revision_v1/arxiv-2303.12712v3.source.tar",
+      "sha256": "154f014e0ab1fb5d2d5d48c0a983669420b48db16505ec5b217f0d11bf6e73ad"
+    },
+    {
+      "path": "data/source_inventory/p14_paper_sparks_revision_v1/arxiv-2303.12712v4.source.tar",
+      "sha256": "3651323cc9eddee607a9c4d2f7329bd1d5ba79bbe6dc22d4e2774a471822738a"
+    },
+    {
+      "path": "data/source_inventory/p14_paper_sparks_revision_v1/arxiv-2303.12712v5.source.tar",
+      "sha256": "2366e07aa84848e354c3f5489fa3b39e7da4af7a9eda4d1cc80b017d8a67f9b0"
+    },
+    {
+      "path": "data/source_inventories/p21-researchlab-elife-94586-review-revision-64k-v1/source_inventory.json",
+      "sha256": "c7a1959d34b757053640f5f122a249f13180d00bed24fcb6badf8378fdd43ff5"
+    },
+    {
+      "path": "data/source_inventory/p14_paper_llama3_revision_preflight_v1/paper_source_workflow_bundle.p14.llama3-source-foundation.signed.json",
+      "sha256": "2ca7b9448646ddda01281890e6fb5f595b2f6acad6fadcc7c6f8c94aa241ed3c",
+      "source_role_key_id": "probe-source-3a689228f9679b0522a18cadd07f1e97"
+    },
+    {
+      "path": "data/source_inventory/p14_paper_sparks_revision_v1/paper_source_workflow_bundle.p14.sparks-section-reconciliation.signed.json",
+      "sha256": "97b35381a2dbd429b9a26b46fdd9f59e75042f5d2dfe8ccc4c373c70fee795ec",
+      "source_role_key_id": "probe-source-3a689228f9679b0522a18cadd07f1e97"
+    }
+  ],
+  "production_eligible": false,
+  "rejection_reasons": {
+    "compact_complete_children_fit_16k_or_context_below_32k": 3,
+    "no_substantive_scientific_delta": 1
+  },
+  "revision": "longworld.p66-researchlab-taskbank.v1",
+  "schema_version": "longworld.p66-researchlab-taskbank-receipt.v1",
+  "semantic_tasks": 48,
+  "source_attestation": {
+    "fresh_hmac_verification_in_current_environment": false,
+    "historical_signed_bundle_identity_bound": true,
+    "local_derivative_authorization": true
+  },
+  "source_domain": "researchlab",
+  "source_families": 3,
+  "source_worlds": 3,
+  "strict_long_dependency_verified": false,
+  "tokenizer_asset_manifest_sha256": "bbcbdfe073f579453f3c891f989a43fbb15cc88952e9f8ae294f04f6ca2036cb",
+  "train_rows": 47,
+  "training_release_eligible": false,
+  "unique_contexts": 48
+}

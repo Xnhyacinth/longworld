@@ -1,0 +1,28 @@
+{
+  "schema_version": "longworld.p65-govinfo-taskbank-build.v1",
+  "source_world": {
+    "path": "data/source_inventory/p65_govinfo_derivatives_v1/118-HR-4366.json",
+    "sha256": "db67486d860577276a58c0e7d4b578a1e956d1ce3105d85920b63931efe8e28b"
+  },
+  "original_source_config": {
+    "path": "configs/p49_govinfo_bill_text_disposition_preflight_v1.json",
+    "sha256": "f465d2eef69e330e2216ef1a32a4bfeb314cfa5f5c6b94c01a9ed334c2d55c67"
+  },
+  "split": "train",
+  "scopes": [
+    "all",
+    "division:a",
+    "division:b",
+    "division:c",
+    "division:d",
+    "division:e",
+    "division:f",
+    "division:g"
+  ],
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "strict_promotion": false,
+  "raw_xml_persisted": false
+}
