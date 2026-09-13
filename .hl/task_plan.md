@@ -528,8 +528,22 @@ remain subsequent milestones, not inferred from compiler checks.
 
 ## Next Step
 
-Implement independent multi-query supervision and additional rule/transition
-families before large scale-out: first pilot has only 1,354 supervised tokens in
-16,096,348 chat tokens (0.00841%). Then add matched compact/retrieval/model controls
-and the planned training ablations. Existing historical strict/release flags stay
-unchanged; L4/L5 and measured utility remain unfinished research milestones.
+Extend domain-specific scenario constraints and natural-language renderers from
+the reviewed v2 mechanisms; continue versioned topic sampling and multi-QA
+production. Model evaluation is deferred by the user's explicit steering and is
+not a synthesis prerequisite. V2 local output is
+`data/capability_curricula/20260913_v2`; historical manifests remain immutable.
+
+## Multi-query curriculum execution — 2026-09-13
+
+User explicitly requested continued taxonomy-based sampling, multi-QA SFT,
+additional rule/world families, L4/L5 mechanisms and empirical controls.
+
+| Track | Owner | Status | Deliverable |
+| --- | --- | --- | --- |
+| OpenAlex hierarchy and balanced sampler | root | complete | 4516-topic snapshot; sampled16topics/16fields/4domains with topic split isolation |
+| Multi-QA ledger/reservation | multiqa_worlds | complete | 16QA percontext, different transitions, CF and3072passing compact controls |
+| Rule induction/tool workflows | rules_workflow | complete | coefficient induction and actual chained tool replay; bounded mechanisms, no model-execution claim |
+| Parallel generation/export | root | complete | 4workers;192shards;384rows/6144QA;1.724% supervision; complete-shard resume reverified |
+| Independent review | p65_handoff | complete | 77tests;6144/6144 exportedanswers;665paired16Ksuffix insufficiency witnesses; scoped local GO |
+| Model/utility controls | root | deferred_by_user | reusable evaluator implemented/tested; no network/GPU calls; not a production prerequisite |

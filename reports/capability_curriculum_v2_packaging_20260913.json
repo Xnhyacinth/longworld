@@ -1,0 +1,149 @@
+{
+  "scope": "same factual world and same16questions per family; exact pinned tokenizer, packaging only, not training compute or quality experiment",
+  "measurements": [
+    {
+      "family": "ledger",
+      "shard_id": "ledger-seed10000-131072",
+      "questions_per_row": 1,
+      "rows": 16,
+      "qa_count": 16,
+      "full_chat_tokens": 1935697,
+      "supervised_tokens": 5731
+    },
+    {
+      "family": "ledger",
+      "shard_id": "ledger-seed10000-131072",
+      "questions_per_row": 4,
+      "rows": 4,
+      "qa_count": 16,
+      "full_chat_tokens": 489397,
+      "supervised_tokens": 5695
+    },
+    {
+      "family": "ledger",
+      "shard_id": "ledger-seed10000-131072",
+      "questions_per_row": 8,
+      "rows": 2,
+      "qa_count": 16,
+      "full_chat_tokens": 248347,
+      "supervised_tokens": 5689
+    },
+    {
+      "family": "ledger",
+      "shard_id": "ledger-seed10000-131072",
+      "questions_per_row": 16,
+      "rows": 1,
+      "qa_count": 16,
+      "full_chat_tokens": 127822,
+      "supervised_tokens": 5686
+    },
+    {
+      "family": "reservation",
+      "shard_id": "reservation-seed10001-131072",
+      "questions_per_row": 1,
+      "rows": 16,
+      "qa_count": 16,
+      "full_chat_tokens": 1988132,
+      "supervised_tokens": 1886
+    },
+    {
+      "family": "reservation",
+      "shard_id": "reservation-seed10001-131072",
+      "questions_per_row": 4,
+      "rows": 4,
+      "qa_count": 16,
+      "full_chat_tokens": 499640,
+      "supervised_tokens": 1850
+    },
+    {
+      "family": "reservation",
+      "shard_id": "reservation-seed10001-131072",
+      "questions_per_row": 8,
+      "rows": 2,
+      "qa_count": 16,
+      "full_chat_tokens": 251558,
+      "supervised_tokens": 1844
+    },
+    {
+      "family": "reservation",
+      "shard_id": "reservation-seed10001-131072",
+      "questions_per_row": 16,
+      "rows": 1,
+      "qa_count": 16,
+      "full_chat_tokens": 127517,
+      "supervised_tokens": 1841
+    },
+    {
+      "family": "rule_learning",
+      "shard_id": "rule_learning-seed10002-131072",
+      "questions_per_row": 1,
+      "rows": 16,
+      "qa_count": 16,
+      "full_chat_tokens": 1995625,
+      "supervised_tokens": 1283
+    },
+    {
+      "family": "rule_learning",
+      "shard_id": "rule_learning-seed10002-131072",
+      "questions_per_row": 4,
+      "rows": 4,
+      "qa_count": 16,
+      "full_chat_tokens": 500329,
+      "supervised_tokens": 1247
+    },
+    {
+      "family": "rule_learning",
+      "shard_id": "rule_learning-seed10002-131072",
+      "questions_per_row": 8,
+      "rows": 2,
+      "qa_count": 16,
+      "full_chat_tokens": 251113,
+      "supervised_tokens": 1241
+    },
+    {
+      "family": "rule_learning",
+      "shard_id": "rule_learning-seed10002-131072",
+      "questions_per_row": 16,
+      "rows": 1,
+      "qa_count": 16,
+      "full_chat_tokens": 126505,
+      "supervised_tokens": 1238
+    },
+    {
+      "family": "workflow",
+      "shard_id": "workflow-seed10003-131072",
+      "questions_per_row": 1,
+      "rows": 16,
+      "qa_count": 16,
+      "full_chat_tokens": 2006118,
+      "supervised_tokens": 704
+    },
+    {
+      "family": "workflow",
+      "shard_id": "workflow-seed10003-131072",
+      "questions_per_row": 4,
+      "rows": 4,
+      "qa_count": 16,
+      "full_chat_tokens": 502890,
+      "supervised_tokens": 668
+    },
+    {
+      "family": "workflow",
+      "shard_id": "workflow-seed10003-131072",
+      "questions_per_row": 8,
+      "rows": 2,
+      "qa_count": 16,
+      "full_chat_tokens": 252352,
+      "supervised_tokens": 662
+    },
+    {
+      "family": "workflow",
+      "shard_id": "workflow-seed10003-131072",
+      "questions_per_row": 16,
+      "rows": 1,
+      "qa_count": 16,
+      "full_chat_tokens": 127083,
+      "supervised_tokens": 659
+    }
+  ]
+}
