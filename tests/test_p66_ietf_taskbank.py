@@ -1,8 +1,15 @@
+import hashlib
+import json
+from pathlib import Path
+
+import pytest
+
 from longworld.core.p66_ietf_taskbank import (
     admission_reason,
     exact_range,
     minimum_positive_evidence_cover,
 )
+from scripts import materialize_p66_ietf_taskbank as materialize
 
 
 def test_exact_ranges_are_numeric_not_capacity_bins():
@@ -62,3 +69,21 @@ def test_admission_is_fail_closed():
         )
         == "accepted_local_long_candidate"
     )
+
+
+def test_validation_rejects_changed_output_tree(tmp_path: Path, monkeypatch) -> None:
+    output = tmp_path / "output"
+    output.mkdir()
+    payload = output / "train.jsonl"
+    payload.write_text("original\n")
+    receipt = {
+        "schema_version": materialize.RECEIPT,
+        "config_sha256": "config-digest",
+        "files": {"train.jsonl": hashlib.sha256(payload.read_bytes()).hexdigest()},
+    }
+    (output / "BUILD_RECEIPT.json").write_text(json.dumps(receipt))
+    monkeypatch.setattr(materialize, "build", lambda *args: receipt)
+
+    payload.write_text("changed\n")
+    with pytest.raises(ValueError, match="output tree"):
+        materialize.validate(tmp_path / "config.json", output, 1)

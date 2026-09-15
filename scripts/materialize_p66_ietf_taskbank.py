@@ -249,9 +249,21 @@ def build(config_path: Path, output: Path, workers: int) -> dict:
 
 
 def validate(config_path: Path, output: Path, workers: int) -> dict:
-    receipt = json.loads((output / "BUILD_RECEIPT.json").read_text())
+    receipt_path = output / "BUILD_RECEIPT.json"
+    if receipt_path.is_symlink() or any(
+        path.is_symlink() for path in output.rglob("*")
+    ):
+        raise ValueError("output contains symlinks")
+    receipt = json.loads(receipt_path.read_text())
     if receipt.get("schema_version") != RECEIPT:
         raise ValueError("invalid P66 receipt schema")
+    actual_files = {
+        path.relative_to(output).as_posix(): digest(path)
+        for path in sorted(output.rglob("*"))
+        if path.is_file() and path != receipt_path
+    }
+    if actual_files != receipt.get("files"):
+        raise ValueError("P66 IETF output tree differs from receipt")
     with tempfile.TemporaryDirectory(prefix="p66-ietf-replay-") as temp:
         replay = Path(temp) / "out"
         rebuilt = build(config_path, replay, workers)
