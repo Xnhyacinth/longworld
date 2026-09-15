@@ -291,6 +291,80 @@ def run_shard(job, capacity, output, fingerprint):
     return receipt
 
 
+def completion_manifest(receipts, plan, fingerprint, files):
+    split_worlds = {
+        split: {r["world_seed"] for r in receipts if r["split"] == split}
+        for split in ("train", "eval")
+    }
+    if split_worlds["train"] & split_worlds["eval"]:
+        raise ValueError("world split collision")
+    topic_sets = {
+        split: {r["topic_id"] for r in receipts if r["split"] == split}
+        for split in ("train", "eval")
+    }
+    if topic_sets["train"] & topic_sets["eval"]:
+        raise ValueError("topic split collision")
+    rule_sets = {
+        split: {
+            r["rule_structure_signature"]
+            for r in receipts
+            if r["split"] == split and r["rule_structure_signature"]
+        }
+        for split in ("train", "eval")
+    }
+    return {
+        "schema_version": SCHEMA,
+        "status": "local_symbolic_curriculum_complete",
+        "fingerprint": fingerprint,
+        "completed_shards": len(receipts),
+        "world_seed_groups": len(plan),
+        "semantic_families": sorted({r["family"] for r in receipts}),
+        "sampled_topics": len({r["topic_id"] for r in receipts}),
+        "sampled_domains": len({r["domain_id"] for r in receipts}),
+        "sampled_fields": len({j["topic"]["field"]["id"] for j in plan}),
+        "sampled_subfields": len({j["topic"]["subfield"]["id"] for j in plan}),
+        "topic_scope": "real taxonomy metadata; domain-specific physics not established",
+        "rows": sum(r["rows"] for r in receipts),
+        "qa_pairs": sum(r["qa_pairs"] for r in receipts),
+        "full_chat_tokens": sum(sum(r["full_chat_tokens"]) for r in receipts),
+        "supervised_tokens": sum(r["supervised_tokens"] for r in receipts),
+        "split_rows": {
+            split: sum(r["rows"] for r in receipts if r["split"] == split)
+            for split in ("train", "eval")
+        },
+        "rule_structure_overlap": sorted(rule_sets["train"] & rule_sets["eval"]),
+        "rule_split_scope": "coefficient-instance overlap only; structural families shared between splits",
+        "worker_pids": sorted({r["worker_pid"] for r in receipts}),
+        "strict_long_dependency_verified": False,
+        "framework_release_ready": False,
+        "production_eligible": False,
+        "model_utility_measured": False,
+        "files": files,
+        "shards": receipts,
+    }
+
+
+def validate_completed_manifest(destination, manifest, expected):
+    required = {
+        "plan.json",
+        "shards",
+        "rejects.json",
+        "train.jsonl",
+        "eval.jsonl",
+        "manifest.json",
+    }
+    if (
+        {path.name for path in destination.iterdir()} != required
+        or any(path.is_symlink() for path in destination.iterdir())
+        or json.loads((destination / "rejects.json").read_text()) != []
+        or manifest != expected
+    ):
+        raise ValueError("completed manifest or export inventory mismatch")
+    for name, digest in expected["files"].items():
+        if base.sha(destination / name) != digest:
+            raise ValueError("completed export hash mismatch")
+
+
 def run(config_path, destination, resume=False):
     config = json.loads(config_path.read_text())
     taxonomy_path = ROOT / config["taxonomy_path"]
@@ -385,30 +459,31 @@ def run(config_path, destination, resume=False):
         base.sha(ROOT / name) != digest for name, digest in state["code_sha256"].items()
     ):
         raise RuntimeError("code changed during run; completion forbidden")
+    receipts.sort(key=lambda row: row["shard_id"])
     if (destination / "manifest.json").exists():
         # Resume must recheck every shard before trusting an existing completion.
         manifest = json.loads((destination / "manifest.json").read_text())
-        if rejects or len(receipts) != manifest["completed_shards"]:
+        if rejects:
             raise ValueError("resume audit failed")
-        for name, digest in manifest["files"].items():
-            if base.sha(destination / name) != digest:
-                raise ValueError("completed export hash mismatch")
+        files = {
+            name: base.sha(destination / name) for name in ("train.jsonl", "eval.jsonl")
+        }
+        expected = completion_manifest(receipts, plan, fingerprint, files)
+        validate_completed_manifest(destination, manifest, expected)
         return manifest
-    receipts.sort(key=lambda row: row["shard_id"])
     base.write_new_json(destination / "rejects.json", rejects)
     if rejects:
         raise RuntimeError(
             f"{len(rejects)} rejected shards; no complete training manifest"
         )
     files = {}
-    seen_ids, split_worlds = set(), defaultdict(set)
+    seen_ids = set()
     for split in ("train", "eval"):
         path = destination / f"{split}.jsonl"
         with path.open("x") as stream:
             for receipt in receipts:
                 if receipt["split"] != split:
                     continue
-                split_worlds[split].add(receipt["world_seed"])
                 shard = destination / "shards" / receipt["shard_id"]
                 load_cached(shard, fingerprint)
                 for line in (shard / "rows.jsonl").read_text().splitlines():
@@ -418,52 +493,7 @@ def run(config_path, destination, resume=False):
                     seen_ids.add(row["example_id"])
                     stream.write(line + "\n")
         files[path.name] = base.sha(path)
-    if split_worlds["train"] & split_worlds["eval"]:
-        raise ValueError("world split collision")
-    topic_sets = {
-        split: {r["topic_id"] for r in receipts if r["split"] == split}
-        for split in ("train", "eval")
-    }
-    if topic_sets["train"] & topic_sets["eval"]:
-        raise ValueError("topic split collision")
-    rule_sets = {
-        split: {
-            r["rule_structure_signature"]
-            for r in receipts
-            if r["split"] == split and r["rule_structure_signature"]
-        }
-        for split in ("train", "eval")
-    }
-    manifest = {
-        "schema_version": SCHEMA,
-        "status": "local_symbolic_curriculum_complete",
-        "fingerprint": fingerprint,
-        "completed_shards": len(receipts),
-        "world_seed_groups": len(plan),
-        "semantic_families": sorted({r["family"] for r in receipts}),
-        "sampled_topics": len({r["topic_id"] for r in receipts}),
-        "sampled_domains": len({r["domain_id"] for r in receipts}),
-        "sampled_fields": len({j["topic"]["field"]["id"] for j in plan}),
-        "sampled_subfields": len({j["topic"]["subfield"]["id"] for j in plan}),
-        "topic_scope": "real taxonomy metadata; domain-specific physics not established",
-        "rows": sum(r["rows"] for r in receipts),
-        "qa_pairs": sum(r["qa_pairs"] for r in receipts),
-        "full_chat_tokens": sum(sum(r["full_chat_tokens"]) for r in receipts),
-        "supervised_tokens": sum(r["supervised_tokens"] for r in receipts),
-        "split_rows": {
-            s: sum(r["rows"] for r in receipts if r["split"] == s)
-            for s in ("train", "eval")
-        },
-        "rule_structure_overlap": sorted(rule_sets["train"] & rule_sets["eval"]),
-        "rule_split_scope": "coefficient-instance overlap only; structural families shared between splits",
-        "worker_pids": sorted({r["worker_pid"] for r in receipts}),
-        "strict_long_dependency_verified": False,
-        "framework_release_ready": False,
-        "production_eligible": False,
-        "model_utility_measured": False,
-        "files": files,
-        "shards": receipts,
-    }
+    manifest = completion_manifest(receipts, plan, fingerprint, files)
     base.write_new_json(destination / "manifest.json", manifest)
     return manifest
 

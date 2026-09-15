@@ -13,18 +13,18 @@ fi
 COND="${1:-B5}"
 shift || true
 TASKBANK_PREPARE_ONLY=0
-if [[ "$COND" == "TASKBANK" || "$COND" == "P64" ]]; then
+if [[ "$COND" == "TASKBANK" ]]; then
   TASKBANK_ARGS=()
   for arg in "$@"; do
     case "$arg" in
       --prepare-only) TASKBANK_PREPARE_ONLY=1 ;;
       eval_dataset=*|tokenized_path=*|model_name_or_path=*|model_revision=*|template=*|cutoff_len=*|packing=*|neat_packing=*|train_on_prompt=*|val_size=*|trust_remote_code=*|--eval_dataset|--eval_dataset=*|--tokenized_path|--tokenized_path=*|--model_name_or_path|--model_name_or_path=*|--model_revision|--model_revision=*|--template|--template=*|--cutoff_len|--cutoff_len=*|--packing|--packing=*|--neat_packing|--neat_packing=*|--train_on_prompt|--train_on_prompt=*|--val_size|--val_size=*|--trust_remote_code|--trust_remote_code=*)
-        echo "$COND source/tokenizer/template overrides require new validated preparation: $arg" >&2
+        echo "TASKBANK source/tokenizer/template overrides require new validated preparation: $arg" >&2
         exit 1
         ;;
       output_dir=*|logging_steps=*|save_steps=*|save_total_limit=*|per_device_train_batch_size=*|gradient_accumulation_steps=*|learning_rate=*|num_train_epochs=*|max_steps=*|lr_scheduler_type=*|warmup_ratio=*|warmup_steps=*|bf16=*|flash_attn=*|gradient_checkpointing=*|ddp_timeout=*|report_to=*|run_name=*) TASKBANK_ARGS+=("$arg") ;;
       *)
-        echo "unsupported $COND override; use a validated recipe for data changes: $arg" >&2
+        echo "unsupported TASKBANK override; use a validated recipe for data changes: $arg" >&2
         exit 1
         ;;
     esac
@@ -58,7 +58,7 @@ if [[ ! -f "$CFG" ]]; then
   echo "missing $CFG" >&2
   exit 1
 fi
-if [[ "$COND" != "TASKBANK" && "$COND" != "P64" && ! -d "$LF_ROOT" ]]; then
+if [[ "$COND" != "TASKBANK" && ! -d "$LF_ROOT" ]]; then
   echo "LLaMA-Factory not found. Run: bash scripts/setup_llamafactory.sh" >&2
   exit 1
 fi
@@ -98,43 +98,6 @@ print(value["snapshot_dir"])
   esac
   if [[ ! -d "$VALIDATED_SNAPSHOT" || -L "$VALIDATED_SNAPSHOT" ]]; then
     echo "TASKBANK validated snapshot is missing or unsafe" >&2
-    exit 1
-  fi
-fi
-
-if [[ "$COND" == "P64" ]]; then
-  : "${LONGWORLD_P64_MANIFEST:?LONGWORLD_P64_MANIFEST is required}"
-  : "${LONGWORLD_P64_REPORT_TRUST:?LONGWORLD_P64_REPORT_TRUST is required}"
-  VERIFY_PY="$ROOT/.venv/bin/python"
-  if [[ ! -x "$VERIFY_PY" ]]; then
-    echo "P64 requires the owning project .venv" >&2
-    exit 1
-  fi
-  SNAPSHOT_ROOT="${LONGWORLD_P64_SNAPSHOT_ROOT:-}"
-  if [[ -z "$SNAPSHOT_ROOT" ]]; then
-    SNAPSHOT_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/longworld-p64-training.XXXXXX")"
-    chmod 700 "$SNAPSHOT_ROOT"
-  fi
-  VALIDATION_JSON="$(
-    "$VERIFY_PY" "$ROOT/scripts/run_with_local_probe_trust.py" \
-      --trust-file "$LONGWORLD_P64_REPORT_TRUST" --role report -- \
-      "$VERIFY_PY" "$ROOT/scripts/prepare_p64_training.py" validate \
-      --manifest "$LONGWORLD_P64_MANIFEST" --snapshot-root "$SNAPSHOT_ROOT"
-  )"
-  VALIDATED_SNAPSHOT="$(
-    "$VERIFY_PY" -c 'import json,sys
-value = json.load(sys.stdin)
-if value.get("ok") is not True or not value.get("snapshot_dir"):
-    raise SystemExit("p64 validator did not return a verified snapshot")
-print(value["snapshot_dir"])
-' <<<"$VALIDATION_JSON"
-  )"
-  case "$VALIDATED_SNAPSHOT" in
-    "$SNAPSHOT_ROOT"/*) ;;
-    *) echo "p64 validator returned an invalid snapshot path" >&2; exit 1 ;;
-  esac
-  if [[ ! -d "$VALIDATED_SNAPSHOT" || -L "$VALIDATED_SNAPSHOT" ]]; then
-    echo "P64 validated snapshot is missing or unsafe" >&2
     exit 1
   fi
 fi
@@ -210,14 +173,13 @@ unset LONGWORLD_PROMOTION_ATTESTATION_KEY LONGWORLD_PROMOTION_ATTESTATION_KEY_ID
 unset LONGWORLD_REPORT_ATTESTATION_KEY LONGWORLD_REPORT_ATTESTATION_KEY_ID
 unset LONGWORLD_PREDECESSOR_GATE_ATTESTATION_KEY LONGWORLD_PREDECESSOR_GATE_ATTESTATION_KEY_ID
 unset LONGWORLD_TASKBANK_REPORT_TRUST
-unset LONGWORLD_P64_REPORT_TRUST
 
-if [[ ( "$COND" == "TASKBANK" || "$COND" == "P64" ) && "$TASKBANK_PREPARE_ONLY" == "1" ]]; then
+if [[ "$COND" == "TASKBANK" && "$TASKBANK_PREPARE_ONLY" == "1" ]]; then
   printf '%s\n' "$VALIDATION_JSON"
   exit 0
 fi
-if [[ ( "$COND" == "TASKBANK" || "$COND" == "P64" ) && ! -d "$LF_ROOT" ]]; then
-  echo "LLaMA-Factory not found; validated input preparation succeeded but training needs LLAMA_FACTORY_ROOT" >&2
+if [[ "$COND" == "TASKBANK" && ! -d "$LF_ROOT" ]]; then
+  echo "LLaMA-Factory not found; taskbank input preparation succeeded but training needs LLAMA_FACTORY_ROOT" >&2
   exit 1
 fi
 
@@ -300,7 +262,7 @@ fi
 if [[ "$COND" == "B5w" ]]; then
   USE_V1=1
 fi
-if [[ "$COND" == "TASKBANK" || "$COND" == "P64" ]]; then
+if [[ "$COND" == "TASKBANK" ]]; then
   USE_V1=0
 fi
 export USE_V1
