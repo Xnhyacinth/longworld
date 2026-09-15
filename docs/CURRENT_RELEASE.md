@@ -20,14 +20,14 @@ hash keys, and IETF/ResearchLab replay validation hashes the supplied output
 tree before comparing a clean rebuild.
 
 Private `Xnhyacinth/LongWorld-Training-State` records the operational worktree
-snapshot. Hub commit `61b73ed38042c366721f95659649910f0277b306`
+snapshot. Hub commit `d7ec76236e7fde73c5554d9ed941a775a4b8afa3`
 contains the dataset card, 1.17 GB of training logs, evaluation results,
 receipts, report intermediates, and `SNAPSHOT_MANIFEST.json`. The manifest
-binds all 2,297 intended files and 214,172,909,533 bytes by SHA-256. The Hub
-accepted 2,157 payload files / 1,173,218,088 bytes; its private LFS quota then
+binds all 2,297 intended files and 214,172,921,054 bytes by SHA-256. The Hub
+accepted 2,157 payload files / 1,173,229,609 bytes; its private LFS quota then
 rejected 140 files / 212,999,691,445 bytes. Those blocked files are the eight
-complete optimizer/model checkpoint pairs and large JSONL/parquet evaluation
-payloads. They remain in the local hard-linked staging view at
+checkpoints' LFS-class model/optimizer/RNG/scheduler assets and large
+JSONL/parquet evaluation payloads. They remain in the local staging view at
 `/workspace/wynckeliao/.longworld-hf-staging/LongWorld-Training-State` and are
 discoverable by exact path, size, and digest in the uploaded manifest.
 

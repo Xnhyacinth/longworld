@@ -41,10 +41,9 @@ in the catalog.
 ## Hugging Face operational snapshot
 
 - Private dataset: `Xnhyacinth/LongWorld-Training-State`.
-- Verified Hub commit:
-  `61b73ed38042c366721f95659649910f0277b306`.
-- Intended local view: 2,297 files / 214,172,909,533 bytes.
-- Uploaded payload: 2,157 files / 1,173,218,088 bytes, plus the dataset card,
+- Frozen manifest revision: Hub tag `state-2026-09-15`.
+- Intended local view: 2,297 files / 214,172,921,054 bytes.
+- Uploaded payload: 2,157 files / 1,173,229,609 bytes, plus the dataset card,
   Hub attributes, and uploaded snapshot manifest.
 - Storage-quota blocked: 140 files / 212,999,691,445 bytes.
 - Local resumable view:
