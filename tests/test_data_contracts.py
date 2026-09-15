@@ -190,6 +190,7 @@ def test_training_does_not_expose_the_producer_attestation_key() -> None:
     launcher = (ROOT / "scripts" / "train_llamafactory.sh").read_text()
     assert f"unset {ATTESTATION_ENV}" in launcher
     assert all(name in launcher for name in ROLE_KEY_ENVS.values())
+    assert "unset LONGWORLD_P64_REPORT_TRUST" in launcher
     assert "validate_training_export.py" in launcher
     assert "dataset_dir=$VALIDATED_SNAPSHOT" in launcher
     assert "train_dataset=$VALIDATED_SNAPSHOT/B5w.datasets.yaml" in launcher
