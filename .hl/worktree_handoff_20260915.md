@@ -8,7 +8,7 @@ experimental branch do not become reachable from `main`.
 
 The complete operational upload view is indexed by SHA-256 in private
 `Xnhyacinth/LongWorld-Training-State` at Hub commit
-`8fc4c86ca0b1be586dec21119ffe3997e242672b`. Hub accepted 1.17 GB of logs,
+tag `state-2026-09-15`. Hub accepted 1.17 GB of logs,
 receipts, reports, and evaluation results. Its private LFS quota rejected
 213.00 GB of full checkpoint and large evaluation payloads. Those files remain
 in the resumable local hard-link view
