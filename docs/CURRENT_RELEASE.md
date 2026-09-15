@@ -1,6 +1,6 @@
 # Current release status
 
-Last updated: 2026-09-12
+Last updated: 2026-09-15
 
 This file is the canonical publication-status summary. Historical receipts and
 `.hl/` logs remain useful for reproducibility, but they do not override this
@@ -8,6 +8,34 @@ status. The canonical project root is `/workspace/wynckeliao/longworld`;
 project code, source inventory, generated data, release receipts, reports, and
 durable progress records must live there. Tool caches may be reconstructed
 outside the repository, and credentials must remain outside Git.
+
+## 2026-09-15 source-tree and experiment-state handoff
+
+The P57--P66 world synthesis history, capability curriculum, P64/P65/P66
+taskbank code, configurations, tests, compact receipts, and durable planning
+records were integrated into `main`. The integration deliberately excludes the
+tracked `.local-probe-env` experiment bundle so that its HMAC key material does
+not enter `main` history. Source-taskbank catalogs now use repository-relative
+hash keys, and IETF/ResearchLab replay validation hashes the supplied output
+tree before comparing a clean rebuild.
+
+Private `Xnhyacinth/LongWorld-Training-State` records the operational worktree
+snapshot. Hub commit `61b73ed38042c366721f95659649910f0277b306`
+contains the dataset card, 1.17 GB of training logs, evaluation results,
+receipts, report intermediates, and `SNAPSHOT_MANIFEST.json`. The manifest
+binds all 2,297 intended files and 214,172,909,533 bytes by SHA-256. The Hub
+accepted 2,157 payload files / 1,173,218,088 bytes; its private LFS quota then
+rejected 140 files / 212,999,691,445 bytes. Those blocked files are the eight
+complete optimizer/model checkpoint pairs and large JSONL/parquet evaluation
+payloads. They remain in the local hard-linked staging view at
+`/workspace/wynckeliao/.longworld-hf-staging/LongWorld-Training-State` and are
+discoverable by exact path, size, and digest in the uploaded manifest.
+
+The deliberate cache exclusions are `.venv`, Python bytecode, downloaded
+models/packages, evaluation `cache/` trees and serve views,
+`data/sft/tokenized`, Git objects, and all trust files/credentials. These
+exclusions do not remove source configs, lockfiles, trainer arguments, logs,
+receipts, or RNG/optimizer entries from the intended manifest.
 
 ## 2026-09-12 sync: P64 product on Hub, P65 adapters on GitHub
 
