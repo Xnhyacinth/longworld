@@ -1,0 +1,186 @@
+{
+  "schema_version": "longworld.p63-taskbank-inventory.v1",
+  "batch_receipt_sha256": "4ca51d9d875851ae70cfdec6b3317f074bf15990fe33bea96075ce3f0b79ee7d",
+  "source_entities": 6,
+  "net_new_source_entities": 0,
+  "source_documents": 24,
+  "worlds": [
+    {
+      "issuer": "alphabet",
+      "split": "train",
+      "tasks": 197,
+      "context_tokens": 16704394,
+      "min_context_tokens": 76354,
+      "max_context_tokens": 97098,
+      "unique_contexts": 13,
+      "build_seconds": 30.095,
+      "families": {
+        "aggregate": 54,
+        "cash_reconciliation": 4,
+        "delta": 54,
+        "filter": 10,
+        "filtered_aggregate": 4,
+        "lookup": 36,
+        "maximum": 27,
+        "ratio": 8
+      }
+    },
+    {
+      "issuer": "amazon",
+      "split": "train",
+      "tasks": 242,
+      "context_tokens": 24129598,
+      "min_context_tokens": 69446,
+      "max_context_tokens": 129233,
+      "unique_contexts": 13,
+      "build_seconds": 39.933,
+      "families": {
+        "aggregate": 54,
+        "cash_reconciliation": 4,
+        "delta": 66,
+        "filter": 24,
+        "filtered_aggregate": 9,
+        "lookup": 44,
+        "maximum": 33,
+        "ratio": 8
+      }
+    },
+    {
+      "issuer": "amd",
+      "split": "eval",
+      "tasks": 185,
+      "context_tokens": 16713551,
+      "min_context_tokens": 80155,
+      "max_context_tokens": 95073,
+      "unique_contexts": 13,
+      "build_seconds": 30.376,
+      "families": {
+        "aggregate": 44,
+        "cash_reconciliation": 4,
+        "delta": 48,
+        "filter": 18,
+        "filtered_aggregate": 7,
+        "lookup": 32,
+        "maximum": 24,
+        "ratio": 8
+      }
+    },
+    {
+      "issuer": "meta",
+      "split": "train",
+      "tasks": 213,
+      "context_tokens": 16522578,
+      "min_context_tokens": 66824,
+      "max_context_tokens": 89910,
+      "unique_contexts": 13,
+      "build_seconds": 29.223,
+      "families": {
+        "aggregate": 54,
+        "cash_reconciliation": 4,
+        "delta": 54,
+        "filter": 22,
+        "filtered_aggregate": 8,
+        "lookup": 36,
+        "maximum": 27,
+        "ratio": 8
+      }
+    },
+    {
+      "issuer": "micron",
+      "split": "train",
+      "tasks": 234,
+      "context_tokens": 18205792,
+      "min_context_tokens": 67889,
+      "max_context_tokens": 89511,
+      "unique_contexts": 13,
+      "build_seconds": 29.678,
+      "families": {
+        "aggregate": 54,
+        "cash_reconciliation": 4,
+        "delta": 54,
+        "filter": 38,
+        "filtered_aggregate": 13,
+        "lookup": 36,
+        "maximum": 27,
+        "ratio": 8
+      }
+    },
+    {
+      "issuer": "nvidia",
+      "split": "train",
+      "tasks": 181,
+      "context_tokens": 16171114,
+      "min_context_tokens": 59152,
+      "max_context_tokens": 125573,
+      "unique_contexts": 13,
+      "build_seconds": 27.573,
+      "families": {
+        "aggregate": 44,
+        "cash_reconciliation": 4,
+        "delta": 48,
+        "filter": 16,
+        "filtered_aggregate": 5,
+        "lookup": 32,
+        "maximum": 24,
+        "ratio": 8
+      }
+    }
+  ],
+  "production_eligible": false,
+  "training_release_eligible": false,
+  "source_groups_overlap": [],
+  "semantic_tasks": 1252,
+  "split_counts": {
+    "train": 1067,
+    "eval": 185
+  },
+  "split_context_tokens": {
+    "train": 91733476,
+    "eval": 16713551
+  },
+  "candidate_funnel": {
+    "source_facts": 216,
+    "draft_candidates": 2466,
+    "attempted_programs": 2458,
+    "program_rejected": 1206,
+    "applicability_rejected": 8
+  },
+  "task_families": {
+    "aggregate": 304,
+    "cash_reconciliation": 24,
+    "delta": 324,
+    "filter": 128,
+    "filtered_aggregate": 46,
+    "lookup": 216,
+    "maximum": 162,
+    "ratio": 48
+  },
+  "context_selection": {
+    "latest_complete_filing_with_historical_statements": 800,
+    "complete_filings": 424,
+    "complete_audited_statement_packet": 28
+  },
+  "unique_contexts": 78,
+  "sum_unique_context_tokens_with_source_overlap": 6730871,
+  "median_tasks_per_source_world": 205.0,
+  "min_context_tokens": 59152,
+  "max_context_tokens": 129233,
+  "all_views": "full only",
+  "legacy_training_union_allowed": false,
+  "strict_long_dependency_verified": false,
+  "matched_training_measured": false,
+  "local_training_preparation": {
+    "manifest_path": "/workspace/wynckeliao/.longworld-taskbank-training-private/p63_v2/TASKBANK_TRAINING_MANIFEST.json",
+    "manifest_sha256": "86acc0735836a4a9184803b106220a7c75669c421200d6347645ee21734ec640",
+    "counts": {
+      "eval": 185,
+      "train": 1067
+    },
+    "local_training_eligible": true,
+    "production_eligible": false,
+    "framework_preprocessing_verified": false,
+    "max_full_message_tokens": 129654,
+    "launcher_prepare_only": "PASS",
+    "root_independent_validation": "PASS"
+  }
+}

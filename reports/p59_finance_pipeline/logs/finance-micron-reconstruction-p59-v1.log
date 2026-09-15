@@ -1,0 +1,39 @@
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/micron/local_probe_trust.json --role source --role candidate --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/reports/p59_finance_reconstruction_generate.py --config /workspace/wynckeliao/longworld-worlds/configs/p59_finance_micron_reconstruction_v1.json
+Traceback (most recent call last):
+  File "/workspace/wynckeliao/longworld-worlds/reports/p59_finance_reconstruction_generate.py", line 68, in <module>
+    raise ValueError("immutable source successor already differs")
+ValueError: immutable source successor already differs
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/micron/local_probe_trust.json --role source --role candidate --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/reports/p59_finance_reconstruction_generate.py --config /workspace/wynckeliao/longworld-worlds/configs/p59_finance_micron_reconstruction_v1.json
+{
+  "schema_version": "longworld.p59-finance-reconstruction-preflight.v1",
+  "source_parent_sha256": "b72d1742da7dfb13145867bd8d98394a7b829e109c7abdc62d52a5a7c77077bd",
+  "source_successor_sha256": "d85ebdb650cb37a9b7e7d0fddc783cf167e4d1b7c5f38109b80236d843cd15cd",
+  "source_text_and_old_facts_unchanged": true,
+  "world_id": "finance_micron_reconstruction_fy2022_2025_p59_v1",
+  "source_profile": "micron.financial-reconstruction.v1",
+  "answer_program_id": "finance.multi_filing_reconstruction.v1",
+  "required_roles": [
+    "assets",
+    "cash_from_financing",
+    "cash_from_investing",
+    "cash_from_operations",
+    "cash_fx_effect",
+    "cash_period_change",
+    "liabilities_and_equity",
+    "operating_income",
+    "revenue"
+  ],
+  "new_semantic_tasks": 1,
+  "new_source_worlds": 0,
+  "base_replay_sufficient": true,
+  "counterfactual_changes_numeric_answer": true,
+  "remove_one_fails": true,
+  "essential_source_rows": 36,
+  "production_eligible": false
+}
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/micron/local_probe_trust.json --role source --role candidate --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py --candidates /workspace/wynckeliao/longworld-worlds/reports/p59_finance_micron_reconstruction_v1/parents/parents.jsonl --sidecar /workspace/wynckeliao/longworld-worlds/reports/p59_finance_micron_reconstruction_v1/parents/TASK_REPLAY_SIDECAR.json --output-dir /workspace/wynckeliao/longworld-worlds/reports/p59_finance_micron_reconstruction_v1/projected --length-bucket 64k
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/micron/local_probe_trust.json --role ranker --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/rank_candidates_dense.py --candidates /workspace/wynckeliao/longworld-worlds/reports/p59_finance_micron_reconstruction_v1/projected/candidates.jsonl --output /workspace/wynckeliao/longworld-worlds/reports/p59_finance_micron_reconstruction_v1/projected/rankings.jsonl --model-id sentence-transformers/all-MiniLM-L6-v2 --revision 1110a243fdf4706b3f48f1d95db1a4f5529b4d41
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 4013.46it/s]
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (612 > 256). Running {"rows": 3, "output": "/workspace/wynckeliao/longworld-worlds/reports/pthis sequence through the model will result in indexing errors
+59_finance_micron_reconstruction_v1/projected/rankings.jsonl"}
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/micron/local_probe_trust.json --role source --role candidate --role ranker --role auditor --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py --candidates /workspace/wynckeliao/longworld-worlds/reports/p59_finance_micron_reconstruction_v1/parents/parents.jsonl --sidecar /workspace/wynckeliao/longworld-worlds/reports/p59_finance_micron_reconstruction_v1/projected/TASK_REPLAY_SIDECAR_V3.json --output-dir /workspace/wynckeliao/longworld-worlds/reports/p59_finance_micron_reconstruction_v1/projected --audit-only --rankings /workspace/wynckeliao/longworld-worlds/reports/p59_finance_micron_reconstruction_v1/projected/rankings.jsonl --audit-workers 3 --length-bucket 64k

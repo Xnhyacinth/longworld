@@ -201,3 +201,39 @@ def test_full_chat_count_counts_ids_not_batch_encoding_keys(exported_bank):
         json.loads(line) for line in (output / "tasks.jsonl").read_text().splitlines()
     ]
     assert all(row["full_hf_chat_tokens"] > row["context_tokens"] for row in rows)
+
+
+def test_source_preflight_must_authorize_candidate_generation(tmp_path, monkeypatch):
+    import hashlib
+    import json
+
+    from scripts import materialize_p65_govinfo_taskbank as exporter
+
+    source = tmp_path / "source.json"
+    source.write_text(json.dumps({"bill_id": "fixture"}))
+    preflight = tmp_path / "preflight.json"
+    preflight.write_text(
+        json.dumps(
+            {
+                "authorization": {
+                    "allowed_actions": ["fetch_frozen_official_xml_to_process_memory"],
+                    "prohibited_actions": ["generate_candidates"],
+                },
+                "chains": [{"bill_id": "fixture"}],
+            }
+        )
+    )
+    monkeypatch.setattr(exporter, "ROOT", tmp_path)
+    config = {
+        "source_world": {
+            "path": source.name,
+            "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        },
+        "original_source_config": {
+            "path": preflight.name,
+            "sha256": hashlib.sha256(preflight.read_bytes()).hexdigest(),
+        },
+    }
+
+    with pytest.raises(ValueError, match="does not allow candidate generation"):
+        exporter.load_source(config)

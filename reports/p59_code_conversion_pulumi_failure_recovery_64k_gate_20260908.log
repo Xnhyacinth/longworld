@@ -1,0 +1,52 @@
+{
+  "ok": true,
+  "errors": [],
+  "n_rows": 3,
+  "n_worlds_observed": 1,
+  "n_unique_conversations": 3,
+  "n_exact_duplicate_rows": 0,
+  "n_conflicting_answer_prompts": 0,
+  "by_length": {
+    "64k": 3
+  },
+  "by_domain": {
+    "codeforge": 3
+  },
+  "worlds_by_domain": {
+    "codeforge": 1
+  },
+  "exact_64k_rows_by_domain": {
+    "codeforge": 3
+  },
+  "by_motif": {
+    "failure_recovery_release_trace": 3
+  },
+  "n_unique_base_tasks": 1,
+  "n_unique_semantic_base_tasks": 1,
+  "n_unique_executable_proofs": 1,
+  "n_unique_source_relations": 2,
+  "n_real_source_relations": 2,
+  "n_hybrid_causal_relations": 2,
+  "n_real_source_families": 1,
+  "n_unique_real_source_workflows": 4,
+  "n_real_base_tasks": 1,
+  "n_real_exact_64k_rows": 3,
+  "real_exact_64k_rows_by_domain": {
+    "codeforge": 3
+  },
+  "real_exact_64k_worlds_by_domain": {
+    "codeforge": 1
+  },
+  "real_worlds_by_split": {
+    "train": 1,
+    "eval": 0
+  },
+  "release_profile_id": "p59-code-pulumi-recovery-64k-probe-1-v1",
+  "release_profile_sha256": "f54b4c473164fc5a859a93e0207c720803e6260050624083c6be971e7abee44e",
+  "n_promotion_ready": 3,
+  "n_unique_answer_programs": 1,
+  "retention": 1.0,
+  "mean_boilerplate": 0.0,
+  "mean_pulse": 0.0,
+  "mean_near_dup_sentence_ratio": 0.0032999999999999995
+}

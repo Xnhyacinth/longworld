@@ -50,6 +50,13 @@ def load_source(config):
     if digest(preflight_path) != config["original_source_config"]["sha256"]:
         raise ValueError("original official source pins changed")
     preflight = json.loads(preflight_path.read_text())
+    authorization = preflight.get("authorization")
+    if (
+        not isinstance(authorization, dict)
+        or "generate_candidates" in authorization.get("prohibited_actions", [])
+        or "generate_candidates" not in authorization.get("allowed_actions", [])
+    ):
+        raise ValueError("source authorization does not allow candidate generation")
     chains = [c for c in preflight["chains"] if c["bill_id"] == world["bill_id"]]
     if len(chains) != 1:
         raise ValueError("source chain missing")

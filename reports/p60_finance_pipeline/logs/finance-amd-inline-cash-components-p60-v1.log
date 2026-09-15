@@ -1,0 +1,33 @@
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/amd/local_probe_trust.json --role source --role candidate --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/reports/p60_finance_amd_generate.py --config /workspace/wynckeliao/longworld-worlds/configs/p60_finance_amd_inline_cash_components_v1.json
+{
+  "schema_version": "longworld.p60-finance-inline-preflight.v1",
+  "source_inventory_sha256": "58cf669447ed35a4f38c911c3bf56d12322004755f2fc8ba78e23c18a02f5781",
+  "source_manifest_sha256": "4b8756fa1819883bbb706fb520516a64c17516cf1c44dbcfe018a5ebdfd67258",
+  "new_issuer_source_world": true,
+  "world_id": "finance_amd_inline_cash_components_fy2021_2024_p60_v1",
+  "source_profile": "amd.inline-cash-components.v1",
+  "answer_program_id": "finance.cash_components_identity.v1",
+  "required_roles": [
+    "assets",
+    "cash_from_financing",
+    "cash_from_investing",
+    "cash_from_operations",
+    "cash_period_change",
+    "liabilities_and_equity",
+    "operating_income",
+    "revenue"
+  ],
+  "new_semantic_tasks": 1,
+  "new_source_worlds": 1,
+  "base_replay_sufficient": true,
+  "counterfactual_changes_numeric_answer": true,
+  "remove_one_fails": true,
+  "essential_source_rows": 32,
+  "production_eligible": false
+}
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/amd/local_probe_trust.json --role source --role candidate --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py --candidates /workspace/wynckeliao/longworld-worlds/reports/p60_finance_amd_inline_cash_components_v1/parents/parents.jsonl --sidecar /workspace/wynckeliao/longworld-worlds/reports/p60_finance_amd_inline_cash_components_v1/parents/TASK_REPLAY_SIDECAR.json --output-dir /workspace/wynckeliao/longworld-worlds/reports/p60_finance_amd_inline_cash_components_v1/projected --length-bucket 64k
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/amd/local_probe_trust.json --role ranker --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/rank_candidates_dense.py --candidates /workspace/wynckeliao/longworld-worlds/reports/p60_finance_amd_inline_cash_components_v1/projected/candidates.jsonl --output /workspace/wynckeliao/longworld-worlds/reports/p60_finance_amd_inline_cash_components_v1/projected/rankings.jsonl --model-id sentence-transformers/all-MiniLM-L6-v2 --revision 1110a243fdf4706b3f48f1d95db1a4f5529b4d41
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 2030.94it/s]
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (1784 > 256). Running {"rows": 3, "output": "/workspace/wynckeliao/longworld-worlds/reports/p60_fithis sequence through the model will result in indexing errors
+nance_amd_inline_cash_components_v1/projected/rankings.jsonl"}
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/amd/local_probe_trust.json --role source --role candidate --role ranker --role auditor --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py --candidates /workspace/wynckeliao/longworld-worlds/reports/p60_finance_amd_inline_cash_components_v1/parents/parents.jsonl --sidecar /workspace/wynckeliao/longworld-worlds/reports/p60_finance_amd_inline_cash_components_v1/projected/TASK_REPLAY_SIDECAR_V3.json --output-dir /workspace/wynckeliao/longworld-worlds/reports/p60_finance_amd_inline_cash_components_v1/projected --audit-only --rankings /workspace/wynckeliao/longworld-worlds/reports/p60_finance_amd_inline_cash_components_v1/projected/rankings.jsonl --audit-workers 3 --length-bucket 64k

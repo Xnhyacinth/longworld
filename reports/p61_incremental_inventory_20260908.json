@@ -1,0 +1,236 @@
+{
+  "baseline": "/workspace/wynckeliao/longworld-worlds/reports/p58_scaleout_inventory_final_20260908.json",
+  "baseline_sha256": "135e00633638238dbae5e8e9848951799cb2e3d29f4f47c9c579d7e6882e9da3",
+  "current_physical_local_probe_inventory": {
+    "b5_estimated_tokens": 12334046,
+    "b5_examples": 185,
+    "eval_exact_context_tokens": 682032,
+    "eval_rows": 18,
+    "production_eligible_rows": 0,
+    "products": 30,
+    "train_exact_context_tokens": 14545942,
+    "train_rows": 246
+  },
+  "execution_or_hidden_attribute_diagnostic_delta": {
+    "b5_estimated_tokens": 394494,
+    "b5_examples": 6,
+    "eval_rows": 0,
+    "exact_context_tokens": 393036,
+    "train_rows": 6
+  },
+  "limitations": [
+    "Physical local-gate counts are not a universal reading-readiness certificate.",
+    "Two new gate-qualified products are held as execution/hidden-attribute diagnostics.",
+    "The source and export validators ran separately; this verifier rechecks bound hashes and counts, not HMAC signatures.",
+    "Exact counts are recorded tokenizer counts, not a new retokenization.",
+    "No new model-accuracy evaluation, full content deduplication or full split-leakage audit is claimed.",
+    "CURRENT_RELEASE and HF are unchanged; production eligibility remains false."
+  ],
+  "new_domains_admitted": 0,
+  "new_source_entities": [
+    "AMD",
+    "Pulumi",
+    "DuckDB"
+  ],
+  "physical_delta": {
+    "b5_estimated_tokens": 1474561,
+    "b5_examples": 24,
+    "eval_rows": 0,
+    "exact_context_tokens": 1468810,
+    "train_rows": 24
+  },
+  "products": [
+    {
+      "b5_estimated_tokens": 196383,
+      "b5_examples": 3,
+      "disposition": "text_or_numeric_target_checked",
+      "eval_rows": 0,
+      "exact_context_tokens": 195786,
+      "gate_ok": true,
+      "hashes": {
+        "eval.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "llamafactory/B5.json": "24e3b8de4f8b89c8ef5f95ade60698e5a1230dccc0b63eea16ecd5c33b5f93fc",
+        "llamafactory/B5.meta.json": "4aa5e9d1c9bf164e37279378671a033c00741592a74ac5d078eaa40dfe7e125a",
+        "llamafactory/dataset_info.json": "3cb3dc8c5d6a77d4b469bfd6276df3eab73cdcfb420ab8a00219efee6944bffb",
+        "llamafactory/export_summary.json": "6c72fa255f9511295f59fc466550c6188d3649f0a442641a8791f708600bfd49",
+        "quality_report.json": "a133db17b6ee53a7651a08f3c03ddad6175f0e574ec08b1e085687f34f045829",
+        "train.jsonl": "f66cc43bd2e8e16a796423896e27e1b38ffeb04f4ac6be5de2cbf39b610541b6"
+      },
+      "product": "p59-finance-alphabet-reconstruction-64k-probe-1-v1-promoted-v1",
+      "production_eligible": false,
+      "train_rows": 3,
+      "world_ids": [
+        "finance_alphabet_reconstruction_2021_2024_p59_v1"
+      ]
+    },
+    {
+      "b5_estimated_tokens": 196347,
+      "b5_examples": 3,
+      "disposition": "text_or_numeric_target_checked",
+      "eval_rows": 0,
+      "exact_context_tokens": 195750,
+      "gate_ok": true,
+      "hashes": {
+        "eval.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "llamafactory/B5.json": "386db65b845b4edac6aa87a2680e291ca27300d890b267a8c130f0c55a3c441f",
+        "llamafactory/B5.meta.json": "4fdc422ba4b508bc49cdfca979a6c56b2eded7f8e2af22fa2aac6cac6ed37b22",
+        "llamafactory/dataset_info.json": "3cb3dc8c5d6a77d4b469bfd6276df3eab73cdcfb420ab8a00219efee6944bffb",
+        "llamafactory/export_summary.json": "7c6c1dc30ca46018507c17a0b31690bf23587b82b9d362ad29e8310a5ed591ec",
+        "quality_report.json": "4261940822abd7b8fd8cca89a2cfb1ea1cf5bc6b1295c8c7d9eaa1c03eba2ad8",
+        "train.jsonl": "c7bbd55dab7418494256d15bd6cc250fdad2c1566f23fe300458d35ddfde1ac3"
+      },
+      "product": "p59-finance-micron-reconstruction-64k-probe-1-v1-promoted-v1",
+      "production_eligible": false,
+      "train_rows": 3,
+      "world_ids": [
+        "finance_micron_reconstruction_fy2022_2025_p59_v1"
+      ]
+    },
+    {
+      "b5_estimated_tokens": 197116,
+      "b5_examples": 3,
+      "disposition": "text_or_numeric_target_checked",
+      "eval_rows": 0,
+      "exact_context_tokens": 195850,
+      "gate_ok": true,
+      "hashes": {
+        "eval.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "llamafactory/B5.json": "26407beffc626e908634b6243ff2ebe1f57ea473cdafe56b387bf9ad33b8e1a0",
+        "llamafactory/B5.meta.json": "89887463782c379c8cfd92432d88920baa8a838214165c8ca95c66ae074c2272",
+        "llamafactory/dataset_info.json": "3cb3dc8c5d6a77d4b469bfd6276df3eab73cdcfb420ab8a00219efee6944bffb",
+        "llamafactory/export_summary.json": "12c1f31c6d8f82294d285ebf84706a1560cd280bc563ec905b9544b82b1de21e",
+        "quality_report.json": "96445a080226300dfa93615033fee5762e6f439cc8a2cd6886d0ed55af300956",
+        "train.jsonl": "d6ad8170916530e038001a6ba4d797b1faf383b94090f76ef1ae0a0032f8cd85"
+      },
+      "product": "p59-finance-nvidia-cash-components-64k-probe-1-v1-promoted-v1",
+      "production_eligible": false,
+      "train_rows": 3,
+      "world_ids": [
+        "finance_nvidia_reconstruction_fy2022_2025_p59_v1"
+      ]
+    },
+    {
+      "b5_estimated_tokens": 197373,
+      "b5_examples": 3,
+      "disposition": "hidden_attribute_diagnostic",
+      "eval_rows": 0,
+      "exact_context_tokens": 196599,
+      "gate_ok": true,
+      "hashes": {
+        "eval.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "llamafactory/B5.json": "e674081145055bbfad8c47133605137bec4a6ca597f6b49848e05d8ce219345b",
+        "llamafactory/B5.meta.json": "64d02e77cecce7ea4134357ecb81dc8d97a377082ce2899c275a086eef0ab191",
+        "llamafactory/dataset_info.json": "3cb3dc8c5d6a77d4b469bfd6276df3eab73cdcfb420ab8a00219efee6944bffb",
+        "llamafactory/export_summary.json": "e4b8f3f46103cdbec61f8ea4e5b3572f07a522cc62cc7e3557d3b3fadc5ed042",
+        "quality_report.json": "a6a008cd73a054ac2ae00ae06b3e9b40360642236ff07fbe45d2608e0145b1a2",
+        "train.jsonl": "093e5e8a1fb27915e8b9b866c8a082d9cf3658eb8cdc1e8c42dcc981002e863a"
+      },
+      "product": "p59-code-pulumi-recovery-64k-probe-1-v1-promoted-v1",
+      "production_eligible": false,
+      "train_rows": 3,
+      "world_ids": [
+        "code000160-ashloftkit-53:focal"
+      ]
+    },
+    {
+      "b5_estimated_tokens": 197121,
+      "b5_examples": 3,
+      "disposition": "byte_hash_and_hidden_attribute_diagnostic",
+      "eval_rows": 0,
+      "exact_context_tokens": 196437,
+      "gate_ok": true,
+      "hashes": {
+        "eval.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "llamafactory/B5.json": "b4696a398e94157528ad6921ee71b15bf79d0771cbed59e7c039c10f566e56c9",
+        "llamafactory/B5.meta.json": "2480ad995e9e09dbc8076393e8fad3cb8fb31db59544c66e8704dc65cd2e4e5f",
+        "llamafactory/dataset_info.json": "3cb3dc8c5d6a77d4b469bfd6276df3eab73cdcfb420ab8a00219efee6944bffb",
+        "llamafactory/export_summary.json": "fcfeceee4e055d4735ed79eca3c0c848c117f086a3231116f5fc1b74b566551c",
+        "quality_report.json": "8e230672ba7f02605c3ade0b97d4849c700009356c7e9877c915d5ddc676411d",
+        "train.jsonl": "a12be253d79d479938d88e70ffaf8465045b67a265dcecd46e62495715bcbe74"
+      },
+      "product": "p60-code-pulumi-patch-review-64k-probe-1-v1-promoted-v1",
+      "production_eligible": false,
+      "train_rows": 3,
+      "world_ids": [
+        "code000160-ashloftkit-53:focal"
+      ]
+    },
+    {
+      "b5_estimated_tokens": 196458,
+      "b5_examples": 3,
+      "disposition": "text_or_numeric_target_checked",
+      "eval_rows": 0,
+      "exact_context_tokens": 195198,
+      "gate_ok": true,
+      "hashes": {
+        "eval.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "llamafactory/B5.json": "57650eaa5225f77af8184ee3a40b480ba8e47546495900e55acbc50dd2a75b95",
+        "llamafactory/B5.meta.json": "7e84b6aaabb56d4058fb21349d753b3dbf424d1a2ee9b403d39fd72017f10fc3",
+        "llamafactory/dataset_info.json": "3cb3dc8c5d6a77d4b469bfd6276df3eab73cdcfb420ab8a00219efee6944bffb",
+        "llamafactory/export_summary.json": "ee7b32258a8829fd9c45e48d1527edee302163c2adcbc4384a2411e9abafc5d1",
+        "quality_report.json": "621fb0d270427547b66d726a991274dfefb6e794465241c3a8cf9d26fc4daa76",
+        "train.jsonl": "3d4469c0c8f2fa770813152f3d758fd3f344fa8e404f6fdbac7a0d0c8290f69b"
+      },
+      "product": "p60-finance-amd-inline-cash-components-64k-probe-1-v1-promoted-v1",
+      "production_eligible": false,
+      "train_rows": 3,
+      "world_ids": [
+        "finance_amd_inline_cash_components_fy2021_2024_p60_v1"
+      ]
+    },
+    {
+      "b5_estimated_tokens": 195684,
+      "b5_examples": 3,
+      "disposition": "text_or_numeric_target_checked",
+      "eval_rows": 0,
+      "exact_context_tokens": 195312,
+      "gate_ok": true,
+      "hashes": {
+        "eval.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "llamafactory/B5.json": "c45b177f9e916ba24d9d5f02d6bdd9ec23be7c8550691b5b4b2a92f1a4a7d7b4",
+        "llamafactory/B5.meta.json": "e3106d36380f9b6205f552d81a319c4cc0b62cd799f118c6bb29943ac95f7de7",
+        "llamafactory/dataset_info.json": "3cb3dc8c5d6a77d4b469bfd6276df3eab73cdcfb420ab8a00219efee6944bffb",
+        "llamafactory/export_summary.json": "c7ba7379b5d39c64669e0f1252433811fc5c9397718cb4e9f07e529cc0ac6114",
+        "quality_report.json": "44b4e91a512cada733dfb51cd769ab9e9ccb80b573f2762f7872a4c872c11203",
+        "train.jsonl": "146da7c73ab3f16d2c2d31e2f90aed06ad4dfba98b93533bd0d80df14d0da47e"
+      },
+      "product": "p60-code-pulumi-patch-files-reading-v2-64k-probe-1-v1-promoted-v1",
+      "production_eligible": false,
+      "train_rows": 3,
+      "world_ids": [
+        "code000160-ashloftkit-53:focal"
+      ]
+    },
+    {
+      "b5_estimated_tokens": 98079,
+      "b5_examples": 3,
+      "disposition": "text_or_numeric_target_checked",
+      "eval_rows": 0,
+      "exact_context_tokens": 97878,
+      "gate_ok": true,
+      "hashes": {
+        "eval.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "llamafactory/B5.json": "9da3576fe0810159e04e0be569f96f73bb3ecc1dc6d143766e8ecef3cc8f9a10",
+        "llamafactory/B5.meta.json": "46f6bf25d9226ee70bf1286155cd522e0e6c391bb31d879fba963a173a2852a0",
+        "llamafactory/dataset_info.json": "3cb3dc8c5d6a77d4b469bfd6276df3eab73cdcfb420ab8a00219efee6944bffb",
+        "llamafactory/export_summary.json": "8fbc1b26b21750bf8b4ef5a1db648a0a89e24ca552bc723724286004016e3be8",
+        "quality_report.json": "f6c86fac8fc3a335dee66c32e1d17e78901a4c1d65e21e585602a368421a098a",
+        "train.jsonl": "8c98dddb78b5c13b7a58e8c315e17d75df3605af539c70f21622713f0183efad"
+      },
+      "product": "p61-code-duckdb-reading-32k-probe-1-v1-promoted-v1",
+      "production_eligible": false,
+      "train_rows": 3,
+      "world_ids": [
+        "code000161-calyxkit-80:focal"
+      ]
+    }
+  ],
+  "schema_version": "longworld.p59-p61-inventory-closeout.v1",
+  "text_or_numeric_target_delta": {
+    "b5_estimated_tokens": 1080067,
+    "b5_examples": 18,
+    "eval_rows": 0,
+    "exact_context_tokens": 1075774,
+    "train_rows": 18
+  }
+}

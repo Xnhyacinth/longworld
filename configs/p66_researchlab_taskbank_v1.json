@@ -1,0 +1,51 @@
+{
+  "schema_version": "longworld.p66-researchlab-taskbank-config.v1",
+  "data_product": "p66_researchlab_taskbank_v1",
+  "local_derivative_synthesis_authorized": true,
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "families": [
+    {
+      "family_id": "llama3-arxiv-2407.21783",
+      "kind": "arxiv_source_tar",
+      "split": "eval",
+      "source_workflow_bundle": {
+        "path": "data/source_inventory/p14_paper_llama3_revision_preflight_v1/paper_source_workflow_bundle.p14.llama3-source-foundation.signed.json",
+        "sha256": "2ca7b9448646ddda01281890e6fb5f595b2f6acad6fadcc7c6f8c94aa241ed3c",
+        "key_id": "probe-source-3a689228f9679b0522a18cadd07f1e97"
+      },
+      "sources": [
+        {"version": "v1", "path": "data/source_inventory/p14_paper_llama3_revision_preflight_v1/arxiv-2407.21783v1.source.tar", "sha256": "76edebee16d35fcbf94f07f50f0ddc083023c80e78473a58d20c39821637c5a8"},
+        {"version": "v2", "path": "data/source_inventory/p14_paper_llama3_revision_preflight_v1/arxiv-2407.21783v2.source.tar", "sha256": "eaa11ed93bb5449a05ecff8c91384a17ad4fbe56c22a29c4b4594e245e151ea6"},
+        {"version": "v3", "path": "data/source_inventory/p14_paper_llama3_revision_preflight_v1/arxiv-2407.21783v3.source.tar", "sha256": "da6dc9f7b180ba164d002239c8e0af5a181c07ae5f9af093743d4d2b99f02430"}
+      ]
+    },
+    {
+      "family_id": "sparks-arxiv-2303.12712",
+      "kind": "arxiv_source_tar",
+      "split": "train",
+      "source_workflow_bundle": {
+        "path": "data/source_inventory/p14_paper_sparks_revision_v1/paper_source_workflow_bundle.p14.sparks-section-reconciliation.signed.json",
+        "sha256": "97b35381a2dbd429b9a26b46fdd9f59e75042f5d2dfe8ccc4c373c70fee795ec",
+        "key_id": "probe-source-3a689228f9679b0522a18cadd07f1e97"
+      },
+      "sources": [
+        {"version": "v1", "path": "data/source_inventory/p14_paper_sparks_revision_v1/arxiv-2303.12712v1.source.tar", "sha256": "83a0605c77c0fa53c08f87612449d4e8a77f8745427179d3d2bc7b8ce419ba21"},
+        {"version": "v2", "path": "data/source_inventory/p14_paper_sparks_revision_v1/arxiv-2303.12712v2.source.tar", "sha256": "b4298a6c254b6ea6e540c16469f52a6db0200400043b7d5443bdd4077ca1d9e2"},
+        {"version": "v3", "path": "data/source_inventory/p14_paper_sparks_revision_v1/arxiv-2303.12712v3.source.tar", "sha256": "154f014e0ab1fb5d2d5d48c0a983669420b48db16505ec5b217f0d11bf6e73ad"},
+        {"version": "v4", "path": "data/source_inventory/p14_paper_sparks_revision_v1/arxiv-2303.12712v4.source.tar", "sha256": "3651323cc9eddee607a9c4d2f7329bd1d5ba79bbe6dc22d4e2774a471822738a"},
+        {"version": "v5", "path": "data/source_inventory/p14_paper_sparks_revision_v1/arxiv-2303.12712v5.source.tar", "sha256": "2366e07aa84848e354c3f5489fa3b39e7da4af7a9eda4d1cc80b017d8a67f9b0"}
+      ]
+    },
+    {
+      "family_id": "elife-94586",
+      "kind": "elife_inventory",
+      "split": "eval",
+      "sources": [
+        {"version": "v1-v2", "path": "data/source_inventories/p21-researchlab-elife-94586-review-revision-64k-v1/source_inventory.json", "sha256": "c7a1959d34b757053640f5f122a249f13180d00bed24fcb6badf8378fdd43ff5"}
+      ]
+    }
+  ]
+}

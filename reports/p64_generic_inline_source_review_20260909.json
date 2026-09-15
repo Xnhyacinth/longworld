@@ -1,0 +1,469 @@
+{
+  "schema_version": "longworld.p64-generic-inline-source-review.v1",
+  "date": "2026-09-09",
+  "status": "two_real_issuers_native_source_validated_and_base_compiler_smoke_passed",
+  "production_eligible": false,
+  "source_worlds": 2,
+  "source_documents": 8,
+  "source_facts": 64,
+  "base_semantic_tasks": 376,
+  "train_ready_tasks": 0,
+  "validation": [
+    "HMAC source role and registered official URL/entity/listing filed-date binding",
+    "Raw normalized bytes and transformation digest binding on every reload",
+    "Dimensionless annual/instant CIK contexts, 350\u2013380 day annual duration, displayed report date",
+    "Standard US-GAAP concepts, USD unit, scale6,decimals-6,source quote,visible table cell sign and monetary header",
+    "Unique statement table and one annual fact per role; equal assets and liabilities/equity",
+    "Unchanged finance_taskbank execute and validate for all 376 accepted tasks"
+  ],
+  "tests": {
+    "command": "uv run python -m pytest tests/test_issuer_generic_inline.py tests/test_finance_taskbank.py -q",
+    "expected_passed": 29,
+    "ruff": "passed"
+  },
+  "smokes": [
+    {
+      "issuer": "intel",
+      "source_manifest": "data/finance_sources/p64_intel_generic_v1/source_manifest.json",
+      "manifest_sha256": "10a717b252973dc50e5578c6964401f23c8b355a5a2dae7af83b2dff15cea2f9",
+      "metrics": {
+        "source_documents": 4,
+        "source_facts": 32,
+        "normalization_rejections": 0,
+        "attempted_programs": 364,
+        "accepted_tasks": 192,
+        "rejected_tasks": 172,
+        "applicability_rejections": 4,
+        "by_family": {
+          "aggregate": 44,
+          "cash_reconciliation": 4,
+          "delta": 48,
+          "filter": 24,
+          "filtered_aggregate": 8,
+          "lookup": 32,
+          "maximum": 24,
+          "ratio": 8
+        },
+        "by_rejection": {
+          "nonadditive_metric": 12,
+          "redundant_singleton_or_unsupported_aggregate": 16,
+          "vacuous_filter": 144
+        },
+        "within_filing_tasks": 52,
+        "cross_filing_tasks": 140,
+        "by_fact_count": {
+          "1": 32,
+          "2": 88,
+          "3": 44,
+          "4": 28
+        },
+        "train_ready_tasks": 0,
+        "draft_candidates": 368,
+        "uninstantiated_templates": 4,
+        "by_applicability_rejection": {
+          "missing_required_metric": 4
+        },
+        "stages": {
+          "applicability": {
+            "input": 368,
+            "passed": 364,
+            "rejected": 4
+          },
+          "program_validation_and_dedup": {
+            "input": 364,
+            "passed": 192,
+            "rejected": 172
+          }
+        }
+      },
+      "validated_tasks": 192,
+      "production_eligible": false,
+      "documents": [
+        {
+          "record_id": "generic-inline:0000050863:2021-12-25",
+          "source_url": "https://www.intc.com/filings-reports/all-sec-filings/content/0000050863-22-000007/intc-20211225.htm",
+          "report_date": "2021-12-25",
+          "filing_date": "2022-01-27",
+          "source_sha256": "57e5533ca477d3796dae0fb6090fb7b7e992caa2a84cb5bf44f33aa5e75c9451",
+          "normalized_bytes": 3934000,
+          "sections": [
+            {
+              "section_id": "dd45cf40bbbc0b5802039ef7c8b534133fcfeb35698026035d844f26fa4d1f7e",
+              "title": "Consolidated Statements of Operations",
+              "start": 1459227,
+              "end": 1519309
+            },
+            {
+              "section_id": "a9f11085cc51d1cfa1adda31259be389789c2464ad1b0c795badd8388d5e8fcc",
+              "title": "Consolidated Balance Sheets",
+              "start": 1549743,
+              "end": 1624544
+            },
+            {
+              "section_id": "acbcf47400ef6c32acf7a13bb00b15491387056b58ee10450bdad636a14062a1",
+              "title": "Consolidated Statements of Cash Flows",
+              "start": 1627957,
+              "end": 1760061
+            }
+          ],
+          "values": {
+            "revenue": 79024,
+            "operating_income": 19456,
+            "assets": 168406,
+            "liabilities_and_equity": 168406,
+            "cash_from_operations": 29991,
+            "cash_from_investing": -25167,
+            "cash_from_financing": -5862,
+            "cash_period_change": -1038
+          }
+        },
+        {
+          "record_id": "generic-inline:0000050863:2022-12-31",
+          "source_url": "https://www.intc.com/filings-reports/all-sec-filings/content/0000050863-23-000006/intc-20221231.htm",
+          "report_date": "2022-12-31",
+          "filing_date": "2023-01-27",
+          "source_sha256": "997ea49fc960f6763f4b530793f32f2bb5f2aff8f2a5d82af1f002a4adf58b4b",
+          "normalized_bytes": 4026555,
+          "sections": [
+            {
+              "section_id": "0e387201d1a3344d4fa67dab6a91807fe46a8b005453d56c96c84ea4348b9cc5",
+              "title": "Consolidated Statements of Operations",
+              "start": 1450881,
+              "end": 1517763
+            },
+            {
+              "section_id": "1b39c9b0ae6e0b7d785286443bdccb5cdb65124614cfecb13bfd25153f2d948b",
+              "title": "Consolidated Balance Sheets",
+              "start": 1554932,
+              "end": 1630644
+            },
+            {
+              "section_id": "597f3dec3565eab5a6f2823216937cdff1071e81901b963afb99eb3f88a8e8b5",
+              "title": "Consolidated Statements of Cash Flows",
+              "start": 1634072,
+              "end": 1775631
+            }
+          ],
+          "values": {
+            "revenue": 63054,
+            "operating_income": 2334,
+            "assets": 182103,
+            "liabilities_and_equity": 182103,
+            "cash_from_operations": 15433,
+            "cash_from_investing": -10477,
+            "cash_from_financing": 1361,
+            "cash_period_change": 6317
+          }
+        },
+        {
+          "record_id": "generic-inline:0000050863:2023-12-30",
+          "source_url": "https://www.intc.com/filings-reports/all-sec-filings/content/0000050863-24-000010/intc-20231230.htm",
+          "report_date": "2023-12-30",
+          "filing_date": "2024-01-26",
+          "source_sha256": "3cbfebb819e981fdfaf9f4988a342aa048c924edb5c8cec2738b4883e534ee4e",
+          "normalized_bytes": 3276073,
+          "sections": [
+            {
+              "section_id": "2443855d603f9755456398465b410e8926502c517b8d9f546715a341ddc80d69",
+              "title": "Consolidated Statements of Operations",
+              "start": 1368770,
+              "end": 1412863
+            },
+            {
+              "section_id": "78c6dbc1f89d458e3eb1f9a666cd678e5a585dadc939c292d202cd394b138370",
+              "title": "Consolidated Balance Sheets",
+              "start": 1440738,
+              "end": 1488809
+            },
+            {
+              "section_id": "06505e9ea03e34750e7adf4291ac224467b56fdce990b564df50e791f5b444a9",
+              "title": "Consolidated Statements of Cash Flows",
+              "start": 1492223,
+              "end": 1588563
+            }
+          ],
+          "values": {
+            "revenue": 54228,
+            "operating_income": 93,
+            "assets": 191572,
+            "liabilities_and_equity": 191572,
+            "cash_from_operations": 11471,
+            "cash_from_investing": -24041,
+            "cash_from_financing": 8505,
+            "cash_period_change": -4065
+          }
+        },
+        {
+          "record_id": "generic-inline:0000050863:2024-12-28",
+          "source_url": "https://www.intc.com/filings-reports/all-sec-filings/content/0000050863-25-000009/intc-20241228.htm",
+          "report_date": "2024-12-28",
+          "filing_date": "2025-01-31",
+          "source_sha256": "60e9b3e88bb1cf3fabc0ea34c6bf6fcfd481979080a97755bb2d168788b6affc",
+          "normalized_bytes": 3334219,
+          "sections": [
+            {
+              "section_id": "655770111d2fa0f59758b046f30b7fa1ad809980837ce9e0a038f8006ef2f936",
+              "title": "Consolidated Statements of Operations",
+              "start": 1224489,
+              "end": 1267285
+            },
+            {
+              "section_id": "f54a6b945803d41f0ecb3f7320c9262875afb29e5bd5c4d27e49ee2d09eeef48",
+              "title": "Consolidated Balance Sheets",
+              "start": 1294507,
+              "end": 1341693
+            },
+            {
+              "section_id": "c3ecddc5eab3452b7c6dec9c02524a7a922b257f6dca50a88ad2ad0d124e2658",
+              "title": "Consolidated Statements of Cash Flows",
+              "start": 1345023,
+              "end": 1440529
+            }
+          ],
+          "values": {
+            "revenue": 53101,
+            "operating_income": -11678,
+            "assets": 196485,
+            "liabilities_and_equity": 196485,
+            "cash_from_operations": 8288,
+            "cash_from_investing": -18256,
+            "cash_from_financing": 11138,
+            "cash_period_change": 1170
+          }
+        }
+      ]
+    },
+    {
+      "issuer": "siriusxm",
+      "source_manifest": "data/finance_sources/p64_siriusxm_generic_v1/source_manifest.json",
+      "manifest_sha256": "8685060409f294a173fa176b6031fbab21a39ad4cf01cfe6640731792fe2e8c2",
+      "metrics": {
+        "source_documents": 4,
+        "source_facts": 32,
+        "normalization_rejections": 0,
+        "attempted_programs": 364,
+        "accepted_tasks": 184,
+        "rejected_tasks": 180,
+        "applicability_rejections": 4,
+        "by_family": {
+          "aggregate": 44,
+          "cash_reconciliation": 4,
+          "delta": 48,
+          "filter": 18,
+          "filtered_aggregate": 6,
+          "lookup": 32,
+          "maximum": 24,
+          "ratio": 8
+        },
+        "by_rejection": {
+          "nonadditive_metric": 12,
+          "redundant_singleton_or_unsupported_aggregate": 12,
+          "vacuous_filter": 156
+        },
+        "within_filing_tasks": 52,
+        "cross_filing_tasks": 132,
+        "by_fact_count": {
+          "1": 32,
+          "2": 86,
+          "3": 41,
+          "4": 25
+        },
+        "train_ready_tasks": 0,
+        "draft_candidates": 368,
+        "uninstantiated_templates": 4,
+        "by_applicability_rejection": {
+          "missing_required_metric": 4
+        },
+        "stages": {
+          "applicability": {
+            "input": 368,
+            "passed": 364,
+            "rejected": 4
+          },
+          "program_validation_and_dedup": {
+            "input": 364,
+            "passed": 184,
+            "rejected": 180
+          }
+        }
+      },
+      "validated_tasks": 184,
+      "production_eligible": false,
+      "documents": [
+        {
+          "record_id": "generic-inline:0000908937:2021-12-31",
+          "source_url": "https://investor.siriusxm.com/sec-filings/all-sec-filings/content/0000908937-22-000007/siri-20211231.htm",
+          "report_date": "2021-12-31",
+          "filing_date": "2022-02-01",
+          "source_sha256": "d67a49a67bf4d433ee9368614833e1a9ea3bbec677d3bff5af462024bacc7dd7",
+          "normalized_bytes": 3158804,
+          "sections": [
+            {
+              "section_id": "a7dc57d4b9f632734656058c9d30e4f4625f8d7b061eadf29a014a3d7fbfac36",
+              "title": "Consolidated Statements of Operations",
+              "start": 1178982,
+              "end": 1293565
+            },
+            {
+              "section_id": "fd03a7d9f8bd75c80f3d3695fe52531f2afb0df2a3965b5b96267398ea7f3e95",
+              "title": "Consolidated Balance Sheets",
+              "start": 1295200,
+              "end": 1381205
+            },
+            {
+              "section_id": "1ce7f5d6a76f132d4709a18fe2feae1f665fa30fa2f05e9148fe084fa43e98f6",
+              "title": "Consolidated Statements of Cash Flows",
+              "start": 1559343,
+              "end": 1714159
+            }
+          ],
+          "values": {
+            "revenue": 8696,
+            "operating_income": 2015,
+            "assets": 10274,
+            "liabilities_and_equity": 10274,
+            "cash_from_operations": 1998,
+            "cash_from_investing": -200,
+            "cash_from_financing": -1682,
+            "cash_period_change": 116
+          }
+        },
+        {
+          "record_id": "generic-inline:0000908937:2022-12-31",
+          "source_url": "https://investor.siriusxm.com/sec-filings/all-sec-filings/content/0000908937-23-000006/siri-20221231.htm",
+          "report_date": "2022-12-31",
+          "filing_date": "2023-02-02",
+          "source_sha256": "7485ad1e56b3a3a5805f17b6881d5b1e14493f5f35bf034ac83b0a020da312fc",
+          "normalized_bytes": 3019857,
+          "sections": [
+            {
+              "section_id": "d9c3503a61aad0dfa8cf4412379ec7a229312a44a9d9d6c2dadb09375cd9ec62",
+              "title": "Consolidated Statements of Operations",
+              "start": 1164539,
+              "end": 1279330
+            },
+            {
+              "section_id": "8ebd6855492a27f89b3b257f8df647cca4ce94209dd11d87e467d9c97a4f781c",
+              "title": "Consolidated Balance Sheets",
+              "start": 1280965,
+              "end": 1364961
+            },
+            {
+              "section_id": "cbb773467d4ad5b08fd08a3f0ce4d01b5176a1319e814a52e75092b158321482",
+              "title": "Consolidated Statements of Cash Flows",
+              "start": 1545271,
+              "end": 1700137
+            }
+          ],
+          "values": {
+            "revenue": 9003,
+            "operating_income": 2036,
+            "assets": 10022,
+            "liabilities_and_equity": 10022,
+            "cash_from_operations": 1976,
+            "cash_from_investing": -548,
+            "cash_from_financing": -1562,
+            "cash_period_change": -134
+          }
+        },
+        {
+          "record_id": "generic-inline:0000908937:2023-12-31",
+          "source_url": "https://investor.siriusxm.com/sec-filings/all-sec-filings/content/0000908937-24-000008/siri-20231231.htm",
+          "report_date": "2023-12-31",
+          "filing_date": "2024-02-01",
+          "source_sha256": "9f382ba24c3be7107d39d64db8293199744e6929cdaf1b946840a65a1b12e3e4",
+          "normalized_bytes": 2408188,
+          "sections": [
+            {
+              "section_id": "9b328ffb622317163093e5c78d32c0459bdea0e35ff62abe6cd2a203a022d6ed",
+              "title": "Consolidated Statements of Operations",
+              "start": 1109238,
+              "end": 1186825
+            },
+            {
+              "section_id": "9d223c5806bdba2892cde6882bb81b2513f805ab2ffbfe8ac3c4b766a711b492",
+              "title": "Consolidated Balance Sheets",
+              "start": 1188459,
+              "end": 1241142
+            },
+            {
+              "section_id": "a80dd7eb3e020c6a76606ddc3fffe9a724c1c392b92fa5bcc0cba85ad0a87669",
+              "title": "Consolidated Statements of Cash Flows",
+              "start": 1379992,
+              "end": 1482809
+            }
+          ],
+          "values": {
+            "revenue": 8953,
+            "operating_income": 1946,
+            "assets": 10374,
+            "liabilities_and_equity": 10374,
+            "cash_from_operations": 1850,
+            "cash_from_investing": -686,
+            "cash_from_financing": -1005,
+            "cash_period_change": 159
+          }
+        },
+        {
+          "record_id": "generic-inline:0000908937:2024-12-31",
+          "source_url": "https://investor.siriusxm.com/sec-filings/all-sec-filings/content/0000908937-25-000005/siri-20241231.htm",
+          "report_date": "2024-12-31",
+          "filing_date": "2025-01-30",
+          "source_sha256": "f90a4e4f9e509dc8a6158126e547662bebb9f0b5f221f5a876a5465daf847085",
+          "normalized_bytes": 2797437,
+          "sections": [
+            {
+              "section_id": "361df795a18711d15622d4d5c32f6a1f0fd020e2a7b7aba98f00e8e725978249",
+              "title": "Consolidated Statements of Operations",
+              "start": 1239910,
+              "end": 1317420
+            },
+            {
+              "section_id": "5cb598462ba24cf63e770197171fecabba44f56a549c07a6753ff8ea5a460477",
+              "title": "Consolidated Balance Sheets",
+              "start": 1341571,
+              "end": 1399803
+            },
+            {
+              "section_id": "610442c80676153a5d4c29910842d00e2cff919e305d365f89107468bc745d6b",
+              "title": "Consolidated Statements of Cash Flows",
+              "start": 1623100,
+              "end": 1707138
+            }
+          ],
+          "values": {
+            "revenue": 8699,
+            "operating_income": -1517,
+            "assets": 27521,
+            "liabilities_and_equity": 27521,
+            "cash_from_operations": 1741,
+            "cash_from_investing": -970,
+            "cash_from_financing": -916,
+            "cash_period_change": -145
+          }
+        }
+      ]
+    }
+  ],
+  "code_sha256": {
+    "longworld/core/issuer_generic_inline.py": "bf506eefb942fec2baa975eee95489117f651d6587359b6209286ad8b9950480",
+    "scripts/fetch_generic_issuer_inline.py": "6c16a57ae6434030ec393581c66a7367caf9d1d4f6dbfa3f801f8f0917d3c017",
+    "tests/test_issuer_generic_inline.py": "163b2131aededc9b7ad61ac505e9a31f66b829bd700a7e4a6630156c0301e0cd"
+  },
+  "rights": {
+    "access": "Official public issuer listing and filing access verified; no SEC access or blocked host retries",
+    "redistribution": "not adjudicated",
+    "training": "not adjudicated",
+    "release": "not eligible"
+  },
+  "limitations": [
+    "Adapter accepts registered hosts and existing standard concepts with integer USD millions; unsupported layouts or units fail closed.",
+    "SiriusXM 2024 filing describes a corporate reorganization; generated comparisons mean amounts as reported in those filings, not economic comparability or a causal trend.",
+    "376 counts are base compiler semantic candidates before v2 expansion or token length packing. No 64k/128k/256k capacity claim is made here.",
+    "No human financial audit, visual browser audit, full independent accounting audit, or long-context necessity certification."
+  ],
+  "second_provider_discovery": {
+    "qualcomm": "Official current site/search points to Q4/CDN and PDF, not registered Equisolve inline history; not imported.",
+    "siriusxm": "Official issuer-host history selected instead; four real 2021\u20132024 annual files acquired and validated."
+  }
+}

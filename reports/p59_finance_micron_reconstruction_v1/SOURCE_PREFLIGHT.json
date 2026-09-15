@@ -1,0 +1,171 @@
+{
+  "schema_version": "longworld.p59-finance-reconstruction-preflight.v1",
+  "source_parent_sha256": "b72d1742da7dfb13145867bd8d98394a7b829e109c7abdc62d52a5a7c77077bd",
+  "source_successor_sha256": "d85ebdb650cb37a9b7e7d0fddc783cf167e4d1b7c5f38109b80236d843cd15cd",
+  "source_text_and_old_facts_unchanged": true,
+  "world_id": "finance_micron_reconstruction_fy2022_2025_p59_v1",
+  "source_profile": "micron.financial-reconstruction.v1",
+  "answer_program_id": "finance.multi_filing_reconstruction.v1",
+  "annual": [
+    {
+      "report_date": "2022-09-01",
+      "source_sha256": "e04618a8a75624cf736ab699ca4ffb26ebe286e709538e94e46c92204113b4c2",
+      "source_url": "https://d18rn0p25nwr6d.cloudfront.net/CIK-0000723125/0a90821f-c89e-49a9-bb34-b250be9da9f0.html",
+      "required_values": {
+        "revenue": 30758,
+        "assets": 66283,
+        "liabilities_and_equity": 66283,
+        "cash_from_operations": 15181,
+        "operating_income": 9702,
+        "cash_from_investing": -11585,
+        "cash_from_financing": -2980,
+        "cash_fx_effect": -106,
+        "cash_period_change": 510
+      }
+    },
+    {
+      "report_date": "2023-08-31",
+      "source_sha256": "4ef56163792483d79f24f85b69cd9e68e4dea029b180f40b8aaca55eb9a15e81",
+      "source_url": "https://d18rn0p25nwr6d.cloudfront.net/CIK-0000723125/ecd4e02e-aa0c-4600-b47e-bf06fe1a8ec0.html",
+      "required_values": {
+        "revenue": 15540,
+        "assets": 64254,
+        "liabilities_and_equity": 64254,
+        "cash_from_operations": 1559,
+        "operating_income": -5745,
+        "cash_from_investing": -6191,
+        "cash_from_financing": 4983,
+        "cash_fx_effect": -34,
+        "cash_period_change": 317
+      }
+    },
+    {
+      "report_date": "2024-08-29",
+      "source_sha256": "de7ea591f495110994ce3849118bead3bdfbdd25874cc69da4a8b7c63ec7b38e",
+      "source_url": "https://d18rn0p25nwr6d.cloudfront.net/CIK-0000723125/119213e5-c006-4048-b893-4b0fd1232734.html",
+      "required_values": {
+        "revenue": 25111,
+        "assets": 69416,
+        "liabilities_and_equity": 69416,
+        "cash_from_operations": 8507,
+        "operating_income": 1304,
+        "cash_from_investing": -8309,
+        "cash_from_financing": -1842,
+        "cash_fx_effect": 40,
+        "cash_period_change": -1604
+      }
+    },
+    {
+      "report_date": "2025-08-28",
+      "source_sha256": "f40036bac90a9f871b6156d07a5608186fe2479282f74c8ac8d6cac28af21321",
+      "source_url": "https://d18rn0p25nwr6d.cloudfront.net/CIK-0000723125/9c0499f6-5b8d-439e-b78a-d89160d2b435.html",
+      "required_values": {
+        "revenue": 37378,
+        "assets": 82798,
+        "liabilities_and_equity": 82798,
+        "cash_from_operations": 17525,
+        "operating_income": 9770,
+        "cash_from_investing": -14087,
+        "cash_from_financing": -850,
+        "cash_fx_effect": 6,
+        "cash_period_change": 2594
+      }
+    }
+  ],
+  "required_roles": [
+    "assets",
+    "cash_from_financing",
+    "cash_from_investing",
+    "cash_from_operations",
+    "cash_fx_effect",
+    "cash_period_change",
+    "liabilities_and_equity",
+    "operating_income",
+    "revenue"
+  ],
+  "new_semantic_tasks": 1,
+  "new_source_worlds": 0,
+  "base_replay_sufficient": true,
+  "counterfactual_changes_numeric_answer": true,
+  "remove_one_fails": true,
+  "essential_source_rows": 36,
+  "source_only_answer": {
+    "annual_checks": [
+      {
+        "balance_sheet_certified": true,
+        "cashflow_reconciled": true,
+        "operating_margin_basis_points": 3154,
+        "report_date": "2022-09-01"
+      },
+      {
+        "balance_sheet_certified": true,
+        "cashflow_reconciled": true,
+        "operating_margin_basis_points": -3697,
+        "report_date": "2023-08-31"
+      },
+      {
+        "balance_sheet_certified": true,
+        "cashflow_reconciled": true,
+        "operating_margin_basis_points": 519,
+        "report_date": "2024-08-29"
+      },
+      {
+        "balance_sheet_certified": true,
+        "cashflow_reconciled": true,
+        "operating_margin_basis_points": 2613,
+        "report_date": "2025-08-28"
+      }
+    ],
+    "cross_filing_revenue_trajectory": {
+      "earliest_report_date": "2022-09-01",
+      "latest_report_date": "2025-08-28",
+      "revenue_change": 6620
+    },
+    "filing_chain": [
+      "issuer-ir:0000723125:2022-09-01",
+      "issuer-ir:0000723125:2023-08-31",
+      "issuer-ir:0000723125:2024-08-29",
+      "issuer-ir:0000723125:2025-08-28"
+    ]
+  },
+  "source_only_cf_answer": {
+    "annual_checks": [
+      {
+        "balance_sheet_certified": true,
+        "cashflow_reconciled": true,
+        "operating_margin_basis_points": 3154,
+        "report_date": "2022-09-01"
+      },
+      {
+        "balance_sheet_certified": true,
+        "cashflow_reconciled": true,
+        "operating_margin_basis_points": -3697,
+        "report_date": "2023-08-31"
+      },
+      {
+        "balance_sheet_certified": true,
+        "cashflow_reconciled": true,
+        "operating_margin_basis_points": 519,
+        "report_date": "2024-08-29"
+      },
+      {
+        "balance_sheet_certified": true,
+        "cashflow_reconciled": true,
+        "operating_margin_basis_points": 2613,
+        "report_date": "2025-08-28"
+      }
+    ],
+    "cross_filing_revenue_trajectory": {
+      "earliest_report_date": "2022-09-01",
+      "latest_report_date": "2025-08-28",
+      "revenue_change": 6621
+    },
+    "filing_chain": [
+      "issuer-ir:0000723125:2022-09-01",
+      "issuer-ir:0000723125:2023-08-31",
+      "issuer-ir:0000723125:2024-08-29",
+      "issuer-ir:0000723125:2025-08-28"
+    ]
+  },
+  "production_eligible": false
+}

@@ -1,0 +1,9 @@
+{
+  "world_id": "finance_amd_inline_cash_components_fy2021_2024_p60_v1",
+  "source_manifest_sha256": "4b8756fa1819883bbb706fb520516a64c17516cf1c44dbcfe018a5ebdfd67258",
+  "parents": 1,
+  "primary_bucket": "64k",
+  "finance_executable_audits": 1,
+  "production_eligible": false,
+  "train_ready": false
+}

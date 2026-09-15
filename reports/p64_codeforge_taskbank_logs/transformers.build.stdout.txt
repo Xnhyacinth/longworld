@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "world_id": "1fc45bfe804f22fa3db5be7bed1240fb4113c6f3d445cd74977a8019b3f8046f",
+  "source_group_id": "https://github.com/huggingface/transformers",
+  "source_episode_count": 8,
+  "eligible_episode_count": 8,
+  "semantic_task_count": 109,
+  "context_count": 22,
+  "accepted_context_count": 22,
+  "context_capacity_counts": {
+    "cap64k": 4,
+    "cap128k": 11,
+    "cap256k": 7
+  },
+  "legacy_exact_band_context_counts": {
+    "64k": 1,
+    "128k": 0,
+    "256k": 0
+  },
+  "max_exact_context_tokens": 246243,
+  "production_eligible": false,
+  "local_training_eligible": false
+}

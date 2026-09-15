@@ -1,0 +1,50 @@
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/amazon/local_probe_trust.json --role source --role candidate --role ranker --role auditor --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py --candidates /workspace/wynckeliao/longworld-worlds/reports/p57_finance_amazon_asset_trajectory_v3/projected/candidates.jsonl --sidecar /workspace/wynckeliao/longworld-worlds/reports/p57_finance_amazon_asset_trajectory_v3/projected/TASK_REPLAY_SIDECAR_V3.json --output-dir /workspace/wynckeliao/longworld-worlds/reports/p57_finance_amazon_asset_trajectory_v3/projected --audit-only --rankings /workspace/wynckeliao/longworld-worlds/reports/p57_finance_amazon_asset_trajectory_v3/projected/rankings.jsonl --audit-workers 2
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskpromotion.py", line 1039, in create_task_dense_audit
+    task_proof = compute_task_proof(
+                 ^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskproof.py", line 2341, in compute_task_proof
+    raw_windows, has_raw_window_evidence, raw_spans = _raw_token_window_proof(
+                                                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskproof.py", line 2083, in _raw_token_window_proof
+    raise TaskProofError(
+longworld.core.taskproof.TaskProofError: raw token window 8k intersecting-artifact upper bound retrieves the gold answer: 119:8311
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+                    ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+           ^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 333, in _audit_one_projection
+    return create_task_dense_audit(
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/longworld/core/taskpromotion.py", line 1045, in create_task_dense_audit
+    raise PromotionError(f"task upstream proof replay failed: {error}") from error
+longworld.core.promotion.PromotionError: task upstream proof replay failed: raw token window 8k intersecting-artifact upper bound retrieves the gold answer: 119:8311
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 497, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 479, in main
+    audit_projections(
+  File "/workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py", line 420, in audit_projections
+    audits = pool.map(_audit_one_projection, items, chunksize=1)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 367, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/multiprocessing/pool.py", line 774, in get
+    raise self._value
+longworld.core.promotion.PromotionError: task upstream proof replay failed: raw token window 8k intersecting-artifact upper bound retrieves the gold answer: 119:8311
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/amazon/local_probe_trust.json --role source --role candidate --role ranker --role auditor --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py --candidates /workspace/wynckeliao/longworld-worlds/reports/p57_finance_amazon_asset_trajectory_v3/projected/candidates.jsonl --sidecar /workspace/wynckeliao/longworld-worlds/reports/p57_finance_amazon_asset_trajectory_v3/projected/TASK_REPLAY_SIDECAR_V3.json --output-dir /workspace/wynckeliao/longworld-worlds/reports/p57_finance_amazon_asset_trajectory_v3/projected --audit-only --rankings /workspace/wynckeliao/longworld-worlds/reports/p57_finance_amazon_asset_trajectory_v3/projected/rankings.jsonl --audit-workers 2
+$ /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py --trust-file /workspace/wynckeliao/.longworld-scaleout-20260906-private/amazon/local_probe_trust.json --role source --role candidate --role ranker --role auditor --allow-combined-roles --pass-env HF_HOME --pass-env HF_HUB_OFFLINE --pass-env TRANSFORMERS_OFFLINE --pass-env TOKENIZERS_PARALLELISM -- /workspace/wynckeliao/longworld-worlds/.venv/bin/python /workspace/wynckeliao/longworld-worlds/scripts/project_task_candidate_views.py --candidates /workspace/wynckeliao/longworld-worlds/reports/p57_finance_amazon_asset_trajectory_v3/projected/candidates.jsonl --sidecar /workspace/wynckeliao/longworld-worlds/reports/p57_finance_amazon_asset_trajectory_v3/projected/TASK_REPLAY_SIDECAR_V3.json --output-dir /workspace/wynckeliao/longworld-worlds/reports/p57_finance_amazon_asset_trajectory_v3/projected --audit-only --rankings /workspace/wynckeliao/longworld-worlds/reports/p57_finance_amazon_asset_trajectory_v3/projected/rankings.jsonl --audit-workers 2 --length-bucket 128k

@@ -1,0 +1,25 @@
+{
+  "schema_version": "longworld.source-taskbank-pipeline-receipt.v1",
+  "catalog_sha256": "e1e0f440c46e64ba1aff73c7b22a3ad52a958759202114b943da86ea7c8ac861",
+  "jobs": [
+    {
+      "job_id": "codeforge-content-proof",
+      "status": "native_replay_verified",
+      "output": "/workspace/wynckeliao/longworld/data/candidates/p65_codeforge_reading_proof_v1",
+      "receipt": "/workspace/wynckeliao/longworld/data/candidates/p65_codeforge_reading_proof_v1/BUILD_RECEIPT.json",
+      "receipt_sha256": "1b3c3951743de3aecde7af94d4ea458a1f6580e1b3acf520da068c36b204c4fd",
+      "receipt_schema": "longworld.codeforge-reading-proof-build.v2",
+      "strict_eligibility_inferred": false,
+      "production_eligible": false,
+      "input_sha256": {
+        "/workspace/wynckeliao/longworld-worlds/scripts/audit_codeforge_reading_proof.py": "a1b29507e3a2280e1f750222e0b9948c2aed9e38f5a05c34c1c2f27855e33613",
+        "/workspace/wynckeliao/longworld-worlds/configs/p65_codeforge_reading_proof_v1.json": "67a2ebb0d4aa257169d2649d578370e7be95d451caf7088e5b8646a2ec7f0fe3",
+        "/workspace/wynckeliao/longworld-worlds/longworld/core/codeforge_reading_proof.py": "9f557ea5cbf135fee4a025fc70f2535fe78c31b6a672316261617b25529f2064",
+        "/workspace/wynckeliao/longworld-worlds/configs/p64_codeforge_taskbank_catalog_v1.json": "9664e83ad47437377aaaa6a7b99b5413697397e3a4517e823409474f8e592aef",
+        "/workspace/wynckeliao/longworld/data/candidates/p64_codeforge_sft_v1/BUILD_RECEIPT.json": "6a90bddcf6a96a2654329c35e425efb76c0c5e3af26c4bf0593faf3ac0ae463b"
+      }
+    }
+  ],
+  "production_eligible": false,
+  "scope": "native build/replay execution only; each task's quality remains governed by its native receipt"
+}

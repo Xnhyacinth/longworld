@@ -1,0 +1,10 @@
+[
+  {
+    "job_id": "attempt1",
+    "status": "audited",
+    "base": "/workspace/wynckeliao/longworld-worlds/reports/p61_code_duckdb_reading_32k_attempt1_v1",
+    "candidate_rows": 3,
+    "accepted_rows": 3,
+    "rejected_rows": 0
+  }
+]

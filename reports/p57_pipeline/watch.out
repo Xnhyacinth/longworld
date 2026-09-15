@@ -1,0 +1,1688 @@
+{
+  "audit_workers": 2,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "status": "pending_compiler"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "pending_compiler"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "already_promoted": true,
+      "job_id": "ietf-ssh-succession-v1",
+      "n_audits": 3,
+      "production_eligible": false,
+      "route": "strict_long_dependency",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "classified",
+      "strict_eligible": true
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "draining",
+  "workers": 4
+}
+P57_PIPELINE_TICK {"status": "draining", "classified": 10, "pending": 2, "blocked": 1, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 2,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "status": "pending_compiler"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "pending_compiler"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "draining",
+  "workers": 4
+}
+P57_PIPELINE_TICK {"status": "draining", "classified": 10, "pending": 2, "blocked": 1, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 2,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "error": "Command '['/workspace/wynckeliao/longworld-worlds/.venv/bin/python', '/workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py', '--trust-file', '/workspace/wynckeliao/.longworld-scaleout-20260906-private/ietf-acme/local_probe_trust.json', '--role', 'source', '--role', 'candidate', '--allow-combined-roles', '--pass-env', 'HF_HOME', '--pass-env', 'HF_HUB_OFFLINE', '--pass-env', 'TRANSFORMERS_OFFLINE', '--pass-env', 'TOKENIZERS_PARALLELISM', '--', '/workspace/wynckeliao/longworld-worlds/.venv/bin/python', '/workspace/wynckeliao/longworld-worlds/reports/p57_ietf_acme_succession_generate.py', '--config', '/workspace/wynckeliao/longworld-worlds/configs/p57_ietf_acme_succession_generation_v1.json']' returned non-zero exit status 1.",
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "failed"
+    },
+    {
+      "error": "Command '['/workspace/wynckeliao/longworld-worlds/.venv/bin/python', '/workspace/wynckeliao/longworld-worlds/scripts/run_with_local_probe_trust.py', '--trust-file', '/workspace/wynckeliao/.longworld-scaleout-20260906-private/ietf-dnssec/local_probe_trust.json', '--role', 'source', '--role', 'candidate', '--allow-combined-roles', '--pass-env', 'HF_HOME', '--pass-env', 'HF_HUB_OFFLINE', '--pass-env', 'TRANSFORMERS_OFFLINE', '--pass-env', 'TOKENIZERS_PARALLELISM', '--', '/workspace/wynckeliao/longworld-worlds/.venv/bin/python', '/workspace/wynckeliao/longworld-worlds/reports/p57_ietf_dnssec_succession_generate.py', '--config', '/workspace/wynckeliao/longworld-worlds/configs/p57_ietf_dnssec_succession_generation_v1.json']' returned non-zero exit status 1.",
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "failed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "failed",
+  "workers": 4
+}
+P57_PIPELINE_TICK {"status": "failed", "classified": 10, "pending": 0, "blocked": 1, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 2,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "route": "blocked_insufficient_proof",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "route": "blocked_insufficient_proof",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 4
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 10, "pending": 0, "blocked": 3, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 2,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "route": "blocked_insufficient_proof",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "already_promoted": false,
+      "job_id": "ietf-dnssec-succession-v1",
+      "n_audits": 3,
+      "production_eligible": false,
+      "route": "strict_long_dependency",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "classified",
+      "strict_eligible": true
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 4
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 11, "pending": 0, "blocked": 2, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 2,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "route": "blocked_insufficient_proof",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 4
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 11, "pending": 0, "blocked": 2, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 2,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "route": "blocked_insufficient_proof",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 4
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 11, "pending": 0, "blocked": 2, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 2,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "route": "blocked_insufficient_proof",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 4
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 11, "pending": 0, "blocked": 2, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 2,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "route": "blocked_insufficient_proof",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 4
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 11, "pending": 0, "blocked": 2, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 2,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "already_promoted": false,
+      "job_id": "ietf-acme-succession-v1",
+      "n_audits": 3,
+      "production_eligible": false,
+      "route": "strict_long_dependency",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "classified",
+      "strict_eligible": true
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 4
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 12, "pending": 0, "blocked": 1, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 2,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 4
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 12, "pending": 0, "blocked": 1, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 2,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 4
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 12, "pending": 0, "blocked": 1, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 3,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 8
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 12, "pending": 0, "blocked": 1, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 3,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-reconstruction-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 8
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 13, "pending": 0, "blocked": 1, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 3,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-reconstruction-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 8
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 13, "pending": 0, "blocked": 1, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 3,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-reconstruction-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 8
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 13, "pending": 0, "blocked": 1, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 3,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-reconstruction-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 8
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 13, "pending": 0, "blocked": 1, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 3,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-reconstruction-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 8
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 13, "pending": 0, "blocked": 1, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 3,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-reconstruction-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 8
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 13, "pending": 0, "blocked": 1, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}
+{
+  "audit_workers": 3,
+  "execute": true,
+  "jobs": [
+    {
+      "job_id": "finance-amazon-asset-trajectory-v3",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-meta-reconstruction-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-asset-trajectory-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "finance-micron-dual-partition-identity-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "errors": [
+        "parent_artifact_explosion:138>80"
+      ],
+      "job_id": "finance-nvidia-market-mix-crossover-v1",
+      "production_eligible": false,
+      "route": "blocked_parent_artifact_explosion",
+      "schema_version": "longworld.p57-task-pipeline-ledger.v1",
+      "status": "blocked"
+    },
+    {
+      "job_id": "finance-nvidia-market-segment-v5",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-acme-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-dnssec-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http-semantics-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-http2-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-pkix-path-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-ssh-succession-v1",
+      "production_eligible": false,
+      "status": "resumed"
+    },
+    {
+      "job_id": "ietf-tls13-handshake-succession-v4",
+      "production_eligible": false,
+      "status": "resumed"
+    }
+  ],
+  "production_eligible": false,
+  "schema_version": "longworld.p57-task-pipeline.v1",
+  "status": "success",
+  "workers": 8
+}
+P57_PIPELINE_TICK {"status": "success", "classified": 13, "pending": 0, "blocked": 1, "prompt": "Drain P57 task pipeline: synthesize packed parents, dense-audit, classify window routes, do not auto-promote or pad."}

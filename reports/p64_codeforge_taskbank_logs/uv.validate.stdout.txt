@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "world_id": "20e9785e3834bcfaf9bca41efc6e3ebefb649ada3146ee5b4850987694f10ac4",
+  "source_group_id": "https://github.com/astral-sh/uv",
+  "source_episode_count": 8,
+  "eligible_episode_count": 8,
+  "semantic_task_count": 98,
+  "context_count": 22,
+  "accepted_context_count": 21,
+  "context_capacity_counts": {
+    "cap64k": 2,
+    "cap128k": 11,
+    "cap256k": 8
+  },
+  "legacy_exact_band_context_counts": {
+    "64k": 0,
+    "128k": 1,
+    "256k": 0
+  },
+  "max_exact_context_tokens": 306161,
+  "production_eligible": false,
+  "local_training_eligible": false
+}

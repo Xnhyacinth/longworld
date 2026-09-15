@@ -1,0 +1,95 @@
+{
+  "schema_version": "longworld.p58-finance-preflight.v1",
+  "answer_program_id": "finance.multi_filing_reconstruction.v1",
+  "source_manifest_sha256": "dee73fdc1d0937e698f2d61d5814ef3b3aacf0729fe3a1f77e75c58b6ff3110b",
+  "source_attestation_verified": true,
+  "filings": [
+    {
+      "report_date": "2022-12-31",
+      "source_url": "https://d18rn0p25nwr6d.cloudfront.net/CIK-0001326801/3fc942c1-0c26-42be-a884-09a7e0eefad2.html",
+      "source_sha256": "e3f7551cb511f6eacbf4a24586e4b825995f622e0c2b919c498a3f3fb980c6f4",
+      "source_rows": 186,
+      "core_facts": {
+        "assets": 185727,
+        "cash_from_operations": 50475,
+        "liabilities_and_equity": 185727,
+        "revenue": 116609
+      },
+      "missing_roles": [
+        "cash_from_financing",
+        "cash_from_investing",
+        "cash_fx_effect",
+        "cash_period_change",
+        "operating_income"
+      ],
+      "cashflow_reconciled": null
+    },
+    {
+      "report_date": "2023-12-31",
+      "source_url": "https://d18rn0p25nwr6d.cloudfront.net/CIK-0001326801/8395af04-55bd-45cd-a201-fa0d2d3d57ec.html",
+      "source_sha256": "4b7d54983e07fe32e812c8810d877124c1737833eeaa896fd11f1de5d2c0f065",
+      "source_rows": 119,
+      "core_facts": {
+        "assets": 229623,
+        "cash_from_operations": 71113,
+        "liabilities_and_equity": 229623,
+        "revenue": 134902
+      },
+      "missing_roles": [
+        "cash_from_financing",
+        "cash_from_investing",
+        "cash_fx_effect",
+        "cash_period_change",
+        "operating_income"
+      ],
+      "cashflow_reconciled": null
+    },
+    {
+      "report_date": "2024-12-31",
+      "source_url": "https://d18rn0p25nwr6d.cloudfront.net/CIK-0001326801/1f8bf8eb-a7ee-4d0c-979c-ca0f22cf633f.html",
+      "source_sha256": "ea046669920f96fdd02831003f032a870e9d3208a308d677d435b6db9d8c523f",
+      "source_rows": 109,
+      "core_facts": {
+        "assets": 276054,
+        "cash_from_operations": 91328,
+        "liabilities_and_equity": 276054,
+        "revenue": 164501
+      },
+      "missing_roles": [
+        "cash_from_financing",
+        "cash_from_investing",
+        "cash_fx_effect",
+        "cash_period_change",
+        "operating_income"
+      ],
+      "cashflow_reconciled": null
+    },
+    {
+      "report_date": "2025-12-31",
+      "source_url": "https://d18rn0p25nwr6d.cloudfront.net/CIK-0001326801/451618c0-0616-4018-ad82-17b05b50492d.html",
+      "source_sha256": "c994affbfc6289be83f90f50e23e7d46b50adbd58e0c45bea5d0bb3d0feb582b",
+      "source_rows": 104,
+      "core_facts": {
+        "assets": 366021,
+        "cash_from_operations": 115800,
+        "liabilities_and_equity": 366021,
+        "revenue": 200966
+      },
+      "missing_roles": [
+        "cash_from_financing",
+        "cash_from_investing",
+        "cash_fx_effect",
+        "cash_period_change",
+        "operating_income"
+      ],
+      "cashflow_reconciled": null
+    }
+  ],
+  "can_materialize": false,
+  "new_semantic_tasks_preflighted": 1,
+  "generated_candidates": 0,
+  "audited_views": 0,
+  "qualified_views": 0,
+  "production_eligible": false,
+  "train_ready": false
+}

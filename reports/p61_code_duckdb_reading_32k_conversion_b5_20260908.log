@@ -1,0 +1,32 @@
+{
+  "conditions": [
+    {
+      "n": 3,
+      "weighted_n": 3,
+      "tokens_est": 98079,
+      "path": "B5.json",
+      "by_view": {
+        "full": 1,
+        "cf": 1,
+        "ordered_artifact_view": 1
+      },
+      "by_length": {
+        "32k": 3
+      },
+      "by_timing": {
+        "first": 3
+      },
+      "by_view_length": {
+        "full|32k": 1,
+        "cf|32k": 1,
+        "ordered_artifact_view|32k": 1
+      },
+      "upsample": false,
+      "duplicates_dropped": 0,
+      "contract_rejects": 0,
+      "condition": "B5"
+    }
+  ],
+  "token_spread": 0.0,
+  "b5w_sampler": null
+}

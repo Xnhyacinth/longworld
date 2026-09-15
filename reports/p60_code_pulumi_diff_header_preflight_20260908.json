@@ -1,0 +1,5 @@
+{
+  "bundle": "configs/p16_codeforge_pulumi_failure_recovery_v1_bundle.json",
+  "diff_header_count": 84,
+  "unsupported_headers": []
+}

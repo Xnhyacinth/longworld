@@ -1,0 +1,23 @@
+[
+  {
+    "query_id": "code000160-ashloftkit-53:patch_files_review_test_release_v2:4_cycles:release:v3.252.0:first:middle:64k",
+    "view": "full",
+    "no_ancestry_target": true,
+    "no_patch_hash_target": true,
+    "all_identifier_outputs_visible": true
+  },
+  {
+    "query_id": "code000160-ashloftkit-53:patch_files_review_test_release_v2:4_cycles:release:v3.252.0:first:middle:64k",
+    "view": "cf",
+    "no_ancestry_target": true,
+    "no_patch_hash_target": true,
+    "all_identifier_outputs_visible": true
+  },
+  {
+    "query_id": "code000160-ashloftkit-53:patch_files_review_test_release_v2:4_cycles:release:v3.252.0:first:back:64k",
+    "view": "ordered_artifact_view",
+    "no_ancestry_target": true,
+    "no_patch_hash_target": true,
+    "all_identifier_outputs_visible": true
+  }
+]

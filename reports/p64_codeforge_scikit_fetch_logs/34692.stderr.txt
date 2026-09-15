@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/workspace/wynckeliao/longworld-worlds/scripts/export_github_workflow.py", line 684, in <module>
+    main()
+  File "/workspace/wynckeliao/longworld-worlds/scripts/export_github_workflow.py", line 662, in main
+    payload = build_public_release_episode(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/scripts/export_github_workflow.py", line 290, in build_public_release_episode
+    license_id = _detect_spdx(license_text)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/wynckeliao/longworld-worlds/scripts/export_github_workflow.py", line 77, in _detect_spdx
+    raise ValueError("license at the pull base has no supported SPDX match")
+ValueError: license at the pull base has no supported SPDX match

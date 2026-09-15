@@ -1,0 +1,149 @@
+{
+  "status": "unsigned_diagnostic_failed_before_manifest_creation",
+  "directory": "/workspace/wynckeliao/longworld/data/sft/p64_primary_training_v1",
+  "failure": "Shared non-symlink file check rejected unresolved sanctioned repository data mount at final output hashing",
+  "source_validators_passed": 9,
+  "completed_message_measurements": 2486,
+  "counts": {
+    "finance/train": 1296,
+    "finance/eval": 386,
+    "codeforge/train": 657,
+    "codeforge/eval": 147
+  },
+  "signed_manifest_created": false,
+  "regression": "test_sanctioned_data_mount_supports_prepare_and_validate",
+  "outputs": {
+    "finance_eval.jsonl": "3ee5d59d48d6f87c032b1afb8ded4f9b255aa6be12cf51d79eb54d32b6875b89",
+    "finance_train.jsonl": "18cce1a697eeacd468b1a1ac278c42734a91711894ec65c31cadd79bb170da57",
+    "TASKBANK_P64.yaml": "fee14c63bc6396991ac6b145ca7837c563c592070b832443a2a9490d05380460",
+    "codeforge_train.jsonl": "e78852013aaa49ea54e65e0d475d5b8e0c61dc1e096ddcfcd4a28ccb3cd7cbae",
+    "sample_index.jsonl": "1e767e5f1fe489887db917615aa071155e33aa3859909ce9a5563a551f9debec",
+    "dataset_info.json": "c41d28e54498091aaf1a8d3f8931a27c298923e84800ed53afb0e5b8315ed301",
+    "codeforge_eval.jsonl": "b6705df17f1c099084dcb2d0a56a3e29376ac80fb4a83eefa4a7c9a81f9d7bee"
+  },
+  "cleanup": "removed_after_signed_v2_and_readonly_snapshot_validation",
+  "source_validation": [
+    {
+      "job": "alphabet",
+      "status": "PASS",
+      "semantic_tasks": 200,
+      "capacity_bins": {
+        "131072": 139,
+        "262144": 61
+      },
+      "exact_token_ranges": {},
+      "production_eligible": false
+    },
+    {
+      "job": "amazon",
+      "status": "PASS",
+      "semantic_tasks": 249,
+      "capacity_bins": {
+        "131072": 163,
+        "262144": 86
+      },
+      "exact_token_ranges": {},
+      "production_eligible": false
+    },
+    {
+      "job": "amd",
+      "status": "PASS",
+      "semantic_tasks": 194,
+      "capacity_bins": {
+        "131072": 124,
+        "262144": 70
+      },
+      "exact_token_ranges": {
+        "262144": 47
+      },
+      "production_eligible": false
+    },
+    {
+      "job": "codeforge",
+      "status": "PASS",
+      "counts": {
+        "train": 657,
+        "eval": 147,
+        "short": 13,
+        "rejected_overflow": 1
+      },
+      "canonical_source_tasks": 818,
+      "primary_long_samples": 804,
+      "full_message_capacity_counts": {
+        "cap64k": 141,
+        "cap128k": 305,
+        "cap256k": 358
+      },
+      "exact_context_token_range_sample_counts": {
+        "other_long": 767,
+        "64k": 12,
+        "128k": 9,
+        "256k": 16
+      },
+      "max_full_message_tokens": 261954,
+      "max_observed_full_message_tokens": 263244,
+      "production_eligible": false,
+      "local_training_eligible": false
+    },
+    {
+      "job": "intel",
+      "status": "PASS",
+      "semantic_tasks": 199,
+      "capacity_bins": {
+        "131072": 128,
+        "262144": 71
+      },
+      "exact_token_ranges": {},
+      "production_eligible": false
+    },
+    {
+      "job": "meta",
+      "status": "PASS",
+      "semantic_tasks": 216,
+      "capacity_bins": {
+        "131072": 145,
+        "262144": 71
+      },
+      "exact_token_ranges": {},
+      "production_eligible": false
+    },
+    {
+      "job": "micron",
+      "status": "PASS",
+      "semantic_tasks": 243,
+      "capacity_bins": {
+        "131072": 149,
+        "262144": 94
+      },
+      "exact_token_ranges": {},
+      "production_eligible": false
+    },
+    {
+      "job": "nvidia",
+      "status": "PASS",
+      "semantic_tasks": 189,
+      "capacity_bins": {
+        "131072": 72,
+        "262144": 65,
+        "65536": 52
+      },
+      "exact_token_ranges": {
+        "65536": 13
+      },
+      "production_eligible": false
+    },
+    {
+      "job": "siriusxm",
+      "status": "PASS",
+      "semantic_tasks": 192,
+      "capacity_bins": {
+        "131072": 126,
+        "262144": 66
+      },
+      "exact_token_ranges": {},
+      "production_eligible": false
+    }
+  ],
+  "replacement_snapshot": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/p64-training-snapshots/bb92e3b1c37f482d26d8697cec481dde75dae274a0b7eacca8bcaff20a9bd3bc",
+  "payload_hashes_equal_replacement": true
+}

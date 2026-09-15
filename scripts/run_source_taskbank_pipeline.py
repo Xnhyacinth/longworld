@@ -25,6 +25,7 @@ from longworld.core.provenance import _read_regular_file
 from scripts.prepare_p64_training import data_mount_path
 
 SCHEMA = "longworld.source-taskbank-pipeline.v1"
+TRUST_WRAPPER = ROOT / "scripts/run_with_local_probe_trust.py"
 
 
 def json_file(path):
@@ -43,6 +44,23 @@ def project_path(value):
 
 def digest(path):
     return hashlib.sha256(_read_regular_file(path, 512_000_000)).hexdigest()
+
+
+def local_probe_trust_identity(path, role):
+    """Return public trust identifiers without retaining or recording role keys."""
+    # Import only after the caller has verified TRUST_WRAPPER against its catalog
+    # pin. The validated payload contains secrets, but only public IDs leave this
+    # function.
+    from scripts.run_with_local_probe_trust import load_local_probe_trust
+
+    payload = load_local_probe_trust(Path(path))
+    return {
+        "schema_version": payload["schema_version"],
+        "environment": payload["environment"],
+        "probe_id": payload["probe_id"],
+        "role": role,
+        "key_id": payload["roles"][role]["key_id"],
+    }
 
 
 def run_pipeline(catalog_path, report_root, workers):
@@ -66,24 +84,30 @@ def run_pipeline(catalog_path, report_root, workers):
         if output in outputs:
             raise ValueError("jobs cannot share output directories")
         outputs.add(output)
-        pins = {
-            str(p): digest(p)
-            for p in (
-                script,
-                config,
-                *(project_path(p) for p in job.get("input_files", [])),
-            )
-        }
+        trust_role = "source"
+        pinned_paths = [
+            script,
+            config,
+            *(project_path(p) for p in job.get("input_files", [])),
+        ]
+        if job.get("trust_file"):
+            pinned_paths.append(TRUST_WRAPPER)
+        pins = {str(p): digest(p) for p in pinned_paths}
         if job["input_sha256"] != pins:
             raise ValueError("catalog input/code pins do not match")
+        trust_identity = None
+        if job.get("trust_file"):
+            trust_identity = local_probe_trust_identity(job["trust_file"], trust_role)
+            if job.get("trust_identity") != trust_identity:
+                raise ValueError("catalog local-probe trust identity does not match")
         receipt_name = job.get("receipt", "BUILD_RECEIPT.json")
         if Path(receipt_name).name != receipt_name:
             raise ValueError("receipt must be a direct output member")
-        jobs.append((job, script, config, output, pins))
+        jobs.append((job, script, config, output, pins, trust_identity))
     report_root.mkdir(parents=True, exist_ok=False)
 
     def execute(item):
-        job, script, config, output, pins = item
+        job, script, config, output, pins, trust_identity = item
         name = job["job_id"]
         receipt = output / job.get("receipt", "BUILD_RECEIPT.json")
         env = dict(os.environ)
@@ -109,15 +133,18 @@ def run_pipeline(catalog_path, report_root, workers):
         if job.get("trust_file"):
             command = [
                 sys.executable,
-                str(ROOT / "scripts/run_with_local_probe_trust.py"),
+                str(TRUST_WRAPPER),
                 "--trust-file",
                 job["trust_file"],
                 "--role",
-                "source",
+                trust_identity["role"],
             ]
-        elif job.get("source_authority") == "official_hash_pinned":
-            # This native source verifier uses official endpoint/byte pins, not
-            # an invented local signature. Pass only the required runtime env.
+        elif job.get("source_authority") in {
+            "official_hash_pinned",
+            "local_hash_pinned",
+        }:
+            # These native verifiers use endpoint or local artifact byte pins,
+            # not an invented local signature. Pass only the required runtime env.
             env = {
                 key: value
                 for key, value in env.items()
@@ -178,6 +205,12 @@ def run_pipeline(catalog_path, report_root, workers):
                 }
         if any(digest(Path(path)) != sha for path, sha in pins.items()):
             raise ValueError("pipeline input changed during execution")
+        if (
+            trust_identity is not None
+            and local_probe_trust_identity(job["trust_file"], trust_identity["role"])
+            != trust_identity
+        ):
+            raise ValueError("local-probe trust identity changed during execution")
         value = json_file(receipt)
         if value.get("schema_version") != job["receipt_schema"]:
             raise ValueError("unexpected native result receipt")
@@ -190,7 +223,9 @@ def run_pipeline(catalog_path, report_root, workers):
             "receipt_schema": value["schema_version"],
             "strict_eligibility_inferred": False,
             "production_eligible": False,
+            "source_authority": job.get("source_authority", "local_probe_trust"),
             "input_sha256": pins,
+            "trust_identity": trust_identity,
         }
 
     results = []
@@ -209,6 +244,7 @@ def run_pipeline(catalog_path, report_root, workers):
             print(json.dumps(result), flush=True)
     result = {
         "schema_version": "longworld.source-taskbank-pipeline-receipt.v1",
+        "orchestrator_sha256": digest(Path(__file__).absolute()),
         "catalog_sha256": hashlib.sha256(catalog_raw).hexdigest(),
         "jobs": sorted(results, key=lambda r: r["job_id"]),
         "production_eligible": False,

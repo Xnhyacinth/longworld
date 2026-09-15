@@ -1,0 +1,900 @@
+{
+  "additional_recent_gate_products": [],
+  "artifact_id_pools_per_world_distribution": {
+    "1": 16,
+    "2": 2,
+    "3": 12,
+    "4": 5,
+    "5": 1,
+    "6": 1
+  },
+  "b5": {
+    "estimated_tokens": 12334046,
+    "examples": 185,
+    "output_hashes_verified": true
+  },
+  "checked_utc": "2026-09-09T02:10:13.928826+00:00",
+  "counts": {
+    "eval": 18,
+    "eval_tokens": 682032,
+    "train": 246,
+    "train_tokens": 14545942
+  },
+  "document_context_exact_hashes": {
+    "covered_rows": 264,
+    "duplicated_row_occurrences": 12,
+    "unique": 252
+  },
+  "domain_rows": {
+    "codeforge": 48,
+    "company": 18,
+    "cyber": 24,
+    "finance": 93,
+    "macro_economics": 30,
+    "researchlab": 18,
+    "standards": 33
+  },
+  "finance_identity_observation": {
+    "basis": "Six issuer CIKs in frozen-row identity receipts, plus Microsoft authorization/source-binding records. Not a full cross-domain source-world census.",
+    "issuers": [
+      "Alphabet",
+      "Amazon",
+      "AMD",
+      "Meta",
+      "Micron",
+      "Microsoft",
+      "NVIDIA"
+    ],
+    "microsoft_world_ids_share_source_manifest": "82f61c8815e901fe9eaf9d7bd78380c2baa08495a338cccefb9c71c08f124aed",
+    "named_issuers": 7,
+    "world_ids": 15
+  },
+  "gate_bound_hashes_match": true,
+  "identifier_counts_not_independence": {
+    "answer_program_id": 44,
+    "base_task_id": 40,
+    "executable_proof_id": 71,
+    "semantic_base_task_id": 39
+  },
+  "length_distribution": [
+    {
+      "bucket": "16k",
+      "rows": 6,
+      "split": "eval"
+    },
+    {
+      "bucket": "32k",
+      "rows": 6,
+      "split": "eval"
+    },
+    {
+      "bucket": "64k",
+      "rows": 6,
+      "split": "eval"
+    },
+    {
+      "bucket": "128k",
+      "rows": 42,
+      "split": "train"
+    },
+    {
+      "bucket": "16k",
+      "rows": 45,
+      "split": "train"
+    },
+    {
+      "bucket": "32k",
+      "rows": 60,
+      "split": "train"
+    },
+    {
+      "bucket": "64k",
+      "rows": 99,
+      "split": "train"
+    }
+  ],
+  "limits": [
+    "World/task/program IDs are not semantic independence certification.",
+    "Question hashes count literal prompts, not independently novel tasks.",
+    "Artifact-ID pools may retain IDs across factual/CF edits; they do not imply byte-identical content.",
+    "Exact body hashes are not near-duplicate or semantic duplicate analysis.",
+    "Current post-hold N_eff and JOIN share were not computed."
+  ],
+  "mapped_ciks": [
+    "0000002488",
+    "0000723125",
+    "0001018724",
+    "0001045810",
+    "0001326801",
+    "0001652044"
+  ],
+  "mapped_repos": [
+    "github.com/astral-sh/uv",
+    "github.com/bytecodealliance/wasmtime",
+    "github.com/dprint/dprint",
+    "github.com/duckdb/duckdb",
+    "github.com/huggingface/transformers",
+    "github.com/pulumi/pulumi"
+  ],
+  "mapped_source_identity_scope": "Finance CIK and CodeForge repository extraction only; not a total entity count across all domains.",
+  "question_texts_per_world_distribution": {
+    "1": 28,
+    "2": 1,
+    "3": 6,
+    "4": 1,
+    "5": 1
+  },
+  "reading_holds": {
+    "eval": 9,
+    "source_report": "reports/p60_reading_readiness_audit_20260908_v2.json",
+    "total": 66,
+    "train": 57,
+    "unheld_rows_not_certified_clean": true
+  },
+  "rows_per_world_distribution": {
+    "12": 5,
+    "15": 1,
+    "21": 1,
+    "3": 16,
+    "6": 2,
+    "9": 12
+  },
+  "semantic_ids_per_world_distribution": {
+    "1": 28,
+    "2": 2,
+    "3": 6,
+    "4": 1
+  },
+  "train_rows_per_product_distribution": {
+    "12": 6,
+    "3": 19,
+    "6": 3,
+    "9": 1,
+    "90": 1
+  },
+  "verified_products": 30,
+  "view_distribution": [
+    {
+      "rows": 6,
+      "split": "eval",
+      "view": "cf"
+    },
+    {
+      "rows": 6,
+      "split": "eval",
+      "view": "full"
+    },
+    {
+      "rows": 6,
+      "split": "eval",
+      "view": "ordered_artifact_view"
+    },
+    {
+      "rows": 82,
+      "split": "train",
+      "view": "cf"
+    },
+    {
+      "rows": 82,
+      "split": "train",
+      "view": "full"
+    },
+    {
+      "rows": 82,
+      "split": "train",
+      "view": "ordered_artifact_view"
+    }
+  ],
+  "world_id_count": 37,
+  "worlds": {
+    "bea-gdi-current-dollars-2005q1-revision-history-v1": {
+      "artifact_pools": 3,
+      "buckets": [
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "macro_economics"
+      ],
+      "programs": 1,
+      "questions": 3,
+      "rows": 9,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "bea-real-gdp-percent-change-2005q4-revision-history-v1": {
+      "artifact_pools": 6,
+      "buckets": [
+        "128k",
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "macro_economics"
+      ],
+      "programs": 1,
+      "questions": 5,
+      "rows": 21,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "code000126-umberkit-83:focal": {
+      "artifact_pools": 3,
+      "buckets": [
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "codeforge"
+      ],
+      "programs": 2,
+      "questions": 3,
+      "rows": 9,
+      "tasks": 2,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "code000130-sablewoodkit-44:focal": {
+      "artifact_pools": 3,
+      "buckets": [
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "codeforge"
+      ],
+      "programs": 3,
+      "questions": 3,
+      "rows": 9,
+      "tasks": 3,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "code000150-nacrekit-34:focal": {
+      "artifact_pools": 2,
+      "buckets": [
+        "128k",
+        "64k"
+      ],
+      "domains": [
+        "codeforge"
+      ],
+      "programs": 2,
+      "questions": 2,
+      "rows": 6,
+      "tasks": 2,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "code000160-ashloftkit-53:focal": {
+      "artifact_pools": 3,
+      "buckets": [
+        "64k"
+      ],
+      "domains": [
+        "codeforge"
+      ],
+      "programs": 3,
+      "questions": 3,
+      "rows": 9,
+      "tasks": 3,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "code000161-calyxkit-80:focal": {
+      "artifact_pools": 1,
+      "buckets": [
+        "32k"
+      ],
+      "domains": [
+        "codeforge"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "code000170-fenlightkit-50:focal": {
+      "artifact_pools": 4,
+      "buckets": [
+        "128k",
+        "64k"
+      ],
+      "domains": [
+        "codeforge"
+      ],
+      "programs": 4,
+      "questions": 4,
+      "rows": 12,
+      "tasks": 4,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "cyber_cisa_kev_catalog_20260829_v1": {
+      "artifact_pools": 5,
+      "buckets": [
+        "128k",
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "cyber"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 15,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "cyber_cross_vendor_remediation_2018_2025_v1": {
+      "artifact_pools": 3,
+      "buckets": [
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "cyber"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 9,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "finance_alphabet_asset_breakdown_2021_2024_v3": {
+      "artifact_pools": 4,
+      "buckets": [
+        "128k",
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "finance"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 12,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "finance_alphabet_reconstruction_2021_2024_p59_v1": {
+      "artifact_pools": 1,
+      "buckets": [
+        "64k"
+      ],
+      "domains": [
+        "finance"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "finance_amazon_asset_trajectory_fy2021_2024_v3": {
+      "artifact_pools": 1,
+      "buckets": [
+        "128k"
+      ],
+      "domains": [
+        "finance"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "finance_amazon_issuer_ir_2021_2024_v1": {
+      "artifact_pools": 3,
+      "buckets": [
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "finance"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 9,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "finance_amd_inline_cash_components_fy2021_2024_p60_v1": {
+      "artifact_pools": 1,
+      "buckets": [
+        "64k"
+      ],
+      "domains": [
+        "finance"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "finance_meta_asset_trajectory_fy2022_2025_v1": {
+      "artifact_pools": 1,
+      "buckets": [
+        "128k"
+      ],
+      "domains": [
+        "finance"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "finance_meta_reconstruction_fy2022_2025_v1": {
+      "artifact_pools": 1,
+      "buckets": [
+        "64k"
+      ],
+      "domains": [
+        "finance"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "finance_micron_asset_trajectory_fy2022_2025_v1": {
+      "artifact_pools": 4,
+      "buckets": [
+        "128k",
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "finance"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 12,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "finance_micron_dual_partition_identity_fy2022_2025_v1": {
+      "artifact_pools": 1,
+      "buckets": [
+        "32k"
+      ],
+      "domains": [
+        "finance"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "finance_micron_reconstruction_fy2022_2025_p59_v1": {
+      "artifact_pools": 1,
+      "buckets": [
+        "64k"
+      ],
+      "domains": [
+        "finance"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "finance_microsoft_asset_trajectory_2022_2025_128k_v1": {
+      "artifact_pools": 4,
+      "buckets": [
+        "128k",
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "finance"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 12,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "finance_microsoft_asset_trajectory_2022_2025_v1": {
+      "artifact_pools": 3,
+      "buckets": [
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "finance"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 9,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "finance_nvidia_market_mix_crossover_fy2022_2025_v1": {
+      "artifact_pools": 1,
+      "buckets": [
+        "64k"
+      ],
+      "domains": [
+        "finance"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "finance_nvidia_market_segment_fy2022_2025_v5": {
+      "artifact_pools": 4,
+      "buckets": [
+        "128k",
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "finance"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 12,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "finance_nvidia_reconstruction_fy2022_2025_p59_v1": {
+      "artifact_pools": 1,
+      "buckets": [
+        "64k"
+      ],
+      "domains": [
+        "finance"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "ietf-acme-issuance-succession-v1": {
+      "artifact_pools": 1,
+      "buckets": [
+        "32k"
+      ],
+      "domains": [
+        "standards"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "ietf-dnssec-succession-v1": {
+      "artifact_pools": 1,
+      "buckets": [
+        "64k"
+      ],
+      "domains": [
+        "standards"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "ietf-http-semantics-succession-v1": {
+      "artifact_pools": 1,
+      "buckets": [
+        "128k"
+      ],
+      "domains": [
+        "standards"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "ietf-http2-succession-v1": {
+      "artifact_pools": 1,
+      "buckets": [
+        "64k"
+      ],
+      "domains": [
+        "standards"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "ietf-oauth-cross-spec-semantic-growth-v1": {
+      "artifact_pools": 3,
+      "buckets": [
+        "128k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "standards"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 9,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "ietf-pkix-path-succession-v1": {
+      "artifact_pools": 1,
+      "buckets": [
+        "64k"
+      ],
+      "domains": [
+        "standards"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "ietf-ssh-architecture-succession-v1": {
+      "artifact_pools": 1,
+      "buckets": [
+        "32k"
+      ],
+      "domains": [
+        "standards"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 3,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "ietf-tls13-handshake-succession-v4": {
+      "artifact_pools": 2,
+      "buckets": [
+        "128k",
+        "64k"
+      ],
+      "domains": [
+        "standards"
+      ],
+      "programs": 1,
+      "questions": 1,
+      "rows": 6,
+      "tasks": 1,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "lab142303127-nacrebench-98:focal": {
+      "artifact_pools": 3,
+      "buckets": [
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "researchlab"
+      ],
+      "programs": 3,
+      "questions": 3,
+      "rows": 9,
+      "tasks": 3,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "lab142407218-ashloftbench-17:focal": {
+      "artifact_pools": 3,
+      "buckets": [
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "researchlab"
+      ],
+      "programs": 3,
+      "questions": 3,
+      "rows": 9,
+      "tasks": 3,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "w014201-sablewood96:focal": {
+      "artifact_pools": 3,
+      "buckets": [
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "company"
+      ],
+      "programs": 3,
+      "questions": 1,
+      "rows": 9,
+      "tasks": 3,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    },
+    "w014202-gilt74:focal": {
+      "artifact_pools": 3,
+      "buckets": [
+        "16k",
+        "32k",
+        "64k"
+      ],
+      "domains": [
+        "company"
+      ],
+      "programs": 3,
+      "questions": 1,
+      "rows": 9,
+      "tasks": 3,
+      "views": [
+        "cf",
+        "full",
+        "ordered_artifact_view"
+      ]
+    }
+  }
+}

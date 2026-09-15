@@ -1,0 +1,160 @@
+{
+  "codeforge_primary": {
+    "all_bound_records_and_scope_fit": {
+      "16384": 0,
+      "4096": 0,
+      "8192": 0
+    },
+    "contexts": 194,
+    "dependency_summary_sha256": "c85636991823eb3c2401da504bdcc3c6002b167b41bba8d16cbf6e6cccbfa00b",
+    "exclusions": {
+      "rejected_overflow": 1,
+      "short": 13
+    },
+    "limits": "Conservative whole-record geometry, not necessity. Head-only geometry omits scope and graph selection and does not establish a proof. No finance numeric reader was applied.",
+    "metadata_sha256": "cc9b17cba2fbba045b9ee2863ff73a2529faa06b0c094e1d745878c5f6c6496d",
+    "oracle_located_complete_heads_fit": {
+      "16384": 46,
+      "4096": 3,
+      "8192": 3
+    },
+    "rows": 804,
+    "semantic_tasks": 804,
+    "split": {
+      "eval": 147,
+      "train": 657
+    },
+    "strict_verified": 0
+  },
+  "finance": {
+    "ast_abstraction": "Replace fact_id and record_ids identities; preserve arity, roles, relations, methods and numeric operator constants.",
+    "ast_shapes_by_split": {
+      "eval": 27,
+      "train": 30
+    },
+    "batch_receipt_sha256": "f76d81f492c205c1068981ce3844bb354cfd9edc31992b5f75b65d4029bd4da9",
+    "capacity_bins": {
+      "131072": 1046,
+      "262144": 584,
+      "65536": 52
+    },
+    "eval_only_ast_shapes": 2,
+    "eval_only_families": [
+      "margin_extremes_cashflow_difference"
+    ],
+    "eval_only_operators": [
+      "difference_extremes",
+      "select_margin_extremes"
+    ],
+    "exact_context_numeric_ranges": {
+      "262144": 47,
+      "65536": 13
+    },
+    "families": {
+      "aggregate": 392,
+      "cash_reconciliation": 32,
+      "conditional_cross_metric_sum": 24,
+      "delta": 420,
+      "filter": 170,
+      "filtered_aggregate": 60,
+      "lookup": 280,
+      "margin_extremes_cashflow_difference": 6,
+      "max_margin_selected_cashflow": 24,
+      "maximum": 210,
+      "ratio": 64
+    },
+    "families_by_split": {
+      "eval": {
+        "aggregate": 88,
+        "cash_reconciliation": 8,
+        "conditional_cross_metric_sum": 5,
+        "delta": 96,
+        "filter": 36,
+        "filtered_aggregate": 13,
+        "lookup": 64,
+        "margin_extremes_cashflow_difference": 6,
+        "max_margin_selected_cashflow": 6,
+        "maximum": 48,
+        "ratio": 16
+      },
+      "train": {
+        "aggregate": 304,
+        "cash_reconciliation": 24,
+        "conditional_cross_metric_sum": 19,
+        "delta": 324,
+        "filter": 134,
+        "filtered_aggregate": 47,
+        "lookup": 216,
+        "max_margin_selected_cashflow": 18,
+        "maximum": 162,
+        "ratio": 48
+      }
+    },
+    "holdout_interpretation": "Program-family plus primitive-operator holdout; not pure composition generalization over known primitives.",
+    "max_context_tokens": 259729,
+    "min_context_tokens": 59152,
+    "new_semantic_tasks_relative_to_p63": 430,
+    "p63_semantic_tasks_not_in_p64": 0,
+    "p63_semantic_tasks_retained": 1252,
+    "primitive_operators_by_split": {
+      "eval": [
+        "aggregate",
+        "collect",
+        "delta",
+        "difference_extremes",
+        "filter",
+        "lookup",
+        "lookup_selected",
+        "margin_series",
+        "maximum",
+        "ratio",
+        "reconcile",
+        "select_margin_extremes",
+        "select_max_margin",
+        "select_sign",
+        "series",
+        "sum_selected"
+      ],
+      "train": [
+        "aggregate",
+        "collect",
+        "delta",
+        "filter",
+        "lookup",
+        "lookup_selected",
+        "margin_series",
+        "maximum",
+        "ratio",
+        "reconcile",
+        "select_max_margin",
+        "select_sign",
+        "series",
+        "sum_selected"
+      ]
+    },
+    "rows": 1682,
+    "semantic_tasks": 1682,
+    "source_groups": {
+      "eval": [
+        "0000002488",
+        "0000908937"
+      ],
+      "train": [
+        "0000050863",
+        "0000723125",
+        "0001018724",
+        "0001045810",
+        "0001326801",
+        "0001652044"
+      ]
+    },
+    "source_groups_overlap": [],
+    "split": {
+      "eval": 386,
+      "train": 1296
+    },
+    "unique_contexts": 104
+  },
+  "schema_version": "longworld.p64-dependency-inventory.v1",
+  "script_sha256": "00a7bebf911c8f73b89cf557e7ebdfe469c8a8400b9620475e3ba18d50840d33"
+}

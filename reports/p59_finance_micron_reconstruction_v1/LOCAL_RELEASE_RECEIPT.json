@@ -1,0 +1,23 @@
+{
+  "release_dir": "/workspace/wynckeliao/longworld/data/releases/p59-finance-micron-reconstruction-64k-probe-1-v1-promoted-v1",
+  "release_profile": "p59-finance-micron-reconstruction-64k-probe-1-v1",
+  "train_rows": 3,
+  "eval_rows": 0,
+  "production_eligible": false,
+  "auto_promote": false,
+  "training_export_validation": {
+    "ok": true,
+    "exit_code": 0,
+    "source_rows": 3,
+    "outputs": 4,
+    "snapshot_dir": null
+  },
+  "sha256": {
+    "train.jsonl": "c7bbd55dab7418494256d15bd6cc250fdad2c1566f23fe300458d35ddfde1ac3",
+    "eval.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "quality_report.json": "4261940822abd7b8fd8cca89a2cfb1ea1cf5bc6b1295c8c7d9eaa1c03eba2ad8",
+    "release_gate_receipt.json": "e6750b5cc1f01e694688aabb49bd7e3ba994facb4e8ffb4189bcf8d1f87716de",
+    "llamafactory/B5.json": "386db65b845b4edac6aa87a2680e291ca27300d890b267a8c130f0c55a3c441f",
+    "llamafactory/training_export_manifest.json": "b806b99c3a96c44f145c9f456c7326c08ec89668c7938a94240de152fd51f0e4"
+  }
+}
