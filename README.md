@@ -31,8 +31,8 @@ Current publication and qualification status is tracked in
   SFT in parquet (not LongWorld product rows).
 - `Xnhyacinth/LongWorld-Training-State` — private training logs, experiment
   receipts, evaluation outputs, and a complete local-file hash manifest. The
-  Hub currently holds 1.17 GB; 213.00 GB of checkpoint and large evaluation
-  payloads are listed but blocked by the private LFS storage quota.
+  Hub currently holds 6.80 GB of the intended payload; 207.38 GB of complete
+  checkpoint state is listed but blocked by the private LFS storage quota.
 - `Xnhyacinth/Qwen3.5-4B-Base-ACC-128k-SFT`,
   `Xnhyacinth/Qwen3.5-4B-Base-LongTrace-128k-SFT`, and
   `Xnhyacinth/Qwen3.5-4B-ACC-128k-SFT` — step-680 inference weights

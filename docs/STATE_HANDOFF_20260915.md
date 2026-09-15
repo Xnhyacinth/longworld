@@ -42,10 +42,10 @@ in the catalog.
 
 - Private dataset: `Xnhyacinth/LongWorld-Training-State`.
 - Frozen manifest revision: Hub tag `state-2026-09-15`.
-- Intended local view: 2,297 files / 214,172,921,054 bytes.
-- Uploaded payload: 2,157 files / 1,173,229,609 bytes, plus the dataset card,
+- Intended local view: 2,297 files / 214,172,921,107 bytes.
+- Uploaded payload: 2,201 files / 6,796,135,011 bytes, plus the dataset card,
   Hub attributes, and uploaded snapshot manifest.
-- Storage-quota blocked: 140 files / 212,999,691,445 bytes.
+- Storage-quota blocked: 96 files / 207,376,786,096 bytes.
 - Local resumable view:
   `/workspace/wynckeliao/.longworld-hf-staging/LongWorld-Training-State`.
 - Complete inventory: `SNAPSHOT_MANIFEST.json` in that Hub repository. Each
@@ -80,6 +80,7 @@ configs, and model references.
 - `.local-probe-env`, HMAC key bytes, API tokens, and credentials.
 
 The untracked/modified experimental report set from the worlds worktree was
-included in the HF snapshot view before upload. Its accepted files are on Hub;
-quota-blocked large report JSONL files remain listed with hashes in the
-manifest and retained in the resumable local view.
+included in the HF snapshot view before upload. Its frozen files and all
+evaluation payloads are on Hub. The remaining quota-blocked files are complete
+training checkpoint states listed with hashes in the manifest and retained in
+the resumable local view.
