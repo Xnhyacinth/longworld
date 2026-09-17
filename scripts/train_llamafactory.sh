@@ -4,6 +4,8 @@
 # Extra CLI overrides: bash scripts/train_llamafactory.sh ext_acc flash_attn=fa2
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$ROOT/scripts/uv_project_env.sh"
 if [[ -f "$ROOT/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
@@ -13,18 +15,18 @@ fi
 COND="${1:-B5}"
 shift || true
 TASKBANK_PREPARE_ONLY=0
-if [[ "$COND" == "TASKBANK" || "$COND" == "P64" ]]; then
+if [[ "$COND" == "TASKBANK" ]]; then
   TASKBANK_ARGS=()
   for arg in "$@"; do
     case "$arg" in
       --prepare-only) TASKBANK_PREPARE_ONLY=1 ;;
       eval_dataset=*|tokenized_path=*|model_name_or_path=*|model_revision=*|template=*|cutoff_len=*|packing=*|neat_packing=*|train_on_prompt=*|val_size=*|trust_remote_code=*|--eval_dataset|--eval_dataset=*|--tokenized_path|--tokenized_path=*|--model_name_or_path|--model_name_or_path=*|--model_revision|--model_revision=*|--template|--template=*|--cutoff_len|--cutoff_len=*|--packing|--packing=*|--neat_packing|--neat_packing=*|--train_on_prompt|--train_on_prompt=*|--val_size|--val_size=*|--trust_remote_code|--trust_remote_code=*)
-        echo "$COND source/tokenizer/template overrides require new validated preparation: $arg" >&2
+        echo "TASKBANK source/tokenizer/template overrides require new validated preparation: $arg" >&2
         exit 1
         ;;
       output_dir=*|logging_steps=*|save_steps=*|save_total_limit=*|per_device_train_batch_size=*|gradient_accumulation_steps=*|learning_rate=*|num_train_epochs=*|max_steps=*|lr_scheduler_type=*|warmup_ratio=*|warmup_steps=*|bf16=*|flash_attn=*|gradient_checkpointing=*|ddp_timeout=*|report_to=*|run_name=*) TASKBANK_ARGS+=("$arg") ;;
       *)
-        echo "unsupported $COND override; use a validated recipe for data changes: $arg" >&2
+        echo "unsupported TASKBANK override; use a validated recipe for data changes: $arg" >&2
         exit 1
         ;;
     esac
@@ -50,15 +52,15 @@ LF_ROOT="${LLAMA_FACTORY_ROOT:-$ROOT/.vendor/LLaMA-Factory}"
 GPUS="${GPUS:-0}"
 HOLD="${HOLD_SH:-}"
 VALIDATED_SNAPSHOT=""
-if [[ "${SKIP_HOLD:-0}" != "1" && -z "$HOLD" && -x /workspace/wynckeliao/ops/gpu/hold.sh ]]; then
-  HOLD="/workspace/wynckeliao/ops/gpu/hold.sh"
+if [[ "${SKIP_HOLD:-0}" != "1" && -z "$HOLD" && -x ${QJIU_ROOT}/wynckeliao-env/ops/gpu/hold.sh ]]; then
+  HOLD="${QJIU_ROOT}/wynckeliao-env/ops/gpu/hold.sh"
 fi
 
 if [[ ! -f "$CFG" ]]; then
   echo "missing $CFG" >&2
   exit 1
 fi
-if [[ "$COND" != "TASKBANK" && "$COND" != "P64" && ! -d "$LF_ROOT" ]]; then
+if [[ "$COND" != "TASKBANK" && ! -d "$LF_ROOT" ]]; then
   echo "LLaMA-Factory not found. Run: bash scripts/setup_llamafactory.sh" >&2
   exit 1
 fi
@@ -98,43 +100,6 @@ print(value["snapshot_dir"])
   esac
   if [[ ! -d "$VALIDATED_SNAPSHOT" || -L "$VALIDATED_SNAPSHOT" ]]; then
     echo "TASKBANK validated snapshot is missing or unsafe" >&2
-    exit 1
-  fi
-fi
-
-if [[ "$COND" == "P64" ]]; then
-  : "${LONGWORLD_P64_MANIFEST:?LONGWORLD_P64_MANIFEST is required}"
-  : "${LONGWORLD_P64_REPORT_TRUST:?LONGWORLD_P64_REPORT_TRUST is required}"
-  VERIFY_PY="$ROOT/.venv/bin/python"
-  if [[ ! -x "$VERIFY_PY" ]]; then
-    echo "P64 requires the owning project .venv" >&2
-    exit 1
-  fi
-  SNAPSHOT_ROOT="${LONGWORLD_P64_SNAPSHOT_ROOT:-}"
-  if [[ -z "$SNAPSHOT_ROOT" ]]; then
-    SNAPSHOT_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/longworld-p64-training.XXXXXX")"
-    chmod 700 "$SNAPSHOT_ROOT"
-  fi
-  VALIDATION_JSON="$(
-    "$VERIFY_PY" "$ROOT/scripts/run_with_local_probe_trust.py" \
-      --trust-file "$LONGWORLD_P64_REPORT_TRUST" --role report -- \
-      "$VERIFY_PY" "$ROOT/scripts/prepare_p64_training.py" validate \
-      --manifest "$LONGWORLD_P64_MANIFEST" --snapshot-root "$SNAPSHOT_ROOT"
-  )"
-  VALIDATED_SNAPSHOT="$(
-    "$VERIFY_PY" -c 'import json,sys
-value = json.load(sys.stdin)
-if value.get("ok") is not True or not value.get("snapshot_dir"):
-    raise SystemExit("p64 validator did not return a verified snapshot")
-print(value["snapshot_dir"])
-' <<<"$VALIDATION_JSON"
-  )"
-  case "$VALIDATED_SNAPSHOT" in
-    "$SNAPSHOT_ROOT"/*) ;;
-    *) echo "p64 validator returned an invalid snapshot path" >&2; exit 1 ;;
-  esac
-  if [[ ! -d "$VALIDATED_SNAPSHOT" || -L "$VALIDATED_SNAPSHOT" ]]; then
-    echo "P64 validated snapshot is missing or unsafe" >&2
     exit 1
   fi
 fi
@@ -212,12 +177,12 @@ unset LONGWORLD_PREDECESSOR_GATE_ATTESTATION_KEY LONGWORLD_PREDECESSOR_GATE_ATTE
 unset LONGWORLD_TASKBANK_REPORT_TRUST
 unset LONGWORLD_P64_REPORT_TRUST
 
-if [[ ( "$COND" == "TASKBANK" || "$COND" == "P64" ) && "$TASKBANK_PREPARE_ONLY" == "1" ]]; then
+if [[ "$COND" == "TASKBANK" && "$TASKBANK_PREPARE_ONLY" == "1" ]]; then
   printf '%s\n' "$VALIDATION_JSON"
   exit 0
 fi
-if [[ ( "$COND" == "TASKBANK" || "$COND" == "P64" ) && ! -d "$LF_ROOT" ]]; then
-  echo "LLaMA-Factory not found; validated input preparation succeeded but training needs LLAMA_FACTORY_ROOT" >&2
+if [[ "$COND" == "TASKBANK" && ! -d "$LF_ROOT" ]]; then
+  echo "LLaMA-Factory not found; taskbank input preparation succeeded but training needs LLAMA_FACTORY_ROOT" >&2
   exit 1
 fi
 
@@ -286,6 +251,115 @@ print("fa3" if want == "fa3" and fa3_ok() else ("fa2" if fa2_ok() else "sdpa"))
 ATTN="${FLASH_ATTN_OVERRIDE:-$(detect_flash_attn)}"
 GBS="${GBS:-0}"
 EXTRA=("$@")
+EXPLICIT_TOKENIZED_PATH=0
+for arg in "$@"; do
+  case "$arg" in
+    tokenized_path=*|--tokenized_path|--tokenized_path=*) EXPLICIT_TOKENIZED_PATH=1 ;;
+  esac
+done
+# The private parquet materializer provides held-out files explicitly. Keep
+# public-source exports on their historical val_size path when that manifest
+# is absent.
+BASELINE_MATERIALIZATION="$ROOT/data/external/llamafactory/materialization_manifest.json"
+BASELINE_FILES=()
+case "$COND" in
+  ext_acc)
+    BASELINE_FILES=(acc_search acc_swe acc_sql acc_search_val acc_swe_val acc_sql_val)
+    ;;
+  ext_longtrace)
+    BASELINE_FILES=(longtracerl longtracerl_val)
+    ;;
+  ext_longmit)
+    BASELINE_FILES=(longmit longmit_val)
+    ;;
+esac
+baseline_materialization_valid() {
+  local manifest="$1"
+  shift
+  "$(pick_py)" - "$manifest" "$ROOT/data/external/llamafactory" "$@" <<'PY'
+import hashlib
+import json
+import pathlib
+import sys
+
+manifest_path = pathlib.Path(sys.argv[1])
+dataset_dir = pathlib.Path(sys.argv[2])
+names = sys.argv[3:]
+try:
+    manifest = json.loads(manifest_path.read_text())
+    if manifest.get("schema_version") != "longworld.hf-baseline-materialization.v1":
+        raise ValueError("unexpected schema")
+    files = manifest["outputs"]["llamafactory"]["files"]
+    fingerprint = hashlib.sha256()
+    for name in names:
+        path = dataset_dir / f"{name}.jsonl"
+        expected = files[name]
+        digest = hashlib.sha256()
+        rows = 0
+        size = 0
+        with path.open("rb") as handle:
+            for line in handle:
+                digest.update(line)
+                size += len(line)
+                rows += 1
+        if (digest.hexdigest(), size, rows) != (
+            expected["sha256"],
+            expected["bytes"],
+            expected["rows"],
+        ):
+            raise ValueError(f"content mismatch: {name}")
+        fingerprint.update(f"{name}:{expected['sha256']}\n".encode())
+except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+    print(f"private baseline materialization is invalid: {error}", file=sys.stderr)
+    raise SystemExit(1)
+print(fingerprint.hexdigest()[:16])
+PY
+}
+if (( ${#BASELINE_FILES[@]} > 0 )) && [[ -f "$BASELINE_MATERIALIZATION" ]]; then
+  if BASELINE_FINGERPRINT="$(baseline_materialization_valid "$BASELINE_MATERIALIZATION" "${BASELINE_FILES[@]}")"; then
+    if (( EXPLICIT_TOKENIZED_PATH == 0 )); then
+      CACHE_FINGERPRINT="$("$(pick_py)" - "$CFG" "$BASELINE_FINGERPRINT" "$LF_ROOT" "$@" <<'PY'
+import hashlib
+import json
+import pathlib
+import subprocess
+import sys
+
+config_path = pathlib.Path(sys.argv[1])
+baseline_fingerprint = sys.argv[2]
+llamafactory_root = pathlib.Path(sys.argv[3])
+cli_overrides = sys.argv[4:]
+revision = subprocess.run(
+    ["git", "-C", str(llamafactory_root), "rev-parse", "HEAD"],
+    check=False,
+    capture_output=True,
+    text=True,
+).stdout.strip()
+digest = hashlib.sha256()
+digest.update(config_path.read_bytes())
+digest.update(baseline_fingerprint.encode())
+digest.update(json.dumps(cli_overrides, separators=(",", ":")).encode())
+digest.update(revision.encode())
+print(digest.hexdigest()[:16])
+PY
+)"
+      EXTRA+=("tokenized_path=$ROOT/data/sft/tokenized/private_hf/${COND}-${CACHE_FINGERPRINT}")
+    fi
+    case "$COND" in
+      ext_acc)
+        EXTRA+=("eval_dataset=acc_search_val,acc_swe_val,acc_sql_val" "val_size=0")
+        ;;
+      ext_longtrace)
+        EXTRA+=("eval_dataset=longtracerl_val" "val_size=0")
+        ;;
+      ext_longmit)
+        EXTRA+=("eval_dataset=longmit_val" "val_size=0")
+        ;;
+    esac
+  else
+    echo "ignoring stale private baseline manifest; using recipe val_size" >&2
+  fi
+fi
 if [[ -n "$VALIDATED_SNAPSHOT" ]]; then
   if [[ "$COND" == "B5w" ]]; then
     EXTRA+=("train_dataset=$VALIDATED_SNAPSHOT/B5w.datasets.yaml")
@@ -300,7 +374,7 @@ fi
 if [[ "$COND" == "B5w" ]]; then
   USE_V1=1
 fi
-if [[ "$COND" == "TASKBANK" || "$COND" == "P64" ]]; then
+if [[ "$COND" == "TASKBANK" ]]; then
   USE_V1=0
 fi
 export USE_V1

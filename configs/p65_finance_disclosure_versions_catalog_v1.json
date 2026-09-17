@@ -5,19 +5,19 @@
       "issuer": "intel",
       "config": "configs/p65_finance_disclosure_versions_intel_v1.json",
       "output": "data/candidates/p65_finance_disclosure_versions_v1/intel",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/intel-p64/local_probe_trust.json"
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/intel-p64/local_probe_trust.json"
     },
     {
       "issuer": "siriusxm",
       "config": "configs/p65_finance_disclosure_versions_siriusxm_v1.json",
       "output": "data/candidates/p65_finance_disclosure_versions_v1/siriusxm",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/siriusxm-p64/local_probe_trust.json"
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/siriusxm-p64/local_probe_trust.json"
     },
     {
       "issuer": "amd",
       "config": "configs/p65_finance_disclosure_versions_amd_v1.json",
       "output": "data/candidates/p65_finance_disclosure_versions_v1/amd",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/amd/local_probe_trust.json"
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/amd/local_probe_trust.json"
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "schema_version": "longworld.ietf-dnssec-generation-config.v1",
-  "source_inventory_dir": "/workspace/wynckeliao/longworld/data/source_inventory/p57_ietf_dnssec_protocol_v1",
+  "source_inventory_dir": "data/source_inventory/p57_ietf_dnssec_protocol_v1",
   "fetch_inventory_file": "ietf_fetch_inventory.json",
   "fetch_inventory_sha256": "92e582bb16fe64d805a3e0aafc3c0c1cb31d8ac225ca183f099c7918201689aa",
   "signed_workflow_file": "ietf_workflow_manifest.p57.dnssec.v1.signed.json",
@@ -62,7 +62,7 @@
     "model_id": "sentence-transformers/all-MiniLM-L6-v2",
     "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
   },
-  "output_dir": "/workspace/wynckeliao/longworld/data/candidates/p57_ietf_dnssec_succession_v1",
+  "output_dir": "data/candidates/p57_ietf_dnssec_succession_v1",
   "do_not_select": true,
   "do_not_promote": true,
   "do_not_count": true

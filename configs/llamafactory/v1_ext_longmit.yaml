@@ -1,5 +1,5 @@
 ### LLaMA-Factory v1 SFT: Ulysses CP (SP=2). Same lr / GBS / steps as v1_ext_acc.
-model: /workspace/wynckeliao/longworld/data/models/Qwen3.5-4B
+model: data/models/Qwen3.5-4B
 trust_remote_code: false
 model_class: llm
 flash_attn: flash_attention_2

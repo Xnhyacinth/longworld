@@ -1,7 +1,7 @@
 ### LLaMA-Factory v1 SFT: Ulysses CP (SP=2) on 2 GPUs.
 ### dp=1, cp=2, micro=1, global_batch_size 16 => accum 16. Same GBS as ACC Table 1.
 ### Official LF blocks qwen3.5 SP; vendor check is a warning so we can try.
-model: /workspace/wynckeliao/longworld/data/models/Qwen3.5-4B
+model: data/models/Qwen3.5-4B
 trust_remote_code: false
 model_class: llm
 flash_attn: flash_attention_2

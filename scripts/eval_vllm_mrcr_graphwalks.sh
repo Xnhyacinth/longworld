@@ -8,21 +8,25 @@
 # Qwen3-30B-A3B-Thinking).
 #
 # Usage:
-#   GPU_HOLD_ALLOW_ROOT=1 bash /workspace/wynckeliao/ops/gpu/hold.sh wrap 4,5,6,7 \
+#   GPU_HOLD_ALLOW_ROOT=1 bash $QJIU_ROOT/wynckeliao-env/ops/gpu/hold.sh wrap 0,1,2,3 \
 #     -- bash scripts/eval_vllm_mrcr_graphwalks.sh
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-RUN_ID="${RUN_ID:-mrcr_graphwalks_20260901}"
+RUN_ID="${RUN_ID:-mrcr_graphwalks_20260917}"
 RUN_ROOT="${RUN_ROOT:-$ROOT/data/evals/$RUN_ID}"
-VENV="${VENV:-$ROOT/.vendor/lm-evaluation-harness/.venv}"
-HF_HOME="${HF_HOME:-/workspace/wynckeliao/.hf}"
+VENV="${VENV:-/volume/pt-dev/qjiu/lm-evaluation-harness/.venv}"
+HF_HOME="${HF_HOME:-/volume/pt-dev/qjiu/.hf}"
 ORIG_MODEL="${ORIG_MODEL:-$ROOT/data/models/Qwen3.5-4B}"
-DATA_ROOT="${DATA_ROOT:-$RUN_ROOT/hf}"
+DATA_ROOT="${DATA_ROOT:-$RUN_ROOT}"
+# HOME must stay on the volume (small container rootfs; /root is forbidden by the
+# disk policy). HF_HOME / XDG_CACHE_HOME / TMPDIR are set explicitly, so this only
+# governs ~ fallbacks.
+RUN_HOME="${RUN_HOME:-${QJIU_ROOT:-/volume/pt-dev/qjiu}}"
 
-GPUS=(${GPUS:-4 5 6 7})
+GPUS=(${GPUS:-0 1 2 3})
 BASE_PORT="${BASE_PORT:-19214}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-131072}"
 GPU_MEM_UTIL="${GPU_MEM_UTIL:-0.80}"
@@ -154,7 +158,7 @@ run_shard() (
   echo "[$model_id/$shard] vLLM GPU=$gpu port=$port ctx=$MAX_MODEL_LEN gen=$max_gen"
   env \
     CUDA_VISIBLE_DEVICES="$gpu" \
-    HOME=/workspace/wynckeliao \
+    HOME="$RUN_HOME" \
     HF_HOME="$HF_HOME" \
     HF_HUB_DISABLE_TELEMETRY=1 \
     DO_NOT_TRACK=1 \
@@ -199,7 +203,7 @@ run_shard() (
   timeout --signal=INT --kill-after=60s "$WALL_TIMEOUT" \
     env \
       CUDA_VISIBLE_DEVICES='' \
-      HOME=/workspace/wynckeliao \
+      HOME="$RUN_HOME" \
       HF_HOME="$HF_HOME" \
       HF_HUB_DISABLE_TELEMETRY=1 \
       DO_NOT_TRACK=1 \
@@ -303,7 +307,7 @@ PY
 
 MODELS=(
   "b0_qwen35_4b|$ROOT/data/models/Qwen3.5-4B"
-  "acc_ckpt680|$ROOT/data/sft/swift_ext_acc/v6-20260825-153450/checkpoint-680"
+  "acc_ckpt680|$ROOT/data/hf/LongWorld-Training-State/training/swift_ext_acc/v6-20260825-153450/checkpoint-680"
 )
 if [[ -n "${EVAL_MODELS:-}" ]]; then
   MODELS=()

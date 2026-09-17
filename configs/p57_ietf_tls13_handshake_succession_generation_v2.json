@@ -1,6 +1,6 @@
 {
   "schema_version": "longworld.ietf-tls13-generation-config.v1",
-  "source_inventory_dir": "/workspace/wynckeliao/longworld/data/source_inventory/p57_ietf_tls13_handshake_graph_v1",
+  "source_inventory_dir": "data/source_inventory/p57_ietf_tls13_handshake_graph_v1",
   "fetch_inventory_file": "ietf_fetch_inventory.json",
   "fetch_inventory_sha256": "c86bc411fe4e31382a729a63b451fff99251ebacc2b1323213b4fa8cba891c36",
   "signed_workflow_file": "ietf_workflow_manifest.p57.tls13-handshake.v1.signed.json",
@@ -93,7 +93,7 @@
     "model_id": "sentence-transformers/all-MiniLM-L6-v2",
     "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
   },
-  "output_dir": "/workspace/wynckeliao/longworld/data/candidates/p57_ietf_tls13_handshake_succession_v2",
+  "output_dir": "data/candidates/p57_ietf_tls13_handshake_succession_v2",
   "do_not_select": true,
   "do_not_promote": true,
   "do_not_count": true

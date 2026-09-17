@@ -13,27 +13,39 @@
 #   do not put max_gen_toks in --gen_kwargs (that would override YAML)
 #
 # Usage:
-#   GPU_HOLD_ALLOW_ROOT=1 bash /workspace/wynckeliao/ops/gpu/hold.sh wrap 4,5,6,7 \
+#   GPU_HOLD_ALLOW_ROOT=1 bash $QJIU_ROOT/wynckeliao-env/ops/gpu/hold.sh wrap 0,1,2,3 \
 #     -- bash scripts/eval_vllm_lm_eval_sharded.sh
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-RUN_ID="${RUN_ID:-downstream_same_protocol_20260901}"
+RUN_ID="${RUN_ID:-downstream_same_protocol_20260917}"
 RUN_ROOT="${RUN_ROOT:-$ROOT/data/evals/$RUN_ID}"
-VENV="${VENV:-$ROOT/.vendor/lm-evaluation-harness/.venv}"
-HF_HOME="${HF_HOME:-/workspace/wynckeliao/.hf}"
-NLTK_DATA="${NLTK_DATA:-$ROOT/data/evals/b0_qwen35_4b_a7b0d22_20260831/cache/nltk}"
-HOLD_SH="${HOLD_SH:-/workspace/wynckeliao/ops/gpu/hold.sh}"
+VENV="${VENV:-/volume/pt-dev/qjiu/lm-evaluation-harness/.venv}"
+HF_HOME="${HF_HOME:-/volume/pt-dev/qjiu/.hf}"
+NLTK_DATA="${NLTK_DATA:-/volume/pt-dev/qjiu/nltk_data}"
+HOLD_SH="${HOLD_SH:-/volume/pt-dev/qjiu/wynckeliao-env/ops/gpu/hold.sh}"
+# HOME must stay on the volume (small container rootfs; /root is forbidden by the
+# disk policy). HF_HOME / XDG_CACHE_HOME / NLTK_DATA / TMPDIR are all set explicitly
+# below, so this only governs ~ fallbacks.
+RUN_HOME="${RUN_HOME:-${QJIU_ROOT:-/volume/pt-dev/qjiu}}"
 
-GPUS=(${GPUS:-4 5 6 7})
+GPUS=(${GPUS:-0 1 2 3})
 BASE_PORT="${BASE_PORT:-18214}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-16384}"
 GPU_MEM_UTIL="${GPU_MEM_UTIL:-0.88}"
 WALL_TIMEOUT="${WALL_TIMEOUT:-24h}"
 DEFAULT_MAX_GEN_TOKS="${DEFAULT_MAX_GEN_TOKS:-8192}"
 ORIG_MODEL="${ORIG_MODEL:-$ROOT/data/models/Qwen3.5-4B}"
+
+GEN_KWARGS='{"temperature":0,"chat_template_kwargs":{"enable_thinking":false}}'
+# IFEval's canonical cap is 1280: Google's instruction_following_eval reference uses
+# it, and upstream lm-eval carried it until this fork's commit 8020f549 raised
+# ifeval.yaml to 8192 WITHOUT bumping metadata.version -- so task "version 4.0" no
+# longer implies the 1280 cap. evaluator.py merges CLI gen_kwargs over the YAML with
+# update=True, so pin it here and keep the 0912 baseline directly comparable.
+GEN_KWARGS_IFEVAL='{"temperature":0,"max_gen_toks":1280,"chat_template_kwargs":{"enable_thinking":false}}'
 
 if [[ ! -x "$VENV/bin/vllm" || ! -x "$VENV/bin/lm-eval" ]]; then
   echo "missing vllm or lm-eval in $VENV" >&2
@@ -48,7 +60,7 @@ import json, sys
 from pathlib import Path
 root = Path(sys.argv[1])
 (root / "PROTOCOL.json").write_text(json.dumps({
-    "framework": "lm-evaluation-harness 0.4.12 + vLLM 0.18.0 OpenAI server",
+    "framework": "lm-evaluation-harness (internal-v2026.0914 vendored tree) + vLLM 0.18.0 OpenAI server",
     "client": "lm-eval run --model local-chat-completions --apply_chat_template",
     "why_not_lm_eval_vllm": "harness Transformers cannot parse model_type=qwen3_5",
     "decoding": {
@@ -58,8 +70,9 @@ root = Path(sys.argv[1])
         "seed": 42,
         "apply_chat_template": True,
         "max_gen_toks_fallback_model_args": 8192,
-        "max_gen_toks_source": "task YAML wins; GPQA CoT has no YAML cap so 8192 fallback",
-        "yaml_caps": {"ifeval": 1280, "mmlu_pro": 2048, "gpqa_diamond_cot_zeroshot": None}
+        "max_gen_toks_source": "CLI gen_kwargs overrides YAML (evaluator.py update=True); GPQA CoT has no YAML cap so 8192 fallback",
+        "yaml_caps": {"ifeval": 1280, "mmlu_pro": 2048, "gpqa_diamond_cot_zeroshot": None},
+        "ifeval_cap_pin": "1280 pinned via --gen_kwargs because the vendored fork's ifeval.yaml says 8192 (commit 8020f549 raised it from 1280 without bumping metadata.version). 1280 is the upstream/Google-reference value and matches the 0912 baseline, whose 541 samples max out at exactly 1280.",
     },
     "tasks": ["ifeval", "gpqa_diamond_cot_zeroshot", "mmlu_pro (14 subjects, weight_by_size)"],
     "limit": None,
@@ -117,6 +130,7 @@ run_shard() (
   shard="$5"
   concurrency="$6"
   tasks="$7"
+  gen_kwargs="${8:-$GEN_KWARGS}"
   shard_dir="$RUN_ROOT/$model_id/$shard"
   served_name="${model_id}-${shard}"
   mkdir -p "$shard_dir"
@@ -138,7 +152,7 @@ run_shard() (
   echo "[$model_id/$shard] vLLM GPU=$gpu port=$port ctx=$MAX_MODEL_LEN conc=$concurrency"
   env \
     CUDA_VISIBLE_DEVICES="$gpu" \
-    HOME=/workspace/wynckeliao \
+    HOME="$RUN_HOME" \
     HF_HOME="$HF_HOME" \
     HF_HUB_DISABLE_TELEMETRY=1 \
     DO_NOT_TRACK=1 \
@@ -183,7 +197,7 @@ run_shard() (
   timeout --signal=INT --kill-after=60s "$WALL_TIMEOUT" \
     env \
       CUDA_VISIBLE_DEVICES='' \
-      HOME=/workspace/wynckeliao \
+      HOME="$RUN_HOME" \
       HF_HOME="$HF_HOME" \
       NLTK_DATA="$NLTK_DATA" \
       HF_HUB_DISABLE_TELEMETRY=1 \
@@ -197,7 +211,7 @@ run_shard() (
         --batch_size 1 \
         --seed 42 \
         --apply_chat_template \
-        --gen_kwargs '{"temperature":0,"chat_template_kwargs":{"enable_thinking":false}}' \
+        --gen_kwargs "$gen_kwargs" \
         --output_path "$shard_dir/results" \
         --log_samples \
         >"$shard_dir/client.log" 2>&1
@@ -219,7 +233,7 @@ run_model() {
   echo "===== model $model_id  path=$model_path ====="
 
   local pids=()
-  run_shard "$g0" "$p0" "$model_id" "$model_path" ifeval 32 ifeval &
+  run_shard "$g0" "$p0" "$model_id" "$model_path" ifeval 32 ifeval "$GEN_KWARGS_IFEVAL" &
   pids+=("$!")
   run_shard "$g1" "$p1" "$model_id" "$model_path" gpqa 16 gpqa_diamond_cot_zeroshot &
   pids+=("$!")
@@ -279,8 +293,8 @@ PY
 
 MODELS=(
   "b0_qwen35_4b|$ROOT/data/models/Qwen3.5-4B"
-  "acc_ckpt680|$ROOT/data/sft/swift_ext_acc/v6-20260825-153450/checkpoint-680"
-  "longtrace_ckpt200|$ROOT/data/sft/swift_ext_longtrace/v0-20260825-235057/checkpoint-200"
+  "acc_ckpt680|$ROOT/data/hf/LongWorld-Training-State/training/swift_ext_acc/v6-20260825-153450/checkpoint-680"
+  "longtrace_ckpt200|$ROOT/data/hf/LongWorld-Training-State/training/swift_ext_longtrace/v0-20260825-235057/checkpoint-200"
 )
 if [[ -n "${EVAL_MODELS:-}" ]]; then
   MODELS=()

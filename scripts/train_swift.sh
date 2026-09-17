@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Full-parameter SFT with latest ms-swift + Ulysses SP.
 # Usage: GPUS=6,7 bash scripts/train_swift.sh ext_acc
+# P64 4B-Base uses the dedicated 8-GPU Megatron launcher: scripts/run_p64_8gpu.sh
 # Extra CLI overrides: bash scripts/train_swift.sh ext_acc --learning_rate 1e-5
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -16,6 +17,10 @@ if [[ -f "$ROOT/.env" ]]; then
 fi
 COND="${1:-ext_acc}"
 shift || true
+if [[ "$COND" == "ext_p64" ]]; then
+  echo "ext_p64 uses Megatron TP+CP to avoid 256k logits OOM; run scripts/run_p64_8gpu.sh" >&2
+  exit 1
+fi
 case "$COND" in
   "B2"|"B4"|"B5w")
     echo "$COND is unsupported for the signed Swift release; use B1/B3/B5, or LLaMA-Factory v1 for weighted B5w" >&2
@@ -35,16 +40,41 @@ SWIFT_ROOT="${SWIFT_ROOT:-$ROOT/.vendor/ms-swift}"
 GPUS="${GPUS:-0}"
 HOLD="${HOLD_SH:-}"
 VALIDATED_SNAPSHOT=""
-if [[ "${SKIP_HOLD:-0}" != "1" && -z "$HOLD" && -x /workspace/wynckeliao/ops/gpu/hold.sh ]]; then
-  HOLD="/workspace/wynckeliao/ops/gpu/hold.sh"
+if [[ "${SKIP_HOLD:-0}" != "1" && -z "$HOLD" && -x ${QJIU_ROOT}/wynckeliao-env/ops/gpu/hold.sh ]]; then
+  HOLD="${QJIU_ROOT}/wynckeliao-env/ops/gpu/hold.sh"
 fi
 
 if [[ ! -f "$CFG" ]]; then
   echo "missing $CFG" >&2
   exit 1
 fi
-if [[ ! -x "$SWIFT_ROOT/.venv/bin/swift" && ! -x "$SWIFT_ROOT/.venv/bin/python" ]]; then
+SWIFT_PY="$SWIFT_ROOT/.venv/bin/python"
+if [[ ! -x "$SWIFT_PY" ]]; then
   echo "ms-swift not installed. Run: INSTALL_SWIFT=1 bash scripts/setup_swift.sh" >&2
+  exit 1
+fi
+
+validate_swift_venv() {
+  "$SWIFT_PY" - "$SWIFT_ROOT" <<'PY'
+import pathlib
+import sys
+
+import swift
+
+root = pathlib.Path(sys.argv[1]).resolve()
+executable = pathlib.Path(sys.executable)
+expected_bin = root / ".venv" / "bin"
+swift_file = pathlib.Path(swift.__file__).resolve()
+if executable.parent != expected_bin:
+    raise SystemExit(
+        f"ms-swift venv is not relocatable: sys.executable={executable}, expected under {expected_bin}"
+    )
+if not swift_file.is_relative_to(root / "swift"):
+    raise SystemExit(f"wrong swift import: {swift_file}, expected source under {root / 'swift'}")
+PY
+}
+if ! validate_swift_venv; then
+  echo "Rebuild this machine's venv: INSTALL_SWIFT=1 FLASH_ATTN=1 SKIP_GDN_EXTRAS=0 bash scripts/setup_swift.sh" >&2
   exit 1
 fi
 
@@ -130,9 +160,15 @@ export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 
 ALIGN_128K=0
 case "$COND" in
-  ext_acc|ext_longtrace|ext_longmit)
+  ext_acc|ext_longtrace|ext_longmit|ext_p64)
     ALIGN_128K=1
-    export WANDB_RUN_GROUP="${WANDB_RUN_GROUP:-${WANDB_RUN_GROUP_128K:-longworld-128k-sft-8gpu}}"
+    if [[ "$COND" == "ext_p64" ]]; then
+      export WANDB_RUN_GROUP="${WANDB_RUN_GROUP_P64:-longworld-p64-sft-4gpu-base}"
+      # recipe.env defaults related-work cutoff to 133120; P64 keeps native 256k.
+      MAX_LENGTH_128K="${MAX_LENGTH_P64:-262144}"
+    else
+      export WANDB_RUN_GROUP="${WANDB_RUN_GROUP:-${WANDB_RUN_GROUP_128K:-longworld-128k-sft-8gpu}}"
+    fi
     ;;
   B*)
     export WANDB_RUN_GROUP="${WANDB_RUN_GROUP:-longworld-causaltwin}"
@@ -140,11 +176,7 @@ case "$COND" in
 esac
 
 pick_py() {
-  if [[ -x "$SWIFT_ROOT/.venv/bin/python" ]]; then
-    echo "$SWIFT_ROOT/.venv/bin/python"
-  else
-    echo "python"
-  fi
+  echo "$SWIFT_PY"
 }
 
 export_venv_torch_lib() {
@@ -236,6 +268,10 @@ if [[ "$ALIGN_128K" == "1" && "$SP" -lt 2 ]]; then
   echo "128k Qwen3.5 SFT needs sequence_parallel_size>=2 (got $SP)" >&2
   exit 1
 fi
+if [[ "$ALIGN_128K" == "1" && "$SP" -gt 4 ]]; then
+  echo "Qwen3.5-4B linear attention supports pure Ulysses SP up to 4 (got $SP); derived Ring attention is unsupported" >&2
+  exit 1
+fi
 if [[ "$ALIGN_128K" == "1" && "$NPROC_PER_NODE" -lt "$SP" ]]; then
   echo "128k SP=$SP needs at least $SP GPUs (GPUS=$GPUS)" >&2
   exit 1
@@ -244,7 +280,12 @@ if [[ "$ALIGN_128K" == "1" ]]; then
   require_qwen35_fla
 fi
 DP=$((NPROC_PER_NODE / SP))
-ACCUM=$((GBS / (DP * MICRO)))
+BATCH_UNIT=$((DP * MICRO))
+if (( GBS % BATCH_UNIT != 0 )); then
+  echo "GBS=$GBS is not divisible by dp=$DP * micro=$MICRO" >&2
+  exit 1
+fi
+ACCUM=$((GBS / BATCH_UNIT))
 if [[ "$ACCUM" -lt 1 ]]; then
   echo "GBS=$GBS is smaller than dp=$DP * micro=$MICRO" >&2
   exit 1
@@ -259,6 +300,11 @@ if [[ -z "$ATTN" ]]; then
 fi
 if [[ "$SP" -gt 1 && "$ATTN" == "flash_attn" ]]; then
   require_flash_attn_2
+fi
+if [[ " ${REPORT_TO:-wandb} " == *" swanlab "* ]] && ! "$SWIFT_PY" -c 'import swanlab' >/dev/null 2>&1; then
+  echo "SwanLab reporting needs swanlab in the ms-swift venv." >&2
+  echo "Install: INSTALL_SWIFT=1 FLASH_ATTN=1 SKIP_GDN_EXTRAS=0 bash scripts/setup_swift.sh" >&2
+  exit 1
 fi
 
 EXTRA=(
@@ -303,6 +349,9 @@ if [[ "$ALIGN_128K" == "1" ]]; then
     "--dataloader_prefetch_factor" "2"
   )
 fi
+if [[ -n "${RUN_NAME:-}" ]]; then
+  EXTRA+=("--run_name" "$RUN_NAME")
+fi
 DS="${DEEPSPEED:-}"
 if [[ -z "$DS" ]]; then
   if [[ "$SP" -gt 1 ]]; then
@@ -322,14 +371,10 @@ if [[ -n "$VALIDATED_SNAPSHOT" ]]; then
   )
 fi
 
-if [[ -x "$SWIFT_ROOT/.venv/bin/swift" ]]; then
-  CLI=("$SWIFT_ROOT/.venv/bin/swift" sft "$CFG" "${EXTRA[@]}")
-else
-  CLI=(swift sft "$CFG" "${EXTRA[@]}")
-fi
+CLI=("$SWIFT_PY" -m swift.cli.main sft "$CFG" "${EXTRA[@]}")
 
 cd "$ROOT"
-echo "swift SFT $COND gpus=$CUDA_VISIBLE_DEVICES nproc=$NPROC_PER_NODE sp=$SP dp=$DP micro=$MICRO accum=$ACCUM true_gbs=$((MICRO * ACCUM * DP)) attn=$ATTN ds=$DS celoss=$CELOSS_PARALLEL_SIZE fla=on wandb=$WANDB_ENTITY/$WANDB_PROJECT group=${WANDB_RUN_GROUP:-none} watch=${WANDB_WATCH:-false}"
+echo "swift SFT $COND gpus=$CUDA_VISIBLE_DEVICES nproc=$NPROC_PER_NODE sp=$SP dp=$DP micro=$MICRO accum=$ACCUM true_gbs=$((MICRO * ACCUM * DP)) attn=$ATTN ds=$DS celoss=$CELOSS_PARALLEL_SIZE fla=on report_to=${REPORT_TO:-wandb} run=${RUN_NAME:-config-default}"
 if [[ -n "$HOLD" && -x "$HOLD" ]]; then
   bash "$HOLD" wrap "$GPUS" -- env \
     NPROC_PER_NODE="$NPROC_PER_NODE" \

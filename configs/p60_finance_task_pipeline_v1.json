@@ -1,14 +1,14 @@
 {
   "schema_version": "longworld.p57-task-pipeline.v1",
-  "python": "/workspace/wynckeliao/longworld-worlds/.venv/bin/python",
-  "hf_home": "/workspace/wynckeliao/.cache/huggingface",
+  "python": "${QJIU_ROOT}/.venv/bin/python",
+  "hf_home": "${QJIU_ROOT}/.hf",
   "minilm_model_id": "sentence-transformers/all-MiniLM-L6-v2",
   "minilm_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
   "ledger": "reports/p60_finance_pipeline/ledger.jsonl",
   "jobs": [
     {
       "job_id": "finance-amd-inline-cash-components-p60-v1",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/amd/local_probe_trust.json",
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/amd/local_probe_trust.json",
       "generate_script": "reports/p60_finance_amd_generate.py",
       "generate_config": "configs/p60_finance_amd_inline_cash_components_v1.json",
       "parents_dir": "reports/p60_finance_amd_inline_cash_components_v1/parents",

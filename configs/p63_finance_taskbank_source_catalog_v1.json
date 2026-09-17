@@ -10,7 +10,7 @@
       "source_schema": "longworld.issuer-ir-filing-manifest.v1",
       "split_group_id": "0001018724",
       "split": "train",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/amazon/local_probe_trust.json",
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/amazon/local_probe_trust.json",
       "source_trust_key_id_matches": true
     },
     {
@@ -22,7 +22,7 @@
       "source_schema": "longworld.issuer-ir-filing-manifest.v1",
       "split_group_id": "0001326801",
       "split": "train",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/meta/local_probe_trust.json",
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/meta/local_probe_trust.json",
       "source_trust_key_id_matches": true
     },
     {
@@ -34,7 +34,7 @@
       "source_schema": "longworld.issuer-ir-filing-manifest.v1",
       "split_group_id": "0000723125",
       "split": "train",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/micron/local_probe_trust.json",
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/micron/local_probe_trust.json",
       "source_trust_key_id_matches": true
     },
     {
@@ -46,7 +46,7 @@
       "source_schema": "longworld.issuer-ir-filing-manifest.v1",
       "split_group_id": "0001652044",
       "split": "train",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/alphabet/local_probe_trust.json",
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/alphabet/local_probe_trust.json",
       "source_trust_key_id_matches": true
     },
     {
@@ -58,7 +58,7 @@
       "source_schema": "longworld.issuer-ir-filing-manifest.v1",
       "split_group_id": "0001045810",
       "split": "train",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/nvidia/local_probe_trust.json",
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/nvidia/local_probe_trust.json",
       "source_trust_key_id_matches": true
     },
     {
@@ -70,7 +70,7 @@
       "source_schema": "longworld.issuer-inline-xbrl-manifest.v1",
       "split_group_id": "0000002488",
       "split": "eval",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/amd/local_probe_trust.json",
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/amd/local_probe_trust.json",
       "source_trust_key_id_matches": true
     }
   ],
