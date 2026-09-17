@@ -14,7 +14,7 @@ the GPU runs must be launched from a GPU node.
 | Item | Status |
 | --- | --- |
 | Network | **Works here.** pypi 200, huggingface.co 200. `uv` pulled 29 GB of wheels. |
-| vLLM 0.18.0 | Installed in `/volume/pt-dev/qjiu/lm-evaluation-harness/.venv` (torch 2.10.0+cu128). Registered `Qwen3_5ForConditionalGeneration` confirmed. |
+| vLLM 0.18.0 | In `/volume/pt-dev/qjiu/lm-eval-upstream-v0.4.12/.venv` (torch 2.10.0+cu128), **with lm-eval 0.4.12**. Registered `Qwen3_5ForConditionalGeneration` confirmed. |
 | System vLLM 0.6.0 | In `/usr/local/lib/python3.10/dist-packages`, **not used**, and broken (`transformers.image_transforms` import error). |
 | Datasets | IFEval 541, GPQA diamond 198, MMLU-Pro 12032 — all load offline from `$HF_HOME`. |
 | GPQA revision | `633f5ee89ab8ad4522a9f850766b73f62147ffdd` = **exact match** to the 0912 record. |
@@ -57,30 +57,51 @@ the 0912 record's *version* is plausible and its *hash* is fabricated.
 - `ifeval` `max_gen_toks` was raised 1280 -> 8192 locally (commits `0377871`,
   `8020f549`) with `version: 4.0` unchanged. Upstream has been 1280 at every
   tag through 0.4.13. This **is** scoring-relevant and invisible to version
-  checks. The corrected launcher pins it back to 1280 via `--gen_kwargs`.
+  checks.
 - `mmlu_pro` subtasks were rewritten locally to a custom `process_results` +
   `acc` metric in place of upstream's `filter_list`/`exact_match` extraction.
-  That changes scoring.
+  That changes scoring, and the two report under different metric names.
 
-Both mean numbers from this fork are *not* upstream-lm-eval numbers, whatever
+Both mean numbers from the fork are *not* upstream-lm-eval numbers, whatever
 the version string says.
 
-## Open decision: which harness
+## Resolution: the harness is upstream v0.4.12 — decided by evidence
 
-The 0912 record's harness is unidentifiable — the version and hash disagree,
-and no branch of the internal fork is at 0.4.12. Three options:
+The 0912 record's "0.4.12 (git eb2b482)" is half right: the version exists, the
+hash does not. But three independent artifacts from that run identify the
+harness conclusively.
 
-| Option | Comparable to 0912? | Comparable to published lm-eval? |
-| --- | --- | --- |
-| `internal-v2026.0914` (current) | Best available proxy — same fork family, and its `mmlu_pro` is 3.1 vs 0912's 3.1 | No — fork-local ifeval 8192 and mmlu_pro rewrite |
-| Upstream `v0.4.12` | No — different fork, different ifeval/mmlu_pro code | Yes for ifeval/mmlu_pro/gpqa |
-| Upstream `v0.4.13` | No | Yes |
+| Evidence from the 0912 artifacts | Fork says | Upstream v0.4.12 says | 0912 recorded |
+| --- | --- | --- | --- |
+| mmlu_pro metric key | `acc` | `exact_match` + `custom-extract` filter | **`exact_match,custom-extract`** |
+| gpqa `cot_zeroshot` version | 1.0 | 2.2 | **2.2** |
+| ifeval `max_gen_toks` | 8192 | 1280 | **1280** (max generation = 1280 exactly, 52/541 at the cap) |
 
-**Recommendation:** if the LongWorld checkpoint must be comparable to the
-ACC/LongTrace numbers, stay on the internal fork and label the results as
-fork-local. If it must be comparable to published long-context numbers, move to
-upstream `v0.4.12` and re-baseline all checkpoints in one wave. Do not report a
-number from one and compare it to the other.
+Upstream `v0.4.12` (`6d642546f`, 2026-05-11) reproduces all three. The fork
+reproduces none. So the 0912 run was upstream v0.4.12 and the fork was the
+wrong tree.
+
+Consequences, both now fixed:
+
+- The fabricated gpqa `1.0 -> 2.2` bump is reverted; the pinned worktree is
+  clean.
+- The ifeval 1280 pin is removed — upstream already ships 1280, so the pin was
+  unnecessary. (It was also the right value; had it been applied to the fork it
+  would have corrected a real divergence.)
+
+Both launchers now point at `/volume/pt-dev/qjiu/lm-eval-upstream-v0.4.12/.venv`
+(vllm 0.18.0, torch 2.10.0+cu128, transformers 4.57.6, lm-eval 0.4.12). The
+MRCR/GraphWalks client is stdlib-only and does not use lm-eval, but points at
+the same venv so "which eval environment" has one answer.
+
+**This makes the ACC/LongTrace comparison exact rather than approximate**, which
+matters because the LongWorld checkpoint's number only means something next to
+theirs. It also means these numbers are upstream-lm-eval numbers and are
+therefore comparable to published results — unlike anything from the fork.
+
+The internal fork is left in place, untouched and unpatched, in case its
+long-context task set is wanted later; it must not be used to produce numbers
+that get compared against the 0912 wave.
 
 ## Checkpoints (weights on this box)
 

@@ -17,7 +17,10 @@ cd "$ROOT"
 
 RUN_ID="${RUN_ID:-mrcr_graphwalks_20260917}"
 RUN_ROOT="${RUN_ROOT:-$ROOT/data/evals/$RUN_ID}"
-VENV="${VENV:-/volume/pt-dev/qjiu/lm-evaluation-harness/.venv}"
+# One eval venv for both halves. This half does not use lm-eval at all -- the
+# client is stdlib-only and only needs vLLM to serve -- but pointing both
+# launchers at the same tree keeps "which eval environment" a single answer.
+VENV="${VENV:-/volume/pt-dev/qjiu/lm-eval-upstream-v0.4.12/.venv}"
 HF_HOME="${HF_HOME:-/volume/pt-dev/qjiu/.hf}"
 ORIG_MODEL="${ORIG_MODEL:-$ROOT/data/models/Qwen3.5-4B}"
 DATA_ROOT="${DATA_ROOT:-$RUN_ROOT}"
