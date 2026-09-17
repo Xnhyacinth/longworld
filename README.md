@@ -17,8 +17,8 @@ real-schema anchors
 
 Scale unit is **dependency topology**, not QA count.
 
-Current publication and qualification status is tracked in
-[`docs/CURRENT_RELEASE.md`](docs/CURRENT_RELEASE.md). Private Hugging Face index:
+Current publication and qualification status is tracked in `docs/CURRENT_RELEASE.md`
+on the `worlds` branch. Private Hugging Face index:
 [`Xnhyacinth/longworld`](https://huggingface.co/collections/Xnhyacinth/longworld-6a9eb196a0c8cd67190ea7fd)
 (private collection). Repos stay separate; do not merge blobs.
 
@@ -40,7 +40,8 @@ Current publication and qualification status is tracked in
 
 Historical snapshot (p1.2, 2026-08-19): causal engine kept; **length is no
 longer a fill target**. p1.1 `data/p0` is frozen as a CausalTwin diagnostic dump
-(`reports/causalcore_v0/FREEZE.md`). New generation uses `configs/causalcore.yaml`.
+(see the `worlds` branch, `reports/causalcore_v0/FREEZE.md`). New generation uses
+`configs/causalcore.yaml`.
 
 The 6GB jsonl is **not** checked in (`data/` is gitignored).
 
@@ -217,7 +218,7 @@ permission to ingest an entire private organization.
 - P4 local-48 已完成完整的 72 candidates→dense ranking→strict audit→
   world-atomic selection→promotion→quality gate→SFT export：最终 48 worlds、
   1,784 train-ready rows，三域精确 16/16/16；报告见
-  `reports/p4_multidomain_local48_v1.md`。这是扩大后的 local engineering
+  `reports/p4_multidomain_local48_v1.md`（见 `worlds` 分支）。这是扩大后的 local engineering
   release，仍不是 production approval。
 - local-48 长度分布为 16K×510、32K×808、64K×466，固定 Qwen tokenizer
   验证的 exact-64K 按域为 Company 160、ResearchLab 300、CodeForge 6；
@@ -236,7 +237,7 @@ permission to ingest an entire private organization.
 - v5 长度分布为 16K×134、32K×190、64K×126；固定 Qwen tokenizer 验证的
   exact-64K 按域为 Company 46、ResearchLab 74、CodeForge 6。0 exact
   duplicate、0 prompt-answer conflict、0 boilerplate/pulse。报告见
-  `reports/p4_multidomain_probe_v5.md`。
+  `reports/p4_multidomain_probe_v5.md`（见 `worlds` 分支）。
 - 450 rows 中只有 28 rows 是 `real_workflow_hybrid_executable`；其余 422
   rows 是明确标注的合成可执行/schema world。80 个真实 GitHub episode、
   2,232 条原始记录是 source pool，不等同于 80 条 SFT 样本。
@@ -274,7 +275,8 @@ Public search/code **anchors** are frozen distractor language. They never hold t
 
 ## Data distribution (p1.1 freeze, `data/p0` — diagnostic only)
 
-Generated 2026-08-18. Reports: [`reports/quality_report.json`](reports/quality_report.json), [`reports/stats.json`](reports/stats.json).
+Generated 2026-08-18. Reports (`quality_report.json`, `stats.json`) live on the
+`worlds` branch.
 
 |                      |                                         |
 | -------------------- | --------------------------------------: |
@@ -368,10 +370,19 @@ optional second, manifest-bound conversion for B1/B3/B5.
 
 ```bash
 source scripts/uv_project_env.sh
-uv sync --extra train
+uv sync --locked --extra synthesis --extra train
 bash scripts/setup_swift.sh
+# Project data/synthesis use .venv; Qwen3.5 SFT uses the separate
+# .vendor/ms-swift/.venv, with pinned Torch/FA2 and matching FLA/fla-core.
 INSTALL_SWIFT=1 bash scripts/setup_swift.sh
 
+# Current private, pinned assets: project data/checkpoints stay under data/;
+# shared Qwen and MiniLM snapshots stay under /volume/pt-dev/qjiu/.hf.
+uv run --extra synthesis --extra train python scripts/download_hf_assets.py
+uv run --extra train python scripts/materialize_hf_baselines.py
+
+# Optional public-source export (use this only when intentionally replacing
+# the canonical private parquet baseline inputs).
 bash scripts/download_external.sh
 uv run --extra train python scripts/export_external_llamafactory.py
 uv run --extra train python scripts/export_swift.py \
@@ -382,8 +393,24 @@ GPUS=0,1,2,3,4,5,6,7 bash scripts/train_baselines_128k.sh
 # 4B-Base ablation on 4 GPUs (still GBS 16: SP=4 DP=1 accum=16):
 # GPUS=4,5,6,7 CONDS="ext_acc ext_longtrace" MODEL=data/models/Qwen3.5-4B-Base \
 #   bash scripts/train_baselines_128k.sh
-# P64 LongWorld primary on the same 4B-Base recipe (eval kept; cutoff 256k):
-# SKIP_HOLD=1 GPUS=4,5,6,7 bash scripts/train_swift.sh ext_p64
+# P64 LongWorld primary keeps the native 256k cutoff. Install the Megatron
+# additions once; Transformer Engine is built against the pinned vendor torch.
+INSTALL_SWIFT=1 INSTALL_MEGATRON=1 bash scripts/setup_swift.sh
+# The 8-GPU topology is TP=4, CP=2, PP=1, DP=1, micro=1, accumulation=16,
+# effective GBS=16. TP shards the model/vocabulary and CP shards the sequence,
+# so no rank materializes the complete 256k vocabulary logits. The launcher has
+# no GPU hold/watchdog and writes logs under logs/ while preserving failures
+# through tee. SwanLab defaults to cloud in workspace qjiu; provide its API key
+# as SWANLAB_API_KEY in the submitted job environment (the launcher never
+# prints it and fails before GPU startup when it is absent).
+SWANLAB_WORKSPACE=qjiu SWANLAB_PROJ_NAME=longworld \
+  PREFLIGHT=1 bash scripts/run_p64_8gpu.sh
+# The smoke extracts the longest indexed training row (currently 261,954
+# tokens) and runs one complete forward/backward step on it.
+SWANLAB_WORKSPACE=qjiu SWANLAB_PROJ_NAME=longworld \
+  SMOKE=1 bash scripts/run_p64_8gpu.sh
+SWANLAB_WORKSPACE=qjiu SWANLAB_PROJ_NAME=longworld \
+  bash scripts/run_p64_8gpu.sh
 
 # cutoff 256k is the native cap; signed B5 samples are 16k/32k/64k (packing off).
 LONGWORLD_RELEASE_PROFILE=p3-probe-12-v1 \
@@ -417,8 +444,13 @@ no general-capability regression, and no closed-book increase.
 ```text
 longworld/          engine, verifier, packer, domains
   domains/company | researchlab | codeforge
-configs/            causalcore / p0 / smoke / LlamaFactory
-scripts/            generate, quality_gate, export, train
+configs/            generation, taskbank, pipeline, and training configs
+scripts/            generate, quality_gate, export, train, evaluate
 tests/
-reports/            frozen quality + stats snapshots
 ```
+
+This branch carries the framework, its adapters, the configs, and the tests for
+core behaviour. Experiment content — generated candidates, per-phase reports,
+source inventories, planning notes, and the report-side pipeline scripts — lives
+on the `worlds` branch of the same repository, which is a superset. Several
+README references below point there.
