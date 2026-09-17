@@ -4,6 +4,8 @@
 # Extra CLI overrides: bash scripts/train_llamafactory.sh ext_acc flash_attn=fa2
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$ROOT/scripts/uv_project_env.sh"
 if [[ -f "$ROOT/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
@@ -50,8 +52,8 @@ LF_ROOT="${LLAMA_FACTORY_ROOT:-$ROOT/.vendor/LLaMA-Factory}"
 GPUS="${GPUS:-0}"
 HOLD="${HOLD_SH:-}"
 VALIDATED_SNAPSHOT=""
-if [[ "${SKIP_HOLD:-0}" != "1" && -z "$HOLD" && -x /workspace/wynckeliao/ops/gpu/hold.sh ]]; then
-  HOLD="/workspace/wynckeliao/ops/gpu/hold.sh"
+if [[ "${SKIP_HOLD:-0}" != "1" && -z "$HOLD" && -x ${QJIU_ROOT}/wynckeliao-env/ops/gpu/hold.sh ]]; then
+  HOLD="${QJIU_ROOT}/wynckeliao-env/ops/gpu/hold.sh"
 fi
 
 if [[ ! -f "$CFG" ]]; then
@@ -249,6 +251,115 @@ print("fa3" if want == "fa3" and fa3_ok() else ("fa2" if fa2_ok() else "sdpa"))
 ATTN="${FLASH_ATTN_OVERRIDE:-$(detect_flash_attn)}"
 GBS="${GBS:-0}"
 EXTRA=("$@")
+EXPLICIT_TOKENIZED_PATH=0
+for arg in "$@"; do
+  case "$arg" in
+    tokenized_path=*|--tokenized_path|--tokenized_path=*) EXPLICIT_TOKENIZED_PATH=1 ;;
+  esac
+done
+# The private parquet materializer provides held-out files explicitly. Keep
+# public-source exports on their historical val_size path when that manifest
+# is absent.
+BASELINE_MATERIALIZATION="$ROOT/data/external/llamafactory/materialization_manifest.json"
+BASELINE_FILES=()
+case "$COND" in
+  ext_acc)
+    BASELINE_FILES=(acc_search acc_swe acc_sql acc_search_val acc_swe_val acc_sql_val)
+    ;;
+  ext_longtrace)
+    BASELINE_FILES=(longtracerl longtracerl_val)
+    ;;
+  ext_longmit)
+    BASELINE_FILES=(longmit longmit_val)
+    ;;
+esac
+baseline_materialization_valid() {
+  local manifest="$1"
+  shift
+  "$(pick_py)" - "$manifest" "$ROOT/data/external/llamafactory" "$@" <<'PY'
+import hashlib
+import json
+import pathlib
+import sys
+
+manifest_path = pathlib.Path(sys.argv[1])
+dataset_dir = pathlib.Path(sys.argv[2])
+names = sys.argv[3:]
+try:
+    manifest = json.loads(manifest_path.read_text())
+    if manifest.get("schema_version") != "longworld.hf-baseline-materialization.v1":
+        raise ValueError("unexpected schema")
+    files = manifest["outputs"]["llamafactory"]["files"]
+    fingerprint = hashlib.sha256()
+    for name in names:
+        path = dataset_dir / f"{name}.jsonl"
+        expected = files[name]
+        digest = hashlib.sha256()
+        rows = 0
+        size = 0
+        with path.open("rb") as handle:
+            for line in handle:
+                digest.update(line)
+                size += len(line)
+                rows += 1
+        if (digest.hexdigest(), size, rows) != (
+            expected["sha256"],
+            expected["bytes"],
+            expected["rows"],
+        ):
+            raise ValueError(f"content mismatch: {name}")
+        fingerprint.update(f"{name}:{expected['sha256']}\n".encode())
+except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+    print(f"private baseline materialization is invalid: {error}", file=sys.stderr)
+    raise SystemExit(1)
+print(fingerprint.hexdigest()[:16])
+PY
+}
+if (( ${#BASELINE_FILES[@]} > 0 )) && [[ -f "$BASELINE_MATERIALIZATION" ]]; then
+  if BASELINE_FINGERPRINT="$(baseline_materialization_valid "$BASELINE_MATERIALIZATION" "${BASELINE_FILES[@]}")"; then
+    if (( EXPLICIT_TOKENIZED_PATH == 0 )); then
+      CACHE_FINGERPRINT="$("$(pick_py)" - "$CFG" "$BASELINE_FINGERPRINT" "$LF_ROOT" "$@" <<'PY'
+import hashlib
+import json
+import pathlib
+import subprocess
+import sys
+
+config_path = pathlib.Path(sys.argv[1])
+baseline_fingerprint = sys.argv[2]
+llamafactory_root = pathlib.Path(sys.argv[3])
+cli_overrides = sys.argv[4:]
+revision = subprocess.run(
+    ["git", "-C", str(llamafactory_root), "rev-parse", "HEAD"],
+    check=False,
+    capture_output=True,
+    text=True,
+).stdout.strip()
+digest = hashlib.sha256()
+digest.update(config_path.read_bytes())
+digest.update(baseline_fingerprint.encode())
+digest.update(json.dumps(cli_overrides, separators=(",", ":")).encode())
+digest.update(revision.encode())
+print(digest.hexdigest()[:16])
+PY
+)"
+      EXTRA+=("tokenized_path=$ROOT/data/sft/tokenized/private_hf/${COND}-${CACHE_FINGERPRINT}")
+    fi
+    case "$COND" in
+      ext_acc)
+        EXTRA+=("eval_dataset=acc_search_val,acc_swe_val,acc_sql_val" "val_size=0")
+        ;;
+      ext_longtrace)
+        EXTRA+=("eval_dataset=longtracerl_val" "val_size=0")
+        ;;
+      ext_longmit)
+        EXTRA+=("eval_dataset=longmit_val" "val_size=0")
+        ;;
+    esac
+  else
+    echo "ignoring stale private baseline manifest; using recipe val_size" >&2
+  fi
+fi
 if [[ -n "$VALIDATED_SNAPSHOT" ]]; then
   if [[ "$COND" == "B5w" ]]; then
     EXTRA+=("train_dataset=$VALIDATED_SNAPSHOT/B5w.datasets.yaml")

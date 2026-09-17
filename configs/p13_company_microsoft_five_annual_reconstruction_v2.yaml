@@ -29,7 +29,7 @@ min_semantic_tokens: 800
 surface_min: 0.82
 keep_one_position: true
 
-source_workflow_bundle: /workspace/wynckeliao/longworld/data/source_inventory/p13_company_microsoft_five_annual_v2/source_workflow_bundle.p13.five-annual.v2.signed.json
+source_workflow_bundle: data/source_inventory/p13_company_microsoft_five_annual_v2/source_workflow_bundle.p13.five-annual.v2.signed.json
 source_workflow_seeds: [13011, 13012, 13013, 13014, 13015]
 source_workflow_query_types:
   - sec_financial_reconstruction

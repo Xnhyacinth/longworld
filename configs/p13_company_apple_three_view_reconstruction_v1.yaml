@@ -29,7 +29,7 @@ min_semantic_tokens: 800
 surface_min: 0.82
 keep_one_position: true
 
-source_workflow_bundle: /workspace/wynckeliao/longworld/data/source_inventory/sec_p12_apple_v1/sec_source_workflow_bundle_p12.v2.signed.json
+source_workflow_bundle: data/source_inventory/sec_p12_apple_v1/sec_source_workflow_bundle_p12.v2.signed.json
 source_workflow_seeds: [1201]
 source_workflow_query_types:
   - sec_financial_reconstruction

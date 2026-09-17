@@ -1,7 +1,7 @@
 {
   "schema_version": "longworld.finance-history-materialization.v1",
   "world_id": "finance_microsoft_asset_trajectory_2022_2025_128k_v1",
-  "signed_issuer_manifest": "/workspace/wynckeliao/longworld/data/source_inventory/p13_company_microsoft_four_annual_v4/sec_filing_manifest.p14.finance.v1.signed.json",
+  "signed_issuer_manifest": "data/source_inventory/p13_company_microsoft_four_annual_v4/sec_filing_manifest.p14.finance.v1.signed.json",
   "source_manifest_kind": "issuer_sec",
   "issuer": {
     "name": "Microsoft Corporation",

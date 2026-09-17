@@ -377,7 +377,7 @@ bash scripts/setup_swift.sh
 INSTALL_SWIFT=1 bash scripts/setup_swift.sh
 
 # Current private, pinned assets: project data/checkpoints stay under data/;
-# shared Qwen and MiniLM snapshots stay under /volume/pt-dev/qjiu/.hf.
+# shared Qwen and MiniLM snapshots stay under $QJIU_ROOT/.hf.
 uv run --extra synthesis --extra train python scripts/download_hf_assets.py
 uv run --extra train python scripts/materialize_hf_baselines.py
 
@@ -431,7 +431,7 @@ uv run --extra train python scripts/eval_causal.py --data data/p3_promoted \
 This single-GPU path emits no signed training manifest and is never a release
 artifact. Use it only for local diagnostics.
 
-`hold.sh` wrap is used only when `/workspace/wynckeliao/ops/gpu/hold.sh` exists.
+`hold.sh` wrap is used only when `${QJIU_ROOT}/wynckeliao-env/ops/gpu/hold.sh` exists.
 `attn_impl` prefers FA3, then FA2 (`flash_attn`), else SDPA. Full FT at a 256k
 _cap_ still needs H100/H200-class cards when a long sample appears.
 

@@ -13,7 +13,7 @@
 #   do not put max_gen_toks in --gen_kwargs (that would override YAML)
 #
 # Usage:
-#   GPU_HOLD_ALLOW_ROOT=1 bash /workspace/wynckeliao/ops/gpu/hold.sh wrap 4,5,6,7 \
+#   GPU_HOLD_ALLOW_ROOT=1 bash ${QJIU_ROOT}/wynckeliao-env/ops/gpu/hold.sh wrap 4,5,6,7 \
 #     -- bash scripts/eval_vllm_lm_eval_sharded.sh
 set -uo pipefail
 
@@ -23,9 +23,9 @@ cd "$ROOT"
 RUN_ID="${RUN_ID:-downstream_same_protocol_20260901}"
 RUN_ROOT="${RUN_ROOT:-$ROOT/data/evals/$RUN_ID}"
 VENV="${VENV:-$ROOT/.vendor/lm-evaluation-harness/.venv}"
-HF_HOME="${HF_HOME:-/workspace/wynckeliao/.hf}"
+HF_HOME="${HF_HOME:-${QJIU_ROOT}/.hf}"
 NLTK_DATA="${NLTK_DATA:-$ROOT/data/evals/b0_qwen35_4b_a7b0d22_20260831/cache/nltk}"
-HOLD_SH="${HOLD_SH:-/workspace/wynckeliao/ops/gpu/hold.sh}"
+HOLD_SH="${HOLD_SH:-${QJIU_ROOT}/wynckeliao-env/ops/gpu/hold.sh}"
 
 GPUS=(${GPUS:-4 5 6 7})
 BASE_PORT="${BASE_PORT:-18214}"
@@ -138,7 +138,7 @@ run_shard() (
   echo "[$model_id/$shard] vLLM GPU=$gpu port=$port ctx=$MAX_MODEL_LEN conc=$concurrency"
   env \
     CUDA_VISIBLE_DEVICES="$gpu" \
-    HOME=/workspace/wynckeliao \
+    HOME=${QJIU_ROOT} \
     HF_HOME="$HF_HOME" \
     HF_HUB_DISABLE_TELEMETRY=1 \
     DO_NOT_TRACK=1 \
@@ -183,7 +183,7 @@ run_shard() (
   timeout --signal=INT --kill-after=60s "$WALL_TIMEOUT" \
     env \
       CUDA_VISIBLE_DEVICES='' \
-      HOME=/workspace/wynckeliao \
+      HOME=${QJIU_ROOT} \
       HF_HOME="$HF_HOME" \
       NLTK_DATA="$NLTK_DATA" \
       HF_HUB_DISABLE_TELEMETRY=1 \

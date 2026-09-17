@@ -29,7 +29,7 @@ min_semantic_tokens: 800
 surface_min: 0.82
 keep_one_position: true
 
-source_workflow_bundle: /workspace/wynckeliao/longworld/data/source_inventory/p13_company_microsoft_four_annual_v4/source_workflow_bundle.p13.four-annual.v4.signed.json
+source_workflow_bundle: data/source_inventory/p13_company_microsoft_four_annual_v4/source_workflow_bundle.p13.four-annual.v4.signed.json
 source_workflow_seeds: [13021]
 source_workflow_query_types:
   - sec_annual_revenue_change

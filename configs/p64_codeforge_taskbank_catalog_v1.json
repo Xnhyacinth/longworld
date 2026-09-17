@@ -1,6 +1,6 @@
 {
   "schema_version": "longworld.codeforge-taskbank-catalog.v1",
-  "trust_file": "/workspace/wynckeliao/.longworld-agent-probe/p12-probe-12-v2/p17-codeforge-trust/local_probe_trust.json",
+  "trust_file": "${QJIU_ROOT}/.longworld-agent-probe/p12-probe-12-v2/p17-codeforge-trust/local_probe_trust.json",
   "approved_policy_sha256": [
     "dd39cfef6803b01b08cc476acef805265a7f10d62378889e1d56cb8603cb4c60",
     "329d2815efd4a0cf42fd800a3c45901e822ecc4865326eb2eaf5ac5b6b38c882"

@@ -55,7 +55,7 @@
   "sources": [
     {
       "repository": "oxc-project/oxc",
-      "checkout": "/workspace/wynckeliao/longworld/data/source_cache/git_history/oxc",
+      "checkout": "data/source_cache/git_history/oxc",
       "skip_commits": 8000,
       "max_commits": 250
     }

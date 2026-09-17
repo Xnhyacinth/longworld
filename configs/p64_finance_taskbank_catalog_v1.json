@@ -7,7 +7,7 @@
       "config_sha256": "d12a2846f7ad26f4eabff1a9688513a3ac6d591699cde188559f4432deec76d4",
       "source_manifest": "data/source_inventory/p57_finance_amazon_ir_fy2021_2024_v1/issuer_ir_manifest.signed.json",
       "source_manifest_sha256": "8e48f6c0688ae3bcbd9b9e9eade195e8ba70e297f7bf806573e2d95c90645bb6",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/amazon/local_probe_trust.json"
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/amazon/local_probe_trust.json"
     },
     {
       "issuer": "meta",
@@ -15,7 +15,7 @@
       "config_sha256": "5bb660c2bde8eb61f67ab8b1749c3715bc2e70dd54ea825c13978c66a9d1aa46",
       "source_manifest": "data/source_inventory/p58_finance_meta_reconstruction_v1/issuer_ir_manifest.signed.json",
       "source_manifest_sha256": "7871f9310cc39bb94a465c7f960b538ebbf53ae752ecc1b439e641cebb4f2b5d",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/meta/local_probe_trust.json"
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/meta/local_probe_trust.json"
     },
     {
       "issuer": "micron",
@@ -23,7 +23,7 @@
       "config_sha256": "78dc57f5056f3d3b8c008a529844607b374ef805cc27cb6c7ccc99a0f640b7b2",
       "source_manifest": "data/source_inventory/p59_finance_micron_reconstruction_v1/issuer_ir_manifest.signed.json",
       "source_manifest_sha256": "d85ebdb650cb37a9b7e7d0fddc783cf167e4d1b7c5f38109b80236d843cd15cd",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/micron/local_probe_trust.json"
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/micron/local_probe_trust.json"
     },
     {
       "issuer": "alphabet",
@@ -31,7 +31,7 @@
       "config_sha256": "37b41f8d73bb8e9f9b7330befc9e5899a0c2d7b501a2a59f84584998c0e1418d",
       "source_manifest": "data/source_inventory/p59_finance_alphabet_reconstruction_v1/issuer_ir_manifest.signed.json",
       "source_manifest_sha256": "4028a54d58dca726657487ee1b4238e3213c3c0b59c5044cb2e1cc50faf31e3c",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/alphabet/local_probe_trust.json"
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/alphabet/local_probe_trust.json"
     },
     {
       "issuer": "nvidia",
@@ -39,7 +39,7 @@
       "config_sha256": "5bcca736d11447f2131f56d9974c0f469235b9c971eb647172f9b6a7811ca245",
       "source_manifest": "data/source_inventory/p59_finance_nvidia_reconstruction_v1/issuer_ir_manifest.signed.json",
       "source_manifest_sha256": "5bb796cc5d1d69fee06bf7ecdde7b86d165738c40f9f688a72aaf7cd0070b793",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/nvidia/local_probe_trust.json"
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/nvidia/local_probe_trust.json"
     },
     {
       "issuer": "amd",
@@ -47,7 +47,7 @@
       "config_sha256": "664ac3f5c92af21fcc47a18b4e9884c38745a37d4a477894c591132b4c97f67c",
       "source_manifest": "data/source_inventory/p60_finance_amd_inline_fy2021_2024_v1/issuer_inline_manifest.signed.json",
       "source_manifest_sha256": "4b8756fa1819883bbb706fb520516a64c17516cf1c44dbcfe018a5ebdfd67258",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/amd/local_probe_trust.json"
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/amd/local_probe_trust.json"
     },
     {
       "issuer": "intel",
@@ -55,7 +55,7 @@
       "config_sha256": "382a20c11211a0640d2cf6c341311735e08286c8d7119d7c0fc49d4c136ae983",
       "source_manifest": "data/finance_sources/p64_intel_generic_v1/source_manifest.json",
       "source_manifest_sha256": "10a717b252973dc50e5578c6964401f23c8b355a5a2dae7af83b2dff15cea2f9",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/intel-p64/local_probe_trust.json"
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/intel-p64/local_probe_trust.json"
     },
     {
       "issuer": "siriusxm",
@@ -63,7 +63,7 @@
       "config_sha256": "84e448f337573008fcfb2fa7cea069ee17bdc0b5bfce6d083b40421b811ce14a",
       "source_manifest": "data/finance_sources/p64_siriusxm_generic_v1/source_manifest.json",
       "source_manifest_sha256": "8685060409f294a173fa176b6031fbab21a39ad4cf01cfe6640731792fe2e8c2",
-      "trust_file": "/workspace/wynckeliao/.longworld-scaleout-20260906-private/siriusxm-p64/local_probe_trust.json"
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/siriusxm-p64/local_probe_trust.json"
     }
   ],
   "structure_holdout": "margin_extremes_cashflow_difference excluded from train",

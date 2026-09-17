@@ -97,7 +97,7 @@ directory wholly, tests included, resolves it.
 main still contains internal detail a public release would have to scrub — measured,
 not assumed:
 
-- **38 configs** reference `/workspace/wynckeliao` paths (35 of them live configs)
+- **38 configs** reference `${QJIU_ROOT}` paths (35 of them live configs)
 - **12 configs** reference private `.longworld-*` trust roots
 - **1 file** (`longworld/core/external_eval.py:23`) embeds a private org URL
 

@@ -10,8 +10,8 @@ EVAL_N="${EVAL_N:-12}"
 OUT="${OUT:-$ROOT/data/sft}"
 GPU="${GPU:-0}"
 HOLD="${HOLD_SH:-}"
-if [[ -z "$HOLD" && -x /workspace/wynckeliao/ops/gpu/hold.sh ]]; then
-  HOLD="/workspace/wynckeliao/ops/gpu/hold.sh"
+if [[ -z "$HOLD" && -x ${QJIU_ROOT}/wynckeliao-env/ops/gpu/hold.sh ]]; then
+  HOLD="${QJIU_ROOT}/wynckeliao-env/ops/gpu/hold.sh"
 fi
 UV=(uv run --extra train python)
 

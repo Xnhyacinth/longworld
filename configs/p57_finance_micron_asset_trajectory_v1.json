@@ -1,7 +1,7 @@
 {
   "schema_version": "longworld.finance-history-materialization.v1",
   "world_id": "finance_micron_asset_trajectory_fy2022_2025_v1",
-  "signed_issuer_manifest": "/workspace/wynckeliao/longworld/data/source_inventory/p57_finance_micron_ir_fy2022_2025_v1/issuer_ir_manifest.signed.json",
+  "signed_issuer_manifest": "data/source_inventory/p57_finance_micron_ir_fy2022_2025_v1/issuer_ir_manifest.signed.json",
   "answer_program_id": "finance.multi_filing_asset_trajectory.v1",
   "tokenizer": {
     "model_id": "Qwen/Qwen3.5-4B",

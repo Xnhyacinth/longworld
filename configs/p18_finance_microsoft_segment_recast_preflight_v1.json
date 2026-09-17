@@ -5,7 +5,7 @@
   "candidate_generation": false,
   "train_ready": false,
   "production_eligible": false,
-  "signed_manifest": "/workspace/wynckeliao/longworld/data/source_inventory/p13_company_microsoft_four_annual_v4/sec_filing_manifest.p14.finance.v1.signed.json",
+  "signed_manifest": "data/source_inventory/p13_company_microsoft_four_annual_v4/sec_filing_manifest.p14.finance.v1.signed.json",
   "signed_manifest_sha256": "82f61c8815e901fe9eaf9d7bd78380c2baa08495a338cccefb9c71c08f124aed",
   "authorization_record_id": "P13-MICROSOFT-GCS-FOUR-ANNUAL-20260901",
   "source_attestation_key_id": "probe-source-3a689228f9679b0522a18cadd07f1e97",

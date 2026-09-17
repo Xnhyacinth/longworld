@@ -13,8 +13,8 @@ unset LONGWORLD_PROMOTION_ATTESTATION_KEY LONGWORLD_PROMOTION_ATTESTATION_KEY_ID
 unset LONGWORLD_REPORT_ATTESTATION_KEY LONGWORLD_REPORT_ATTESTATION_KEY_ID
 unset LONGWORLD_PREDECESSOR_GATE_ATTESTATION_KEY LONGWORLD_PREDECESSOR_GATE_ATTESTATION_KEY_ID
 HOLD="${HOLD_SH:-}"
-if [[ -z "$HOLD" && -x /workspace/wynckeliao/ops/gpu/hold.sh ]]; then
-  HOLD="/workspace/wynckeliao/ops/gpu/hold.sh"
+if [[ -z "$HOLD" && -x ${QJIU_ROOT}/wynckeliao-env/ops/gpu/hold.sh ]]; then
+  HOLD="${QJIU_ROOT}/wynckeliao-env/ops/gpu/hold.sh"
 fi
 MARKER="${FOREIGN_GPU_MARKER:-}"
 

@@ -1,7 +1,7 @@
 {
   "schema_version": "longworld.macro-vintage-materialization.v1",
-  "workflow_manifest": "/workspace/wynckeliao/longworld/data/source_cache/macro/bea_gdp_gdi_vintage_20260831/workflow_manifest.json",
-  "raw_source": "/workspace/wynckeliao/longworld/data/source_cache/macro/bea_gdp_gdi_vintage_20260831/bea-gdp-gdi-vintage-history.xlsx",
+  "workflow_manifest": "data/source_cache/macro/bea_gdp_gdi_vintage_20260831/workflow_manifest.json",
+  "raw_source": "data/source_cache/macro/bea_gdp_gdi_vintage_20260831/bea-gdp-gdi-vintage-history.xlsx",
   "world_id": "bea-real-gdp-percent-change-2005q4-revision-history-v1",
   "target_series_id": "BEA_REAL_GDP_PERCENT_CHANGE",
   "target_period": "2005Q4",

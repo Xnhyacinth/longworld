@@ -8,7 +8,7 @@
 # Qwen3-30B-A3B-Thinking).
 #
 # Usage:
-#   GPU_HOLD_ALLOW_ROOT=1 bash /workspace/wynckeliao/ops/gpu/hold.sh wrap 4,5,6,7 \
+#   GPU_HOLD_ALLOW_ROOT=1 bash ${QJIU_ROOT}/wynckeliao-env/ops/gpu/hold.sh wrap 4,5,6,7 \
 #     -- bash scripts/eval_vllm_mrcr_graphwalks.sh
 set -uo pipefail
 
@@ -18,7 +18,7 @@ cd "$ROOT"
 RUN_ID="${RUN_ID:-mrcr_graphwalks_20260901}"
 RUN_ROOT="${RUN_ROOT:-$ROOT/data/evals/$RUN_ID}"
 VENV="${VENV:-$ROOT/.vendor/lm-evaluation-harness/.venv}"
-HF_HOME="${HF_HOME:-/workspace/wynckeliao/.hf}"
+HF_HOME="${HF_HOME:-${QJIU_ROOT}/.hf}"
 ORIG_MODEL="${ORIG_MODEL:-$ROOT/data/models/Qwen3.5-4B}"
 DATA_ROOT="${DATA_ROOT:-$RUN_ROOT/hf}"
 
@@ -154,7 +154,7 @@ run_shard() (
   echo "[$model_id/$shard] vLLM GPU=$gpu port=$port ctx=$MAX_MODEL_LEN gen=$max_gen"
   env \
     CUDA_VISIBLE_DEVICES="$gpu" \
-    HOME=/workspace/wynckeliao \
+    HOME=${QJIU_ROOT} \
     HF_HOME="$HF_HOME" \
     HF_HUB_DISABLE_TELEMETRY=1 \
     DO_NOT_TRACK=1 \
@@ -199,7 +199,7 @@ run_shard() (
   timeout --signal=INT --kill-after=60s "$WALL_TIMEOUT" \
     env \
       CUDA_VISIBLE_DEVICES='' \
-      HOME=/workspace/wynckeliao \
+      HOME=${QJIU_ROOT} \
       HF_HOME="$HF_HOME" \
       HF_HUB_DISABLE_TELEMETRY=1 \
       DO_NOT_TRACK=1 \
