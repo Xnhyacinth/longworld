@@ -1,3 +1,8 @@
+---
+pretty_name: LongWorld Probe Trust
+license: other
+---
+
 # Local probe environment snapshot (worlds branch + private HF)
 
 This directory is a private machine-migration bundle for LongWorld synthesis
