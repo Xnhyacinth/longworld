@@ -170,3 +170,36 @@ dead `/workspace/wynckeliao` paths (VENV, HF_HOME, NLTK_DATA, HOLD_SH).
   Triton GDN prefill, weights load, 109k-token recall correct). The prep host
   could not re-verify — no GPUs.
 - `±0.015` run-to-run noise applies (0912 finding 3).
+
+## Verified protocol facts, read off the 0912 artifacts
+
+These are not from the report's claims; each is confirmed against the per-run
+results files, which record the exact task configs the harness used:
+
+| Task | num_fewshot | max_gen_toks | decoding | metric key |
+| --- | --- | --- | --- | --- |
+| ifeval | 0 | 1280 | do_sample=false, temp 0 | prompt/inst × strict/loose acc |
+| mmlu_pro (×14) | 5 | 2048 | do_sample=false, temp 0 | exact_match,custom-extract |
+| gpqa_diamond_cot_zeroshot | 0 | 8192 (model_args fallback) | do_sample=false, temp 0 | exact_match,strict-match + flexible-extract |
+
+Upstream v0.4.12's own defaults reproduce all of these (mmlu_pro 5-shot/2048,
+ifeval 0-shot/1280, gpqa 0-shot with no YAML cap). The 14 MMLU-Pro subjects is
+the full official set, not a subset. GPQA numbers quoted should be
+flexible-extract, with strict-match noted as 0 for every model — that is what
+the 0912 report already does.
+
+## Mainstream comparison, from the target papers
+
+Decoding is the one place where this wave and the mainstream genuinely differ.
+ACC (Table 2, avg@3), LongTraceRL (temp 0.6, n=4, 160k context) and LoongRL
+(temp 0.6, n=8) all sample; this wave is greedy. That is a deliberate, recorded
+choice: greedy is reproducible within ±0.015 on this stack, and the MRCR
+hash-prefix grader punishes extra text that sampling would introduce. Any
+comparison against those papers' absolute numbers should note the decoding
+difference rather than hide it.
+
+MRCR: this wave runs 2+4-needle, matching ACC exactly. LongTraceRL averages
+2/4/8. The frontier labs headline 8-needle (Anthropic, Google); OpenAI's own
+blog headline is 2-needle only. GraphWalks: Parents+BFS with precision as the
+headline matches ACC; the parquet is pinned by revision (hash-verified), so the
+2026-02-27 ground-truth revision cannot silently enter.
