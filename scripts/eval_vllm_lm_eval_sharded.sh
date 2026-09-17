@@ -22,7 +22,13 @@ cd "$ROOT"
 
 RUN_ID="${RUN_ID:-downstream_same_protocol_20260917}"
 RUN_ROOT="${RUN_ROOT:-$ROOT/data/evals/$RUN_ID}"
-VENV="${VENV:-/volume/pt-dev/qjiu/lm-evaluation-harness/.venv}"
+# Harness = upstream EleutherAI v0.4.12 (6d642546f, 2026-05-11), not the internal
+# fork. The 2026-09-12 run is upstream v0.4.12: its results carry
+# exact_match,custom-extract (upstream's mmlu_pro metric; the fork emits "acc"),
+# gpqa cot_zeroshot version 2.2 (fork is 1.0), and ifeval capped at 1280 (fork
+# raised it to 8192 under an unchanged version 4.0). Upstream reproduces all
+# three exactly; the fork reproduces none.
+VENV="${VENV:-/volume/pt-dev/qjiu/lm-eval-upstream-v0.4.12/.venv}"
 HF_HOME="${HF_HOME:-/volume/pt-dev/qjiu/.hf}"
 NLTK_DATA="${NLTK_DATA:-/volume/pt-dev/qjiu/nltk_data}"
 HOLD_SH="${HOLD_SH:-/volume/pt-dev/qjiu/wynckeliao-env/ops/gpu/hold.sh}"
@@ -40,12 +46,11 @@ DEFAULT_MAX_GEN_TOKS="${DEFAULT_MAX_GEN_TOKS:-8192}"
 ORIG_MODEL="${ORIG_MODEL:-$ROOT/data/models/Qwen3.5-4B}"
 
 GEN_KWARGS='{"temperature":0,"chat_template_kwargs":{"enable_thinking":false}}'
-# IFEval's canonical cap is 1280: Google's instruction_following_eval reference uses
-# it, and upstream lm-eval carried it until this fork's commit 8020f549 raised
-# ifeval.yaml to 8192 WITHOUT bumping metadata.version -- so task "version 4.0" no
-# longer implies the 1280 cap. evaluator.py merges CLI gen_kwargs over the YAML with
-# update=True, so pin it here and keep the 0912 baseline directly comparable.
-GEN_KWARGS_IFEVAL='{"temperature":0,"max_gen_toks":1280,"chat_template_kwargs":{"enable_thinking":false}}'
+# Upstream v0.4.12 already ships ifeval max_gen_toks 1280, so no pin is needed and
+# none is applied -- pinning would be indistinguishable here anyway. Verified from
+# the 0912 artifacts rather than from the record: all 541 generations of
+# acc_base_ckpt680 max out at exactly 1280 tokens, 52 of them at the cap.
+GEN_KWARGS_IFEVAL="$GEN_KWARGS"
 
 if [[ ! -x "$VENV/bin/vllm" || ! -x "$VENV/bin/lm-eval" ]]; then
   echo "missing vllm or lm-eval in $VENV" >&2
@@ -60,8 +65,9 @@ import json, sys
 from pathlib import Path
 root = Path(sys.argv[1])
 (root / "PROTOCOL.json").write_text(json.dumps({
-    "framework": "lm-evaluation-harness (internal-v2026.0914 vendored tree) + vLLM 0.18.0 OpenAI server",
-    "client": "lm-eval run --model local-chat-completions --apply_chat_template",
+    "framework": "lm-evaluation-harness upstream v0.4.12 (6d642546f) + vLLM 0.18.0 OpenAI server",
+    "harness_choice": "Upstream v0.4.12, identified from the 2026-09-12 artifacts: those results carry exact_match,custom-extract (upstream's mmlu_pro metric), gpqa cot_zeroshot v2.2, and ifeval capped at 1280. Upstream matches all three; the internal fork matches none (it emits metric 'acc', gpqa v1.0, ifeval 8192).",
+    "client": "lm-eval --model local-chat-completions --apply_chat_template (this harness has no `run` subcommand)",
     "why_not_lm_eval_vllm": "harness Transformers cannot parse model_type=qwen3_5",
     "decoding": {
         "temperature": 0.0,
@@ -72,7 +78,7 @@ root = Path(sys.argv[1])
         "max_gen_toks_fallback_model_args": 8192,
         "max_gen_toks_source": "CLI gen_kwargs overrides YAML (evaluator.py update=True); GPQA CoT has no YAML cap so 8192 fallback",
         "yaml_caps": {"ifeval": 1280, "mmlu_pro": 2048, "gpqa_diamond_cot_zeroshot": None},
-        "ifeval_cap_pin": "1280 pinned via --gen_kwargs because the vendored fork's ifeval.yaml says 8192 (commit 8020f549 raised it from 1280 without bumping metadata.version). 1280 is the upstream/Google-reference value and matches the 0912 baseline, whose 541 samples max out at exactly 1280.",
+        "ifeval_cap": "1280, from upstream v0.4.12's own ifeval.yaml; no CLI pin is applied. Confirmed against the 0912 per-sample file: all 541 acc_base_ckpt680 generations max out at exactly 1280, 52 of them at the cap.",
     },
     "tasks": ["ifeval", "gpqa_diamond_cot_zeroshot", "mmlu_pro (14 subjects, weight_by_size)"],
     "limit": None,
@@ -204,7 +210,7 @@ run_shard() (
       DO_NOT_TRACK=1 \
       PYTHONHASHSEED=0 \
       LMEVAL_LOG_LEVEL=INFO \
-      "$VENV/bin/lm-eval" run \
+      "$VENV/bin/lm-eval" \
         --model local-chat-completions \
         --model_args "model=$served_name,base_url=http://127.0.0.1:$port/v1/chat/completions,tokenizer_backend=none,num_concurrent=$concurrency,max_retries=5,max_gen_toks=$DEFAULT_MAX_GEN_TOKS,max_length=$MAX_MODEL_LEN,timeout=7200,eos_string=<|im_end|>" \
         --tasks "$tasks" \
