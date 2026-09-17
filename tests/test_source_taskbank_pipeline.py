@@ -7,6 +7,29 @@ import pytest
 
 from scripts import run_source_taskbank_pipeline as pipeline
 
+ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize(
+    "catalog_name",
+    (
+        "p65_source_pipeline_wave1.json",
+        "p65_source_pipeline_wave2.json",
+        "p66_source_pipeline_wave1.json",
+    ),
+)
+def test_repository_catalog_pins_are_relative_and_current(catalog_name):
+    catalog = json.loads((ROOT / "configs" / catalog_name).read_text())
+    for job in catalog["jobs"]:
+        names = [job["script"], job["config"], *job.get("input_files", [])]
+        if job.get("trust_file"):
+            names.append("scripts/run_with_local_probe_trust.py")
+        assert set(job["input_sha256"]) == set(names)
+        assert job["input_sha256"] == {
+            name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
+            for name in names
+        }
+
 
 @pytest.fixture
 def job(tmp_path, monkeypatch):
@@ -24,7 +47,8 @@ def job(tmp_path, monkeypatch):
         "source_authority": "official_hash_pinned",
         "receipt_schema": "native-proof-v1",
         "input_sha256": {
-            str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in (script, config)
+            name: hashlib.sha256(p.read_bytes()).hexdigest()
+            for name, p in (("scripts/native.py", script), ("config.json", config))
         },
     }
     catalog = tmp_path / "catalog.json"
@@ -150,7 +174,15 @@ def trust_job(tmp_path, monkeypatch):
         "trust_identity": identity,
         "receipt_schema": "native-proof-v1",
         "input_sha256": {
-            str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths
+            name: hashlib.sha256(p.read_bytes()).hexdigest()
+            for name, p in zip(
+                (
+                    "scripts/native.py",
+                    "config.json",
+                    "scripts/run_with_local_probe_trust.py",
+                ),
+                paths,
+            )
         },
     }
     catalog = tmp_path / "catalog.json"
@@ -193,7 +225,7 @@ def test_receipt_records_public_trust_identity_and_wrapper_pin(tmp_path, monkeyp
     recorded = result["jobs"][0]
     assert recorded["status"] == "native_replay_verified"
     assert recorded["trust_identity"] == identity
-    assert str(wrapper) in recorded["input_sha256"]
+    assert "scripts/run_with_local_probe_trust.py" in recorded["input_sha256"]
 
 
 def test_trust_identity_mismatch_is_rejected(tmp_path, monkeypatch):
