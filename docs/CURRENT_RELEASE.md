@@ -1,6 +1,6 @@
 # Current release status
 
-Last updated: 2026-09-06
+Last updated: 2026-09-15
 
 This file is the canonical publication-status summary. Historical receipts and
 `.hl/` logs remain useful for reproducibility, but they do not override this
@@ -8,6 +8,129 @@ status. The canonical project root is `/workspace/wynckeliao/longworld`;
 project code, source inventory, generated data, release receipts, reports, and
 durable progress records must live there. Tool caches may be reconstructed
 outside the repository, and credentials must remain outside Git.
+
+## 2026-09-15 source-tree and experiment-state handoff
+
+The P57--P66 world synthesis history, capability curriculum, P64/P65/P66
+taskbank code, configurations, tests, compact receipts, and durable planning
+records were integrated into `main`. The integration deliberately excludes the
+tracked `.local-probe-env` experiment bundle so that its HMAC key material does
+not enter `main` history. Source-taskbank catalogs now use repository-relative
+hash keys, and IETF/ResearchLab replay validation hashes the supplied output
+tree before comparing a clean rebuild.
+
+Private `Xnhyacinth/LongWorld-Training-State` records the operational worktree
+snapshot at Hub tag `state-2026-09-15`. It contains the dataset card, training
+logs, evaluation results,
+receipts, report intermediates, and `SNAPSHOT_MANIFEST.json`. The manifest
+binds all 2,297 intended files and 214,172,921,107 bytes by SHA-256. The Hub
+accepted 2,201 payload files / 6,796,135,011 bytes; its private LFS quota then
+rejected 96 files / 207,376,786,096 bytes. Those blocked files are the eight
+checkpoints' LFS-class model/optimizer/RNG/scheduler assets. They remain in the local staging view at
+`/workspace/wynckeliao/.longworld-hf-staging/LongWorld-Training-State` and are
+discoverable by exact path, size, and digest in the uploaded manifest.
+
+The deliberate cache exclusions are `.venv`, Python bytecode, downloaded
+models/packages, evaluation `cache/` trees and serve views,
+`data/sft/tokenized`, Git objects, and all trust files/credentials. These
+exclusions do not remove source configs, lockfiles, trainer arguments, logs,
+receipts, or RNG/optimizer entries from the intended manifest.
+
+## 2026-09-12 sync: P64 product on Hub, P65 adapters on GitHub
+
+LongWorld **training rows** for the current P64 primary set are on private
+`Xnhyacinth/LongWorld-Real-Workflows` at
+`local-probe-train-ready/p64-primary-training-v2/` (Hub `30f4a0194bad`, 1953
+train / 533 eval jsonl; sizes match the local snapshot). They are
+`local_training_eligible` and **not** `production_eligible`. Synthesis
+intermediates for P64/P65 (candidates, signed source inventories, retained
+filings) belong on `Xnhyacinth/LongWorld-Synthesis-Workspace`; HMAC keys stay
+off Hub and Git. There is still **no** P64/LongWorld 256k full-SFT checkpoint
+(the 4-GPU 256k run OOM'd after step 1).
+
+P65 taskbank adapters (CodeForge reading-proof, finance disclosure versions,
+GovInfo HR4366) landed on `main` from the worlds worktree without probe-trust
+files or report jsonl dumps. P65 candidates are synthesis intermediates, not a
+new Real-Workflows product.
+
+## 2026-09-11 P64 4B-Base SFT (not a LongWorld product release)
+
+ACC and LongTrace already have held-out val sets (32 rows each), so the signed
+P64 eval split stays eval and is **not** folded into train. Local product is
+`data/sft/p64_primary_training_v2/` (finance+codeforge: 1953 train / 533 eval;
+max chat tokens 261,954; Hub copy under
+`Xnhyacinth/LongWorld-Real-Workflows` `local-probe-train-ready/p64-primary-training-v2/`).
+`production_eligible` remains false.
+
+The run reuses the latest 4B-Base ACC/LongTrace ms-swift recipe on GPUs 4–7
+only (GBS 16, SP=4, DP=1, micro=1, accum=16, lr 1e-5 cosine, 680 steps, FA2+FLA,
+DeepSpeed none, packing off, `SKIP_HOLD=1`). Cutoff is native 262144 so those
+rows are not truncated. Related-work Base ACC/LongTrace checkpoints stay 128k
+baselines, not this product. Config: `configs/swift/ext_p64.yaml`.
+
+## 2026-09-07 128k related-work baselines on private Hugging Face
+
+ACC / LongTrace / LongMIT 128k SFT jsonl was **not** on Hub (private
+`Xnhyacinth/LongWorld-Real-Workflows` remains the P6 542-row LongWorld product
+and was left unchanged). A new private parquet dataset now holds the valid
+ms-swift 128k baselines:
+
+- Dataset: [`Xnhyacinth/longworld-128k-sft-baselines`](https://huggingface.co/datasets/Xnhyacinth/longworld-128k-sft-baselines) (private)
+- Hub commit: `72eecdd3f8774399c75c9b7ba1aa1d5e00453246`
+- Configs: `acc`, `longtrace`, `longmit` (each `train` + `validation` parquet)
+- Rows: ACC 10770/32, LongTrace 2783/32, LongMIT 10770/32
+
+Latest valid full-SFT checkpoints (step 680, inference weights only;
+optimizer/RNG omitted):
+
+| Condition | Private model | Local run | Train / eval loss |
+| --- | --- | --- | --- |
+| Base ACC | [`Xnhyacinth/Qwen3.5-4B-Base-ACC-128k-SFT`](https://huggingface.co/Xnhyacinth/Qwen3.5-4B-Base-ACC-128k-SFT) | `swift_ext_acc_base` ckpt-680 | 0.437 / 0.375 |
+| Base LongTrace | [`Xnhyacinth/Qwen3.5-4B-Base-LongTrace-128k-SFT`](https://huggingface.co/Xnhyacinth/Qwen3.5-4B-Base-LongTrace-128k-SFT) | `swift_ext_longtrace_base` ckpt-680 | — / 0.177 |
+| Instruct ACC | [`Xnhyacinth/Qwen3.5-4B-ACC-128k-SFT`](https://huggingface.co/Xnhyacinth/Qwen3.5-4B-ACC-128k-SFT) | `swift_ext_acc` ckpt-680 | 0.365 / 0.375 |
+
+Hub commits: Base ACC `2b4dae0e6c3cddeaf6dea4e07d9ec1b31a250ddb`, Base
+LongTrace `734d5a13211cdcf7a524d283e2fc982592cb09d9`, Instruct ACC
+`ca665f6df393b31414b1ff2c286a3dcb8997bd9f`. Base recipe is GBS 16, SP 4 DP 1
+micro 1 accum 16, lr 1e-5, max_length 133120, 680 steps. Instruct ACC used 8
+GPU SP=4 DP=2. LongMIT is data only; it was not trained on 4B-Base this
+round. Instruct LongTrace stopped at ckpt-200 and is not published. These
+artifacts are related-work baselines, not LongWorld product rows;
+`production_eligible` is unchanged.
+
+Private collection (do not merge the repos):
+[`Xnhyacinth/longworld`](https://huggingface.co/collections/Xnhyacinth/longworld-6a9eb196a0c8cd67190ea7fd).
+
+## 2026-09-07 P57 local-probe products and synthesis delta
+
+Three independently signed local-probe products were appended under
+`local-probe-train-ready/` on `Xnhyacinth/LongWorld-Real-Workflows` (Hub
+commit `cf28fcf07501768e54ecaee2ef132c11951ce192`). The P6 542-row payload
+and its attested `release_inventory.json` were not rewritten.
+
+| Product | Rows | Exact tokens | Bands |
+| --- | ---: | ---: | --- |
+| `p57-ietf-tls13-handshake-succession-probe-1-v1-promoted-v1` | 6 | 581,651 | 3×64K + 3×128K |
+| `p57-finance-nvidia-market-segment-probe-1-v1-promoted-v1` | 12 | 728,085 | 3 each 16/32/64/128K |
+| `p57-finance-micron-asset-trajectory-probe-1-v1-promoted-v1` | 12 | 733,444 | 3 each 16/32/64/128K |
+
+Content-gated SFT inventory is now **ten** independently signed local-probe
+products: the previous seven plus these three. Together they contain
+**183 train rows / 10,045,500 exact Qwen context tokens** and **18 eval rows /
+682,032 tokens**. Total local inventory is **201 rows / 10,727,532 tokens**
+across 20 unique world IDs. Train length distribution is 45×16K, 48×32K,
+60×64K, and **30×128K**. `production_eligible` remains false.
+
+P57 TLS uses profile `p57-ietf-tls13-64k-128k-extension-probe-1-v1` (one-world
+standards gate, length-view pair exemption). NVIDIA and Micron reuse
+`p17-finance-128k-extension-probe-1-v1` on new issuers and separate probe
+trust roots. HTTP/3 QUIC remains a candidate track, not a product.
+
+Synthesis intermediates (candidates, signed source inventories, retained
+filing/RFC bytes, and the three product trees) were appended to private
+`Xnhyacinth/LongWorld-Synthesis-Workspace` (Hub commit
+`4bc492923e26f30aff93ef7064992a46c15eea6e`; 368 P57 files / ~383MB). HMAC
+keys stay off Hub and Git. Optimizer/RNG training states were not uploaded.
 
 ## 2026-09-06 Alphabet conversion and GovInfo six-relation hold
 
@@ -147,7 +270,8 @@ these partial tracks contributes inventory rows.
 ## Published private dataset
 
 - Repository: `Xnhyacinth/LongWorld-Real-Workflows` (private)
-- Hub commit: `32b5dcd274c301300826be20f7a698b4d9b09f7d`
+- Hub commit: `32b5dcd274c301300826be20f7a698b4d9b09f7d` (latest seen product
+  path SHA `02b4885f40b83495dcc4bf7dfb3ad4c9569b33ea` for P55 Alphabet)
 - Release profile: `p6-source-dependent-probe-12-v1`
 - Scope: local engineering only; not production-approved
 - Rows: 542 total (428 train, 114 eval)
@@ -156,6 +280,10 @@ these partial tracks contributes inventory rows.
 The remote contains 19 release payload files plus the Hub-managed
 `.gitattributes`; the payload matches the local immutable P6 v4 staging package.
 No P6 payload is missing; no P12 production upload is authorized.
+
+Related-work 128k SFT baselines live in a **separate** private dataset,
+`Xnhyacinth/longworld-128k-sft-baselines` (parquet). Do not overwrite
+`LongWorld-Real-Workflows` with ACC/LongTrace/LongMIT.
 
 ## 2026-09-01 task replay and baseline checkpoint
 
