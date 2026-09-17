@@ -82,13 +82,40 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def _expand_environment(value: Any) -> Any:
+    """Expand ${VAR} in catalog string values, failing closed on an unset variable.
+
+    Catalog paths are absolute by contract: the trust loader rejects a relative
+    one outright, and consumer scripts resolve job paths against this value.
+    Catalogs therefore cannot hard-code a machine path, and they cannot carry a
+    bare ${QJIU_ROOT} either, because nothing downstream expands it. Expansion
+    happens here, at the single point every catalog goes through, so a missing
+    variable is one clear error instead of a downstream "trust file is missing".
+    """
+    if isinstance(value, str):
+        if "${" not in value:
+            return value
+        expanded = os.path.expandvars(value)
+        if "${" in expanded:
+            raise PipelineCatalogError(
+                f"catalog value {value!r} references an unset environment "
+                "variable; source scripts/uv_project_env.sh before running"
+            )
+        return expanded
+    if isinstance(value, dict):
+        return {key: _expand_environment(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_expand_environment(item) for item in value]
+    return value
+
+
 def load_catalog(path: Path) -> dict[str, Any]:
     if path.is_symlink() or not path.is_file():
         raise PipelineCatalogError("catalog is missing or not a regular file")
     raw = path.read_bytes()
     if len(raw) > _MAX_CATALOG_BYTES:
         raise PipelineCatalogError("catalog exceeds size limit")
-    catalog = json.loads(raw.decode("utf-8"))
+    catalog = _expand_environment(json.loads(raw.decode("utf-8")))
     if not isinstance(catalog, dict):
         raise PipelineCatalogError("catalog must be a JSON object")
     if catalog.get("schema_version") != PIPELINE_SCHEMA:

@@ -305,9 +305,15 @@ for model, tasks in sorted(by.items()):
 PY
 }
 
+# data/checkpoints/* are the published HF exports of the same runs (args.json
+# output_dir + global_step match), and they carry real weight shards. The copies
+# under LongWorld-Training-State/training/swift_ext_* have only
+# model.safetensors.index.json -- the shards were never pulled, so vLLM dies with
+# "Cannot find any model weights". Use the data/checkpoints path.
 MODELS=(
-  "b0_qwen35_4b|$ROOT/data/models/Qwen3.5-4B"
-  "acc_ckpt680|$ROOT/data/hf/LongWorld-Training-State/training/swift_ext_acc/v6-20260825-153450/checkpoint-680"
+  "acc_base_ckpt680|$ROOT/data/checkpoints/Qwen3.5-4B-Base-ACC-128k-SFT"
+  "longtrace_base_ckpt680|$ROOT/data/checkpoints/Qwen3.5-4B-Base-LongTrace-128k-SFT"
+  "p64_base_ckpt680|$ROOT/data/sft/megatron_ext_p64_base/v1-20260914-155129/checkpoint-680"
 )
 if [[ -n "${EVAL_MODELS:-}" ]]; then
   MODELS=()

@@ -6,7 +6,7 @@
       "script": "scripts/audit_codeforge_reading_proof.py",
       "config": "configs/p65_codeforge_reading_proof_v1.json",
       "output": "data/candidates/p65_codeforge_reading_proof_v1",
-      "trust_file": "/workspace/wynckeliao/.longworld-agent-probe/p12-probe-12-v2/p17-codeforge-trust/local_probe_trust.json",
+      "trust_file": "${QJIU_ROOT}/.longworld-agent-probe/p12-probe-12-v2/p17-codeforge-trust/local_probe_trust.json",
       "receipt_schema": "longworld.codeforge-reading-proof-build.v2",
       "stage_workers": 3,
       "public_policy_sha256": [

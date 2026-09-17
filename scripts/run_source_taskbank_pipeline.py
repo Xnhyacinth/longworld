@@ -35,6 +35,32 @@ def json_file(path):
     return value
 
 
+def expand_environment(value):
+    """Expand ${VAR} in catalog values so no machine path is baked into configs.
+
+    The trust loader rejects a relative path outright, so catalog paths must be
+    absolute; they must not name a specific machine either. Nothing downstream
+    expands a shell variable, so it happens here, at the point the catalog is
+    read. An unset variable is an error rather than a literal that would surface
+    later as a misleading "trust file is missing".
+    """
+    if isinstance(value, str):
+        if "${" not in value:
+            return value
+        expanded = os.path.expandvars(value)
+        if "${" in expanded:
+            raise ValueError(
+                f"catalog value {value!r} references an unset environment "
+                "variable; source scripts/uv_project_env.sh before running"
+            )
+        return expanded
+    if isinstance(value, dict):
+        return {key: expand_environment(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [expand_environment(item) for item in value]
+    return value
+
+
 def project_path(value):
     path = Path(value)
     if path.is_absolute() or ".." in path.parts or not path.parts:
@@ -65,7 +91,7 @@ def local_probe_trust_identity(path, role):
 
 def run_pipeline(catalog_path, report_root, workers):
     catalog_raw = _read_regular_file(catalog_path, 1_000_000)
-    catalog = json.loads(catalog_raw)
+    catalog = expand_environment(json.loads(catalog_raw))
     if catalog.get("schema_version") != SCHEMA or not catalog.get("jobs"):
         raise ValueError("invalid source-taskbank pipeline catalog")
     if not 1 <= workers <= 8:
