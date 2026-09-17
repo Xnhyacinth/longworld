@@ -13,8 +13,10 @@ from reports.p57_finance_micron_dual_partition_generate import (
     replay_micron_dual_partition_task,
 )
 
+ROOT = Path(__file__).resolve().parents[1]
+
 SIGNED_GRAPH = Path(
-    "/workspace/wynckeliao/longworld/data/source_inventory/"
+    f"{ROOT}/data/source_inventory/"
     "p57_finance_micron_ir_fy2022_2025_v1/issuer_ir_manifest.signed.json"
 )
 
@@ -157,7 +159,7 @@ def test_parser_on_signed_bytes_matches_gold_and_not_disk_html_offsets():
     assert revenue.evidence_quote == gold["evidence_quote"] == "$ 37,378"
     assert revenue.char_start == gold["char_start"]
     disk = Path(
-        "/workspace/wynckeliao/longworld/data/source_inventory/"
+        f"{ROOT}/data/source_inventory/"
         "p57_finance_micron_ir_fy2022_2025_v1/micron-fy2025-annual.rendered_xbrl_html.html"
     ).read_text(encoding="utf-8")
     assert hashlib.sha256(disk.encode()).hexdigest() != fy2025["source_sha256"]

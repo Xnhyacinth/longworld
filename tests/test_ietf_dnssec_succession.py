@@ -17,13 +17,15 @@ from longworld.core.standardsworkflow import (
 )
 from tests.test_standardsworkflow import _write
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 DNSSEC_FAMILY_INVENTORY = Path(
-    "/workspace/wynckeliao/longworld/data/source_inventory/"
+    f"{ROOT}/data/source_inventory/"
     "p57_ietf_dnssec_family_v1/ietf_fetch_inventory.json"
 )
 DNSSEC_SIGNED_MANIFEST = Path(
-    "/workspace/wynckeliao/longworld/data/source_inventory/"
+    f"{ROOT}/data/source_inventory/"
     "p57_ietf_dnssec_family_v1/"
     "ietf_workflow_manifest.p57.dnssec.v1.signed.json"
 )

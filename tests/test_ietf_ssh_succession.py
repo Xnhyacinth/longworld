@@ -16,8 +16,10 @@ from longworld.core.standardsworkflow import (
 )
 from tests.test_standardsworkflow import _write
 
+ROOT = Path(__file__).resolve().parents[1]
+
 _OFFICIAL_SIGNED = Path(
-    "/workspace/wynckeliao/longworld/data/source_inventory/"
+    f"{ROOT}/data/source_inventory/"
     "p57_ietf_ssh_family_v1/ietf_workflow_manifest.p57.ssh.v1.signed.json"
 )
 _LEFTOVER_RFCS = (4252, 4253, 4254)

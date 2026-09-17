@@ -17,8 +17,10 @@ from longworld.core.standardsworkflow import (
 )
 from tests.test_standardsworkflow import _write
 
+ROOT = Path(__file__).resolve().parents[1]
+
 _OFFICIAL_INVENTORY = Path(
-    "/workspace/wynckeliao/longworld/data/source_inventory/"
+    f"{ROOT}/data/source_inventory/"
     "p57_ietf_acme_family_v1/ietf_fetch_inventory.json"
 )
 _OFFICIAL_DIR = _OFFICIAL_INVENTORY.parent

@@ -14,6 +14,8 @@ from longworld.core.standardsworkflow import (
 )
 from tests.test_standardsworkflow import _write
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 def _http2_inventory(tmp_path: Path) -> dict[str, object]:
     request = {
@@ -238,7 +240,7 @@ def test_http2_succession_task_replays_and_fails_closed_on_remove_one(
 
 def test_http2_succession_task_binds_official_bytes_when_present() -> None:
     signed = Path(
-        "/workspace/wynckeliao/longworld/data/source_inventory/"
+        f"{ROOT}/data/source_inventory/"
         "p57_ietf_http2_graph_v1/"
         "ietf_workflow_manifest.p57.http2.v1.signed.json"
     )
