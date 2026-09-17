@@ -1,0 +1,3 @@
+ERROR tests/test_paper_workflow_fetch.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+2390 tests collected, 1 error in 5.71s
