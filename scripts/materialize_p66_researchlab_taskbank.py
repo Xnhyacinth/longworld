@@ -457,6 +457,13 @@ def validate(config_path: Path, output: Path, workers: int) -> dict:
         raise ValueError("invalid P66 ResearchLab receipt schema")
     if any(path.is_symlink() for path in output.rglob("*")):
         raise ValueError("output contains symlinks")
+    actual_files = {
+        path.relative_to(output).as_posix(): digest(path)
+        for path in sorted(output.rglob("*"))
+        if path.is_file() and path != receipt_path
+    }
+    if actual_files != receipt.get("files"):
+        raise ValueError("P66 ResearchLab output tree differs from receipt")
     with tempfile.TemporaryDirectory(prefix="p66-researchlab-replay-") as temp:
         rebuilt = build(config_path, Path(temp) / "out", workers)
     for key in (

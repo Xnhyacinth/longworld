@@ -3,7 +3,11 @@ import json
 
 import pytest
 
-from scripts.run_capability_curriculum import build_messages, make_plan
+from scripts.run_capability_curriculum import (
+    build_messages,
+    make_plan,
+    validate_completed_manifest,
+)
 
 
 def taxonomy():
@@ -78,3 +82,20 @@ def test_context_in_question_prompt_is_rejected():
             ],
             None,
         )
+
+
+def test_completed_resume_rejects_manifest_field_tampering(tmp_path):
+    (tmp_path / "shards").mkdir()
+    for name, value in (
+        ("plan.json", "{}\n"),
+        ("rejects.json", "[]\n"),
+        ("train.jsonl", "train\n"),
+        ("eval.jsonl", "eval\n"),
+    ):
+        (tmp_path / name).write_text(value)
+    expected = {"files": {}}
+    forged = {"files": {}, "production_eligible": True}
+    (tmp_path / "manifest.json").write_text(json.dumps(forged))
+
+    with pytest.raises(ValueError, match="manifest"):
+        validate_completed_manifest(tmp_path, forged, expected)

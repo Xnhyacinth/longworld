@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
+
+import pytest
 
 from longworld.core.p66_researchlab_taskbank import (
     answer_with_complete_records,
@@ -9,6 +12,7 @@ from longworld.core.p66_researchlab_taskbank import (
     delta_signature,
     exact_numeric_range,
 )
+from scripts import materialize_p66_researchlab_taskbank as materialize
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "configs/p66_researchlab_taskbank_v1.json"
@@ -95,3 +99,20 @@ def test_materialized_rows_are_complete_record_contract_candidates() -> None:
     }
     assert len({row["semantic_task_id"] for row in candidates}) == len(candidates)
     assert len({row["context_sha256"] for row in candidates}) == len(candidates)
+
+
+def test_validation_rejects_missing_output_member(tmp_path: Path, monkeypatch) -> None:
+    output = tmp_path / "output"
+    output.mkdir()
+    payload = output / "candidates.jsonl"
+    payload.write_text("candidate\n")
+    receipt = {
+        "schema_version": materialize.RECEIPT,
+        "files": {"candidates.jsonl": hashlib.sha256(payload.read_bytes()).hexdigest()},
+    }
+    (output / "BUILD_RECEIPT.json").write_text(json.dumps(receipt))
+    monkeypatch.setattr(materialize, "build", lambda *args: receipt)
+
+    payload.unlink()
+    with pytest.raises(ValueError, match="output tree"):
+        materialize.validate(tmp_path / "config.json", output, 1)
