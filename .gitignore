@@ -34,12 +34,16 @@ saves/
 *.pfx
 .netrc
 .hf/
-.longworld-trust/
-.longworld-private/
-.longworld-agent-probe/
-.longworld-local-probe-private/
-.longworld-scaleout-*-private/
-.longworld_probe_keys/
+# Live trust roots at the checkout root only. The worlds migration bundle
+# `.local-probe-env/` is tracked so other machines can restore probe HMAC.
+/.longworld-trust/
+/.longworld-private/
+/.longworld-agent-probe/
+/.longworld-local-probe-private/
+/.longworld-scaleout-*-private/
+/.longworld_probe_keys/
+!.local-probe-env/
+!.local-probe-env/**
 
 # Local planning state (canonical project status lives in .hl/)
 .planning/

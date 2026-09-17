@@ -1,0 +1,237 @@
+{
+  "schema_version": "longworld-probe-trust-bundle.v1",
+  "environment": "probe",
+  "production_eligible": false,
+  "restore_root": "$HOME",
+  "n_files": 38,
+  "files": [
+    {
+      "path": ".longworld/p9-probe-12-v1.env",
+      "bytes": 1326,
+      "mode": "0o600",
+      "sha256": "952ae53f30a96eac3287d159fc16c9bd8062aa03016e1683cadb02ca12523393"
+    },
+    {
+      "path": ".longworld-agent-probe/p12-probe-12-v2/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "0e43b7a8de8d957ddabc3e2abde8e13244ca488164e2892bc22abfcc81f63ae5"
+    },
+    {
+      "path": ".longworld-agent-probe/p12-probe-12-v2/p17-codeforge-trust/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "0e43b7a8de8d957ddabc3e2abde8e13244ca488164e2892bc22abfcc81f63ae5"
+    },
+    {
+      "path": ".longworld-local-probe-private/p12-probe-12-20260829-v1/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "dd04724b1d4e803244e5c131c1c3a986ab2730473e0221195b517fd26baef701"
+    },
+    {
+      "path": ".longworld-local-probe-private/p17-codeforge-trust/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "0e43b7a8de8d957ddabc3e2abde8e13244ca488164e2892bc22abfcc81f63ae5"
+    },
+    {
+      "path": ".longworld-p59-domain-private/clinical/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "195156c0685a910e0c5513d94cdcde6a408230fbacd241032fc6769065d5b814"
+    },
+    {
+      "path": ".longworld-private/p12-probe-12-v2/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "0e43b7a8de8d957ddabc3e2abde8e13244ca488164e2892bc22abfcc81f63ae5"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/alphabet/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "7deb902671fb1e2f4a0e2d2311368a4c77a290beb2f5d33f7f5946aed3ef86be"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/amazon/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "011cdf4f7e46ea9fa9f67c6c628117bcf195cb62b77f7b07aa942a81e1a09921"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/amd/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "8bf2567b22105f01f65225af55cbc7b686bf950aa4126450a3701d8d7afeee46"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/eurlex/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "fa6a78b9b3551df5607b9656e9b815d1306b749bd203076afd2aaae6adfa2d67"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/govinfo/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "c7a209a635e681297760462f8dbb4b8a8f0c83ebf4beaed2713360d2ec5afadd"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/ietf-acme/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "277778bb2fa7628ff6ad9a6dca50c2c8b0a5d99ac6a24a5e6015f4bee0fb5368"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/ietf-dnssec/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "9be957ad25650d9737099b4b470bd67856ebd260d97ed889aa113db1423e9478"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/ietf-http-semantics/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "9b58965918e0d81edac43905f61bb3a342bd99c521ce9acda6ab0450d7afb704"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/ietf-http-semantics-graph/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "5596593d6e5e8966da0c42a7d0eead63168c48d3ba2c4d93b19a55c0e10ccaee"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/ietf-http2/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "149236a5ef5e310c352740891993b47e29d545e2dea6ae7bfcaa6e8850e23571"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/ietf-pkix/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "e674b346f36c756bf2d467ff93cdf662ae9c8ce5084340fa4fff4f71e525032a"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/ietf-pkix-path/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "cbeb8fccaea81c427d2a5b5378307c4512169a1921921e9d2f1599c819bd05eb"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/ietf-quic/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "0bf28000617dd02247c718a703857e361b01f068ff416bad66c020665f59f8eb"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/ietf-ssh/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "052d68a3c36f528659b3fc69903b98762a4b897d4f26d3322cbc483f0773117c"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/ietf-tls13/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "c7a962c3513d7219a9dc4af916eaacc3a711948c13a7733fea374e617be6cd14"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/intel-p64/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "085422de96a3422fbaa5a90ed8c0c2fcd8ec50feb621d62ad36a973365d9e0f7"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/meta/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "78b5dc7155d0539a95067035aeea077e97ad1607115a2a5b0dd7f944aae45304"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/micron/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "9eb89adefa48344bcff30ef6bc5b79b86d9d0a79ae6d06f805dd7a2ba1bab58e"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/nvidia/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "ec77fbbbf209cb13ab667879e15a5a8b61431d1ae23008e21d08db9a7dea08f0"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/ofgem/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "4c8b229a9ab602b07fe8776517d3cd5807c6d1af37fd7e1ad06dccb46400448f"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/p64-training/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "9265d786c4d0fceff4c14f9234a3460b4fcdbec5c4938efe6ea0e0b032de4ef8"
+    },
+    {
+      "path": ".longworld-scaleout-20260906-private/siriusxm-p64/local_probe_trust.json",
+      "bytes": 1184,
+      "mode": "0o600",
+      "sha256": "b150e8ed44d733b0da0eb113d345ea53dcc0dd226844b22aec57fe4e36432dc8"
+    },
+    {
+      "path": ".longworld-trust/p3-probe-12-v1/approval.json",
+      "bytes": 1053,
+      "mode": "0o600",
+      "sha256": "88017bf12c6fd73ed2877481b424607dddfa7a4475183c52107490284647fae5"
+    },
+    {
+      "path": ".longworld-trust/p3-probe-12-v1/auditor.key",
+      "bytes": 65,
+      "mode": "0o600",
+      "sha256": "63fd8320be45974a2b4a1596f21f21554c10b88c70fbf21e81d34d1081c42286"
+    },
+    {
+      "path": ".longworld-trust/p3-probe-12-v1/candidate.key",
+      "bytes": 65,
+      "mode": "0o600",
+      "sha256": "3e7be0d829199abe2a7d420d71e6e08a50732235d754bad3c5238ac6f1388f40"
+    },
+    {
+      "path": ".longworld-trust/p3-probe-12-v1/load-env.sh",
+      "bytes": 1902,
+      "mode": "0o600",
+      "sha256": "fa5d5c4f494baba7b314e562641cc30b30226996588000fa99cb3a6706dae68b"
+    },
+    {
+      "path": ".longworld-trust/p3-probe-12-v1/promotion.key",
+      "bytes": 65,
+      "mode": "0o600",
+      "sha256": "5f6a1897b647a2b08c986bf785ffe1b537e607acf0b44dc6b2b6934c6f28bcfa"
+    },
+    {
+      "path": ".longworld-trust/p3-probe-12-v1/ranker.key",
+      "bytes": 65,
+      "mode": "0o600",
+      "sha256": "06007a75aa33ddabeb30e4c4b5933eb417b3e6f110d62847f0d03c07f3361a99"
+    },
+    {
+      "path": ".longworld-trust/p3-probe-12-v1/report.key",
+      "bytes": 65,
+      "mode": "0o600",
+      "sha256": "8e7f25bc9255867fe5212f81af76563e0ddf16d2cc948ee1b766dc465a4947a8"
+    },
+    {
+      "path": ".longworld-trust/p3-probe-12-v1/source.key",
+      "bytes": 65,
+      "mode": "0o600",
+      "sha256": "fac766396973fbad574b76ecc7532ab74598fe2f47a6dc10b8c550b7a9e88b62"
+    },
+    {
+      "path": ".longworld_probe_keys/p12_company_source.key",
+      "bytes": 65,
+      "mode": "0o600",
+      "sha256": "49670a3d345ef3abd71dfedcaf9103af116fd964aec485449fbf54f73d48b370"
+    }
+  ]
+}
