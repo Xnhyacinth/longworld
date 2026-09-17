@@ -1,9 +1,0 @@
-{
-  "world_id": "finance_alphabet_reconstruction_2021_2024_p59_v1",
-  "source_successor_sha256": "4028a54d58dca726657487ee1b4238e3213c3c0b59c5044cb2e1cc50faf31e3c",
-  "parents": 3,
-  "primary_bucket": "64k",
-  "finance_executable_audits": 3,
-  "production_eligible": false,
-  "train_ready": false
-}

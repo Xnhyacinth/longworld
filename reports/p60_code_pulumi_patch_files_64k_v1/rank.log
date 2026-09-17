@@ -1,4 +1,0 @@
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 8910.80it/s]
-[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (510 > 256). Running this sequence through the model will result in indexing errors
-{"rows": 3, "output": "/workspace/wynckeliao/longworld-worlds/reports/p60_code_pulumi_patch_files_64k_v1/audit/rankings.jsonl"}

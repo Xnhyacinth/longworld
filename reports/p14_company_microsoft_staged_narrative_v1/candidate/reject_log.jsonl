@@ -1,2 +1,0 @@
-{"seed": 14002, "query_id": "w014002-ashloft50:sec_financial_narrative_reconciliation:sec_0000950170-24-087843:16k", "reason": "exact_16k_out_of_range:14635", "view": "full", "timing": "first", "bucket": "16k"}
-{"seed": 14002, "query_id": "w014002-ashloft50:sec_financial_narrative_reconciliation:sec_0000950170-24-087843:32k", "reason": "exact_32k_out_of_range:30712", "view": "full", "timing": "first", "bucket": "32k"}

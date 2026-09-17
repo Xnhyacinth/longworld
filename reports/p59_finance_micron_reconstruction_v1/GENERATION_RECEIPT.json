@@ -1,9 +1,0 @@
-{
-  "world_id": "finance_micron_reconstruction_fy2022_2025_p59_v1",
-  "source_successor_sha256": "d85ebdb650cb37a9b7e7d0fddc783cf167e4d1b7c5f38109b80236d843cd15cd",
-  "parents": 3,
-  "primary_bucket": "64k",
-  "finance_executable_audits": 3,
-  "production_eligible": false,
-  "train_ready": false
-}
