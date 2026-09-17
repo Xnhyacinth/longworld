@@ -55,5 +55,6 @@ configs/public_repo_episodes_v2_pre_*.json
 # Exposed at these names because the pipelines and tests resolve data/<name>
 # directly; the content stays in the HF dataset rather than being duplicated.
 /data/source_inventory
+/data/source_inventories
 /data/finance_sources
 /data/candidates
