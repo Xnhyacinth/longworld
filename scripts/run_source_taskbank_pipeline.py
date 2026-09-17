@@ -85,14 +85,12 @@ def run_pipeline(catalog_path, report_root, workers):
             raise ValueError("jobs cannot share output directories")
         outputs.add(output)
         trust_role = "source"
-        pinned_paths = [
-            script,
-            config,
-            *(project_path(p) for p in job.get("input_files", [])),
-        ]
+        pinned_names = [job["script"], job["config"], *job.get("input_files", [])]
+        pinned_paths = [project_path(name) for name in pinned_names]
         if job.get("trust_file"):
+            pinned_names.append("scripts/run_with_local_probe_trust.py")
             pinned_paths.append(TRUST_WRAPPER)
-        pins = {str(p): digest(p) for p in pinned_paths}
+        pins = {name: digest(path) for name, path in zip(pinned_names, pinned_paths)}
         if job["input_sha256"] != pins:
             raise ValueError("catalog input/code pins do not match")
         trust_identity = None
@@ -203,7 +201,7 @@ def run_pipeline(catalog_path, report_root, workers):
                     "stage": stage,
                     "returncode": result.returncode,
                 }
-        if any(digest(Path(path)) != sha for path, sha in pins.items()):
+        if any(digest(project_path(path)) != sha for path, sha in pins.items()):
             raise ValueError("pipeline input changed during execution")
         if (
             trust_identity is not None
