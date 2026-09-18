@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 from longworld.core.p66_macro_vintage_taskbank import execute
+from scripts.materialize_p66_macro_vintage_taskbank import rejection_counts
 
 
 def _rows() -> list[dict[str, object]]:
@@ -47,3 +48,35 @@ def test_fewer_than_two_observations_is_explicitly_insufficient() -> None:
     assert execute(_rows()[:1], "revision_change_summary") == {
         "status": "insufficient_observations"
     }
+
+
+def test_rejection_counter_reads_both_reject_row_schemas() -> None:
+    # Whole-world rejections carry "rejection" (_world), band/program
+    # rejections carry "reason" (build). Reading only "reason" raised KeyError
+    # on the first rejected world and lost the entire report.
+    rows: list[dict[str, object]] = [
+        {"series_id": "s", "period": "2020", "rejection": "fewer_than_four_vintages"},
+        {
+            "series_id": "s",
+            "period": "2020",
+            "band": "64k",
+            "reason": "authentic_unique_records_cannot_fill_band",
+        },
+        {
+            "series_id": "s",
+            "period": "2020",
+            "band": "128k",
+            "program": "full_revision_path",
+            "reason": "complete_hf_chat_overflow",
+            "tokens": 262145,
+        },
+        {"series_id": "s", "period": "2021", "rejection": "fewer_than_four_vintages"},
+        {"series_id": "s", "period": "2022"},
+    ]
+    assert rejection_counts(rows) == {
+        "fewer_than_four_vintages": 2,
+        "authentic_unique_records_cannot_fill_band": 1,
+        "complete_hf_chat_overflow": 1,
+        "unknown": 1,
+    }
+    assert rejection_counts([]) == {}

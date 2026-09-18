@@ -365,7 +365,16 @@ def build(config_path: Path, output: Path, workers: int) -> dict:
                 "context_path": f"contexts/{context_sha}.txt",
                 "context_sha256": context_sha,
                 "admission_state": "complete_record_contract_local_candidate",
-                "local_candidate": True,
+                # One admission gate per row. This flag pair used to read
+                # local_candidate=True next to local_training_candidate=False
+                # while the SFT sample was still written to train.jsonl: two
+                # eligibility-shaped flags disagreeing in one record, with the
+                # True one ("local_candidate") outside the shared vocabulary, so
+                # any consumer reading it would admit rows the build does not
+                # admit. local_training_candidate stays the single gate; this
+                # field only records that the declared record contract was
+                # materialized.
+                "record_contract_complete": True,
                 "local_training_candidate": False,
                 "strict_long_dependency_verified": False,
                 "training_release_eligible": False,
@@ -409,6 +418,16 @@ def build(config_path: Path, output: Path, workers: int) -> dict:
             )
         ),
         "admission_states": dict(Counter(row["admission_state"] for row in candidates)),
+        # The single admission gate is local_training_candidate (documented as
+        # false here because these are local-probe candidates). Record the
+        # count under the shared gate name so a reader cannot mistake the
+        # per-row contract field for a second gate.
+        "record_contract_complete": sum(
+            bool(row["record_contract_complete"]) for row in candidates
+        ),
+        "local_training_candidate": sum(
+            bool(row["local_training_candidate"]) for row in candidates
+        ),
         "controls": {
             "complete_record_contract": "declared and source-record inventory checked",
             "question_only": "unmeasured",
@@ -483,6 +502,9 @@ def validate(config_path: Path, output: Path, workers: int) -> dict:
         "semantic_tasks",
         "capacity_bins",
         "rejection_reasons",
+        "admission_states",
+        "record_contract_complete",
+        "local_training_candidate",
     ):
         if rebuilt[key] != receipt[key]:
             raise ValueError(f"P66 ResearchLab replay mismatch: {key}")

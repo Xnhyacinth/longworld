@@ -177,7 +177,11 @@ def build(config_path: Path, output: Path, workers: int) -> dict:
             "latest_document_only_answer_em": "unmeasured",
             "compact_complete_record_controls": "unmeasured",
             "admission_reason": item["admission_reason"],
-            "local_training_candidate": accepted,
+            # The shared gate vocabulary is "local_training_eligible"
+            # (prepare_p64_training.py, taskbank_training.py). Emitting
+            # "local_training_candidate" here made every consumer that reads
+            # the shared name drop IETF rows silently.
+            "local_training_eligible": accepted,
             "strict_long_dependency_verified": False,
             "training_release_eligible": False,
             "production_eligible": False,

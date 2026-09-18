@@ -82,10 +82,16 @@ def test_materialized_rows_are_complete_record_contract_candidates() -> None:
     }
     assert all(
         row["admission_state"] == "complete_record_contract_local_candidate"
-        and row["local_candidate"] is True
+        and row["record_contract_complete"] is True
         and row["local_training_candidate"] is False
         for row in candidates
     )
+    # One admission flag per row: the old "local_candidate": True next to
+    # "local_training_candidate": False was an eligibility-shaped pair whose
+    # True half sat outside the shared vocabulary.
+    assert all("local_candidate" not in row for row in candidates)
+    assert receipt["record_contract_complete"] == len(candidates)
+    assert receipt["local_training_candidate"] == 0
     assert all(
         set(row["shortcut_evidence"].values()) == {"unmeasured"} for row in candidates
     )
@@ -99,6 +105,98 @@ def test_materialized_rows_are_complete_record_contract_candidates() -> None:
     }
     assert len({row["semantic_task_id"] for row in candidates}) == len(candidates)
     assert len({row["context_sha256"] for row in candidates}) == len(candidates)
+
+
+class _InlinePool:
+    def __init__(self, **kwargs):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def map(self, function, iterable):
+        return [function(item) for item in iterable]
+
+
+def test_admitted_row_has_exactly_one_eligibility_gate(
+    tmp_path: Path, monkeypatch
+) -> None:
+    spec = {
+        "family_id": "family-a",
+        "split": "train",
+        "old_version": "v1",
+        "new_version": "v2",
+        "paths": ["a"],
+        "context": "old a\nnew a",
+        "record_spans": {"v1:a": (0, 5), "v2:a": (6, 11)},
+        "answer": [{"path": "a", "status": "replaced"}],
+        "expected_capacity": 65536,
+        "compact_complete_child_tokens": 20_000,
+    }
+    monkeypatch.setattr(
+        materialize,
+        "checked_config",
+        lambda path: {
+            "families": [
+                {
+                    "family_id": "family-a",
+                    "kind": "arxiv_source_tar",
+                    "split": "train",
+                    "sources": [],
+                }
+            ],
+            "tokenizer": {"model_id": "Qwen/Qwen3.5-4B", "revision": "0" * 40},
+        },
+    )
+    monkeypatch.setattr(materialize, "_init_tokenizer", lambda config: None)
+    monkeypatch.setattr(materialize, "ProcessPoolExecutor", _InlinePool)
+    monkeypatch.setattr(materialize, "_tar_specs", lambda family: ([spec], []))
+    monkeypatch.setattr(
+        materialize,
+        "_evaluate",
+        lambda item: {
+            **item,
+            "question": "question?",
+            "messages": [
+                {"role": "user", "content": item["context"]},
+                {"role": "assistant", "content": "[]"},
+            ],
+            "context_tokens": 65_000,
+            "full_hf_chat_tokens": 65_100,
+            "assistant_tokens": 4,
+            "capacity_bin": 65536,
+            "exact_numeric_range": "64k",
+            "complete_record_span_tokens": 20_000,
+            "required_complete_records": 2,
+            "shortcut_evidence": {"question_only": "unmeasured"},
+            "admission_reason": "complete_record_contract_local_candidate",
+        },
+    )
+    monkeypatch.setattr(
+        materialize,
+        "resolved_tokenizer_asset_manifest_sha256",
+        lambda *args: "test-only",
+    )
+    output = tmp_path / "output"
+    config_path = tmp_path / "config.json"
+    config_path.write_text("{}\n")
+    materialize.build(config_path, output, 1)
+
+    (candidate,) = _jsonl(output / "candidates.jsonl")
+    # Exactly one eligibility-shaped flag, and it is the declared gate.
+    assert candidate["local_training_candidate"] is False
+    assert candidate["record_contract_complete"] is True
+    assert "local_candidate" not in candidate
+    # A local-probe corpus still writes its SFT seed: that behavior is
+    # unchanged; only the misleading second gate is gone.
+    (seed,) = _jsonl(output / "train.jsonl")
+    assert seed["sample_id"] == candidate["task_id"]
+    receipt = json.loads((output / "BUILD_RECEIPT.json").read_text())
+    assert receipt["record_contract_complete"] == 1
+    assert receipt["local_training_candidate"] == 0
 
 
 def test_validation_rejects_missing_output_member(tmp_path: Path, monkeypatch) -> None:

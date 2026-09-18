@@ -39,6 +39,19 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def rejection_counts(rows: list[dict[str, object]]) -> dict[str, int]:
+    """Count rejections from both schemas this build emits.
+
+    Whole-world rejections write "rejection" (:81), band/program rejections
+    write "reason" (:251/:291). Reading only "reason" raised KeyError on the
+    first rejected world and lost the whole report; reading both keys keeps
+    every rejection class visible.
+    """
+    return dict(
+        Counter(row.get("reason") or row.get("rejection") or "unknown" for row in rows)
+    )
+
+
 def _load(config: dict[str, object]) -> tuple[dict[str, object], str]:
     source = config["source"]
     assert isinstance(source, dict)
@@ -405,7 +418,7 @@ def build(
         "remove_one_all_change": sum(
             row["remove_one_all_change_answer"] for row in rows
         ),
-        "rejections": dict(Counter(row["reason"] for row in rejects)),
+        "rejections": rejection_counts(rejects),
         "workers": worker_count,
         "tokenizer": dict(tokenizer_config, asset_manifest_sha256=assets),
         "strict_verified": 0,
