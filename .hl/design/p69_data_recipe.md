@@ -328,3 +328,19 @@ p66 实测 151,947，128k 是偏保守的下游目标）：
 - **不合成 P69/P70 未经干预验证的行**：`strict_long_dependency_verified`
   由实测置位，`unmeasured` 不得默认 True（G-D5）；三个 prepare 脚本的
   fail-closed 硬门保持不动。
+
+
+## 6. P69 验证波生成记录（2026-09-18 实测）
+
+- 银行：`data/capability_records/p69_validation_wave_v1/`（348 行 = 278 train
+  / 70 eval；174 完整 shard；rejects 空；6 个 infeasible 单元如实记录于
+  infeasible.json——join_lookup 在 8K/K=20 与 32K/K=60 的 L 不可行，是
+  编译器诚实拒绝而非截断）。
+- 门（`--steps 26` 即 1.5-epoch 预算）：**exit 0 通过**。硬指标：
+  shape_uniqueness **0.8597**（P64 finance 为 0.036）、top3 覆盖 4.32%、
+  278 条指令（1.0 行/指令）、最差任务脚手架 0.002、监督占比 1.48%。
+- **held-out 独立复核：348/348 行的 assistant 答案由 solve_visible 从可见
+  正文重算一致**（train 与 eval 都过）。
+- 注意：shape-exposure 是预算函数——278 行的银行在 680×16 历史预算下为
+  9.2 epoch（10.7 exposure），会触红线；P69 波的训练预算必须按行数重定
+  （26 steps @ GBS16 = 1.5 epoch），这正是 P67 训练纪律条款的执行。
