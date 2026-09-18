@@ -1,0 +1,32 @@
+{
+  "schema_version": "longworld.record-world-config.v1",
+  "world_seed_base": 690000,
+  "families": [
+    "filter_aggregate",
+    "group_compare",
+    "join_lookup"
+  ],
+  "depths": [1, 2, 3],
+  "lengths": [200, 800, 3200],
+  "consumed_by_depth": {
+    "1": 20,
+    "2": 60,
+    "3": 200
+  },
+  "variants_per_world": 2,
+  "worlds_per_cell": 2,
+  "token_targets_by_depth": {
+    "1": [8192, 32768, 131072],
+    "2": [32768, 131072],
+    "3": [131072]
+  },
+  "workers": 4,
+  "notes": {
+    "lengths": "target L values in record rows; the runner fits L to the token target and records the accepted L",
+    "consumed_by_depth": "K per depth: depth 1 reads 20 rows, depth 2 reads 60, depth 3 reads 200",
+    "token_targets_by_depth": "K sets a hard floor on L: the K consumed records plus the minimum distractor budget must fit, so an 8K row is infeasible at K=60 and 32768 is infeasible at K=200. Only feasible cells are scheduled, and an infeasible one is rejected loudly rather than truncated",
+    "variants_per_world": "one primary length per semantic task; the (L,K,H) grid varies across worlds, not as three copies of one task",
+    "worlds_per_cell": "pilot scale; raise for a production bank",
+    "padding": "L - K rows are same-schema distractors: exposure and interference, never semantic scale"
+  }
+}
