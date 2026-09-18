@@ -280,6 +280,11 @@ def main() -> int:
             return record
         record["status"] = "ok"
         record["response_chars"] = len(text)
+        # Store the raw response so later waves can be re-graded format-free.
+        # The 0917 P64 diagnosis needed this and it did not exist: MRCR 0.0038
+        # zeroes ~489/491 rows on a missing 10-char prefix, and there was no
+        # way to ask what the content actually was.
+        record["response"] = text[:4096]
         if args.task.startswith("mrcr_"):
             record["score"] = grade_mrcr(text, row["answer"], row["prefix"])
             record["hash_ok"] = text.startswith(row["prefix"])
