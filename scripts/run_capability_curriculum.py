@@ -1,4 +1,20 @@
-"""Stratified multi-QA generation; resume reuses complete verified shards only."""
+"""Stratified multi-QA generation; resume reuses complete verified shards only.
+
+Two answer contracts are packaged here, chosen per family:
+
+* `joint` — every question of the world in one user turn and one assistant
+  JSON object. Only families whose answers are independent per entity/alias
+  (ledger, reservation) and the affine rule family may use it.
+* `split` — one supervised question per row, each with its own context prefix.
+  The workflow family must use it: its answers form one reversible value chain
+  (value = ((prior + payload) * multiplier) % 100003 with depends_on = the
+  previous record), so a joint row lets a decoder read answer k off answer
+  k-1 plus the partition slice without the long read.
+
+Because the packaging is part of the world identity and of the row schema,
+an output directory written by the previous (v2) schema is not resumable:
+choose a fresh output directory.
+"""
 
 from __future__ import annotations
 
@@ -26,11 +42,42 @@ FAMILIES = {
     "rule_learning": "capability_rules_workflow",
     "workflow": "capability_rules_workflow",
 }
-SCHEMA = "longworld.multiqa-curriculum.v2"
+# Packaging is a property of the family, not of a run: the workflow family is
+# one-question-per-row and every other family stays joint.
+PACKAGING = {
+    "ledger": "joint",
+    "reservation": "joint",
+    "rule_learning": "joint",
+    "workflow": "split",
+}
+QUESTIONS_PER_ROW = {"joint": 16, "split": 1}
+SCHEMA = "longworld.multiqa-curriculum.v3"
 
 
 def compiler(family):
     return importlib.import_module("longworld.synthesis." + FAMILIES[family])
+
+
+# Families whose module does not own the accessor still have to state how their
+# answers stand to the visible context. ledger/reservation answers are one
+# per-entity reduction over that entity's own records, so they are independent
+# by construction -- the same claim capability_curriculum's own lineage makes
+# with "qa_layout": "independent_branches".
+JOINT_INDEPENDENT_DEPENDENCY = {
+    "answer_dependency_mode": "independent",
+    "basis": "one question per entity/alias partition; no answer shares evidence with another",
+    "visible_prefix_self_contained": True,
+}
+
+
+def dependency_metadata(family, packaging):
+    module = compiler(family)
+    accessor = getattr(module, "dependency_metadata", None)
+    if accessor is None:
+        if packaging != "joint":
+            raise ValueError("split packaging requires a module dependency accessor")
+        return dict(JOINT_INDEPENDENT_DEPENDENCY)
+    return accessor(family, packaging)
 
 
 def make_plan(topics, config):
@@ -78,15 +125,29 @@ def make_plan(topics, config):
     return plan
 
 
-def build_messages(context, tasks, topic):
+def build_messages(context, tasks, topic, packaging="joint", supervised=None):
+    """One visible context plus the assistant answer(s) this row supervises.
+
+    `joint` supervises every question in one assistant JSON object. `split`
+    supervises exactly one question (`supervised` names it) and fails closed if
+    any sibling gold string would still appear in that assistant message.
+    """
     ids = [task["task_id"] for task in tasks]
     if not tasks or len(set(ids)) != len(ids):
         raise ValueError("missing or duplicate question IDs")
     if any(context in task["prompt"] for task in tasks):
         raise ValueError("question prompt duplicates context")
+    if packaging == "joint":
+        supervised_rows = list(tasks)
+    elif packaging == "split":
+        if supervised not in ids:
+            raise ValueError("split row requires one supervised question ID")
+        supervised_rows = [task for task in tasks if task["task_id"] == supervised]
+    else:
+        raise ValueError("unknown packaging mode")
     queries = [
         {"id": t["task_id"], "question": t["question"], "instruction": t["prompt"]}
-        for t in tasks
+        for t in supervised_rows
     ]
     metadata = (
         "TOPIC METADATA (sampling label; all events are simulated):\n"
@@ -95,6 +156,20 @@ def build_messages(context, tasks, topic):
         if topic
         else ""
     )
+    assistant = base.canonical(
+        {t["task_id"]: t["answer"] for t in supervised_rows}
+    )
+    # Fail closed on the P0-3 leak: a split row must not hand the model any
+    # other question's gold string, whatever the answer shapes turn out to be.
+    if packaging == "split":
+        for task in tasks:
+            if task["task_id"] == supervised:
+                continue
+            if base.canonical(task["answer"]) in assistant:
+                raise ValueError("split row exposes another question's gold answer")
+    # The closing line is the family module's constant: the auditor parses the
+    # user turn by stripping exactly this suffix. The per-question wording lives
+    # in the question payload above, where the auditor reads it.
     return [
         {
             "role": "user",
@@ -102,17 +177,30 @@ def build_messages(context, tasks, topic):
             + context
             + "\n\nQUESTIONS\n"
             + base.canonical(queries)
-            + "\nReturn one JSON object mapping every question id to its answer.",
+            + compiler("workflow").ANSWER_SUFFIX,
         },
-        {
-            "role": "assistant",
-            "content": base.canonical({t["task_id"]: t["answer"] for t in tasks}),
-        },
+        {"role": "assistant", "content": assistant},
     ]
 
 
+def row_context(module, variant, task, packaging):
+    """Visible context of one row: the whole world, or that question's prefix."""
+    if packaging == "joint":
+        return variant["context"]
+    return module.workflow_context(
+        json.loads(variant["context"]), task["question"]["cutoff"]
+    )
+
+
 def fit_world(job, capacity, tokenizer):
+    """Grow the record count until every row is input-long and complete.
+
+    Under `split` each row is length-fitted at its own prefix length: the
+    shortest prefix is the hardest one to keep above 90% of capacity, so the
+    record count is driven by the minimum over rows, not by the full world.
+    """
     module = compiler(job["family"])
+    packaging = PACKAGING[job["family"]]
     count = 120
     seen = set()
     for _ in range(12):
@@ -137,32 +225,32 @@ def fit_world(job, capacity, tokenizer):
                 or len({base.canonical(t["question"]) for t in tasks}) != 16
             ):
                 raise ValueError("expected 16 distinct questions")
-            messages = build_messages(variant["context"], tasks, job["topic"])
-            full = base._render_chat(tokenizer, messages, generation_prompt=False)
-            prompt = base._render_chat(tokenizer, messages[:-1], generation_prompt=True)
-            full_tokens = len(tokenizer(full, truncation=False)["input_ids"])
-            input_tokens = len(tokenizer(prompt, truncation=False)["input_ids"])
-            rows.append(
-                {
-                    "schema_version": SCHEMA,
-                    "example_id": f"{bundle['world_id']}:{view}:multiqa16",
-                    "world_id": bundle["world_id"],
-                    "world_seed": job["seed"],
-                    "family": job["family"],
-                    "topic": job["topic"],
-                    "split": job["split"],
-                    "view": view,
-                    "messages": messages,
-                    "qa_count": len(tasks),
-                    "capabilities": dict(Counter(t["capability"] for t in tasks)),
-                    "capacity_tokens": capacity,
-                    "full_chat_tokens": full_tokens,
-                    "input_tokens": input_tokens,
-                    "n_records": count,
-                    "strict_long_dependency_verified": False,
-                    "production_eligible": False,
-                }
+            for task in tasks if packaging == "split" else [None]:
+                supervised = None if task is None else task["task_id"]
+                context = row_context(module, variant, task, packaging) if task else variant["context"]
+                rows.append(
+                    _row(
+                        job,
+                        capacity,
+                        bundle["world_id"],
+                        variant,
+                        tasks,
+                        context,
+                        packaging,
+                        view,
+                        supervised,
+                        count,
+                    )
+                )
+        for row in rows:
+            full = base._render_chat(
+                tokenizer, row["messages"], generation_prompt=False
             )
+            prompt = base._render_chat(
+                tokenizer, row["messages"][:-1], generation_prompt=True
+            )
+            row["full_chat_tokens"] = len(tokenizer(full, truncation=False)["input_ids"])
+            row["input_tokens"] = len(tokenizer(prompt, truncation=False)["input_ids"])
         if all(
             math.ceil(capacity * 0.90) <= row["input_tokens"]
             and row["full_chat_tokens"] <= capacity
@@ -193,6 +281,40 @@ def fit_world(job, capacity, tokenizer):
     raise ValueError("length fitting exhausted")
 
 
+def _row(job, capacity, world_id, variant, tasks, context, packaging, view, supervised, count):
+    """One exported row; the row's own packaging decides its supervision."""
+    messages = build_messages(context, tasks, job["topic"], packaging, supervised)
+    supervised_tasks = [
+        t for t in tasks if supervised is None or t["task_id"] == supervised
+    ]
+    per_row = len(supervised_tasks)
+    tag = "multiqa16" if supervised is None else f"single-{supervised}"
+    metadata = dependency_metadata(job["family"], packaging)
+    return {
+        "schema_version": SCHEMA,
+        "example_id": f"{world_id}:{view}:{tag}",
+        "world_id": world_id,
+        "world_seed": job["seed"],
+        "family": job["family"],
+        "topic": job["topic"],
+        "split": job["split"],
+        "view": view,
+        "packaging": packaging,
+        "questions_per_row": per_row,
+        "supervised_question_id": supervised,
+        "messages": messages,
+        "qa_count": per_row,
+        "capabilities": dict(Counter(t["capability"] for t in supervised_tasks)),
+        "dependency_metadata": metadata,
+        "answer_dependency_mode": metadata["answer_dependency_mode"],
+        "capacity_tokens": capacity,
+        "context_chars": len(context),
+        "n_records": count,
+        "strict_long_dependency_verified": False,
+        "production_eligible": False,
+    }
+
+
 def load_cached(shard, fingerprint, *, semantic=False):
     receipt_file = shard / "receipt.json"
     if not receipt_file.is_file():
@@ -212,23 +334,46 @@ def load_cached(shard, fingerprint, *, semantic=False):
         module = compiler(receipt["family"])
         if not module.validate_bundle(bundle)["passed"]:
             raise ValueError("cached world semantic validation failed")
+        packaging = PACKAGING[receipt["family"]]
+        if receipt["packaging"] != packaging:
+            raise ValueError("cached shard packaging does not match the family")
         rows = [
             json.loads(line) for line in (shard / "rows.jsonl").read_text().splitlines()
         ]
-        if len(rows) != 2 or {row["view"] for row in rows} != {
-            "factual",
-            "counterfactual",
-        }:
+        if len(rows) != 2 * receipt["rows_per_view"] or {
+            row["view"] for row in rows
+        } != {"factual", "counterfactual"}:
             raise ValueError("cached rows are incomplete")
         for row in rows:
             variant = bundle if row["view"] == "factual" else bundle["counterfactual"]
+            task = next(
+                (
+                    t
+                    for t in variant["tasks"]
+                    if t["task_id"] == row["supervised_question_id"]
+                ),
+                None,
+            )
+            context = (
+                variant["context"]
+                if task is None
+                else row_context(module, variant, task, packaging)
+            )
             if (
-                row["messages"]
-                != build_messages(variant["context"], variant["tasks"], row["topic"])
+                row["schema_version"] != SCHEMA
+                or row["packaging"] != packaging
+                or row["questions_per_row"] != QUESTIONS_PER_ROW[packaging]
+                or row["messages"]
+                != build_messages(
+                    context,
+                    variant["tasks"],
+                    row["topic"],
+                    packaging,
+                    row["supervised_question_id"],
+                )
                 or row["world_id"] != bundle["world_id"]
                 or row["world_seed"] != bundle["seed"]
                 or row["family"] != bundle["family"]
-                or row["qa_count"] != 16
                 or row["split"] != receipt["split"]
                 or row["topic"]["id"] != receipt["topic_id"]
             ):
@@ -275,8 +420,12 @@ def run_shard(job, capacity, output, fingerprint):
         "domain_id": job["topic"]["domain"]["id"],
         "split": job["split"],
         "capacity_tokens": capacity,
+        "packaging": PACKAGING[job["family"]],
+        "questions_per_row": QUESTIONS_PER_ROW[PACKAGING[job["family"]]],
         "n_records": rows[0]["n_records"],
         "rows": len(rows),
+        "rows_per_view": len(rows) // 2,
+        "dependency_metadata": rows[0]["dependency_metadata"],
         "qa_pairs": sum(row["qa_count"] for row in rows),
         "input_tokens": [row["input_tokens"] for row in rows],
         "full_chat_tokens": [row["full_chat_tokens"] for row in rows],
@@ -319,6 +468,23 @@ def completion_manifest(receipts, plan, fingerprint, files):
         "completed_shards": len(receipts),
         "world_seed_groups": len(plan),
         "semantic_families": sorted({r["family"] for r in receipts}),
+        # Packaging is a per-family contract, recorded here so a consumer can
+        # see how many questions each row supervises and how the answer stands
+        # to the visible context (independent vs dependency_given).
+        "packaging": {
+            family: {
+                "packaging": receipt["packaging"],
+                "questions_per_row": receipt["questions_per_row"],
+                **receipt["dependency_metadata"],
+            }
+            for family, receipt in sorted(
+                {r["family"]: r for r in receipts}.items()
+            )
+        },
+        "rows_per_family": {
+            family: sum(r["rows"] for r in receipts if r["family"] == family)
+            for family in sorted({r["family"] for r in receipts})
+        },
         "sampled_topics": len({r["topic_id"] for r in receipts}),
         "sampled_domains": len({r["domain_id"] for r in receipts}),
         "sampled_fields": len({j["topic"]["field"]["id"] for j in plan}),

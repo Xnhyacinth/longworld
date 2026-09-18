@@ -84,6 +84,40 @@ def test_context_in_question_prompt_is_rejected():
         )
 
 
+@pytest.mark.parametrize("packaging", ["joint", "split"])
+def test_duplicate_ids_and_context_in_prompt_are_rejected_in_both_modes(packaging):
+    """Backward compatibility: the two fail-closed guards survive packaging."""
+    tasks = [
+        {"task_id": "q0", "question": {}, "prompt": "Compute state.", "answer": 1},
+        {"task_id": "q1", "question": {}, "prompt": "Recall memo.", "answer": 2},
+    ]
+    supervised = None if packaging == "joint" else "q0"
+    duplicate = copy.deepcopy(tasks)
+    duplicate[1]["task_id"] = "q0"
+    with pytest.raises(ValueError, match="duplicate"):
+        build_messages("CONTEXT", duplicate, None, packaging, supervised)
+    embedded = copy.deepcopy(tasks)
+    embedded[1]["prompt"] = "CONTEXT appears inside the question"
+    with pytest.raises(ValueError, match="context"):
+        build_messages("CONTEXT", embedded, None, packaging, supervised)
+
+
+def test_joint_mode_is_the_historical_single_assistant_object():
+    """The v2 packaging contract is unchanged where the family still uses it."""
+    tasks = [
+        {"task_id": "q0", "question": {"operation": "state"}, "prompt": "Compute.",
+         "answer": [1, 2]},
+        {"task_id": "q1", "question": {"operation": "recall"}, "prompt": "Recall.",
+         "answer": "memo"},
+    ]
+    messages = build_messages("CONTEXT_ONLY_ONCE", tasks, None)
+    assert json.loads(messages[1]["content"]) == {"q0": [1, 2], "q1": "memo"}
+    assert messages[0]["content"].count("CONTEXT_ONLY_ONCE") == 1
+    assert messages[0]["content"].endswith(
+        "\nReturn one JSON object mapping every question id to its answer."
+    )
+
+
 def test_completed_resume_rejects_manifest_field_tampering(tmp_path):
     (tmp_path / "shards").mkdir()
     for name, value in (

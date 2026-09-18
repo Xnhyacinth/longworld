@@ -4,6 +4,7 @@ import json
 import pytest
 
 from longworld.synthesis.capability_rules_workflow import (
+    PROMPTS,
     execute_job,
     generate_bundle,
     solve_visible,
@@ -13,14 +14,41 @@ from longworld.synthesis.capability_rules_workflow import (
 
 @pytest.mark.parametrize("family", ["rule_learning", "workflow"])
 @pytest.mark.parametrize("questions", [1, 4, 8, 16])
-def test_generation_visible_solve_and_counterfactual(family, questions):
-    bundle = generate_bundle(137, family, 120, questions)
+@pytest.mark.parametrize("packaging", ["joint", "split"])
+def test_generation_visible_solve_and_counterfactual(family, questions, packaging):
+    if packaging == "split" and family != "workflow":
+        pytest.skip("split packaging is workflow-only")
+    bundle = generate_bundle(137, family, 120, questions, packaging=packaging)
     report = validate_bundle(bundle)
     assert report["passed"], report
     assert report["checks"]["answers_checked"] == questions * 2
     assert 1 <= report["checks"]["changed_answers"] <= questions
-    assert bundle == generate_bundle(137, family, 120, questions)
+    assert bundle == generate_bundle(137, family, 120, questions, packaging=packaging)
     assert bundle["lineage"]["source_kind"] == "simulated"
+
+
+@pytest.mark.parametrize("questions", [1, 4, 8, 16])
+def test_joint_mode_still_answers_all_questions_per_row(questions):
+    """Backward compatibility: the historical 16-per-row contract is intact."""
+    bundle = generate_bundle(137, "workflow", 120, questions, packaging="joint")
+    assert bundle["tasks"][0]["question"] == {"partition": 0}
+    assert "cutoff" not in bundle["tasks"][0]["question"]
+    assert bundle["tasks"][0]["prompt"] == PROMPTS["workflow"]
+    assert bundle["tasks"][0]["answer"] == _joint_answer(bundle, 0)
+
+
+def _joint_answer(bundle, partition):
+    doc = json.loads(bundle["context"])
+    selected = {row["id"] for row in doc["records"] if row["partition"] == partition}
+    receipts = [
+        row for row in bundle["lineage"]["execution_receipts"] if row["job"] in selected
+    ]
+    return {
+        "last_job": receipts[-1]["job"],
+        "final_value": receipts[-1]["value"],
+        "recovery_count": sum(len(row["continuation"]) > 1 for row in receipts),
+        "next_action_for_last_job": receipts[-1]["continuation"][0]["action"],
+    }
 
 
 def test_rule_inference_requires_identifying_demonstrations():
