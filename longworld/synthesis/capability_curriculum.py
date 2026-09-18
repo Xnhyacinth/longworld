@@ -280,6 +280,39 @@ def generate_bundle(
             **({"approved": True} if family == "ledger" else {}),
         )
     ordinary_reservations = {entity: [] for entity in entities}
+    # T3 fix: track the conservative running balance per entity so debit
+    # amounts are drawn against it. Without this, credits (mean ~25, approval
+    # ~0.81) outweigh debits (mean ~6.4) 6.6:1 in total, balances grow +11.4
+    # per event, and from the mid third of the context 99.7% of debits pass
+    # the sufficiency conditional trivially (measured over 30 seeds) -- the
+    # only conditional mechanism in the ledger family goes inert.
+    # The tracked balance is an upper bound (skipped debits are not
+    # subtracted), so drawn amounts stay conservative.
+    balances = {entity: 0 for entity in entities}
+    freeable: list[int] = []
+    for event in events:
+        if event.params.get("approved", True) and event.type in (
+            "credit",
+            "supply",
+        ):
+            balances[event.params["entity"]] += event.params["amount"]
+
+    def add_conditional(kind, entity, **params):
+        """Add a debit/reserve whose amount is drawn against the entity's
+        tracked balance. ~1/3 of the time it exceeds the balance by 1-3 so
+        failures exist throughout the context (real withdrawal requests do
+        get declined) and so the counterfactual -- raising an earlier credit
+        by 5-20 -- can genuinely free it, flipping downstream application
+        state as the descendant_recomputed check requires."""
+        balance = max(0, balances[entity])
+        amount = rng.randint(1, max(2, balance))
+        if rng.random() < 0.34:
+            amount = balance + rng.randint(1, 3)
+            freeable.append(len(events))
+        else:
+            balances[entity] = balance - amount
+        return add(kind, entity, amount=amount, **params)
+
     while len(events) < n_records:
         entity = rng.choice(entities)
         if family == "reservation" and rng.random() < 0.35:
@@ -288,10 +321,10 @@ def generate_bundle(
                 add("release", entity, reservation=rng.choice(reservations))
             else:
                 ordinary_reservations[entity].append(
-                    add("reserve", entity, amount=rng.randint(1, 8))
+                    add_conditional("reserve", entity)
                 )
         elif family == "ledger" and rng.random() < 0.35:
-            add("debit", entity, amount=rng.randint(1, 8))
+            add_conditional("debit", entity)
         else:
             add(
                 "credit" if family == "ledger" else "supply",
@@ -300,6 +333,7 @@ def generate_bundle(
                 memo=f"note-{rng.getrandbits(96):024x}",
                 **({"approved": rng.random() > 0.2} if family == "ledger" else {}),
             )
+            balances[entity] += events[-1].params["amount"]
     for entity, first in zip(entities, first_attempts):
         state_cutoffs.append(
             add(
@@ -309,10 +343,59 @@ def generate_bundle(
                 amount=1,
             )
         )
-    alternate = copy.deepcopy(events)
-    alternate[4].params["amount"] += 10
+    # T1 fix: the counterfactual used to modify event index 4 (the first
+    # credit of entities[0]) in every world -- intervention position 0.0323
+    # with zero variance over 20 seeds. Draw the target from credit/supply
+    # events, stratified into early/mid/late thirds, and verify by oracle
+    # simulation that the bump actually flips a downstream conditional
+    # (descendant_recomputed requires it). A candidate qualifies only if
+    # raising it by the drawn delta toggles some event's application state;
+    # freeable gaps grow as later over-balance conditionals stack, so the
+    # filter must simulate rather than reason from the generation-time gap.
     world, history = _oracle(events, family, seed)
+
+    def try_intervention(index: int, delta: int) -> bool:
+        probe = copy.deepcopy(events)
+        probe[index].params["amount"] += delta
+        probe_world, _ = _oracle(probe, family, seed)
+        return any(
+            a.skipped != b.skipped
+            for a, b in zip(world.events, probe_world.events)
+        )
+
+    candidates = [i for i, e in enumerate(events) if e.type in ("credit", "supply")]
+    third = max(1, len(candidates) // 3)
+    strata = [candidates[:third], candidates[third : 2 * third], candidates[2 * third:]]
+    strata = [s for s in strata if s]
+    rng.shuffle(strata)
+    target_index, delta = 4, 10  # historical fallback
+    for stratum in strata:
+        for candidate in stratum:
+            attempt_delta = rng.randint(5, 20)
+            if try_intervention(candidate, attempt_delta):
+                target_index, delta = candidate, attempt_delta
+                break
+        else:
+            continue
+        break
+    alternate = copy.deepcopy(events)
+    alternate[target_index].params["amount"] += delta
     cf_world, cf_history = _oracle(alternate, family, seed)
+
+    # T2 fix: recall ordinals used to be 1 + (supply_count - 1) * i // 3, an
+    # exact function of the entity index (entity 0 always ordinal 1 -- "take
+    # the first memo" answered 25% of recall tasks). Draw them per entity
+    # BEFORE tasks_for runs, so the factual and counterfactual views share
+    # the same ordinals and stay a paired sample.
+    recall_ordinals = {}
+    for i, entity in enumerate(entities):
+        supply_count = sum(
+            1
+            for e in events
+            if e.params.get("entity") == entity
+            and e.type in ("credit", "supply")
+        )
+        recall_ordinals[i] = rng.randint(1, max(1, supply_count))
 
     def tasks_for(view, trace, visible_events):
         tasks = []
@@ -329,10 +412,7 @@ def generate_bundle(
                 cutoff = state_cutoffs[i] if op == "state" else entity_events[-1].id
                 question = {"operation": op, "alias": alias, "asof": cutoff}
                 if op == "recall":
-                    supply_count = sum(
-                        e.type in ("credit", "supply") for e in entity_events
-                    )
-                    question["ordinal"] = 1 + (supply_count - 1) * i // 3
+                    question["ordinal"] = recall_ordinals[i]
                 compact = [e for e in entity_events if e.id <= cutoff]
                 task = {
                     "task_id": f"{op}-{i}",
@@ -348,7 +428,33 @@ def generate_bundle(
                     },
                 }
                 tasks.append(task)
-        return tasks[:n_questions]
+        # T4 fix: plain prefix truncation turned any n_questions < 16 into a
+        # single-capability dataset (n=4 -> 4 state_transitions, measured).
+        # Round-robin across capability families instead, so every family
+        # stays within max-min <= 1 of balanced at any n.
+        buckets = {
+            capability: []
+            for capability in (
+                "state_transitions",
+                "dense_aggregation",
+                "recall_binding",
+                "state_set_integration",
+            )
+        }
+        for task in tasks:
+            buckets[task["capability"]].append(task)
+        selected: list[dict] = []
+        order = sorted(buckets)
+        offset = rng.randrange(len(order))
+        while len(selected) < n_questions:
+            for name in order[offset:] + order[:offset]:
+                if buckets[name] and len(selected) < n_questions:
+                    selected.append(buckets[name].pop(0))
+        # Sorting after selection keeps the factual and counterfactual task
+        # lists in identical order: the rng draw above is consumed once per
+        # tasks_for call, so an unsorted return would interleave families
+        # differently between the two views and break the paired-sample zip.
+        return sorted(selected, key=lambda t: t["task_id"])
 
     tasks = tasks_for(world, history, events)
     cf_tasks = tasks_for(cf_world, cf_history, alternate)
@@ -372,7 +478,9 @@ def generate_bundle(
             "tasks": cf_tasks,
             "intervention": {
                 "param_overrides": {
-                    source_ids[0]: {"amount": alternate[4].params["amount"]}
+                    events[target_index].id: {
+                        "amount": alternate[target_index].params["amount"]
+                    }
                 }
             },
             "checks": {

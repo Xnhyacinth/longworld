@@ -111,7 +111,16 @@ def test_long_chain_and_question_only_witness(family):
     assert original["question"] == alternate["question"]
     assert original["answer"] != alternate["answer"]
     changed = bundle["counterfactual"]["checks"]["changed_application_events"]
-    assert int(changed[-1][1:]) - int(changed[0][1:]) > 3900
+    # The intervention position is now randomized (T1 fix), so the span of
+    # recomputed descendants varies with it. The old assertion
+    # (span > 3900) encoded the degenerate always-index-4 intervention:
+    # every descendant across the full context flipped every time. Keep the
+    # substantive requirements instead: the recomputation exists, it is
+    # ordered after the intervention, and the context is fully rendered.
+    assert len(changed) >= 1
+    assert int(changed[0][1:]) > int(
+        next(iter(bundle["counterfactual"]["intervention"]["param_overrides"]))[1:]
+    )
     assert len(bundle["context"].splitlines()) == 4005
 
 

@@ -118,6 +118,11 @@ def main() -> int:
     parser.add_argument("--steps", type=int, default=680)
     parser.add_argument("--gbs", type=int, default=16)
     parser.add_argument("--json", action="store_true", help="machine-readable output")
+    parser.add_argument(
+        "--gate",
+        action="store_true",
+        help="apply collapse gates and exit non-zero on violation",
+    )
     args = parser.parse_args()
 
     shapes: Counter[str] = Counter()
@@ -209,11 +214,64 @@ def main() -> int:
         else None,
     }
 
+    # Collapse gates. Thresholds derive from the three measured runs, not
+    # from a published number (none exists -- see the P68 design doc):
+    # ACC 1.1 shape-exposure / 94% shape uniqueness / 3.2 rows-per-document
+    # survived; LongTrace 5.6 / 70% / -- survived with partial damage;
+    # P64 68.4 / 8.1% / 89 rows-per-doc collapsed. Floors sit a factor of
+    # ~2 above the observed success and ~2-5x below the observed failure.
+    violations: list[str] = []
+    shape_uniqueness = report["shape_uniqueness"]
+    if shape_uniqueness < 0.10:
+        violations.append(
+            f"shape_uniqueness {shape_uniqueness} < 0.10 floor "
+            "(P64 measured 0.081; ACC 0.940)"
+        )
+    if report.get("per_document_exposure_at_budget") and report[
+        "per_document_exposure_at_budget"
+    ] > 50:
+        violations.append(
+            f"per-document exposure {report['per_document_exposure_at_budget']} > 50 "
+            "(ACC measured 3.2 rows/doc; P64 measured 89)"
+        )
+    top_instr_share = report.get("template_collapse", {}).get(
+        "top_instruction_share"
+    )
+    if top_instr_share and top_instr_share > 0.10:
+        violations.append(
+            f"top_instruction_share {top_instr_share} > 0.10 "
+            "(P64 finance: 17 instructions, one serves 25% of rows)"
+        )
+    # Scaffold concentration is REPORT-ONLY: ACC's worst task measures 0.704
+    # and P64's 0.837 -- a real but thin margin, not a gate. Use it as a
+    # signal to inspect a family, not to block a corpus.
+    shape_exposure = (
+        report["effective_epochs_at_budget"] * rows / len(shapes)
+        if shapes
+        else 0.0
+    )
+    if shape_exposure > 10:
+        violations.append(
+            f"shape-exposure {shape_exposure:.1f} > 10 "
+            "(ACC 1.1 / LongTrace 5.6 / P64 68.4; failure boundary ~19.6)"
+        )
+    report["gate_violations"] = violations
+    report["gate_passed"] = not violations
+
     if args.json:
         print(json.dumps(report, indent=2))
     else:
         for k, v in report.items():
-            print(f"  {k:38s} {v}")
+            if k == "gate_violations" and v:
+                print("  GATE VIOLATIONS:")
+                for item in v:
+                    print(f"    - {item}")
+            elif k == "gate_violations":
+                print("  gate_violations                   []")
+            else:
+                print(f"  {k:38s} {v}")
+    if args.gate and violations:
+        return 1
     return 0
 
 
