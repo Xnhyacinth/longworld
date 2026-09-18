@@ -126,8 +126,17 @@ def audit_export(source: Path, tokenizer, windows=WINDOWS):
         rows = [
             _loads(line) for line in (shard / "rows.jsonl").read_text().splitlines()
         ]
-        if len(rows) != 2 or {r["view"] for r in rows} != {"factual", "counterfactual"}:
+        # Joint packaging exports exactly one factual/counterfactual pair per
+        # shard; split packaging (workflow) exports one row per supervised
+        # question per view, so a shard carries 2 * n_questions rows. Both
+        # views must always be present; the pairing below is by question id
+        # within one shard either way.
+        if not rows or {r["view"] for r in rows} != {"factual", "counterfactual"}:
             raise ValueError("missing paired view")
+        if receipt.get("packaging") == "joint" and len(rows) != 2:
+            raise ValueError("joint shard must hold exactly two rows")
+        if receipt.get("rows_per_view") and len(rows) != 2 * receipt["rows_per_view"]:
+            raise ValueError("row count disagrees with receipt rows_per_view")
         family = receipt["family"]
         module = compiler(family)
         stats = summary[family]
@@ -157,12 +166,32 @@ def audit_export(source: Path, tokenizer, windows=WINDOWS):
             context, questions, answers = parse_exported_messages(row["messages"])
             variant = bundle if row["view"] == "factual" else bundle["counterfactual"]
             tasks = {t["task_id"]: t for t in variant["tasks"]}
-            if (
-                context != variant["context"]
-                or set(tasks) != set(answers)
-                or len(questions) != row["qa_count"]
-            ):
+            # A joint row carries the whole variant context verbatim. A split
+            # row's context is a RE-RENDERED prefix of the variant world
+            # (workflow_context re-renders with a corrected header, e.g. the
+            # event count), so string-prefix comparison does not hold; the
+            # row's context must reproduce exactly from the variant plus the
+            # question's cutoff.
+            if receipt.get("packaging") == "split":
+                task = tasks[row["supervised_question_id"]]
+                expected = module.workflow_context(
+                    json.loads(variant["context"]), task["question"]["cutoff"]
+                )
+                if context != expected:
+                    raise ValueError("split row context is not the cutoff re-render")
+            elif context != variant["context"]:
                 raise ValueError("visible task/context coverage mismatch")
+            # Joint rows supervise every task; split rows supervise exactly
+            # the one named by supervised_question_id.
+            if receipt.get("packaging") == "split":
+                if (
+                    set(answers) != {row["supervised_question_id"]}
+                    or len(questions) != row["qa_count"]
+                    or row["qa_count"] != 1
+                ):
+                    raise ValueError("split row answer coverage mismatch")
+            elif set(tasks) != set(answers) or len(questions) != row["qa_count"]:
+                raise ValueError("visible task/answer coverage mismatch")
             for question in questions:
                 task = tasks[question["id"]]
                 if (
@@ -187,30 +216,55 @@ def audit_export(source: Path, tokenizer, windows=WINDOWS):
                     stats["oracle_compact_tokens_sum"] += len(
                         _token_ids(tokenizer, compact)
                     )
-            views[row["view"]] = (
-                context,
-                questions,
-                answers,
-                _token_ids(tokenizer, context),
+            # Pair by question id within the view: joint rows contribute all
+            # ids at once, split rows contribute their single supervised id.
+            # The counterfactual must answer the SAME questions with the same
+            # instructions; for split rows the pairing key is the question id
+            # (the contexts legitimately differ -- that is the point of the
+            # prefix contract).
+            entry = views.setdefault(
+                row["view"],
+                {"questions": {}, "answers": {}, "token_ids": {}},
             )
+            context_ids = _token_ids(tokenizer, context)
+            for question in questions:
+                qid = question["id"]
+                if qid in entry["questions"]:
+                    raise ValueError("duplicate question id within view")
+                entry["questions"][qid] = question
+                entry["answers"][qid] = answers[qid]
+                entry["token_ids"][qid] = context_ids
             stats["rows"] += 1
             total_qa += len(questions)
         left, right = views["factual"], views["counterfactual"]
-        if left[1] != right[1]:
-            raise ValueError("counterfactual changes question/instruction")
+        if set(left["questions"]) != set(right["questions"]):
+            raise ValueError("counterfactual changes question set")
+        for qid, question in left["questions"].items():
+            other = right["questions"][qid]
+            if (
+                question["question"] != other["question"]
+                or question["instruction"] != other["instruction"]
+            ):
+                raise ValueError("counterfactual changes question/instruction")
         witnesses = Counter()
         changed = 0
-        for q in left[1]:
-            answer_changed = base.canonical(left[2][q["id"]]) != base.canonical(
-                right[2][q["id"]]
+        for qid in left["questions"]:
+            answer_changed = base.canonical(left["answers"][qid]) != base.canonical(
+                right["answers"][qid]
             )
             changed += answer_changed
+            # Window witnesses compare the two views' rendered contexts. For
+            # joint rows there is one context per view; for split rows each
+            # question has its own prefix pair, so compare that question's
+            # factual/counterfactual prefix tokens.
+            left_ids = left["token_ids"][qid]
+            right_ids = right["token_ids"][qid]
             for name, found in bounded_window_witnesses(
-                left[3], right[3], answer_changed, windows
+                left_ids, right_ids, answer_changed, windows
             ).items():
                 witnesses[name] += found
         stats["changed_pairs"] += changed
-        stats["unchanged_pairs"] += len(left[1]) - changed
+        stats["unchanged_pairs"] += len(left["questions"]) - changed
         stats["world_shards"] += 1
         for name, count in witnesses.items():
             stats["identical_window_changed_answer:" + name] += count
@@ -223,9 +277,12 @@ def audit_export(source: Path, tokenizer, windows=WINDOWS):
                 "shard_id": shard_id,
                 "family": family,
                 "changed_pairs": changed,
-                "unchanged_pairs": len(left[1]) - changed,
+                "unchanged_pairs": len(left["questions"]) - changed,
                 "window_witnesses": dict(witnesses),
-                "context_tokens": [len(left[3]), len(right[3])],
+                "context_tokens": [
+                    len(left["token_ids"][qid0]) if (qid0 := next(iter(left["token_ids"]), None)) else 0,
+                    len(right["token_ids"][qid1]) if (qid1 := next(iter(right["token_ids"]), None)) else 0,
+                ],
             }
         )
     if (
