@@ -25,12 +25,28 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from longworld.core.attestation import sanitized_attestation_environment
+from longworld.synthesis import capability_families as families
 from longworld.synthesis import capability_records as records
 
 MODEL = "Qwen/Qwen3.5-4B"
 REVISION = "a7b0d22b993d71000cf2eadfb37222a67cee521e"
 SCHEMA = "longworld.record-world.v1"
 _TOKENIZER = None
+
+# Family dispatch: every capability family owns its generator, visible contract
+# and validator behind the same (L, K, H) surface, so the runner resolves the
+# owning module once per family instead of branching in every step. The record
+# worlds are the reference implementation; the P70 families ride the same spine.
+FAMILY_MODULES = {
+    **{name: records for name in records.FAMILIES},
+    **{name: families for name in families.FAMILIES},
+}
+
+
+def module_for(family: str):
+    if family not in FAMILY_MODULES:
+        raise ValueError(f"no module registered for family {family!r}")
+    return FAMILY_MODULES[family]
 
 
 class InfeasibleTarget(ValueError):
@@ -111,7 +127,7 @@ def build_messages(context: str, task: dict) -> list[dict[str, str]]:
     byte for byte, so a reworded prompt cannot reach a training row.
     """
     instruction = task["instruction"]
-    if instruction != records.render_instruction(
+    if instruction != module_for(task["question"]["family"]).render_instruction(
         task["question"]["family"], task["question"], task["phrasing_index"]
     ):
         raise ValueError("instruction does not match the registered contract")
@@ -163,7 +179,12 @@ def fit_cell(job: dict, token_target: int, tokenizer) -> tuple[dict, list[dict]]
     smallest length that can host the requested variants, so the search never
     proposes a world the generator would reject.
     """
-    floor = min_hostable_length(job["consumed_records"], job["n_variants"])
+    # The floor is the family's own: a family that spends more primary rows per
+    # consumed row needs a longer L than the record worlds do.
+    module, variants = module_for(job["family"]), job["n_variants"]
+    floor = job["length_records"]
+    while module.plan_variants(floor, job["consumed_records"], variants) != variants:
+        floor += 1
     low, high = floor, max(floor, 30000)
     best = None
     seen = set()
@@ -172,7 +193,7 @@ def fit_cell(job: dict, token_target: int, tokenizer) -> tuple[dict, list[dict]]
         if length in seen:
             raise ValueError("token fitting stalled; no truncated fallback")
         seen.add(length)
-        bundle = records.generate_world(
+        bundle = module.generate_world(
             job["seed"],
             job["family"],
             length,
@@ -201,7 +222,7 @@ def fit_cell(job: dict, token_target: int, tokenizer) -> tuple[dict, list[dict]]
             f"L={floor} for K={job['consumed_records']}"
         )
     bundle, tokens, length = best
-    check = records.validate_bundle(bundle)
+    check = module_for(job["family"]).validate_bundle(bundle)
     if not check["passed"]:
         # One validation per fitted cell: full intervention replay at final L.
         raise ValueError(f"fitted world failed validation: {check['errors']}")
@@ -305,7 +326,7 @@ def run_shard(job: dict, token_target: int, output: str, fingerprint: str) -> di
         "input_tokens": [row["input_tokens"] for row in rows],
         "full_chat_tokens": [row["full_chat_tokens"] for row in rows],
         "supervised_tokens": sum(row["supervised_tokens"] for row in rows),
-        "validation": records.validate_bundle(bundle),
+        "validation": module_for(job["family"]).validate_bundle(bundle),
         "files": {name: sha(shard / name) for name in ("world.json", "rows.jsonl")},
     }
     # Completion receipt is written last; incomplete shards are never admitted.
@@ -378,6 +399,7 @@ def run(config_path: Path, destination: Path, resume: bool = False) -> dict:
     code_paths = (
         "scripts/run_capability_records.py",
         "longworld/synthesis/capability_records.py",
+        "longworld/synthesis/capability_families.py",
         "scripts/train_sft.py",
     )
     state = {
