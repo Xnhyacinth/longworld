@@ -26,6 +26,20 @@ def _dump(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
+def topic_digest(topic: dict | None) -> str:
+    """Bind the topic metadata the runner prepends to the user message.
+
+    The topic is the one model-visible surface that is not derived from the
+    simulated events, and the runner renders it into the prompt verbatim, so
+    it needs the same generation-time binding the visible prompt/protocol has
+    in capability_rules_workflow. The digest covers the canonical serialization
+    of the whole topic dict, so any tampering (title, domain, field, id)
+    changes it. It belongs in lineage: the parallel test requires world_id and
+    context to be identical across different topics.
+    """
+    return hashlib.sha256(_dump(topic).encode()).hexdigest()
+
+
 def _render(events, family):
     header = {
         "schema": VERSION,
@@ -493,6 +507,7 @@ def generate_bundle(
             "source_type": "fully_simulated",
             "topology_family": VERSION + ":" + family,
             "topic_is_presentation_label": True,
+            "topic_digest": topic_digest(topic),
             "topic_view_id": hashlib.sha256(
                 _dump([identity, topic]).encode()
             ).hexdigest()[:20],
@@ -518,6 +533,14 @@ def validate_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
             bundle["n_questions"],
             bundle.get("topic"),
         )
+        # The runner prepends bundle["topic"] verbatim to the user message, and
+        # nothing else in the bundle constrains it: topic_view_id is recomputed
+        # from the topic, so a tampered topic matches itself. Recompute the
+        # digest from the topic carried in the bundle and compare it with the
+        # generation-time value in lineage.
+        checks["topic_digest_matches_generated_topic"] = bundle["lineage"].get(
+            "topic_digest"
+        ) == topic_digest(bundle.get("topic"))
         for label, view in [
             ("original", bundle),
             ("counterfactual", bundle["counterfactual"]),
