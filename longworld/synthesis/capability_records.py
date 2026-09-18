@@ -281,26 +281,24 @@ def render_context(rows: list[Row], family: str) -> str:
     return "\n".join([_dump(header)] + [_dump(row.visible()) for row in rows])
 
 
+def _row_from_item(item: dict[str, Any]) -> Row:
+    return Row(
+        id=item["id"],
+        type=item["type"],
+        entity=item["entity"],
+        amount=item["amount"],
+        memo=item["memo"],
+        category=item.get("category"),
+        day=item.get("date"),
+    )
+
+
 def parse_context(context: str) -> tuple[dict[str, Any], list[Row]]:
     lines = context.splitlines()
     if not lines:
         raise ValueError("empty context")
     header = json.loads(lines[0])
-    rows = []
-    for line in lines[1:]:
-        item = json.loads(line)
-        rows.append(
-            Row(
-                id=item["id"],
-                type=item["type"],
-                entity=item["entity"],
-                amount=item["amount"],
-                memo=item["memo"],
-                category=item.get("category"),
-                day=item.get("date"),
-            )
-        )
-    return header, rows
+    return header, [_row_from_item(json.loads(line)) for line in lines[1:]]
 
 
 def _holds(row: Row, condition: dict[str, Any]) -> bool:
@@ -435,10 +433,39 @@ def _terminal(table: list[Row], references: list[Row], step: dict[str, Any]) -> 
     raise ValueError("unsupported terminal operation")
 
 
-def solve_visible(context: str, question: dict[str, Any]) -> Any:
-    """Independent executor over visible rows only; never reads gold or hidden state."""
+def _execute(
+    rows: list[Row], family: Any, question: dict[str, Any]
+) -> tuple[list[Row], list[Row]]:
+    """The two relations the program's terminal step reads: (table, references).
+
+    Split out of the executor so a caller that already holds parsed rows can read
+    the survivors of the filter chain without re-parsing a context, and can reuse
+    them across remove-one interventions (see _drop_row).
+    """
+    if question.get("family") != family:
+        raise ValueError("program family does not match the visible contract")
+    steps = question.get("steps")
+    if not isinstance(steps, list) or not 1 <= len(steps) <= 4:
+        raise ValueError("invalid program chain")
+    table = [row for row in rows if row.type == "record"]
+    for row in rows:
+        if row.type not in ("record", "reference"):
+            raise ValueError("unknown row type")
+    for step in _filter_steps(steps[:-1]):
+        table = [
+            row
+            for row in table
+            if all(_holds(row, condition) for condition in step["conditions"])
+        ]
+    return table, [row for row in rows if row.type == "reference"]
+
+
+def _evaluate(
+    parsed: tuple[dict[str, Any], list[Row]], question: dict[str, Any]
+) -> tuple[Any, list[Row], list[Row]]:
+    """Execute one program over parsed rows: (answer, terminal table, references)."""
+    header, rows = parsed
     try:
-        header, rows = parse_context(context)
         family = header.get("family")
         if (
             header.get("schema") != VERSION
@@ -446,26 +473,26 @@ def solve_visible(context: str, question: dict[str, Any]) -> Any:
             or header.get("rules") != PROTOCOLS[family]
         ):
             raise ValueError("unsupported or missing visible contract")
-        if question.get("family") != family:
-            raise ValueError("program family does not match the visible contract")
-        steps = question.get("steps")
-        if not isinstance(steps, list) or not 1 <= len(steps) <= 4:
-            raise ValueError("invalid program chain")
-        table = [row for row in rows if row.type == "record"]
-        for row in rows:
-            if row.type not in ("record", "reference"):
-                raise ValueError("unknown row type")
-        for step in _filter_steps(steps[:-1]):
-            table = [
-                row
-                for row in table
-                if all(_holds(row, condition) for condition in step["conditions"])
-            ]
-        return _terminal(
-            table, [row for row in rows if row.type == "reference"], steps[-1]
-        )
+        table, references = _execute(rows, family, question)
+        return _terminal(table, references, question["steps"][-1]), table, references
     except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
         raise ValueError("incomplete or malformed visible records/program") from exc
+
+
+def _solve_parsed(
+    parsed: tuple[dict[str, Any], list[Row]], question: dict[str, Any]
+) -> Any:
+    """solve_visible's evaluation half, over an already-parsed context."""
+    return _evaluate(parsed, question)[0]
+
+
+def solve_visible(context: str, question: dict[str, Any]) -> Any:
+    """Independent executor over visible rows only; never reads gold or hidden state."""
+    try:
+        parsed = parse_context(context)
+    except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+        raise ValueError("incomplete or malformed visible records/program") from exc
+    return _solve_parsed(parsed, question)
 
 
 def describe_program(program: dict[str, Any]) -> str:
@@ -919,6 +946,23 @@ def _remove_line(context: str, line: str) -> str:
     return reduced
 
 
+def _drop_row(table: list[Row], row: Row) -> list[Row]:
+    """`table` minus its first occurrence of `row` (a no-op when it is absent).
+
+    The filter steps compare each row against the program's constants and nothing
+    else, so filtering is elementwise: filtering "the rows minus one" is the same
+    list as "the filtered rows minus that one". A remove-one intervention can
+    therefore reuse the surviving relation it already computed and take out the
+    removed row, instead of re-running every filter step over the whole table.
+    The first occurrence is dropped because that is the line _remove_line
+    deletes (`context.replace(line + "\\n", "", 1)`).
+    """
+    for index, candidate in enumerate(table):
+        if candidate == row:
+            return table[:index] + table[index + 1:]
+    return table
+
+
 def window_ablation(bundle: dict[str, Any], probes: int = 24) -> dict[str, Any]:
     """Cheap 1/2-context window gate: is the answer reachable from a half window?
 
@@ -929,13 +973,31 @@ def window_ablation(bundle: dict[str, Any], probes: int = 24) -> dict[str, Any]:
     lines = bundle["context"].splitlines()
     half = max(1, len(lines) // 2)
     starts = sorted({round(i * (len(lines) - half) / max(1, probes - 1)) for i in range(probes)})
+    # Every window is a slice of these same lines, so each line is parsed at most
+    # once across all of them and the probe loop never re-parses a line it has
+    # already read. The per-slice parse is exactly parse_context("\n".join(slice)).
+    row_cache: dict[int, Row] = {}
+
+    def window(start: int, stop: int) -> tuple[dict[str, Any], list[Row]]:
+        header = json.loads(lines[start])
+        rows = []
+        for index in range(start + 1, stop):
+            if index not in row_cache:
+                row_cache[index] = _row_from_item(json.loads(lines[index]))
+            rows.append(row_cache[index])
+        return header, rows
+
     attempted = matching = 0
     for start in starts:
-        chunk = "\n".join(lines[start : start + half])
+        try:
+            parsed = window(start, start + half)
+        except (KeyError, IndexError, TypeError, json.JSONDecodeError):
+            attempted += len(bundle["tasks"])
+            continue
         for task in bundle["tasks"]:
             attempted += 1
             try:
-                if solve_visible(chunk, task["question"]) == task["answer"]:
+                if _solve_parsed(parsed, task["question"]) == task["answer"]:
                     matching += 1
             except ValueError:
                 continue
@@ -965,7 +1027,10 @@ def validate_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
             bundle["honesty"][key] for key in HONESTY if key != "source_kind"
         ):
             errors.append("honesty labels must stay fail-closed")
-        header, rows = parse_context(bundle["context"])
+        context = bundle["context"]
+        context_lines = context.splitlines()
+        header, rows = parse_context(context)
+        parsed = (header, rows)
         if header.get("rules") != PROTOCOLS[bundle["family"]]:
             errors.append("rules text does not match the registered contract")
         if header.get("family") != bundle["family"]:
@@ -973,16 +1038,30 @@ def validate_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
         if len(rows) != bundle["length_accounting"]["rendered_rows"]:
             errors.append("rendered row count mismatch")
         by_id = {row.id: row for row in rows}
-        lines = {row.id: _dump(row.visible()) for row in rows}
+        # The context is parsed once here and every task is solved against that
+        # one parse; the remove-one interventions then reuse the surviving
+        # relation the solve already computed (see _drop_row) instead of
+        # re-parsing and re-filtering a shortened context per removed row. That
+        # reduced-vs-splice equivalence holds only when the context's lines *are*
+        # the rows rendered in order, which `reduced_ok` tests; anything else
+        # takes the string path, where _remove_line is by definition correct.
+        rendered = [_dump(row.visible()) for row in rows]
+        reduced_ok = context == "\n".join([context_lines[0], *rendered])
+        lines = {row.id: line for row, line in zip(rows, rendered)}
         necessary_total = 0
         for task in bundle["tasks"]:
             if task["instruction"] != render_instruction(
                 bundle["family"], task["question"], task["phrasing_index"]
             ):
                 errors.append("instruction does not match the registered contract")
-            if bundle["world_id"] in bundle["context"] + task["instruction"]:
+            if bundle["world_id"] in context + task["instruction"]:
                 errors.append("world identity leaked into the visible text")
-            if solve_visible(bundle["context"], task["question"]) != task["answer"]:
+            # One solve per task: its answer, the terminal step and the relations
+            # that step reads. The remove-one checks below reduce that one solved
+            # relation instead of re-solving a context per removed row.
+            answer, table, references = _evaluate(parsed, task["question"])
+            terminal = task["question"]["steps"][-1]
+            if answer != task["answer"]:
                 errors.append("answer is not reproducible by the visible executor")
             consumed = sorted(task["consumed"])
             if len(consumed) != task["consumed_count"] or len(set(consumed)) != len(consumed):
@@ -1005,15 +1084,33 @@ def validate_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
             gold = answer_value(task["answer"])
             shifted = 0
             for row_id in consumed:
-                reduced = _remove_line(bundle["context"], lines[row_id])
-                try:
-                    changed = answer_value(
-                        solve_visible(reduced, task["question"])
-                    ) != gold
-                except ValueError:
-                    changed = True
+                if reduced_ok:
+                    # The context is the rows rendered in order, so the reduced
+                    # context's parse is this parse minus that row: drop it and
+                    # re-run only the terminal step, never the filter chain. A
+                    # consumed id with no row behind it raises out of the id map,
+                    # exactly as the string path's line map does below.
+                    try:
+                        changed = answer_value(
+                            _terminal(
+                                _drop_row(table, by_id[row_id]), references, terminal
+                            )
+                        ) != gold
+                    except ValueError:
+                        changed = True
+                else:
+                    # Non-render context: only _remove_line defines the reduced
+                    # context, and it is called outside the try so a line that is
+                    # not present still aborts the validation.
+                    reduced = _remove_line(context, lines[row_id])
+                    try:
+                        changed = answer_value(
+                            solve_visible(reduced, task["question"])
+                        ) != gold
+                    except ValueError:
+                        changed = True
                 shifted += changed
-            how = task["question"]["steps"][-1].get("how")
+            how = terminal.get("how")
             if how in ("min", "max"):
                 extremal = task["answer"]["aggregate"]["value"]
                 ties = sum(by_id[row_id].amount == extremal for row_id in consumed)
@@ -1035,8 +1132,27 @@ def validate_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
             ]
             stable = 0
             for row_id in probe[:16]:
-                reduced = _remove_line(bundle["context"], lines[row_id])
-                stable += answer_value(solve_visible(reduced, task["question"])) == gold
+                if not reduced_ok:
+                    # Neither the splice nor the solve is guarded here: a
+                    # distractor whose line or whose removal cannot be solved
+                    # aborts the validation, as it always has.
+                    stable += (
+                        answer_value(
+                            solve_visible(
+                                _remove_line(context, lines[row_id]), task["question"]
+                            )
+                        )
+                        == gold
+                    )
+                    continue
+                stable += (
+                    answer_value(
+                        _terminal(
+                            _drop_row(table, by_id[row_id]), references, terminal
+                        )
+                    )
+                    == gold
+                )
             checks["distractor_rows_removed:" + task["task_id"]] = stable
             if stable != len(probe[:16]):
                 errors.append("a distractor row changed the answer")

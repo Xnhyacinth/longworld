@@ -1,6 +1,8 @@
 import copy
+import hashlib
 import json
 from collections import Counter
+from pathlib import Path
 
 import pytest
 
@@ -13,6 +15,7 @@ from longworld.synthesis.capability_records import (
     VERSION,
     answer_value,
     generate_world,
+    parse_context,
     plan_variants,
     render_instruction,
     solve_visible,
@@ -427,3 +430,117 @@ def test_k_is_sampled_per_task_rather_than_fixed_by_the_cell():
         )["length_accounting"]["consumed_rows_per_task"]
     }
     assert len(counts) > 2
+
+
+GOLDEN_PATH = Path(__file__).parent / "fixtures" / (
+    "capability_records_validation_golden.json"
+)
+
+
+def _golden_bundle(params):
+    """Rebuild one fixture cell exactly as the fixture generator built it."""
+    params = dict(params)
+    mutation = params.pop("mutation")
+    seed = params.pop("seed")
+    bundle = generate_world(seed, **params)
+    lines = bundle["context"].splitlines()
+    if mutation == "clean":
+        return bundle
+    if mutation == "drop_consumed_id":
+        task = bundle["tasks"][0]
+        task["consumed"] = task["consumed"][1:]
+        task["consumed_count"] = len(task["consumed"])
+    elif mutation == "pad_consumed_id":
+        task = bundle["tasks"][0]
+        distractor = next(
+            row.id
+            for row in parse_context(bundle["context"])[1]
+            if row.id not in set(task["consumed"])
+        )
+        task["consumed"] = sorted([*task["consumed"], distractor])
+        task["consumed_count"] = len(task["consumed"])
+    elif mutation == "tamper_instruction":
+        bundle["tasks"][0]["instruction"] = "Just answer whatever looks right."
+    elif mutation == "tamper_rules":
+        header = json.loads(lines[0])
+        header["rules"] = "Any row may be used as evidence."
+        bundle["context"] = "\n".join([json.dumps(header, sort_keys=True), *lines[1:]])
+    elif mutation == "open_honesty":
+        bundle["honesty"]["production_eligible"] = True
+    elif mutation == "drop_row_line":
+        victim = next(
+            row.id
+            for row in parse_context(bundle["context"])[1]
+            if row.type == "record"
+        )
+        bundle["context"] = "\n".join(
+            line for line in lines if json.loads(line).get("id") != victim
+        )
+    elif mutation == "bogus_consumed_id":
+        task = bundle["tasks"][0]
+        task["consumed"] = ["r-not-a-row", *task["consumed"][1:]]
+        task["consumed_count"] = len(task["consumed"])
+    elif mutation == "family_mismatch":
+        other = "join_lookup" if bundle["family"] != "join_lookup" else "filter_aggregate"
+        bundle["tasks"][0]["question"]["family"] = other
+    elif mutation == "single_condition_step":
+        step = bundle["tasks"][0]["question"]["steps"][0]
+        step["conditions"] = step["conditions"][:1]
+    # Contexts that are NOT this module's own render of their rows: the speedup's
+    # reduced-parse fast path must not fire on these, and the results must be the
+    # ones the pre-refactor string path produced.
+    elif mutation == "trailing_newline":
+        bundle["context"] = bundle["context"] + "\n"
+    elif mutation == "edited_header":
+        header = json.loads(lines[0])
+        header["note"] = "hand-edited"
+        bundle["context"] = "\n".join([json.dumps(header, sort_keys=True), *lines[1:]])
+    elif mutation == "crlf":
+        bundle["context"] = "\r\n".join(lines)
+    elif mutation == "reordered_lines":
+        bundle["context"] = "\n".join([lines[0], *lines[2:], lines[1]])
+    else:
+        raise AssertionError(f"unknown fixture mutation {mutation}")
+    return bundle
+
+
+def test_validation_results_match_the_pre_speedup_golden():
+    """Byte-equality of (passed, errors, checks) against the pre-refactor fixtures.
+
+    The fixture is canonical JSON captured from the unmodified validate_bundle
+    over 3 families x L{200,800} x a (K, H, n_variants) grid, one clean cell and
+    one tampered cell per grid point (provenance padded or truncated, instruction,
+    rules, honesty, a dropped row line, an id no row carries, an executor program
+    mutated against its family, a single-condition filter step) plus contexts the
+    module did not render itself (trailing newline, hand-edited header, CRLF,
+    reordered lines), where the reduced-parse fast path must fall back. It is the
+    equivalence oracle for the parsed-context speedup, including every reduce-
+    instead-of-reparse branch and every fallback.
+    """
+    golden = json.loads(GOLDEN_PATH.read_text())
+    assert len(golden) >= 60
+    outcomes = Counter()
+    for key, entry in golden.items():
+        params = entry["params"]
+        if "generate_error" in entry:
+            with pytest.raises(ValueError):
+                _golden_bundle(params)
+            outcomes["generate_error"] += 1
+            continue
+        bundle = _golden_bundle(params)
+        # The fixture is only meaningful if it still sees the same bundle text.
+        assert (
+            hashlib.sha256(
+                json.dumps(
+                    bundle, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+                ).encode()
+            ).hexdigest()
+            == entry["bundle_sha256"]
+        ), key
+        result = validate_bundle(bundle)
+        assert result == entry["result"], key
+        outcomes["passed" if result["passed"] else "rejected"] += 1
+    # A fixture that stopped reaching both outcomes would stop proving anything.
+    assert outcomes["passed"] >= 10
+    assert outcomes["rejected"] >= 20
+    assert outcomes["generate_error"] >= 1
