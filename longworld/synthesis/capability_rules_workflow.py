@@ -13,6 +13,23 @@ def _json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
+# The visible task instruction and the world protocol are part of the task
+# contract: solve_visible() consumes the structured fields, so a tampered or
+# paraphrased prompt that contradicts the protocol would still validate.
+# validate_bundle() therefore pins both to these constants and rejects any
+# deviation. Changing the wording means changing the constant, and every
+# historical bundle with the old wording then fails validation loudly.
+PROMPTS: dict[str, str] = {
+    "rule_learning": "Infer the unique affine rule from demonstrations, sum every update per entity, and return entity/label pairs sorted by entity.",
+    "workflow": "Replay dependent jobs in record order. Given observed first-attempt statuses, return last_job, its final_value, the number of jobs requiring recovery in this partition (recovery_count), and next_action_for_last_job after its observed first attempt. Earlier partitions still determine dependency values.",
+}
+
+PROTOCOLS: dict[str, str] = {
+    "rule_learning": "Unknown a,b,c define labels[(a*x+b*y+c) mod 7]. Infer the rule from demonstrations. Each entity starts x=y=0; apply all dx/dy increments. Labels are the ordered output alphabet. dx and dy are integers 1..6.",
+    "workflow": "Jobs form a dependency chain in record order. value=((dependency committed value or 0)+payload)*multiplier mod 100003. Each record reports the observed result of an initial inspect/process attempt; checksum_error reveals failure, processed reveals success. A failed job requires repair (failed->repaired, checksum_restored), process (repaired->processed, decimal value), commit (processed->committed, durable). A processed job only requires commit. No future recovery result is included. Return job,continuation,value; transitions have action,before,after,feedback. Replay earlier jobs to resolve dependencies.",
+}
+
+
 def _infer(doc: dict) -> tuple[int, int, int]:
     p, labels = doc["modulus"], doc["labels"]
     hypotheses = [(a, b, c) for a, b, c in itertools.product(range(p), repeat=3)
@@ -121,8 +138,7 @@ def _tasks(doc: dict, world_id: str, oracle: list[dict]) -> list[dict]:
     key = "entity" if doc["family"] == "rule_learning" else "job"
     for partition in range(doc["partitions"]):
         selected = {r["entity"] if key == "entity" else r["id"] for r in doc["records"] if r["partition"] == partition}
-        prompt = ("Infer the unique affine rule from demonstrations, sum every update per entity, and return entity/label pairs sorted by entity."
-                  if key == "entity" else "Replay dependent jobs in record order. Given observed first-attempt statuses, return last_job, its final_value, the number of jobs requiring recovery in this partition (recovery_count), and next_action_for_last_job after its observed first attempt. Earlier partitions still determine dependency values.")
+        prompt = PROMPTS[doc["family"]]
         tasks.append({"task_id": f"q{partition:03d}",
                       "capability": "L4_rule_induction" if key == "entity" else "L5_bounded_causal_replay",
                       "question": {"partition": partition}, "prompt": prompt,
@@ -141,7 +157,7 @@ def generate_bundle(seed: int, family: str = "rule_learning", n_records: int = 1
         labels = [f"label_{rng.getrandbits(48):012x}" for _ in range(7)]
         coefficients = a, b, c = rng.randrange(1, 7), rng.randrange(1, 7), rng.randrange(7)
         doc.update({"modulus": 7, "labels": labels,
-                    "protocol": "Unknown a,b,c define labels[(a*x+b*y+c) mod 7]. Infer the rule from demonstrations. Each entity starts x=y=0; apply all dx/dy increments. Labels are the ordered output alphabet. dx and dy are integers 1..6.",
+                    "protocol": PROTOCOLS["rule_learning"],
                     "demonstrations": [{"x": x, "y": y, "label": labels[(a*x+b*y+c) % 7]} for x, y in [(0, 0), (1, 0), (0, 1)]]})
         for i in range(n_records):
             doc["records"].append({"id": f"u{i:07d}", "partition": i % n_questions,
@@ -157,7 +173,7 @@ def generate_bundle(seed: int, family: str = "rule_learning", n_records: int = 1
                 row = last[entity]
                 row["dy"] = rng.choice([v for v in range(1, 7) if (x, (y+v-row["dy"]) % 7) not in {(0, 0), (1, 0), (0, 1)}])
     else:
-        doc["protocol"] = ("Jobs form a dependency chain in record order. value=((dependency committed value or 0)+payload)*multiplier mod 100003. Each record reports the observed result of an initial inspect/process attempt; checksum_error reveals failure, processed reveals success. A failed job requires repair (failed->repaired, checksum_restored), process (repaired->processed, decimal value), commit (processed->committed, durable). A processed job only requires commit. No future recovery result is included. Return job,continuation,value; transitions have action,before,after,feedback. Replay earlier jobs to resolve dependencies.")
+        doc["protocol"] = PROTOCOLS["workflow"]
         for i in range(n_records):
             hidden = {"id": f"job{i:07d}", "payload": rng.randrange(1, 10000), "multiplier": rng.randrange(2, 10), "fault": bool(rng.randrange(2))}
             # Execute the first attempt to observe its status, then discard hidden fault.
@@ -204,6 +220,15 @@ def validate_bundle(bundle: dict) -> dict:
         for version in (bundle, bundle["counterfactual"]):
             doc = json.loads(version["context"])
             docs.append(doc)
+            # The visible wording is part of the contract, not decoration:
+            # solve_visible() reads only the structured fields, so a prompt or
+            # protocol that contradicts the executor would otherwise still
+            # validate. Pin both to the module constants.
+            if doc.get("protocol") != PROTOCOLS[bundle["family"]]:
+                errors.append("protocol does not match the registered contract")
+            for task in version["tasks"]:
+                if task.get("prompt") != PROMPTS[bundle["family"]]:
+                    errors.append("task prompt does not match the registered contract")
             if len(doc["records"]) != bundle["n_records"] or len(version["tasks"]) != bundle["n_questions"]:
                 errors.append("declared counts mismatch")
             if {t["question"]["partition"] for t in version["tasks"]} != set(range(bundle["n_questions"])):

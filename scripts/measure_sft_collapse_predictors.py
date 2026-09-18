@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 from collections import Counter, defaultdict
@@ -54,6 +55,60 @@ def scaffolding_fraction(answers: list[str]) -> tuple[float, int]:
     n = len(answers)
     fixed = sum(1 for i in range(max_len) if by_pos[i].most_common(1)[0][1] / n >= 0.9)
     return fixed / max_len if max_len else 0.0, fixed
+
+
+def entropy_bits(counter: Counter) -> float:
+    n = sum(counter.values())
+    return -sum((c / n) * math.log2(c / n) for c in counter.values() if c)
+
+
+def conditional_entropy_bits(by_x: dict[str, Counter]) -> float:
+    n = sum(sum(c.values()) for c in by_x.values())
+    total = 0.0
+    for c in by_x.values():
+        nx = sum(c.values())
+        for v in c.values():
+            total -= (v / n) * math.log2(v / nx)
+    return total
+
+
+def template_collapse_profile(
+    shapes: list[str], instructions: list[str]
+) -> dict:
+    """RAGEN-2-style decomposition (arXiv 2604.06268): how much of the answer-
+    shape entropy is explained by the instruction template alone?
+
+    Template collapse = high I(shape;instruction) combined with a low number
+    of distinct shapes per instruction. Measured on P64 finance it is 69%
+    with 17 instructions serving 76 rows each; on ACC it is 80% but 6,396
+    instructions serving 1.7 rows each -- the same share with a thousandfold
+    different instruction count. Both numbers are needed to tell them apart.
+    """
+    h_shape = entropy_bits(Counter(shapes))
+    by_instr: dict[str, Counter] = defaultdict(Counter)
+    for i, s in zip(instructions, shapes):
+        by_instr[i][s] += 1
+    h_shape_given_instr = conditional_entropy_bits(by_instr)
+    mutual = max(0.0, h_shape - h_shape_given_instr)
+    import statistics
+
+    rows_per_instr = [sum(c.values()) for c in by_instr.values()]
+    shapes_per_row = [len(c) / sum(c.values()) for c in by_instr.values()]
+    top_instr = Counter(instructions).most_common(1)[0]
+    return {
+        "shape_entropy_bits": round(h_shape, 2),
+        "instruction_explained_fraction": round(mutual / h_shape, 3) if h_shape else 0.0,
+        "distinct_instructions": len(by_instr),
+        "mean_rows_per_instruction": round(statistics.mean(rows_per_instr), 1)
+        if rows_per_instr
+        else 0.0,
+        "mean_shapes_per_row_within_instruction": round(
+            statistics.mean(shapes_per_row), 3
+        )
+        if shapes_per_row
+        else 0.0,
+        "top_instruction_share": round(top_instr[1] / len(instructions), 3),
+    }
 
 
 def main() -> int:
@@ -116,8 +171,24 @@ def main() -> int:
     }
     worst_scaffold = max(scaffolds.items(), key=lambda kv: kv[1][0]) if scaffolds else None
 
+    instr_list: list[str] = []
+    shape_list: list[str] = []
+    for path in args.train:
+        with path.open() as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                d = json.loads(line)
+                msgs = d["messages"]
+                assistant = next(m for m in msgs if m["role"] == "assistant")["content"]
+                user = next(m for m in msgs if m["role"] == "user")["content"]
+                shape_list.append(mask_shape(assistant))
+                instr_list.append(instruction_line(user))
+
     report = {
         "rows": rows,
+        "template_collapse": template_collapse_profile(shape_list, instr_list),
         "distinct_answer_shapes": len(shapes),
         "shape_uniqueness": round(len(shapes) / rows, 4) if rows else 0.0,
         "top3_shape_coverage": round(top3 / rows, 4) if rows else 0.0,

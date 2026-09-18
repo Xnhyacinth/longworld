@@ -398,7 +398,16 @@ def build(config_path: Path, output: Path, workers: int) -> dict:
         "exact_numeric_ranges": dict(
             Counter(row["exact_numeric_range"] or "none" for row in candidates)
         ),
-        "rejection_reasons": dict(Counter(row["reason"] for row in rejected)),
+        # Rejections carry one of two schemas: source-level specs write
+        # "reason" (:180/:224), admission-level rows write "admission_reason"
+        # (:289). Count both so neither path disappears from the report and no
+        # row type raises KeyError.
+        "rejection_reasons": dict(
+            Counter(
+                row.get("admission_reason") or row.get("reason") or "unknown"
+                for row in rejected
+            )
+        ),
         "admission_states": dict(Counter(row["admission_state"] for row in candidates)),
         "controls": {
             "complete_record_contract": "declared and source-record inventory checked",
