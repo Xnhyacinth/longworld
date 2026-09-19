@@ -67,7 +67,7 @@ root = Path(sys.argv[1])
 (root / "PROTOCOL.json").write_text(json.dumps({
     "framework": "lm-evaluation-harness upstream v0.4.12 (6d642546f) + vLLM 0.18.0 OpenAI server",
     "harness_choice": "Upstream v0.4.12, identified from the 2026-09-12 artifacts: those results carry exact_match,custom-extract (upstream's mmlu_pro metric), gpqa cot_zeroshot v2.2, and ifeval capped at 1280. Upstream matches all three; the internal fork matches none (it emits metric 'acc', gpqa v1.0, ifeval 8192).",
-    "client": "lm-eval --model local-chat-completions --apply_chat_template (this harness has no `run` subcommand)",
+    "client": "lm-eval run --model local-chat-completions --apply_chat_template; gen kwargs flow as **gen_kwargs into the request body, so chat_template_kwargs reaches vLLM's ChatCompletionRequest (protocol.py) and disables thinking",
     "why_not_lm_eval_vllm": "harness Transformers cannot parse model_type=qwen3_5",
     "decoding": {
         "temperature": 0.0,
@@ -210,7 +210,7 @@ run_shard() (
       DO_NOT_TRACK=1 \
       PYTHONHASHSEED=0 \
       LMEVAL_LOG_LEVEL=INFO \
-      "$VENV/bin/lm-eval" \
+      "$VENV/bin/lm-eval" run \
         --model local-chat-completions \
         --model_args "model=$served_name,base_url=http://127.0.0.1:$port/v1/chat/completions,tokenizer_backend=none,num_concurrent=$concurrency,max_retries=5,max_gen_toks=$DEFAULT_MAX_GEN_TOKS,max_length=$MAX_MODEL_LEN,timeout=7200,eos_string=<|im_end|>" \
         --tasks "$tasks" \
