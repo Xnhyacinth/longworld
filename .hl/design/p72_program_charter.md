@@ -37,13 +37,13 @@ Status: active。P71 保留为**机制基线**(p71_pool_v1 冻结不改写);本�
   scope 内记录须独立判 pass/fail/分类,聚合出 counts/sets)——K=scope 全集
   (K/L 40-80%),Oolong 式 per-fragment+aggregation。验收:必读占比实测
   ≥40%、干预(改任一片段翻聚合)、求解器复核、进测试。
-- **G72-4 语义 domain 试点(2 条路线)**:科研实验(配置→样本→结果→
-  无效→勘误)与软件/基础设施(版本→调用点→配置→失败测试)两个 domain
-  adapter——**复用机制库**(JOIN/as-of/group/集合),换的是字段语义、行
-  类型、合法关系与 renderer 模板;共享执行器出 gold。验收:①任务语义在
-  真实领域关系上成立(领域合法性检查);②同机制跨 domain 的对照材料
-  (同一 op 在 finance-style 与 research-style 各一组);③干预验证;④≥24
-  措辞钉定。**不做**:为凑 domain 数的换皮(用户红线)。
+- **G72-4 语义 domain 试点** ✅ 路线 A(科研,797554f + 接线 304f4dd):
+  research_run(生命周期 as-of:撤销/勘误+显性翻转,优先级 retracted>
+  invalidated>valid)+ research_join(配置→批次→测量链式 JOIN,子树移除
+  干预)。domain 合法性 fail-closed(测量→唯一批次→唯一配置、仪器-单位
+  映射、悬空引用拒绝);词汇检查无账本术语;72 测试 + 170 cell 扫描 0 失败;
+  source_kind=simulated_domain。**路线 B(软件/基础设施)未开工**——待
+  A 验收波跑完后决定是否同模式再加(用户"2 条路线"的另一半)。
 - **G72-5 探针升级**:①matched-entity 错属性对照(实体名/schema 不变,
   换关键属性/关系/时间——回答"用没用内容"而不是"ID 在不在");②
   question↔gold-span / ↔hard-negative / ↔full-context 三口径分开;
