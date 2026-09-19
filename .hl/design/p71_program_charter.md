@@ -31,7 +31,7 @@ Status: active. 2026-09-19 启动。前序:P70 章程已 superseded(G70-4/G70-6 
 ## Track D — 卫生
 
 - [x] 评测脚本 + 汇总器提交。commit ed8556c。
-- [ ] security hook 静默失败可见化(hook 配置不在本仓,需 `.claude/` 侧查)。
+- [x] security hook 修复(2026-09-19):根因不是 hook 逻辑而是模型名——plugin 默认 `claude-opus-4-7`(此端点不存在)+ 端点 Anthropic 路径要求**不带 `[1M]` 后缀**的名字(带后缀 model_not_found)。修复:`~/.claude/settings.json` env 增 `SECURITY_REVIEW_MODEL=zai-org/glm-5.3`(官方支持的 env 覆盖,未改 plugin 文件)。已验证 LLM 往返(`{'verdict':'ok'}`)+ hook 对 .md-only commit 的 skip-30 是正确行为(无可审源文件)。此前"commit 无安全审查"状态解除。
 
 ## 红线(继承 P70 + 用户裁定)
 
