@@ -44,11 +44,13 @@ Status: active。P71 保留为**机制基线**(p71_pool_v1 冻结不改写);本�
   映射、悬空引用拒绝);词汇检查无账本术语;72 测试 + 170 cell 扫描 0 失败;
   source_kind=simulated_domain。**路线 B(软件/基础设施)未开工**——待
   A 验收波跑完后决定是否同模式再加(用户"2 条路线"的另一半)。
-- **G72-5 探针升级**:①matched-entity 错属性对照(实体名/schema 不变,
-  换关键属性/关系/时间——回答"用没用内容"而不是"ID 在不在");②
-  question↔gold-span / ↔hard-negative / ↔full-context 三口径分开;
-  ③P(Y|metadata) 多数类之外加简单分类器(逻辑回归级)。验收:三个探针
-  各自出带口径的数字进 verification 类收据。
+- **G72-5 探针升级** ✅(e505245):①matched-entity 控制(表面恒定只动
+  内容):**196 抽检 gold 重现 0**(188 答案变 + 7 拒绝);②三口径词法重叠
+  (evidence/gold-span/hard-negative 分母各明):p50 各 0.011-0.086 /
+  0.005-0.017 / 0.0-0.083;③P(Y|metadata) 5-fold CV 逻辑回归:lift
+  **-0.0007 / -0.008**(不优于类先验),join_unanswerable 按设计排除单列。
+  46 新测试(+10 skip 按 family 条件)。"零捷径"表述自此只以带口径的
+  探针报告存在。
 - **G72-6 统一口径报告**:`.hl/` 一页:池/世界/shard/任务/CF/视图/臂/
   token/短锚分母全部对齐 sample_index 派生,禁止口头汇总。
 
