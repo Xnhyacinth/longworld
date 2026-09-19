@@ -8,7 +8,9 @@
     "alias_locate",
     "asof_state",
     "rule_holdout",
-    "join_unanswerable"
+    "join_unanswerable",
+    "research_run",
+    "research_join"
   ],
   "depths": [1, 2],
   "lengths": [64, 200, 800],
@@ -25,13 +27,17 @@
     "alias_locate": 40,
     "asof_state": 40,
     "rule_holdout": 40,
-    "join_unanswerable": 30
+    "join_unanswerable": 30,
+    "research_run": 40,
+    "research_join": 40
   },
   "depths_by_family": {
     "alias_locate": [1, 2],
     "asof_state": [1, 2],
     "rule_holdout": [1, 2],
-    "join_unanswerable": [1]
+    "join_unanswerable": [1],
+    "research_run": [1, 2],
+    "research_join": [1, 2]
   },
   "token_targets_by_depth": {
     "1": [8192, 16384],
