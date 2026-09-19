@@ -1,6 +1,6 @@
-"""P70 capability families, slice 1: alias binding (L1), as-of state (L3), rule holdout (L4).
+"""P70 capability families: alias binding (L1), as-of state (L3), rule holdout (L4), set completeness (L2).
 
-Three record-world families on the P69 (L, K, H) compiler spine. Each owns its
+Four record-world families on the P69 (L, K, H) compiler spine. Each owns its
 visible contract, its own pure-Python executor and its own interventions:
 
 * ``alias_locate`` (L1, binding/location): record rows plus alias declarations
@@ -20,6 +20,14 @@ visible contract, its own pure-Python executor and its own interventions:
   rule uniquely by brute-force enumeration over the hypothesis space. The
   runner-facing split is by rule structure (``holdout_plan``), so an eval bank
   holds one structure out while training on the other.
+* ``set_complete`` (L2, exhaustive set membership): one scope step declares
+  the conditions every member satisfies, and the answer is the *complete* set
+  -- a missing member is a wrong answer and so is an extra row, which is a
+  property of the data (the gold is the full set) rather than of a grader.
+  Same-schema sibling rows fail at least one condition and are exposure,
+  never members. Inserting a legal hit into a region no member covers must
+  enter the answer (``insert_hit``). An H=1 family: only depth 1 is
+  generated, and the generator rejects a deeper one.
 
 (L, K, H) are independent knobs, as in capability_records: L is the number of
 primary rows rendered in the context, K is the number of rows the program
@@ -58,43 +66,193 @@ BASE_DATE = date(2019, 1, 1)
 WINDOW_DAYS = 40
 GAP_DAYS = 20
 AMOUNT_CAP = 700
-FAMILIES = ("alias_locate", "asof_state", "rule_holdout")
+FAMILIES = ("alias_locate", "asof_state", "rule_holdout", "set_complete")
 RULE_FAMILIES = ("threshold_class", "parity_vote")
 PRIMARY_TYPES = ("record", "event")
 # Each world draws its own vocabulary (as in capability_records): the drawn size
 # is a shape lever, because the rendered width of a category-, alias- or
 # label-bearing answer carries the drawn alphabet.
 CATEGORY_POOL = (
-    "aurora", "boreal", "cinder", "delta", "ember", "fjord", "garnet", "hollow",
-    "indigo", "juniper", "kelvin", "lumen", "marrow", "nimbus", "onyx", "petrel",
-    "quartz", "rimer", "solace", "tundra", "umber", "verdigris", "willow",
-    "yarrow", "zephyr", "alcove", "bramble", "cobalt", "drift", "estuary",
-    "fathom", "gable", "heath", "inlet", "jetty", "kestrel", "lantern", "marsh",
-    "nadir", "orchard", "pallet", "quarry", "ridge", "sable", "thicket",
-    "upland", "vellum", "wicker", "xenon", "zenith", "amber", "basalt",
-    "cedar", "dune", "elm", "flint", "grove", "harbor", "iron", "jade", "knoll",
-    "lagoon", "mesa", "nettle", "oakum", "prairie", "quill",
+    "aurora",
+    "boreal",
+    "cinder",
+    "delta",
+    "ember",
+    "fjord",
+    "garnet",
+    "hollow",
+    "indigo",
+    "juniper",
+    "kelvin",
+    "lumen",
+    "marrow",
+    "nimbus",
+    "onyx",
+    "petrel",
+    "quartz",
+    "rimer",
+    "solace",
+    "tundra",
+    "umber",
+    "verdigris",
+    "willow",
+    "yarrow",
+    "zephyr",
+    "alcove",
+    "bramble",
+    "cobalt",
+    "drift",
+    "estuary",
+    "fathom",
+    "gable",
+    "heath",
+    "inlet",
+    "jetty",
+    "kestrel",
+    "lantern",
+    "marsh",
+    "nadir",
+    "orchard",
+    "pallet",
+    "quarry",
+    "ridge",
+    "sable",
+    "thicket",
+    "upland",
+    "vellum",
+    "wicker",
+    "xenon",
+    "zenith",
+    "amber",
+    "basalt",
+    "cedar",
+    "dune",
+    "elm",
+    "flint",
+    "grove",
+    "harbor",
+    "iron",
+    "jade",
+    "knoll",
+    "lagoon",
+    "mesa",
+    "nettle",
+    "oakum",
+    "prairie",
+    "quill",
 )
 ALIAS_POOL = (
-    "accord", "anchor", "arbour", "atlas", "basin", "beacon", "belfry", "birch",
-    "bramble", "breeze", "bronze", "cadence", "cairn", "canopy", "cedar",
-    "chalet", "cinder", "cobalt", "compass", "coppice", "cornice", "crescent",
-    "crystal", "current", "cypress", "dahlia", "delta", "dune", "echo",
-    "ember", "estuary", "fathom", "ferry", "flint", "fossil", "fresco",
-    "gable", "garnet", "glacier", "granite", "grove", "harbor", "harrow",
-    "heather", "hollow", "indigo", "inlet", "ivory", "juniper", "keystone",
-    "lantern", "lattice", "ledger", "lumen", "marble", "meadow", "mesa",
-    "nimbus", "northwind", "obsidian", "onyx", "orchard", "pebble", "pennant",
-    "quartz", "quill", "ridge", "ripple", "sable", "sextant", "solace",
-    "sparrow", "summit", "tamarind", "thicket", "thistle", "timber", "tundra",
-    "umber", "vellum", "verdigris", "wicker", "willow", "yarrow", "zenith",
+    "accord",
+    "anchor",
+    "arbour",
+    "atlas",
+    "basin",
+    "beacon",
+    "belfry",
+    "birch",
+    "bramble",
+    "breeze",
+    "bronze",
+    "cadence",
+    "cairn",
+    "canopy",
+    "cedar",
+    "chalet",
+    "cinder",
+    "cobalt",
+    "compass",
+    "coppice",
+    "cornice",
+    "crescent",
+    "crystal",
+    "current",
+    "cypress",
+    "dahlia",
+    "delta",
+    "dune",
+    "echo",
+    "ember",
+    "estuary",
+    "fathom",
+    "ferry",
+    "flint",
+    "fossil",
+    "fresco",
+    "gable",
+    "garnet",
+    "glacier",
+    "granite",
+    "grove",
+    "harbor",
+    "harrow",
+    "heather",
+    "hollow",
+    "indigo",
+    "inlet",
+    "ivory",
+    "juniper",
+    "keystone",
+    "lantern",
+    "lattice",
+    "ledger",
+    "lumen",
+    "marble",
+    "meadow",
+    "mesa",
+    "nimbus",
+    "northwind",
+    "obsidian",
+    "onyx",
+    "orchard",
+    "pebble",
+    "pennant",
+    "quartz",
+    "quill",
+    "ridge",
+    "ripple",
+    "sable",
+    "sextant",
+    "solace",
+    "sparrow",
+    "summit",
+    "tamarind",
+    "thicket",
+    "thistle",
+    "timber",
+    "tundra",
+    "umber",
+    "vellum",
+    "verdigris",
+    "wicker",
+    "willow",
+    "yarrow",
+    "zenith",
 )
 LABEL_POOL = (
-    "label_alpha", "label_beta", "label_gamma", "label_delta", "label_epsilon",
-    "label_zeta", "label_eta", "label_theta", "label_iota", "label_kappa",
-    "label_lambda", "label_mu", "label_nu", "label_xi", "label_omicron",
-    "label_pi", "label_rho", "label_sigma", "label_tau", "label_upsilon",
-    "label_phi", "label_chi", "label_psi", "label_omega",
+    "label_alpha",
+    "label_beta",
+    "label_gamma",
+    "label_delta",
+    "label_epsilon",
+    "label_zeta",
+    "label_eta",
+    "label_theta",
+    "label_iota",
+    "label_kappa",
+    "label_lambda",
+    "label_mu",
+    "label_nu",
+    "label_xi",
+    "label_omicron",
+    "label_pi",
+    "label_rho",
+    "label_sigma",
+    "label_tau",
+    "label_upsilon",
+    "label_phi",
+    "label_chi",
+    "label_psi",
+    "label_omega",
 )
 KINDS = ("credit", "debit", "set_aside", "release")
 HOLD_KINDS = ("set_aside", "release")
@@ -110,9 +268,22 @@ FIELD_OPS: dict[str, tuple[str, ...]] = {
     "date": ("==", "!=", ">=", "<=", ">", "<"),
     "category": ("==", "!="),
 }
-ALIAS_TERMINALS = ("locate", "locate_count", "locate_list", "locate_one", "locate_empty")
+ALIAS_TERMINALS = (
+    "locate",
+    "locate_count",
+    "locate_list",
+    "locate_one",
+    "locate_empty",
+)
 ASOF_TERMINALS = ("balance", "by_entity", "total", "active_set")
-RULE_TERMINALS = ("label", "labels", "label_list", "label_set", "label_counts", "verify")
+RULE_TERMINALS = (
+    "label",
+    "labels",
+    "label_list",
+    "label_set",
+    "label_counts",
+    "verify",
+)
 # The terminal a task draws is a function of (seed, task index), so a seed sweep
 # covers every shape instead of leaving the schedule to a coin flip.
 ALIAS_TERMINALS_BY_DEPTH: dict[int, tuple[str, ...]] = {
@@ -123,10 +294,33 @@ RULE_TERMINALS_BY_DEPTH: dict[int, tuple[str, ...]] = {
     1: ("label", "verify"),
     2: ("labels", "label_list", "label_set", "label_counts"),
 }
+SET_TERMINALS = ("set_list", "set_count", "set_contains", "set_missing")
+# Each terminal is drawn with its own answer shape, so the arity bins the P69
+# F2 card demands are structural DOF, not phrasing: the shapes below are the
+# full per-terminal rotation (mask_shape distinguishes every one of them).
+SET_SHAPES: dict[str, tuple[str, ...]] = {
+    "set_list": ("ids", "ids_count", "ids_groups"),
+    # set_count's bare integer is one masked shape however many members there
+    # are, so the dict-of-counts shape is the arity-bearing one; the pair stays
+    # (the card's list-vs-count-vs-dict DOF) but the rotation favors the dict.
+    "set_count": ("count_groups", "count_groups", "count"),
+    "set_contains": (
+        "contains",
+        "contains_verdict",
+        "contains_entity",
+        "contains_count",
+    ),
+    "set_missing": ("missing", "missing_named", "missing_count"),
+}
 # Primary rows one consumed row costs at most, per family. plan_variants() uses
 # the widest value, so a (K, n_variants) cell it accepts is hostable by every
 # family even though the dispatch does not know which family will run.
-EVIDENCE_MULTIPLIER = {"alias_locate": 2, "asof_state": 2, "rule_holdout": 2}
+EVIDENCE_MULTIPLIER = {
+    "alias_locate": 2,
+    "asof_state": 2,
+    "rule_holdout": 2,
+    "set_complete": 2,
+}
 
 # The visible protocol and the instruction phrasings are part of the task
 # contract: the executors read only the structured program, so a reworded rules
@@ -183,6 +377,31 @@ PROTOCOLS: dict[str, str] = {
         "(whether a claimed label holds for one entity). Records of unnamed "
         "entities are not evidence. No rows are omitted."
     ),
+    "set_complete": (
+        "Each rendered row is a JSON object of type record. A scope step "
+        "declares 2 to 4 conditions, each comparing amount, date or category "
+        "to a constant with ==, !=, >=, <=, > or <; a row is a member of the "
+        "set exactly when it satisfies every condition, and the set is "
+        "exhaustive: gold is the complete membership, so a missing member is "
+        "as wrong as an extra row. Rows that fail at least one condition are "
+        "siblings, never members, however much of the condition range they "
+        "overlap. Answer the program's terminal in the shape it declares: "
+        "set_list with shape ids (the bare sorted row ids of every member), "
+        "ids_count (the sorted ids with the member count) or ids_groups (the "
+        "count with the members grouped by entity, each group's ids sorted); "
+        "set_count with shape count (the bare member count) or count_groups "
+        "(the count with the per-entity member counts); set_contains with "
+        "shape contains (the named row id with its membership verdict), "
+        "contains_verdict (the bare membership verdict for the named row id), "
+        "contains_entity (the named row id with its entity and verdict) or "
+        "contains_count (the named row id with its verdict and the member "
+        "count); "
+        "set_missing with shape missing (the bare sorted named row ids that "
+        "are not members), missing_count (the sorted missing ids with how "
+        "many there are) or missing_named (the sorted missing ids with the "
+        "sorted named ids). Every id list in an answer is in the answer's own "
+        "sorted order, not the presentation order. No rows are omitted."
+    ),
 }
 
 # Per-rule-family structure text, pinned into the header as `rule_structure`:
@@ -217,6 +436,12 @@ RETURNS: dict[str, str] = {
         "Return one JSON object with rule_family and the label, labels, label "
         "set, label counts or verdict the program asks for."
     ),
+    "set_complete": (
+        "Return the exhaustive member set the scope defines, in the shape the "
+        "terminal declares: bare ids, ids with a count, ids grouped by entity, "
+        "the member count with or without per-entity counts, a membership "
+        "verdict for a named row, or the sorted named ids that are missing."
+    ),
 }
 
 FIELDS: dict[str, str] = {
@@ -229,6 +454,7 @@ FIELDS: dict[str, str] = {
         "demo rows carry id, points, label, memo; record rows carry id, entity, "
         "x, y, memo."
     ),
+    "set_complete": ("record rows carry id, entity, category, amount, date, memo."),
 }
 
 # What each family trains: L1 binding/location, L3 time-separated state replay,
@@ -238,6 +464,7 @@ CAPABILITY_LEVELS: dict[str, str] = {
     "alias_locate": "L1_alias_binding_location",
     "asof_state": "L3_asof_state_reveal_split",
     "rule_holdout": "L4_rule_induction_structured_holdout",
+    "set_complete": "L2_exhaustive_set_membership",
 }
 
 HONESTY: dict[str, Any] = {
@@ -328,6 +555,33 @@ PROMPTS: dict[str, tuple[str, ...]] = {
         "Solve the rule query by running the program and report the labels.",
         "Run the program over the rows and give the labels or verdict it asks for.",
         "Learn the declared rule structure from the demonstrations and answer the query.",
+    ),
+    "set_complete": (
+        "Execute the typed program below over the rendered rows and return the complete member set.",
+        "Run the scope over every row and report the exhaustive set it defines.",
+        "Evaluate this program against the records and give the full membership it asks for.",
+        "Apply the declared conditions to all the rows and answer with the complete set.",
+        "Carry out the following typed query over the records and return every member.",
+        "Read the record table, run the program exactly as written, and report its result.",
+        "Compute the complete set of rows the scope admits, then answer the terminal.",
+        "Process every row with the program below and return the membership it defines.",
+        "Work through the program against the rendered rows and state the answer.",
+        "Run this set program and return the ids, the count or the verdict it asks for.",
+        "Solve the typed set query below and report the result as specified.",
+        "Execute the program over the rendered rows; report the members it admits.",
+        "Take the scope's conditions, filter nothing less than every row, and answer.",
+        "Apply the program to the records and give the exhaustive answer it asks for.",
+        "Interpret the query program, evaluate it on every row, and return the answer.",
+        "Evaluate the set-completeness program on the rendered rows and answer.",
+        "Execute the stated conditions over the rows in order and report the full set.",
+        "Run the query program on the rows below and return the membership asked for.",
+        "Resolve the scope, keep exactly the rows that satisfy it, and report the set.",
+        "Compute the program's result over the rendered record table.",
+        "Execute the following program on the rows and report the members with their count.",
+        "Evaluate this exhaustive-set program over the records and answer.",
+        "Solve the set query by running the program and report the complete membership.",
+        "Run the program over the table and give the ids, count or missing list it asks for.",
+        "Apply every condition to every row and return the exhaustive set the scope defines.",
     ),
 }
 
@@ -509,13 +763,13 @@ def _alias_bound(rows: list[Row], steps: list[dict[str, Any]]) -> tuple[Row, lis
         raise ValueError("the alias handle does not name exactly one entity")
     declaration = declarations[0]
     table = [
-        row for row in rows
-        if row.type == "record" and row.entity == declaration.entity
+        row for row in rows if row.type == "record" and row.entity == declaration.entity
     ]
     for step in steps[1:-1]:
         conditions = _filter_conditions(step)
         table = [
-            row for row in table
+            row
+            for row in table
             if all(_holds(row, condition) for condition in conditions)
         ]
     return declaration, table
@@ -620,7 +874,8 @@ def _fold(
     key = "day" if order == "event" else "reveal"
     named = set(entities)
     events = [
-        row for row in rows
+        row
+        for row in rows
         if row.type == "event" and row.entity in named and row.reveal <= cutoff
     ]
     events.sort(key=lambda row: (getattr(row, key), row.id))
@@ -711,9 +966,7 @@ def _solve_asof(
                 }
             )
         return answer
-    active = sorted(
-        entity for entity in entities if after[entity]["held"] > 0
-    )
+    active = sorted(entity for entity in entities if after[entity]["held"] > 0)
     answer = {"as_of": later, "entities": entities, "active_set": active}
     if chained:
         was = {entity for entity in entities if before[entity]["held"] > 0}
@@ -733,7 +986,8 @@ def _asof_evidence(rows: list[Row], question: dict[str, Any]) -> list[str]:
     _, later = _asof_cutoffs(steps)
     named = set(_asof_named(steps[-1]))
     return sorted(
-        row.id for row in rows
+        row.id
+        for row in rows
         if row.type == "event" and row.entity in named and row.reveal <= later
     )
 
@@ -748,7 +1002,10 @@ def _rule_steps(question: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(steps, list) or not 2 <= len(steps) <= 3:
         raise ValueError("invalid program chain")
     learned = steps[0]
-    if learned.get("op") != "learn" or learned.get("rule_family") not in RULE_STRUCTURES:
+    if (
+        learned.get("op") != "learn"
+        or learned.get("rule_family") not in RULE_STRUCTURES
+    ):
         raise ValueError("a learn step must come first")
     for step in steps[1:-1]:
         if step.get("op") != "aggregate":
@@ -805,14 +1062,12 @@ def _threshold_hypotheses(modulus: int) -> list[tuple[int, int, int, int]]:
 
 def _parity_hypotheses() -> list[tuple[int, int]]:
     """One hypothesis per (counted residue class, label parity): 4 in total."""
-    return [
-        (residue, flip)
-        for residue in range(PARITY_MODULUS)
-        for flip in (0, 1)
-    ]
+    return [(residue, flip) for residue in range(PARITY_MODULUS) for flip in (0, 1)]
 
 
-def _total_features(points: list[tuple[int, int]] | tuple[tuple[int, int], ...]) -> tuple[int, int]:
+def _total_features(
+    points: list[tuple[int, int]] | tuple[tuple[int, int], ...],
+) -> tuple[int, int]:
     return (sum(x for x, _ in points), sum(y for _, y in points))
 
 
@@ -837,7 +1092,8 @@ def _infer_rule(
             rule
             for rule in _threshold_hypotheses(modulus)
             if all(
-                _threshold_label(rule, _total_features(points), labels, modulus) == label
+                _threshold_label(rule, _total_features(points), labels, modulus)
+                == label
                 for points, label in demonstrations
             )
         ]
@@ -925,7 +1181,9 @@ def _features(rule_family: str, rows: list[Row]) -> dict[str, int]:
     }
 
 
-def _named_entities(terminal: dict[str, Any], entities: dict[str, list[Row]]) -> list[str]:
+def _named_entities(
+    terminal: dict[str, Any], entities: dict[str, list[Row]]
+) -> list[str]:
     named = terminal.get("entities")
     if not isinstance(named, list) or not 1 <= len(named) <= 12:
         raise ValueError("a label query must name 1 to 12 entities")
@@ -937,7 +1195,9 @@ def _named_entities(terminal: dict[str, Any], entities: dict[str, list[Row]]) ->
     return list(named)
 
 
-def _solve_rule(header: dict[str, Any], rows: list[Row], question: dict[str, Any]) -> Any:
+def _solve_rule(
+    header: dict[str, Any], rows: list[Row], question: dict[str, Any]
+) -> Any:
     rule_family, modulus, labels = _rule_header(header)
     steps = _rule_steps(question)
     if (
@@ -1018,8 +1278,156 @@ def _rule_evidence(rows: list[Row], question: dict[str, Any]) -> list[str]:
 
 
 # --------------------------------------------------------------------------
-# execution
+# set_complete (L2): gold is the exhaustive membership
 # --------------------------------------------------------------------------
+
+
+def _set_steps(question: dict[str, Any]) -> list[dict[str, Any]]:
+    steps = question.get("steps")
+    if not isinstance(steps, list) or len(steps) != 2:
+        raise ValueError("a set program is exactly a scope step and a terminal")
+    scope, terminal = steps
+    if scope.get("op") != "scope":
+        raise ValueError("a scope step must come first")
+    conditions = scope.get("conditions")
+    if not isinstance(conditions, list) or not 2 <= len(conditions) <= 4:
+        raise ValueError("a scope step needs 2 to 4 conditions")
+    for condition in conditions:
+        if not isinstance(condition, dict) or set(condition) != {
+            "field",
+            "op",
+            "value",
+        }:
+            raise ValueError("a scope condition is a field, an op and a value")
+        field, op = condition["field"], condition["op"]
+        if field not in FIELD_OPS or op not in FIELD_OPS[field]:
+            raise ValueError("unsupported predicate")
+        value = condition["value"]
+        if field == "amount" and type(value) is not int:
+            raise ValueError("an amount predicate must be an integer")
+        if field != "amount" and not isinstance(value, str):
+            raise ValueError("a text predicate must be a string")
+    if terminal.get("op") not in SET_TERMINALS:
+        raise ValueError("unsupported terminal operation")
+    shape = terminal.get("shape")
+    if shape not in SET_SHAPES[terminal["op"]]:
+        raise ValueError("unsupported terminal shape")
+    if terminal["op"] == "set_contains":
+        row_id = terminal.get("id")
+        if not isinstance(row_id, str):
+            raise ValueError("a contains query must name one row id")
+    elif terminal["op"] == "set_missing":
+        named = terminal.get("ids")
+        if not isinstance(named, list) or not 2 <= len(named) <= 8:
+            raise ValueError("a missing query must name 2 to 8 row ids")
+        if any(not isinstance(row_id, str) for row_id in named):
+            raise ValueError("named row ids must be strings")
+        if len(set(named)) != len(named):
+            raise ValueError("named row ids must be distinct")
+    return steps
+
+
+def _set_members(rows: list[Row], steps: list[dict[str, Any]]) -> list[Row]:
+    """The exhaustive membership: every row that satisfies every condition."""
+    conditions = steps[0]["conditions"]
+    members = [row for row in rows if row.type == "record"]
+    for condition in conditions:
+        members = [row for row in members if _holds(row, condition)]
+    return members
+
+
+def _set_evidence(rows: list[Row], question: dict[str, Any]) -> list[str]:
+    """Provenance: the full membership for set terminals, the named rows for verdicts.
+
+    A set answer is exhaustive, so its evidence is every member -- a reader
+    cannot know the set is complete without reading them all. A verdict names
+    its own rows; membership still has to be decided, but the answer only
+    covers the ids it names, exactly as _rule_evidence covers only the named
+    entities. Siblings are never evidence: they are what the reader must
+    exclude, not read.
+    """
+    steps = _set_steps(question)
+    terminal = steps[-1]
+    if terminal["op"] == "set_contains":
+        # A contains verdict is fail-closed about its own row: the program
+        # names a rendered row, and a world that no longer renders it is a
+        # malformed query rather than a negative verdict. The contains_count
+        # shape also reads the whole membership (its count key), so its
+        # evidence is the membership plus the named row.
+        row_id = terminal["id"]
+        if not any(row.id == row_id for row in rows if row.type == "record"):
+            raise ValueError("the contains query names a row that is not rendered")
+        if terminal["shape"] == "contains_count":
+            members = set(row.id for row in _set_members(rows, steps))
+            return sorted({row_id, *members})
+        return [row_id]
+    if terminal["op"] == "set_missing":
+        wanted = set(terminal["ids"])
+        return sorted(
+            row.id for row in rows if row.type == "record" and row.id in wanted
+        )
+    return sorted(row.id for row in _set_members(rows, steps))
+
+
+def _solve_set(rows: list[Row], question: dict[str, Any]) -> Any:
+    steps = _set_steps(question)
+    terminal = steps[-1]
+    if terminal["op"] == "set_contains":
+        # Fail-closed: the program names a rendered row, and a world that no
+        # longer renders it is a malformed query rather than a verdict.
+        row_id = terminal["id"]
+        if not any(row.id == row_id for row in rows if row.type == "record"):
+            raise ValueError("the contains query names a row that is not rendered")
+    members = _set_members(rows, steps)
+    ids = sorted(row.id for row in members)
+    by_entity: dict[str, list[str]] = {}
+    for row in sorted(members, key=lambda row: (row.entity, row.id)):
+        by_entity.setdefault(row.entity, []).append(row.id)
+    op, shape = terminal["op"], terminal["shape"]
+    if op == "set_list":
+        if shape == "ids":
+            return ids
+        if shape == "ids_count":
+            return {"ids": ids, "count": len(ids)}
+        return {"count": len(ids), "entities": by_entity}
+    if op == "set_count":
+        if shape == "count":
+            return len(ids)
+        return {
+            "count": len(ids),
+            "entities": {
+                entity: len(entity_ids) for entity, entity_ids in by_entity.items()
+            },
+        }
+    if op == "set_contains":
+        row_id = terminal["id"]
+        contains = row_id in set(ids)
+        if shape == "contains_verdict":
+            return contains
+        if shape == "contains_entity":
+            row = next(row for row in rows if row.id == row_id)
+            return {"id": row_id, "entity": row.entity, "contains": contains}
+        if shape == "contains_count":
+            return {
+                "id": row_id,
+                "contains": contains,
+                "count": len(ids),
+            }
+        return {"id": row_id, "contains": contains}
+    named = sorted(terminal["ids"])
+    rendered = {row.id for row in rows if row.type == "record"}
+    if not set(named) <= rendered:
+        # Fail-closed: a named row that is no longer rendered is a malformed
+        # query, not an implicitly-missing one -- else dropping the sibling
+        # row would "answer" it into the missing list for free.
+        raise ValueError("the missing query names a row that is not rendered")
+    member_ids = set(ids)
+    missing = sorted(row_id for row_id in named if row_id not in member_ids)
+    if shape == "missing":
+        return missing
+    if shape == "missing_count":
+        return {"missing": missing, "count": len(missing)}
+    return {"ids": named, "missing": missing}
 
 
 def _solve_rows(
@@ -1041,6 +1449,8 @@ def _solve_rows(
         return _solve_alias(rows, question)
     if family == "asof_state":
         return _solve_asof(rows, question, order)
+    if family == "set_complete":
+        return _solve_set(rows, question)
     return _solve_rule(header, rows, question)
 
 
@@ -1074,7 +1484,9 @@ def describe_program(program: dict[str, Any]) -> str:
         elif op == "locate_one":
             parts.append("report the single located row id")
         elif op == "locate_empty":
-            parts.append("report that the condition locates no row, with the alias it bound")
+            parts.append(
+                "report that the condition locates no row, with the alias it bound"
+            )
         elif op == "asof":
             parts.append(f"take the state as of reveal date {step['reveal']}")
         elif op == "delta":
@@ -1090,7 +1502,9 @@ def describe_program(program: dict[str, Any]) -> str:
         elif op == "active_set":
             parts.append("report the sorted named entities whose held is above zero")
         elif op == "learn":
-            parts.append(f"infer the {step['rule_family']} rule from the demonstrations")
+            parts.append(
+                f"infer the {step['rule_family']} rule from the demonstrations"
+            )
         elif op == "aggregate":
             parts.append("aggregate every named entity's rows into its features")
         elif op == "label":
@@ -1098,22 +1512,84 @@ def describe_program(program: dict[str, Any]) -> str:
         elif op == "labels":
             parts.append("report every named entity's label")
         elif op == "label_list":
-            parts.append("report the named entities' labels as a bare list in named order")
+            parts.append(
+                "report the named entities' labels as a bare list in named order"
+            )
         elif op == "label_set":
             parts.append(f"report which named entities carry the label {step['label']}")
         elif op == "label_counts":
-            parts.append(f"report how many named entities carry the label {step['label']}")
+            parts.append(
+                f"report how many named entities carry the label {step['label']}"
+            )
         elif op == "verify":
             parts.append(
                 f"report whether entity {step['entity']} carries the claimed label "
                 f"{step['claim']}"
             )
+        elif op == "scope":
+            parts.append(
+                f"collect every row where {_conditions_text(step['conditions'])}"
+            )
+        elif op == "set_list":
+            if step["shape"] == "ids":
+                parts.append("report every member's row id as a bare sorted list")
+            elif step["shape"] == "ids_count":
+                parts.append(
+                    "report every member's row id as a sorted list with the member count"
+                )
+            else:
+                parts.append(
+                    "report the member count with the members grouped by entity"
+                )
+        elif op == "set_count":
+            if step["shape"] == "count":
+                parts.append("report how many rows the scope admits")
+            else:
+                parts.append(
+                    "report how many rows the scope admits with per-entity counts"
+                )
+        elif op == "set_contains":
+            row_id = step["id"]
+            if step["shape"] == "contains_verdict":
+                parts.append(f"report only whether row {row_id} is a member of the set")
+            elif step["shape"] == "contains_entity":
+                parts.append(
+                    f"report whether row {row_id} is a member of the set, naming it "
+                    "and its entity"
+                )
+            elif step["shape"] == "contains_count":
+                parts.append(
+                    f"report whether row {row_id} is a member of the set, with the "
+                    "member count"
+                )
+            else:
+                parts.append(
+                    f"report whether row {row_id} is a member of the set, naming it"
+                )
+        elif op == "set_missing":
+            if step["shape"] == "missing":
+                parts.append(
+                    "report as a bare sorted list which of the named row ids are not "
+                    "members of the set"
+                )
+            elif step["shape"] == "missing_count":
+                parts.append(
+                    "report which of the named row ids are not members of the set, "
+                    "with how many there are"
+                )
+            else:
+                parts.append(
+                    "report the sorted named row ids with which of them are not "
+                    "members of the set"
+                )
         else:
             raise ValueError("unknown program step")
     return "; then ".join(parts)
 
 
-def render_instruction(family: str, program: dict[str, Any], phrasing_index: int) -> str:
+def render_instruction(
+    family: str, program: dict[str, Any], phrasing_index: int
+) -> str:
     prompts = PROMPTS[family]
     if not 0 <= phrasing_index < len(prompts):
         raise ValueError("invalid phrasing index")
@@ -1129,8 +1605,7 @@ def _split_sizes(rng: random.Random, consumed: int, n_variants: int) -> list[int
     """K is sampled per task over a band around the cell value (as in capability_records)."""
     spread = max(2, consumed // 3)
     return [
-        max(4, consumed + rng.randrange(-spread, spread + 1))
-        for _ in range(n_variants)
+        max(4, consumed + rng.randrange(-spread, spread + 1)) for _ in range(n_variants)
     ]
 
 
@@ -1216,7 +1691,10 @@ def _alias_world(
                 {"field": "date", "op": ">=", "value": start.isoformat()},
                 {"field": "date", "op": "<=", "value": stop.isoformat()},
             ]
-            target_pattern = [(day(), amounts[position % len(amounts)], category) for position in range(size)]
+            target_pattern = [
+                (day(), amounts[position % len(amounts)], category)
+                for position in range(size)
+            ]
             twin_pattern = [
                 (day(), rng.randint(floor, floor + AMOUNT_CAP), other)
                 for _ in range(size)
@@ -1247,7 +1725,8 @@ def _alias_world(
                 {"field": "amount", "op": ">=", "value": floor},
             ]
             target_pattern = [
-                (day(), amounts[position], category) for position in range(max(1, size - 1))
+                (day(), amounts[position], category)
+                for position in range(max(1, size - 1))
             ]
             twin_pattern = list(target_pattern)
         for pattern, owner in ((target_pattern, entity), (twin_pattern, twin)):
@@ -1274,17 +1753,19 @@ def _alias_world(
                 "twin_entity": twin,
                 "declaration_row": target_declaration.id,
                 "twin_declaration_row": twin_declaration.id,
-                "queried_category": (
-                    other if terminal == "locate_empty" else category
-                ),
+                "queried_category": (other if terminal == "locate_empty" else category),
             }
         )
-    return rows, specs, {
-        "header": None,
-        "id_width": id_width,
-        "memo_width": memo_width,
-        "categories": categories,
-    }
+    return (
+        rows,
+        specs,
+        {
+            "header": None,
+            "id_width": id_width,
+            "memo_width": memo_width,
+            "categories": categories,
+        },
+    )
 
 
 def _asof_world(
@@ -1376,10 +1857,14 @@ def _asof_world(
                     )
                 )
             rows.append(
-                event(entity, day_from(start, 8), earlier, "credit", rng.randint(10, 400))
+                event(
+                    entity, day_from(start, 8), earlier, "credit", rng.randint(10, 400)
+                )
             )
             rows.append(
-                event(entity, day_from(start, 8), earlier, "debit", rng.randint(10, 200))
+                event(
+                    entity, day_from(start, 8), earlier, "debit", rng.randint(10, 200)
+                )
             )
         # The rest of the visible budget duplicates events, one copy visible by
         # the earlier cutoff and one in the tail a delta step has to separate.
@@ -1416,10 +1901,17 @@ def _asof_world(
                     template.amount,
                 )
             )
-        header = {"schema": VERSION, "family": "asof_state", "rules": PROTOCOLS["asof_state"]}
+        header = {
+            "schema": VERSION,
+            "family": "asof_state",
+            "rules": PROTOCOLS["asof_state"],
+        }
         steps: list[dict[str, Any]] = [{"op": "asof", "reveal": later}]
         if depth >= 2:
-            steps = [{"op": "asof", "reveal": earlier}, {"op": "delta", "reveal": later}]
+            steps = [
+                {"op": "asof", "reveal": earlier},
+                {"op": "delta", "reveal": later},
+            ]
         steps.append(
             {"op": "balance", "entity": named[0]}
             if terminal == "balance"
@@ -1434,7 +1926,9 @@ def _asof_world(
         # keeps a decisive row of its own -- which is checked here on the moved
         # world rather than assumed.
         answer = _solve_rows(header, rows, question)
-        decisive = _sensitivity(header, rows, question, answer, _asof_evidence(rows, question))
+        decisive = _sensitivity(
+            header, rows, question, answer, _asof_evidence(rows, question)
+        )
         by_id = {row.id: row for row in rows}
         hidden_reveal = day_from(date.fromisoformat(later) + timedelta(days=1), 20)
         crossed: tuple[str, str, str] | None = None
@@ -1458,7 +1952,9 @@ def _asof_world(
             rows = moved
             break
         if crossed is None:
-            raise ValueError("no decisive row can cross the query date and keep the world valid")
+            raise ValueError(
+                "no decisive row can cross the query date and keep the world valid"
+            )
         hidden.append((crossed[0], crossed[1]))
         # Further hidden rows: revealed after the query date, so they are outside
         # every answer and are pure exposure.
@@ -1521,7 +2017,9 @@ def _threshold_signature(
     )
 
 
-def _sample_threshold_rule(rng: random.Random, modulus: int) -> tuple[int, int, int, int]:
+def _sample_threshold_rule(
+    rng: random.Random, modulus: int
+) -> tuple[int, int, int, int]:
     """A drawn rule, re-expressed as the enumerated representative of its function.
 
     Several parameter tuples induce the same label function, and the inference
@@ -1807,8 +2305,7 @@ def _rule_world(
     # The feature signatures the demonstrations publish: every query entity has
     # to stay off this set, so the label is never read off a demonstrated point.
     seen = {
-        _reduced_point(rule_family, points, modulus, rule)
-        for points in demonstrations
+        _reduced_point(rule_family, points, modulus, rule) for points in demonstrations
     }
     used: set[str] = set()
     specs: list[dict[str, Any]] = []
@@ -1863,7 +2360,11 @@ def _rule_world(
             steps.append({"op": terminal, "entities": list(named)})
         else:
             steps.append(
-                {"op": terminal, "entities": list(named), "label": labels[(seed + index) % 2]}
+                {
+                    "op": terminal,
+                    "entities": list(named),
+                    "label": labels[(seed + index) % 2],
+                }
             )
         specs.append(
             {
@@ -1881,12 +2382,304 @@ def _rule_world(
         "labels": list(labels),
         "rule_structure": RULE_STRUCTURES[rule_family],
     }
-    return rows, specs, {
-        "header": header,
-        "id_width": id_width,
-        "memo_width": memo_width,
-        "rule": rule,
-    }
+    return (
+        rows,
+        specs,
+        {
+            "header": header,
+            "id_width": id_width,
+            "memo_width": memo_width,
+            "rule": rule,
+        },
+    )
+
+
+# --------------------------------------------------------------------------
+# set_complete generation
+# --------------------------------------------------------------------------
+
+
+def _set_world(
+    rng: random.Random, sizes: list[int], depth: int, seed: int
+) -> tuple[list[Row], list[dict[str, Any]], dict[str, Any]]:
+    """Rows, task specs and rendering extras for one set_complete world.
+
+    Each task pins a scope (2 to 4 conditions) and builds exactly the rows it
+    needs: K members drawn from a fresh entity population, same-schema
+    siblings that fail exactly one condition, and the insert-hit row -- a
+    legal hit injected into a region of the condition space no member covers
+    (a disjoint date window or a fresh entity's rows), which must enter the
+    answer when the intervention re-renders it inside the scope. Every task
+    runs over the whole world, so another task's members are its siblings:
+    the exhaustiveness is real, not staged.
+    """
+    categories = rng.sample(
+        CATEGORY_POOL, rng.randint(4, min(len(CATEGORY_POOL), max(4, len(sizes) * 5)))
+    )
+    id_width = rng.choice((8, 12, 16, 20, 24))
+    memo_width = rng.choice((16, 32, 48))
+    used: set[str] = set()
+    rows: list[Row] = []
+    specs: list[dict[str, Any]] = []
+
+    def record(day: str, amount: int, category: str, entity: str) -> Row:
+        return Row(
+            id=_new_id("r", rng, id_width),
+            type="record",
+            entity=entity,
+            memo=_new_id("note-", rng, memo_width),
+            amount=amount,
+            category=category,
+            day=day,
+        )
+
+    for index, size in enumerate(sizes):
+        terminal = SET_TERMINALS[(seed + index) % len(SET_TERMINALS)]
+        # The shape rotation is coupled to the terminal rotation but a period
+        # off it, so a seed sweep covers every (terminal, shape) pair while the
+        # bare-count shape -- arity-invisible when masked -- is diluted by the
+        # arity-rich dict shapes landing on the same terminal.
+        shape = SET_SHAPES[terminal][
+            (seed // len(SET_TERMINALS) + index) % len(SET_SHAPES[terminal])
+        ]
+        # The unordered pin is its own rotation axis, decoupled from the
+        # terminal rotation: else one parity of seed pins the whole sweep's
+        # set_list tasks to a single presentation order.
+        unordered = bool((seed // len(SET_TERMINALS) + index) % 2)
+        start = BASE_DATE + timedelta(days=index * (WINDOW_DAYS + GAP_DAYS))
+        stop = start + timedelta(days=WINDOW_DAYS)
+        floor = rng.randint(120, 880)
+        cap = rng.randint(floor + 40, floor + AMOUNT_CAP)
+        category = rng.choice(categories)
+        members: list[Row] = []
+        # Members share entities in small groups (2 to 6 entities hold the K
+        # rows), so the grouped answer shapes carry a real group structure
+        # rather than one row per entity.
+        member_entities = max(2, min(6, size // 3))
+        entities = []
+        for _ in range(member_entities):
+            entity = f"unit-{rng.getrandbits(20):05x}"
+            while entity in used:
+                entity = f"unit-{rng.getrandbits(20):05x}"
+            used.add(entity)
+            entities.append(entity)
+        for position in range(size):
+            members.append(
+                record(
+                    (start + timedelta(days=rng.randrange(WINDOW_DAYS))).isoformat(),
+                    rng.randint(floor, cap),
+                    category,
+                    entities[position % member_entities],
+                )
+            )
+        conditions: list[dict[str, Any]] = [
+            {"field": "category", "op": "==", "value": category},
+            {"field": "date", "op": ">=", "value": start.isoformat()},
+            {"field": "date", "op": "<=", "value": stop.isoformat()},
+            {"field": "amount", "op": ">=", "value": floor},
+            {"field": "amount", "op": "<=", "value": cap},
+        ]
+        if rng.randrange(2):
+            rng.shuffle(conditions)
+        conditions = conditions[: rng.choice((2, 3, 4))]
+        if not any(
+            condition["field"] == "category" and condition["op"] == "=="
+            for condition in conditions
+        ):
+            conditions[0] = {"field": "category", "op": "==", "value": category}
+        # Siblings: same schema, same category-family, fail exactly one
+        # condition. One sibling population per dropped condition axis.
+        siblings: list[Row] = []
+        sibling_count = max(4, size // 2)
+        other = rng.choice([name for name in categories if name != category])
+        for position in range(sibling_count):
+            entity = f"unit-{rng.getrandbits(20):05x}"
+            while entity in used:
+                entity = f"unit-{rng.getrandbits(20):05x}"
+            used.add(entity)
+            if position % 3 == 0:
+                # Wrong category, inside the date and amount range.
+                siblings.append(
+                    record(
+                        (
+                            start + timedelta(days=rng.randrange(WINDOW_DAYS))
+                        ).isoformat(),
+                        rng.randint(floor, cap),
+                        other,
+                        entity,
+                    )
+                )
+            elif position % 3 == 1:
+                # Outside the date window (before it), inside amount and category.
+                siblings.append(
+                    record(
+                        (
+                            start - timedelta(days=rng.randrange(1, GAP_DAYS))
+                        ).isoformat(),
+                        rng.randint(floor, cap),
+                        category,
+                        entity,
+                    )
+                )
+            else:
+                # Outside the amount range, inside date and category.
+                siblings.append(
+                    record(
+                        (
+                            start + timedelta(days=rng.randrange(WINDOW_DAYS))
+                        ).isoformat(),
+                        rng.randint(1, max(1, floor - 1)),
+                        category,
+                        entity,
+                    )
+                )
+        # The insert-hit row: a legal hit in a previously uncovered region of
+        # the text -- a fresh entity carrying the queried category, a date
+        # before the window, an amount above the cap. It is built against the
+        # *final* condition list (the trim may have dropped the bounds it was
+        # planned to violate), and it must satisfy every condition but one so
+        # the repair moves exactly one field and the answer must take it.
+        kept = {(condition["field"], condition["op"]) for condition in conditions}
+
+        def region_value(field: str, op: str, inside: bool) -> Any:
+            if field == "date":
+                if op == ">=":
+                    return (
+                        (start + timedelta(days=rng.randrange(WINDOW_DAYS))).isoformat()
+                        if inside
+                        else (
+                            start - timedelta(days=rng.randrange(1, GAP_DAYS))
+                        ).isoformat()
+                    )
+                return (
+                    (start + timedelta(days=rng.randrange(WINDOW_DAYS))).isoformat()
+                    if inside
+                    else (stop + timedelta(days=rng.randrange(1, GAP_DAYS))).isoformat()
+                )
+            if field == "amount":
+                if op == ">=":
+                    return (
+                        rng.randint(floor, cap)
+                        if inside
+                        else rng.randint(1, max(1, floor - 1))
+                    )
+                return rng.randint(floor, cap) if inside else cap + rng.randint(1, 60)
+            return category if inside else other
+
+        insert_entity = f"unit-{rng.getrandbits(20):05x}"
+        while insert_entity in used:
+            insert_entity = f"unit-{rng.getrandbits(20):05x}"
+        used.add(insert_entity)
+        # Violate exactly one kept condition axis, chosen among those the row
+        # can cross; every other kept condition is satisfied.
+        candidates = sorted(kept)
+        rng.shuffle(candidates)
+        violated, insert_day, insert_amount, insert_category = (
+            None,
+            (start + timedelta(days=rng.randrange(WINDOW_DAYS))).isoformat(),
+            rng.randint(floor, cap),
+            category,
+        )
+        for field, op in candidates:
+            if (field, op) == ("category", "=="):
+                continue
+            violated = (field, op)
+            value = region_value(field, op, inside=False)
+            if field == "date":
+                insert_day = value
+            else:
+                insert_amount = value
+            break
+        if violated is None:
+            # Only the category condition was kept: the insert row carries the
+            # sibling category, and the repair moves it across that boundary.
+            insert_category = other
+        insert_row = record(insert_day, insert_amount, insert_category, insert_entity)
+        # 50% of rows present the member set unordered; the answer is sorted.
+        # The pin above covers both parities across a seed sweep and both
+        # within every world of >=2 variants (an all-coin world would leave a
+        # quarter of 2-variant worlds all-ordered).
+        presented: list[Row] = list(members) + list(siblings) + [insert_row]
+        if unordered:
+            rng.shuffle(presented)
+        rows.extend(presented)
+        steps = [
+            {"op": "scope", "conditions": conditions},
+            {"op": terminal, "shape": shape},
+        ]
+        if terminal in ("set_contains", "set_missing"):
+            # Named rows span both sides of the boundary: members, a sibling
+            # that violates a kept condition, and the insert-hit row (itself a
+            # non-member until repaired) -- so the verdict carries a real
+            # discriminator, the boundary row is never sliced out, and the
+            # insert intervention moves a *named* row across the boundary.
+            boundary_sibling = next(
+                sibling
+                for sibling in siblings
+                if any(not _holds(sibling, condition) for condition in conditions)
+            )
+            probe_members = [
+                member.id for member in members[: max(2, min(5, size // 3))]
+            ]
+            rng.shuffle(probe_members)
+            if terminal == "set_contains":
+                # The queried row is the insert-hit row: its verdict is False
+                # as rendered, and repairing it into the scope flips the named
+                # row's own membership -- the intervention is about the row it
+                # asks for, not one the repair happens to add elsewhere. The
+                # sibling stays in the world as the discriminator a reader
+                # must not take. The contains_count shape may instead name a
+                # member (verdict True), because its count key keeps the
+                # repair flip observable either way; the id-only and bare
+                # verdict shapes stay pinned to the insert row, whose own
+                # membership the repair flips.
+                if shape == "contains_count" and rng.randrange(2):
+                    steps[1]["id"] = probe_members[0]
+                else:
+                    steps[1]["id"] = insert_row.id
+            else:
+                # The named-probe arity is a shape axis: 2 to 6 members plus a
+                # drawn 1 to 3 of the boundary siblings plus the insert row,
+                # so both the named arity and the missing arity vary per task.
+                boundary_rows = [
+                    sibling.id
+                    for sibling in siblings
+                    if any(not _holds(sibling, condition) for condition in conditions)
+                ]
+                rng.shuffle(boundary_rows)
+                probe_count = rng.randint(2, 4)
+                boundary_count = rng.randint(1, min(3, len(boundary_rows)))
+                steps[1]["ids"] = (
+                    probe_members[:probe_count]
+                    + boundary_rows[:boundary_count]
+                    + [insert_row.id]
+                )
+        question = {
+            "family": "set_complete",
+            "steps": steps,
+            "unordered": unordered,
+        }
+        specs.append(
+            {
+                "task_id": f"q{index}",
+                "question": question,
+                "sibling_rows": [sibling.id for sibling in siblings],
+                "insert_row": insert_row.id,
+                "scope": {
+                    "conditions": [dict(condition) for condition in conditions],
+                },
+            }
+        )
+    return (
+        rows,
+        specs,
+        {
+            "header": None,
+            "id_width": id_width,
+            "memo_width": memo_width,
+            "categories": categories,
+        },
+    )
 
 
 def _padding_rows(
@@ -1925,6 +2718,20 @@ def _padding_rows(
                     reveal=(day + timedelta(days=60)).isoformat(),
                 )
             )
+        elif family == "set_complete":
+            rows.append(
+                Row(
+                    id=_new_id("r", rng, id_width),
+                    type="record",
+                    entity=entity,
+                    memo=_new_id("note-", rng, memo_width),
+                    amount=rng.randint(1, 999),
+                    category=categories[index % len(categories)],
+                    day=(
+                        BASE_DATE + timedelta(days=rng.randrange(-90, 90))
+                    ).isoformat(),
+                )
+            )
         else:
             offset = (2 if family == "parity_vote" else 3) * rng.randint(3, 9)
             rows.append(
@@ -1960,13 +2767,19 @@ def generate_world(
     if type(n_variants) is not int or not 1 <= n_variants <= 8:
         raise ValueError("n_variants must be 1..8")
     if n_variants != plan_variants(length_records, consumed_records, n_variants):
-        raise ValueError("K budget does not fit inside L; shrink K or the variant count")
+        raise ValueError(
+            "K budget does not fit inside L; shrink K or the variant count"
+        )
     rng = random.Random(seed)
     sizes = _split_sizes(rng, consumed_records, n_variants)
     if family == "alias_locate":
         rows, specs, extra = _alias_world(rng, sizes, depth, seed)
     elif family == "asof_state":
         rows, specs, extra = _asof_world(rng, sizes, depth, seed)
+    elif family == "set_complete":
+        if depth != 1:
+            raise ValueError("set_complete is an H=1 family; only depth 1 is generated")
+        rows, specs, extra = _set_world(rng, sizes, depth, seed)
     else:
         rows, specs, extra = _rule_world(rng, sizes, depth, seed)
     primary = sum(1 for row in rows if row.type in PRIMARY_TYPES)
@@ -2065,6 +2878,8 @@ def _executor_evidence(rows: list[Row], question: dict[str, Any]) -> list[str]:
         return _asof_evidence(rows, question)
     if family == "rule_holdout":
         return _rule_evidence(rows, question)
+    if family == "set_complete":
+        return _set_evidence(rows, question)
     raise ValueError("unsupported family")
 
 
@@ -2133,6 +2948,22 @@ def _structurally_necessary(
             if by_id[row_id].kind in HOLD_KINDS
         ]
         return not holds or any(row_id in decisive for row_id in holds)
+    if family == "set_complete":
+        # The exhaustive gold means every member is individually decisive for
+        # a set answer: removing any one of them shrinks the complete set,
+        # which the measured partition must confirm row by row. A contains
+        # task names one row, so that row must be decisive: the verdict flips
+        # with its own fields. A missing task names rows on both sides of the
+        # boundary, so at least one named row of each kind must be decisive.
+        terminal = _set_steps(question)[-1]
+        members = set(row.id for row in _set_members(rows, _set_steps(question)))
+        if terminal["op"] == "set_contains":
+            return terminal["id"] in decisive
+        if terminal["op"] == "set_missing":
+            named = set(terminal["ids"])
+            decisive_named = named & decisive
+            return bool(decisive_named & members) and bool(decisive_named - members)
+        return members <= decisive
     terminal = _rule_steps(question)[-1]
     named = (
         [terminal.get("entity")]
@@ -2156,6 +2987,12 @@ def _decoys(family: str, specs: list[dict[str, Any]], extra: dict[str, Any]) -> 
         )
     if family == "asof_state":
         return sum(len(spec["hidden_events"]) for spec in specs)
+    if family == "set_complete":
+        # Every task's sibling population plus its insert-hit row are built to
+        # be confusable with the membership but never read by it.
+        return sum(
+            len(spec["sibling_rows"]) + 1 for spec in specs if spec.get("sibling_rows")
+        )
     return 0
 
 
@@ -2172,6 +3009,8 @@ def _intervention(
         return _alias_intervention(header, rows, question, answer, spec)
     if family == "asof_state":
         return _asof_intervention(header, rows, question, answer, spec)
+    if family == "set_complete":
+        return _set_intervention(header, rows, question, answer, spec)
     return _rule_intervention(header, rows, question, answer)
 
 
@@ -2238,6 +3077,77 @@ def _rule_intervention(
     if not _differs(header, reduced, question, answer):
         raise ValueError("removing every demonstration did not change the answer")
     return {"kind": "demo_removal", "rows": demos}
+
+
+def _set_intervention(
+    header: dict[str, Any],
+    rows: list[Row],
+    question: dict[str, Any],
+    answer: Any,
+    spec: dict[str, Any],
+) -> dict[str, Any]:
+    """Inserting a legal hit into an uncovered region must enter the answer.
+
+    The insert-hit row (a fresh entity's row that satisfies every condition
+    but one and sits in a region the members do not cover: before the window,
+    above the cap) is repaired into the scope -- the one violated field is
+    moved inside -- and the answer must flip: the complete set grows by
+    exactly that row. The question already names the insert row (the
+    generation draws it among the probes), so a set answer takes it, a
+    missing answer drops it, and a contains verdict flips with it. The one
+    exception is the bare-verdict shape, which cannot carry an id: its probe
+    is widened to the id-bearing shape for the moved world only, because a
+    bare True is not distinguishable from a bare True for another row.
+    """
+    insert_id = spec["insert_row"]
+    scope = spec["scope"]["conditions"]
+    bounds: dict[tuple[str, str], str | int | None] = {
+        (condition["field"], condition["op"]): condition["value"] for condition in scope
+    }
+    moved = []
+    for row in rows:
+        if row.id != insert_id:
+            moved.append(row)
+            continue
+        day = row.day
+        low = bounds.get(("date", ">="))
+        if low is not None and day < low:
+            day = low
+        high = bounds.get(("date", "<="))
+        if high is not None and day > high:
+            day = high
+        amount = row.amount
+        floor = bounds.get(("amount", ">="))
+        ceil = bounds.get(("amount", "<="))
+        if floor is not None and amount < floor:
+            amount = floor
+        if ceil is not None and amount > ceil:
+            amount = ceil
+        category = row.category
+        wanted = bounds.get(("category", "=="))
+        if wanted is not None and category != wanted:
+            category = wanted
+        moved.append(replace(row, day=day, amount=amount, category=category))
+    terminal = question["steps"][-1]
+    if terminal["op"] == "set_contains" and terminal["shape"] == "contains_verdict":
+        # The bare verdict cannot carry the hit's id; widen the probe for the
+        # moved world so the flip is observable.
+        moved_question = {
+            **question,
+            "steps": [
+                question["steps"][0],
+                dict(terminal, id=insert_id, shape="contains"),
+            ],
+        }
+    else:
+        moved_question = question
+    if not _differs(header, moved, moved_question, answer):
+        raise ValueError("inserting the legal hit did not change the answer")
+    return {
+        "kind": "insert_hit",
+        "row": insert_id,
+        "conditions": [dict(condition) for condition in scope],
+    }
 
 
 def answer_value(answer: Any) -> Any:
@@ -2363,6 +3273,60 @@ def _validate_intervention(
             for candidate in rows
         ]
         flipped = _solve_rows(header, moved, question) != answer
+    elif kind == "insert_hit":
+        insert_id = intervention.get("row")
+        row = by_id.get(insert_id)
+        if row is None:
+            return ["the declared insert-hit row is not rendered"]
+        if [dict(condition) for condition in intervention["conditions"]] != [
+            dict(condition) for condition in question["steps"][0]["conditions"]
+        ]:
+            return ["the declared insert-hit conditions do not match the program"]
+        bounds = {
+            (condition["field"], condition["op"]): condition["value"]
+            for condition in intervention["conditions"]
+        }
+        moved = []
+        for candidate in rows:
+            if candidate.id != insert_id:
+                moved.append(candidate)
+                continue
+            day = candidate.day
+            low = bounds.get(("date", ">="))
+            if low is not None and day < low:
+                day = low
+            high = bounds.get(("date", "<="))
+            if high is not None and day > high:
+                day = high
+            amount = candidate.amount
+            floor = bounds.get(("amount", ">="))
+            ceil = bounds.get(("amount", "<="))
+            if floor is not None and amount < floor:
+                amount = floor
+            if ceil is not None and amount > ceil:
+                amount = ceil
+            category = candidate.category
+            wanted = bounds.get(("category", "=="))
+            if wanted is not None and category != wanted:
+                category = wanted
+            moved.append(replace(candidate, day=day, amount=amount, category=category))
+        terminal = question["steps"][-1]
+        if terminal["op"] == "set_contains":
+            moved_question = {
+                **question,
+                "steps": [question["steps"][0], dict(terminal, id=insert_id)],
+            }
+        elif terminal["op"] == "set_missing":
+            ids = list(terminal["ids"])
+            if insert_id not in ids:
+                ids = [*ids, insert_id] if len(ids) < 8 else [*ids[1:], insert_id]
+            moved_question = {
+                **question,
+                "steps": [question["steps"][0], dict(terminal, ids=ids)],
+            }
+        else:
+            moved_question = question
+        flipped = _differs(header, moved, moved_question, answer)
     else:
         selected = set(intervention["rows"])
         if any(row_id not in by_id for row_id in selected):
@@ -2399,7 +3363,8 @@ def _family_checks(
             declaration, table = _alias_bound(rows, _alias_steps(question))
             queried = task["queried_category"]
             twins = [
-                row for row in rows
+                row
+                for row in rows
                 if row.type == "record"
                 and row.entity != declaration.entity
                 and row.category == queried
@@ -2422,8 +3387,8 @@ def _family_checks(
             earlier, later = _asof_cutoffs(_asof_steps(question))
             entities = _asof_named(_asof_steps(question)[-1])
             for cutoff in {earlier, later}:
-                state_disagreements += (
-                    _fold(rows, cutoff, entities) != _fold(rows, cutoff, entities, "reveal")
+                state_disagreements += _fold(rows, cutoff, entities) != _fold(
+                    rows, cutoff, entities, "reveal"
                 )
             answer_disagreements += (
                 _solve_rows(header, rows, question, order="reveal") != task["answer"]
@@ -2431,17 +3396,97 @@ def _family_checks(
             by_id = {row.id: row for row in rows}
             # Revocation propagation: the sign of a set-aside or release row
             # must reach the answer, not just be rendered.
-            if any(
-                by_id[row_id].kind in HOLD_KINDS for row_id in task["necessary"]
-            ):
+            if any(by_id[row_id].kind in HOLD_KINDS for row_id in task["necessary"]):
                 hold_flips += 1
         checks["reveal_order_state_disagreements"] = state_disagreements
         checks["reveal_order_answer_disagreements"] = answer_disagreements
         checks["tasks_carrying_a_decisive_hold_row"] = hold_flips
         if not state_disagreements:
-            errors.append("the reveal order changes no state; the times are not separate")
+            errors.append(
+                "the reveal order changes no state; the times are not separate"
+            )
         if hold_flips != len(bundle["tasks"]):
             errors.append("a set-aside or release row is not decisive for its task")
+        return
+    if family == "set_complete":
+        # Gold is the exhaustive membership, re-derived here over the whole
+        # world; a set answer carries the members, a verdict answer its own
+        # named rows, and every answer list is sorted regardless of the
+        # presentation order the task pinned.
+        unordered = 0
+        for task in bundle["tasks"]:
+            question = task["question"]
+            steps = _set_steps(question)
+            members = _set_members(rows, steps)
+            ids = sorted(row.id for row in members)
+            answer = task["answer"]
+            terminal = steps[-1]
+            if terminal["op"] == "set_list":
+                if isinstance(answer, list):
+                    shown = answer
+                elif "ids" in answer:
+                    shown = answer["ids"]
+                else:
+                    shown = sorted(
+                        row_id
+                        for entity_ids in answer["entities"].values()
+                        for row_id in entity_ids
+                    )
+                if sorted(shown) != ids:
+                    errors.append("a set answer is not the exhaustive membership")
+            elif terminal["op"] == "set_missing":
+                shown = answer if isinstance(answer, list) else answer["missing"]
+                member_ids = set(ids)
+                expected_missing = sorted(
+                    row_id
+                    for row_id in sorted(terminal["ids"])
+                    if row_id not in member_ids
+                )
+                if sorted(shown) != expected_missing:
+                    errors.append("a missing answer is not the named non-members")
+                if (
+                    not isinstance(answer, list)
+                    and terminal["shape"] == "missing_count"
+                    and answer.get("count") != len(expected_missing)
+                ):
+                    errors.append("a missing count disagrees with the membership")
+            elif terminal["op"] == "set_contains":
+                verdict = answer if isinstance(answer, bool) else answer["contains"]
+                if verdict != (terminal["id"] in set(ids)):
+                    errors.append("a contains verdict disagrees with the membership")
+                if (
+                    terminal["shape"] == "contains_entity"
+                    and answer.get("entity") is not None
+                ):
+                    entity = next(
+                        row.entity for row in rows if row.id == terminal["id"]
+                    )
+                    if answer["entity"] != entity:
+                        errors.append("a contains entity disagrees with the row")
+            else:
+                # set_count: the count and, where the shape declares it, the
+                # per-entity counts are the exhaustive membership in numbers.
+                counts: dict[str, int] = {}
+                for row in members:
+                    counts[row.entity] = counts.get(row.entity, 0) + 1
+                if isinstance(answer, int):
+                    if answer != len(ids):
+                        errors.append("a count answer disagrees with the membership")
+                elif answer["count"] != len(ids) or answer.get("entities") != counts:
+                    errors.append("a count answer disagrees with the membership")
+            if set(task["necessary"]) != set(ids) and terminal["op"] in (
+                "set_list",
+                "set_count",
+            ):
+                errors.append("a member is not in the necessary partition")
+            if question.get("unordered") is True:
+                unordered += 1
+            checks["members:" + task["task_id"]] = len(ids)
+        # The unordered-presentation DOF has to be exercised: 50% of tasks pin
+        # it, so a world where none did would be a degenerate draw.
+        if not unordered:
+            errors.append("no task pins the unordered presentation")
+        checks["unordered_tasks"] = unordered
         return
     rule_family, modulus, labels = _rule_header(header)
     records = _rule_entities(rows)
@@ -2449,8 +3494,7 @@ def _family_checks(
     demonstration_points = {point for points, _ in demos for point in points}
     rule = _infer_rule(rule_family, demos, modulus, labels)
     demonstrated_signatures = {
-        _reduced_point(rule_family, list(points), modulus, rule)
-        for points, _ in demos
+        _reduced_point(rule_family, list(points), modulus, rule) for points, _ in demos
     }
     # Unseen features, at the level the rule reads: no entity a question asks
     # about may aggregate to a feature point the demonstrations publish.
@@ -2470,9 +3514,12 @@ def _family_checks(
         if not entity_rows:
             errors.append("a queried entity has no records")
             continue
-        if _reduced_point(
-            rule_family, [(row.x, row.y) for row in entity_rows], modulus, rule
-        ) in demonstrated_signatures:
+        if (
+            _reduced_point(
+                rule_family, [(row.x, row.y) for row in entity_rows], modulus, rule
+            )
+            in demonstrated_signatures
+        ):
             errors.append("a query entity's feature signature was demonstrated")
         if any((row.x, row.y) in demonstration_points for row in entity_rows):
             errors.append("a record repeats a demonstrated feature point")
@@ -2550,8 +3597,12 @@ def validate_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
                 labels,
             )
             if list(rule) != list(declared.get("parameters", [])):
-                errors.append("the visible demonstrations do not identify the declared rule")
-            checks["rule_hypotheses_enumerated"] = _hypothesis_count(rule_family, modulus)
+                errors.append(
+                    "the visible demonstrations do not identify the declared rule"
+                )
+            checks["rule_hypotheses_enumerated"] = _hypothesis_count(
+                rule_family, modulus
+            )
         if len(rows) != bundle["length_accounting"]["rendered_rows"]:
             errors.append("rendered row count mismatch")
         by_id = {row.id: row for row in rows}
@@ -2563,9 +3614,13 @@ def validate_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
             ):
                 errors.append("instruction does not match the registered contract")
             if task.get("capability") != family or question.get("family") != family:
-                errors.append("task capability tag does not match the registered contract")
+                errors.append(
+                    "task capability tag does not match the registered contract"
+                )
             if task.get("capability_level") != CAPABILITY_LEVELS[family]:
-                errors.append("task capability level does not match the registered contract")
+                errors.append(
+                    "task capability level does not match the registered contract"
+                )
             if bundle["world_id"] in bundle["context"] + task["instruction"]:
                 errors.append("world identity leaked into the visible text")
             if solve_visible(bundle["context"], question) != task["answer"]:
@@ -2593,7 +3648,8 @@ def validate_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
             checks["necessary:" + task["task_id"]] = len(necessary)
             necessary_total += len(consumed)
             probe = [
-                row.id for row in rows
+                row.id
+                for row in rows
                 if row.id not in set(consumed) and row.type in PRIMARY_TYPES
             ]
             stable = 0
@@ -2620,11 +3676,15 @@ def validate_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
             errors.append("length accounting mismatch")
         if sum(accounting["consumed_rows_per_task"]) != necessary_total:
             errors.append("consumed row accounting mismatch")
-        if accounting["consumed_primary_rows"] + accounting["padding_rows"] != accounting[
-            "record_rows"
-        ]:
+        if (
+            accounting["consumed_primary_rows"] + accounting["padding_rows"]
+            != accounting["record_rows"]
+        ):
             errors.append("primary padding accounting mismatch")
-        if len({row_id for task in bundle["tasks"] for row_id in task["consumed"]}) == 0:
+        if (
+            len({row_id for task in bundle["tasks"] for row_id in task["consumed"]})
+            == 0
+        ):
             errors.append("no consumed rows at all")
         checks["window_ablation"] = window_ablation(bundle)
     except (ValueError, KeyError, TypeError, IndexError, StopIteration) as exc:

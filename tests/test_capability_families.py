@@ -26,7 +26,19 @@ from longworld.synthesis.capability_families import (
 )
 
 SMALL = {"length_records": 200, "consumed_records": 20, "depth": 2, "n_variants": 2}
+# set_complete is an H=1 family: the spine schedules depth 1 for it and the
+# executor rejects depth 2, so its shared-contract runs pin depth 1.
+SET_SMALL = {**SMALL, "depth": 1}
 SEEDS = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+
+
+def family_depth(family):
+    """set_complete is an H=1 family; the shared-contract tests run its depth."""
+    return 1 if family == "set_complete" else 2
+
+
+def small_for(family):
+    return SET_SMALL if family == "set_complete" else SMALL
 
 
 def visible_rows(bundle):
@@ -74,7 +86,8 @@ def answer_after_drop(bundle, task, row_id):
 @pytest.mark.parametrize("family", FAMILIES)
 @pytest.mark.parametrize("seed", SEEDS)
 def test_generation_and_validation_are_green_over_ten_seeds(family, seed):
-    for depth in (1, 2):
+    depths = (1,) if family == "set_complete" else (1, 2)
+    for depth in depths:
         bundle = generate_world(seed, family, **{**SMALL, "depth": depth})
         result = validate_bundle(bundle)
         assert result["passed"], (family, seed, depth, result["errors"])
@@ -82,17 +95,17 @@ def test_generation_and_validation_are_green_over_ten_seeds(family, seed):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_world_is_deterministic_and_serializable(family):
-    first = generate_world(3, family, **SMALL)
-    second = generate_world(3, family, **SMALL)
+    first = generate_world(3, family, **small_for(family))
+    second = generate_world(3, family, **small_for(family))
     assert first == second
     assert json.loads(json.dumps(first)) == first
-    assert first["context"] != generate_world(4, family, **SMALL)["context"]
+    assert first["context"] != generate_world(4, family, **small_for(family))["context"]
     assert validate_bundle(first)["checks"]["deterministic_reproduction"] is True
 
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_a_relabelled_world_fails_deterministic_reproduction(family):
-    bundle = generate_world(20, family, **SMALL)
+    bundle = generate_world(20, family, **small_for(family))
     bundle["length_records"] = 400
     result = validate_bundle(bundle)
     assert not result["passed"]
@@ -101,7 +114,7 @@ def test_a_relabelled_world_fails_deterministic_reproduction(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_validation_does_not_mutate_the_bundle(family):
-    bundle = generate_world(21, family, **SMALL)
+    bundle = generate_world(21, family, **small_for(family))
     before = copy.deepcopy(bundle)
     validate_bundle(bundle)
     assert bundle == before
@@ -121,7 +134,7 @@ def test_prompt_pool_is_deep_enough_and_rotated(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_instruction_is_reproducible_from_program_and_phrasing(family):
-    bundle = generate_world(6, family, **SMALL)
+    bundle = generate_world(6, family, **small_for(family))
     assert set(PROTOCOLS) == set(FAMILIES)
     for task in bundle["tasks"]:
         assert task["instruction"] == render_instruction(
@@ -134,7 +147,7 @@ def test_instruction_is_reproducible_from_program_and_phrasing(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_tampered_prompt_is_rejected(family):
-    bundle = generate_world(5, family, **SMALL)
+    bundle = generate_world(5, family, **small_for(family))
     bundle["tasks"][0]["instruction"] = "Just answer whatever looks right."
     result = validate_bundle(bundle)
     assert not result["passed"]
@@ -144,22 +157,20 @@ def test_tampered_prompt_is_rejected(family):
 @pytest.mark.parametrize("family", FAMILIES)
 def test_a_prompt_from_another_family_is_rejected(family):
     other = next(name for name in FAMILIES if name != family)
-    bundle = generate_world(5, family, **SMALL)
+    bundle = generate_world(5, family, **small_for(family))
     bundle["tasks"][0]["instruction"] = render_instruction(
-        other, generate_world(5, other, **SMALL)["tasks"][0]["question"], 0
+        other, generate_world(5, other, **small_for(other))["tasks"][0]["question"], 0
     )
     assert not validate_bundle(bundle)["passed"]
 
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_tampered_protocol_is_rejected(family):
-    bundle = generate_world(5, family, **SMALL)
+    bundle = generate_world(5, family, **small_for(family))
     lines = bundle["context"].splitlines()
     header = json.loads(lines[0])
     header["rules"] = "Any row may be used as evidence."
-    bundle["context"] = "\n".join(
-        [json.dumps(header, sort_keys=True), *lines[1:]]
-    )
+    bundle["context"] = "\n".join([json.dumps(header, sort_keys=True), *lines[1:]])
     result = validate_bundle(bundle)
     assert not result["passed"]
     assert "rules text does not match the registered contract" in result["errors"]
@@ -167,7 +178,7 @@ def test_tampered_protocol_is_rejected(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_honesty_labels_fail_closed(family):
-    bundle = generate_world(14, family, **SMALL)
+    bundle = generate_world(14, family, **small_for(family))
     assert bundle["honesty"] == HONESTY
     assert bundle["honesty"]["strict_long_dependency_verified"] is False
     assert bundle["honesty"]["model_utility_measured"] is False
@@ -181,7 +192,7 @@ def test_honesty_labels_fail_closed(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_world_identity_never_appears_in_the_visible_text(family):
-    bundle = generate_world(15, family, **SMALL)
+    bundle = generate_world(15, family, **small_for(family))
     assert VERSION in bundle["context"]  # the contract, not the identity
     assert bundle["world_id"] not in bundle["context"]
     for task in bundle["tasks"]:
@@ -193,7 +204,7 @@ def test_world_identity_never_appears_in_the_visible_text(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_executor_fails_closed_on_missing_contract(family):
-    bundle = generate_world(17, family, **SMALL)
+    bundle = generate_world(17, family, **small_for(family))
     question = bundle["tasks"][0]["question"]
     with pytest.raises(ValueError):
         solve_visible("", question)
@@ -201,26 +212,32 @@ def test_executor_fails_closed_on_missing_contract(family):
     header = json.loads(lines[0])
     header["schema"] = "not-this-schema"
     with pytest.raises(ValueError):
-        solve_visible("\n".join([json.dumps(header, sort_keys=True), *lines[1:]]), question)
+        solve_visible(
+            "\n".join([json.dumps(header, sort_keys=True), *lines[1:]]), question
+        )
     header["schema"] = VERSION
     header["family"] = "some_other_family"
     with pytest.raises(ValueError):
-        solve_visible("\n".join([json.dumps(header, sort_keys=True), *lines[1:]]), question)
+        solve_visible(
+            "\n".join([json.dumps(header, sort_keys=True), *lines[1:]]), question
+        )
 
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_executor_rejects_a_program_from_another_family(family):
     other = next(name for name in FAMILIES if name != family)
-    context = generate_world(17, family, **SMALL)["context"]
-    foreign = generate_world(17, other, **SMALL)["tasks"][0]["question"]
+    context = generate_world(17, family, **small_for(family))["context"]
+    foreign = generate_world(17, other, **small_for(other))["tasks"][0]["question"]
     with pytest.raises(ValueError):
         solve_visible(context, foreign)
 
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_distractor_rows_are_never_counted_as_consumed_evidence(family):
-    bundle = generate_world(8, family, 300, 25, 2, 2)
-    primary = {row["id"] for row in data_rows(bundle) if row["type"] in ("record", "event")}
+    bundle = generate_world(8, family, 300, 25, family_depth(family), 2)
+    primary = {
+        row["id"] for row in data_rows(bundle) if row["type"] in ("record", "event")
+    }
     consumed = {row_id for task in bundle["tasks"] for row_id in task["consumed"]}
     assert consumed & primary
     accounting = bundle["length_accounting"]
@@ -237,7 +254,7 @@ def test_distractor_rows_are_never_counted_as_consumed_evidence(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_deleting_a_necessary_row_changes_the_answer(family):
-    bundle = generate_world(12, family, 300, 25, 2, 2)
+    bundle = generate_world(12, family, 300, 25, family_depth(family), 2)
     for task in bundle["tasks"]:
         for row_id in task["necessary"]:
             assert answer_value(
@@ -247,7 +264,7 @@ def test_deleting_a_necessary_row_changes_the_answer(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_deleting_a_distractor_does_not_change_the_answer(family):
-    bundle = generate_world(12, family, 300, 25, 2, 2)
+    bundle = generate_world(12, family, 300, 25, family_depth(family), 2)
     for task in bundle["tasks"]:
         consumed = set(task["consumed"])
         distractor = next(
@@ -263,7 +280,7 @@ def test_deleting_a_distractor_does_not_change_the_answer(family):
 @pytest.mark.parametrize("family", FAMILIES)
 def test_declared_necessity_partition_must_match_the_measurement(family):
     """A padded or hand-edited `necessary` list would make the check vacuous."""
-    bundle = generate_world(24, family, 300, 25, 2, 2)
+    bundle = generate_world(24, family, 300, 25, family_depth(family), 2)
     task = bundle["tasks"][0]
     task["necessary"] = []
     result = validate_bundle(bundle)
@@ -276,7 +293,7 @@ def test_declared_necessity_partition_must_match_the_measurement(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_declared_provenance_must_match_the_executor(family):
-    bundle = generate_world(24, family, 300, 25, 2, 2)
+    bundle = generate_world(24, family, 300, 25, family_depth(family), 2)
     task = bundle["tasks"][0]
     distractor = next(
         row["id"]
@@ -292,7 +309,7 @@ def test_declared_provenance_must_match_the_executor(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_window_ablation_is_a_measured_fraction_of_half_context_windows(family):
-    bundle = generate_world(13, family, 400, 25, 2, 2)
+    bundle = generate_world(13, family, 400, 25, family_depth(family), 2)
     ablation = window_ablation(bundle)
     assert ablation == validate_bundle(bundle)["checks"]["window_ablation"]
     assert ablation["windows_attempted"] > 0
@@ -307,22 +324,34 @@ def test_each_family_carries_at_least_eight_structural_answer_shapes(family):
     shapes = Counter(
         shape_of(task["answer"])
         for seed in range(1, 41)
-        for task in generate_world(seed, family, 400, 40, 2, 2)["tasks"]
+        for task in generate_world(seed, family, 400, 40, family_depth(family), 2)[
+            "tasks"
+        ]
     )
     assert len(shapes) >= 8, shapes.most_common(3)
 
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_padding_volume_grows_with_l_and_not_with_k(family):
-    small = generate_world(19, family, 200, 20, 2, 2)
-    large = generate_world(19, family, 800, 20, 2, 2)
+    small = generate_world(19, family, 200, 20, family_depth(family), 2)
+    large = generate_world(19, family, 800, 20, family_depth(family), 2)
     assert (
         large["length_accounting"]["padding_rows"]
         > small["length_accounting"]["padding_rows"]
     )
-    assert large["length_accounting"]["consumed_rows_per_task"] == small[
-        "length_accounting"
-    ]["consumed_rows_per_task"]
+    if family == "set_complete":
+        # A scope reads every rendered row, so the exhaustive membership
+        # grows with L itself (padding rows can legally be members): the
+        # invariance the other families enjoy cannot hold here, and the
+        # honest claim is only that each task's *own* K-built population is
+        # the floor of what it consumes.
+        for small_task, large_task in zip(small["tasks"], large["tasks"]):
+            assert large_task["consumed_count"] >= small_task["consumed_count"]
+        return
+    assert (
+        large["length_accounting"]["consumed_rows_per_task"]
+        == small["length_accounting"]["consumed_rows_per_task"]
+    )
 
 
 @pytest.mark.parametrize("family", FAMILIES)
@@ -330,7 +359,7 @@ def test_rejects_k_that_cannot_fit_in_l(family):
     with pytest.raises(ValueError):
         generate_world(1, family, 200, 20, 2, 8)
     with pytest.raises(ValueError):
-        generate_world(1, family, 40, 200, 2, 2)
+        generate_world(1, family, 40, 200, family_depth(family), 2)
     assert plan_variants(3200, 200, 6) >= 2
 
 
@@ -386,7 +415,11 @@ def test_alias_binding_is_drawn_per_world_and_not_a_fixed_map():
                 held.setdefault(row["alias"], set()).add(row["entity"])
         # No handle is bound to more than one entity inside a world.
         assert all(len(entities) == 1 for entities in held.values())
-        bindings.append(frozenset((handle, next(iter(entities))) for handle, entities in held.items()))
+        bindings.append(
+            frozenset(
+                (handle, next(iter(entities))) for handle, entities in held.items()
+            )
+        )
     # The handle -> entity maps differ per world: a fixed map would let a reader
     # learn the binding instead of resolving it.
     assert len(set(bindings)) > 1
@@ -432,9 +465,7 @@ def test_a_locating_task_can_answer_with_a_declared_empty_set():
             # The declaration is enforced: a world where rows matched would make
             # this query malformed rather than empty.
             assert task["consumed"] == [
-                row_id
-                for row_id in task["consumed"]
-                if row_id in set(task["consumed"])
+                row_id for row_id in task["consumed"] if row_id in set(task["consumed"])
             ]
     assert empties >= 1
 
@@ -538,7 +569,9 @@ def test_as_of_answers_carry_their_query_date():
         bundle = generate_world(seed, "asof_state", 200, 20, 2, 1)
         for task in bundle["tasks"]:
             steps = task["question"]["steps"]
-            assert task["answer"]["as_of"] == steps[-2 if len(steps) == 3 else 0]["reveal"]
+            assert (
+                task["answer"]["as_of"] == steps[-2 if len(steps) == 3 else 0]["reveal"]
+            )
 
 
 # --------------------------------------------------------------------------
@@ -623,14 +656,19 @@ def test_demonstrations_do_not_include_the_query_entities_feature_points():
         # counted residue population) vote. No queried entity's signature of
         # either kind may be one the demonstrations publish. Individual record
         # rows may well repeat a demonstrated point.
-        residue = bundle["rule"]["parameters"][0] if rule_family == "parity_vote" else None
+        residue = (
+            bundle["rule"]["parameters"][0] if rule_family == "parity_vote" else None
+        )
         signatures = set()
         for row in rows:
             if row["type"] != "demo":
                 continue
             points = [tuple(point) for point in row["points"]]
             signatures.add(
-                (sum(x for x, _ in points) % modular, sum(y for _, y in points) % modular)
+                (
+                    sum(x for x, _ in points) % modular,
+                    sum(y for _, y in points) % modular,
+                )
                 if residue is None
                 else (len(points), sum((x + y) % modular == residue for x, y in points))
             )
@@ -645,7 +683,10 @@ def test_demonstrations_do_not_include_the_query_entities_feature_points():
                 if residue is None
                 else (
                     len(entity_rows),
-                    sum((row["x"] + row["y"]) % modular == residue for row in entity_rows),
+                    sum(
+                        (row["x"] + row["y"]) % modular == residue
+                        for row in entity_rows
+                    ),
                 )
             )
             assert signature not in signatures
@@ -689,7 +730,10 @@ def test_a_declared_rule_that_the_demonstrations_do_not_identify_is_rejected():
     bundle["rule"]["parameters"] = [1, 1, 1, 1]
     result = validate_bundle(bundle)
     assert not result["passed"]
-    assert "the visible demonstrations do not identify the declared rule" in result["errors"]
+    assert (
+        "the visible demonstrations do not identify the declared rule"
+        in result["errors"]
+    )
 
 
 def test_rule_worlds_carry_a_structural_holdout_plan():
@@ -698,3 +742,215 @@ def test_rule_worlds_carry_a_structural_holdout_plan():
         rule_family = bundle["rule"]["rule_family"]
         assert bundle["rule"]["holdout"] == holdout_plan(rule_family)
         assert bundle["rule"]["holdout"]["eval_rule_families"]
+
+
+# --------------------------------------------------------------------------
+# F2 set_complete: gold is the exhaustive membership
+# --------------------------------------------------------------------------
+
+
+def data_rows_as_rows(bundle):
+    """The visible rows re-parsed into Row objects for the family's own helpers."""
+    from longworld.synthesis.capability_families import Row
+
+    return [
+        Row(
+            id=row["id"],
+            type=row["type"],
+            entity=row["entity"],
+            memo=row["memo"],
+            amount=row.get("amount"),
+            category=row.get("category"),
+            day=row.get("date"),
+            alias=row.get("alias"),
+            kind=row.get("kind"),
+            reveal=row.get("reveal"),
+            x=row.get("x"),
+            y=row.get("y"),
+            points=tuple(tuple(p) for p in row["points"])
+            if row.get("points")
+            else None,
+            label=row.get("label"),
+        )
+        for row in data_rows(bundle)
+    ]
+
+
+def test_gold_is_the_executor_computed_full_set_over_the_visible_world():
+    from longworld.synthesis.capability_families import _set_members, _set_steps
+
+    for seed in range(1, 20):
+        bundle = generate_world(seed, "set_complete", 300, 25, 1, 2)
+        assert validate_bundle(bundle)["passed"]
+        for task in bundle["tasks"]:
+            members = _set_members(
+                data_rows_as_rows(bundle), _set_steps(task["question"])
+            )
+            ids = sorted(row.id for row in members)
+            terminal = task["question"]["steps"][-1]
+            answer = task["answer"]
+            if terminal["op"] == "set_list":
+                shown = (
+                    answer
+                    if isinstance(answer, list)
+                    else answer.get("ids")
+                    or sorted(
+                        one for group in answer["entities"].values() for one in group
+                    )
+                )
+                assert sorted(shown) == ids
+            elif terminal["op"] == "set_count":
+                count = answer if isinstance(answer, int) else answer["count"]
+                assert count == len(ids)
+            elif terminal["op"] == "set_contains":
+                verdict = answer if isinstance(answer, bool) else answer["contains"]
+                assert verdict == (terminal["id"] in set(ids))
+            else:
+                missing = answer if isinstance(answer, list) else answer["missing"]
+                assert sorted(missing) == sorted(
+                    row_id for row_id in terminal["ids"] if row_id not in set(ids)
+                )
+
+
+def test_every_member_is_individually_decisive_miss_item_is_wrong():
+    """Removing any member changes the answer: a missing item is a wrong answer."""
+    for seed in range(1, 12):
+        bundle = generate_world(seed, "set_complete", 300, 25, 1, 2)
+        for task in bundle["tasks"]:
+            terminal = task["question"]["steps"][-1]
+            if terminal["op"] in ("set_contains", "set_missing"):
+                continue
+            # task["necessary"] is the measured decisive set; for set answers
+            # it must cover the whole membership.
+            assert set(task["necessary"]) == set(task["consumed"])
+            for row_id in task["necessary"]:
+                assert answer_value(
+                    answer_after_drop(bundle, task, row_id)
+                ) != answer_value(task["answer"])
+
+
+def test_inserting_a_legal_hit_into_the_world_flips_the_answer():
+    """The insert-hit intervention: a legal hit in an uncovered region must
+    enter the answer once repaired into the scope."""
+    for seed in range(1, 12):
+        bundle = generate_world(seed, "set_complete", 300, 25, 1, 2)
+        lines = bundle["context"].splitlines()
+        by_id = {json.loads(line)["id"]: json.loads(line) for line in lines[1:]}
+        for task in bundle["tasks"]:
+            assert task["intervention"]["kind"] == "insert_hit"
+            insert_id = task["intervention"]["row"]
+            row = by_id[insert_id]
+            # The row as rendered is outside the scope (a previously uncovered
+            # region), and repairing it inside must change the answer.
+            bounds = {
+                (c["field"], c["op"]): c["value"]
+                for c in task["intervention"]["conditions"]
+            }
+            moved = []
+            for line in lines[1:]:
+                item = json.loads(line)
+                if item["id"] == insert_id:
+                    day = item.get("date")
+                    low = bounds.get(("date", ">="))
+                    if low is not None and day < low:
+                        day = low
+                    high = bounds.get(("date", "<="))
+                    if high is not None and day > high:
+                        day = high
+                    amount = item.get("amount")
+                    floor = bounds.get(("amount", ">="))
+                    if floor is not None and amount < floor:
+                        amount = floor
+                    ceil = bounds.get(("amount", "<="))
+                    if ceil is not None and amount > ceil:
+                        amount = ceil
+                    category = item.get("category")
+                    wanted = bounds.get(("category", "=="))
+                    if wanted is not None and category != wanted:
+                        category = wanted
+                    item = {**item, "date": day, "amount": amount, "category": category}
+                moved.append(json.dumps(item, sort_keys=True, separators=(",", ":")))
+            context = "\n".join([lines[0], *moved])
+            question = task["question"]
+            assert solved(context, question) != task["answer"]
+
+
+def test_sibling_distractor_removal_does_not_change_the_answer():
+    for seed in range(1, 12):
+        bundle = generate_world(seed, "set_complete", 300, 25, 1, 2)
+        for task in bundle["tasks"]:
+            consumed = set(task["consumed"])
+            # A same-schema row the task does not consume: a sibling, the
+            # insert row of another task, or padding. Removing it must not
+            # move the membership answer.
+            outside = [
+                row["id"] for row in data_rows(bundle) if row["id"] not in consumed
+            ]
+            for row_id in outside[:8]:
+                assert answer_value(
+                    answer_after_drop(bundle, task, row_id)
+                ) == answer_value(task["answer"]), (seed, task["task_id"], row_id)
+
+
+def test_set_complete_rejects_depth_above_one():
+    with pytest.raises(ValueError, match="H=1"):
+        generate_world(1, "set_complete", 200, 20, 2, 2)
+
+
+def test_answer_is_sorted_canonical_regardless_of_presentation():
+    unordered_seen = ordered_seen = 0
+    for seed in range(1, 60):
+        bundle = generate_world(seed, "set_complete", 300, 25, 1, 2)
+        for task in bundle["tasks"]:
+            terminal = task["question"]["steps"][-1]
+            if terminal["op"] != "set_list":
+                continue
+            answer = task["answer"]
+            ids = answer if isinstance(answer, list) else answer.get("ids")
+            if ids is None:
+                ids = sorted(
+                    one for group in answer["entities"].values() for one in group
+                )
+            assert ids == sorted(ids)
+            if task["question"]["unordered"]:
+                unordered_seen += 1
+            else:
+                ordered_seen += 1
+    assert unordered_seen >= 10
+    assert ordered_seen >= 10
+
+
+def test_set_complete_prompt_pool_is_pinned():
+    from longworld.synthesis.capability_families import PROMPTS as P
+
+    assert len(P["set_complete"]) >= 24
+    assert len(set(P["set_complete"])) == len(P["set_complete"])
+
+
+def test_set_complete_instruction_tamper_is_rejected():
+    bundle = generate_world(5, "set_complete", 200, 20, 1, 2)
+    bundle["tasks"][0]["instruction"] = "Answer with the first rows you see."
+    result = validate_bundle(bundle)
+    assert not result["passed"]
+    assert "instruction does not match the registered contract" in result["errors"]
+
+
+def test_set_complete_declared_necessity_tamper_is_rejected():
+    bundle = generate_world(24, "set_complete", 300, 25, 1, 2)
+    bundle["tasks"][0]["necessary"] = []
+    result = validate_bundle(bundle)
+    assert not result["passed"]
+    assert (
+        "the declared sensitivity partition does not match the measurement"
+        in result["errors"]
+    )
+
+
+def test_set_complete_intervention_tamper_is_rejected():
+    bundle = generate_world(24, "set_complete", 300, 25, 1, 2)
+    # Point the declared insert at a member row: the repair cannot change
+    # anything and the validator must reject the flip claim.
+    task = bundle["tasks"][0]
+    task["intervention"]["row"] = task["consumed"][0]
+    result = validate_bundle(bundle)
+    assert not result["passed"]
