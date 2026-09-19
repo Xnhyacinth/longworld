@@ -167,6 +167,36 @@ def token_targets_for_depth(config: dict, depth: int) -> list[int]:
     return targets
 
 
+def consumed_for(config: dict, family: str, depth: int) -> int:
+    """K for a (family, depth) cell: family override first, depth map otherwise.
+
+    dense_aggregate's K is a FRACTION of L (density is the family's point),
+    so its depth->K map must disagree with the global one — a family-scoped
+    override expresses that without touching every other family's arithmetic.
+    """
+    overrides = (config.get("consumed_by_family_depth") or {}).get(family)
+    if overrides:
+        value = overrides.get(str(depth))
+        if value is None:
+            raise ValueError(f"family {family} pins no K for depth {depth}")
+        return value
+    value = config["consumed_by_depth"].get(str(depth))
+    if value is None:
+        raise ValueError(f"no K scheduled for depth {depth}")
+    return value
+
+
+def token_targets_for(config: dict, family: str, depth: int) -> list[int]:
+    """Targets for a (family, depth) cell: family override first, else depth map."""
+    overrides = (config.get("token_targets_by_family_depth") or {}).get(family)
+    if overrides:
+        targets = overrides.get(str(depth))
+        if not targets:
+            raise ValueError(f"family {family} pins no token targets for depth {depth}")
+        return targets
+    return token_targets_for_depth(config, depth)
+
+
 def worlds_per_cell_for(config: dict, family: str) -> int:
     """Per-family world density: a family's split rule and attrition differ.
 
@@ -204,9 +234,9 @@ def make_plan(config: dict) -> list[dict]:
     plan = []
     for family in config["families"]:
         for depth in depths_for(config, family):
-            consumed = config["consumed_by_depth"][str(depth)]
+            consumed = consumed_for(config, family, depth)
             for index in range(worlds_per_cell_for(config, family)):
-                for target in token_targets_for_depth(config, depth):
+                for target in token_targets_for(config, family, depth):
                     floor = min_hostable_length(consumed, config["variants_per_world"])
                     seed = config["world_seed_base"] + len(plan)
                     rule_family = rule_family_for_plan(family, seed, index)

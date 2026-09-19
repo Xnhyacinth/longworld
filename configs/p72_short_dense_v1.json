@@ -10,13 +10,15 @@
     "rule_holdout",
     "join_unanswerable",
     "research_run",
-    "research_join"
+    "research_join",
+    "dense_aggregate"
   ],
-  "depths": [1, 2],
-  "lengths": [64, 200, 800],
+  "depths": [1, 2, 3],
+  "lengths": [64, 200, 800, 3200],
   "consumed_by_depth": {
     "1": 8,
-    "2": 20
+    "2": 20,
+    "3": 160
   },
   "variants_per_world": 4,
   "worlds_per_cell": 40,
@@ -29,7 +31,15 @@
     "rule_holdout": 40,
     "join_unanswerable": 30,
     "research_run": 40,
-    "research_join": 40
+    "research_join": 40,
+    "dense_aggregate": 30
+  },
+  "consumed_by_family_depth": {
+    "dense_aggregate": {
+      "1": 48,
+      "2": 96,
+      "3": 160
+    }
   },
   "depths_by_family": {
     "alias_locate": [1, 2],
@@ -37,11 +47,20 @@
     "rule_holdout": [1, 2],
     "join_unanswerable": [1],
     "research_run": [1, 2],
-    "research_join": [1, 2]
+    "research_join": [1, 2],
+    "dense_aggregate": [1, 2, 3]
+  },
+  "token_targets_by_family_depth": {
+    "dense_aggregate": {
+      "1": [8192],
+      "2": [16384],
+      "3": [32768]
+    }
   },
   "token_targets_by_depth": {
     "1": [8192, 16384],
-    "2": [65536]
+    "2": [65536],
+    "3": [32768]
   },
   "workers": 6,
   "trained_rule_family": "threshold_class",
