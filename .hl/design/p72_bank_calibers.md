@@ -46,3 +46,18 @@
 不同措辞、不同消费行集;同世界=共享上下文,分属 train/eval 时世界不跨侧)。
 证据:distinct instructions 2,688/2,784(v2)、消费行集 remove-one 必要性逐行验证。
 CF/事实对是设计属性(provenance.decoy),当前波内**未**作为独立行计数。
+
+## p72_short_dense_v1(长度补全 + 密集 + research domain,811 shards)
+
+| 池 | 行(总/train/eval) | 世界(总/train) | 全对话 token |
+|---|---|---|---|
+| p72_short_dense_v1 | 3244/2464/780 | 811/616 | 108,743,610 |
+
+- **长度覆盖(train)**:8K 648 / 16K 840 / 64K 976——三档全部 ≥300 行(p71 双峰之外的补全)。
+- **族(train 10 族)**:dense_aggregate 80(必读密度 0.5-0.8,K/L=0.61@8K)、
+  research_run 136 + research_join 284(simulated_domain)、join_unanswerable 192。
+- 求解器复核 3244/3244;门双口径 exit 0(曝光 6.0);matched-entity 探针 200/0 重现。
+- 预算:154/231 步,shape-exposure 7.26(红线 10 内)。
+- 诚实账:352 infeasible(K/干扰地板的系统性格)+ 7 rejects(dense 密度带 4 + asof 干扰地板 3),全部带理由。
+- **P71+P72 合并视野**:8K/16K/32K/64K/128K 五档连续覆盖(p71 供 32K/128K,p72 供 8K/16K/64K),
+  十一族(含 set_complete 实测未入选),两 domain(模拟记录 + research)。
