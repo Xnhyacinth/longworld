@@ -60,7 +60,7 @@ def test_rule_family_decoupled_from_seed_parity():
         assert set(structures) == {"threshold_class", "parity_vote"}, cell
 
 
-def test_seed_nudge_yields_planned_structure():
+def test_seed_nudge_yields_planned_structure_without_collision():
     for rule_family in ("threshold_class", "parity_vote"):
         for seed in range(900000, 900020):
             nudged = seed_for_rule_family(seed, rule_family)
@@ -68,8 +68,23 @@ def test_seed_nudge_yields_planned_structure():
             from longworld.synthesis.capability_families import RULE_FAMILIES
 
             assert RULE_FAMILIES[nudged % len(RULE_FAMILIES)] == rule_family
-            # The nudge is minimal: 0 or 1.
-            assert nudged - seed in (0, 1)
+            # The nudge is 0 or the large odd stride — never +1, which would
+            # land on the next plan slot's seed and produce rng-twin worlds.
+            assert nudged - seed in (0, 10007)
+
+
+def test_nudged_seeds_never_collide_with_plan_slots():
+    """A nudged seed must not equal any other slot's seed in the plan."""
+    config = {
+        **BASE_CONFIG,
+        "families": ["rule_holdout"],
+        "depths": [1],
+        "consumed_by_depth": {"1": 20},
+        "token_targets_by_depth": {"1": [8192, 32768]},
+    }
+    plan = make_plan(config)
+    seeds = [job["seed"] for job in plan]
+    assert len(seeds) == len(set(seeds)), "plan seeds collide"
 
 
 def test_per_family_overrides_plan_only_the_feasible_surface():

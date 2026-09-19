@@ -125,16 +125,21 @@ def rule_family_for_plan(family: str, seed: int, cell_index: int) -> str | None:
 def seed_for_rule_family(seed: int, rule_family: str | None) -> int:
     """A seed whose modulo draw yields the planned rule structure.
 
-    _rule_world reads RULE_FAMILIES[seed % 2]; nudging an odd offset onto the
-    seed when the planned structure disagrees keeps every other consumer of
-    the seed (world_id hashing, split assignment) on the same stream.
+    _rule_world reads RULE_FAMILIES[seed % 2]. The nudge must change parity
+    WITHOUT colliding with any other plan slot's seed — a +1 step lands
+    exactly on the next slot's seed, and same-seed worlds share rng streams:
+    near-identical entity pools that make foreign-world probes trivially
+    solvable (measured: 84/504 rule_holdout gold 'leaks' and an 18.7%
+    meta-feature share, all traced to seed-twin worlds). The offset is a
+    large odd stride beyond any plan's size, so nudged seeds sit outside the
+    base's slot range and cannot collide with this bank or the next.
     """
     if rule_family is None:
         return seed
     parity = families.RULE_FAMILIES.index(rule_family)
     if seed % len(families.RULE_FAMILIES) == parity:
         return seed
-    return seed + 1
+    return seed + 10007
 
 
 def split_for_job(config: dict, job: dict) -> str:
