@@ -20,7 +20,7 @@ Status: active. 2026-09-19 启动。前序:P70 章程已 superseded(G70-4/G70-6 
 - [ ] **B2** F2 集合完备性(f2-track agent 进行中;用户裁定:小批实测达标并入 v3)。
 - [x] **B3-a** 错题上下文基线:`measure_wrong_context_baseline.py`,v2 实测 198/0 泄漏。commit bf12f0b。
 - [ ] **B3-b** 元特征可预测性(可顺延)。**B3-c** 词法重叠 audit 化(可顺延)。
-- [ ] **B4** unanswerable 脊柱适配器(unanswerable-track agent 进行中)。
+- [x] **B4** unanswerable 脊柱适配器:`capability_unanswerable_adapter.py`(43 新测试,两世界证书双拷贝+篡改拒绝,行形与 join_lookup 可答行匹配;FAMILY_MODULES 注册与 5-10% 配比留给 B1 接线)。commit 1356f88。
 
 ## Track C — 真实性与训练准备
 
