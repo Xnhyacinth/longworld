@@ -23,10 +23,12 @@ Status: active。P71 保留为**机制基线**(p71_pool_v1 冻结不改写);本�
 
 ## 分目标
 
-- **G72-1 格式臂物化**:extract_arms 的 format 臂导出 jsonl/prose/table 三
-  视图(同 world 同 task 同 gold),token 用钉定 tokenizer 重测,gold 过
-  verify_format_equivalence,收据进臂 manifest。验收:三视图行数一致、
-  gold 字节一致、token 实测、配对声明完整。
+- **G72-1 格式臂物化** ✅(adb4f02):`--render-formats` 三视图(3,564 任务
+  × jsonl/prose/table,ids 相同/gold 字节一致/上下文各异 230K/189K/140K
+  字符,每任务过 verify_format_equivalence 硬门);408 行 unanswerable
+  显式排除并声明(jsonl 臂须同步剔除以保任务组成一致);收据含 per-view
+  sha。**遗留**:视图行暂未带 tokenizer 实测 token(行内注明),训练导出
+  时统一重测——这是 C3 训练管线的前置项,记录在案。
 - **G72-2 长度补全波(p72_short_dense)**:8K/16K/64K 三档进网格。手段:
   小 K 档(consumed_by_depth 增 "s" 档 K≈8,n_variants=2 → 8K 可行)+
   16K/64K target 直接排入现有可行面。验收:新波长度分位数覆盖
