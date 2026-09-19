@@ -29,14 +29,19 @@ Status: active。P71 保留为**机制基线**(p71_pool_v1 冻结不改写);本�
   显式排除并声明(jsonl 臂须同步剔除以保任务组成一致);收据含 per-view
   sha。**遗留**:视图行暂未带 tokenizer 实测 token(行内注明),训练导出
   时统一重测——这是 C3 训练管线的前置项,记录在案。
-- **G72-2 长度补全波(p72_short_dense)**:8K/16K/64K 三档进网格。手段:
-  小 K 档(consumed_by_depth 增 "s" 档 K≈8,n_variants=2 → 8K 可行)+
-  16K/64K target 直接排入现有可行面。验收:新波长度分位数覆盖
-  8K-128K 连续(不少于 4 档),每档行数 ≥300,门过。
-- **G72-3 密集整合族(dense/audit)**:新族"逐片段判定→全局聚合"(每行
-  scope 内记录须独立判 pass/fail/分类,聚合出 counts/sets)——K=scope 全集
-  (K/L 40-80%),Oolong 式 per-fragment+aggregation。验收:必读占比实测
-  ≥40%、干预(改任一片段翻聚合)、求解器复核、进测试。
+- **G72-2 长度补全波** ✅:`p72_short_dense_v1` 银行落地(811 shards/
+  **3,244 行**=2,464 train+780 eval)。**长度三档补全**:8K 648 / 16K 840 /
+  64K 976(train)——加 p71 基线的 32K/128K,视野内五档连续。求解器复核
+  3,244/3,244;门双口径 exit 0;matched-entity 探针 200/0;预算 154/231 步。
+  352 infeasible+7 rejects 全带理由(dense 密度带 4、asof 干扰地板 3)。
+  波三跑:首跑暴露 3 个真缺陷(fit_cell 未传 family→dense 密度塌 0.094;
+  config 误排 dense depth2/3 K 阶梯;depth3 target 缺)——修于 671d1f5。
+  commits c77127d/3c05cd3/bbb9b38/671d1f5。
+- **G72-3 密集整合族** ✅(4aad386):dense_aggregate(逐片段判定→全局
+  聚合,区域跨任务共享;K/L 带门 [0.35,0.85] 校验强制,带外格诚实拒绝)。
+  落进 p72 波:80 train 行 @8K/密度~0.61;207 族测试全绿。**16K/32K dense
+  cells(K=96/160)留追加波**——consumed_by_family_depth 每深度一 K 的
+  限制如实记录。
 - **G72-4 语义 domain 试点** ✅ 路线 A(科研,797554f + 接线 304f4dd):
   research_run(生命周期 as-of:撤销/勘误+显性翻转,优先级 retracted>
   invalidated>valid)+ research_join(配置→批次→测量链式 JOIN,子树移除
