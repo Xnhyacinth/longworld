@@ -28,6 +28,7 @@ sys.path.insert(0, str(ROOT))
 from longworld.core.attestation import sanitized_attestation_environment
 from longworld.synthesis import capability_families as families
 from longworld.synthesis import capability_records as records
+from longworld.synthesis import capability_research as research
 from longworld.synthesis import capability_unanswerable_adapter as unanswerable
 from scripts.recommend_training_budget import derive_budget_report
 
@@ -44,6 +45,7 @@ _TOKENIZER = None
 FAMILY_MODULES = {
     **{name: records for name in records.FAMILIES},
     **{name: families for name in families.FAMILIES},
+    **{name: research for name in research.FAMILIES},
     **{name: unanswerable for name in unanswerable.FAMILIES},
 }
 
@@ -615,6 +617,7 @@ def run(config_path: Path, destination: Path, resume: bool = False) -> dict:
         "scripts/run_capability_records.py",
         "longworld/synthesis/capability_records.py",
         "longworld/synthesis/capability_families.py",
+        "longworld/synthesis/capability_research.py",
         "longworld/synthesis/capability_unanswerable_adapter.py",
         "scripts/train_sft.py",
     )
