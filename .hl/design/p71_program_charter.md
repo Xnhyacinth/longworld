@@ -16,7 +16,7 @@ Status: active. 2026-09-19 启动。前序:P70 章程已 superseded(G70-4/G70-6 
 
 ## Track B — 数据供给
 
-- [ ] **B1** v3 扩容波:等 A1(已落地)+ B2/B4 定型;逐族池算术(split 规则×~40% 损耗×4 行/shard);`configs/p71_pool_v1.json`;新 seed_base;分阶段计时。
+- [x] **B1** v3 扩容波:`p71_pool_v1` 银行落地(1,504 shards / **6,016 行**=4,656 train+1,360 eval;7 族含 join_unanswerable;L4 结构 252/252 两侧零交叉;**求解器复核 6,016/6,016 进 verification.json**;塌缩门双口径 exit 0,曝光 4,1164 文档实测;监督 token 占比 manifest)。波三跑:首跑 finalize 死于 unanswerable refusal(修 66ec416);二跑暴露 **+1 种子微调孪生世界缺陷**(错题探针 84/504 假泄漏+meta 18.7%,根因=微调 seed 撞下一槽位;修 5a2ea89 为 +10007 大步长);终跑全套验收通过。d2@32k 随机 ~18% infeasible(与 v2 同源)+ F 族 d2@32k 全灭(网格误排,记录在案)——1,840 计划→1,504 完成。臂提取落地(main/format 配对 3,972,mechanism 1,168,extreme 684;各臂独立过门)。commits 372d6f9/66ec416/5a2ea89/d2ed9fa。
 - [x] **B2** set_complete 族落地,实测 55.2% < 60% 目标 → **按用户裁定不入 v3 波,只留实测记录**(96 任务 53 形状;per-terminal:set_list 91.7%/count 50%/missing 27%/contains 10.4%——verdict 终端是结构性地板,P69 F2 卡预测属实)。补齐杠杆(终端配比/verdict 嵌套键)是族规格决策,后续单议。加一干预(insert_hit)已实现并验证。commit 7ead630。
 - [x] **B3-a** 错题上下文基线:`measure_wrong_context_baseline.py`,v2 实测 198/0 泄漏。commit bf12f0b。
 - [ ] **B3-b** 元特征可预测性(可顺延)。**B3-c** 词法重叠 audit 化(可顺延)。
@@ -26,7 +26,7 @@ Status: active. 2026-09-19 启动。前序:P70 章程已 superseded(G70-4/G70-6 
 
 - [ ] **C1** IETF + Finance IR grounded 适配器(里程碑外,用户已选)。
 - [ ] **C2** 短锚诚实降配比 ~23%(用户已裁定;配比文档待改)。
-- [ ] **C3** 训练实验冻结文档(依赖 A4 格式臂 + A5 + B1)。
+- [x] **C3** 训练实验冻结:`.hl/design/p71_experiment_freeze.md`(臂/对照/预注册指标/成功标准;GPU 用户门控)。commit 44065f0。
 
 ## Track D — 卫生
 
