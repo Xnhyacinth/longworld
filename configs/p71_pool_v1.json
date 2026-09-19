@@ -8,8 +8,7 @@
     "alias_locate",
     "asof_state",
     "rule_holdout",
-    "join_unanswerable",
-    "set_complete"
+    "join_unanswerable"
   ],
   "depths": [1, 2, 3],
   "lengths": [200, 800, 3200],
@@ -27,15 +26,13 @@
     "alias_locate": 84,
     "asof_state": 84,
     "rule_holdout": 42,
-    "join_unanswerable": 75,
-    "set_complete": 63
+    "join_unanswerable": 75
   },
   "depths_by_family": {
     "alias_locate": [1, 2],
     "asof_state": [1, 2],
     "rule_holdout": [1, 2],
-    "join_unanswerable": [1],
-    "set_complete": [1, 2]
+    "join_unanswerable": [1]
   },
   "token_targets_by_depth": {
     "1": [32768, 131072],
@@ -49,6 +46,7 @@
     "feasible_surface": "v2 measured every FEASIBLE cell to complete; the v2 attrition was systematic, not random: depth-1@8192 is infeasible for all families (K=20 + distractor floor), F-families reject depth 3, join_lookup loses depth-2@32k. This grid schedules only the measured-feasible cells, so infeasible.json should come back empty and any entry is a regression to investigate",
     "worlds_per_cell_by_family": "absorbs the per-family differences: rule_holdout's structure split sends a whole structure to eval (needs 42 x 6 cells = 252 shards for 1,000 rows), alias/asof live on a 3-cell surface (84 worlds/cell), records families on 5 cells",
     "world_seed_base": "760000 is far from v2's 710000 (seed = base + plan index; overlapping ranges would collide world_ids across banks)",
-    "families": "join_unanswerable rides the B4 adapter (commit 1356f88); set_complete rides the B2 family (in flight at config-writing time — generation holds until both are registered in FAMILY_MODULES)"
+    "families": "join_unanswerable rides the B4 adapter (commit 1356f88). set_complete is IMPLEMENTED (commit 7ead630) but EXCLUDED from this wave: its measured small-batch answer-shape uniqueness is 55.2% (53/96 tasks), below the 60% design target — per the user's ruling the family ships its measurement record, not scaled rows. Closing the gap is a family-spec decision (terminal-mix weighting or one more nesting key on verdict terminals), not a runner change.",
+    "set_complete_measurement": "96 tasks / 32 worlds / K 8-24 / mask_shape: 53 distinct shapes = 55.2%; per-terminal set_list 91.7%, set_count 50%, set_missing 27%, set_contains 10.4% (verdict terminals are the structural floor, as the P69 F2 card predicted). 192-task saturation: 44.8%."
   }
 }

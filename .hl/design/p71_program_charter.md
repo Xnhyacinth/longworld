@@ -17,7 +17,7 @@ Status: active. 2026-09-19 启动。前序:P70 章程已 superseded(G70-4/G70-6 
 ## Track B — 数据供给
 
 - [ ] **B1** v3 扩容波:等 A1(已落地)+ B2/B4 定型;逐族池算术(split 规则×~40% 损耗×4 行/shard);`configs/p71_pool_v1.json`;新 seed_base;分阶段计时。
-- [ ] **B2** F2 集合完备性(f2-track agent 进行中;用户裁定:小批实测达标并入 v3)。
+- [x] **B2** set_complete 族落地,实测 55.2% < 60% 目标 → **按用户裁定不入 v3 波,只留实测记录**(96 任务 53 形状;per-terminal:set_list 91.7%/count 50%/missing 27%/contains 10.4%——verdict 终端是结构性地板,P69 F2 卡预测属实)。补齐杠杆(终端配比/verdict 嵌套键)是族规格决策,后续单议。加一干预(insert_hit)已实现并验证。commit 7ead630。
 - [x] **B3-a** 错题上下文基线:`measure_wrong_context_baseline.py`,v2 实测 198/0 泄漏。commit bf12f0b。
 - [ ] **B3-b** 元特征可预测性(可顺延)。**B3-c** 词法重叠 audit 化(可顺延)。
 - [x] **B4** unanswerable 脊柱适配器:`capability_unanswerable_adapter.py`(43 新测试,两世界证书双拷贝+篡改拒绝,行形与 join_lookup 可答行匹配;FAMILY_MODULES 注册与 5-10% 配比留给 B1 接线)。commit 1356f88。
