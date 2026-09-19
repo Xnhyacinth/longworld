@@ -746,6 +746,10 @@ def write_solver_verification(
     Every exported task's assistant answer is re-derived from the stored
     world's visible context through the owning module's solve path; the
     3,476/3,476 claim of the v2 bank lived only in the commit message.
+    A join_unanswerable task's expected outcome is the executor's REFUSAL
+    (completion A: the join is undetermined over the visible world), so the
+    solver raising ValueError there is the pass condition — the same signal
+    the two-world certificate records.
     """
     checked = mismatches = 0
     for receipt in receipts:
@@ -757,7 +761,15 @@ def write_solver_verification(
             task_id = row["example_id"].split(":")[-1]
             task = next(t for t in bundle["tasks"] if t["task_id"] == task_id)
             module = module_for(row["family"])
-            solved = module.solve_visible(bundle["context"], task["question"])
+            try:
+                solved = module.solve_visible(bundle["context"], task["question"])
+            except ValueError:
+                # The undetermined-answer refusal: the stored answer must be
+                # the UNKNOWN marker for this to count as verified.
+                if row["messages"][1]["content"] != canonical("UNKNOWN"):
+                    mismatches += 1
+                checked += 1
+                continue
             checked += 1
             if canonical(solved) != row["messages"][1]["content"]:
                 mismatches += 1
