@@ -16,6 +16,7 @@ import hashlib
 import json
 import multiprocessing
 import os
+import re
 import sys
 import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -27,10 +28,12 @@ sys.path.insert(0, str(ROOT))
 from longworld.core.attestation import sanitized_attestation_environment
 from longworld.synthesis import capability_families as families
 from longworld.synthesis import capability_records as records
+from scripts.recommend_training_budget import derive_budget_report
 
 MODEL = "Qwen/Qwen3.5-4B"
 REVISION = "a7b0d22b993d71000cf2eadfb37222a67cee521e"
 SCHEMA = "longworld.record-world.v1"
+BUDGET_GBS = 16
 _TOKENIZER = None
 
 # Family dispatch: every capability family owns its generator, visible contract
@@ -80,9 +83,71 @@ def write_new_json(path: Path, value):
             temporary.unlink()
 
 
+def write_replace_json(path: Path, value):
+    # Derived ledgers (rejects/infeasible) are recomputed on resume; atomic
+    # rename rather than link so a resumed wave can rewrite its own ledger.
+    with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as stream:
+        temporary = Path(stream.name)
+        try:
+            stream.write(canonical(value) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+            os.replace(temporary, path)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+
+
 def split_for_seed(seed: int) -> str:
     """One world seed lives in exactly one split, with all its (L,K,H) variants."""
     return "eval" if seed % 5 == 0 else "train"
+
+
+def rule_family_for_plan(family: str, seed: int, cell_index: int) -> str | None:
+    """The rule structure a plan slot will generate, decided at plan time.
+
+    The v2 bank let rule_family be seed % 2, which perfectly confounded
+    structure with the (world, token_target) interleave: every depth-2
+    threshold_class slot happened to land infeasible. Assigning the structure
+    by cell_index parity instead decouples it from the seed stream, so both
+    structures appear on both sides of the split and in every target bucket.
+    The rule world derives its structure from `seed % 2` internally, so the
+    plan re-derives the seed the world needs: keep the seed stream untouched
+    for every other family and pass a structure-carrying seed for rule_holdout.
+    """
+    if family != "rule_holdout":
+        return None
+    return families.RULE_FAMILIES[cell_index % len(families.RULE_FAMILIES)]
+
+
+def seed_for_rule_family(seed: int, rule_family: str | None) -> int:
+    """A seed whose modulo draw yields the planned rule structure.
+
+    _rule_world reads RULE_FAMILIES[seed % 2]; nudging an odd offset onto the
+    seed when the planned structure disagrees keeps every other consumer of
+    the seed (world_id hashing, split assignment) on the same stream.
+    """
+    if rule_family is None:
+        return seed
+    parity = families.RULE_FAMILIES.index(rule_family)
+    if seed % len(families.RULE_FAMILIES) == parity:
+        return seed
+    return seed + 1
+
+
+def split_for_job(config: dict, job: dict) -> str:
+    """The bank-level split rule: rule structure for rule_holdout, seed otherwise.
+
+    config's trained_rule_family names the ONE structure whose worlds train;
+    the other structure's worlds are all eval (structure isolation), while
+    every other family keeps the seed-modulo split. A world's local
+    rule.holdout block is self-relative and stays untouched — the export
+    split is decided here, once, at the bank level.
+    """
+    if job["family"] == "rule_holdout":
+        trained = config["trained_rule_family"]
+        return families.split_for_rule_family(job["rule_family"], trained)
+    return split_for_seed(job["seed"])
 
 
 def token_targets_for_depth(config: dict, depth: int) -> list[int]:
@@ -95,6 +160,10 @@ def token_targets_for_depth(config: dict, depth: int) -> list[int]:
 
 def make_plan(config: dict) -> list[dict]:
     """Stratify the grid deterministically: family x depth x worlds, L fitted."""
+    if "rule_holdout" in config["families"] and "trained_rule_family" not in config:
+        raise ValueError(
+            "rule_holdout banks must pin trained_rule_family (structure split)"
+        )
     plan = []
     for family in config["families"]:
         for depth in config["depths"]:
@@ -102,21 +171,21 @@ def make_plan(config: dict) -> list[dict]:
             for index in range(config["worlds_per_cell"]):
                 for target in token_targets_for_depth(config, depth):
                     floor = min_hostable_length(consumed, config["variants_per_world"])
-                    plan.append(
-                        {
-                            "seed": config["world_seed_base"] + len(plan),
-                            "family": family,
-                            "depth": depth,
-                            "length_records": max(config["lengths"][0], floor),
-                            "consumed_records": consumed,
-                            "n_variants": config["variants_per_world"],
-                            "split": split_for_seed(
-                                config["world_seed_base"] + len(plan)
-                            ),
-                            "cell_index": index,
-                            "token_target": target,
-                        }
-                    )
+                    seed = config["world_seed_base"] + len(plan)
+                    rule_family = rule_family_for_plan(family, seed, index)
+                    job = {
+                        "seed": seed_for_rule_family(seed, rule_family),
+                        "family": family,
+                        "depth": depth,
+                        "length_records": max(config["lengths"][0], floor),
+                        "consumed_records": consumed,
+                        "n_variants": config["variants_per_world"],
+                        "rule_family": rule_family,
+                        "cell_index": index,
+                        "token_target": target,
+                    }
+                    job["split"] = split_for_job(config, job)
+                    plan.append(job)
     return plan
 
 
@@ -257,7 +326,7 @@ def _rows(bundle: dict, job: dict, token_target: int, tokens: int) -> list[dict]
             "example_id": f"{bundle['world_id']}:{task['task_id']}",
             "world_id": bundle["world_id"],
             "world_seed": job["seed"],
-            "split": job["split"] if job.get("split") else split_for_seed(job["seed"]),
+            "split": job["split"],
             "family": job["family"],
             "depth": job["depth"],
             "length_records": bundle["length_records"],
@@ -288,14 +357,108 @@ def _rows(bundle: dict, job: dict, token_target: int, tokens: int) -> list[dict]
     return rows
 
 
-def run_shard(job: dict, token_target: int, output: str, fingerprint: str) -> dict:
+def manifest_rule_families(plan: list[dict]) -> dict[int, str | None]:
+    """Seed -> planned rule structure, so the index reads the plan, not the seed.
+
+    v3 decouples the structure from seed % 2 (rule_family_for_plan), so the
+    seed alone can no longer re-derive it. The plan's own mapping is the
+    authority; jobs carry it and the sample index copies it through.
+    """
+    return {job["seed"]: job.get("rule_family") for job in plan}
+
+
+def write_sample_index(
+    destination: Path, receipts: list[dict], rule_families: dict[int, str | None]
+) -> str:
+    """The one index every downstream tool reads (gate, arms, budget, holdouts).
+
+    One line per exported task, covering the WHOLE bank (train+eval); the
+    collapse gate counts only split == train rows. group_id is the world_id —
+    the simulated world is the document analog, so exposure measures world
+    atomicity, not source breadth. Field names are literal: the gate reads
+    d.get("group_id") and d.get("full_message_tokens").
+    """
+    path = destination / "sample_index.jsonl"
+    rows = 0
+    with path.open("x") as stream:
+        for receipt in receipts:
+            shard = destination / "shards" / receipt["shard_id"]
+            source = shard / "rows.jsonl"
+            if sha(source) != receipt["files"]["rows.jsonl"]:
+                raise RuntimeError("shard content changed before export")
+            for line in source.read_text().splitlines():
+                row = json.loads(line)
+                task = _task_program_signature(row)
+                index_row = {
+                    "example_id": row["example_id"],
+                    "semantic_task_id": row["example_id"],
+                    "world_id": row["world_id"],
+                    "group_id": row["world_id"],
+                    "family": row["family"],
+                    "rule_structure_id": rule_families.get(row["world_seed"]),
+                    "program_signature": task,
+                    "language": "en",
+                    "renderer": "jsonl",
+                    "length_records": row["length_records"],
+                    "depth": row["depth"],
+                    "consumed_records": row["consumed_records"],
+                    "token_target": row["target"]["token_target"],
+                    "input_tokens": row["input_tokens"],
+                    "supervised_tokens": row["supervised_tokens"],
+                    "full_message_tokens": row["full_chat_tokens"],
+                    "output_file": f"{row['split']}.jsonl",
+                    "row_index": rows,
+                    "split": row["split"],
+                    "admission_status": "completed",
+                }
+                stream.write(canonical(index_row) + "\n")
+                rows += 1
+    return sha(path)
+
+
+def _task_program_signature(row: dict) -> str:
+    """A masked signature of the typed program: op chain plus arity, no values.
+
+    The renderer/CF variants of one semantic task share this signature, so
+    arm extraction can tell 'same task, new expression' from a new task.
+    """
+    assistant = row["messages"][1]["content"]
+    signature = re.sub(r'"[^"]*"', '"S"', assistant)
+    signature = re.sub(r"\b\d+(?:\.\d+)?\b", "N", signature)
+    return re.sub(r"\s+", " ", signature).strip()[:120]
+
+
+def run_shard(
+    job: dict, token_target: int, output: str, fingerprint: str, resume: bool = False
+) -> dict:
     shard_id = (
         f"{job['family']}-h{job['depth']}-L{job['length_records']}"
         f"-seed{job['seed']}-{token_target}"
     )
     shard = Path(output) / "shards" / shard_id
     if shard.exists():
-        raise ValueError("shard directory already exists; resume needs a fresh output")
+        # Resume adopts a completed shard instead of discarding it: before
+        # this, a --resume wave re-filed every existing shard as a reject and
+        # a finalized bank could not resume at all (train.jsonl opens with
+        # "x"). Adoption is strict: the receipt must exist, match this
+        # fingerprint, and re-hash both files; anything else stays an error.
+        if not resume:
+            raise ValueError(
+                "shard directory already exists; resume needs a fresh output"
+            )
+        try:
+            receipt = json.loads((shard / "receipt.json").read_text())
+        except FileNotFoundError as error:
+            raise ValueError(
+                f"incomplete shard {shard_id} exists without a receipt; "
+                "it cannot be adopted and the destination must be recreated"
+            ) from error
+        if receipt.get("fingerprint") != fingerprint:
+            raise ValueError(f"shard {shard_id} belongs to a different state")
+        for name in ("world.json", "rows.jsonl"):
+            if sha(shard / name) != receipt["files"][name]:
+                raise ValueError(f"shard {shard_id} content changed under the receipt")
+        return receipt
     shard.mkdir()
     bundle, rows = fit_cell(job, token_target, _TOKENIZER)
     write_new_json(shard / "world.json", bundle)
@@ -313,12 +476,11 @@ def run_shard(job: dict, token_target: int, output: str, fingerprint: str) -> di
         "target_length_records": job["length_records"],
         "target_consumed_records": job["consumed_records"],
         "split": job["split"],
+        "rule_family": job.get("rule_family"),
         "token_target": token_target,
         "rows": len(rows),
         "length_records": bundle["length_records"],
-        "consumed_rows_per_task": bundle["length_accounting"][
-            "consumed_rows_per_task"
-        ],
+        "consumed_rows_per_task": bundle["length_accounting"]["consumed_rows_per_task"],
         "padding_rows": bundle["length_accounting"]["padding_rows"],
         "decoy_padding_rows": bundle["length_accounting"]["decoy_padding_rows"],
         "reference_rows": bundle["length_accounting"]["reference_rows"],
@@ -343,6 +505,14 @@ def completion_manifest(
     }
     if split_worlds["train"] & split_worlds["eval"]:
         raise ValueError("world split collision")
+    structure_rows: dict[str, dict[str, int]] = {}
+    for receipt in receipts:
+        if receipt.get("rule_family") is None:
+            continue
+        bucket = structure_rows.setdefault(
+            receipt["rule_family"], {"train": 0, "eval": 0}
+        )
+        bucket[receipt["split"]] += receipt["rows"]
     return {
         "schema_version": SCHEMA,
         "status": "local_symbolic_record_worlds_complete",
@@ -377,6 +547,16 @@ def completion_manifest(
         "one_semantic_task_one_primary_length": (
             "each world fixes one L; the (L,K,H) grid varies across worlds"
         ),
+        "split_basis": {
+            "default": "seed_mod_5",
+            "rule_holdout": (
+                "rule_structure: trained_rule_family worlds all train, the "
+                "other structure's worlds are all eval. Each world's local "
+                "rule.holdout block is self-relative and does not decide the "
+                "export split."
+            ),
+            "rule_structure_rows": structure_rows,
+        },
         "source_kind": "simulated",
         "strict_long_dependency_verified": False,
         "model_utility_measured": False,
@@ -426,7 +606,12 @@ def run(config_path: Path, destination: Path, resume: bool = False) -> dict:
     ) as pool:
         futures = {
             pool.submit(
-                run_shard, job, job["token_target"], str(destination), fingerprint
+                run_shard,
+                job,
+                job["token_target"],
+                str(destination),
+                fingerprint,
+                resume,
             ): (job, job["token_target"])
             for job in plan
         }
@@ -475,12 +660,13 @@ def run(config_path: Path, destination: Path, resume: bool = False) -> dict:
                     }
                 )
                 print(canonical({"rejected": rejects[-1]}), flush=True)
-    if any(
-        sha(ROOT / name) != digest for name, digest in state["code_sha256"].items()
-    ):
+    if any(sha(ROOT / name) != digest for name, digest in state["code_sha256"].items()):
         raise RuntimeError("code changed during run; completion forbidden")
-    write_new_json(destination / "rejects.json", rejects)
-    write_new_json(destination / "infeasible.json", skips)
+    # rejects/infeasible are derived ledgers recomputed from the same state, so
+    # a resumed run rewrites them (atomically) rather than hard-failing on the
+    # link — unlike receipts and exports, they carry no first-write authority.
+    write_replace_json(destination / "rejects.json", rejects)
+    write_replace_json(destination / "infeasible.json", skips)
     receipts.sort(key=lambda row: row["shard_id"])
     files = {}
     for split in ("train", "eval"):
@@ -501,9 +687,58 @@ def run(config_path: Path, destination: Path, resume: bool = False) -> dict:
                     seen.add(row["example_id"])
                     stream.write(line + "\n")
         files[path.name] = sha(path)
+    files["sample_index.jsonl"] = write_sample_index(
+        destination, receipts, manifest_rule_families(plan)
+    )
     manifest = completion_manifest(receipts, plan, files, skips)
+    manifest["budget_recommendation"] = {
+        **derive_budget_report([destination / "train.jsonl"], BUDGET_GBS)[
+            "budget_recommendation"
+        ],
+        "gbs": BUDGET_GBS,
+        "rule": "steps = floor(epochs x train_rows / GBS); budget is an upper-bound recommendation, not a training license",
+    }
+    write_new_json(
+        destination / "verification.json",
+        write_solver_verification(destination, receipts, state["code_sha256"]),
+    )
+    manifest["verification"] = "verification.json"
     write_new_json(destination / "manifest.json", manifest)
     return manifest
+
+
+def write_solver_verification(
+    destination: Path, receipts: list[dict], code_sha256: dict
+) -> dict:
+    """The independent solver re-check as an in-bank receipt, not a commit note.
+
+    Every exported task's assistant answer is re-derived from the stored
+    world's visible context through the owning module's solve path; the
+    3,476/3,476 claim of the v2 bank lived only in the commit message.
+    """
+    checked = mismatches = 0
+    for receipt in receipts:
+        shard = destination / "shards" / receipt["shard_id"]
+        bundle = json.loads((shard / "world.json").read_text())
+        rows = (shard / "rows.jsonl").read_text().splitlines()
+        for line in rows:
+            row = json.loads(line)
+            task_id = row["example_id"].split(":")[-1]
+            task = next(t for t in bundle["tasks"] if t["task_id"] == task_id)
+            module = module_for(row["family"])
+            solved = module.solve_visible(bundle["context"], task["question"])
+            checked += 1
+            if canonical(solved) != row["messages"][1]["content"]:
+                mismatches += 1
+    return {
+        "solver_recheck": {
+            "checked": checked,
+            "mismatches": mismatches,
+            "passed": mismatches == 0,
+            "method": "solve_visible re-derivation over stored worlds, per task",
+        },
+        "code_sha256": code_sha256,
+    }
 
 
 def _init_worker():

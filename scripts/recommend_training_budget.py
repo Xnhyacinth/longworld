@@ -29,20 +29,12 @@ def mask_shape(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("bank", type=Path)
-    parser.add_argument("--gbs", type=int, default=16)
-    parser.add_argument("--json", action="store_true")
-    args = parser.parse_args()
-
-    train_files = [args.bank / "train.jsonl"] + sorted(
-        args.bank.glob("*_train.jsonl")
-    )
-    train_files = [f for f in train_files if f.is_file()]
+def derive_budget_report(train_paths: list[Path], gbs: int) -> dict:
+    """The budget report over explicit train files; the CLI and the runner
+    manifest share this one derivation so the numbers cannot drift apart."""
+    train_files = [p for p in train_paths if p.is_file()]
     if not train_files:
-        print(f"missing train.jsonl under {args.bank}", file=sys.stderr)
-        return 2
+        raise FileNotFoundError(f"no train files among {[str(p) for p in train_paths]}")
     rows = 0
     shapes: set[str] = set()
     for train in train_files:
@@ -58,16 +50,14 @@ def main() -> int:
                     "",
                 )
                 shapes.add(mask_shape(answer))
-    epoch_steps = max(1, round(rows / args.gbs))
-    report = {
-        "bank": str(args.bank),
+    return {
         "train_files": [f.name for f in train_files],
         "train_rows": rows,
         "distinct_answer_shapes": len(shapes),
-        "gbs": args.gbs,
+        "gbs": gbs,
         "budget_recommendation": {
-            "steps_at_1_epoch": epoch_steps,
-            "steps_at_1_5_epoch": max(1, round(rows * 1.5 / args.gbs)),
+            "steps_at_1_epoch": max(1, round(rows / gbs)),
+            "steps_at_1_5_epoch": max(1, round(rows * 1.5 / gbs)),
             "shape_exposure_at_1_epoch": round(rows / max(1, len(shapes)), 2),
             "shape_exposure_at_1_5_epoch": round(1.5 * rows / max(1, len(shapes)), 2),
         },
@@ -77,6 +67,22 @@ def main() -> int:
             else "within the gate's shape-exposure band at 1.5 epochs"
         ),
     }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("bank", type=Path)
+    parser.add_argument("--gbs", type=int, default=16)
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args()
+
+    train_files = [args.bank / "train.jsonl"] + sorted(args.bank.glob("*_train.jsonl"))
+    try:
+        report = derive_budget_report(train_files, args.gbs)
+    except FileNotFoundError as error:
+        print(f"missing train.jsonl under {args.bank} ({error})", file=sys.stderr)
+        return 2
+    report = {"bank": str(args.bank), **report}
     print(json.dumps(report, indent=2) if args.json else json.dumps(report))
     return 0
 
