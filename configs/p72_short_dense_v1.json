@@ -1,0 +1,48 @@
+{
+  "schema_version": "longworld.record-world-config.v1",
+  "world_seed_base": 830000,
+  "families": [
+    "filter_aggregate",
+    "group_compare",
+    "join_lookup",
+    "alias_locate",
+    "asof_state",
+    "rule_holdout",
+    "join_unanswerable"
+  ],
+  "depths": [1, 2],
+  "lengths": [64, 200, 800],
+  "consumed_by_depth": {
+    "1": 8,
+    "2": 20
+  },
+  "variants_per_world": 4,
+  "worlds_per_cell": 40,
+  "worlds_per_cell_by_family": {
+    "filter_aggregate": 40,
+    "group_compare": 40,
+    "join_lookup": 40,
+    "alias_locate": 40,
+    "asof_state": 40,
+    "rule_holdout": 40,
+    "join_unanswerable": 30
+  },
+  "depths_by_family": {
+    "alias_locate": [1, 2],
+    "asof_state": [1, 2],
+    "rule_holdout": [1, 2],
+    "join_unanswerable": [1]
+  },
+  "token_targets_by_depth": {
+    "1": [8192, 16384],
+    "2": [65536]
+  },
+  "workers": 6,
+  "trained_rule_family": "threshold_class",
+  "notes": {
+    "purpose": "G72-2 length-coverage wave: fills the 8K/16K hole (K=8 at depth 1 — the small-K axis the v3 grid lacked) and adds 64K (K=20 at depth 2). 32K/128K stay in the frozen p71 baseline; the union is composed at arm/export level, not by merging bank dirs.",
+    "coverage_target": ">=300 rows per length bucket; 8K and 16K via depth-1 cells, 64K via depth-2 cells; expected rows = (7 families x ~40 worlds x 2 targets + join_unanswerable 30 x 2) x 4 rows/shard approx 2,000+ rows",
+    "feasibility": "measured via plan_variants: K=8 hosts n=4 at L=64 already; 8K target fits L~79, 16K fits L~157, 64K fits L~615 (K=20). All on the feasible surface — infeasible.json should stay empty; any entry is a regression to investigate.",
+    "dense_note": "dense_aggregate (G72-3, in flight) and research families (G72-4, in flight) register into THIS config in a follow-up commit once their modules land — this wave generates only the families that exist today, then a second invocation with the extended config tops up (fresh seed range 831000+ to avoid world_id collisions)."
+  }
+}
