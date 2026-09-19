@@ -1,0 +1,47 @@
+{
+  "consumed_by_depth": {
+    "1": 20,
+    "2": 60,
+    "3": 200
+  },
+  "depths": [
+    1,
+    2,
+    3
+  ],
+  "families": [
+    "filter_aggregate",
+    "group_compare",
+    "join_lookup",
+    "alias_locate",
+    "asof_state",
+    "rule_holdout"
+  ],
+  "lengths": [
+    200,
+    800,
+    3200
+  ],
+  "notes": {
+    "wave": "P70 superset pool v2 (scale); hash-stratified arms post-hoc; padding is exposure not semantic scale"
+  },
+  "schema_version": "longworld.record-world-config.v1",
+  "token_targets_by_depth": {
+    "1": [
+      8192,
+      32768,
+      131072
+    ],
+    "2": [
+      32768,
+      131072
+    ],
+    "3": [
+      131072
+    ]
+  },
+  "variants_per_world": 4,
+  "workers": 6,
+  "world_seed_base": 710000,
+  "worlds_per_cell": 40
+}
