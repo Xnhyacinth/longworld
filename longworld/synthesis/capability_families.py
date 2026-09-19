@@ -1,6 +1,6 @@
-"""P70 capability families: alias binding (L1), as-of state (L3), rule holdout (L4), set completeness (L2).
+"""P70 capability families: alias binding (L1), as-of state (L3), rule holdout (L4), set completeness (L2), dense aggregation (L2).
 
-Four record-world families on the P69 (L, K, H) compiler spine. Each owns its
+Five record-world families on the P69 (L, K, H) compiler spine. Each owns its
 visible contract, its own pure-Python executor and its own interventions:
 
 * ``alias_locate`` (L1, binding/location): record rows plus alias declarations
@@ -28,6 +28,18 @@ visible contract, its own pure-Python executor and its own interventions:
   never members. Inserting a legal hit into a region no member covers must
   enter the answer (``insert_hit``). An H=1 family: only depth 1 is
   generated, and the generator rejects a deeper one.
+* ``dense_aggregate`` (L2, per-fragment judgment then global aggregation): a
+  region step declares a *coarse* boundary (a category slice over a contiguous
+  date span) whose size is the world's K, shared by every task; each row
+  inside it is judged by a 2-3 condition predicate and the answer aggregates
+  the whole region -- per-class counts, the failing id set, the majority
+  class, or a compound. The defining property is density: K is a large
+  measured fraction of L (the generator rejects any (K, L) cell outside the
+  declared band) because the scope is a declared region to judge row by row,
+  not a needle subset to locate, so every in-region row is individually
+  decisive and the family's own checks re-measure K/L per task. Changing one
+  in-region row's class must move the aggregate (``class_flip``). An H=1
+  family: aggregation over the dense region IS the computation.
 
 (L, K, H) are independent knobs, as in capability_records: L is the number of
 primary rows rendered in the context, K is the number of rows the program
@@ -66,7 +78,13 @@ BASE_DATE = date(2019, 1, 1)
 WINDOW_DAYS = 40
 GAP_DAYS = 20
 AMOUNT_CAP = 700
-FAMILIES = ("alias_locate", "asof_state", "rule_holdout", "set_complete")
+FAMILIES = (
+    "alias_locate",
+    "asof_state",
+    "rule_holdout",
+    "set_complete",
+    "dense_aggregate",
+)
 RULE_FAMILIES = ("threshold_class", "parity_vote")
 PRIMARY_TYPES = ("record", "event")
 # Each world draws its own vocabulary (as in capability_records): the drawn size
@@ -312,6 +330,31 @@ SET_SHAPES: dict[str, tuple[str, ...]] = {
     ),
     "set_missing": ("missing", "missing_named", "missing_count"),
 }
+DENSE_TERMINALS = (
+    "dense_counts",
+    "dense_failing_ids",
+    "dense_majority",
+    "dense_compound",
+)
+# Each terminal's answer shapes, the arity-bearing rotation the masked-shape
+# measurement reads. Every shape carries both class counts (directly or via a
+# list whose length is the class count and a total): that is what makes every
+# in-region row individually decisive for the aggregate, whatever the shape.
+DENSE_SHAPES: dict[str, tuple[str, ...]] = {
+    "dense_counts": ("counts", "counts_entities"),
+    "dense_failing_ids": ("ids_total", "ids_both"),
+    "dense_majority": ("majority", "majority_margin"),
+    "dense_compound": ("set", "first", "grouped"),
+}
+# The density band (K/L) dense worlds are validated against: the family's
+# whole point is that the consumed region is a large share of the rendered
+# table, so the generator rejects any (K, L) cell outside the band loudly --
+# the cell, not the world, is what carries the fraction. The band is slightly
+# wider than the nominal 0.4-0.8 to tolerate the +-spread of the per-world K
+# draw (_split_sizes) around the cell's consumed_records.
+DENSE_FLOOR_FRACTION = 0.35
+DENSE_CAP_FRACTION = 0.85
+
 # Primary rows one consumed row costs at most, per family. plan_variants() uses
 # the widest value, so a (K, n_variants) cell it accepts is hostable by every
 # family even though the dispatch does not know which family will run.
@@ -320,6 +363,11 @@ EVIDENCE_MULTIPLIER = {
     "asof_state": 2,
     "rule_holdout": 2,
     "set_complete": 2,
+    # Dense tasks share one region, so one consumed row costs exactly one
+    # primary row; 1 would under-cost the cell for the shared plan_variants,
+    # which uses the widest multiplier across families, so the family rides
+    # the same conservative 2 every other family pays.
+    "dense_aggregate": 2,
 }
 
 # The visible protocol and the instruction phrasings are part of the task
@@ -402,6 +450,29 @@ PROTOCOLS: dict[str, str] = {
         "sorted named ids). Every id list in an answer is in the answer's own "
         "sorted order, not the presentation order. No rows are omitted."
     ),
+    "dense_aggregate": (
+        "Each rendered row is a JSON object of type record. A region step "
+        "declares 1 to 3 conditions comparing amount, date or category to a "
+        "constant with ==, !=, >=, <=, > or <; a row is inside the region "
+        "exactly when it satisfies every condition. The region is a coarse "
+        "boundary -- a declared band of the table, not a needle to find: every "
+        "inside row is read, and no inside row may be skipped. Classify every "
+        "inside row with the world's per-row judgment, a pass/fail predicate "
+        "of 2 or 3 conditions in the same grammar. Answer the program's "
+        "terminal by aggregating over the whole region: dense_counts with "
+        "shape counts (the pass and fail counts) or counts_entities (the "
+        "counts with the per-entity fail counts); dense_failing_ids with "
+        "shape ids_total (the sorted failing ids with how many rows the "
+        "region holds) or ids_both (the sorted passing and failing id "
+        "lists); dense_majority with shape majority (which class holds more "
+        "region rows, with both counts) or majority_margin (the majority, "
+        "both counts and their margin); dense_compound with shape set (the "
+        "fail count with the sorted failing ids), first (the fail count with "
+        "the first failing row id) or grouped (the fail count with the "
+        "failing ids grouped per entity). Out-of-region rows are never "
+        "evidence. Every id list in an answer is in the answer's own sorted "
+        "order, not the presentation order. No rows are omitted."
+    ),
 }
 
 # Per-rule-family structure text, pinned into the header as `rule_structure`:
@@ -442,6 +513,12 @@ RETURNS: dict[str, str] = {
         "the member count with or without per-entity counts, a membership "
         "verdict for a named row, or the sorted named ids that are missing."
     ),
+    "dense_aggregate": (
+        "Return the aggregate over the whole region, in the shape the "
+        "terminal declares: the class counts, the sorted failing ids, the "
+        "majority class with both counts, or the fail count with the sorted "
+        "failing ids."
+    ),
 }
 
 FIELDS: dict[str, str] = {
@@ -455,6 +532,7 @@ FIELDS: dict[str, str] = {
         "x, y, memo."
     ),
     "set_complete": ("record rows carry id, entity, category, amount, date, memo."),
+    "dense_aggregate": ("record rows carry id, entity, category, amount, date, memo."),
 }
 
 # What each family trains: L1 binding/location, L3 time-separated state replay,
@@ -465,6 +543,7 @@ CAPABILITY_LEVELS: dict[str, str] = {
     "asof_state": "L3_asof_state_reveal_split",
     "rule_holdout": "L4_rule_induction_structured_holdout",
     "set_complete": "L2_exhaustive_set_membership",
+    "dense_aggregate": "L2_dense_region_aggregation",
 }
 
 HONESTY: dict[str, Any] = {
@@ -582,6 +661,33 @@ PROMPTS: dict[str, tuple[str, ...]] = {
         "Solve the set query by running the program and report the complete membership.",
         "Run the program over the table and give the ids, count or missing list it asks for.",
         "Apply every condition to every row and return the exhaustive set the scope defines.",
+    ),
+    "dense_aggregate": (
+        "Execute the typed program below over the rendered rows and return the aggregate over the region.",
+        "Classify every row inside the declared region and report the aggregate it asks for.",
+        "Judge each row of the region against the stated predicate, then aggregate over all of it.",
+        "Read the region boundary, decide every inside row, and answer with the aggregate.",
+        "Carry out the following typed query over the records and return the aggregated result.",
+        "Read the record table, run the program exactly as written, and report its result.",
+        "Apply the per-row judgment to each row of the region and aggregate the outcomes.",
+        "Process every in-region row with the program below and return the aggregate it defines.",
+        "Work through the region row by row and state the aggregate the program asks for.",
+        "Run this dense program and return the counts, the failing ids or the majority it asks for.",
+        "Solve the typed aggregate query below and report the result as specified.",
+        "Execute the program over the rendered rows; report the aggregate over the whole region.",
+        "Take the region's boundary, judge nothing less than every inside row, and answer.",
+        "Apply the judgment to the region's rows and give the aggregate the program asks for.",
+        "Interpret the query program, evaluate it on the region, and return the answer.",
+        "Evaluate the dense-aggregate program on the rendered records and answer.",
+        "Execute the stated boundary and judgment over the rows and report the aggregate.",
+        "Run the query program on the rows below and return the aggregated answer.",
+        "Resolve the region, classify each row it admits, and report the aggregate.",
+        "Compute the program's result over the rendered record table.",
+        "Execute the following program on the rows and report the aggregate with its counts.",
+        "Evaluate this region-aggregation program over the records and answer.",
+        "Solve the dense query by running the program and report the aggregate it defines.",
+        "Run the program over the table and give the counts, failing ids or majority it asks for.",
+        "Apply the judgment to every in-region row and return the aggregate the region yields.",
     ),
 }
 
@@ -1430,6 +1536,124 @@ def _solve_set(rows: list[Row], question: dict[str, Any]) -> Any:
     return {"ids": named, "missing": missing}
 
 
+# --------------------------------------------------------------------------
+# dense_aggregate (L2): per-fragment judgment, then global aggregation
+# --------------------------------------------------------------------------
+
+
+def _dense_steps(question: dict[str, Any]) -> list[dict[str, Any]]:
+    steps = question.get("steps")
+    if not isinstance(steps, list) or len(steps) != 2:
+        raise ValueError("a dense program is exactly a region step and a terminal")
+    region, terminal = steps
+    if region.get("op") != "region":
+        raise ValueError("a region step must come first")
+    conditions = region.get("conditions")
+    if not isinstance(conditions, list) or not 1 <= len(conditions) <= 3:
+        raise ValueError("a region step needs 1 to 3 conditions")
+    for condition in conditions:
+        if not isinstance(condition, dict) or set(condition) != {
+            "field",
+            "op",
+            "value",
+        }:
+            raise ValueError("a region condition is a field, an op and a value")
+        field, op = condition["field"], condition["op"]
+        if field not in FIELD_OPS or op not in FIELD_OPS[field]:
+            raise ValueError("unsupported predicate")
+        value = condition["value"]
+        if field == "amount" and type(value) is not int:
+            raise ValueError("an amount predicate must be an integer")
+        if field != "amount" and not isinstance(value, str):
+            raise ValueError("a text predicate must be a string")
+    judgment = region.get("judgment")
+    if not isinstance(judgment, list) or not 2 <= len(judgment) <= 3:
+        raise ValueError("a region step declares a 2 or 3 condition judgment")
+    for condition in judgment:
+        if not isinstance(condition, dict) or set(condition) != {
+            "field",
+            "op",
+            "value",
+        }:
+            raise ValueError("a judgment condition is a field, an op and a value")
+        field, op = condition["field"], condition["op"]
+        if field not in FIELD_OPS or op not in FIELD_OPS[field]:
+            raise ValueError("unsupported predicate")
+        value = condition["value"]
+        if field == "amount" and type(value) is not int:
+            raise ValueError("an amount predicate must be an integer")
+        if field != "amount" and not isinstance(value, str):
+            raise ValueError("a text predicate must be a string")
+    if terminal.get("op") not in DENSE_TERMINALS:
+        raise ValueError("unsupported terminal operation")
+    if terminal.get("shape") not in DENSE_SHAPES[terminal["op"]]:
+        raise ValueError("unsupported terminal shape")
+    return steps
+
+
+def _dense_region(rows: list[Row], steps: list[dict[str, Any]]) -> list[Row]:
+    """Every row inside the coarse boundary -- the declared region to judge."""
+    return [
+        row
+        for row in rows
+        if row.type == "record"
+        and all(_holds(row, condition) for condition in steps[0]["conditions"])
+    ]
+
+
+def _dense_evidence(rows: list[Row], question: dict[str, Any]) -> list[str]:
+    """Provenance: every in-region row, because the aggregate reads them all."""
+    return sorted(row.id for row in _dense_region(rows, _dense_steps(question)))
+
+
+def _solve_dense(rows: list[Row], question: dict[str, Any]) -> Any:
+    steps = _dense_steps(question)
+    terminal = steps[-1]
+    op, shape = terminal["op"], terminal["shape"]
+    region = _dense_region(rows, steps)
+    judgment = steps[0]["judgment"]
+    failing = sorted(
+        row.id
+        for row in region
+        if not all(_holds(row, condition) for condition in judgment)
+    )
+    passing = sorted(row.id for row in region if row.id not in set(failing))
+    by_entity: dict[str, int] = {}
+    failing_by_entity: dict[str, list[str]] = {}
+    for row in sorted(region, key=lambda row: (row.entity, row.id)):
+        if row.id in set(failing):
+            by_entity[row.entity] = by_entity.get(row.entity, 0) + 1
+            failing_by_entity.setdefault(row.entity, []).append(row.id)
+    passed = len(passing)
+    if op == "dense_counts":
+        if shape == "counts":
+            return {"pass": passed, "fail": len(failing)}
+        return {"pass": passed, "fail": len(failing), "entities": by_entity}
+    if op == "dense_failing_ids":
+        if shape == "ids_total":
+            return {"failing": failing, "total": len(region)}
+        return {"passing": passing, "failing": failing}
+    if op == "dense_majority":
+        answer = {
+            "majority": "pass" if passed > len(failing) else "fail",
+            "pass": passed,
+            "fail": len(failing),
+        }
+        if shape == "majority_margin":
+            answer["margin"] = abs(passed - len(failing))
+        return answer
+    if shape == "set":
+        return {"fail": len(failing), "pass": passed, "failing": failing}
+    if shape == "first":
+        return {"fail": len(failing), "pass": passed, "first": failing[0]}
+    return {
+        "fail": len(failing),
+        "pass": passed,
+        "failing": failing,
+        "entities": failing_by_entity,
+    }
+
+
 def _solve_rows(
     header: dict[str, Any],
     rows: list[Row],
@@ -1451,6 +1675,8 @@ def _solve_rows(
         return _solve_asof(rows, question, order)
     if family == "set_complete":
         return _solve_set(rows, question)
+    if family == "dense_aggregate":
+        return _solve_dense(rows, question)
     return _solve_rule(header, rows, question)
 
 
@@ -1582,6 +1808,51 @@ def describe_program(program: dict[str, Any]) -> str:
                     "report the sorted named row ids with which of them are not "
                     "members of the set"
                 )
+        elif op == "region":
+            parts.append(
+                f"take every row where {_conditions_text(step['conditions'])} as the "
+                f"region, judging each by {_conditions_text(step['judgment'])}"
+            )
+        elif op == "dense_counts":
+            if step["shape"] == "counts":
+                parts.append(
+                    "report how many region rows pass the judgment and how many fail"
+                )
+            else:
+                parts.append(
+                    "report the pass and fail counts with the per-entity fail counts"
+                )
+        elif op == "dense_failing_ids":
+            if step["shape"] == "ids_total":
+                parts.append(
+                    "report the sorted ids of the failing rows with how many rows "
+                    "the region holds"
+                )
+            else:
+                parts.append(
+                    "report the sorted passing and failing id lists of the region"
+                )
+        elif op == "dense_majority":
+            if step["shape"] == "majority":
+                parts.append(
+                    "report which class holds more region rows, with both counts"
+                )
+            else:
+                parts.append(
+                    "report which class holds more region rows, with both counts "
+                    "and their margin"
+                )
+        elif op == "dense_compound":
+            if step["shape"] == "set":
+                parts.append(
+                    "report the fail count with the sorted ids of the failing rows"
+                )
+            elif step["shape"] == "first":
+                parts.append("report the fail count with the first failing row id")
+            else:
+                parts.append(
+                    "report the fail count with the failing ids grouped per entity"
+                )
         else:
             raise ValueError("unknown program step")
     return "; then ".join(parts)
@@ -1609,13 +1880,29 @@ def _split_sizes(rng: random.Random, consumed: int, n_variants: int) -> list[int
     ]
 
 
-def plan_variants(length_records: int, consumed: int, requested: int) -> int:
+def plan_variants(
+    length_records: int, consumed: int, requested: int, family: str | None = None
+) -> int:
     """How many K-sized tasks fit in L while leaving real distractor room.
 
     The multiplier is the widest per-family evidence cost, so a cell this
     accepts is hostable by every family even though the dispatch does not know
-    which family will generate the world.
+    which family will generate the world. The default path is shared and
+    family-agnostic; a caller that knows the family may pass it, and the one
+    family whose feasibility arithmetic differs -- dense_aggregate, whose
+    tasks share one region instead of packing disjoint scopes -- gets a
+    family-scoped branch. Every other family's result is byte-identical to
+    the default path.
     """
+    if family == "dense_aggregate":
+        # Shared-region feasibility: one region of size K carries every
+        # variant, so the variant count costs no extra rows and the binding
+        # constraints are the density band (the family's defining property)
+        # and the out-of-region distractor room the band already implies.
+        density = consumed / length_records
+        if not DENSE_FLOOR_FRACTION <= density <= DENSE_CAP_FRACTION:
+            return 0
+        return requested
     widest = max(EVIDENCE_MULTIPLIER.values())
     room = length_records - max(8, length_records // 10)
     return max(1, min(requested, room // max(4, (consumed * widest * 6) // 5)))
@@ -2682,6 +2969,240 @@ def _set_world(
     )
 
 
+def _dense_world(
+    rng: random.Random,
+    sizes: list[int],
+    depth: int,
+    seed: int,
+    length_records: int,
+) -> tuple[list[Row], list[dict[str, Any]], dict[str, Any]]:
+    """Rows, task specs and rendering extras for one dense_aggregate world.
+
+    The world is one table and ONE region: a coarse boundary -- a contiguous
+    date span plus a category slice -- whose size is the world's K, shared by
+    every task the world carries. The tasks differ in judgment (each a 2-3
+    condition predicate over the region's fields), terminal and answer shape,
+    and each one aggregates over the WHOLE region, so every region row is
+    necessary for every task: the counts (or the id lists plus a total) move
+    whenever any region row is dropped. The class mixture under a judgment is
+    chosen through the judgment itself: the amount cut is drawn at a quantile
+    of the base rows' amounts, so both classes are populated and the cut sits
+    next to a real row -- the flip candidate, whose class the intervention
+    moves by taking its amount across the cut.
+
+    Density is the family's defining property, so the region size is the
+    passed K and the caller (generate_world) rejects the world unless K/L
+    lands inside the declared band. Out-of-region rows are the same-schema
+    exposure the boundary excludes by category or date, never by id; the
+    padding branch of this family draws them off the span and off the region
+    categories, so padding can never silently join the region and drift the
+    measured density.
+    """
+    region_size = sizes[0]
+    # The world carries exactly three categories: one or two region
+    # categories plus the outside remainder, so the category half of the
+    # boundary is always expressible in the shared condition grammar -- a
+    # single == for a one-category slice, a single != for a two-category
+    # slice -- without naming rows or leaking outside categories into the
+    # region.
+    categories = rng.sample(CATEGORY_POOL, 3)
+    id_width = rng.choice((8, 12, 16, 20, 24))
+    memo_width = rng.choice((16, 32, 48))
+    used: set[str] = set()
+    # The region categories are the coarse category half of the boundary; the
+    # rest are the outside categories. The span (the coarse date half)
+    # covers the region's rows.
+    if rng.randrange(2):
+        region_categories = categories[:2]
+        exclusion = categories[2]
+    else:
+        region_categories = categories[:1]
+        exclusion = None
+    outside_categories = [name for name in categories if name not in region_categories]
+    span_days = max(WINDOW_DAYS, region_size)
+    start = BASE_DATE + timedelta(days=GAP_DAYS)
+    stop = start + timedelta(days=span_days)
+
+    def record(day: str, amount: int, category: str, entity: str) -> Row:
+        return Row(
+            id=_new_id("r", rng, id_width),
+            type="record",
+            entity=entity,
+            memo=_new_id("note-", rng, memo_width),
+            amount=amount,
+            category=category,
+            day=day,
+        )
+
+    def fresh_entity() -> str:
+        entity = f"unit-{rng.getrandbits(20):05x}"
+        while entity in used:
+            entity = f"unit-{rng.getrandbits(20):05x}"
+        used.add(entity)
+        return entity
+
+    def span_day() -> str:
+        return (start + timedelta(days=rng.randrange(span_days))).isoformat()
+
+    def offspan_day() -> str:
+        offset = rng.randrange(-GAP_DAYS, span_days + GAP_DAYS)
+        if 0 <= offset < span_days:
+            offset = span_days + rng.randrange(GAP_DAYS)
+        return (start + timedelta(days=offset)).isoformat()
+
+    rows: list[Row] = []
+    specs: list[dict[str, Any]] = []
+    # The region rows: every one carries an amount over a wide, well-spread
+    # space (so per-row judgment is a value cut, not a repeated value), a
+    # date inside the span and a category inside the slice.
+    for _ in range(region_size):
+        rows.append(
+            record(
+                span_day(),
+                rng.randrange(1, 1 << 20),
+                rng.choice(region_categories),
+                fresh_entity(),
+            )
+        )
+    region = [row for row in rows if row.type == "record"]
+    # One task per variant: judgment, terminal and shape drawn by rotation.
+    for index in range(len(sizes)):
+        terminal = DENSE_TERMINALS[(seed + index) % len(DENSE_TERMINALS)]
+        shape = DENSE_SHAPES[terminal][
+            (seed // len(DENSE_TERMINALS) + index) % len(DENSE_SHAPES[terminal])
+        ]
+        # The judgment: an amount cut (always present -- the axis the flip
+        # moves a row across) plus a category and/or date axis, so it is a
+        # 2-3 condition predicate in the family's shared grammar. The
+        # non-amount axes are re-drawn until they leave a base of at least 8
+        # region rows, so the cut always has two populated sides.
+        judgment: list[dict[str, Any]] = []
+        base: list[Row] = []
+        for _ in range(8):
+            judgment = [
+                {"field": "amount", "op": ">=", "value": 0},
+            ]
+            axis = rng.choice(("category", "date", "both"))
+            if axis in ("category", "both"):
+                judgment.append(
+                    {
+                        "field": "category",
+                        "op": "==",
+                        "value": rng.choice(region_categories),
+                    }
+                )
+            if axis in ("date", "both"):
+                judgment.append(
+                    {
+                        "field": "date",
+                        "op": "<=",
+                        "value": (start + timedelta(days=span_days // 2)).isoformat(),
+                    }
+                )
+            base = [
+                row
+                for row in region
+                if all(
+                    _holds(row, condition)
+                    for condition in judgment
+                    if condition["field"] != "amount"
+                )
+            ]
+            if len(base) >= 8:
+                break
+        if len(base) < 8:
+            raise ValueError("no judgment axis draw leaves a populated base")
+        # The class mixture rides the cut: drawn at a quantile of the base
+        # amounts, off 0 and 1 (both classes present) and off an exact tie
+        # when the majority terminal is drawn.
+        amounts = sorted(row.amount for row in base)
+        mixture = rng.uniform(0.25, 0.75)
+        if terminal == "dense_majority" and abs(mixture - 0.5) < 0.08:
+            mixture = 0.5 + (0.12 if mixture >= 0.5 else -0.12)
+        pass_target = max(1, min(len(base) - 1, round(len(base) * mixture)))
+        cut = amounts[len(base) - pass_target]
+        judgment[0]["value"] = cut
+        # The flip candidate: the boundary row, the smallest amount at or
+        # above the cut. Moving its amount below the cut flips its class.
+        boundary = min(
+            (row for row in base if row.amount >= cut),
+            key=lambda row: row.amount,
+        )
+        # One boundary for the whole world: the category condition is pinned
+        # at the world level (== the single region category, or != the one
+        # outside category), so every task's region is the same row set.
+        conditions: list[dict[str, Any]] = [
+            {"field": "date", "op": ">=", "value": start.isoformat()},
+            {"field": "date", "op": "<=", "value": stop.isoformat()},
+        ]
+        if exclusion is None:
+            conditions.insert(
+                0,
+                {"field": "category", "op": "==", "value": region_categories[0]},
+            )
+        else:
+            conditions.insert(
+                0,
+                {"field": "category", "op": "!=", "value": exclusion},
+            )
+        specs.append(
+            {
+                "task_id": f"q{index}",
+                "question": {
+                    "family": "dense_aggregate",
+                    "steps": [
+                        {
+                            "op": "region",
+                            "conditions": conditions,
+                            "judgment": judgment,
+                        },
+                        {"op": terminal, "shape": shape},
+                    ],
+                },
+                "flip_row": boundary.id,
+            }
+        )
+    # Out-of-region rows: the same-schema exposure the boundary excludes --
+    # outside categories inside the span, and region categories outside it.
+    # Built here so they carry realistic near-region values; the padding
+    # branch fills the rest of L with the same placement rule.
+    distractors = max(4, (length_records - region_size) * 2 // 3)
+    for _ in range(distractors):
+        if rng.randrange(2) and outside_categories:
+            rows.append(
+                record(
+                    span_day(),
+                    rng.randrange(1, 1 << 20),
+                    rng.choice(outside_categories),
+                    fresh_entity(),
+                )
+            )
+        else:
+            rows.append(
+                record(
+                    offspan_day(),
+                    rng.randrange(1, 1 << 20),
+                    rng.choice(region_categories),
+                    fresh_entity(),
+                )
+            )
+    return (
+        rows,
+        specs,
+        {
+            "header": None,
+            "id_width": id_width,
+            "memo_width": memo_width,
+            "categories": categories,
+            "dense": {
+                "region_categories": list(region_categories),
+                "outside_categories": list(outside_categories),
+                "span": [start.isoformat(), stop.isoformat()],
+            },
+        },
+    )
+
+
 def _padding_rows(
     rng: random.Random, family: str, count: int, extra: dict[str, Any], used: set[str]
 ) -> list[Row]:
@@ -2716,6 +3237,33 @@ def _padding_rows(
                     kind=KINDS[index % len(KINDS)],
                     day=day.isoformat(),
                     reveal=(day + timedelta(days=60)).isoformat(),
+                )
+            )
+        elif family == "dense_aggregate":
+            # Padding stays out of the region by construction: off the span
+            # AND off the region categories, so a padding row can never join
+            # the region and drift the measured density.
+            dense = extra.get("dense") or {}
+            outside = dense.get("outside_categories") or categories
+            span_start, span_stop = dense.get("span") or (
+                (BASE_DATE + timedelta(days=GAP_DAYS)).isoformat(),
+                (BASE_DATE + timedelta(days=GAP_DAYS + WINDOW_DAYS)).isoformat(),
+            )
+            offset = rng.randrange(-90, 0) if rng.randrange(2) else rng.randrange(0, 90)
+            day = (
+                date.fromisoformat(span_stop) + timedelta(days=offset + 1)
+            ).isoformat()
+            if span_start <= day <= span_stop:
+                day = (date.fromisoformat(span_stop) + timedelta(days=1)).isoformat()
+            rows.append(
+                Row(
+                    id=_new_id("r", rng, id_width),
+                    type="record",
+                    entity=entity,
+                    memo=_new_id("note-", rng, memo_width),
+                    amount=rng.randrange(1, 1 << 20),
+                    category=outside[index % len(outside)],
+                    day=day,
                 )
             )
         elif family == "set_complete":
@@ -2766,7 +3314,23 @@ def generate_world(
         raise ValueError("depth must be 1 or 2")
     if type(n_variants) is not int or not 1 <= n_variants <= 8:
         raise ValueError("n_variants must be 1..8")
-    if n_variants != plan_variants(length_records, consumed_records, n_variants):
+    if family == "dense_aggregate" and depth != 1:
+        raise ValueError("dense_aggregate is an H=1 family; only depth 1 is generated")
+    if family == "dense_aggregate":
+        # Density gate, ahead of the plan gate so an out-of-band cell fails
+        # with the band in the message rather than a generic budget error:
+        # the region is the cell's K (shared by every task), so the cell
+        # itself carries the fraction.
+        cell_density = consumed_records / length_records
+        if not DENSE_FLOOR_FRACTION <= cell_density <= DENSE_CAP_FRACTION:
+            raise ValueError(
+                f"dense_aggregate needs K/L in [{DENSE_FLOOR_FRACTION}, "
+                f"{DENSE_CAP_FRACTION}]; K={consumed_records} over "
+                f"L={length_records} is {cell_density:.3f}"
+            )
+    if n_variants != plan_variants(
+        length_records, consumed_records, n_variants, family
+    ):
         raise ValueError(
             "K budget does not fit inside L; shrink K or the variant count"
         )
@@ -2780,6 +3344,13 @@ def generate_world(
         if depth != 1:
             raise ValueError("set_complete is an H=1 family; only depth 1 is generated")
         rows, specs, extra = _set_world(rng, sizes, depth, seed)
+    elif family == "dense_aggregate":
+        # The shared region is the world's K: every task consumes the same
+        # row set, so the drawn K (sizes[0]) is the region size and the
+        # remaining draws only set the variant count, never extra scopes.
+        rows, specs, extra = _dense_world(
+            rng, [sizes[0]] * len(sizes), depth, seed, length_records
+        )
     else:
         rows, specs, extra = _rule_world(rng, sizes, depth, seed)
     primary = sum(1 for row in rows if row.type in PRIMARY_TYPES)
@@ -2837,6 +3408,14 @@ def generate_world(
         "decoy_padding_rows": _decoys(family, specs, extra),
         "padding_is_exposure_not_semantic_scale": True,
     }
+    if family == "dense_aggregate":
+        # The family's defining measurement: K as a fraction of L, per task
+        # and world-level, recorded in the bundle the validator re-derives.
+        accounting["density_per_task"] = [
+            round(task["consumed_count"] / length_records, 4) for task in tasks
+        ]
+        accounting["density_min"] = min(accounting["density_per_task"])
+        accounting["density_band"] = [DENSE_FLOOR_FRACTION, DENSE_CAP_FRACTION]
     identity = _dump(
         [VERSION, seed, family, length_records, consumed_records, depth, n_variants]
     )
@@ -2880,6 +3459,8 @@ def _executor_evidence(rows: list[Row], question: dict[str, Any]) -> list[str]:
         return _rule_evidence(rows, question)
     if family == "set_complete":
         return _set_evidence(rows, question)
+    if family == "dense_aggregate":
+        return _dense_evidence(rows, question)
     raise ValueError("unsupported family")
 
 
@@ -2964,6 +3545,14 @@ def _structurally_necessary(
             decisive_named = named & decisive
             return bool(decisive_named & members) and bool(decisive_named - members)
         return members <= decisive
+    if family == "dense_aggregate":
+        # Every in-region row must be individually decisive for the aggregate:
+        # the density claim is that no row of the region may be skipped, so
+        # remove-one over the whole region must flip some aggregate output.
+        # The measured partition is re-derived by re-execution in
+        # validate_bundle(); this check only asserts the structural claim the
+        # family is defined by.
+        return set(_dense_evidence(rows, question)) <= decisive
     terminal = _rule_steps(question)[-1]
     named = (
         [terminal.get("entity")]
@@ -2993,6 +3582,10 @@ def _decoys(family: str, specs: list[dict[str, Any]], extra: dict[str, Any]) -> 
         return sum(
             len(spec["sibling_rows"]) + 1 for spec in specs if spec.get("sibling_rows")
         )
+    if family == "dense_aggregate":
+        # The out-of-region rows: same-schema exposure the region boundary
+        # excludes, never read by the aggregate.
+        return 0
     return 0
 
 
@@ -3011,6 +3604,8 @@ def _intervention(
         return _asof_intervention(header, rows, question, answer, spec)
     if family == "set_complete":
         return _set_intervention(header, rows, question, answer, spec)
+    if family == "dense_aggregate":
+        return _dense_intervention(header, rows, question, answer, spec)
     return _rule_intervention(header, rows, question, answer)
 
 
@@ -3148,6 +3743,72 @@ def _set_intervention(
         "row": insert_id,
         "conditions": [dict(condition) for condition in scope],
     }
+
+
+def _dense_intervention(
+    header: dict[str, Any],
+    rows: list[Row],
+    question: dict[str, Any],
+    answer: Any,
+    spec: dict[str, Any],
+) -> dict[str, Any]:
+    """Flipping one in-region row's class must move the aggregate.
+
+    The candidate is an in-region row sitting near the judgment's amount cut
+    (built as a value-ambiguous row); moving its amount across the cut flips
+    its class, which moves the class counts of both classes, the failing-id
+    set, and -- through them -- the majority or the compound. The generator
+    draws the candidate per task at world build; this function moves it and
+    requires the flip, so a world where the candidate is stale (its class did
+    not change) is a generation failure rather than a silent no-op.
+    """
+    steps = _dense_steps(question)
+    judgment = steps[0]["judgment"]
+    cut = next(
+        condition["value"]
+        for condition in judgment
+        if condition["field"] == "amount" and condition["op"] == ">="
+    )
+    region = _dense_region(rows, steps)
+    region_ids = {row.id for row in region}
+
+    def passes(row: Row) -> bool:
+        return all(_holds(row, condition) for condition in judgment)
+
+    # Prefer the drawn candidate, then any in-region row whose amount sits
+    # within 30 of the cut; a far row would need a large move that could leave
+    # the world's value range.
+    ordered = [spec.get("flip_row")] + [
+        row.id for row in region if abs((row.amount or 0) - cut) <= 30
+    ]
+    seen: set[str] = set()
+    for row_id in ordered:
+        if row_id is None or row_id in seen or row_id not in region_ids:
+            continue
+        seen.add(row_id)
+        row = next(candidate for candidate in rows if candidate.id == row_id)
+        before = passes(row)
+        # Move the amount across the cut, staying inside a sane range.
+        moved_amount = cut - 5 if before else cut + 5
+        moved = [
+            replace(candidate, amount=moved_amount)
+            if candidate.id == row_id
+            else candidate
+            for candidate in rows
+        ]
+        after = passes(next(candidate for candidate in moved if candidate.id == row_id))
+        if after == before:
+            continue
+        if _differs(header, moved, question, answer):
+            return {
+                "kind": "class_flip",
+                "row": row_id,
+                "amount_before": row.amount,
+                "amount_after": moved_amount,
+                "class_before": "pass" if before else "fail",
+                "class_after": "pass" if after else "fail",
+            }
+    raise ValueError("no in-region row's class flip changes the aggregate")
 
 
 def answer_value(answer: Any) -> Any:
@@ -3327,6 +3988,29 @@ def _validate_intervention(
         else:
             moved_question = question
         flipped = _differs(header, moved, moved_question, answer)
+    elif kind == "class_flip":
+        row = by_id.get(intervention["row"])
+        if row is None:
+            return ["the declared class-flip row is not rendered"]
+        if row.amount != intervention["amount_before"]:
+            return ["the declared class-flip row does not carry the declared amount"]
+        moved = [
+            replace(candidate, amount=intervention["amount_after"])
+            if candidate.id == row.id
+            else candidate
+            for candidate in rows
+        ]
+        judgment = question["steps"][0]["judgment"]
+        before = all(_holds(row, condition) for condition in judgment)
+        after_row = next(candidate for candidate in moved if candidate.id == row.id)
+        after = all(_holds(after_row, condition) for condition in judgment)
+        if ("pass" if before else "fail") != intervention["class_before"]:
+            return ["the declared class-flip before-class does not match the row"]
+        if ("pass" if after else "fail") != intervention["class_after"]:
+            return ["the declared class-flip after-class does not match the row"]
+        if before == after:
+            return ["the declared class flip does not change the row's class"]
+        flipped = _differs(header, moved, question, answer)
     else:
         selected = set(intervention["rows"])
         if any(row_id not in by_id for row_id in selected):
@@ -3488,6 +4172,45 @@ def _family_checks(
             errors.append("no task pins the unordered presentation")
         checks["unordered_tasks"] = unordered
         return
+    if family == "dense_aggregate":
+        # The density claim re-measured: K/L per task inside the declared
+        # band, every in-region row in the necessary partition (no skippable
+        # row), both classes present under every judgment (no degenerate
+        # mixture), and the class counts re-derived from the region.
+        for task in bundle["tasks"]:
+            question = task["question"]
+            steps = _dense_steps(question)
+            region = _dense_region(rows, steps)
+            judgment = steps[0]["judgment"]
+            failing = sum(
+                not all(_holds(row, condition) for condition in judgment)
+                for row in region
+            )
+            answer = task["answer"]
+            op = steps[-1]["op"]
+            shown_pass = shown_fail = None
+            if isinstance(answer, dict):
+                shown_pass = answer.get("pass")
+                shown_fail = answer.get("fail")
+            density = len(region) / len(rows)
+            checks["density:" + task["task_id"]] = round(density, 4)
+            if not DENSE_FLOOR_FRACTION <= density <= DENSE_CAP_FRACTION:
+                errors.append("the measured density is outside the declared band")
+            if len(region) != task["consumed_count"]:
+                errors.append("the region is not the task's consumed set")
+            if set(task["necessary"]) != {row.id for row in region}:
+                errors.append("an in-region row is not in the necessary partition")
+            if shown_pass is not None and shown_pass != len(region) - failing:
+                errors.append("a pass count disagrees with the region")
+            if shown_fail is not None and shown_fail != failing:
+                errors.append("a fail count disagrees with the region")
+            if op == "dense_majority" and answer["majority"] != (
+                "pass" if shown_pass > shown_fail else "fail"
+            ):
+                errors.append("a majority disagrees with the class counts")
+            if failing == 0 or failing == len(region):
+                errors.append("a judgment leaves a class empty")
+        return
     rule_family, modulus, labels = _rule_header(header)
     records = _rule_entities(rows)
     demos = [(row.points, row.label) for row in rows if row.type == "demo"]
@@ -3557,15 +4280,25 @@ def validate_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
     errors: list[str] = []
     checks: dict[str, Any] = {}
     try:
-        expected = generate_world(
-            bundle["seed"],
-            bundle["family"],
-            bundle["length_records"],
-            bundle["consumed_records"],
-            bundle["depth"],
-            bundle["n_variants"],
-        )
-        checks["deterministic_reproduction"] = bundle == expected
+        try:
+            expected = generate_world(
+                bundle["seed"],
+                bundle["family"],
+                bundle["length_records"],
+                bundle["consumed_records"],
+                bundle["depth"],
+                bundle["n_variants"],
+            )
+        except ValueError:
+            # A cell that can no longer regenerate (a relabelled L that left
+            # the band, a depth the family rejects) is a failed reproduction
+            # by definition, not an abort: the rest of the checks still run
+            # over the bundle as stored.
+            expected = None
+            checks["deterministic_reproduction"] = False
+            errors.append("the declared (seed, L, K, depth) cannot regenerate")
+        if expected is not None:
+            checks["deterministic_reproduction"] = bundle == expected
         if bundle["honesty"] != HONESTY or any(
             bundle["honesty"][key] for key in HONESTY if key != "source_kind"
         ):

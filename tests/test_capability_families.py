@@ -29,16 +29,39 @@ SMALL = {"length_records": 200, "consumed_records": 20, "depth": 2, "n_variants"
 # set_complete is an H=1 family: the spine schedules depth 1 for it and the
 # executor rejects depth 2, so its shared-contract runs pin depth 1.
 SET_SMALL = {**SMALL, "depth": 1}
+# dense_aggregate is H=1 AND band-gated: its region is the passed K shared by
+# every task, so a shared-contract cell must carry K/L inside [0.35, 0.85].
+# The shared cells below keep their (L, K) for the other families and are
+# rescaled for dense by cells_for(), so one parametrized suite covers all.
+DENSE_SMALL = {**SMALL, "depth": 1, "consumed_records": 100}
 SEEDS = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+H1_FAMILIES = ("set_complete", "dense_aggregate")
 
 
 def family_depth(family):
-    """set_complete is an H=1 family; the shared-contract tests run its depth."""
-    return 1 if family == "set_complete" else 2
+    """set_complete and dense_aggregate are H=1 families; the shared-contract
+    tests run their depth."""
+    return 1 if family in H1_FAMILIES else 2
 
 
 def small_for(family):
-    return SET_SMALL if family == "set_complete" else SMALL
+    if family == "set_complete":
+        return SET_SMALL
+    if family == "dense_aggregate":
+        return DENSE_SMALL
+    return SMALL
+
+
+def cells_for(family, length_records, consumed_records):
+    """A shared (L, K) cell, rescaled in-band when the family is band-gated.
+
+    dense_aggregate's K is the region, so a K/L of 0.1 (the shared cells'
+    ratio) is out of its band; the rescale keeps the same L and lifts K to
+    the band's midpoint, which is the family's own operating point.
+    """
+    if family == "dense_aggregate":
+        return length_records, max(4, round(length_records * 0.6))
+    return length_records, consumed_records
 
 
 def visible_rows(bundle):
@@ -86,9 +109,9 @@ def answer_after_drop(bundle, task, row_id):
 @pytest.mark.parametrize("family", FAMILIES)
 @pytest.mark.parametrize("seed", SEEDS)
 def test_generation_and_validation_are_green_over_ten_seeds(family, seed):
-    depths = (1,) if family == "set_complete" else (1, 2)
+    depths = (1,) if family in H1_FAMILIES else (1, 2)
     for depth in depths:
-        bundle = generate_world(seed, family, **{**SMALL, "depth": depth})
+        bundle = generate_world(seed, family, **{**small_for(family), "depth": depth})
         result = validate_bundle(bundle)
         assert result["passed"], (family, seed, depth, result["errors"])
 
@@ -127,7 +150,9 @@ def test_prompt_pool_is_deep_enough_and_rotated(family):
     phrasings = {
         task["phrasing_index"]
         for seed in range(200)
-        for task in generate_world(seed, family, 120, 16, 1, 1)["tasks"]
+        for task in generate_world(seed, family, *cells_for(family, 120, 16), 1, 1)[
+            "tasks"
+        ]
     }
     assert len(phrasings) >= 20
 
@@ -234,7 +259,8 @@ def test_executor_rejects_a_program_from_another_family(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_distractor_rows_are_never_counted_as_consumed_evidence(family):
-    bundle = generate_world(8, family, 300, 25, family_depth(family), 2)
+    length, consumed = cells_for(family, 300, 25)
+    bundle = generate_world(8, family, length, consumed, family_depth(family), 2)
     primary = {
         row["id"] for row in data_rows(bundle) if row["type"] in ("record", "event")
     }
@@ -254,7 +280,8 @@ def test_distractor_rows_are_never_counted_as_consumed_evidence(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_deleting_a_necessary_row_changes_the_answer(family):
-    bundle = generate_world(12, family, 300, 25, family_depth(family), 2)
+    length, consumed = cells_for(family, 300, 25)
+    bundle = generate_world(12, family, length, consumed, family_depth(family), 2)
     for task in bundle["tasks"]:
         for row_id in task["necessary"]:
             assert answer_value(
@@ -264,7 +291,8 @@ def test_deleting_a_necessary_row_changes_the_answer(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_deleting_a_distractor_does_not_change_the_answer(family):
-    bundle = generate_world(12, family, 300, 25, family_depth(family), 2)
+    length, consumed = cells_for(family, 300, 25)
+    bundle = generate_world(12, family, length, consumed, family_depth(family), 2)
     for task in bundle["tasks"]:
         consumed = set(task["consumed"])
         distractor = next(
@@ -280,7 +308,8 @@ def test_deleting_a_distractor_does_not_change_the_answer(family):
 @pytest.mark.parametrize("family", FAMILIES)
 def test_declared_necessity_partition_must_match_the_measurement(family):
     """A padded or hand-edited `necessary` list would make the check vacuous."""
-    bundle = generate_world(24, family, 300, 25, family_depth(family), 2)
+    length, consumed = cells_for(family, 300, 25)
+    bundle = generate_world(24, family, length, consumed, family_depth(family), 2)
     task = bundle["tasks"][0]
     task["necessary"] = []
     result = validate_bundle(bundle)
@@ -293,7 +322,8 @@ def test_declared_necessity_partition_must_match_the_measurement(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_declared_provenance_must_match_the_executor(family):
-    bundle = generate_world(24, family, 300, 25, family_depth(family), 2)
+    length, consumed = cells_for(family, 300, 25)
+    bundle = generate_world(24, family, length, consumed, family_depth(family), 2)
     task = bundle["tasks"][0]
     distractor = next(
         row["id"]
@@ -309,7 +339,8 @@ def test_declared_provenance_must_match_the_executor(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_window_ablation_is_a_measured_fraction_of_half_context_windows(family):
-    bundle = generate_world(13, family, 400, 25, family_depth(family), 2)
+    length, consumed = cells_for(family, 400, 25)
+    bundle = generate_world(13, family, length, consumed, family_depth(family), 2)
     ablation = window_ablation(bundle)
     assert ablation == validate_bundle(bundle)["checks"]["window_ablation"]
     assert ablation["windows_attempted"] > 0
@@ -324,27 +355,31 @@ def test_each_family_carries_at_least_eight_structural_answer_shapes(family):
     shapes = Counter(
         shape_of(task["answer"])
         for seed in range(1, 41)
-        for task in generate_world(seed, family, 400, 40, family_depth(family), 2)[
-            "tasks"
-        ]
+        for task in generate_world(
+            seed, family, *cells_for(family, 400, 40), family_depth(family), 2
+        )["tasks"]
     )
     assert len(shapes) >= 8, shapes.most_common(3)
 
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_padding_volume_grows_with_l_and_not_with_k(family):
-    small = generate_world(19, family, 200, 20, family_depth(family), 2)
-    large = generate_world(19, family, 800, 20, family_depth(family), 2)
+    small = generate_world(
+        19, family, *cells_for(family, 200, 20), family_depth(family), 2
+    )
+    large = generate_world(
+        19, family, *cells_for(family, 800, 20), family_depth(family), 2
+    )
     assert (
         large["length_accounting"]["padding_rows"]
         > small["length_accounting"]["padding_rows"]
     )
-    if family == "set_complete":
-        # A scope reads every rendered row, so the exhaustive membership
-        # grows with L itself (padding rows can legally be members): the
+    if family in ("set_complete", "dense_aggregate"):
+        # A scope reads every rendered row (set_complete) or the region is a
+        # band-gated share of L (dense_aggregate, whose shared cells rescale
+        # K with L): the consumed count grows with L itself, so the
         # invariance the other families enjoy cannot hold here, and the
-        # honest claim is only that each task's *own* K-built population is
-        # the floor of what it consumes.
+        # honest claim is only that each task's consumed set never shrinks.
         for small_task, large_task in zip(small["tasks"], large["tasks"]):
             assert large_task["consumed_count"] >= small_task["consumed_count"]
         return
@@ -356,6 +391,20 @@ def test_padding_volume_grows_with_l_and_not_with_k(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_rejects_k_that_cannot_fit_in_l(family):
+    if family == "dense_aggregate":
+        # The band gate, not the disjoint-budget gate, is what rejects a
+        # dense cell: K below the floor (0.1) and K above the cap (5.0) both
+        # fail loudly, and the shared plan gate is untouched for the rest.
+        with pytest.raises(ValueError, match="K/L in"):
+            generate_world(1, family, 200, 20, 1, 2)
+        with pytest.raises(ValueError, match="K/L in"):
+            generate_world(1, family, 40, 200, 1, 2)
+        assert plan_variants(3200, 200, 6) >= 2
+        # Below the floor (0.25) rejects; inside the band (0.6) the shared
+        # region hosts every requested variant.
+        assert plan_variants(3200, 800, 6, family) == 0
+        assert plan_variants(3200, 1920, 6, family) == 6
+        return
     with pytest.raises(ValueError):
         generate_world(1, family, 200, 20, 2, 8)
     with pytest.raises(ValueError):
@@ -954,3 +1003,235 @@ def test_set_complete_intervention_tamper_is_rejected():
     task["intervention"]["row"] = task["consumed"][0]
     result = validate_bundle(bundle)
     assert not result["passed"]
+
+
+# --------------------------------------------------------------------------
+# F8 dense_aggregate: per-fragment judgment, then global aggregation
+# --------------------------------------------------------------------------
+
+
+def dense_bundle(seed=1, length=300, consumed=180, variants=2):
+    return generate_world(seed, "dense_aggregate", length, consumed, 1, variants)
+
+
+def test_dense_region_is_the_shared_consumed_set_of_every_task():
+    for seed in range(1, 8):
+        bundle = dense_bundle(seed)
+        regions = [set(task["consumed"]) for task in bundle["tasks"]]
+        # One region, shared by every task: density is a world property.
+        assert all(region == regions[0] for region in regions)
+        assert regions[0]
+        by_id = {row["id"]: row for row in data_rows(bundle)}
+        region = regions[0]
+        # The boundary is coarse: every region row is a same-schema record,
+        # and the region is declared by dates and a category slice, never by
+        # ids the program could name.
+        assert all(by_id[row_id]["type"] == "record" for row_id in region)
+        steps = bundle["tasks"][0]["question"]["steps"][0]
+        fields = {condition["field"] for condition in steps["conditions"]}
+        assert fields <= {"category", "date"}
+
+
+def test_dense_measured_density_stays_inside_the_declared_band():
+    from longworld.synthesis.capability_families import (
+        DENSE_CAP_FRACTION,
+        DENSE_FLOOR_FRACTION,
+    )
+
+    for seed in range(1, 20):
+        bundle = dense_bundle(seed)
+        for density in bundle["length_accounting"]["density_per_task"]:
+            assert DENSE_FLOOR_FRACTION <= density <= DENSE_CAP_FRACTION, (
+                seed,
+                density,
+            )
+        for task in bundle["tasks"]:
+            assert (
+                DENSE_FLOOR_FRACTION
+                <= task["consumed_count"] / bundle["length_records"]
+                <= DENSE_CAP_FRACTION
+            )
+
+
+def test_every_in_region_row_is_individually_decisive():
+    """Removing any region row changes the aggregate: no skippable row."""
+    for seed in range(1, 10):
+        bundle = dense_bundle(seed)
+        for task in bundle["tasks"]:
+            assert set(task["necessary"]) == set(task["consumed"])
+            for row_id in task["necessary"]:
+                assert answer_value(
+                    answer_after_drop(bundle, task, row_id)
+                ) != answer_value(task["answer"])
+
+
+def test_flipping_one_region_rows_class_moves_the_aggregate():
+    for seed in range(1, 12):
+        bundle = dense_bundle(seed)
+        lines = bundle["context"].splitlines()
+        for task in bundle["tasks"]:
+            assert task["intervention"]["kind"] == "class_flip"
+            row_id = task["intervention"]["row"]
+            moved = []
+            for line in lines[1:]:
+                row = json.loads(line)
+                if row["id"] == row_id:
+                    assert row["amount"] == task["intervention"]["amount_before"]
+                    row["amount"] = task["intervention"]["amount_after"]
+                moved.append(json.dumps(row, sort_keys=True, separators=(",", ":")))
+            context = "\n".join([lines[0], *moved])
+            assert solved(context, task["question"]) != task["answer"]
+
+
+def test_out_of_region_rows_are_stable_distractors():
+    for seed in range(1, 12):
+        bundle = dense_bundle(seed)
+        for task in bundle["tasks"]:
+            consumed = set(task["consumed"])
+            outside = [
+                row["id"] for row in data_rows(bundle) if row["id"] not in consumed
+            ]
+            assert outside, "the world carries no out-of-region exposure"
+            for row_id in outside[:8]:
+                assert answer_value(
+                    answer_after_drop(bundle, task, row_id)
+                ) == answer_value(task["answer"]), (seed, task["task_id"], row_id)
+
+
+def test_both_classes_are_present_under_every_judgment():
+    from longworld.synthesis.capability_families import (
+        _dense_region,
+        _dense_steps,
+        _holds,
+    )
+
+    for seed in range(1, 12):
+        bundle = dense_bundle(seed)
+        rows = data_rows_as_rows(bundle)
+        for task in bundle["tasks"]:
+            judgment = task["question"]["steps"][0]["judgment"]
+            region = _dense_region(rows, _dense_steps(task["question"]))
+            passing = sum(
+                all(_holds(row, condition) for condition in judgment) for row in region
+            )
+            assert 0 < passing < len(region), (seed, task["task_id"])
+
+
+def test_dense_answers_are_sorted_and_carry_both_counts():
+    from longworld.synthesis.capability_families import (
+        _dense_region,
+        _dense_steps,
+        _holds,
+    )
+
+    for seed in range(1, 12):
+        bundle = dense_bundle(seed)
+        rows = data_rows_as_rows(bundle)
+        for task in bundle["tasks"]:
+            answer = task["answer"]
+            region = _dense_region(rows, _dense_steps(task["question"]))
+            assert isinstance(answer, dict), terminal_shape(task)
+            if "failing" in answer:
+                assert answer["failing"] == sorted(answer["failing"])
+            if "passing" in answer:
+                assert answer["passing"] == sorted(answer["passing"])
+                assert len(answer["passing"]) + len(answer["failing"]) == len(region)
+            if "total" in answer:
+                assert answer["total"] == len(region)
+            if "first" in answer:
+                # The compound's first failing id is the smallest id the
+                # judgment fails over the region.
+                failing = sorted(
+                    row.id
+                    for row in region
+                    if not all(
+                        _holds(row, condition)
+                        for condition in task["question"]["steps"][0]["judgment"]
+                    )
+                )
+                assert answer["first"] == failing[0]
+                assert answer["fail"] == len(failing)
+            if "pass" in answer:
+                assert answer["pass"] + answer["fail"] == len(region)
+
+
+def terminal_shape(task):
+    terminal = task["question"]["steps"][-1]
+    return (terminal["op"], terminal.get("shape"))
+
+
+def test_dense_aggregate_rejects_depth_above_one():
+    with pytest.raises(ValueError, match="H=1"):
+        generate_world(1, "dense_aggregate", 300, 180, 2, 2)
+
+
+def test_dense_out_of_band_cells_are_rejected_loudly():
+    with pytest.raises(ValueError, match="K/L in"):
+        generate_world(1, "dense_aggregate", 200, 20, 1, 2)
+    with pytest.raises(ValueError, match="K/L in"):
+        generate_world(1, "dense_aggregate", 40, 200, 1, 2)
+
+
+def test_dense_prompt_pool_is_pinned():
+    from longworld.synthesis.capability_families import PROMPTS as P
+
+    assert len(P["dense_aggregate"]) >= 24
+    assert len(set(P["dense_aggregate"])) == len(P["dense_aggregate"])
+
+
+def test_dense_instruction_tamper_is_rejected():
+    bundle = dense_bundle(5, 200, 100)
+    bundle["tasks"][0]["instruction"] = "Count the rows that look like failures."
+    result = validate_bundle(bundle)
+    assert not result["passed"]
+    assert "instruction does not match the registered contract" in result["errors"]
+
+
+def test_dense_declared_necessity_tamper_is_rejected():
+    bundle = dense_bundle(24)
+    bundle["tasks"][0]["necessary"] = []
+    result = validate_bundle(bundle)
+    assert not result["passed"]
+    assert (
+        "the declared sensitivity partition does not match the measurement"
+        in result["errors"]
+    )
+
+
+def test_dense_intervention_tamper_is_rejected():
+    bundle = dense_bundle(24)
+    # Point the declared flip at a row whose amount does not match the
+    # declaration: the replay must refuse the flip claim.
+    task = bundle["tasks"][0]
+    task["intervention"]["row"] = next(
+        row["id"]
+        for row in data_rows(bundle)
+        if row["id"] != task["intervention"]["row"]
+    )
+    result = validate_bundle(bundle)
+    assert not result["passed"]
+
+
+def test_dense_padding_rows_never_join_the_region():
+    """The measured region equals the built region exactly: padding placement
+    cannot drift the density by accidentally landing inside the boundary."""
+    from longworld.synthesis.capability_families import (
+        _dense_region,
+        _dense_steps,
+        _holds,
+    )
+
+    for seed in range(1, 12):
+        bundle = dense_bundle(seed, 400, 240)
+        rows = data_rows_as_rows(bundle)
+        header = json.loads(bundle["context"].splitlines()[0])
+        for task in bundle["tasks"]:
+            region = _dense_region(rows, _dense_steps(task["question"]))
+            assert len(region) == task["consumed_count"]
+        # Every out-of-region row is excluded by the boundary, not by absence.
+        steps = _dense_steps(bundle["tasks"][0]["question"])[0]
+        for row in rows:
+            if row.id in set(bundle["tasks"][0]["consumed"]):
+                continue
+            assert not all(_holds(row, condition) for condition in steps["conditions"])
+        assert header["family"] == "dense_aggregate"
