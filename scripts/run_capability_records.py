@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import inspect
 import json
 import multiprocessing
 import os
@@ -237,7 +238,9 @@ def make_plan(config: dict) -> list[dict]:
             consumed = consumed_for(config, family, depth)
             for index in range(worlds_per_cell_for(config, family)):
                 for target in token_targets_for(config, family, depth):
-                    floor = min_hostable_length(consumed, config["variants_per_world"])
+                    floor = min_hostable_length(
+                        consumed, config["variants_per_world"], family
+                    )
                     seed = config["world_seed_base"] + len(plan)
                     rule_family = rule_family_for_plan(family, seed, index)
                     job = {
@@ -295,11 +298,39 @@ def measure_tokens(context: str, instruction: str, answer: str) -> dict:
     }
 
 
-def min_hostable_length(consumed_records: int, n_variants: int) -> int:
-    """Smallest L whose distractor budget still hosts n_variants K-sized tasks."""
+def plan_variants_for(
+    module, family: str | None, length_records: int, consumed: int, requested: int
+) -> int:
+    """The owning module's feasibility answer, with family when it asks for it.
+
+    Only capability_families' plan_variants takes a family argument (its
+    dense_aggregate branch needs it); the other spine modules keep the
+    3-argument signature and the family is simply not passed.
+    """
+    if (
+        family is not None
+        and "family" in inspect.signature(module.plan_variants).parameters
+    ):
+        return module.plan_variants(length_records, consumed, requested, family)
+    return module.plan_variants(length_records, consumed, requested)
+
+
+def min_hostable_length(
+    consumed_records: int, n_variants: int, family: str | None = None
+) -> int:
+    """Smallest L whose distractor budget still hosts n_variants K-sized tasks.
+
+    The owning module answers for its own feasibility arithmetic: the shared
+    records path is the default, and a family whose tasks share a region
+    (dense_aggregate) accepts the cell on its own terms.
+    """
+    module = module_for(family) if family else records
     length = 32
     while length < 40000:
-        if records.plan_variants(length, consumed_records, n_variants) == n_variants:
+        if (
+            plan_variants_for(module, family, length, consumed_records, n_variants)
+            == n_variants
+        ):
             return length
         length += 1
     raise ValueError("no hostable L found for this K and variant count")
@@ -319,7 +350,12 @@ def fit_cell(job: dict, token_target: int, tokenizer) -> tuple[dict, list[dict]]
     # consumed row needs a longer L than the record worlds do.
     module, variants = module_for(job["family"]), job["n_variants"]
     floor = job["length_records"]
-    while module.plan_variants(floor, job["consumed_records"], variants) != variants:
+    while (
+        plan_variants_for(
+            module, job["family"], floor, job["consumed_records"], variants
+        )
+        != variants
+    ):
         floor += 1
     low, high = floor, max(floor, 30000)
     best = None

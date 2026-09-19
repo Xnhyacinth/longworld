@@ -36,9 +36,7 @@
   },
   "consumed_by_family_depth": {
     "dense_aggregate": {
-      "1": 48,
-      "2": 96,
-      "3": 160
+      "1": 48
     }
   },
   "depths_by_family": {
@@ -48,13 +46,11 @@
     "join_unanswerable": [1],
     "research_run": [1, 2],
     "research_join": [1, 2],
-    "dense_aggregate": [1, 2, 3]
+    "dense_aggregate": [1]
   },
   "token_targets_by_family_depth": {
     "dense_aggregate": {
-      "1": [8192],
-      "2": [16384],
-      "3": [32768]
+      "1": [8192]
     }
   },
   "token_targets_by_depth": {
