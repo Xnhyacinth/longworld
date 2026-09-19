@@ -1,0 +1,54 @@
+{
+  "schema_version": "longworld.record-world-config.v1",
+  "world_seed_base": 760000,
+  "families": [
+    "filter_aggregate",
+    "group_compare",
+    "join_lookup",
+    "alias_locate",
+    "asof_state",
+    "rule_holdout",
+    "join_unanswerable",
+    "set_complete"
+  ],
+  "depths": [1, 2, 3],
+  "lengths": [200, 800, 3200],
+  "consumed_by_depth": {
+    "1": 20,
+    "2": 60,
+    "3": 200
+  },
+  "variants_per_world": 4,
+  "worlds_per_cell": 60,
+  "worlds_per_cell_by_family": {
+    "filter_aggregate": 60,
+    "group_compare": 60,
+    "join_lookup": 50,
+    "alias_locate": 84,
+    "asof_state": 84,
+    "rule_holdout": 42,
+    "join_unanswerable": 75,
+    "set_complete": 63
+  },
+  "depths_by_family": {
+    "alias_locate": [1, 2],
+    "asof_state": [1, 2],
+    "rule_holdout": [1, 2],
+    "join_unanswerable": [1],
+    "set_complete": [1, 2]
+  },
+  "token_targets_by_depth": {
+    "1": [32768, 131072],
+    "2": [32768, 131072],
+    "3": [131072]
+  },
+  "workers": 6,
+  "trained_rule_family": "threshold_class",
+  "notes": {
+    "pool_target": ">= 7,800 candidate rows so the 5,000-row main arm survives the 0.8 train split and an 0.8 training-side retention; per-family arithmetic in the P71 plan (split rule x feasible surface x 4 rows/shard)",
+    "feasible_surface": "v2 measured every FEASIBLE cell to complete; the v2 attrition was systematic, not random: depth-1@8192 is infeasible for all families (K=20 + distractor floor), F-families reject depth 3, join_lookup loses depth-2@32k. This grid schedules only the measured-feasible cells, so infeasible.json should come back empty and any entry is a regression to investigate",
+    "worlds_per_cell_by_family": "absorbs the per-family differences: rule_holdout's structure split sends a whole structure to eval (needs 42 x 6 cells = 252 shards for 1,000 rows), alias/asof live on a 3-cell surface (84 worlds/cell), records families on 5 cells",
+    "world_seed_base": "760000 is far from v2's 710000 (seed = base + plan index; overlapping ranges would collide world_ids across banks)",
+    "families": "join_unanswerable rides the B4 adapter (commit 1356f88); set_complete rides the B2 family (in flight at config-writing time — generation holds until both are registered in FAMILY_MODULES)"
+  }
+}

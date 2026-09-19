@@ -158,6 +158,34 @@ def token_targets_for_depth(config: dict, depth: int) -> list[int]:
     return targets
 
 
+def worlds_per_cell_for(config: dict, family: str) -> int:
+    """Per-family world density: a family's split rule and attrition differ.
+
+    The v2 grid used one global density, but the families are not equal:
+    rule_holdout's structure split sends a whole structure to eval, and the
+    F-families' feasible surface is narrower (no depth 3). A family-level
+    override absorbs exactly that; families without one keep the global value.
+    """
+    overrides = config.get("worlds_per_cell_by_family") or {}
+    if family in overrides:
+        return overrides[family]
+    return config["worlds_per_cell"]
+
+
+def depths_for(config: dict, family: str) -> list[int]:
+    """Per-family depth surface: scheduling infeasible depths is noise.
+
+    The F-families cap at depth 2 and reject depth 3 loudly at generation —
+    v2 recorded 120 such rejects as pure scheduling waste. A family-level
+    override plans only the depths the family can host; families without one
+    keep the global list.
+    """
+    overrides = config.get("depths_by_family") or {}
+    if family in overrides:
+        return overrides[family]
+    return config["depths"]
+
+
 def make_plan(config: dict) -> list[dict]:
     """Stratify the grid deterministically: family x depth x worlds, L fitted."""
     if "rule_holdout" in config["families"] and "trained_rule_family" not in config:
@@ -166,9 +194,9 @@ def make_plan(config: dict) -> list[dict]:
         )
     plan = []
     for family in config["families"]:
-        for depth in config["depths"]:
+        for depth in depths_for(config, family):
             consumed = config["consumed_by_depth"][str(depth)]
-            for index in range(config["worlds_per_cell"]):
+            for index in range(worlds_per_cell_for(config, family)):
                 for target in token_targets_for_depth(config, depth):
                     floor = min_hostable_length(consumed, config["variants_per_world"])
                     seed = config["world_seed_base"] + len(plan)

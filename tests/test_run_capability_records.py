@@ -72,6 +72,33 @@ def test_seed_nudge_yields_planned_structure():
             assert nudged - seed in (0, 1)
 
 
+def test_per_family_overrides_plan_only_the_feasible_surface():
+    """worlds_per_cell_by_family and depths_by_family shape the grid per family.
+
+    The v2 grid scheduled depth 3 for F-families that reject it (120 rejects
+    of pure noise) and one global density that ignored the structure split.
+    """
+    config = {
+        **BASE_CONFIG,
+        "families": ["rule_holdout", "filter_aggregate"],
+        "depths": [1, 2],
+        "consumed_by_depth": {"1": 20, "2": 60},
+        "token_targets_by_depth": {"1": [8192], "2": [32768]},
+        "worlds_per_cell": 2,
+        "worlds_per_cell_by_family": {"rule_holdout": 4},
+        "depths_by_family": {"rule_holdout": [1]},
+    }
+    plan = make_plan(config)
+    rh = [job for job in plan if job["family"] == "rule_holdout"]
+    fa = [job for job in plan if job["family"] == "filter_aggregate"]
+    # rule_holdout: 4 worlds x 1 depth x 1 target = 4 jobs, depth 1 only
+    assert len(rh) == 4 and {job["depth"] for job in rh} == {1}
+    # filter_aggregate: global 2 worlds x 2 depths x 1 target = 4 jobs
+    assert len(fa) == 4
+    # families without overrides keep the global values (filter uses depth 2)
+    assert {job["depth"] for job in fa} == {1, 2}
+
+
 def test_non_rule_families_keep_seed_split():
     plan = make_plan(
         {
