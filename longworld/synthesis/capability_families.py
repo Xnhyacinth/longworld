@@ -352,6 +352,13 @@ DENSE_SHAPES: dict[str, tuple[str, ...]] = {
 # the cell, not the world, is what carries the fraction. The band is slightly
 # wider than the nominal 0.4-0.8 to tolerate the +-spread of the per-world K
 # draw (_split_sizes) around the cell's consumed_records.
+#
+# Consequence for scheduling: the necessary read IS most of the context, so
+# dense tasks are naturally SHORT -- at 8K-32K tokens the band holds with K in
+# the hundreds, while a 64K+ target needs K in the thousands, a different
+# (and legitimately near-infeasible) regime. Out-of-band cells fail closed at
+# generation and are recorded as skips/rejects, never silently drifted; a
+# dense wave therefore schedules large K against small token targets.
 DENSE_FLOOR_FRACTION = 0.35
 DENSE_CAP_FRACTION = 0.85
 
