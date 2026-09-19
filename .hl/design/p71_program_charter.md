@@ -10,7 +10,7 @@ Status: active. 2026-09-19 启动。前序:P70 章程已 superseded(G70-4/G70-6 
 - [x] **A2** sample_index.jsonl:runner finalize 写入 + `build_record_bank_index.py` v2 事后回填(3,476 行,869 group);字面 `group_id`/`full_message_tokens`;group_id=world_id 语义注记;`configs/p70_superset_v2.json` 追溯钉定。v2 首个真实曝光数:696 文档/6.0@1.5ep。commit e6df788/aeca553。
 - [x] **A3** budget_recommendation 进 manifest:`derive_budget_report` 库化 + runner 合并(gbs+规则文案)。commit e6df788。
 - [x] **A4** hash 分层取臂:`scripts/extract_arms.py`(world 原子性 hash;stratum=family×depth×target×split×rule_family;每臂 train.jsonl+索引切片+预算;arms.json 绑定银行 shas+overlap 声明);字节一致重跑验证。commit ad30fb7。**待办**:格式臂渲染视图(A5 后)+ token 重测。
-- [ ] **A5** renderer F 族扩展(renderer-track agent 进行中)。
+- [x] **A5** renderer F 族扩展:族分派重构(六个函数按属主模块解析),prose/table 各 4-12 模板/行类型、per-family 表列、`# extra:` 契约头第三行(携带 rule_holdout 结构声明且篡改/丢弃即拒)、lexical_overlap 证据类型修正。168 测试(原 82 全过);独立冒烟:v2 真实 shard 三格式 round-trip 逐行相等;jsonl=属主原字节。π² 词汇门**推迟**(容器词在钉定问题骨架内,改骨架=契约变更另议,计划允许)。实测记入 B3 参考:alias locate_empty 终端证据分母~8 token,prose 重叠可到 0.375——终端属性非 renderer 缺陷。commit 512f97e。
 - [x] **A6** verification.json:solve_visible 全量复核收据(micro bank 16/16)。commit e6df788。**待办**:v2 跑一次进收据(生成侧无脚本,收据随 v3 波)。
 - [x] **resume 修复**:--resume 采纳已完成 shard(receipt+指纹+哈希三重验证);ledger 原子重写。中断恢复演练通过。commit e6df788。
 
