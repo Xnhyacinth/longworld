@@ -17,6 +17,7 @@
 # Checkpoint eval cadence for arm_a/arm_b: EXPOSE_STEPS below saves at the user's
 # 10%/25%/50%/100% task-exposure marks.
 set -euo pipefail
+set -x
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
