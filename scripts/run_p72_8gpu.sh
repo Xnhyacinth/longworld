@@ -85,7 +85,7 @@ case "${MODE:-linkup}" in
     TRAIN_ITERS=248        # 1.0 epoch, GBS 16 — the observation ceiling per the user's ruling
     RUN_NAME="p72-arm-a-p71main-256k"
     # 10% / 25% / 50% / 100% exposure marks (248 * .1 = 25, .25 = 62, .5 = 124)
-    EXPOSE_ARGS=(--save_steps 1 --save_total_limit 100)
+    EXPOSE_ARGS=(--save_steps 25 --save_total_limit 12)
     ;;
   arm_b)
     # arm_b combines arm A with the P72 pool: same launcher, longer file, new steps.
@@ -93,7 +93,7 @@ case "${MODE:-linkup}" in
     VAL_DATA=()
     TRAIN_ITERS=402        # 6,436 rows / 16 — re-derived if short anchor is mixed in
     RUN_NAME="p72-arm-b-combined-256k"
-    EXPOSE_ARGS=(--save_steps 1 --save_total_limit 100)
+    EXPOSE_ARGS=(--save_steps 25 --save_total_limit 12)
     ;;
   *) echo "MODE must be linkup | arm_a | arm_b" >&2; exit 1 ;;
 esac
