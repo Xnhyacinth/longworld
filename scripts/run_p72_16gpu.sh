@@ -17,6 +17,10 @@ set -x
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 # shellcheck disable=SC1091
+# uv_project_env.sh aborts the whole non-interactive shell when QJIU_ROOT is unset
+# (its :? guard is a fatal expansion error that `|| true` cannot catch) — the pods
+# do not carry QJIU_ROOT, which is what killed the last two launches silently.
+export QJIU_ROOT="${QJIU_ROOT:-/volume/pt-dev/qjiu}"
 source "$ROOT/scripts/uv_project_env.sh" 2>/dev/null || true
 
 SWIFT_ROOT="${SWIFT_ROOT:-$ROOT/.vendor/ms-swift}"
