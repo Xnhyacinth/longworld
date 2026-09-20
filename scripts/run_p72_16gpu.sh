@@ -104,7 +104,17 @@ unset PYTORCH_CUDA_ALLOC_CONF || true
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export TOKENIZERS_PARALLELISM=false
 export USE_MCORE_GDN=1
+# Reporting: tensorboard always; swanlab cloud additionally when the key is present
+# (the P64 dashboard used swanlab cloud — SWANLAB_API_KEY passes through the pod env).
 export SWANLAB_MODE="${SWANLAB_MODE:-disabled}"
+REPORT_TO=(tensorboard)
+if [[ -n "${SWANLAB_API_KEY:-}" ]]; then
+  export SWANLAB_MODE=cloud
+  export SWANLAB_WORKSPACE="${SWANLAB_WORKSPACE:-qjiu}"
+  export SWANLAB_SAVE_DIR="${SWANLAB_SAVE_DIR:-$QJIU_CACHE/swanlab}"
+  mkdir -p "$SWANLAB_SAVE_DIR"
+  REPORT_TO=(tensorboard swanlab)
+fi
 LOG_DIR="${LOG_DIR:-$ROOT/logs}"
 mkdir -p "$LOG_DIR"
 
@@ -150,6 +160,6 @@ echo "P72-16GPU MODE=${MODE:-linkup} DP=$DP TP=$TP CP=$CP GBS=$GBS ACCUM/rank=$A
   --output_dir "$ROOT/data/sft/p72_${MODE:-linkup}_16gpu" \
   "${EXPOSE_ARGS[@]}" \
   --eval_steps 100 --dataloader_num_workers 4 --dataset_num_proc 32 \
-  --report_to tensorboard \
+  --report_to "${REPORT_TO[@]}" \
   --train_iters "$TRAIN_ITERS" 2>&1 | tee "$LOG"
 echo "P72-16GPU MODE=${MODE:-linkup} EXIT: $?"

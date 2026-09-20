@@ -3,7 +3,7 @@
 exec bash -c '
 set -x
 cd /volume/pt-dev/qjiu/longworld || { echo "P72-FATAL: mount path missing" >&2; exit 2; }
-MODE=linkup bash /volume/pt-dev/qjiu/longworld/scripts/run_p72_16gpu.sh
+SWANLAB_API_KEY='${SWANLAB_API_KEY:-eq1xYwE5wHD9b0t4XOmyK}' MODE=linkup bash /volume/pt-dev/qjiu/longworld/scripts/run_p72_16gpu.sh
 rc=$?
 echo "P72-16GPU-step1-EXIT: $rc"
 exit $rc
