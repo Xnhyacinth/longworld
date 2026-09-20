@@ -12,6 +12,7 @@
 #   arm_b  : arm A + P72 pool, 6,436 rows, 402 iters @1ep
 # Exposure checkpoints every 25 steps (10/50/75/100% of arm_a's epoch).
 set -euo pipefail
+set -x
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -41,8 +42,20 @@ PY
 )"
 export LD_LIBRARY_PATH="$RUNTIME_LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-export CUDA_VISIBLE_DEVICES="${GPUS:-0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}"
-NPROC_PER_NODE="$(awk -F, '{print NF}' <<<"$CUDA_VISIBLE_DEVICES")"
+# Node topology: the platform allocates 8-GPU NODES (a 16-GPU request is 2 nodes,
+# ssh-bootstrap writes a hostfile). Local GPUs per node decide --nproc_per_node;
+# the node count comes from the hostfile when present (multi-node torchrun), else
+# everything runs single-node.
+LOCAL_GPUS="${GPUS:-}"
+if [[ -z "$LOCAL_GPUS" ]]; then
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    LOCAL_GPUS="$(nvidia-smi --query-gpu=index --format=csv,noheader | wc -l)"
+  else
+    LOCAL_GPUS=8
+  fi
+fi
+NPROC_PER_NODE="$(awk -F, '{print NF}' <<<"$(seq -s, 1 "$LOCAL_GPUS" 2>/dev/null || echo "$LOCAL_GPUS")")"
+NPROC_PER_NODE="$LOCAL_GPUS"
 TP=4; CP=2; PP=1; MICRO=1; GBS=16
 MODEL_PARALLEL=$((TP * CP * PP))
 if (( MODEL_PARALLEL != 8 )); then
@@ -50,15 +63,37 @@ if (( MODEL_PARALLEL != 8 )); then
   exit 1
 fi
 if (( NPROC_PER_NODE % MODEL_PARALLEL != 0 || NPROC_PER_NODE < 8 )); then
-  echo "GPU count ($NPROC_PER_NODE) must be a multiple of 8 for TP4xCP2 replicas" >&2
+  echo "local GPU count ($NPROC_PER_NODE) must be a multiple of 8 for TP4xCP2 replicas" >&2
   exit 1
 fi
-DP=$((NPROC_PER_NODE / MODEL_PARALLEL))
+# Multi-node: find the ssh-bootstrap hostfile (master+worker pods), or fall back to
+# single-node when no hostfile exists on this box.
+HOSTFILE="${HOSTFILE:-}"
+if [[ -z "$HOSTFILE" ]]; then
+  for candidate in /etc/mpi/hostfile /opt/ssh-devtools/hostfile /tmp/hostfile; do
+    [[ -s "$candidate" ]] && HOSTFILE="$candidate" && break
+  done
+fi
+NNODES=1; RDZV_ARGS=()
+if [[ -n "$HOSTFILE" ]]; then
+  NNODES="$(grep -cE '^[a-z0-9-]+[[:space:]]+slots=' "$HOSTFILE" || true)"
+  [[ "$NNODES" -ge 1 ]] || NNODES=1
+fi
+WORLD=$((NPROC_PER_NODE * NNODES))
+DP=$((WORLD / MODEL_PARALLEL))
 if (( GBS % (MICRO * DP) != 0 )); then
-  echo "GBS=$GBS must be divisible by micro*DP=$MICRO*$DP" >&2
+  echo "GBS=$GBS must be divisible by micro*DP=$MICRO*$DP (world=$WORLD)" >&2
   exit 1
 fi
 ACCUM=$((GBS / MICRO / DP))
+if (( NNODES > 1 )); then
+  # torchrun elastic rendezvous over ssh; the master pod reaches workers by name.
+  RDZV_ARGS=(--nnodes "$NNODES" --node_rank "${NODE_RANK:-0}"
+             --rdzv_backend c10d --rdzv_endpoint "${MASTER_ADDR:-$HOSTNAME}:${MASTER_PORT:-29600}")
+  echo "multi-node: $NNODES nodes x $NPROC_PER_NODE GPUs, hostfile=$HOSTFILE"
+else
+  RDZV_ARGS=()
+fi
 
 export PYTORCH_ALLOC_CONF="${PYTORCH_ALLOC_CONF:-expandable_segments:True}"
 unset PYTORCH_CUDA_ALLOC_CONF || true
@@ -92,7 +127,7 @@ esac
 LOG="$LOG_DIR/train_${RUN_NAME}.log"
 echo "P72-16GPU MODE=${MODE:-linkup} DP=$DP TP=$TP CP=$CP GBS=$GBS ACCUM/rank=$ACCUM iters=$TRAIN_ITERS data=${TRAIN_DATA[*]} log=$LOG"
 
-"$MEGATRON_PY" -m torch.distributed.run --nproc_per_node "$NPROC_PER_NODE" --master_port "${MASTER_PORT:-29600}" \
+"$MEGATRON_PY" -m torch.distributed.run --nproc_per_node "$NPROC_PER_NODE" "${RDZV_ARGS[@]}" \
   "$SWIFT_ROOT/swift/cli/_megatron/sft.py" \
   --model "$MODEL" \
   --dataset "${TRAIN_DATA[@]}" \
