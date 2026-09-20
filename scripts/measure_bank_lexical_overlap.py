@@ -72,15 +72,19 @@ def _span_text(row: dict, fields: tuple[str, ...]) -> str:
 def _question_text(task: dict) -> str:
     """The question as the bank renders it.
 
-    join_unanswerable's program carries the adapter family, which the
-    renderer's registry does not own (the bank-calibers note: its format
-    views are excluded for the same reason); its stored instruction is the
-    question text the row actually carries, so the calibers use that.
+    Families the renderer's registry does not own (join_unanswerable's
+    adapter key; research_run/research_join/dense_aggregate, which landed
+    after the renderer extension) fall back to the stored instruction —
+    the question text the row actually carries — same as the bank-calibers
+    note on excluded format views.
     """
     program = task["question"]
     if program.get("family") == "join_unanswerable":
         return task["instruction"]
-    return render_question(program, "jsonl", task.get("phrasing_index", 0))
+    try:
+        return render_question(program, "jsonl", task.get("phrasing_index", 0))
+    except ValueError:
+        return task["instruction"]
 
 
 def _parse(context: str) -> list[dict]:
