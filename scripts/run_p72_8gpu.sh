@@ -60,7 +60,7 @@ unset PYTORCH_CUDA_ALLOC_CONF || true
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export TOKENIZERS_PARALLELISM=false
 export USE_MCORE_GDN=1
-export SWANLAB_MODE="${SWANLAB_MODE:-local}"
+export SWANLAB_MODE="${SWANLAB_MODE:-disabled}"
 export SWANLAB_SAVE_DIR="${SWANLAB_SAVE_DIR:-$QJIU_CACHE/swanlab}"
 LOG_DIR="${LOG_DIR:-$ROOT/logs}"
 mkdir -p "$LOG_DIR" "$SWANLAB_SAVE_DIR"
@@ -121,5 +121,5 @@ echo "P72 MODE=${MODE:-linkup} iters=$TRAIN_ITERS data=${TRAIN_DATA[*]} log=$LOG
   --output_dir "$ROOT/data/sft/p72_${MODE:-linkup}" \
   "${EXPOSE_ARGS[@]}" \
   --eval_steps 100 --dataloader_num_workers 4 --dataset_num_proc 32 \
-  --report_to swanlab --swanlab_project longworld --swanlab_exp_name "${RUN_NAME}" \
+  --report_to tensorboard \
   --train_iters "$TRAIN_ITERS" 2>&1 | tee "$LOG"

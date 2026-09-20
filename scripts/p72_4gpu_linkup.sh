@@ -27,7 +27,7 @@ unset PYTORCH_CUDA_ALLOC_CONF || true
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export TOKENIZERS_PARALLELISM=false
 export USE_MCORE_GDN=1
-export SWANLAB_MODE=local
+export SWANLAB_MODE=disabled
 export SWANLAB_SAVE_DIR="${SWANLAB_SAVE_DIR:-/volume/pt-dev/qjiu/.cache/swanlab}"
 mkdir -p "$SWANLAB_SAVE_DIR" /volume/pt-dev/qjiu/longworld/logs
 
@@ -53,6 +53,6 @@ echo "P72 4-GPU linkup start $(date -u +%FT%TZ) log=$LOG"
   --output_dir "$ROOT/data/sft/p72_linkup_4gpu" \
   --save_steps 1000000 --eval_steps 100 \
   --dataloader_num_workers 2 --dataset_num_proc 8 \
-  --report_to swanlab --swanlab_project longworld --swanlab_exp_name p72-linkup-4gpu \
+  --report_to tensorboard \
   --train_iters 4 2>&1 | tee "$LOG"
 echo "P72 4-GPU linkup EXIT: $?"
