@@ -10,6 +10,20 @@ RUN_ROOT="${RUN_ROOT:?}"
 DATA_ROOT="${DATA_ROOT:-/volume/pt-dev/qjiu/longworld/data/evals/mrcr_graphwalks_20260917}"
 MODELS_FILE="${MODELS_FILE:?}"
 GPUS_ARR=(${GPUS:-0 1})
+
+# EXIT trap: never leave orphan vLLM engines on this queue's GPUs. Scoped by the
+# --gpus filter so a concurrent queue on other cards is untouched. Runs on any
+# exit path (normal, error, signal) — this is the guarantee the manual cleanup
+# script provides, wired in so it cannot be forgotten.
+CLEANUP="$ROOT/scripts/gpu_cleanup.sh"
+[[ -f "$CLEANUP" ]] || CLEANUP=/volume/pt-dev/qjiu/longworld/scripts/gpu_cleanup.sh
+cleanup_my_gpus() {
+  local rc=$?
+  echo "[queue-exit rc=$rc] reaping this queue's GPUs: ${GPUS_ARR[*]}" | tee -a "$LOG" 2>/dev/null || true
+  GPU_LIST="${GPUS_ARR[*]}" bash "$CLEANUP" --gpus "${GPUS_ARR[*]}" >> "$LOG" 2>&1 || true
+  exit $rc
+}
+trap cleanup_my_gpus EXIT
 BASE_PORT="${BASE_PORT:-19400}"
 ORIG_MODEL="$ROOT/data/models/Qwen3.5-4B"
 MAX_MODEL_LEN=131072; GPU_MEM_UTIL=0.80; MAX_NUM_SEQS=2; WALL=36h
