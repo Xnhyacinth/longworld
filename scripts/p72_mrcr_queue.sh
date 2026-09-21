@@ -39,6 +39,13 @@ TASKS=()
 while IFS= read -r spec; do
   [[ -z "$spec" ]] && continue
   id="${spec%%|*}"; path="${spec#*|}"
+  # A checkpoint that does not exist (or has no weight shards) must fail HERE, not
+  # as a mid-queue server error whose serve view silently lacks tensors (measured:
+  # a wrong save-step number produced "Invalid repository ID or local directory").
+  if [[ ! -f "$path/config.json" ]] || ! compgen -G "$path/model*.safetensors" >/dev/null; then
+    echo "SKIP $id: no checkpoint at $path (config.json or weight shards missing)" | tee -a "$LOG"
+    continue
+  fi
   for shard in mrcr_2needle mrcr_4needle graphwalks_parents graphwalks_bfs; do
     if [[ -s "$RUN_ROOT/$id/$shard/summary.json" ]]; then
       echo "skip(done) $id/$shard" | tee -a "$LOG"; continue
@@ -94,9 +101,25 @@ run_task() {
       --enforce-eager --gdn-prefill-backend triton --generation-config vllm \
       >"$dir/server.log" 2>&1 &
   local spid=$!   # setsid: this pid IS the process-group leader; kill the group to reap children
+
+  # Preflight: the port must be FREE before we start. Two concurrent queues sharing a
+  # port range produce the worst failure mode seen: the second server fails to bind,
+  # the readiness probe then hits the FIRST server and reports ready, and every
+  # request 404s against the wrong model (measured: n_error 248-483, all rows).
+  if curl -fsS "http://127.0.0.1:$port/health" >/dev/null 2>&1; then
+    echo "[$id/$shard] PORT $port ALREADY SERVING (another queue?) - refusing to start" | tee -a "$LOG"
+    printf 'PORT-CONFLICT %s\n' "$port" > "$dir/status"
+    kill -9 -- "-$spid" 2>/dev/null || kill -9 "$spid" 2>/dev/null || true
+    return 71
+  fi
+
   local ready=0
   for _ in $(seq 1 900); do
-    curl -fsS "http://127.0.0.1:$port/health" >/dev/null 2>&1 && { ready=1; break; }
+    # Readiness must confirm OUR model is served, not merely that SOME server answers:
+    # /v1/models must name the served model. A bare /health probe is not enough.
+    if curl -fsS "http://127.0.0.1:$port/v1/models" 2>/dev/null | grep -q "$id"; then
+      ready=1; break
+    fi
     kill -0 "$spid" 2>/dev/null || break
     sleep 2
   done
@@ -137,9 +160,25 @@ run_task() {
     fi
     sleep 3; waited=$((waited + 3))
   done
+  # Validity gate: a summary whose errors dominate is NOT a result. Rename it so the
+  # task retries instead of being averaged in (the port collision produced n_error
+  # 248-483 with all-zero scores that would otherwise have looked like data).
+  local sumf="$dir/summary.json"
+  if [[ -f "$sumf" ]]; then
+    if [[ "$(python3 "$ROOT/scripts/check_summary_valid.py" "$sumf" 2>/dev/null)" == "INVALID" ]]; then
+      echo "[$id/$shard] INVALID RESULT (errors dominate) - renaming so it retries" | tee -a "$LOG"
+      mv "$sumf" "$dir/summary.invalid.json"
+      rc=1
+    fi
+  fi
   echo "[$id/$shard] DONE rc=$rc gpu$gpu=${used}MiB $(date -u +%H:%M:%S)" | tee -a "$LOG"
 }
 
+# Retry rounds: an INVALID result (isolated by the validity gate as
+# summary.invalid.json) goes back on the queue. Bounded at MAX_ROUNDS so a
+# permanently broken task cannot spin forever; every round logs what it retried.
+MAX_ROUNDS="${MAX_ROUNDS:-3}"
+round=1
 declare -A BUSY; pids=(); tgpu=(); next=0
 while (( next < ${#TASKS[@]} )) || (( ${#pids[@]} > 0 )); do
   for gi in "${!GPUS_ARR[@]}"; do
@@ -157,4 +196,48 @@ while (( next < ${#TASKS[@]} )) || (( ${#pids[@]} > 0 )); do
   done
   pids=("${np[@]}"); tgpu=("${ng[@]}"); sleep 10
 done
-echo "MRCR QUEUE COMPLETE" | tee -a "$LOG"
+# Re-queue anything the validity gate isolated, up to MAX_ROUNDS.
+RETRY=()
+while IFS= read -r spec; do
+  [[ -z "$spec" ]] && continue
+  id="${spec%%|*}"; path="${spec#*|}"
+  for shard in mrcr_2needle mrcr_4needle graphwalks_parents graphwalks_bfs; do
+    if [[ -f "$RUN_ROOT/$id/$shard/summary.invalid.json" ]]; then
+      RETRY+=("$id|$path|$shard")
+    fi
+  done
+done < "$MODELS_FILE"
+
+if (( ${#RETRY[@]} > 0 )); then
+  if (( round >= MAX_ROUNDS )); then
+    echo "RETRY LIMIT ($MAX_ROUNDS) reached; still invalid: ${RETRY[*]}" | tee -a "$LOG"
+  else
+    round=$((round + 1))
+    echo "=== RETRY round $round: ${#RETRY[@]} invalid task(s) re-queued ===" | tee -a "$LOG"
+    for spec in "${RETRY[@]}"; do
+      IFS='|' read -r id path shard <<<"$spec"
+      rm -f "$RUN_ROOT/$id/$shard/summary.invalid.json"
+      TASKS+=("$spec")
+    done
+    next_prev=$next
+    next=$next_prev
+    # continue the scheduler with the extended list
+    while (( next < ${#TASKS[@]} )) || (( ${#pids[@]} > 0 )); do
+      for gi in "${!GPUS_ARR[@]}"; do
+        gpu="${GPUS_ARR[$gi]}"; [[ -n "${BUSY[$gpu]:-}" ]] && continue
+        (( next < ${#TASKS[@]} )) || continue
+        IFS='|' read -r id path shard <<<"${TASKS[$next]}"
+        BUSY[$gpu]="$id/$shard"
+        run_task "$gpu" "$((BASE_PORT + gi))" "$id" "$path" "$shard" &
+        pids+=("$!"); tgpu+=("$gpu"); next=$((next+1))
+      done
+      np=(); ng=()
+      for i in "${!pids[@]}"; do
+        if kill -0 "${pids[$i]}" 2>/dev/null; then np+=("${pids[$i]}"); ng+=("${tgpu[$i]}")
+        else wait "${pids[$i]}" 2>/dev/null || true; unset "BUSY[${tgpu[$i]}]"; fi
+      done
+      pids=("${np[@]}"); tgpu=("${ng[@]}"); sleep 10
+    done
+  fi
+fi
+echo "MRCR QUEUE COMPLETE (rounds=$round)" | tee -a "$LOG"

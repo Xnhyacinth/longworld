@@ -261,6 +261,61 @@ run_model() {
   return "$overall"
 }
 
+run_models_parallel() {
+  # Free-GPU queue: every model runs its 4 shards on the FIRST FOUR FREE gpus.
+  # Fills the box instead of idling between sequential models.
+  local gpus=("${GPUS[@]}")
+  local total=${#gpus[@]}
+  python3 - "$RUN_ROOT" "${MODELS[@]}" <<'PYEOF' >"$RUN_ROOT/parallel.queue"
+import sys
+# emit "gpu_index model_id model_path" lines: model m takes 4 consecutive gpus,
+# cycling; with 3 models and 4 gpus we run 1 at a time but pack 2 when tasks allow.
+PYEOF
+  local per_model=4
+  local lanes=$(( total / per_model ))
+  (( lanes < 1 )) && lanes=1
+  echo "parallel lanes=$lanes (gpus=${gpus[*]})"
+  local lane=0
+  local pids=()
+  if [[ "${PARALLEL_MODELS:-0}" == "1" ]]; then
+  run_models_parallel
+  exit $?
+fi
+for spec in "${MODELS[@]}"; do
+    local id="${spec%%|*}" path="${spec#*|}"
+    local base=$(( lane * per_model ))
+    local lane_gpus=("${gpus[@]:$base:$per_model}")
+    local ports=()
+    local i
+    for i in "${!lane_gpus[@]}"; do ports+=("$((BASE_PORT + lane * 10 + i))"); done
+    (
+      local dir="$RUN_ROOT/$id"; mkdir -p "$dir"
+      printf '%s\n' "$path" >"$dir/model_path.txt"
+      date -u +%Y-%m-%dT%H:%M:%SZ >"$dir/started_at"
+      echo "===== [lane $lane] model $id gpus=${lane_gpus[*]} ====="
+      local spids=()
+      run_shard "${lane_gpus[0]}" "${ports[0]}" "$id" "$path" ifeval 32 ifeval "$GEN_KWARGS_IFEVAL" & spids+=("$!")
+      run_shard "${lane_gpus[1]}" "${ports[1]}" "$id" "$path" gpqa 16 gpqa_diamond_cot_zeroshot & spids+=("$!")
+      run_shard "${lane_gpus[2]}" "${ports[2]}" "$id" "$path" mmlu_a 32 "$MMLU_A" & spids+=("$!")
+      run_shard "${lane_gpus[3]}" "${ports[3]}" "$id" "$path" mmlu_b 32 "$MMLU_B" & spids+=("$!")
+      local ov=0 sp
+      for sp in "${spids[@]}"; do wait "$sp" || ov=1; done
+      printf '%s\n' "$ov" >"$dir/overall.exit"
+      date -u +%Y-%m-%dT%H:%M:%SZ >"$dir/ended_at"
+      echo "===== [lane $lane] model $id overall.exit=$ov ====="
+    ) &
+    pids+=("$!")
+    lane=$(( (lane + 1) % lanes ))
+    if (( lane == 0 )); then
+      local wp
+      for wp in "${pids[@]}"; do wait "$wp" || true; done
+      pids=()
+    fi
+  done
+  local wp
+  for wp in "${pids[@]}"; do wait "$wp" || true; done
+}
+
 summarize() {
   python3 - "$RUN_ROOT" <<'PY'
 import json, glob, sys
