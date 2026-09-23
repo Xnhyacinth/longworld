@@ -4,6 +4,10 @@
 MRCR: SequenceMatcher ratio after required hash prefix (openai/mrcr README).
 GraphWalks: last-line ``Final Answer: [...]`` then set precision/recall/F1
 (openai/graphwalks README). Empty∩empty F1 is 1.0, not 0.0.
+Official-F1 defect (kept for comparability with past summary.json): it
+returns 1.0 whenever precision+recall==0, so disjoint non-empty sets and
+parse failures also score 1.0. The corrected key ``f1_standard`` scores
+those cases 0.0; only empty∩empty is 1.0.
 
 Do not flatten MRCR into one user string. The prompt is already a chat.
 Do not enable thinking: the MRCR hash-prefix grader zeros any extra text.
@@ -65,10 +69,21 @@ def grade_graphwalks(response: str, gold: list[str]) -> dict[str, float | bool]:
         f1 = 2 * (recall * precision) / (recall + precision)
     else:
         f1 = 1.0
+    if parse_error:
+        # Parse failure: standard F1 has nothing correct to score.
+        f1_standard = 0.0
+    elif n_golden == 0 and n_sampled == 0:
+        f1_standard = 1.0
+    elif recall + precision > 0:
+        f1_standard = 2 * (recall * precision) / (recall + precision)
+    else:
+        # Disjoint non-empty sets: harmonic formula is 0/0, standard is 0.0.
+        f1_standard = 0.0
     return {
         "precision": precision,
         "recall": recall,
         "f1": f1,
+        "f1_standard": f1_standard,
         "f1_parse_zero": 0.0 if parse_error else f1,
         "format_fail": parse_error,
         "empty_empty": n_golden == 0 and n_sampled == 0,
@@ -83,10 +98,19 @@ def _self_check() -> None:
     assert ok["precision"] == 1.0 and ok["f1"] == 1.0 and ok["format_fail"] is False
     empty = grade_graphwalks("Final Answer: []", [])
     assert empty["f1"] == 1.0
+    assert empty["f1_standard"] == 1.0
     bad = grade_graphwalks("no list here", gold)
     # Official F1 is 1 when both precision and recall are 0, including parse misses.
+    # f1_standard instead scores parse failure and disjoint sets as 0.0.
     assert bad["format_fail"] is True and bad["f1"] == 1.0
+    assert bad["f1_standard"] == 0.0
     assert bad["precision"] == 0.0 and bad["f1_parse_zero"] == 0.0
+    disjoint = grade_graphwalks("Final Answer: [x]", gold)
+    assert disjoint["f1"] == 1.0
+    assert disjoint["f1_standard"] == 0.0
+    partial = grade_graphwalks("Final Answer: [a]", gold)
+    assert partial["f1"] == 2 * (1.0 * 0.5) / (1.0 + 0.5)
+    assert partial["f1_standard"] == partial["f1"]
 
 
 def _load_messages(raw) -> list[dict]:
@@ -219,6 +243,7 @@ def summarize(task: str, records: list[dict]) -> dict:
         out["precision"] = mean([float(r["precision"]) for r in scored])
         out["recall"] = mean([float(r["recall"]) for r in scored])
         out["f1"] = mean([float(r["f1"]) for r in scored])
+        out["f1_standard"] = mean([float(r["f1_standard"]) for r in scored])
         out["f1_parse_zero"] = mean([float(r["f1_parse_zero"]) for r in scored])
         out["format_fail_rate"] = mean([1.0 if r["format_fail"] else 0.0 for r in scored])
     return out

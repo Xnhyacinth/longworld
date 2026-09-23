@@ -9,6 +9,7 @@ against baseline 0.118 graded). This script recomputes precision/recall from any
 JSON-shaped id list in the response, using the same gold sets the client loads,
 and writes <shard>/summary.format_free.json alongside the official summary.
 """
+
 import json
 import re
 import sys
@@ -39,12 +40,13 @@ def main() -> int:
     run_root = Path(sys.argv[2])
     df = pd.read_parquet(data_root / "openai_graphwalks" / GRAPH)
     gold_by_uid = {}
-    counters = {"parents": 0, "bfs": 0}
-    for _, row in df.iterrows():
+    # uids are "<parquet>:<problem_type>:<global parquet row index>" — the eval
+    # client's scheme (load_rows). A per-type counter only coincides with it for
+    # parents (rows 0-399); bfs rows are 400-749, so per-type counting silently
+    # dropped every bfs row from the rescoring.
+    for index, row in df.iterrows():
         ptype = row["problem_type"]
-        # uids are "<parquet>:<problem_type>:<row index within that type>"
-        gold_by_uid[f"{GRAPH}:{ptype}:{counters[ptype]}"] = set(row["answer_nodes"])
-        counters[ptype] += 1
+        gold_by_uid[f"{GRAPH}:{ptype}:{index}"] = set(row["answer_nodes"])
 
     written = 0
     for samples in sorted(run_root.glob("*/graphwalks_*/samples.jsonl")):
