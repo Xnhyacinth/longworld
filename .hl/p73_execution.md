@@ -92,11 +92,13 @@ Gates (details in `data/capability_records/p73_shared_v1/verification.gates.json
   consistent across train.jsonl, eval.jsonl and shards.
 - Collapse gate passes both calibers on both splits (exposure 13.7-14.0 /
   20.6-21.0, shape_uniqueness 0.62/0.57, top_instruction_share 0.004).
-- Length honesty: worlds cluster at ~64K full-chat tokens (min 66.7K, median
-  75.9K, max 92.3K); 36/42 within ±25% of 65536, ZERO at 8K or 32K. The design's
-  8K/32K/64K three-band coverage is NOT met — the pilot is a single-band bank.
-  Fixing this needs per-group length_records reduction in
-  generate_p73_pilot.py CONFIG (later wave, not silently patched here).
+- Length honesty: the bank is a single LENGTH CLUSTER around the 64K target —
+  actual 67K-92K full-chat tokens (min 66.7K, median 75.9K, max 92.3K); 36/42
+  within ±25% of 65536, ZERO at 8K or 32K, 128K/256K not attempted this wave.
+  The design's 8K/32K/64K three-band coverage is NOT met — the pilot is one
+  cluster, not precisely controlled 64K. Fixing this needs per-group
+  length_records reduction in generate_p73_pilot.py CONFIG (later wave, not
+  silently patched here); see P74 §7 for the two length modes.
 
 C/D arms (`data/capability_records/p73_shared_v1/arms.json`): 400 train rows
 each, 32 worlds each; supervised 143,640 (C) vs 145,502 (D) tokens; full-chat
