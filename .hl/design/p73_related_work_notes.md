@@ -19,7 +19,9 @@
 2. **任务适用性层**:对每个 world 枚举适用的任务程序(L1 定位/L2 集合/聚合/JOIN/L3 as-of/规则),绑定对象+范围;类型/单位/时序检查(借 MuSiQue 连接纪律:多跳程序的后步参数必须来自前步输出)。
 3. **契约渲染**:answer-only/+minimal-evidence/full-provenance 三契约(已实现 capability_contracts.py);指令与答案一致。
 4. **Witness 层**:语义变异区分度作为质量层(已实现 capability_mutations.py),正常实例保持自然分布。
-5. **来源层**:Wiki 表格 adapter(revision-pinned,八行试点已验证可行)→ JSON dump 扩量;repo/research 两条后续线。
+5. **来源层**:Wiki 表格 adapter(revision-pinned;2026-09-23 复核:本工作树
+   无该 adapter 的任何工件/脚本/试点银行,"八行试点已验证"无盘上依据,
+   应视为未验证计划)→ JSON dump 扩量;repo/research 两条后续线。
 6. **Spark 映射**:source_prepare 一次→world 并行→TaskSpec 展开→CPU 验证→渲染→最终物化(借 SWE-smith 成本结构);世界内顺序执行不阻碍世界间并行。
 7. **评测**:RULER/HELMET 式多任务族曲线(不只平均分);公开 GW 只作回归。
 

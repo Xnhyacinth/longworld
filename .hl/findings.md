@@ -1570,6 +1570,15 @@ so `n_real_source_relations=0` is correct. Do not use this slice to claim the
 RUN_ROOT=data/evals/lm_eval_p72_arm_b_20260921;LM_EVAL_ARM_B_EXIT: 0;watchdog 89167 存活,
 auto.py 恢复(wrap 退出陷阱生效)。
 
+> **2026-09-23 更正注记**:下表的 MMLU-Pro 列(0.6157/0.6064/0.6077,即
+> "−2.0/−2.9/−2.8pp")无法在盘上复现——正确数值见 2026-09-23 补齐节
+> (arm_b@100% 加权 MMLU-Pro = 0.3928,即 −24.3pp,按
+> `data/evals/lm_eval_p72_arm_b_20260921/SUMMARY.json` 逐 subject×sample_len
+> 重算,n=12032)。下表 MMLU-Pro 列作废,IFEval/GPQA 列经抽验无矛盾。
+> 该错误源自 commit 42f4a19 的提交信息与旧表,已在
+> p73_counterexample_synthesis.md §2 更正。本表的"B 无额外损害"判读
+> 按正确数值不再成立,以下方补齐节判读为准。
+
 | 模型 | IFEval strict | GPQA flex | MMLU-Pro w | 对比 Base(0.6433/0.5404/0.6359) |
 |---|---:|---:|---:|---|
 | arm_b@10% (ckpt25) | 0.6007 | 0.3636 | 0.6157 | −4.3 / −17.7 / −2.0 |

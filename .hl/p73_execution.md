@@ -63,13 +63,28 @@ Witness audit (588/588 rows, deterministic re-run after the split fix):
 | alias_locate | 96.4% | 0.482 | nearest_lexical 81/84; 16/84 empty-answer rows |
 | set_complete | 81.0% | 0.405 | relax_one_condition 67/84, tighten_one_condition 1/84 |
 
-Honest readings: `latest_text` is NEVER distinguished on asof_state (the as-of
-fold and reveal order coincide on these worlds — the mutant is dead on this
-bank and should be replaced or the worlds varied); `tighten_one_condition` is
-near-dead (1/84; set sizes sit far from scope bounds). Distinguished fractions
-here are computed with erroring mutants counted as distinguished (a shortcut
-that cannot produce a legal answer still fails the task) — see
-capability_mutations.witness_report.
+Honest readings — dead or near-dead mutants on this bank (root causes verified
+by the witness-audit agent, 2026-09-23):
+- `latest_text` (asof) 0/84: NOT a bank coincidence — the implementation calls
+  the same solver path as the correct answer (capability_mutations.py:232-234
+  vs answer_of), so it can never distinguish on ANY bank. Inert by code.
+- `last_declaration` (alias) 0/84: the spine enforces exactly ONE declaration
+  row per alias handle (capability_families.py:873-876), so declarations[-1] ==
+  declarations[0]. Inert by spine contract.
+- `ignore_exclusion` (group_compare/join_lookup) 0/84 structurally: the
+  generator draws the excluded category outside the two named groups
+  (capability_records.py:668-671), so dropping it never changes the answer.
+- `tighten_one_condition` (set_complete) 1/84: 69/84 scopes pin category==
+  first (no numeric bound to sharpen); on-bound members are rare. Honest, but
+  weak.
+- `relax_one_condition` (set_complete) errors on 26/84 two-condition scopes
+  (falls to 1 condition, below the 2-to-4 gate) — counted distinguished by the
+  error-is-distinguished rule; real effect, noisy signal.
+Design §3.1 has been amended to match what ships. asof's witness-fraction is
+structurally capped at 0.5 while latest_text is inert — material for the C/D
+>= 0.5 threshold. Distinguished fractions here are computed with erroring
+mutants counted as distinguished (a shortcut that cannot produce a legal
+answer still fails the task) — see capability_mutations.witness_report.
 
 Gates (details in `data/capability_records/p73_shared_v1/verification.gates.json`):
 - Solver recheck 588/588: zero answer mismatches, zero solver errors, zero
@@ -96,6 +111,28 @@ Contract arms: answer-only cuts supervised tokens 2.80M -> 0.396M (14.1%) and
 minimal-evidence -> 0.306M (10.9%) over the same 3,972 rows — the ID-enumeration
 supervision hypothesis is now directly measurable by training B' vs A'.
 
+Two late findings from the verification passes, landed after the first commit:
+- The original answer-only export had DESTROYED the records-family world
+  context (the old instruction swap replaced the whole ~228K-char user message
+  with a 79-char one-liner; ~188M full-chat tokens were missing — visible only
+  as the 187.7M-vs-375.8M full_chat_tokens gap in the stale arms.json). Fixed
+  in capability_contracts.py (instruction_for_contract swaps only the Task and
+  Return sentences; user_message_for_contract preserves the world context under
+  every contract), answer-only regenerated and verified row-by-row (60 seeded
+  rows/family/contract, 120 rows/contract re-tokenized, 0 mismatches). B' must
+  train on the regenerated export.
+- verification.gates.json as first written was invalid JSON (one missing
+  brace; gate3/honesty nested inside gate2). Repaired and re-serialized; all
+  gate data intact.
+
+ID-enumeration "~73% of supervision tokens" (findings.md:1549) remains
+UNVERIFIABLE as a number — no measurement artifact backs it. The honest
+on-disk replacement: full-provenance 2,802,609 vs answer-only 395,793
+supervised tokens on the same 3,972 rows = 85.9% of supervision sits in
+answer-side id enumeration (p73_contract_arms/arms.json, tokenized with the
+export's pinned Qwen recipe). Cite that number, not 73%, until a dedicated
+measurement lands.
+
 ## What is NOT claimed
 
 - No training has been run; all five arms (R/A'/B'/C/D) remain user-gated.
@@ -103,9 +140,14 @@ supervision hypothesis is now directly measurable by training B' vs A'.
 - The C/D contrast is weak at this scale (documented above), so the pilot bank
   is for pipeline validation and D-threshold calibration, not for a
   publishable D>C comparison.
-- Related-work notes got a read-only fact-check pass (task #6, agent went idle
-  without delivering its findings list back to the lead); no corrections were
-  applied from it. The notes' claims should be re-checked before paper writing.
+- Related-work notes fact-checked by a read-only pass (task #6): 12 findings,
+  key corrections applied — arm_b MMLU-Pro "−2.8pp" corrected to −24.3pp
+  (design §2 + findings.md annotation; the −2.8 table matches nothing on disk),
+  DocQA stock corrected to 3,597 rows (13,485 included never-downloaded
+  LongAlign-10k), wiki "八行试点" marked unverified, set_complete
+  ignore-emptiness mutant noted as unimplemented, witness audit aggregation is
+  family-only (not family×length). External-work table: no factual errors
+  found. ID-enumeration "73%" and the wiki pilot remain unbacked claims.
 
 ## Next steps (user-gated)
 

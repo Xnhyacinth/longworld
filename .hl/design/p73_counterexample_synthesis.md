@@ -27,8 +27,10 @@
   (消融定因果,不是一律删 ID)。
 - H 深度可合并为合取,无数据依赖链。→ 目标 3:**变异程序作为难度来源**,
   而非堆叠常量 filter。
-- 短锚从未进 A/B;arm_b 下游已补齐(B 的 MMLU-Pro 仅 −2.8pp vs A −17.6pp,
-  归因前需抽验协议)。→ 目标 4:**真回放臂 R**。
+- 短锚从未进 A/B;arm_b 下游已补齐(2026-09-23 复核更正:B 的 MMLU-Pro
+  实测 −24.3pp——arm_b@402 0.3928 vs Base 0.6359,与 A 的 −17.6pp 同量级;
+  首个 "−2.8pp" 表格数值无法在盘上复现,findings.md 中已加注,见
+  `data/evals/lm_eval_p72_arm_b_20260921/SUMMARY.json`)。→ 目标 4:**真回放臂 R**。
 
 ## 3. 三个新模块(文件作用域互斥,全部走既有 spine 接口)
 
@@ -37,9 +39,11 @@
   (可执行、可解释):
   - filter_aggregate/group_compare/join_lookup:忽略一个条件、AND→OR、
     忽略排除条件、按文本顺序代替值域;
-  - 集合类(set_complete 目标):多报相关项(放松一个条件)、漏报(收紧)、
-    ignore-emptiness;
-  - asof_state:latest-text 替代 as-of 折叠、忽略撤销;
+  - 集合类(set_complete 目标):多报相关项(放松一个条件)、漏报(收紧)
+    (设计原列 ignore-emptiness,实现未包含——以代码为准);
+  - asof_state:忽略撤销(latest-text 曾设计为"按 reveal 顺序折叠"的
+    替代捷径,但现实现与正确解同一路径,零区分度,审计已证实——待重实现
+    或替换,见 p73_execution.md);
   - rule_holdout:使用另一规则族、忽略示例;
   - alias_locate:词面最近邻替代绑定、取最后一次声明。
 - `witness_split(family, program, rows)`(纯函数):对一个已生成世界,算出
@@ -48,7 +52,7 @@
 
 ### 3.2 `scripts/measure_witness_coverage.py`(新)
 - 输入银行目录,复用 runner 的索引与 parse_context/solve 机制;对每行算
-  变异区分度,按 family×length 汇总:
+  变异区分度,按 family 汇总(实现无 length 维度,原设计的 ×length 待补):
   - `distinguished_fraction`(每行至少一个变异被区分的比例);
   - per-mutant 区分率(哪些错误程序"到处成功"——它们就是模型学到的捷径);
   - 空集/信息不足行占比。
@@ -80,7 +84,9 @@
 
 匹配纪律:C 与 D 同 family 配额、同长度分布、同空集比例、同答案规模分布、
 同预算四口径;D 的选择规则 = `distinguished_fraction ≥ 阈值`(先 0.5);
-分层数进 arms.json。R/A'/B' 复用 C1 短锚池(DocQA-RL-1.6K 现货 13,485 行,
+分层数进 arms.json。R/A'/B' 复用 C1 短锚池(2026-09-23 复核更正:现货
+实为 3,597 行——train 1,591 + test 2,006;原 13,485 是 p69 期把从未下载的
+LongAlign-10k 9,888 行计入的口径,回放池算术需按 3,597 重列),
 配比四口径实测入 manifest——**输入 token 占比≠梯度占比**,如实分报)。
 
 ## 5. P73 pilot 银行(`configs/p73_counterexample_v1.json`)
