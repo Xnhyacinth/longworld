@@ -1106,3 +1106,13 @@ in`; no private-repository or upload claim was made.
   source-driven Article83 scope and updated selected-span rights coverage.
   Independent review also rejected requiring an unrelated neighboring sentence
   after the complete risk-control list. No P54 train-ready claim is made.
+- P73 pilot wave (2026-09-23): counterexample-guided synthesis modules landed
+  (mutations/witness audit, shared-world compiler with solve_context provenance,
+  answer-contract export, C/D arm split). Bank p73_shared_v1: 588 rows, 42
+  worlds, solver recheck 588/588, collapse gate pass, world-level split fixed
+  (row-level cut had leaked 1 world). Witness audit: 7/7 families >=81%
+  witness-rich; two near-dead mutants recorded honestly (latest_text 0/84,
+  tighten_one_condition 1/84). Honest limits: single ~64K length band only;
+  C/D contrast weak at 42 worlds. Contract arms: answer-only cuts supervised
+  tokens to 14% of full-provenance on the frozen arm_a bank. Training still
+  user-gated; see .hl/p73_execution.md.
