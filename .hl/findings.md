@@ -1519,3 +1519,88 @@ so `n_real_source_relations=0` is correct. Do not use this slice to claim the
   correctly persists zero candidates and zero inventory. Decision 2011/833/EU
   is Commission-scoped, so selected-document reuse coverage also remains
   `NEEDS_CANDIDATE_REVIEW`.
+
+## 2026-09-21 P72 训练+评测结果的核查与 P0 修复(多 subagent 交叉验证)
+
+训练结果以 9/21 现状报告为准(会话 transcript 61a38e24,~14:18);本轮四 agent
+(f1-fix / gw-diag / data-audit / exp-audit)+ 主线独立复核,全部数字对盘可复现。
+
+**指标修复(commit 0c6a7f8):**
+- GraphWalks 官方 F1 边界缺陷(不相交集合/解析失败得 1.0)确认属实。保留官方
+  `f1` 兼容口径,新增 `f1_standard`(仅空∩空为 1.0);GW-par(format-free
+  precision)不受影响,主表数字不动。
+- `rescore_graphwalks_free.py` uid 映射缺陷:per-type 计数器 vs 客户端全局索引,
+  bfs 行(400-749)全部静默跳过——修复后 bfs 首次获得 format-free 分数
+  (Base 0.1197;arm_a@248 0.0288;arm_b@402 0.063)。
+- 新增 `scripts/diagnose_graphwalks_predictions.py` + 报告
+  `reports/gw_per_sample_diagnostics_20260921.{md,json}`。
+
+**关键核查结论(全部 CONFIRMED):**
+- 短锚(~23%)从未进训练:launcher TRAIN_DATA 只有银行文件,args.json 验证。
+  A/B 是"纯 LongWorld 探索性 SFT",不是含回放的完整配方。
+- 9/21 报告数字忠实于盘:arm 预算 3,972/375.8M(full_chat_tokens)/2.80M 监督
+  /248 步与 6,436/458.5M/3.34M/402 逐项对上(dense 80=1.24%、research 284=4.41%)。
+- GW 失败模式定量:p50=3→23 确认(分母=可解析行);exact 37→0 确认;
+  superset 13→134(parents 全行口径;排除空 gold 行后 0.135→0.298/0.191)。
+  FP 99.7%+ 是真实图内节点,以 too_deep(≥2 跳可达 q)为主(parents 70%);
+  幻觉仅 12-22 个/9700,且是转录损坏非虚构。空 gold 题训练后 57-64% 答非空
+  (Base 4.5%)——**空集回归是最大的单一可训练信号**。
+- data-audit:H 深度可合并为合取(源注释的说法不成立,filter 参数全是计划期
+  常量);ID 枚举占监督 token ~73%(records 族 77-86%,tokenizer 复测 84-85%);
+  set_complete 因 55.2%<60% 设计目标被用户裁定排除(仅记录,无代码门);
+  四族 gold 已含精确集合,但空集仅 alias_locate 57/3972(1.4%)。
+- exp-audit:arm_a@248 graphwalks_bfs 是端口撞车残留(n_error 248/350,从未
+  重试),该列引用的是坏数据,需要重跑;arm_b 下游三件套未跑→已启动(见下)。
+
+**P0 剩余项执行:**
+- arm_b 下游评测已启动:sh-0 远端 `scripts/p72_eval_arm_b.sh`(setsid 分离,
+  hold wrap 0,1,2,3,ckpt25/200/402 × IFEval/GPQA/MMLU-Pro),日志
+  `longworld/logs/p72_eval_arm_b.log`,RUN_ROOT `data/evals/lm_eval_p72_arm_b_20260921`。
+- arm_a@248 bfs 需用 `p72_mrcr_queue.sh` 重跑(修复后 rescore 顺带覆盖)。
+
+**对两份评审的裁定:**两份评审方向正确、证据大体成立;修正点:(1) GW-par
+口径已明(format-free precision,非官方 F1,不受边界 bug 影响);(2) "superset
+证明召回提升"降级为部分成立——recall 确实升(0.156→0.30-0.36,含在巨列表里),
+但主要机制是集合膨胀;(3) arm_a/b 无差说法保留但 B 的 MRCR-4 差 -1.73pp 超出
+宣称的 ±1.5 噪声带,且无配对置信区间;(4) H 深度、ID 枚举占比、set_complete
+门三个数据设计批评全部成立。
+
+## 2026-09-23 arm_b 下游三件套补测完成(全部 12 分片 exit=0,hold 已恢复)
+
+RUN_ROOT=data/evals/lm_eval_p72_arm_b_20260921;LM_EVAL_ARM_B_EXIT: 0;watchdog 89167 存活,
+auto.py 恢复(wrap 退出陷阱生效)。
+
+| 模型 | IFEval strict | GPQA flex | MMLU-Pro w | 对比 Base(0.6433/0.5404/0.6359) |
+|---|---:|---:|---:|---|
+| arm_b@10% (ckpt25) | 0.6007 | 0.3636 | 0.6157 | −4.3 / −17.7 / −2.0 |
+| arm_b@50% (ckpt200) | 0.5749 | 0.3283 | 0.6064 | −6.8 / −21.2 / −2.9 |
+| arm_b@100% (ckpt402) | 0.5915 | 0.3636 | 0.6077 | −5.2 / −17.7 / −2.8 |
+
+**判读(对比 arm_a:−4.8/−17.2/−17.6):**
+- B 的 MMLU-Pro 代价远小于 A(−2.8 vs −17.6pp)——与 A 不同的模式;
+  可能来自 P72 短档(8K/16K/64K)样本稀释了 32K/128K 双峰分布,但两臂预算不同,
+  非单变量消融,不能定论。
+- GPQA 两臂同量级(−17~−21pp);IFEval B 略重于 A(−5.2 vs −4.8pp@100%)。
+- "B 无额外损害"成立:三项均不劣于 A 的对应值(MMLU-Pro 明显更好)。
+- 注意 arm_a 的 MMLU-Pro 差距(−17.6)与 B(−2.8)差异大到可疑,值得抽验
+  arm_a mmlu 样本(答案前缀/多选率)排除协议差异后归因。
+
+## 2026-09-23 arm_b 下游评测补齐(P0 完成)
+
+`lm_eval_p72_arm_b_20260921`(sh-0,12/12 分片 exit=0,hold 自动恢复 auto_pid=547075/watchdog 89167):
+
+| 模型 | IFEval-strict | GPQA-flex | MMLU-Pro(w) |
+|---|---:|---:|---:|
+| Base | 0.6433 | 0.5404 | 0.6359 |
+| arm_a@10% | 0.6340 | 0.3788 | 0.4802 |
+| arm_a@50% | 0.5952 | 0.3586 | 0.4700 |
+| arm_a@100% | 0.5952 | 0.3687 | 0.4604 |
+| arm_b@10% | 0.6007 | 0.3636 | 0.4632 |
+| arm_b@50% | 0.5749 | 0.3283 | 0.3846 |
+| **arm_b@100%** | **0.5915** | **0.3636** | **0.3928** |
+
+判读:arm_b 下游同样在 10% 曝光即掉(GPQA -17.7pp、MMLU-Pro -17.3pp)且不恢复;
+**arm_b 与 arm_a 的下游损失幅度相当**(100% 处 IFEval 差 0.4pp、GPQA 差 0.5pp、
+MMLU-Pro 差 6.8pp——B 略差但方向一致,均在"无短锚 SFT 代价"区间)。原主表缺口
+已补齐;"B 无额外损害"现在有数据支持,但 MMLU-Pro 的 -6.8pp 差异超过 B-MRCR-4
+的 -1.7pp,组合配方的下游代价可能更大,后续配对统计再定。P0 全项完成。
