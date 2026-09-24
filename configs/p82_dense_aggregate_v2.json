@@ -1,0 +1,17 @@
+{
+  "schema_version": "longworld.record-world-config.v1",
+  "world_seed_base": 1410000,
+  "families": ["dense_aggregate"],
+  "depths": [1],
+  "lengths": [200, 800, 3200],
+  "consumed_by_depth": {"1": 160},
+  "variants_per_world": 4,
+  "worlds_per_cell": 32,
+  "depths_by_family": {"dense_aggregate": [1]},
+  "token_targets_by_depth": {"1": [32768]},
+  "workers": 4,
+  "trained_rule_family": "threshold_class",
+  "notes": {
+    "purpose": "P82 corrected 32K dense aggregation density grid; independent candidate-only worlds"
+  }
+}

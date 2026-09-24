@@ -127,6 +127,33 @@ def test_foundation_year_table_header_requires_a_plain_year() -> None:
     assert wa._cell_semantics("Year offoundation", "Aberystwyth") is None
 
 
+def test_ragged_table_row_missing_nonleading_name_is_skipped() -> None:
+    page = wa.PageRecord(
+        pageid=73,
+        title="List of test stadiums",
+        revid=7301,
+        timestamp="2026-09-24T00:00:00Z",
+        wikitext=(
+            '{| class="wikitable"\n'
+            "! Photo !! Capacity !! Stadium !! Opened\n"
+            "|-\n| thumbnail || 1200\n"
+            "|-\n| thumbnail || 3000 || Arena X || 1980\n"
+            "|}\n"
+        ),
+    )
+    snapshot = wa.build_snapshot(
+        members=[wa.Member(page.pageid, page.title)],
+        pages={page.pageid: page},
+        link_meta=[],
+        rights=_rights(),
+        category_title="test stadium lists",
+        collection_kind="title_bundle",
+        frozen_at="2026-09-24T00:00:00Z",
+    )
+    assert any(fact["subject"] == "Arena X" for fact in snapshot["facts"])
+    assert not any(fact["subject"] == "thumbnail" for fact in snapshot["facts"])
+
+
 def test_snapshot_identity_changes_when_extraction_changes() -> None:
     snapshot = _snapshot()
     source = snapshot["source"]

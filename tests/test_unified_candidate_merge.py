@@ -174,7 +174,10 @@ def test_split_order_stream_does_not_prescan_reader(
     assert read_calls == 3
 
 
-def test_simulation_hashes_source_without_question(tmp_path: Path) -> None:
+@pytest.mark.parametrize("separate_prompt_tokens", [90, 100, 101])
+def test_simulation_hashes_source_without_question(
+    tmp_path: Path, separate_prompt_tokens: int
+) -> None:
     receipt = tmp_path / "manifest.json"
     receipt.write_text("{}\n")
     row = {
@@ -195,7 +198,7 @@ def test_simulation_hashes_source_without_question(tmp_path: Path) -> None:
         "row_index": 0,
         "output_file": "train.jsonl",
         "full_message_tokens": 100,
-        "input_tokens": 90,
+        "input_tokens": separate_prompt_tokens,
         "supervised_tokens": 8,
     }
     _write_rows(tmp_path / "train.jsonl", [row])

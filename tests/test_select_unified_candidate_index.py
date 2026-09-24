@@ -126,6 +126,18 @@ def test_selection_is_deterministic_and_reports_all_drops(tmp_path: Path) -> Non
         verify_selection(merged, policy, tmp_path / "first")
 
 
+def test_selection_can_limit_review_to_named_native_lanes(tmp_path: Path) -> None:
+    merged, policy_path = _fixture(tmp_path)
+    policy = json.loads(policy_path.read_text())
+    policy["source_names"] = ["another_wave"]
+    _write_json(policy_path, policy)
+
+    result = select(merged, policy_path, tmp_path / "none")
+
+    assert result["selected_views"] == 0
+    assert result["rejected_by_reason"]["source_name_outside_policy"] == 4
+
+
 def test_selection_fails_on_changed_source_or_cross_split_task(tmp_path: Path) -> None:
     merged, policy = _fixture(tmp_path)
     (merged / "candidate_train.jsonl").write_text("changed\n")

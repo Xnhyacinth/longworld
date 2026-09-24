@@ -1,0 +1,18 @@
+{
+  "schema": "longworld.connected-wiki-intake.v1",
+  "base_pool": "data/capability_records/p78_wiki_topic_discovery_broad_v1/source_pool.json",
+  "base_pool_sha256": "c5acd537c30a09bac21885af095f739b3463dfc273fd0f7e9721f89664ce2a13",
+  "prior_unified_batch": {
+    "path": "data/candidates/p81_unified_full_v4",
+    "manifest_sha256": "844448c47a3c1fbe8101c6dfcbb19242d957a37d7115b28e2828255e9e0fd4e5"
+  },
+  "auto_sources": {
+    "domains": "*",
+    "max_sources": 26,
+    "max_per_domain": 2,
+    "max_queries": 3,
+    "results_per_query": 8,
+    "max_previews": 6,
+    "max_freezes": 2
+  }
+}

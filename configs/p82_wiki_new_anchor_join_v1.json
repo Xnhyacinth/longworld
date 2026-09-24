@@ -1,0 +1,27 @@
+{
+  "schema": "longworld.connected-wiki-intake.v1",
+  "base_pool": "data/capability_records/p82_wiki_anchor_join_pool_v1/source_pool.json",
+  "base_pool_sha256": "7fe6a33423e2ae9ade1e2cd5808cfcb453a91e8bfea30d15e3931e6a94ead022",
+  "prior_unified_batch": {
+    "path": "data/candidates/p81_unified_full_v4",
+    "manifest_sha256": "844448c47a3c1fbe8101c6dfcbb19242d957a37d7115b28e2828255e9e0fd4e5"
+  },
+  "seeds": [
+    {
+      "name": "new_botanical_anchor",
+      "anchor_source": "snapshot_d23e3ee716396db8322f",
+      "max_queries": 3,
+      "results_per_query": 8,
+      "max_previews": 5,
+      "max_freezes": 1
+    },
+    {
+      "name": "new_stadium_anchor",
+      "anchor_source": "snapshot_fa01a4aef8f44fe755ab",
+      "max_queries": 3,
+      "results_per_query": 8,
+      "max_previews": 5,
+      "max_freezes": 1
+    }
+  ]
+}

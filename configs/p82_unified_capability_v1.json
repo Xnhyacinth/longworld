@@ -1,0 +1,131 @@
+{
+  "schema_version": "longworld.unified-synthesis-plan.v1",
+  "sources": [
+    {
+      "name": "wiki_real",
+      "kind": "wiki_source_pool",
+      "config": "data/capability_records/p76_wiki_expansion_v3/source_pool.json",
+      "output": "data/candidates/p77_wiki_expanded_v1",
+      "generation": "verified_reuse"
+    },
+    {
+      "name": "finance_real",
+      "kind": "finance_taskbank",
+      "config": "configs/p77_finance_pilot_v1.json",
+      "output": "data/candidates/p77_finance_pilot_v1",
+      "generation": "verified_reuse"
+    },
+    {
+      "name": "codeforge_real",
+      "kind": "codeforge_taskbank",
+      "config": "configs/p77_codeforge_pilot_v1.json",
+      "output": "data/candidates/p77_codeforge_pilot_v1",
+      "generation": "verified_reuse"
+    },
+    {
+      "name": "controlled_simulation",
+      "kind": "capability_records",
+      "config": "configs/p77_simulation_pilot_v1.json",
+      "output": "data/candidates/p77_simulation_pilot_v1",
+      "generation": "verified_reuse"
+    },
+    {
+      "name": "finance_remaining",
+      "kind": "finance_taskbank",
+      "config": "configs/p78_finance_remaining_v1.json",
+      "output": "data/candidates/p78_finance_remaining_v1",
+      "generation": "new_p78"
+    },
+    {
+      "name": "codeforge_remaining",
+      "kind": "codeforge_taskbank",
+      "config": "configs/p78_codeforge_remaining_v1.json",
+      "output": "data/candidates/p78_codeforge_remaining_v1",
+      "generation": "new_p78"
+    },
+    {
+      "name": "simulation_seven_family",
+      "kind": "capability_records",
+      "config": "configs/p78_simulation_seven_family_v1.json",
+      "output": "data/candidates/p78_simulation_seven_family_v1",
+      "generation": "new_p78"
+    },
+    {
+      "name": "wiki_new_pilot",
+      "kind": "wiki_source_pool",
+      "config": "data/capability_records/p78_wiki_topic_discovery_pilot_v1/new_source_pool.json",
+      "output": "data/candidates/p78_wiki_topic_discovery_pilot_v1",
+      "generation": "new_p78"
+    },
+    {
+      "name": "wiki_new_broad",
+      "kind": "wiki_source_pool",
+      "config": "data/capability_records/p78_wiki_topic_discovery_broad_v1/new_source_pool.json",
+      "output": "data/candidates/p78_wiki_topic_discovery_broad_v1",
+      "generation": "new_p78"
+    },
+    {
+      "name": "wiki_concat_pair",
+      "kind": "wiki_source_pool",
+      "config": "configs/p78_wiki_concat_parks_hospitals_source_pool_v1.json",
+      "output": "data/candidates/p78_wiki_concat_pair_pool_v1",
+      "generation": "new_p79"
+    },
+    {
+      "name": "simulation_p80_scale",
+      "kind": "capability_records",
+      "config": "configs/p80_simulation_scale_v1.json",
+      "output": "data/candidates/p80_simulation_scale_v1",
+      "generation": "new_p80"
+    },
+    {
+      "name": "wiki_p80_task_delta",
+      "kind": "wiki_candidate_delta",
+      "config": "configs/p80_wiki_task_delta_lane_v1.json",
+      "output": "data/candidates/p80_wiki_task_delta_v2",
+      "generation": "new_p80"
+    },
+    {
+      "name": "wiki_p80_row_join_v2",
+      "kind": "wiki_row_join_probe",
+      "config": "configs/p80_wiki_task_scale_v1.json",
+      "output": "data/candidates/p80_wiki_row_binding_probe_v4",
+      "generation": "new_p80"
+    },
+    {
+      "name": "wiki_p81_connected_pairs_v3",
+      "kind": "wiki_row_join_probe",
+      "config": "data/capability_records/p81_connected_wiki_auto_v3/source_pool.json",
+      "output": "data/candidates/p81_connected_wiki_row_binding_v3",
+      "generation": "new_p81"
+    },
+    {
+      "name": "simulation_p81_depth_length",
+      "kind": "capability_records",
+      "config": "configs/p81_simulation_depth_length_v1.json",
+      "output": "data/candidates/p81_simulation_depth_length_v1",
+      "generation": "new_p81"
+    },
+    {
+      "name": "wiki_p82_stadium_join",
+      "kind": "wiki_row_join_probe",
+      "config": "data/capability_records/p82_connected_wiki_scale_v1/source_pool.json",
+      "output": "data/candidates/p82_connected_wiki_row_binding_v1",
+      "generation": "new_p82"
+    },
+    {
+      "name": "simulation_p82_l2_coverage",
+      "kind": "capability_records",
+      "config": "configs/p82_simulation_l2_coverage_v1.json",
+      "output": "data/candidates/p82_simulation_l2_coverage_v1",
+      "generation": "new_p82"
+    },
+    {
+      "name": "simulation_p82_dense_v2",
+      "kind": "capability_records",
+      "config": "configs/p82_dense_aggregate_v2.json",
+      "output": "data/candidates/p82_dense_aggregate_v2",
+      "generation": "new_p82"
+    }
+  ]
+}

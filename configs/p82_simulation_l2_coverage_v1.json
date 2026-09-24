@@ -1,0 +1,24 @@
+{
+  "schema_version": "longworld.record-world-config.v1",
+  "world_seed_base": 1400000,
+  "families": ["set_complete", "dense_aggregate"],
+  "depths": [1],
+  "lengths": [200, 800, 3200],
+  "consumed_by_depth": {"1": 20},
+  "consumed_by_family_depth": {"dense_aggregate": {"1": 128}},
+  "variants_per_world": 4,
+  "worlds_per_cell": 16,
+  "depths_by_family": {
+    "set_complete": [1],
+    "dense_aggregate": [1]
+  },
+  "token_targets_by_depth": {"1": [32768, 65536]},
+  "token_targets_by_family_depth": {
+    "dense_aggregate": {"1": [32768]}
+  },
+  "workers": 4,
+  "trained_rule_family": "threshold_class",
+  "notes": {
+    "purpose": "P82 candidate-only L2 complete-set and dense-global aggregation coverage; no training promotion"
+  }
+}

@@ -49,9 +49,16 @@ def _policy(path: Path) -> dict[str, Any]:
         "maximum_tasks_per_source_group",
         "maximum_tasks_per_operation",
     }
-    if set(policy) != required or policy["schema_version"] != SCHEMA:
+    if (
+        not required <= set(policy)
+        or set(policy) - required - {"source_names"}
+        or policy["schema_version"] != SCHEMA
+    ):
         raise ValueError("invalid candidate selection policy")
-    for key in ("source_kinds", "evidence_profiles", "dependency_statuses"):
+    allowlists = ("source_kinds", "evidence_profiles", "dependency_statuses")
+    if "source_names" in policy:
+        allowlists += ("source_names",)
+    for key in allowlists:
         values = policy[key]
         if (
             not isinstance(values, list)
@@ -127,6 +134,8 @@ def select(merged_dir: Path, policy_path: Path, output_dir: Path) -> dict[str, A
         "evidence_profile": set(policy["evidence_profiles"]),
         "dependency_status": set(policy["dependency_statuses"]),
     }
+    if "source_names" in policy:
+        allowed["source_name"] = set(policy["source_names"])
     candidates: list[dict[str, Any]] = []
     rejected = Counter()
     seen_samples: set[str] = set()

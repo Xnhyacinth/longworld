@@ -26,6 +26,7 @@ KINDS = {
     "finance_taskbank",
     "codeforge_taskbank",
     "capability_records",
+    "shared_record_taskbank",
 }
 
 
@@ -221,6 +222,10 @@ def _execute(entry: dict[str, Any], *, workers: int) -> dict[str, Any]:
         result = run_native(config, output, resume=output.exists())
         result["native_receipt_sha256"] = _sha(output / "manifest.json")
         return result
+    if kind == "shared_record_taskbank":
+        from longworld.synthesis.shared_record_native_adapter import run_native
+
+        return run_native(config, output, workers=workers)
     from longworld.synthesis import finance_code_native_adapter as adapters
 
     if kind == "finance_taskbank":
@@ -306,6 +311,11 @@ def _verified_base_batch(base_batch: Path) -> tuple[dict[str, Any], str]:
             native_paths = [Path(paths["manifest"]).parent / "ADAPTER_RECEIPT.json"]
         elif kind == "wiki_row_join_probe":
             native_paths = [Path(paths["manifest"])]
+        elif kind == "shared_record_taskbank":
+            native_paths = [
+                Path(paths["manifest"]),
+                *(Path(path) for path in lane["receipt_paths"]),
+            ]
         else:
             continue
         actual = {_sha(path) for path in native_paths}

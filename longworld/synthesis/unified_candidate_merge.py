@@ -227,7 +227,10 @@ def _simulation(lane: dict[str, Any]) -> Iterator[tuple[Any, dict[str, Any], str
         prompt_tokens = index["input_tokens"]
         full = index["full_message_tokens"]
         supervised = index["supervised_tokens"]
-        if not 0 < prompt_tokens < full:
+        # This is a separately tokenized generation prompt, not the SFT mask
+        # boundary. Chat-template suffixes and cross-boundary tokenization can
+        # make it equal to, or slightly longer than, the completed chat.
+        if type(prompt_tokens) is not int or prompt_tokens <= 0:
             raise ValueError("simulation prompt token count is invalid")
         counts = TokenCounts(full - supervised, supervised, full)
         index = {key: value for key, value in index.items() if key != "input_tokens"}
@@ -253,6 +256,64 @@ def _simulation(lane: dict[str, Any]) -> Iterator[tuple[Any, dict[str, Any], str
             row,
             ref,
         )
+
+
+def _shared_record(
+    lane: dict[str, Any],
+) -> Iterator[tuple[Any, dict[str, Any], str]]:
+    """Read verified paired-operation worlds without exposing their sidecars."""
+    for raw_receipt in lane["receipt_paths"]:
+        receipt = Path(raw_receipt)
+        shard = receipt.parent
+        native = json.loads(receipt.read_text())
+        rows_path = shard / "rows.jsonl"
+        if (
+            _sha(rows_path) != native["rows_sha256"]
+            or _sha(shard / "world.json") != native["world_sha256"]
+        ):
+            raise ValueError("shared-record shard changed")
+        for row in _rows(rows_path):
+            user = row["messages"][0]["content"]
+            separator = "\n\nQUESTION\n"
+            if user.count(separator) != 1 or row["train_ready"] is not False:
+                raise ValueError("shared-record reader boundary or status changed")
+            context = user.split(separator, 1)[0]
+            index = {
+                "sample_id": row["example_id"],
+                "semantic_task_id": row["semantic_task_id"],
+                "group_id": row["world_id"],
+                "split": row["split"],
+                "context_sha256": row["context_sha256"],
+                "evidence_status": "controlled_shared_row_deletion",
+                "dependency_status": "native_shared_row_deletion_only",
+            }
+            binding = _binding(
+                index,
+                receipt,
+                source_kind="controlled_simulation",
+                source_group=row["world_id"],
+                domain="simulation",
+                topic="shared_record",
+                operation=row["operation"],
+                evidence_profile="controlled_shared_row_deletion",
+                tokenizer_profile="pinned-chat-template",
+            )
+            counts = TokenCounts(
+                row["input_tokens"],
+                row["supervised_tokens"],
+                row["full_chat_tokens"],
+            )
+            yield (
+                normalize_native_candidate(
+                    index,
+                    row,
+                    binding,
+                    context_text=context,
+                    token_counts=counts,
+                ),
+                row,
+                f"{rows_path}:{row['example_id']}",
+            )
 
 
 def _finance(
@@ -390,6 +451,7 @@ READERS = {
     "wiki_candidate_delta": _wiki_delta,
     "wiki_row_join_probe": _wiki_row_join,
     "capability_records": _simulation,
+    "shared_record_taskbank": _shared_record,
     "finance_taskbank": _finance,
     "codeforge_taskbank": _codeforge,
 }

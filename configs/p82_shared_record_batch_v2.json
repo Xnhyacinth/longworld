@@ -1,0 +1,9 @@
+{
+  "schema_version": "longworld.shared-record-plan.v1",
+  "seed_base": 141100,
+  "worlds": 32,
+  "length_records": 400,
+  "consumed_records": 20,
+  "depth": 2,
+  "variants": 2
+}

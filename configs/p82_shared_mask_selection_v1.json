@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.unified-candidate-selection.v1",
+  "selection_seed": 8201,
+  "source_kinds": ["controlled_simulation"],
+  "source_names": ["shared_record_p82"],
+  "evidence_profiles": ["controlled_shared_row_deletion"],
+  "dependency_statuses": ["native_shared_row_deletion_only"],
+  "minimum_full_chat_tokens": 0,
+  "maximum_views_per_semantic_task": 1,
+  "maximum_tasks_per_source_group": 200,
+  "maximum_tasks_per_operation": 1000
+}

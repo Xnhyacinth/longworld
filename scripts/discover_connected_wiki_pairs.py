@@ -26,6 +26,7 @@ from scripts.freeze_wiki_title_bundle import freeze_titles, resolve_titles
 from scripts.run_source_pool_batch import _snapshot
 
 SCHEMA = "longworld.connected-wiki-intake.v1"
+BOOTSTRAP_SCHEMA = "longworld.wiki-anchor-bootstrap.v1"
 API = "https://en.wikipedia.org/w/api.php"
 
 
@@ -37,6 +38,10 @@ def _write(path: Path, value: Any) -> None:
     path.write_text(
         json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
     )
+
+
+def _relative_to_root(path: Path) -> str:
+    return str((path if path.is_absolute() else ROOT / path).relative_to(ROOT))
 
 
 def _anchor_rows(snapshot: dict[str, Any]) -> dict[str, list[str]]:
@@ -77,8 +82,12 @@ def _auto_seeds(config: dict[str, Any], pool: dict[str, Any]) -> list[dict[str, 
     auto = config.get("auto_sources")
     if auto is None:
         return config.get("seeds", [])
-    domains = auto["domains"]
-    selected = []
+    domains = (
+        sorted({source["domain"] for source in pool["sources"]})
+        if auto["domains"] == "*"
+        else auto["domains"]
+    )
+    by_domain: dict[str, list[str]] = {}
     for domain in domains:
         candidates = []
         for source in pool["sources"]:
@@ -86,10 +95,18 @@ def _auto_seeds(config: dict[str, Any], pool: dict[str, Any]) -> list[dict[str, 
                 continue
             rows = _anchor_rows(_snapshot(ROOT, source["snapshot"]))
             candidates.append((sum(map(len, rows.values())), source["name"]))
-        if candidates:
-            count, name = max(candidates)
-            if count:
-                selected.append(name)
+        by_domain[domain] = [
+            name
+            for count, name in sorted(candidates, key=lambda item: (-item[0], item[1]))
+            if count
+        ][: auto.get("max_per_domain", 1)]
+    selected = []
+    for rank in range(auto.get("max_per_domain", 1)):
+        for domain in domains:
+            if len(by_domain[domain]) > rank:
+                selected.append(by_domain[domain][rank])
+                if len(selected) >= auto["max_sources"]:
+                    break
         if len(selected) >= auto["max_sources"]:
             break
     return [
@@ -122,6 +139,402 @@ def _query_specs(topic: str, names: list[str], limit: int) -> list[tuple[str, st
         for name in _spread(names, max(1, limit - 1))
     )
     return queries[:limit]
+
+
+def _bootstrap_topics(pool: dict[str, Any], limit: int) -> list[dict[str, str]]:
+    """Cover source domains before taking a second topic from any domain."""
+    by_domain: dict[str, list[dict[str, str]]] = {}
+    seen = set()
+    for source in sorted(
+        pool["sources"], key=lambda item: (item["domain"], item["topic"], item["name"])
+    ):
+        key = (source["domain"], source["topic"], source["split"])
+        if key not in seen:
+            by_domain.setdefault(source["domain"], []).append(source)
+            seen.add(key)
+    selected = []
+    for rank in range(max(map(len, by_domain.values()), default=0)):
+        for domain in sorted(by_domain):
+            if len(by_domain[domain]) > rank:
+                selected.append(by_domain[domain][rank])
+                if len(selected) >= limit:
+                    return selected
+    return selected
+
+
+def _topic_matches_title(topic: str, title: str) -> bool:
+    words = [
+        word for word in topic.split("_") if word not in {"lists", "expansion", "broad"}
+    ]
+    lowered = title.casefold()
+    return any(
+        (word[:-3] + "y" if word.endswith("ies") else word.removesuffix("s")) in lowered
+        for word in words
+        if len(word) >= 5
+    )
+
+
+def bootstrap_from_preview(
+    config_path: Path,
+    output_dir: Path,
+    *,
+    fetcher: wiki_adapter.WikiHttpFetcher | None = None,
+) -> dict[str, Any]:
+    """Reuse pinned, productive previews as new anchors without new search calls."""
+    if output_dir.exists():
+        raise ValueError("output directory must be new")
+    config = json.loads(config_path.read_text())
+    if config.get("schema") != BOOTSTRAP_SCHEMA:
+        raise ValueError("wrong anchor bootstrap schema")
+    for key, maximum in (
+        ("max_candidates", 50),
+        ("max_anchors", 50),
+        ("max_per_domain", 20),
+        ("min_rows", 100),
+    ):
+        value = config.get(key)
+        if type(value) is not int or not 1 <= value <= maximum:
+            raise ValueError(f"{key} must be within 1..{maximum}")
+    base_path = Path(config["base_pool"])
+    if not base_path.is_absolute():
+        base_path = ROOT / base_path
+    if _sha(base_path) != config.get("base_pool_sha256"):
+        raise ValueError("base source pool pin mismatch")
+    base = json.loads(base_path.read_text())
+    if base.get("schema") != "longworld.source-batch-pool.v2":
+        raise ValueError("wrong source pool schema")
+    pin = config["preview_manifest"]
+    preview_path = Path(pin["path"])
+    if not preview_path.is_absolute():
+        preview_path = ROOT / preview_path
+    if _sha(preview_path) != pin["sha256"]:
+        raise ValueError("preview manifest pin mismatch")
+    preview = json.loads(preview_path.read_text())
+    if preview.get("schema") != SCHEMA + ".result":
+        raise ValueError("wrong preview manifest schema")
+    prior = config["prior_unified_batch"]
+    existing = _existing_titles(base, prior)
+    for report in preview["seeds"]:
+        for frozen in report["frozen"]:
+            for title in frozen["revisions"]:
+                existing.setdefault(title.casefold(), set()).add(report["split"])
+    source_by_name = {source["name"]: source for source in base["sources"]}
+    candidates: dict[str, list[dict[str, Any]]] = {}
+    title_splits: dict[str, set[str]] = {}
+    excluded = Counter()
+    for report in preview["seeds"]:
+        source = source_by_name[report["anchor_source"]]
+        if report["split"] != source["split"]:
+            raise ValueError("preview anchor split drift")
+        for item in report["previewed"]:
+            title = item["title"]
+            if item["target_rows"] < config["min_rows"]:
+                excluded["too_few_typed_rows"] += 1
+            elif title.casefold() in existing:
+                excluded["prior_title"] += 1
+            elif not _topic_matches_title(source["topic"], title):
+                excluded["topic_title_mismatch"] += 1
+            else:
+                candidates.setdefault(source["domain"], []).append(
+                    {
+                        "title": title,
+                        "source": source,
+                        "preview_rows": item["target_rows"],
+                    }
+                )
+                title_splits.setdefault(title.casefold(), set()).add(source["split"])
+    by_domain = {
+        domain: sorted(
+            rows,
+            key=lambda row: (-row["preview_rows"], row["title"], row["source"]["name"]),
+        )
+        for domain, rows in candidates.items()
+    }
+    chosen = []
+    seen_titles = set()
+    for rank in range(max(map(len, by_domain.values()), default=0)):
+        for domain in sorted(by_domain):
+            if rank >= min(len(by_domain[domain]), config["max_per_domain"]):
+                continue
+            row = by_domain[domain][rank]
+            key = row["title"].casefold()
+            if key in seen_titles:
+                continue
+            if len(title_splits[key]) > 1:
+                excluded["cross_split_preview"] += 1
+                continue
+            chosen.append(row)
+            seen_titles.add(key)
+            if len(chosen) >= config["max_candidates"]:
+                break
+        if len(chosen) >= config["max_candidates"]:
+            break
+    output_dir.mkdir(parents=True)
+    (output_dir / "snapshots").mkdir()
+    fetcher = fetcher or wiki_adapter.WikiHttpFetcher(API)
+    sources = []
+    reports = []
+    for item in chosen:
+        if len(sources) >= config["max_anchors"]:
+            break
+        title = item["title"]
+        report = {
+            "title": title,
+            "source": item["source"]["name"],
+            "preview_rows": item["preview_rows"],
+        }
+        reports.append(report)
+        try:
+            member = resolve_titles(fetcher, [title])[0]
+            page = fetcher.fetch_revision(member.pageid)
+            if page.title.casefold() in existing:
+                report["rejection"] = "resolved_prior_title"
+                continue
+            rendered = wiki_adapter.render_wikitext(page.title, page.wikitext).text
+            rows = _preview_score(rendered, set())[1]
+            if rows < config["min_rows"]:
+                report["rejection"] = "current_rows_below_minimum"
+                continue
+            name = "anchor_" + hashlib.sha256(page.title.encode()).hexdigest()[:16]
+            path = output_dir / "snapshots" / f"{name}.json"
+            receipt = freeze_titles(fetcher, [page.title], name, path)
+            snapshot_sha = _sha(path)
+            snapshot = _snapshot(ROOT, {"path": str(path), "sha256": snapshot_sha})
+            if (
+                _preview_score(snapshot["documents"][0]["text"], set())[1]
+                < config["min_rows"]
+            ):
+                report["rejection"] = "frozen_rows_below_minimum"
+                continue
+            report["frozen"] = {
+                "snapshot_id": receipt["snapshot_id"],
+                "revisions": receipt["revisions"],
+                "sha256": snapshot_sha,
+                "path": _relative_to_root(path),
+                "usable_rows": rows,
+            }
+            source = item["source"]
+            sources.append(
+                {
+                    "name": receipt["snapshot_id"],
+                    "domain": source["domain"],
+                    "topic": source["topic"],
+                    "split": source["split"],
+                    "snapshot": {
+                        "path": _relative_to_root(path),
+                        "sha256": snapshot_sha,
+                    },
+                }
+            )
+            existing[page.title.casefold()] = {source["split"]}
+        except (
+            wiki_adapter.HttpError,
+            wiki_adapter.SnapshotError,
+            OSError,
+        ) as error:
+            report["rejection"] = f"freeze_or_probe:{type(error).__name__}:{error}"
+    source_pool = {
+        "schema": "longworld.source-batch-pool.v2",
+        "prior_source_manifest": base["prior_source_manifest"],
+        "requested_recipes": base["requested_recipes"],
+        "max_tasks_by_recipe": base["max_tasks_by_recipe"],
+        "sources": sources,
+    }
+    _write(output_dir / "source_pool.json", source_pool)
+    result = {
+        "schema": BOOTSTRAP_SCHEMA + ".preview-result",
+        "config_sha256": _sha(config_path),
+        "base_pool_sha256": _sha(base_path),
+        "preview_manifest_sha256": _sha(preview_path),
+        "source_pool_sha256": _sha(output_dir / "source_pool.json"),
+        "eligible_previews": len(chosen),
+        "attempted_anchors": len(reports),
+        "frozen_anchors": len(sources),
+        "excluded": dict(sorted(excluded.items())),
+        "reports": reports,
+        "train_ready": False,
+    }
+    _write(output_dir / "acquisition_manifest.json", result)
+    return result
+
+
+def bootstrap_anchors(
+    config_path: Path,
+    output_dir: Path,
+    *,
+    fetcher: wiki_adapter.WikiHttpFetcher | None = None,
+) -> dict[str, Any]:
+    """Freeze novel table anchors from existing topic metadata, for a later JOIN run."""
+    if output_dir.exists():
+        raise ValueError("output directory must be new")
+    config = json.loads(config_path.read_text())
+    if config.get("schema") != BOOTSTRAP_SCHEMA:
+        raise ValueError("wrong anchor bootstrap schema")
+    for key, maximum in (
+        ("max_topics", 100),
+        ("results_per_topic", 20),
+        ("max_anchors", 50),
+        ("min_rows", 100),
+    ):
+        value = config.get(key)
+        if type(value) is not int or not 1 <= value <= maximum:
+            raise ValueError(f"{key} must be within 1..{maximum}")
+    pool_path = Path(config["base_pool"])
+    if not pool_path.is_absolute():
+        pool_path = ROOT / pool_path
+    if _sha(pool_path) != config.get("base_pool_sha256"):
+        raise ValueError("base source pool pin mismatch")
+    pool = json.loads(pool_path.read_text())
+    if pool.get("schema") != "longworld.source-batch-pool.v2":
+        raise ValueError("wrong source pool schema")
+    prior = config.get("prior_unified_batch")
+    if not isinstance(prior, dict) or set(prior) != {"path", "manifest_sha256"}:
+        raise ValueError("prior unified batch pin required")
+    existing = _existing_titles(pool, prior)
+    fetcher = fetcher or wiki_adapter.WikiHttpFetcher(API)
+    output_dir.mkdir(parents=True)
+    (output_dir / "search").mkdir()
+    (output_dir / "snapshots").mkdir()
+    reports = []
+    sources = []
+    for source in _bootstrap_topics(pool, config["max_topics"]):
+        if len(sources) >= config["max_anchors"]:
+            break
+        query = _query_specs(source["topic"], [], 1)[0][1]
+        report: dict[str, Any] = {
+            "source": source["name"],
+            "domain": source["domain"],
+            "topic": source["topic"],
+            "split": source["split"],
+            "query": query,
+            "previewed": [],
+            "rejections": [],
+        }
+        reports.append(report)
+        try:
+            payload = fetcher.get_json(
+                {
+                    "action": "query",
+                    "format": "json",
+                    "formatversion": 2,
+                    "list": "search",
+                    "srsearch": query,
+                    "srnamespace": 0,
+                    "srlimit": config["results_per_topic"],
+                }
+            )
+            titles = [
+                item["title"]
+                for item in payload["query"]["search"]
+                if item["title"].startswith("List of ")
+            ]
+            search_path = output_dir / "search" / f"{source['name']}.json"
+            _write(search_path, payload)
+            report["search_sha256"] = _sha(search_path)
+        except (wiki_adapter.HttpError, KeyError, TypeError) as error:
+            report["rejections"].append(
+                {"reason": f"search:{type(error).__name__}:{error}"}
+            )
+            continue
+        for title in titles:
+            if title.casefold() in existing:
+                report["rejections"].append({"title": title, "reason": "prior_title"})
+                continue
+            if not _topic_matches_title(source["topic"], title):
+                report["rejections"].append(
+                    {"title": title, "reason": "topic_title_mismatch"}
+                )
+                continue
+            try:
+                member = resolve_titles(fetcher, [title])[0]
+                page = fetcher.fetch_revision(member.pageid)
+                if page.title.casefold() in existing:
+                    report["rejections"].append(
+                        {"title": title, "reason": "resolved_prior_title"}
+                    )
+                    continue
+                if not _topic_matches_title(source["topic"], page.title):
+                    report["rejections"].append(
+                        {"title": page.title, "reason": "resolved_topic_title_mismatch"}
+                    )
+                    continue
+                rendered = wiki_adapter.render_wikitext(page.title, page.wikitext).text
+                usable_rows = _preview_score(rendered, set())[1]
+                report["previewed"].append(
+                    {
+                        "title": page.title,
+                        "revision": page.revid,
+                        "usable_rows": usable_rows,
+                    }
+                )
+                if usable_rows < config["min_rows"]:
+                    continue
+                name = "anchor_" + hashlib.sha256(page.title.encode()).hexdigest()[:16]
+                path = output_dir / "snapshots" / f"{name}.json"
+                receipt = freeze_titles(fetcher, [page.title], name, path)
+                frozen = _snapshot(ROOT, {"path": str(path), "sha256": _sha(path)})
+                if (
+                    _preview_score(frozen["documents"][0]["text"], set())[1]
+                    < config["min_rows"]
+                ):
+                    report["rejections"].append(
+                        {"title": page.title, "reason": "frozen_rows_below_minimum"}
+                    )
+                    continue
+                report["frozen"] = {
+                    "title": page.title,
+                    "snapshot_id": receipt["snapshot_id"],
+                    "revisions": receipt["revisions"],
+                    "path": str(path),
+                    "sha256": _sha(path),
+                    "usable_rows": usable_rows,
+                }
+                sources.append(
+                    {
+                        "name": receipt["snapshot_id"],
+                        "domain": source["domain"],
+                        "topic": source["topic"],
+                        "split": source["split"],
+                        "snapshot": {
+                            "path": _relative_to_root(path),
+                            "sha256": _sha(path),
+                        },
+                    }
+                )
+                existing[page.title.casefold()] = {source["split"]}
+                break
+            except (
+                wiki_adapter.HttpError,
+                wiki_adapter.SnapshotError,
+                OSError,
+            ) as error:
+                report["rejections"].append(
+                    {
+                        "title": title,
+                        "reason": f"freeze_or_probe:{type(error).__name__}:{error}",
+                    }
+                )
+    source_pool = {
+        "schema": "longworld.source-batch-pool.v2",
+        "prior_source_manifest": pool["prior_source_manifest"],
+        "requested_recipes": pool["requested_recipes"],
+        "max_tasks_by_recipe": pool["max_tasks_by_recipe"],
+        "sources": sources,
+    }
+    _write(output_dir / "source_pool.json", source_pool)
+    result = {
+        "schema": BOOTSTRAP_SCHEMA + ".result",
+        "config_sha256": _sha(config_path),
+        "base_pool_sha256": _sha(pool_path),
+        "source_pool_sha256": _sha(output_dir / "source_pool.json"),
+        "topics_searched": len(reports),
+        "previewed_pages": sum(len(row["previewed"]) for row in reports),
+        "frozen_anchors": len(sources),
+        "reports": reports,
+        "train_ready": False,
+    }
+    _write(output_dir / "acquisition_manifest.json", result)
+    return result
 
 
 def _prior_unified_titles(pin: dict[str, str]) -> dict[str, set[str]]:
@@ -206,24 +619,35 @@ def _validate(config: dict[str, Any], pool: dict[str, Any]) -> None:
         raise ValueError("invalid prior unified batch pin")
     auto = config.get("auto_sources")
     if auto is not None:
-        if (
-            not isinstance(auto, dict)
-            or not isinstance(auto.get("domains"), list)
-            or not 1 <= len(auto["domains"]) <= 20
-            or len(auto["domains"]) != len(set(auto["domains"]))
+        domains = auto.get("domains") if isinstance(auto, dict) else None
+        if not isinstance(auto, dict) or not (
+            domains == "*"
+            or (
+                isinstance(domains, list)
+                and 1 <= len(domains) <= 500
+                and all(isinstance(domain, str) for domain in domains)
+                and len(domains) == len(set(domains))
+            )
         ):
-            raise ValueError("auto_sources domains must be 1..20 unique entries")
+            raise ValueError(
+                "auto_sources domains must be '*' or 1..500 unique entries"
+            )
         if (
             type(auto.get("max_sources")) is not int
-            or not 1 <= auto["max_sources"] <= 20
+            or not 1 <= auto["max_sources"] <= 500
         ):
-            raise ValueError("auto_sources max_sources must be 1..20")
+            raise ValueError("auto_sources max_sources must be 1..500")
+        if (
+            type(auto.get("max_per_domain", 1)) is not int
+            or not 1 <= auto.get("max_per_domain", 1) <= 20
+        ):
+            raise ValueError("auto_sources max_per_domain must be 1..20")
         known = {source["domain"] for source in pool["sources"]}
-        if any(domain not in known for domain in auto["domains"]):
+        if domains != "*" and any(domain not in known for domain in domains):
             raise ValueError("auto_sources contains unknown domain")
     seeds = _auto_seeds(config, pool)
-    if not isinstance(seeds, list) or not 1 <= len(seeds) <= 20:
-        raise ValueError("seeds must have 1..20 entries")
+    if not isinstance(seeds, list) or not 1 <= len(seeds) <= 500:
+        raise ValueError("seeds must have 1..500 entries")
     sources = {item["name"]: item for item in pool["sources"]}
     seen = set()
     for seed in seeds:
@@ -588,11 +1012,28 @@ def main() -> int:
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--refilter-from", type=Path)
+    parser.add_argument("--bootstrap-anchors", action="store_true")
+    parser.add_argument("--bootstrap-preview", action="store_true")
     args = parser.parse_args()
+    if (
+        sum(
+            (
+                args.bootstrap_anchors,
+                args.bootstrap_preview,
+                args.refilter_from is not None,
+            )
+        )
+        > 1
+    ):
+        parser.error("bootstrap and refilter modes are exclusive")
     print(
         json.dumps(
             (
-                refilter_frozen_acquisition(
+                bootstrap_from_preview(args.config, args.output_dir)
+                if args.bootstrap_preview
+                else bootstrap_anchors(args.config, args.output_dir)
+                if args.bootstrap_anchors
+                else refilter_frozen_acquisition(
                     args.config, args.refilter_from, args.output_dir
                 )
                 if args.refilter_from is not None

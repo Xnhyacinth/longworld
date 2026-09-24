@@ -1,0 +1,22 @@
+{
+  "schema_version": "longworld.unified-candidate-selection.v1",
+  "selection_seed": 82,
+  "source_kinds": ["real_wiki", "controlled_simulation"],
+  "source_names": [
+    "wiki_p82_stadium_join",
+    "simulation_p82_l2_coverage",
+    "simulation_p82_dense_v2"
+  ],
+  "evidence_profiles": [
+    "bounded_table_reader_dependency",
+    "native_solver_recheck"
+  ],
+  "dependency_statuses": [
+    "two_cell_interventions_passed",
+    "unmeasured"
+  ],
+  "minimum_full_chat_tokens": 0,
+  "maximum_views_per_semantic_task": 1,
+  "maximum_tasks_per_source_group": 200,
+  "maximum_tasks_per_operation": 1000
+}

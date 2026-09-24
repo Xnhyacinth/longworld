@@ -111,6 +111,206 @@ def test_auto_anchor_routing_uses_row_capacity_without_local_data(
     assert [seed["anchor_source"] for seed in seeds] == ["nature_large", "culture"]
 
 
+def test_auto_anchor_routing_round_robins_all_domains_and_multiple_sources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pool = {
+        "sources": [
+            {"name": "nature_small", "domain": "nature", "snapshot": {"name": "n1"}},
+            {"name": "culture_small", "domain": "culture", "snapshot": {"name": "c1"}},
+            {"name": "nature_large", "domain": "nature", "snapshot": {"name": "n2"}},
+            {"name": "culture_large", "domain": "culture", "snapshot": {"name": "c2"}},
+            {"name": "empty", "domain": "zoology", "snapshot": {"name": "z"}},
+        ]
+    }
+    monkeypatch.setattr(intake, "_snapshot", lambda _root, pin: pin)
+    monkeypatch.setattr(
+        intake,
+        "_anchor_rows",
+        lambda snapshot: {
+            "table": list(
+                range({"n2": 4, "c2": 3, "n1": 2, "c1": 1}.get(snapshot["name"], 0))
+            )
+        },
+    )
+    config = {
+        "auto_sources": {
+            "domains": "*",
+            "max_sources": 4,
+            "max_per_domain": 2,
+            "max_queries": 2,
+            "results_per_query": 2,
+            "max_previews": 2,
+            "max_freezes": 1,
+        }
+    }
+    seeds = intake._auto_seeds(config, pool)
+    assert [seed["anchor_source"] for seed in seeds] == [
+        "culture_large",
+        "nature_large",
+        "culture_small",
+        "nature_small",
+    ]
+    assert len({seed["name"] for seed in seeds}) == 4
+    assert (
+        intake._auto_seeds(config, {"sources": list(reversed(pool["sources"]))})
+        == seeds
+    )
+
+
+def test_auto_source_limits_reject_invalid_catalog(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pool = {
+        "schema": "longworld.source-batch-pool.v2",
+        "sources": [{"name": "nature", "domain": "nature", "snapshot": {}}],
+    }
+    monkeypatch.setattr(intake, "_snapshot", lambda _root, pin: pin)
+    monkeypatch.setattr(intake, "_anchor_rows", lambda _snapshot: {"table": ["A"]})
+    base = {
+        "schema": intake.SCHEMA,
+        "auto_sources": {
+            "domains": "*",
+            "max_sources": 1,
+            "max_per_domain": 1,
+            "max_queries": 1,
+            "results_per_query": 1,
+            "max_previews": 1,
+            "max_freezes": 1,
+        },
+    }
+    intake._validate(base, pool)
+    invalid = json.loads(json.dumps(base))
+    invalid["auto_sources"]["max_per_domain"] = 0
+    with pytest.raises(ValueError, match="max_per_domain"):
+        intake._validate(invalid, pool)
+    invalid = json.loads(json.dumps(base))
+    invalid["auto_sources"]["domains"] = ["missing"]
+    with pytest.raises(ValueError, match="unknown domain"):
+        intake._validate(invalid, pool)
+
+
+def test_bootstrap_topics_covers_domains_before_second_topic() -> None:
+    pool = {
+        "sources": [
+            {"name": "a2", "domain": "alpha", "topic": "two", "split": "train"},
+            {"name": "a1", "domain": "alpha", "topic": "one", "split": "train"},
+            {"name": "b1", "domain": "beta", "topic": "one", "split": "eval"},
+            {"name": "a1_dup", "domain": "alpha", "topic": "one", "split": "train"},
+        ]
+    }
+    assert [row["name"] for row in intake._bootstrap_topics(pool, 3)] == [
+        "a1",
+        "b1",
+        "a2",
+    ]
+
+
+def test_bootstrap_pin_failure_precedes_output_and_network(tmp_path: Path) -> None:
+    _local_pool()
+    config = json.loads(
+        (ROOT / "configs/p82_wiki_anchor_bootstrap_v1.json").read_text()
+    )
+    config["base_pool_sha256"] = "0" * 64
+    path = tmp_path / "bootstrap_bad_pin.json"
+    path.write_text(json.dumps(config))
+    with pytest.raises(ValueError, match="base source pool pin mismatch"):
+        intake.bootstrap_anchors(path, tmp_path / "output")
+    assert not (tmp_path / "output").exists()
+
+
+def test_preview_bootstrap_topic_gate_rejects_unrelated_search_hits() -> None:
+    assert intake._topic_matches_title(
+        "stadiums", "List of football stadiums in England"
+    )
+    assert intake._topic_matches_title(
+        "botanical_gardens", "List of botanical gardens and arboretums in New York"
+    )
+    assert not intake._topic_matches_title(
+        "hospitals", "List of Murray State University alumni"
+    )
+    assert not intake._topic_matches_title(
+        "museums_lists", "List of University of the Arts alumni"
+    )
+
+
+def test_direct_bootstrap_rejects_unrelated_title_before_fetch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pool = {
+        "schema": "longworld.source-batch-pool.v2",
+        "sources": [
+            {
+                "name": "museum_source",
+                "domain": "culture",
+                "topic": "museums_lists",
+                "split": "train",
+            }
+        ],
+        "prior_source_manifest": {},
+        "requested_recipes": [],
+        "max_tasks_by_recipe": {},
+    }
+    pool_path = tmp_path / "pool.json"
+    pool_path.write_text(json.dumps(pool))
+    config = {
+        "schema": intake.BOOTSTRAP_SCHEMA,
+        "base_pool": str(pool_path),
+        "base_pool_sha256": hashlib.sha256(pool_path.read_bytes()).hexdigest(),
+        "prior_unified_batch": {"path": "unused", "manifest_sha256": "0" * 64},
+        "max_topics": 1,
+        "results_per_topic": 1,
+        "max_anchors": 1,
+        "min_rows": 2,
+    }
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(config))
+    monkeypatch.setattr(intake, "_existing_titles", lambda _pool, _prior: {})
+    monkeypatch.setattr(
+        intake,
+        "resolve_titles",
+        lambda *_args: pytest.fail("unrelated title was fetched"),
+    )
+
+    class SearchOnlyFetcher:
+        def get_json(self, _params):
+            return {
+                "query": {
+                    "search": [{"title": "List of University of the Arts alumni"}]
+                }
+            }
+
+    result = intake.bootstrap_anchors(
+        config_path, tmp_path / "output", fetcher=SearchOnlyFetcher()
+    )
+    assert result["frozen_anchors"] == 0
+    assert result["reports"][0]["rejections"] == [
+        {
+            "title": "List of University of the Arts alumni",
+            "reason": "topic_title_mismatch",
+        }
+    ]
+
+
+def test_preview_bootstrap_manifest_pin_failure_precedes_output(tmp_path: Path) -> None:
+    _local_pool()
+    config = json.loads(
+        (ROOT / "configs/p82_wiki_preview_bootstrap_v1.json").read_text()
+    )
+    config["preview_manifest"]["sha256"] = "0" * 64
+    path = tmp_path / "preview_bad_pin.json"
+    path.write_text(json.dumps(config))
+    with pytest.raises(ValueError, match="preview manifest pin mismatch"):
+        intake.bootstrap_from_preview(path, tmp_path / "output")
+    assert not (tmp_path / "output").exists()
+
+
+def test_bootstrap_relative_snapshot_path_is_root_relative() -> None:
+    path = Path("data/capability_records/example/snapshots/page.json")
+    assert intake._relative_to_root(path) == str(path)
+    assert intake._relative_to_root(ROOT / path) == str(path)
+
+
 def test_prior_unified_wiki_lane_adds_opposite_split_title(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

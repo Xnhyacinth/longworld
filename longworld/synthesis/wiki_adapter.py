@@ -1341,10 +1341,14 @@ def _extract_facts_for_page(
             table_headers = line.cells
             continue
         if line.kind == "table_row" and table_headers:
+            name_column = _name_column_index(table_headers)
+            if name_column is not None and name_column >= len(line.cells):
+                # A shortened row has no subject cell. Its remaining cells
+                # cannot be assigned to a person or facility without guessing.
+                continue
             row_subject = _row_subject(line, table_headers, subject)
             if row_subject is None:
                 continue
-            name_column = _name_column_index(table_headers)
             if name_column is not None and row_subject != subject:
                 # a name-ish first column on a single-entity page means the
                 # row names one of the page subject's components (a telescope
