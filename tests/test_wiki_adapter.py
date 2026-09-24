@@ -144,6 +144,55 @@ def test_snapshot_identity_changes_when_extraction_changes() -> None:
     )
 
 
+def test_repeated_table_header_changes_the_active_column_meaning() -> None:
+    text = (
+        "# List of test hospitals\n"
+        "Name (other name) | Location | Established\n"
+        "Alpha Hospital | Athens | 1900\n"
+        "Name (other name) | Location | Established/New building\n"
+        "Beta Hospital | Athens | 2000\n"
+    )
+    table_lines = [line for line in wa.structured_lines(text) if line.cells]
+    assert [line.kind for line in table_lines] == [
+        "table_header",
+        "table_row",
+        "table_header",
+        "table_row",
+    ]
+    page = wa.PageRecord(
+        pageid=72,
+        title="List of test hospitals",
+        revid=7201,
+        timestamp="2026-09-24T00:00:00Z",
+        wikitext=(
+            '{| class="wikitable"\n'
+            "! Name (other name) !! Location !! Established\n"
+            "|-\n| Alpha Hospital || Athens || 1900\n"
+            "|}\n"
+            '{| class="wikitable"\n'
+            "! Name (other name) !! Location !! Established/New building\n"
+            "|-\n| Beta Hospital || Athens || 2000\n"
+            "|}\n"
+        ),
+    )
+    snapshot = wa.build_snapshot(
+        members=[wa.Member(page.pageid, page.title)],
+        pages={page.pageid: page},
+        link_meta=[],
+        rights=_rights(),
+        category_title="test hospital lists",
+        collection_kind="title_bundle",
+        frozen_at="2026-09-24T00:00:00Z",
+    )
+    founded = {
+        (fact["subject"], fact["value"])
+        for fact in snapshot["facts"]
+        if fact["relation"] == "established in"
+    }
+    assert len(founded) == 1
+    assert next(iter(founded))[1] == "1900"
+
+
 # ---------------------------------------------------------------------------
 # Rendering
 # ---------------------------------------------------------------------------

@@ -57,12 +57,13 @@ less -R data/candidates/p76_batch_index_v1/distribution.json
 curated groups (astronomy, bridges, mountains, museums, parks, universities and
 two expansions) froze 28 real pages, with per-page revision pins and CC BY-SA
 source metadata. The title-bundle path does not invent category membership.
-The first raw extraction yielded 2,304 facts, but the source screen found only 279
-table facts with both structural row/column support and no obvious template
-debris. The usable units cluster in astronomy (133), national parks (101)
-and universities (45); bridge values retain template junk, while mountain and
+The first raw extraction yielded 2,304 facts, but the initial value-only source
+screen found only 279 table facts with structural row/column support and no
+obvious value template debris. The corrected subject-and-value screen over the
+canonical v4 pool admits 255 units: astronomy (128), national parks (78)
+and universities (49) dominate; bridge values retain template junk, while mountain and
 museum pages produce no admitted clean table units under the current parser.
-Even the 279 figure is a source-routing diagnostic, **not** 279 tasks or a
+Even the 255 figure is a source-routing diagnostic, **not** 255 tasks or a
 semantic entailment guarantee.
 
 An additive parser rule for the exact `Year offoundation` header admitted four
@@ -76,13 +77,13 @@ that explicit-title bundles were mislabelled `mediawiki_category` in
 `source.kind`; a content-preserving, hash-bound repair of all eight groups is
 now under `data/capability_records/p76_wiki_titles_v4/`, with parent digests in
 `repair_manifest.json`. The v1/v2/v3 artifacts are not overwritten or treated
-as independent sources. The v4 screen reports 2,308 facts and 283 clean
-structurally supported table facts; university contributes 38 clean units
+as independent sources. The v4 screen reports 2,308 facts and 255 clean
+structurally supported table facts; university lists contribute 38 clean units
 (32 England years, four Wales years and two locations).
 
 ```bash
-uv run python scripts/screen_p76_wiki_sources.py --snapshots-dir data/capability_records/p76_wiki_titles_v4 --output data/capability_records/p76_wiki_titles_v4/source_screen.json
-less -R data/capability_records/p76_wiki_titles_v4/source_screen.json
+uv run python scripts/screen_p76_wiki_sources.py --snapshots-dir data/capability_records/p76_wiki_titles_v4 --output data/capability_records/p76_wiki_titles_v4/source_screen_v2.json
+less -R data/capability_records/p76_wiki_titles_v4/source_screen_v2.json
 ```
 
 This demonstrates why sampling topics or downloaded pages blindly cannot
@@ -147,6 +148,62 @@ less -R data/candidates/p76_wiki_table_pairs_v5_universities/sample_index.jsonl
 less -R data/candidates/p76_wiki_table_pairs_v5_universities/verification.json
 less -R data/candidates/p76_batch_index_v3/coverage.json
 less -R data/candidates/p76_batch_index_v3/distribution.json
+```
+
+## Second source scout, common parser fix and dense scan
+
+Five more explicit-title groups (museums, libraries, botanical gardens,
+airports, hospitals) froze 17 additional unique pages. Only the hospital
+group had a dense enough usable year table. Its first snapshot exposed a
+shared parser error: repeated `Name | Location | Established/New building`
+headers were treated as data rows, so facts below them inherited an older
+`Established` header. This falsely inflated source support. The common
+`structured_lines` parser now recognizes repeated headers, and the relation
+checker stops at the nearest table header. The same hospital page revisions
+were frozen as a new, content-bound v6 snapshot; extracted facts fell from
+348 to 277. The v5 hospital snapshot and its initial closed-universe reject
+remain diagnostics, not task inputs.
+
+The corrected source screen excludes template debris in both the value and
+subject cells. Across the canonical v4 groups, four nonhospital v5 groups,
+and v6 hospitals, the pool has 13 source groups, 45 unique pages, 2,675
+extracted facts and 432 clean structurally supported table units. The strict
+hospital scan universe is smaller than the source screen: 81 rows have an
+exact `Established` header, a plain four-digit year and a plain citation-free
+name cell. It excludes ten format-mismatched rows, with the exclusion scope
+stated in the question. The final-reader independent table parser and native
+fact inventory match exactly on those 81 rows.
+
+`scripts/export_p76_wiki_scan.py` compiled eight complete-table interval
+tasks each for Japan national parks (35 eligible rows), England universities
+(32), and Greece hospitals (81). Answer cardinalities span 2–15; every
+eligible candidate, including nonmatches, is in the audit ledger. An inserted
+same-schema hit changes the full answer; a near-miss insertion does not. The
+final-input lengths are 55,563–55,668 tokens for parks, 17,517–17,573 for
+universities and 48,639–48,755 for hospitals. These are dense scan/integration
+tasks, **not** a claim that their candidate tables themselves span 48K/55K.
+The three scan manifests set `train_ready=false`.
+
+The assistant-only verifier checked all 24 scan rows: 1,184 exact proof-span
+token mappings and 1,593 supervised tokens (parks 644, universities 355,
+hospitals 594). Together with the 28 pair tasks, this wave adds **52
+independent real Wiki tasks and 76 reader views**. Combining them with the
+same historical P64/P66/P71/P73/P75 indexes yields 9,194 source rows, 9,064
+distinct sample views and 9,040 independent tasks, with zero index rejects.
+The 154 repeated task rows are still 130 P64/P66 CodeForge duplicate views
+and 24 second-length astronomy views. Of the 9,040 tasks, 52 new ones have
+four explicit topics: observatories 24, national parks 8, universities 12,
+hospitals 8. Historical tasks with absent topic labels remain unknown. The
+combined batch is an inventory, not a quality-filtered training export.
+
+```bash
+less -R data/capability_records/p76_wiki_titles_v5/source_screen_v2.json
+less -R data/capability_records/p76_wiki_titles_v6/source_screen_v2.json
+less -R data/candidates/p76_wiki_table_scan_v2_parks/sample_index.jsonl
+less -R data/candidates/p76_wiki_table_scan_v2_universities/sample_index.jsonl
+less -R data/candidates/p76_wiki_table_scan_v2_hospitals/sample_index.jsonl
+less -R data/candidates/p76_batch_index_v5/coverage.json
+less -R data/candidates/p76_batch_index_v5/distribution.json
 ```
 
 ## Research decisions for scaling

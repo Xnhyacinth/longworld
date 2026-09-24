@@ -588,8 +588,8 @@ The next data decision requires a coverage report keyed by `source_kind × domai
 | ----- | --------------- | ------ | ---------- |
 | P76.R0 | Cross-review native pipelines and literature; freeze task/world/view and truth labels | complete | P64/P66 CodeForge duplicate found; unmeasured dependency stays unmeasured |
 | P76.R1 | Streaming multi-producer coverage index and deterministic overlap/reject ledger | complete | 8,726 indexed rows / 8,596 independent tasks; 130 duplicate CodeForge rows; byte-stable rebuild |
-| P76.R2 | One reusable real table/list multi-evidence recipe on frozen Wiki sources | complete | 28 independent cross-document tasks, 52 views, oracle + gold-blind table replay + bounded text deletion |
-| P76.R3 | Batch run plus independent distribution and case audit | complete | eight title bundles/28 pages screened; 9,016 unique historical+new tasks indexed, 28 new Wiki tasks, 0 new-Wiki source-title split overlap, exact SFT mask verified |
+| P76.R2 | Source-native cross-document comparison and closed-table scan recipes | complete | 28 pair tasks plus 24 dense scan tasks; formal oracle, independent final-reader parser, bounded deletion/insertion checks |
+| P76.R3 | Batch run plus independent distribution and case audit | complete | 13 canonical title bundles/45 unique pages screened; 9,040 unique historical+new tasks indexed, 52 new Wiki tasks/76 views, 0 new-Wiki source-title split overlap, exact SFT mask verified |
 | P76.R4 | Scale plan for real, concatenated-real, grounded-mixed and controlled-sim sources | complete_as_design | `.hl/p76_execution.md` source-native routing, bounded parallel/resume, exact token bins and dependency-specific gates |
 | P76.R5 | Execute source-diverse quality scale batch before training | planned | >=100 independent worlds and >=1,000 *accepted* tasks across real/concatenated/mixed/simulated strata; source-connected split, reader checks and actual distribution; no count from historical inventory alone |
 

@@ -22,7 +22,10 @@ def _rows(path: Path) -> list[dict]:
 def _token_limit(manifest: dict) -> int:
     if manifest.get("schema") == "longworld.p75-real-reader-export.v1":
         limit = manifest["config"]["max_full_tokens"]
-    elif manifest.get("schema") == "longworld.p76-wiki-table-pairs.v5":
+    elif manifest.get("schema") in {
+        "longworld.p76-wiki-table-pairs.v5",
+        "longworld.p76-wiki-table-scan.v2",
+    }:
         limit = 262144
     else:
         raise ValueError("unsupported reader export schema")
@@ -107,11 +110,11 @@ def verify(directory: Path) -> dict:
                 raise ValueError(f"missing fact value token span: {example_id}")
     if groups["train"] & groups["eval"]:
         raise ValueError("train/eval source worlds overlap")
-    verification_schema = (
-        "longworld.p75-real-reader-verification.v1"
-        if manifest["schema"] == "longworld.p75-real-reader-export.v1"
-        else "longworld.p76-wiki-table-verification.v1"
-    )
+    verification_schema = {
+        "longworld.p75-real-reader-export.v1": "longworld.p75-real-reader-verification.v1",
+        "longworld.p76-wiki-table-pairs.v5": "longworld.p76-wiki-table-verification.v1",
+        "longworld.p76-wiki-table-scan.v2": "longworld.p76-wiki-table-scan-verification.v1",
+    }[manifest["schema"]]
     result = {
         "schema": verification_schema,
         "rows": {split: len(rows[split]) for split in ("train", "eval")},

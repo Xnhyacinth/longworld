@@ -215,6 +215,9 @@ def compile_task(
     if task.family == "source_compare" and task.template == "source_compare":
         question = task.question
         question_style = "natural_source_compare"
+    elif task.family == "table_scan" and task.template == "table_scan":
+        question = task.question
+        question_style = "natural_table_scan"
     else:
         question = natural_locate_question(task)
         question_style = "natural_locate"

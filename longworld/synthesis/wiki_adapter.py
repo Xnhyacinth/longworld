@@ -553,6 +553,7 @@ def structured_lines(text: str) -> list[StructuredLine]:
     lines: list[StructuredLine] = []
     first_heading_offset = None
     table_block_open = False
+    table_header_cells: tuple[str, ...] | None = None
     cursor = 0
     for raw in text.split("\n"):
         start, end = cursor, cursor + len(raw)
@@ -560,6 +561,7 @@ def structured_lines(text: str) -> list[StructuredLine]:
         if not raw:
             if table_block_open:
                 table_block_open = False
+                table_header_cells = None
             continue
         if raw.startswith("# ") and not lines:
             lines.append(StructuredLine(start, end, "title", raw, value=raw[2:]))
@@ -570,6 +572,7 @@ def structured_lines(text: str) -> list[StructuredLine]:
                 start if first_heading_offset is None else first_heading_offset
             )
             table_block_open = False
+            table_header_cells = None
             lines.append(
                 StructuredLine(
                     start,
@@ -582,19 +585,38 @@ def structured_lines(text: str) -> list[StructuredLine]:
             )
             continue
         if " | " in raw and all(part.strip() for part in raw.split(" | ")):
-            kind = "table_header" if not table_block_open else "table_row"
+            cells = tuple(part.strip() for part in raw.split(" | "))
+            repeated_header = (
+                table_block_open
+                and table_header_cells is not None
+                and len(cells) == len(table_header_cells)
+                and cells[0] == table_header_cells[0]
+                and sum(
+                    cell == prior or cell.startswith(prior + "/")
+                    for cell, prior in zip(cells, table_header_cells)
+                )
+                >= 2
+            )
+            kind = (
+                "table_header"
+                if not table_block_open or repeated_header
+                else "table_row"
+            )
             table_block_open = True
+            if kind == "table_header":
+                table_header_cells = cells
             lines.append(
                 StructuredLine(
                     start,
                     end,
                     kind,
                     raw,
-                    cells=tuple(part.strip() for part in raw.split(" | ")),
+                    cells=cells,
                 )
             )
             continue
         table_block_open = False
+        table_header_cells = None
         list_match = _LIST_LINE_RE.match(raw)
         if list_match:
             lines.append(

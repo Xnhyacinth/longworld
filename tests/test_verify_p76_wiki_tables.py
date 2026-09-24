@@ -18,6 +18,7 @@ def test_reader_verifier_accepts_only_known_export_schemas() -> None:
         == 100000
     )
     assert _token_limit({"schema": "longworld.p76-wiki-table-pairs.v5"}) == 262144
+    assert _token_limit({"schema": "longworld.p76-wiki-table-scan.v2"}) == 262144
     with pytest.raises(ValueError, match="unsupported"):
         _token_limit({"schema": "arbitrary"})
     with pytest.raises(ValueError, match="invalid"):

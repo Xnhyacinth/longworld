@@ -58,6 +58,34 @@ def test_table_cell_requires_subject_header_and_value_alignment():
     ).supported
 
 
+def test_table_fact_cannot_borrow_an_older_header_after_column_changes():
+    text = (
+        "# List of test hospitals\n"
+        "Name (other name) | Location | Established\n"
+        "Alpha Hospital | Athens | 1900\n"
+        "Name (other name) | Location | Established/New building\n"
+        "Beta Hospital | Athens | 2000\n"
+    )
+    start = text.rindex("2000")
+    fact = Fact(
+        "f1",
+        "e1",
+        "established in",
+        2000,
+        "year",
+        qualifiers={"table_column": "Established"},
+        supporting_spans=(SpanRef("d1", start, start + 4),),
+    )
+    world = SemanticWorld(
+        (Document("d1", "List of test hospitals", text),),
+        (Entity("e1", "Beta Hospital"),),
+        (fact,),
+    )
+    check = check_locate_fact(world, fact)
+    assert not check.supported
+    assert "nearest table header" in check.reason
+
+
 def test_value_mention_alone_does_not_support_false_subject_claim():
     text = "Desert ecology is a field. Deserts are located in Antarctica."
     start = text.index("Antarctica")

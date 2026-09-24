@@ -49,10 +49,19 @@ def _table_check(
     rows = row.split(" | ")
     if not rows or rows[0].strip() not in _subject_surfaces(world, fact):
         return EvidenceCheck(False, "table row does not identify fact subject")
-    for header_line in reversed(doc.text[:row_start].splitlines()):
-        headers = header_line.split(" | ")
-        if column not in headers or len(headers) != len(rows):
+    for line in reversed(wiki_adapter.structured_lines(doc.text)):
+        if line.start >= row_start:
             continue
+        if line.kind == "heading":
+            break
+        if line.kind != "table_header":
+            continue
+        header_line = line.text
+        headers = line.cells
+        if column not in headers or len(headers) != len(rows):
+            return EvidenceCheck(
+                False, "nearest table header does not match fact column"
+            )
         index = headers.index(column)
         if index == 0 or not (0 <= index < len(rows)):
             continue

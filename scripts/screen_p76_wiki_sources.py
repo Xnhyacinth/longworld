@@ -38,7 +38,10 @@ def screen(path: Path) -> dict:
             rejected[check.reason] += 1
             continue
         structural[key] += 1
-        if not _TEMPLATE_DEBRIS.search(str(fact.value)):
+        subject_cell = check.row.split(" | ", 1)[0] if check.row else ""
+        if not _TEMPLATE_DEBRIS.search(str(fact.value)) and not _TEMPLATE_DEBRIS.search(
+            subject_cell
+        ):
             clean[key] += 1
             doc_ids = {span.doc_id for span in fact.supporting_spans}
             if len(doc_ids) == 1:
@@ -87,8 +90,8 @@ def main() -> None:
     if not paths:
         parser.error("no frozen snapshots found")
     result = {
-        "schema": "longworld.p76.wiki-source-screen.v1",
-        "scope": "source routing only; no tasks or long-dependency admission",
+        "schema": "longworld.p76.wiki-source-screen.v2",
+        "scope": "source routing, checked row/header/value with subject-and-value template debris excluded; no task or long-dependency admission",
         "groups": [screen(path) for path in paths],
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
