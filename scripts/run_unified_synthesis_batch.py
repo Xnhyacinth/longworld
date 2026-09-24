@@ -21,6 +21,8 @@ sys.path.insert(0, str(ROOT))
 SCHEMA = "longworld.unified-synthesis-plan.v1"
 KINDS = {
     "wiki_source_pool",
+    "wiki_candidate_delta",
+    "wiki_row_join_probe",
     "finance_taskbank",
     "codeforge_taskbank",
     "capability_records",
@@ -113,6 +115,75 @@ def _execute(entry: dict[str, Any], *, workers: int) -> dict[str, Any]:
     config = _root_file(entry["config"])
     output = _root_output(entry["output"])
     kind = entry["kind"]
+    if kind == "wiki_candidate_delta":
+        from longworld.synthesis.wiki_delta_adapter import (
+            project_delta,
+            verify_delta,
+        )
+
+        delta_config = _json(config)
+        if set(delta_config) != {"schema_version", "native_pool", "base_merged"} or (
+            delta_config["schema_version"] != "longworld.wiki-delta-lane.v1"
+        ):
+            raise ValueError("invalid Wiki delta lane configuration")
+        native_pool = _root_output(delta_config["native_pool"])
+        base_merged = _root_output(delta_config["base_merged"])
+        if not output.exists():
+            project_delta(native_pool, base_merged, output)
+        result = verify_delta(output, native_pool, base_merged)
+        index_path = output / "sample_index.jsonl"
+        groups: set[str] = set()
+        domains: set[str] = set()
+        with index_path.open(encoding="utf-8") as index_stream:
+            for line in index_stream:
+                row = json.loads(line)
+                groups.add(row["source_group"])
+                domains.add(row["domain"])
+        manifest = _json(output / "manifest.json")
+        return {
+            "source_kind": "real_wiki",
+            "status": "verified_native_candidate",
+            "rows": result["rows"],
+            "semantic_tasks": result["new_independent_semantic_tasks"],
+            "source_groups": len(groups),
+            "operations": manifest["operations"],
+            "domains": sorted(domains),
+            "train_ready": False,
+            "paths": {
+                "train": str(output / "candidate_train.jsonl"),
+                "eval": str(output / "candidate_eval.jsonl"),
+                "sample_index": str(index_path),
+                "manifest": str(output / "manifest.json"),
+            },
+            "native_receipt_sha256": _sha(output / "ADAPTER_RECEIPT.json"),
+        }
+    if kind == "wiki_row_join_probe":
+        from scripts.probe_wiki_row_binding import run as run_row_join
+        from scripts.probe_wiki_row_binding import verify_output
+
+        if not output.exists():
+            run_row_join(config, output)
+        verified = verify_output(config, output)
+        manifest = _json(output / "manifest.json")
+        if verified["verified_rows"] != manifest["views"]:
+            raise ValueError("Wiki row join reader count changed")
+        return {
+            "source_kind": "real_wiki",
+            "status": "verified_native_candidate",
+            "rows": manifest["views"],
+            "semantic_tasks": manifest["independent_tasks"],
+            "source_groups": manifest["productive_groups"],
+            "operations": {"cross_document_table_join": manifest["views"]},
+            "domains": manifest["domains"],
+            "train_ready": False,
+            "paths": {
+                "train": str(output / "train.jsonl"),
+                "eval": str(output / "eval.jsonl"),
+                "sample_index": str(output / "sample_index.jsonl"),
+                "manifest": str(output / "manifest.json"),
+            },
+            "native_receipt_sha256": _sha(output / "manifest.json"),
+        }
     if kind == "wiki_source_pool":
         from scripts.run_source_pool_batch import run
 
@@ -185,13 +256,17 @@ def _verified_base_batch(base_batch: Path) -> tuple[dict[str, Any], str]:
     merged = verify_merge(base_batch / "merged")
     base_sha = _sha(base_batch / "merged/manifest.json")
     manifest = _json(base_batch / "manifest.json")
+    plan_path = base_batch / "plan.json"
+    base_plan = _json(plan_path)
     receipts = manifest.get("lane_receipt_sha256")
     if (
         manifest.get("schema_version") != "longworld.unified-synthesis-batch.v1"
+        or manifest.get("plan_sha256") != _sha(plan_path)
         or manifest.get("merged_manifest_sha256") != base_sha
         or manifest.get("candidate_views") != merged["candidate_views"]
         or not isinstance(receipts, dict)
         or manifest.get("source_count") != len(receipts)
+        or {entry["name"] for entry in base_plan["sources"]} != set(receipts)
     ):
         raise ValueError("base batch and merged reader manifest disagree")
     for name, digest in receipts.items():
@@ -205,6 +280,42 @@ def _verified_base_batch(base_batch: Path) -> tuple[dict[str, Any], str]:
         or sum(lane_rows.values()) != merged["candidate_views"]
     ):
         raise ValueError("base native lanes and merged reader counts disagree")
+    indexed_receipts: dict[str, set[str]] = {}
+    with (base_batch / "merged/sample_index.jsonl").open(encoding="utf-8") as stream:
+        for line in stream:
+            row = json.loads(line)
+            indexed_receipts.setdefault(row["source_name"], set()).add(
+                row["receipt_sha256"]
+            )
+    for name in receipts:
+        lane = _json(base_batch / f"{name}.json")
+        paths = lane.get("paths", {})
+        kind = lane.get("kind")
+        if kind == "wiki_source_pool":
+            native_paths = [Path(paths["manifest"]).parent.parent / "result.json"]
+        elif kind == "capability_records":
+            native_paths = [Path(paths["manifest"])]
+        elif kind == "finance_taskbank":
+            native_paths = [
+                Path(issuer["receipt"]) for issuer in paths["issuers"].values()
+            ]
+            native_paths.append(Path(paths["batch_receipt"]))
+        elif kind == "codeforge_taskbank":
+            native_paths = [Path(paths["receipt"])]
+        elif kind == "wiki_candidate_delta":
+            native_paths = [Path(paths["manifest"]).parent / "ADAPTER_RECEIPT.json"]
+        elif kind == "wiki_row_join_probe":
+            native_paths = [Path(paths["manifest"])]
+        else:
+            continue
+        actual = {_sha(path) for path in native_paths}
+        if kind != "wiki_candidate_delta" and not indexed_receipts.get(
+            name, set()
+        ).issubset(actual):
+            raise ValueError(f"base native receipt changed: {name}")
+        pinned = lane.get("native_receipt_sha256")
+        if pinned is not None and pinned not in actual:
+            raise ValueError(f"base native receipt changed: {name}")
     return manifest, base_sha
 
 
@@ -219,6 +330,32 @@ def run(
     if workers < 1:
         raise ValueError("workers must be positive")
     resolved = plan(config_path)
+    base_sha = None
+    base_lanes: dict[str, dict[str, Any]] = {}
+    base_entries: dict[str, dict[str, Any]] = {}
+    if base_batch is not None:
+        base_batch = Path(base_batch)
+        base_manifest, base_sha = _verified_base_batch(base_batch)
+        base_entries = {
+            entry["name"]: entry for entry in _json(base_batch / "plan.json")["sources"]
+        }
+        base_lanes = {
+            name: _json(base_batch / f"{name}.json")
+            for name in base_manifest["lane_receipt_sha256"]
+        }
+        if set(base_lanes) - {entry["name"] for entry in resolved["sources"]}:
+            raise ValueError("append plan removed a base source lane")
+    for entry in resolved["sources"]:
+        if entry["kind"] != "wiki_candidate_delta" or entry["name"] in base_lanes:
+            continue
+        if base_batch is None:
+            raise ValueError("Wiki delta lane requires a frozen base batch")
+        delta_config = _json(_root_file(entry["config"]))
+        if (
+            _root_output(delta_config["base_merged"]).resolve()
+            != (base_batch / "merged").resolve()
+        ):
+            raise ValueError("Wiki delta lane base differs from append base")
     if output_dir.exists():
         if not resume or _json(output_dir / "plan.json") != resolved:
             raise ValueError("existing unified output needs matching --resume")
@@ -229,39 +366,38 @@ def run(
         (output_dir / "plan.json").write_text(json.dumps(resolved, indent=2) + "\n")
     lanes: dict[str, Any] = {}
     for entry in resolved["sources"]:
-        existed_before = _root_output(entry["output"]).exists()
-        result = _execute(entry, workers=workers)
-        if result.get("rows", 0) < 1 or result.get("train_ready") is True:
-            raise ValueError(f"invalid candidate-only result for {entry['name']}")
-        lanes[entry["name"]] = {
-            "kind": entry["kind"],
-            "declared_generation_cohort": entry["generation"],
-            "adoption_mode": "verified_existing"
-            if existed_before
-            else "built_by_batch",
-            "config_sha256": entry["config_sha256"],
-            **result,
-        }
-        lane_path = output_dir / f"{entry['name']}.json"
-        if lane_path.exists():
-            if _json(lane_path) != lanes[entry["name"]]:
-                raise ValueError(f"native lane receipt changed: {entry['name']}")
+        name = entry["name"]
+        if name in base_lanes:
+            if entry != base_entries[name]:
+                raise ValueError(f"append plan changed frozen base lane: {name}")
+            lanes[name] = base_lanes[name]
         else:
-            lane_path.write_text(json.dumps(lanes[entry["name"]], indent=2) + "\n")
+            existed_before = _root_output(entry["output"]).exists()
+            result = _execute(entry, workers=workers)
+            if result.get("rows", 0) < 1 or result.get("train_ready") is True:
+                raise ValueError(f"invalid candidate-only result for {name}")
+            lanes[name] = {
+                "kind": entry["kind"],
+                "declared_generation_cohort": entry["generation"],
+                "adoption_mode": "verified_existing"
+                if existed_before
+                else "built_by_batch",
+                "config_sha256": entry["config_sha256"],
+                **result,
+            }
+        lane_path = output_dir / f"{name}.json"
+        if lane_path.exists():
+            if _json(lane_path) != lanes[name]:
+                raise ValueError(f"native lane receipt changed: {name}")
+        else:
+            lane_path.write_text(json.dumps(lanes[name], indent=2) + "\n")
     from longworld.synthesis.unified_candidate_merge import append, merge, verify_merge
 
     merged_dir = output_dir / "merged"
-    base_sha = None
     new_lanes = lanes
     if base_batch is not None:
-        base_batch = Path(base_batch)
-        base_manifest, base_sha = _verified_base_batch(base_batch)
-        base_names = set(base_manifest["lane_receipt_sha256"])
-        for name in base_names:
-            if name not in lanes or lanes[name] != _json(base_batch / f"{name}.json"):
-                raise ValueError(f"base lane changed before append: {name}")
         new_lanes = {
-            name: lane for name, lane in lanes.items() if name not in base_names
+            name: lane for name, lane in lanes.items() if name not in base_lanes
         }
         if not new_lanes:
             raise ValueError("base append has no new source lanes")
@@ -270,9 +406,15 @@ def run(
         if merged.get("base_manifest_sha256") != base_sha:
             raise ValueError("merged base batch changed")
     elif base_batch is None:
-        merged = merge(output_dir, merged_dir, lanes)
+        merged = merge(output_dir, merged_dir, lanes, workers=workers)
     else:
-        merged = append(output_dir, base_batch / "merged", merged_dir, new_lanes)
+        merged = append(
+            output_dir,
+            base_batch / "merged",
+            merged_dir,
+            new_lanes,
+            workers=workers,
+        )
     if merged["candidate_views"] != sum(lane["rows"] for lane in lanes.values()):
         raise ValueError("unified candidate merge lost native rows")
     by_kind = Counter()

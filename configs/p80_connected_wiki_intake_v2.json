@@ -1,0 +1,14 @@
+{
+  "schema": "longworld.connected-wiki-intake.v1",
+  "base_pool": "data/capability_records/p78_wiki_topic_discovery_broad_v1/source_pool.json",
+  "seeds": [
+    {
+      "name": "observatory_complements",
+      "anchor_source": "wiki_observatories",
+      "max_queries": 27,
+      "results_per_query": 10,
+      "max_previews": 30,
+      "max_freezes": 3
+    }
+  ]
+}

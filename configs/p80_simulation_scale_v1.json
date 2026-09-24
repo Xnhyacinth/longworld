@@ -1,0 +1,84 @@
+{
+  "schema_version": "longworld.record-world-config.v1",
+  "world_seed_base": 1200000,
+  "families": [
+    "filter_aggregate",
+    "group_compare",
+    "join_lookup",
+    "alias_locate",
+    "asof_state",
+    "rule_holdout",
+    "join_unanswerable"
+  ],
+  "depths": [
+    1,
+    2
+  ],
+  "lengths": [
+    200,
+    800,
+    3200
+  ],
+  "consumed_by_depth": {
+    "1": 20,
+    "2": 60,
+    "3": 200
+  },
+  "variants_per_world": 4,
+  "worlds_per_cell": 8,
+  "worlds_per_cell_by_family": {
+    "filter_aggregate": 8,
+    "group_compare": 8,
+    "join_lookup": 8,
+    "alias_locate": 8,
+    "asof_state": 8,
+    "rule_holdout": 8,
+    "join_unanswerable": 8
+  },
+  "depths_by_family": {
+    "filter_aggregate": [
+      1,
+      2
+    ],
+    "group_compare": [
+      1,
+      2
+    ],
+    "join_lookup": [
+      1,
+      2
+    ],
+    "alias_locate": [
+      1,
+      2
+    ],
+    "asof_state": [
+      1,
+      2
+    ],
+    "rule_holdout": [
+      1,
+      2
+    ],
+    "join_unanswerable": [
+      1
+    ]
+  },
+  "token_targets_by_depth": {
+    "1": [
+      32768,
+      65536,
+      131072
+    ],
+    "2": [
+      32768,
+      65536,
+      131072
+    ]
+  },
+  "workers": 4,
+  "trained_rule_family": "threshold_class",
+  "notes": {
+    "purpose": "P80 fresh multiprocessing coverage across seven families, two depths, three token targets; candidate only"
+  }
+}

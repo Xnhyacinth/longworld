@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from longworld.synthesis.unified_candidate_merge import (
     READERS,
     _indexed_rows,
     _simulation,
+    _wiki_delta,
     append,
     merge,
     verify_merge,
@@ -115,6 +117,66 @@ def test_simulation_hashes_source_without_question(tmp_path: Path) -> None:
     assert candidate.input_tokens == 92
 
 
+def test_wiki_delta_joins_declared_split_and_checks_reader_identity(
+    tmp_path: Path,
+) -> None:
+    candidate = NativeCandidate(
+        sample_id="delta-a",
+        task_key='["real_wiki","group-a","task-a"]',
+        semantic_task_id="task-a",
+        source_kind="real_wiki",
+        source_group="group-a",
+        receipt_sha256="a" * 64,
+        domain="nature",
+        topic="parks",
+        operation="table_cell_lookup",
+        evidence_profile="native",
+        evidence_status="checked",
+        dependency_status="scoped",
+        tokenizer_profile="pinned-chat-template",
+        split="eval",
+        context_sha256="b" * 64,
+        answer_sha256=hashlib.sha256(b'"answer"').hexdigest(),
+        full_chat_tokens=100,
+        input_tokens=90,
+        supervised_tokens=10,
+        length_bin="lt32k",
+        source_length_label=None,
+    )
+    index = {
+        **candidate.to_dict(),
+        "output_file": "candidate_eval.jsonl",
+        "row_index": 0,
+    }
+    index_path = tmp_path / "sample_index.jsonl"
+    _write_rows(index_path, [index])
+    train = tmp_path / "candidate_train.jsonl"
+    eval_path = tmp_path / "candidate_eval.jsonl"
+    _write_rows(train, [])
+    messages = [
+        {"role": "user", "content": "context\nQuestion"},
+        {"role": "assistant", "content": '"answer"'},
+    ]
+    _write_rows(eval_path, [{"sample_id": "delta-a", "messages": messages}])
+    lane = {
+        "paths": {
+            "sample_index": str(index_path),
+            "train": str(train),
+            "eval": str(eval_path),
+        }
+    }
+    assert next(_wiki_delta(lane))[0] == candidate
+    index["output_file"] = "candidate_train.jsonl"
+    _write_rows(index_path, [index])
+    with pytest.raises(ValueError, match="split/output"):
+        list(_wiki_delta(lane))
+    index["output_file"] = "candidate_eval.jsonl"
+    _write_rows(index_path, [index])
+    _write_rows(eval_path, [{"sample_id": "other", "messages": messages}])
+    with pytest.raises(ValueError, match="sample ID mismatch"):
+        list(_wiki_delta(lane))
+
+
 def test_append_reuses_verified_reader_bytes_and_deduplicates_task(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -177,6 +239,9 @@ def test_append_reuses_verified_reader_bytes_and_deduplicates_task(
             "first": hashlib.sha256(lane_receipt.read_bytes()).hexdigest()
         },
     }
+    plan_path = base_batch / "plan.json"
+    plan_path.write_text(json.dumps({"sources": [{"name": "first"}]}))
+    base_manifest["plan_sha256"] = hashlib.sha256(plan_path.read_bytes()).hexdigest()
     (base_batch / "manifest.json").write_text(json.dumps(base_manifest))
     _verified_base_batch(base_batch)
     base_bytes = (base_dir / "candidate_train.jsonl").read_bytes()
@@ -217,3 +282,73 @@ def test_partial_native_lane_requires_new_output(
         runner._execute(
             {"kind": kind, "config": "ignored", "output": "ignored"}, workers=1
         )
+
+
+def test_parallel_finance_merge_matches_serial_and_rejects_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from scripts import materialize_finance_histories, train_sft
+
+    root = tmp_path / "native"
+    issuer = root / "issuer"
+    (issuer / "contexts").mkdir(parents=True)
+    (root / "BATCH_RECEIPT.json").write_text(json.dumps({"jobs": [{"name": "issuer"}]}))
+    (issuer / "BUILD_RECEIPT.json").write_text(
+        json.dumps({"tokenizer": {"model_id": "pinned", "revision": "revision"}})
+    )
+    tasks, readers = [], []
+    for number in range(4):
+        context = f"Source fact number {number}."
+        (issuer / f"contexts/{number}.txt").write_text(context)
+        tasks.append(
+            {
+                "sample_id": f"sample-{number}",
+                "semantic_task_id": f"task-{number}",
+                "split": "train",
+                "split_group_id": "issuer-group",
+                "context_sha256": hashlib.sha256(context.encode()).hexdigest(),
+                "context_path": f"contexts/{number}.txt",
+                "task_spec": {"family": "lookup"},
+            }
+        )
+        readers.append(
+            {
+                "sample_id": f"sample-{number}",
+                "messages": [
+                    {"role": "user", "content": f"{context}\nQuestion {number}"},
+                    {"role": "assistant", "content": f'"answer-{number}"'},
+                ],
+            }
+        )
+    _write_rows(issuer / "tasks.jsonl", tasks)
+    _write_rows(issuer / "sft_candidates.jsonl", readers)
+    monkeypatch.setattr(
+        materialize_finance_histories, "_load_tokenizer", lambda *_: object()
+    )
+    worker_threads: set[int] = set()
+    barrier = threading.Barrier(2)
+
+    def tokenize(_tokenizer: object, _messages: list[dict], _limit: int) -> dict:
+        if threading.current_thread() is not threading.main_thread():
+            identifier = threading.get_ident()
+            if identifier not in worker_threads:
+                worker_threads.add(identifier)
+                barrier.wait(timeout=5)
+        return {"labels": [-100] * 20 + [1] * 5}
+
+    monkeypatch.setattr(train_sft, "tokenize_assistant_only", tokenize)
+    lane = {"kind": "finance_taskbank", "rows": 4, "paths": {"root": str(root)}}
+    serial = merge(tmp_path, tmp_path / "serial", {"finance": lane}, workers=1)
+    parallel = merge(tmp_path, tmp_path / "parallel", {"finance": lane}, workers=2)
+    assert len(worker_threads) == 2
+    assert serial == parallel
+    for name in ("candidate_train.jsonl", "candidate_eval.jsonl", "sample_index.jsonl"):
+        assert (tmp_path / "serial" / name).read_bytes() == (
+            tmp_path / "parallel" / name
+        ).read_bytes()
+
+    readers[2]["sample_id"] = "wrong-sample"
+    _write_rows(issuer / "sft_candidates.jsonl", readers)
+    with pytest.raises(ValueError, match="Finance task and reader sample disagree"):
+        merge(tmp_path, tmp_path / "rejected", {"finance": lane}, workers=2)
+    assert not (tmp_path / "rejected").exists()

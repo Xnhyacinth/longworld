@@ -1,0 +1,5 @@
+{
+  "schema_version": "longworld.wiki-delta-lane.v1",
+  "native_pool": "data/candidates/p80_wiki_task_scale_v1",
+  "base_merged": "data/candidates/p79_unified_with_concat_v1/merged"
+}

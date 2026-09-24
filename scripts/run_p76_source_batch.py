@@ -145,7 +145,7 @@ def preflight(
             for key in ("domain", "topic")
         ):
             raise ValueError(f"missing domain/topic: {name}")
-        if not isinstance(job.get("max_tasks"), int) or not 1 <= job["max_tasks"] <= 32:
+        if not isinstance(job.get("max_tasks"), int) or not 1 <= job["max_tasks"] <= 96:
             raise ValueError(f"invalid max_tasks: {name}")
         if recipe == "wiki_table_scan" and not job.get("table_title"):
             raise ValueError(f"scan job lacks table_title: {name}")

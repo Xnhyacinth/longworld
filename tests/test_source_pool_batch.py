@@ -53,6 +53,20 @@ def test_source_pool_rejects_unpinned_and_unsupported_recipe() -> None:
         _planned(config)
 
 
+def test_source_pool_supports_bounded_larger_task_quota() -> None:
+    config = json.loads(CONFIG.read_text(encoding="utf-8"))
+    if any(
+        not (ROOT / item["snapshot"]["path"]).is_file() for item in config["sources"]
+    ):
+        pytest.skip("frozen source pool is not mounted")
+    config["max_tasks_by_recipe"]["wiki_table_lookup"] = 96
+    jobs, _ = _planned(config)
+    assert any(job["max_tasks"] == 96 for job in jobs["jobs"])
+    config["max_tasks_by_recipe"]["wiki_table_lookup"] = 97
+    with pytest.raises(ValueError, match="bounded recipe quotas"):
+        _planned(config)
+
+
 def test_snapshot_metadata_must_match_pinned_source(tmp_path: Path) -> None:
     path = tmp_path / "source.json"
     path.write_text(

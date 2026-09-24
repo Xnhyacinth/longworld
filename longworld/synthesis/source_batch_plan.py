@@ -49,7 +49,7 @@ def expand(
         raise ValueError("source pool requested_recipes invalid")
     quotas = config.get("max_tasks_by_recipe")
     if not isinstance(quotas, dict) or any(
-        type(quotas.get(recipe)) is not int or not 1 <= quotas[recipe] <= 32
+        type(quotas.get(recipe)) is not int or not 1 <= quotas[recipe] <= 96
         for recipe in requested
     ):
         raise ValueError("source pool needs bounded recipe quotas")
