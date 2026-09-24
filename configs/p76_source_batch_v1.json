@@ -1,0 +1,122 @@
+{
+  "schema": "longworld.p76-source-batch-config.v1",
+  "prior_source_manifest": {
+    "path": "data/p75_real_reader_candidates_v1/source_manifest.jsonl",
+    "sha256": "436bc1623736dbefe00afd5d9d582380805e619792367bef02f8354b015be270"
+  },
+  "jobs": [
+    {
+      "name": "astronomy_table_pair",
+      "recipe": "wiki_table_pair",
+      "snapshot": {
+        "path": "data/capability_records/p74_wiki_snapshot_v1/astronomical_observatories_snapshot.json",
+        "sha256": "26e496257a005e5dfd983d357a690585c8465e063d56b662de4161b244ee1a80",
+        "snapshot_id": "snapshot_fbc7c0b18c87d85cbea3",
+        "revisions": {
+          "Astronomical observatory": 1262280884,
+          "CCOR-1": 1375615527,
+          "Cosmic-ray observatory": 1375378834,
+          "Cryogenic Observatory for Signatures Seen in Next-Generation Underground Searches": 1316176460,
+          "Equatorial room": 1368147009,
+          "Gravitational-wave observatory": 1370776656,
+          "List of astronomical observatories": 1373277034,
+          "List of highest astronomical observatories": 1354977611,
+          "List of observatory codes": 1370782680,
+          "Observatory of Bologna": 1364208499,
+          "SISTINE": 1336546707,
+          "Solar telescope": 1348186964,
+          "Space telescope": 1376349857,
+          "Taiji program": 1376328822,
+          "Timeline of telescopes, observatories, and observing technology": 1372796102
+        }
+      },
+      "domain": "astronomy",
+      "topic": "astronomical_observatories",
+      "split": "train",
+      "max_tasks": 24,
+      "length_policy": "paired_32k_64k_or_native"
+    },
+    {
+      "name": "universities_table_pair",
+      "recipe": "wiki_table_pair",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v4/universities_snapshot.json",
+        "sha256": "95dbd60135fdcc10fa0235c1fb56585fa2f3f74ead274ef41c75dd08176c55a0",
+        "snapshot_id": "snapshot_9efe7ed148e8ba67ab2b",
+        "revisions": {
+          "List of universities in England": 1367015465,
+          "List of universities in Ireland": 1310622919,
+          "List of universities in Scotland": 1333547869,
+          "List of universities in Wales": 1360131643
+        }
+      },
+      "domain": "education",
+      "topic": "universities",
+      "split": "eval",
+      "max_tasks": 4,
+      "length_policy": "paired_32k_64k_or_native"
+    },
+    {
+      "name": "parks_table_scan",
+      "recipe": "wiki_table_scan",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v4/parks_snapshot.json",
+        "sha256": "3b808804bb435847c8f3f199664e1cf0e485fc3621f4c4f335cd6443873c6b6a",
+        "snapshot_id": "snapshot_c363c5af8780a75d524b",
+        "revisions": {
+          "List of national parks of Canada": 1361235905,
+          "List of national parks of India": 1375345091,
+          "List of national parks of Japan": 1367926306,
+          "List of national parks of the United States": 1372953537
+        }
+      },
+      "domain": "nature",
+      "topic": "national_parks",
+      "split": "train",
+      "max_tasks": 8,
+      "length_policy": "native_whole_pages",
+      "table_title": "List of national parks of Japan"
+    },
+    {
+      "name": "universities_table_scan",
+      "recipe": "wiki_table_scan",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v4/universities_snapshot.json",
+        "sha256": "95dbd60135fdcc10fa0235c1fb56585fa2f3f74ead274ef41c75dd08176c55a0",
+        "snapshot_id": "snapshot_9efe7ed148e8ba67ab2b",
+        "revisions": {
+          "List of universities in England": 1367015465,
+          "List of universities in Ireland": 1310622919,
+          "List of universities in Scotland": 1333547869,
+          "List of universities in Wales": 1360131643
+        }
+      },
+      "domain": "education",
+      "topic": "universities",
+      "split": "eval",
+      "max_tasks": 8,
+      "length_policy": "native_whole_pages",
+      "table_title": "List of universities in England"
+    },
+    {
+      "name": "hospitals_table_scan",
+      "recipe": "wiki_table_scan",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v6/hospitals_snapshot.json",
+        "sha256": "95b16afb6fe9a7cf1fac768ec0540a7bfa9f92fa1f0c119f9845c9b1136f7a5e",
+        "snapshot_id": "snapshot_6351424e02d15bd4d883",
+        "revisions": {
+          "List of hospitals in Greece": 1375820760,
+          "List of hospitals in Montreal": 1334985280,
+          "List of hospitals in New York (state)": 1371142107
+        }
+      },
+      "domain": "healthcare",
+      "topic": "hospitals",
+      "split": "train",
+      "max_tasks": 8,
+      "length_policy": "native_whole_pages",
+      "table_title": "List of hospitals in Greece"
+    }
+  ]
+}

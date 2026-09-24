@@ -34,7 +34,7 @@ def _token_limit(manifest: dict) -> int:
     return limit
 
 
-def verify(directory: Path) -> dict:
+def verify(directory: Path, *, write: bool = True) -> dict:
     manifest = json.loads((directory / "manifest.json").read_text())
     for name, expected in manifest["files_sha256"].items():
         observed = hashlib.sha256((directory / name).read_bytes()).hexdigest()
@@ -125,9 +125,10 @@ def verify(directory: Path) -> dict:
         "checks": "file_hashes; source_split; no_audit_markers; reader_span_hashes; pinned_chat_tokens; assistant_only_mask",
         "train_ready": False,
     }
-    (directory / "verification.json").write_text(
-        json.dumps(result, indent=2, sort_keys=True) + "\n"
-    )
+    if write:
+        (directory / "verification.json").write_text(
+            json.dumps(result, indent=2, sort_keys=True) + "\n"
+        )
     return result
 
 
@@ -139,8 +140,13 @@ def main() -> None:
         type=Path,
         default=ROOT / "data/p75_real_reader_candidates_v1",
     )
+    parser.add_argument(
+        "--no-write",
+        action="store_true",
+        help="verify immutable exports without adding verification.json",
+    )
     args = parser.parse_args()
-    print(json.dumps(verify(args.directory), sort_keys=True))
+    print(json.dumps(verify(args.directory, write=not args.no_write), sort_keys=True))
 
 
 if __name__ == "__main__":

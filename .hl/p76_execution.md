@@ -206,6 +206,49 @@ less -R data/candidates/p76_batch_index_v5/coverage.json
 less -R data/candidates/p76_batch_index_v5/distribution.json
 ```
 
+## Actual source-native batch execution and resume
+
+`configs/p76_source_batch_v1.json` pins five qualified jobs and the prior P75
+source manifest by SHA, source snapshot ID, page revisions, domain/topic,
+recipe, split and length policy. `scripts/run_p76_source_batch.py` checks
+the actual frozen snapshots before worker launch, forms connected components
+by page title and rejects opposite train/eval exposure including prior P75
+sources. Each worker reads and tokenizes its own source; the coordinator
+handles only metadata and bounded ProcessPool dispatch. Receipts bind config,
+source, relevant code and every output file. Partial or failed jobs require a
+fresh output directory; resume reuses only fully verified jobs.
+
+The first real `--workers 2` run at `data/candidates/p76_source_batch_v1/`
+produced five jobs from four source groups: 52 independent tasks and 76
+candidate rows. Three jobs are train, two eval. A second fresh `--workers 1`
+run produced byte-identical train/eval/index/audit/reject/manifest/receipt
+files for all five jobs and the same batch manifest. An immediate resume and
+another resume after **read-only** SFT-mask verification changed zero files.
+The batch outputs are also byte-identical to the separately generated v5
+pair and v2 scan candidates. The generated `inventory_inputs.json` fed the
+unified index directly; its round-trip coverage is 9,194 source rows, 9,064
+distinct sample views, 9,040 independent tasks and zero index rejects. No
+GPU training or release promotion was run; the batch manifest says
+`train_ready=false`.
+
+Read-only mask verification across the five batch job directories found 1,288
+exact proof-span/token mappings and 3,438 supervised tokens, with all file
+hashes and assistant-only boundaries valid. These are loader-contract checks,
+not independent natural-language reader performance.
+
+```bash
+uv run python scripts/run_p76_source_batch.py --config configs/p76_source_batch_v1.json --output-dir data/candidates/p76_source_batch_v1 --workers 2
+uv run python scripts/run_p76_source_batch.py --config configs/p76_source_batch_v1.json --output-dir data/candidates/p76_source_batch_v1 --workers 2 --resume
+less -R data/candidates/p76_source_batch_v1/batch_manifest.json
+less -R data/candidates/p76_source_batch_v1/inventory_inputs.json
+less -R data/candidates/p76_batch_index_v6_from_source_batch/coverage.json
+```
+
+As above, the first command requires a **new** output directory on rerun.
+The present five-job batch proves deterministic orchestration and native
+reader compilation. It is still far below the source-diverse, quality-filtered
+scale gate for a model utility experiment.
+
 ## Research decisions for scaling
 
 The source-native route follows [QwenLong-L1.5](https://arxiv.org/abs/2512.12967)
