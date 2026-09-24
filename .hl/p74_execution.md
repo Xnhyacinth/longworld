@@ -27,6 +27,11 @@ capability_mutations.py 的 witness_report 现在按三指标返回每个变异:
 新 C/D 臂(arms.json,语义阈值 0.5):D=360 行、C=360 行;总重叠 76.1%;
 **set_complete 重叠 0%**(D 全 witness-rich / C 全 witness-poor——第一个真
 对比族);asof/filter 仍 100%(该两族 witness-poor 训练池为 0,如实记录)。
+细节(w0-metrics 报告):C∪D 覆盖 446/448(2 条 set_complete fraction-0.0
+行落两臂之外,arms.json notes 已记);alias 的 poor 池(16 行)依赖
+nearest_lexical 的 18 个报错保持报错——若下波把它们修成合法输出,poor 池
+可能重新缩小。wrong_rule_family 语义化后 4/84 有效输出,与
+tighten_one_condition(1/84)并列为变异刷新候选。
 结论:重叠问题部分缓解;干净 D>C 对照还需要 witness-poor 池加大的银行
 (下波规模决策)。
 
@@ -73,9 +78,15 @@ scope recovery True。28 测试覆盖章程 §15 的 (a)-(f)。
 (CLI;live API / 本地缓存 / BLOCKER 退出码 3 三态)。**真实冻结成功**:
 Category:Astronomical observatories → 15 页(revid 钉死,32 次 HTTP,
 live-api)→ 2,781 实体 / 196 facts / 34 relations / 15 条 ungrounded 隔离;
-**196/196 span 抽验逐字命中**;许可如实记录(CC-BY-SA,per-page URL 留
+**196/196 span 抽验逐字命中**;许可如实记录(CC-BY-SA-4.0,per-page URL 留
 attribution)。快照落 `data/capability_records/p74_wiki_snapshot_v1/`(data/
 按先例不入库,manifest 引用其路径)。17 嵌入式 fixture 测试(无网络)。
+**接线契约注记(t4-wiki 报告)**:快照的 `documents[].text` 是冻结 wikitext
+经适配器渲染的视图(渲染规则见模块 docstring),不是原始 wikitext——下波
+T1/T2 编译器消费的是渲染文本 + span,溯源时以 revid 钉死的原始 revision
+为准。缓存回退路径已端到端验证(3 页 local-cache,0 HTTP);本地历史
+wikimedia 抓取(p7/p10/p12 系)是单 title revision JSON,无 category 列表,
+故冻结走 live-first。
 
 ## 未做(下一波,按章程)
 
