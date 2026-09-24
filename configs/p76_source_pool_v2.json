@@ -1,0 +1,159 @@
+{
+  "schema": "longworld.source-batch-pool.v2",
+  "prior_source_manifest": {
+    "path": "data/p75_real_reader_candidates_v1/source_manifest.jsonl",
+    "sha256": "436bc1623736dbefe00afd5d9d582380805e619792367bef02f8354b015be270"
+  },
+  "requested_recipes": [
+    "wiki_table_pair",
+    "wiki_table_scan",
+    "wiki_table_lookup"
+  ],
+  "max_tasks_by_recipe": {
+    "wiki_table_pair": 24,
+    "wiki_table_scan": 16,
+    "wiki_table_lookup": 32
+  },
+  "sources": [
+    {
+      "name": "wiki_observatories",
+      "domain": "astronomy",
+      "topic": "astronomical_observatories",
+      "split": "train",
+      "snapshot": {
+        "path": "data/capability_records/p74_wiki_snapshot_v1/astronomical_observatories_snapshot.json",
+        "sha256": "26e496257a005e5dfd983d357a690585c8465e063d56b662de4161b244ee1a80"
+      }
+    },
+    {
+      "name": "wiki_astronomy_lists",
+      "domain": "astronomy",
+      "topic": "astronomy_lists",
+      "split": "train",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v4/astronomy_snapshot.json",
+        "sha256": "d94d755e76e96f3190e717a184fc833192f6f00780c4c4a1b28238edac61a8b4"
+      }
+    },
+    {
+      "name": "wiki_bridges_lists",
+      "domain": "infrastructure",
+      "topic": "bridges_lists",
+      "split": "train",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v4/bridges_snapshot.json",
+        "sha256": "b190721a72239c9c18f51b60115ccc763428d292e6be7fee68b3faa7a42ddea3"
+      }
+    },
+    {
+      "name": "wiki_mountains_lists",
+      "domain": "geography",
+      "topic": "mountains_lists",
+      "split": "train",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v4/mountains_snapshot.json",
+        "sha256": "458fcafd692a73b6f81f3b531b641d97b3dbf17defa46303f9f03e18035a3e6d"
+      }
+    },
+    {
+      "name": "wiki_museums_lists",
+      "domain": "culture",
+      "topic": "museums_lists",
+      "split": "eval",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v4/museums_snapshot.json",
+        "sha256": "20e075a3724c26a035e2a6f948abfd17a6d66dde47082dfd4312db7a7b604886"
+      }
+    },
+    {
+      "name": "wiki_parks_expansion_lists",
+      "domain": "nature",
+      "topic": "parks_expansion_lists",
+      "split": "train",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v4/parks_expansion_snapshot.json",
+        "sha256": "e5f1350d8c5520d3bfc22f623a9475fda188a0d343872c0417f43fad0c87b391"
+      }
+    },
+    {
+      "name": "wiki_parks_lists",
+      "domain": "nature",
+      "topic": "parks_lists",
+      "split": "train",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v4/parks_snapshot.json",
+        "sha256": "3b808804bb435847c8f3f199664e1cf0e485fc3621f4c4f335cd6443873c6b6a"
+      }
+    },
+    {
+      "name": "wiki_universities_expansion_lists",
+      "domain": "education",
+      "topic": "universities_expansion_lists",
+      "split": "eval",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v4/universities_expansion_snapshot.json",
+        "sha256": "273f31c2f087e9eb481f5a610dee3fd7b43db5899552e710df15b0557bc616bf"
+      }
+    },
+    {
+      "name": "wiki_universities_lists",
+      "domain": "education",
+      "topic": "universities_lists",
+      "split": "eval",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v4/universities_snapshot.json",
+        "sha256": "95dbd60135fdcc10fa0235c1fb56585fa2f3f74ead274ef41c75dd08176c55a0"
+      }
+    },
+    {
+      "name": "wiki_airports",
+      "domain": "transport",
+      "topic": "airports",
+      "split": "train",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v5/airports_snapshot.json",
+        "sha256": "1e80769d27dd23aff4453c463e490e327f35069cdbbb6dd38e42f02249e42384"
+      }
+    },
+    {
+      "name": "wiki_botanical_gardens",
+      "domain": "biology",
+      "topic": "botanical_gardens",
+      "split": "train",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v5/botanical_snapshot.json",
+        "sha256": "939b9dbd1d5d23f0cb08c8572fa3e3e7a29e5fd45ab887da7288371fe551d877"
+      }
+    },
+    {
+      "name": "wiki_libraries",
+      "domain": "culture",
+      "topic": "libraries",
+      "split": "train",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v5/libraries_snapshot.json",
+        "sha256": "002fbf2cacbbe2e4e904e5675f3e360d2cf2b497764c70f83b3e97691fc896f3"
+      }
+    },
+    {
+      "name": "wiki_museums_expansion",
+      "domain": "culture",
+      "topic": "museums_expansion",
+      "split": "eval",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v5/museums_expansion_snapshot.json",
+        "sha256": "b7400c91f05c3d491f38767453b3ae8207435704b7df78e52a97534292ff4648"
+      }
+    },
+    {
+      "name": "wiki_hospitals",
+      "domain": "healthcare",
+      "topic": "hospitals",
+      "split": "train",
+      "snapshot": {
+        "path": "data/capability_records/p76_wiki_titles_v6/hospitals_snapshot.json",
+        "sha256": "95b16afb6fe9a7cf1fac768ec0540a7bfa9f92fa1f0c119f9845c9b1136f7a5e"
+      }
+    }
+  ]
+}

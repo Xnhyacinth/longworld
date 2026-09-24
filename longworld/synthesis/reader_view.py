@@ -218,6 +218,9 @@ def compile_task(
     elif task.family == "table_scan" and task.template == "table_scan":
         question = task.question
         question_style = "natural_table_scan"
+    elif task.family == "table_lookup" and task.template == "table_lookup":
+        question = task.question
+        question_style = "natural_table_lookup"
     else:
         question = natural_locate_question(task)
         question_style = "natural_locate"

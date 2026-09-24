@@ -911,12 +911,20 @@ def _cell_semantics(header: str, cell: str) -> tuple[str, str, str | None] | Non
         if _YEARISH_RE.fullmatch(value):
             return "established in", value, None
         return None
+    if header_l in ("opened", "year opened"):
+        if _YEARISH_RE.fullmatch(value):
+            return "opened in", value, None
+        return None
     if header_l in ("year", "years", "period"):
         if _YEARISH_RE.fullmatch(value):
             return "active in", value, None
         return None
     if header_l in ("location", "place", "site"):
         return "located in", value, None
+    if header_l in ("city", "town", "locality"):
+        return "located in", value, None
+    if header_l in ("state", "province", "governorate", "district"):
+        return "located in region", value, None
     if header_l in (
         "name",
         "notes",
@@ -952,17 +960,11 @@ def _row_subject(
     if not line.cells:
         return None
     first = line.cells[0]
-    header0 = (table_headers[0] if table_headers else "").lower()
-    nameish = header0 in (
-        "name",
-        "observatory",
-        "telescope",
-        "institution",
-        "facility",
-        "title",
-    )
-    if nameish and first and not first.replace(",", "").replace(".", "").isdigit():
-        return first
+    name_index = _name_column_index(table_headers)
+    if name_index is not None and name_index < len(line.cells):
+        name = line.cells[name_index]
+        if name and not name.replace(",", "").replace(".", "").isdigit():
+            return name
     if (
         first
         and not _URL_JUNK_RE.search(first)
@@ -1898,17 +1900,24 @@ class WikiHttpFetcher:
 
 
 def _name_column_index(table_headers: tuple[str, ...]) -> int | None:
-    """Index of the name-ish column of a table, if the first column is one."""
+    """Return a unique subject-name column, including non-leading names."""
     if not table_headers:
         return None
-    header0 = table_headers[0].lower().strip()
-    if header0 in (
+    names = {
         "name",
+        "station name",
+        "station",
+        "stadium",
+        "zoo",
         "telescope",
         "observatory",
         "instrument",
         "facility",
         "title",
-    ):
-        return 0
-    return None
+    }
+    matches = [
+        index
+        for index, header in enumerate(table_headers)
+        if header.lower().strip() in names
+    ]
+    return matches[0] if len(matches) == 1 else None

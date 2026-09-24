@@ -232,8 +232,12 @@ def execute_interval(world: SemanticWorld, program: dict[str, Any]) -> dict[str,
         raise ValueError("table scan column drift")
     if tuple(fact.fact_id for fact in facts) != tuple(program["candidate_fact_ids"]):
         raise ValueError("table scan candidate universe drift")
+    # The visible name cell can be an alias of the canonical entity label.
+    # Return the table's own names, which the final reader can reproduce.
     entries = sorted(
-        world.label_of(fact.subject) for fact in facts if low <= fact.value <= high
+        row.subject
+        for row, fact in zip(parsed.eligible, facts)
+        if low <= fact.value <= high
     )
     return {"count": len(entries), "entries": entries}
 

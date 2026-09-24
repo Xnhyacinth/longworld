@@ -15,6 +15,7 @@ from scripts.run_p76_source_batch import (
     _existing_receipt,
     _job_id,
     _sha,
+    _verify_export,
     preflight,
 )
 
@@ -183,6 +184,7 @@ def test_receipt_rejects_mutated_output(tmp_path: Path) -> None:
         "files_sha256": files,
         "candidate_rows": 1,
         "independent_tasks": 1,
+        "rejected_rows": 0,
         "train_ready": False,
     }
     _write(directory / "receipt.json", receipt)
@@ -190,3 +192,36 @@ def test_receipt_rejects_mutated_output(tmp_path: Path) -> None:
     data.write_text('{"sample_id":"changed"}\n', encoding="utf-8")
     with pytest.raises(ValueError, match="export file hash drift"):
         _existing_receipt(directory, job, "test-config", code)
+
+
+def test_pool_job_records_partial_rejects_without_discarding_accepted_rows(
+    tmp_path: Path,
+) -> None:
+    source = _snapshot(tmp_path, "partial", "Table")
+    job = _job("partial_scan", source, "Table", "train")
+    job["job_id"] = _job_id(job)
+    directory = tmp_path / "export"
+    directory.mkdir()
+    data = directory / "train.jsonl"
+    data.write_text('{"messages":[]}\n', encoding="utf-8")
+    _write(
+        directory / "manifest.json",
+        {
+            "source_group": source["snapshot_id"],
+            "split": "train",
+            "domain": "test",
+            "topic": "test_table",
+            "table_title": "Table",
+            "train_ready": False,
+            "candidate_rows": 1,
+            "independent_tasks": 1,
+            "rejected_rows": 2,
+            "files_sha256": {"train.jsonl": _sha(data)},
+        },
+    )
+    with pytest.raises(ValueError, match="export admission failed"):
+        _verify_export(directory, job)
+    job["allow_task_rejects"] = True
+    manifest, _ = _verify_export(directory, job)
+    assert manifest["candidate_rows"] == 1
+    assert manifest["rejected_rows"] == 2

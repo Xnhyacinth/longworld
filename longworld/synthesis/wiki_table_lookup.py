@@ -1,0 +1,251 @@
+"""Source-backed table-cell lookup with a value-blind final-reader replay."""
+
+from __future__ import annotations
+
+import hashlib
+import re
+from collections import defaultdict
+from typing import Any
+
+from longworld.synthesis import reader_view, wiki_adapter, wiki_evidence
+from longworld.synthesis.dependency_ops import ProofItem
+from longworld.synthesis.shared_semantic_world import ScopeEntry, SemanticWorld
+from longworld.synthesis.world_task_bank import TaskSpec
+
+YEAR = re.compile(r"[12][0-9]{3}\Z")
+SAFE = re.compile(r"[\[\]{}|?]|https?://")
+
+
+def _cells(
+    text: str, surface: str, column: str, relation: str
+) -> list[tuple[Any, int, int]]:
+    header: tuple[str, ...] | None = None
+    found: list[tuple[Any, int, int]] = []
+    for line in wiki_adapter.structured_lines(text):
+        if line.kind == "table_header":
+            header = line.cells
+            continue
+        if line.kind != "table_row":
+            header = None
+            continue
+        subject_index = wiki_adapter._name_column_index(header or ())
+        if subject_index is None:
+            subject_index = 0
+        if (
+            header is None
+            or len(line.cells) != len(header)
+            or line.cells[subject_index] != surface
+            or header.count(column) != 1
+        ):
+            continue
+        index = header.index(column)
+        cell = line.cells[index]
+        if SAFE.search(cell) or len(cell) > 200:
+            continue
+        semantics = wiki_adapter._cell_semantics(column, cell)
+        if semantics is None or semantics[0] != relation:
+            continue
+        value: Any = semantics[1]
+        if relation in {"established in", "opened in"}:
+            if not YEAR.fullmatch(value):
+                continue
+            value = int(value)
+        parts = line.text.split(" | ")
+        start = line.start + sum(len(part) + 3 for part in parts[:index])
+        start += len(parts[index]) - len(parts[index].lstrip())
+        found.append((value, start, start + len(cell)))
+    return found
+
+
+def _fact_matches_cell(world: SemanticWorld, fact: Any, value: Any) -> bool:
+    if fact.value_type == "entity":
+        entity = world.objects[fact.value]
+        return value in (entity.label, *entity.aliases)
+    return value == fact.value
+
+
+def execute_lookup(world: SemanticWorld, program: dict[str, Any]) -> Any:
+    """Native oracle checks the fact identity against the visible table cell."""
+    if program.get("op") != "table_cell_lookup":
+        raise ValueError("wrong table lookup operator")
+    fact = world.facts_by_id[program["fact_id"]]
+    if (
+        fact.relation != program["relation"]
+        or fact.qualifiers.get("table_column") != program["column"]
+        or len(fact.supporting_spans) != 1
+        or fact.supporting_spans[0].doc_id != program["doc_id"]
+        or not wiki_evidence.check_locate_fact(world, fact).supported
+    ):
+        raise ValueError("table lookup fact/source binding drift")
+    cells = _cells(
+        world._docs[program["doc_id"]].text,
+        program["surface"],
+        program["column"],
+        program["relation"],
+    )
+    if len(cells) != 1 or not _fact_matches_cell(world, fact, cells[0][0]):
+        raise ValueError("table lookup source fact disagrees with visible cell")
+    return cells[0][0]
+
+
+def build_lookup_tasks(
+    world: SemanticWorld, *, max_tasks: int = 32
+) -> tuple[TaskSpec, ...]:
+    """Select one unambiguous named cell per checked source fact and column."""
+    if max_tasks < 1:
+        return ()
+    buckets: dict[tuple[str, str, str], list[TaskSpec]] = defaultdict(list)
+    for fact in sorted(world.facts, key=lambda item: item.fact_id):
+        column = fact.qualifiers.get("table_column")
+        if (
+            not isinstance(column, str)
+            or fact.relation
+            not in {"established in", "opened in", "located in", "located in region"}
+            or len(fact.supporting_spans) != 1
+        ):
+            continue
+        check = wiki_evidence.check_locate_fact(world, fact)
+        if not check.supported or not check.row:
+            continue
+        header = check.header.split(" | ") if check.header else []
+        row_cells = check.row.split(" | ")
+        subject_index = wiki_adapter._name_column_index(tuple(header))
+        if subject_index is None:
+            subject_index = 0
+        if subject_index >= len(row_cells):
+            continue
+        surface = row_cells[subject_index].strip()
+        if not surface or SAFE.search(surface):
+            continue
+        span = fact.supporting_spans[0]
+        doc = world._docs[span.doc_id]
+        cells = _cells(doc.text, surface, column, fact.relation)
+        if len(cells) != 1 or not _fact_matches_cell(world, fact, cells[0][0]):
+            continue
+        digest = hashlib.sha256(
+            f"{doc.doc_id}|{fact.fact_id}|{column}".encode()
+        ).hexdigest()[:16]
+        task_id = f"wiki-table-lookup-{digest}"
+        question = (
+            f"In the {column!r} column of {doc.title}, what value is listed "
+            f"for {surface}?"
+        )
+        program = {
+            "op": "table_cell_lookup",
+            "fact_id": fact.fact_id,
+            "relation": fact.relation,
+            "doc_id": doc.doc_id,
+            "surface": surface,
+            "column": column,
+        }
+        answer = execute_lookup(world, program)
+        proof = (
+            ProofItem(
+                step=0,
+                op="table_cell_lookup",
+                out="value",
+                kind="fact",
+                ref_id=fact.fact_id,
+                subject=fact.subject,
+                relation=fact.relation,
+                value=fact.value,
+                spans=fact.supporting_spans,
+                span_texts=(doc.text[span.start : span.end],),
+            ),
+        )
+        task = TaskSpec(
+            task_id=task_id,
+            family="table_lookup",
+            template="table_lookup",
+            question=question,
+            program=program,
+            scope=ScopeEntry(
+                task_id=task_id,
+                object_families=("untyped",),
+                relations=(fact.relation,),
+                documents=tuple(item.doc_id for item in world.documents if item.text),
+            ),
+            answer=answer,
+            answer_rendered=answer,
+            proof=proof,
+            consumed_fact_ids=(fact.fact_id,),
+            metrics={"consumed_facts": 1, "source_documents": 1},
+            nondegenerate={"unique_subject_column_cell": True},
+            structure_signals={
+                "lookup_doc_id": doc.doc_id,
+                "lookup_surface": surface,
+                "lookup_column": column,
+            },
+            spread=(doc.doc_id, fact.relation, column),
+        )
+        buckets[(doc.doc_id, fact.relation, column)].append(task)
+    selected: list[TaskSpec] = []
+    keys = sorted(buckets)
+    while len(selected) < max_tasks and any(buckets.values()):
+        for key in keys:
+            if buckets[key] and len(selected) < max_tasks:
+                selected.append(buckets[key].pop(0))
+    return tuple(selected)
+
+
+def reader_lookup(
+    world: SemanticWorld, task: TaskSpec, context: str, *, allow_masked: bool = False
+) -> tuple[Any, tuple[int, int]]:
+    """Read the named cell from final visible bytes without using fact values."""
+    rendered = reader_view.render_documents(world, task.scope.documents)
+    if (not allow_masked and rendered.text != context) or (
+        allow_masked and len(rendered.text) != len(context)
+    ):
+        raise ValueError("table lookup final reader context drift")
+    signals = task.structure_signals
+    layout = next(
+        item for item in rendered.layouts if item.doc_id == signals["lookup_doc_id"]
+    )
+    relation = task.program["relation"]
+    cells = _cells(
+        context[layout.text_start : layout.text_end],
+        signals["lookup_surface"],
+        signals["lookup_column"],
+        relation,
+    )
+    if len(cells) != 1:
+        raise ValueError("reader table lookup lacks one unambiguous cell")
+    value, start, end = cells[0]
+    return value, (layout.text_start + start, layout.text_start + end)
+
+
+def reader_cell_intervention(
+    world: SemanticWorld, task: TaskSpec, context: str
+) -> dict[str, Any]:
+    value, (start, end) = reader_lookup(world, task, context)
+    if value != task.answer_rendered:
+        raise ValueError("reader table lookup disagrees with program answer")
+    masked = context[:start] + "?" * (end - start) + context[end:]
+    fact = world.facts_by_id[task.consumed_fact_ids[0]]
+    entity = world.objects[fact.subject]
+    surfaces = (task.structure_signals["lookup_surface"], entity.label, *entity.aliases)
+    value_pattern = re.compile(
+        r"(?<!\w)" + re.escape(str(value)) + r"(?!\w)", re.IGNORECASE
+    )
+    other_answer_lines = [
+        line for line in masked.splitlines() if value_pattern.search(line)
+    ]
+    if any(
+        any(surface.casefold() in line.casefold() for surface in surfaces)
+        for line in other_answer_lines
+    ):
+        raise ValueError("equivalent_subject_answer_elsewhere_in_reader_text")
+    try:
+        reader_lookup(world, task, masked, allow_masked=True)
+    except ValueError as error:
+        if "lacks one unambiguous cell" not in str(error):
+            raise
+    else:
+        raise ValueError("table cell deletion left reader parser answer")
+    return {
+        "status": "scoped_named_table_cell_removed",
+        "cell_span": {"start": start, "end": end},
+        "masked_context_sha256": hashlib.sha256(masked.encode()).hexdigest(),
+        "other_answer_line_count": len(other_answer_lines),
+        "certification_scope": "one named table row and column; equivalent prose elsewhere unchecked",
+    }

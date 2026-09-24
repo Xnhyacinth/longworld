@@ -25,6 +25,8 @@ def _token_limit(manifest: dict) -> int:
     elif manifest.get("schema") in {
         "longworld.p76-wiki-table-pairs.v5",
         "longworld.p76-wiki-table-scan.v2",
+        "longworld.p76-wiki-table-lookup.v1",
+        "longworld.source-batch-merged.v1",
     }:
         limit = 262144
     else:
@@ -114,6 +116,8 @@ def verify(directory: Path, *, write: bool = True) -> dict:
         "longworld.p75-real-reader-export.v1": "longworld.p75-real-reader-verification.v1",
         "longworld.p76-wiki-table-pairs.v5": "longworld.p76-wiki-table-verification.v1",
         "longworld.p76-wiki-table-scan.v2": "longworld.p76-wiki-table-scan-verification.v1",
+        "longworld.p76-wiki-table-lookup.v1": "longworld.p76-wiki-table-lookup-verification.v1",
+        "longworld.source-batch-merged.v1": "longworld.source-batch-merged-verification.v1",
     }[manifest["schema"]]
     result = {
         "schema": verification_schema,

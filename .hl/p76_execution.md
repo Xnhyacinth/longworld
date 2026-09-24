@@ -320,7 +320,82 @@ Current support matrix: Finance supplies native lookup/delta/ratio/aggregate;
 CodeForge supplies several file/CI/merge programs; P71 supplies simulated
 locate/join/aggregate/state/rule tasks; P75 supplies real Wiki locate plus two
 source comparisons; the new table-pair recipe adds another cross-document
-comparison pattern. Books, papers, true dense complete-set scans, grounded
+comparison pattern. Books, papers, dense complete-set scans beyond the
+closed plain-year-table interval recipe, grounded
 rule+event hybrids and source-diverse 128K certified dependency have no
 qualified P76 output yet. They are explicit expansion work, not hidden behind
 the 8,596-task inventory total.
+
+## Parameterized source-pool compilation, 2026-09-24
+
+The five hand-written P76 jobs were a fixed execution pilot. The new
+`scripts/run_source_pool_batch.py` reads a pinned pool of source groups and
+requested operations, probes each source against native task builders, and
+expands only supported cells into the existing isolated worker/receipt runner.
+The same batch merges accepted rows, indexes and audits into one candidate
+dataset, normalizes length bins from actual final-chat token counts, checks
+task/answer/split collisions and records both unsupported source-operation
+cells and final task rejects. The control plane is parameterized; its current
+executable adapters are Wiki table lookup, complete-table interval scan and
+cross-document founding-year comparison. Finance, CodeForge, simulated and
+grounded-mixed adapters are **not yet** on this new runner.
+
+The pool config is `configs/p76_source_pool_v2.json`. Eight additional topic
+groups were frozen by `scripts/freeze_p76_expansion_pool.py` from explicit
+Wikipedia title bundles. The first 23 new pages yielded zero supported jobs:
+the shared parser lacked city/province/locality/opened columns and non-leading
+subject-name columns. The rejected source screen was preserved. After changing
+those common parser rules, new revision-pinned snapshots of zoos, railway
+stations, power stations and stadiums entered the same pool. This is a concrete
+source-to-task yield improvement, not a count of downloaded pages as tasks.
+The v1 expansion still records the unproductive castles, lighthouses, dams,
+archaeology and other pages; those need native table/section support rather
+than more title substitution.
+
+The current combined run is
+`data/candidates/p76_source_pool_v8_stadiums/`. Its input source pool is
+`data/capability_records/p76_wiki_expansion_v3/source_pool.json`, pinned by the
+acquisition manifests in expansion v1–v3. It selected 19 jobs from 18 source
+groups; 11 groups actually contributed final rows. There are 298 independent
+semantic tasks and 351 candidate views across astronomy, biology, education,
+energy, healthcare, nature, sports and transport. Three operations contribute:
+table-cell lookup, closed-table interval scan and cross-document year
+comparison. The 351 views occupy `<32K` 126, `32–<64K` 156, `64–<128K` 24,
+and `128–<256K` 45 physical final-chat tokens. Twenty-nine tasks recur in more
+than one source group; 24 astronomy comparisons have a second length view.
+By unique semantic task, the operation counts are 214 table-cell lookups, 56
+closed-table scans and 28 cross-document comparisons. The shortest-view
+distribution is `<32K` 126, `32–<64K` 156 and `128–<256K` 16; all 24 64K
+views are paired views of shorter tasks. The current mix is lookup-heavy and
+does not meet the balanced-operation or multiple-domain-per-64K target.
+The batch retained 25 rejected task candidates, 74 unsupported source-operation
+cells and one supported but zero-yield botanical-garden job. These are separate
+from the accepted count. Task-level rejection is now allowed without discarding
+other accepted tasks in the job.
+
+An independent review found that a table-cell mask alone left a same-line
+subject+answer disclosure for some lookups. The new filter rejects that
+obvious shortcut; it does not claim to find paraphrases, all aliases or every
+equivalent source. The merged output remains `train_ready=false`. Its 128K
+views are measured input lengths, not certified 128K evidence dependencies;
+the cross-document comparison evidence spans and dense scans are separate
+capabilities. There was no GPU run, training comparison, promotion or HF
+publication.
+
+Reproduce or inspect without touching frozen outputs:
+
+```bash
+uv run python scripts/run_source_pool_batch.py --config data/capability_records/p76_wiki_expansion_v3/source_pool.json --output-dir data/candidates/p76_source_pool_v8_stadiums --workers 2 --resume
+uv run python scripts/verify_p75_real_reader.py data/candidates/p76_source_pool_v8_stadiums/merged --no-write
+less -R data/candidates/p76_source_pool_v8_stadiums/plan.json
+less -R data/candidates/p76_source_pool_v8_stadiums/result.json
+less -R data/candidates/p76_source_pool_v8_stadiums/merged/manifest.json
+less -R data/candidates/p76_source_pool_v8_stadiums/merged/sample_index.jsonl
+```
+
+The next scale work is a header-aware scout that predicts legal task capacity
+before freezing hundreds of pages, plus native Finance/CodeForge/simulation
+adapters under this **same** planning, reader-validation and reject contract.
+The proposed 100-world/1,000-task quality batch and balanced multi-operation
+distribution remain unmet; another lookup quota increase would inflate the
+dominant L1 operation without solving those gaps.

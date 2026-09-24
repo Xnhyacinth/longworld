@@ -1,0 +1,14 @@
+{
+  "schema": "longworld.p76-wiki-expansion.v1",
+  "base_pool": "configs/p76_source_pool_v2.json",
+  "groups": [
+    {"name": "wiki_zoos", "domain": "biology", "topic": "zoos", "split": "train", "titles": ["List of zoos in India", "List of zoos in Pakistan", "List of zoos in Australia"]},
+    {"name": "wiki_lighthouses", "domain": "infrastructure", "topic": "lighthouses", "split": "train", "titles": ["List of lighthouses in the United States territories", "List of lighthouses in Egypt", "List of lighthouses in Cyprus"]},
+    {"name": "wiki_dams", "domain": "infrastructure", "topic": "dams", "split": "train", "titles": ["List of dams in Japan", "List of dams in Saudi Arabia", "List of dams in Nagano Prefecture"]},
+    {"name": "wiki_castles", "domain": "history", "topic": "castles", "split": "eval", "titles": ["List of castles in England", "List of castles in Scotland"]},
+    {"name": "wiki_power_stations", "domain": "energy", "topic": "power_stations", "split": "train", "titles": ["List of power stations in Australia", "List of power stations in North Macedonia", "List of power stations in Egypt"]},
+    {"name": "wiki_railway_stations", "domain": "transport", "topic": "railway_stations", "split": "train", "titles": ["List of railway stations in Sardinia", "List of railway stations in Aosta Valley", "List of railway stations in Umbria"]},
+    {"name": "wiki_stadiums", "domain": "sports", "topic": "stadiums", "split": "eval", "titles": ["List of football stadiums in Albania", "List of stadiums in Bangladesh", "List of football stadiums in Serbia"]},
+    {"name": "wiki_archaeological_sites", "domain": "history", "topic": "archaeological_sites", "split": "train", "titles": ["List of archaeological sites in Colombia", "List of archaeological sites in Taiwan", "List of archaeological sites in Peru"]}
+  ]
+}

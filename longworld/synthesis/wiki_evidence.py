@@ -47,8 +47,6 @@ def _table_check(
     doc = world._docs[span.doc_id]
     column = fact.qualifiers["table_column"]
     rows = row.split(" | ")
-    if not rows or rows[0].strip() not in _subject_surfaces(world, fact):
-        return EvidenceCheck(False, "table row does not identify fact subject")
     for line in reversed(wiki_adapter.structured_lines(doc.text)):
         if line.start >= row_start:
             continue
@@ -58,6 +56,13 @@ def _table_check(
             continue
         header_line = line.text
         headers = line.cells
+        subject_index = wiki_adapter._name_column_index(headers)
+        if subject_index is None:
+            subject_index = 0
+        if subject_index >= len(rows) or rows[
+            subject_index
+        ].strip() not in _subject_surfaces(world, fact):
+            return EvidenceCheck(False, "table row does not identify fact subject")
         if column not in headers or len(headers) != len(rows):
             return EvidenceCheck(
                 False, "nearest table header does not match fact column"

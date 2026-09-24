@@ -1,0 +1,39 @@
+{
+  "schema": "longworld.p76-wiki-expansion.v1",
+  "base_pool": "configs/p76_source_pool_v2.json",
+  "groups": [
+    {
+      "name": "wiki_zoos",
+      "domain": "biology",
+      "topic": "zoos",
+      "split": "train",
+      "titles": [
+        "List of zoos in India",
+        "List of zoos in Pakistan",
+        "List of zoos in Australia"
+      ]
+    },
+    {
+      "name": "wiki_power_stations",
+      "domain": "energy",
+      "topic": "power_stations",
+      "split": "train",
+      "titles": [
+        "List of power stations in Australia",
+        "List of power stations in North Macedonia",
+        "List of power stations in Egypt"
+      ]
+    },
+    {
+      "name": "wiki_railway_stations",
+      "domain": "transport",
+      "topic": "railway_stations",
+      "split": "train",
+      "titles": [
+        "List of railway stations in Sardinia",
+        "List of railway stations in Aosta Valley",
+        "List of railway stations in Umbria"
+      ]
+    }
+  ]
+}

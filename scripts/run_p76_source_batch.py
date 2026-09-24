@@ -29,8 +29,10 @@ CODE_PATHS = (
     "scripts/run_p76_source_batch.py",
     "scripts/export_p76_wiki_tables.py",
     "scripts/export_p76_wiki_scan.py",
+    "scripts/export_p76_wiki_lookup.py",
     "longworld/synthesis/wiki_table_tasks.py",
     "longworld/synthesis/wiki_table_scan.py",
+    "longworld/synthesis/wiki_table_lookup.py",
     "longworld/synthesis/reader_view.py",
     "longworld/synthesis/wiki_adapter.py",
     "longworld/synthesis/wiki_evidence.py",
@@ -132,6 +134,7 @@ def preflight(
         expected_policy = {
             "wiki_table_pair": "paired_32k_64k_or_native",
             "wiki_table_scan": "native_whole_pages",
+            "wiki_table_lookup": "native_whole_pages",
         }.get(recipe)
         if expected_policy is None or job.get("length_policy") != expected_policy:
             raise ValueError(f"unsupported recipe or length policy: {name}")
@@ -236,15 +239,24 @@ def _verify_export(
     directory: Path, job: dict[str, Any]
 ) -> tuple[dict[str, Any], dict[str, str]]:
     manifest = _json(directory / "manifest.json")
+    accepted = manifest.get("candidate_rows")
+    independent = manifest.get("independent_tasks")
+    rejected = manifest.get("rejected_rows")
     if (
         manifest.get("source_group") != job["snapshot"]["snapshot_id"]
         or manifest.get("split") != job["split"]
         or manifest.get("domain") != job["domain"]
         or manifest.get("topic") != job["topic"]
         or manifest.get("train_ready") is not False
-        or manifest.get("candidate_rows", 0) <= 0
-        or manifest.get("independent_tasks", 0) <= 0
-        or manifest.get("rejected_rows") != 0
+        or type(accepted) is not int
+        or type(independent) is not int
+        or type(rejected) is not int
+        or accepted < 0
+        or independent < 0
+        or independent > accepted
+        or rejected < 0
+        or (not job.get("allow_task_rejects") and rejected != 0)
+        or (accepted == 0 and rejected == 0)
     ):
         raise ValueError(f"export admission failed: {job['job_id']}")
     if (
@@ -283,13 +295,24 @@ def _worker(
             domain=job["domain"],
             topic=job["topic"],
         )
-    else:
+    elif job["recipe"] == "wiki_table_scan":
         from scripts.export_p76_wiki_scan import export
 
         export(
             snapshot,
             directory,
             table_title=job["table_title"],
+            domain=job["domain"],
+            topic=job["topic"],
+            split=job["split"],
+            max_tasks=job["max_tasks"],
+        )
+    else:
+        from scripts.export_p76_wiki_lookup import export
+
+        export(
+            snapshot,
+            directory,
             domain=job["domain"],
             topic=job["topic"],
             split=job["split"],
@@ -308,6 +331,7 @@ def _worker(
         "files_sha256": files,
         "candidate_rows": manifest["candidate_rows"],
         "independent_tasks": manifest["independent_tasks"],
+        "rejected_rows": manifest["rejected_rows"],
         "train_ready": False,
     }
     _write_new(directory / "receipt.json", receipt)
@@ -335,6 +359,7 @@ def _existing_receipt(
     if receipt.get("files_sha256") != actual or (
         receipt.get("candidate_rows") != manifest["candidate_rows"]
         or receipt.get("independent_tasks") != manifest["independent_tasks"]
+        or receipt.get("rejected_rows") != manifest["rejected_rows"]
     ):
         raise ValueError(f"job receipt file or count mismatch: {job['job_id']}")
     if {path.name for path in directory.iterdir()} != {*actual, "receipt.json"}:
@@ -457,6 +482,7 @@ def run(
         "independent_tasks": sum(
             receipt["independent_tasks"] for receipt in receipts.values()
         ),
+        "rejected_rows": sum(receipt["rejected_rows"] for receipt in receipts.values()),
         "job_receipt_sha256": {
             job["job_id"]: _sha(output_dir / "jobs" / job["job_id"] / "receipt.json")
             for job in jobs

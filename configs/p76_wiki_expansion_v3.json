@@ -1,0 +1,17 @@
+{
+  "schema": "longworld.p76-wiki-expansion.v1",
+  "base_pool": "data/capability_records/p76_wiki_expansion_v2/source_pool.json",
+  "groups": [
+    {
+      "name": "wiki_stadiums",
+      "domain": "sports",
+      "topic": "stadiums",
+      "split": "eval",
+      "titles": [
+        "List of football stadiums in Albania",
+        "List of stadiums in Bangladesh",
+        "List of football stadiums in Serbia"
+      ]
+    }
+  ]
+}
