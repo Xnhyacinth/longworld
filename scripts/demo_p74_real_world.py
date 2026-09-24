@@ -589,12 +589,8 @@ def run_showcase(world: SemanticWorld, snapshot_row: dict[str, Any]) -> dict[str
     }
 
     # --- intervention checks: upstream / direct / unrelated ---
-    # All mutations run on a mention-stripped copy: the wiki bridge drops
-    # alias-surface mentions but keeps label-bearing ones, and the module's
-    # span re-offsetter re-maps mention offsets without re-checking that the
-    # mention text still carries the entity label after the edit — a mutated
-    # world with label mentions fails the world's own validation.  Stripping
-    # mentions before mutation keeps the arms comparable and the error honest.
+    # This showcase retains the historical mention-stripped intervention
+    # baseline so its certificate rows remain comparable to prior runs.
     bare = _mention_stripped(world)
     interventions = []
     direct_fact = _first_fact_id(world, execution, "entity")

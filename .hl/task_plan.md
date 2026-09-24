@@ -559,9 +559,21 @@ Assumptions: P74 frozen source snapshots remain immutable; existing tokenizer re
 | Phase | Objective | Status | Verification |
 | --- | --- | --- | --- |
 | P75.0 | Review current source, artifacts, literature and reproduce the matrix/demo mismatch | complete | raw Wiki bank 0 tasks vs typed demo bank 6 locate + 6 as-of on observatories |
-| P75.1 | Preserve exact alias mentions and centralize structural typing | in_progress | focused tests; frozen snapshot mention and task accounting |
-| P75.2 | Compile document-only reader view and audit sidecar with exact final-input length and span map | in_progress | focused tests and real batch smoke; no FACTS/program/proof in messages |
-| P75.3 | Rebuild support matrix through the shared typing path and run batch validation | planned | matrix/demo alignment; deterministic manifest, source-world split, token budget and lineage checks |
-| P75.4 | Record supported scope, remaining real-semantic gaps and next source recipe | planned | report with actual counts and explicit unresolved long-text dependency / training utility |
+| P75.1 | Preserve exact alias mentions and centralize structural typing | complete | 4,687 observatory mentions retained; 55 bridge/demo/dependency tests passed |
+| P75.2 | Compile document-only reader view and audit sidecar with exact final-input length and span map | complete | 24 candidate rows; 48 exact prompt-token evidence mappings; no audit indices in messages |
+| P75.3 | Rebuild support matrix through the shared typing path and run batch validation | complete | 49 P74 bank tasks reported with scope notes; 21/3 candidate split; mask verifier passed on 24 rows |
+| P75.4 | Record supported scope, remaining real-semantic gaps and next source recipe | complete | `.hl/p75_execution.md` records 24-row limits, related work and P76 order |
+| P75.5 | Compile a bounded two-source comparison pilot from checked real rows | complete | two Apache Point comparison rows; two source documents and facts per task; exact final-input and mask check |
 
-Next step: finish P75.1/P75.2 in disjoint files, then integrate P75.3 and verify the frozen seven-snapshot batch.
+Next step: P76.1 native table/row evidence in a new frozen source set; keep the P75 24-row research candidate package immutable.
+
+## P76 source-rich multi-evidence batch — planned
+
+Goal: replace the one-object comparison pilot with a source-diverse batch whose tasks require two or more independently checked visible evidence units and whose eval covers more than one relation/source genre.
+
+| Phase | Objective | Status | Exit check |
+| --- | --- | --- | --- |
+| P76.1 | Freeze table-rich Wiki and numeric report sources with row, column, unit, note and revision evidence | planned | new source enters without a topic-specific task function; source/license/revision hashes pinned |
+| P76.2 | Split multi-valued relations from revision state; preserve effective and disclosure time separately | planned | a list row never becomes as-of state; genuine revision fixture still resolves correctly |
+| P76.3 | Compile source comparison and table aggregation from checked rows | planned | independent execution, at least two visible source units, bounded text-redaction probe and exact chat-token map |
+| P76.4 | Batch and utility preparation | planned | versioned local candidate/eval exports, source-disjoint split with multiple relations; fixed-budget training arms specified before GPU execution |

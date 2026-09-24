@@ -61,7 +61,7 @@ DEFAULT_JSON_OUT = REPO / "data" / "capability_records" / "p74_support_matrix_v1
 SCHEMA = "longworld.p74-support-matrix.v1"
 
 # The bank's family universe is the matrix's capability columns.
-from longworld.synthesis.world_task_bank import CAPABILITY_FAMILIES  # noqa: E402
+from longworld.synthesis.world_task_bank import CAPABILITY_FAMILIES
 
 LARGE_BUDGET = {family: 1000 for family in CAPABILITY_FAMILIES}
 
@@ -250,7 +250,7 @@ def validate_funnel(stages: list[dict[str, Any]]) -> None:
             continue
         count_in, count_out = stage.get("in"), stage.get("out")
         if not isinstance(count_in, int) or not isinstance(count_out, int):
-            raise ValueError(f"funnel stage {name}: counts must be integers")
+            raise TypeError(f"funnel stage {name}: counts must be integers")
         if count_in < 0 or count_out < 0:
             raise ValueError(f"funnel stage {name}: negative counts")
         if count_out > count_in:
@@ -497,6 +497,9 @@ def render_report(matrix: dict[str, Any], funnel: dict[str, Any]) -> str:
     rows = matrix["rows"]
     out: list[str] = []
     out.append("P74 T7 support matrix (topic x capability family x length band)")
+    out.append(
+        "Length bands use T5 text-concat for real Wiki and audit render for the demo; neither is a final reader message."
+    )
     out.append(f"worlds: {len(rows)}; families: {', '.join(CAPABILITY_FAMILIES)}")
     out.append("")
     out.append("Matrix (cell = task count when supported, else a code):")
@@ -538,6 +541,11 @@ def build_matrix(
     length_by_name = {}
     for row in length_report.get("band_assignment", []):
         length_by_name[row["name"]] = row
+    length_kind_by_name = {
+        row["name"]: row["kind"]
+        for row in length_report.get("inputs", [])
+        if "name" in row and "kind" in row
+    }
 
     rows = []
     for detail in world_details:
@@ -548,25 +556,29 @@ def build_matrix(
             "in": detail.get("candidates_in"),
             "out": detail.get("candidates_out"),
             "rejected": detail.get("rejected"),
+            "rejected_log_may_be_capped": detail.get("rejected_capped", False),
         }
-        rows.append(
-            world_row(
-                detail["name"],
-                detail["kind"],
-                detail["topic"],
-                detail["family_cells"],
-                pages=detail.get("pages"),
-                entities=detail.get("entities"),
-                typed_entities=detail.get("typed_entities"),
-                facts=detail.get("facts"),
-                band=length.get("band") if length else None,
-                band_verdict=length.get("verdict") if length else None,
-                band_feasible=length.get("feasible") if length else None,
-                natural_tokens=length.get("natural_tokens") if length else None,
-                candidates=candidates,
-                note=detail.get("note"),
-            )
+        row = world_row(
+            detail["name"],
+            detail["kind"],
+            detail["topic"],
+            detail["family_cells"],
+            pages=detail.get("pages"),
+            entities=detail.get("entities"),
+            typed_entities=detail.get("typed_entities"),
+            facts=detail.get("facts"),
+            band=length.get("band") if length else None,
+            band_verdict=length.get("verdict") if length else None,
+            band_feasible=length.get("feasible") if length else None,
+            natural_tokens=length.get("natural_tokens") if length else None,
+            candidates=candidates,
+            note=detail.get("note"),
         )
+        if "length" in row:
+            row["length"]["measured_view"] = length_kind_by_name.get(
+                detail["name"], "unknown"
+            )
+        rows.append(row)
     legend = _reason_codes(rows)
     return {
         "family_columns": list(CAPABILITY_FAMILIES),
@@ -577,9 +589,11 @@ def build_matrix(
         "bands": length_report.get("bands"),
         "notes": [
             "infeasible and empty cells are never dropped (charter §16 T7)",
-            "family cells come from the W2-B bank's own skip log plus derived "
-            "infeasible classification for zeros the bank did not skip",
-            "band columns come from the T5 length report consumed verbatim",
+            (
+                "family cells come from the W2-B bank's own skip log plus derived "
+                "infeasible classification for zeros the bank did not skip"
+            ),
+            "band columns come from the T5 length report; row length.measured_view records text-concat or semantic-world, neither the final chat length",
         ],
     }
 
@@ -610,7 +624,7 @@ def _classify_family_cells(
 ) -> dict[str, dict[str, Any]]:
     """Every family cell classified: supported, skipped, or infeasible."""
     counts = bank.counts()
-    skips, unclassified = _zero_families(bank)
+    skips, _unclassified = _zero_families(bank)
     cells = {}
     for family in CAPABILITY_FAMILIES:
         if counts[family] > 0:
@@ -715,7 +729,7 @@ def _gather_wiki(manifest: dict[str, Any], snapshot_dir: Path) -> list[dict[str,
         try:
             world = wb.snapshot_to_world(snapshot)
             world, typing_stats = wb.structurally_typed_world(world)
-        except Exception as error:  # bridge failure is a matrix row, not a crash
+        except Exception as error:  # noqa: BLE001 - bridge failure is a report row
             details.append(
                 {
                     "name": name,
@@ -800,6 +814,7 @@ def build_funnel_from_details(
     answerable = sum(d["text_answerable"] for d in details)
     fold_total = sum(d["fold_total"] for d in details)
     fold_pass = sum(d["fold_pass"] for d in details)
+    capped_worlds = sum(bool(d.get("rejected_capped")) for d in details)
 
     stages = [
         funnel_stage(
@@ -823,9 +838,8 @@ def build_funnel_from_details(
             real_out=facts_out,
             note=(
                 f"frozen facts surviving the bridge with verbatim supporting "
-                f"spans; entity typing is the loss point: {typed_total}/"
-                f"{entities_total} entities typed after bridging (wiki "
-                "entities carry no type; no family is bindable)"
+                f"spans; {typed_total}/{entities_total} entities have a "
+                "structural role assigned after bridging, not a semantic type"
             ),
         ),
         funnel_stage(
@@ -836,11 +850,16 @@ def build_funnel_from_details(
             real_in=sum(d["candidates_in"] for d in wiki),
             real_out=sum(d["candidates_out"] for d in wiki),
             note=(
-                "enumerated candidates that execute non-degenerately; the "
-                "demo semantic world supplies the mass — the 7 real wiki "
-                "topics enumerate 0 candidates (0 typed entities)"
+                "enumerated candidates that execute non-degenerately; "
+                f"{capped_worlds} world(s) may have rejection logs capped at 40, "
+                "so the denominator is a lower bound and rate an upper bound; "
+                "demo and real Wiki worlds are counted separately"
                 if demo
-                else "no demo world in scope"
+                else (
+                    "real Wiki worlds only; "
+                    f"{capped_worlds} world(s) may have rejection logs capped at 40, "
+                    "so the denominator is a lower bound and rate an upper bound"
+                )
             ),
         ),
         funnel_stage(
@@ -865,7 +884,8 @@ def build_funnel_from_details(
             real_out=sum(d["text_answerable"] for d in wiki),
             note=(
                 "export-budget tasks whose every fact-lineage proof item "
-                "carries doc-anchored spans; wiki topics export 0 tasks"
+                "carries doc-anchored spans; this checks span integrity, "
+                "not relation entailment or final reader answerability"
             ),
         ),
         funnel_stage(
@@ -979,10 +999,16 @@ def main(argv: list[str] | None = None) -> int:
         "funnel": funnel,
         "notes": [
             "infeasible and empty cells never disappear (charter §16 T7)",
-            "real_topic_* funnel columns count only bridged wiki topics; the "
-            "demo world is synthetic and excluded from them",
-            "witness/audit numbers for P74 tasks are not yet measured (P73 "
-            "witness artifacts cover a different population)",
+            "Wiki as_of_state bank counts are diagnostic: snapshots have no revision or revocation semantics, so these are not qualified historical-state tasks",
+            "real Wiki length bands use raw document text-concat; demo uses audit render; neither is final reader input length",
+            (
+                "real_topic_* funnel columns count only bridged wiki topics; the "
+                "demo world is synthetic and excluded from them"
+            ),
+            (
+                "witness/audit numbers for P74 tasks are not yet measured (P73 "
+                "witness artifacts cover a different population)"
+            ),
         ],
     }
 

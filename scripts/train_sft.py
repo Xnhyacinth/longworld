@@ -128,6 +128,18 @@ def _render_chat(tokenizer, messages: list[dict], *, generation_prompt: bool) ->
     return text
 
 
+def assistant_prefix_length(prompt_ids: list[int], full_ids: list[int]) -> int:
+    """Return the exact prefix masked by the SFT loader's chat-template rule."""
+    prefix_len = 0
+    for prompt_id, full_id in zip(prompt_ids, full_ids):
+        if prompt_id != full_id:
+            break
+        prefix_len += 1
+    if prefix_len == 0 or prefix_len >= len(full_ids):
+        raise ValueError("chat template did not expose an assistant answer boundary")
+    return prefix_len
+
+
 def tokenize_assistant_only(tokenizer, messages: list[dict], max_length: int) -> dict:
     """Supervise only a complete answer; reject any source/query truncation."""
     if not messages or messages[-1].get("role") != "assistant":
@@ -138,13 +150,7 @@ def tokenize_assistant_only(tokenizer, messages: list[dict], max_length: int) ->
     prompt_encoded = tokenizer(prompt, truncation=False, padding=False)
     full_ids = list(encoded["input_ids"])
     prompt_ids = list(prompt_encoded["input_ids"])
-    prefix_len = 0
-    for prompt_id, full_id in zip(prompt_ids, full_ids):
-        if prompt_id != full_id:
-            break
-        prefix_len += 1
-    if prefix_len == 0 or prefix_len >= len(full_ids):
-        raise ValueError("chat template did not expose an assistant answer boundary")
+    prefix_len = assistant_prefix_length(prompt_ids, full_ids)
     answer_ids = full_ids[prefix_len:]
     if len(answer_ids) >= max_length:
         raise ValueError("assistant answer exceeds the training sequence length")

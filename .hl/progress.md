@@ -1143,3 +1143,11 @@ in`; no private-repository or upload claim was made.
   milestone verdict: locate+chains pass on real wiki; aggregate/multi_hop/
   as_of skipped on real structure — needs richer sources, not code. See
   .hl/p74_wave2_execution.md.
+- 2026-09-24 P75 real-reader slice: reconciled Wiki structural typing across
+  demo and support matrix; preserved 1,003 observatory alias-surface mentions;
+  exported 21 train / 3 eval local research candidates from five source worlds
+  with doc-only reader messages and audit sidecars. The pinned chat-template
+  verifier checked 24 masks, 48 exact proof-span token mappings, source splits
+  and file hashes; two rows compare named columns across two real Wiki lists;
+  train_ready remains false. See `.hl/p75_execution.md` and
+  `data/p75_real_reader_candidates_v1/verification.json`.
