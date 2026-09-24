@@ -58,3 +58,7 @@ configs/public_repo_episodes_v2_pre_*.json
 /data/source_inventories
 /data/finance_sources
 /data/candidates
+
+# Session scratch (worlds worktree local) — keep out of history; durable
+# planning state belongs in .hl/
+tmp/
