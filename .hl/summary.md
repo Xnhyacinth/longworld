@@ -1,3 +1,15 @@
+# Summary index — read the recent waves first
+
+> 状态路由(2026-09-24):本文件下方的历史条目停在 2026-09-05(P7 时代)。
+> 当前项目状态按顺序看:
+> 1. .hl/design/p74_real_shared_worlds.md — 生效章程
+> 2. .hl/p74_wave2_execution.md — 最新执行记录(含 P73 索引)
+> 3. .hl/p73_execution.md / .hl/p74_execution.md — 前两波
+> 4. .hl/progress.md — 时间线流水
+> 5. .hl/git_hygiene.md — 分支与推送政策
+>
+> 历史条目(P7 及更早)仅作背景,不代表当前状态。
+
 # Summary — P7 source-rich integration
 
 ## 2026-09-05 authentic-world scale-out checkpoint
