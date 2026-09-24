@@ -54,6 +54,17 @@ def probe(config: dict[str, Any], *, max_shards: int = MAX_SHARDS) -> dict[str, 
     if any(type(target) is not int or target < 4096 for target in targets):
         raise ValueError("token targets must be >= 4096")
     cells = Counter((job["family"], job["depth"], job["token_target"]) for job in plan)
+    allowed_depths = {
+        native.records: {1, 2, 3},
+        native.families: {1, 2},
+        native.research: {1, 2},
+        native.unanswerable: {1},
+    }
+    unsupported = Counter(
+        (job["family"], job["depth"], job["token_target"])
+        for job in plan
+        if job["depth"] not in allowed_depths[native.module_for(job["family"])]
+    )
     splits = Counter(job["split"] for job in plan)
     if set(splits) - {"train", "eval"}:
         raise ValueError("invalid capability-world split")
@@ -64,6 +75,11 @@ def probe(config: dict[str, Any], *, max_shards: int = MAX_SHARDS) -> dict[str, 
         "families": sorted(set(families)),
         "split_shards": dict(sorted(splits.items())),
         "token_targets": sorted(set(targets)),
+        "unsupported_depth_shards": sum(unsupported.values()),
+        "unsupported_depth_cells": [
+            {"family": family, "depth": depth, "token_target": target, "shards": count}
+            for (family, depth, target), count in sorted(unsupported.items())
+        ],
         "cells": [
             {"family": family, "depth": depth, "token_target": target, "shards": count}
             for (family, depth, target), count in sorted(cells.items())
@@ -171,6 +187,13 @@ def run_native(
     destination = Path(destination)
     config = json.loads(config_path.read_text())
     planned = probe(config, max_shards=max_shards)
+    if (
+        planned["unsupported_depth_shards"]
+        and not (destination / "manifest.json").exists()
+    ):
+        raise ValueError(
+            "fresh capability-world plan contains unsupported family/depth cells"
+        )
     if destination.exists() and (destination / "manifest.json").exists():
         if not resume:
             raise ValueError("existing capability-world output requires resume")

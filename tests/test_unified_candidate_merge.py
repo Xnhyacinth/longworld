@@ -77,6 +77,103 @@ def test_native_index_rejects_out_of_range_position(tmp_path: Path) -> None:
         list(_indexed_rows(index, paths, index_name="code", use_native_row_index=True))
 
 
+def test_native_index_reads_forward_once_and_can_revisit_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    train = tmp_path / "train.jsonl"
+    eval_path = tmp_path / "eval.jsonl"
+    index = tmp_path / "index.jsonl"
+    _write_rows(train, [{"id": n} for n in range(4)])
+    _write_rows(eval_path, [])
+    _write_rows(
+        index,
+        [
+            {"split": "train", "output_file": "train.jsonl", "row_index": n}
+            for n in (0, 2, 1, 3)
+        ],
+    )
+    original_open = Path.open
+    read_calls = 0
+
+    class CountingReader:
+        def __init__(self, stream):
+            self.stream = stream
+
+        def __enter__(self):
+            self.stream.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.stream.__exit__(*args)
+
+        def __getattr__(self, name):
+            return getattr(self.stream, name)
+
+        def readline(self):
+            nonlocal read_calls
+            read_calls += 1
+            return self.stream.readline()
+
+    def open_reader(path: Path, *args, **kwargs):
+        stream = original_open(path, *args, **kwargs)
+        return CountingReader(stream) if path == train else stream
+
+    monkeypatch.setattr(Path, "open", open_reader)
+    joined = _indexed_rows(
+        index,
+        {"train": train, "eval": eval_path},
+        index_name="code",
+        use_native_row_index=True,
+    )
+    assert next(joined)[1]["id"] == 0
+    assert read_calls == 1
+    assert [row["id"] for _, row, _ in joined] == [2, 1, 3]
+    assert read_calls == 5  # Four forward reads and one deliberate revisit.
+
+
+def test_split_order_stream_does_not_prescan_reader(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    train = tmp_path / "train.jsonl"
+    eval_path = tmp_path / "eval.jsonl"
+    index = tmp_path / "index.jsonl"
+    _write_rows(train, [{"id": n} for n in range(3)])
+    _write_rows(eval_path, [])
+    _write_rows(index, [{"split": "train"} for _ in range(3)])
+    original_open = Path.open
+    read_calls = 0
+
+    class CountingReader:
+        def __init__(self, stream):
+            self.stream = stream
+
+        def __enter__(self):
+            self.stream.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.stream.__exit__(*args)
+
+        def __getattr__(self, name):
+            return getattr(self.stream, name)
+
+        def readline(self):
+            nonlocal read_calls
+            read_calls += 1
+            return self.stream.readline()
+
+    def open_reader(path: Path, *args, **kwargs):
+        stream = original_open(path, *args, **kwargs)
+        return CountingReader(stream) if path == train else stream
+
+    monkeypatch.setattr(Path, "open", open_reader)
+    joined = _indexed_rows(index, {"train": train, "eval": eval_path}, index_name="sim")
+    assert next(joined)[1]["id"] == 0
+    assert read_calls == 1
+    assert [row["id"] for _, row, _ in joined] == [1, 2]
+    assert read_calls == 3
+
+
 def test_simulation_hashes_source_without_question(tmp_path: Path) -> None:
     receipt = tmp_path / "manifest.json"
     receipt.write_text("{}\n")

@@ -29,6 +29,24 @@ def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _verify_acquisition_sidecar(config_path: Path) -> None:
+    """Preserve the discovery-to-pool lineage when a pool was acquired live."""
+    receipt_path = config_path.parent / "source_pool_receipt.json"
+    acquisition_path = config_path.parent / "acquisition_manifest.json"
+    if not receipt_path.exists() and not acquisition_path.exists():
+        return
+    if not receipt_path.is_file() or not acquisition_path.is_file():
+        raise ValueError("incomplete acquired source-pool lineage")
+    receipt = json.loads(receipt_path.read_text())
+    if (
+        receipt.get("schema")
+        != "longworld.connected-wiki-intake.v1.source-pool-receipt"
+        or receipt.get("source_pool_sha256") != _sha(config_path)
+        or receipt.get("acquisition_manifest_sha256") != _sha(acquisition_path)
+    ):
+        raise ValueError("acquired source-pool lineage changed")
+
+
 def _jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.write_text(
         "".join(
@@ -65,6 +83,7 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
     if output_dir.exists():
         raise ValueError("output directory must be new")
     config = json.loads(config_path.read_text())
+    _verify_acquisition_sidecar(config_path)
     if config.get("schema") != "longworld.source-batch-pool.v2":
         raise ValueError("wrong source pool schema")
     prior = _prior_splits(config)
@@ -219,6 +238,7 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 def verify_output(config_path: Path, output_dir: Path) -> dict[str, int]:
     """Recheck pins, final reader bytes, split-local indexes, gold and tokens."""
     config = json.loads(config_path.read_text())
+    _verify_acquisition_sidecar(config_path)
     manifest = json.loads((output_dir / "manifest.json").read_text())
     if (
         config.get("schema") != "longworld.source-batch-pool.v2"

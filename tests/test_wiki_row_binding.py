@@ -80,3 +80,53 @@ def test_optional_frozen_bridge_snapshot_has_independent_joins():
     assert len({task.task_id for task in tasks}) == len(tasks)
     assert all(task.first_title != task.second_title for task in tasks)
     assert all(task.alternatives >= 2 for task in tasks)
+
+
+def test_normalized_answer_and_same_column_shortcuts_are_rejected():
+    world = SemanticWorld(
+        (
+            Document(
+                "d1",
+                "First List",
+                "Name | Summary | Type\nA Museum | Industry – finance | History\n"
+                "B Museum | Science | Art\nC Museum | Community | Sports",
+            ),
+            Document(
+                "d2",
+                "Second List",
+                "Name | Category | Type\nA Museum | Industry - Finance | Culture\n"
+                "B Museum | Engineering | Science\nC Museum | Archive | Library",
+            ),
+        ),
+        (),
+        (),
+    )
+    tasks = wiki_row_binding.build_join_tasks(world, max_tasks=100)
+    assert all(task.answer != "Industry - Finance" for task in tasks)
+    assert all(task.selector_column != task.target_column for task in tasks)
+    assert wiki_row_binding._fold("Industry – finance") == wiki_row_binding._fold(
+        "Industry - Finance"
+    )
+
+
+def test_first_row_partial_answer_support_is_rejected():
+    world = SemanticWorld(
+        (
+            Document(
+                "d1",
+                "First List",
+                "Name | Focus | Code\nPoster House | Posters | QX42\n"
+                "Other House | Painting | QX43\nThird House | Sculpture | QX44",
+            ),
+            Document(
+                "d2",
+                "Second List",
+                "Name | Summary\nPoster House | Posters as art\n"
+                "Other House | Gallery space\nThird House | Public art",
+            ),
+        ),
+        (),
+        (),
+    )
+    tasks = wiki_row_binding.build_join_tasks(world, max_tasks=100)
+    assert all(task.answer != "Posters as art" for task in tasks)

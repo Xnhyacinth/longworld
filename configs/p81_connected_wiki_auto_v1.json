@@ -1,0 +1,20 @@
+{
+  "schema": "longworld.connected-wiki-intake.v1",
+  "base_pool": "data/capability_records/p78_wiki_topic_discovery_broad_v1/source_pool.json",
+  "base_pool_sha256": "c5acd537c30a09bac21885af095f739b3463dfc273fd0f7e9721f89664ce2a13",
+  "auto_sources": {
+    "domains": [
+      "infrastructure",
+      "nature",
+      "transport",
+      "education",
+      "astronomy",
+      "culture"
+    ],
+    "max_sources": 6,
+    "max_queries": 5,
+    "results_per_query": 8,
+    "max_previews": 8,
+    "max_freezes": 2
+  }
+}

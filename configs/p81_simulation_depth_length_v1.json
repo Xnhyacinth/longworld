@@ -1,0 +1,95 @@
+{
+  "schema_version": "longworld.record-world-config.v1",
+  "world_seed_base": 1300000,
+  "families": [
+    "filter_aggregate",
+    "group_compare",
+    "join_lookup",
+    "alias_locate",
+    "asof_state",
+    "rule_holdout",
+    "join_unanswerable"
+  ],
+  "depths": [
+    1,
+    2,
+    3
+  ],
+  "lengths": [
+    200,
+    800,
+    3200
+  ],
+  "consumed_by_depth": {
+    "1": 20,
+    "2": 60,
+    "3": 200
+  },
+  "variants_per_world": 4,
+  "worlds_per_cell": 12,
+  "worlds_per_cell_by_family": {
+    "filter_aggregate": 12,
+    "group_compare": 12,
+    "join_lookup": 12,
+    "alias_locate": 12,
+    "asof_state": 12,
+    "rule_holdout": 12,
+    "join_unanswerable": 12
+  },
+  "depths_by_family": {
+    "filter_aggregate": [
+      1,
+      2,
+      3
+    ],
+    "group_compare": [
+      1,
+      2,
+      3
+    ],
+    "join_lookup": [
+      1,
+      2,
+      3
+    ],
+    "alias_locate": [
+      1,
+      2,
+      3
+    ],
+    "asof_state": [
+      1,
+      2,
+      3
+    ],
+    "rule_holdout": [
+      1,
+      2,
+      3
+    ],
+    "join_unanswerable": [
+      1
+    ]
+  },
+  "token_targets_by_depth": {
+    "1": [
+      49152,
+      98304,
+      196608
+    ],
+    "2": [
+      49152,
+      98304,
+      196608
+    ],
+    "3": [
+      98304,
+      196608
+    ]
+  },
+  "workers": 4,
+  "trained_rule_family": "threshold_class",
+  "notes": {
+    "purpose": "P81 fresh multiprocess depth-3 and noncanonical 48/96/192K target synthesis; candidate only"
+  }
+}

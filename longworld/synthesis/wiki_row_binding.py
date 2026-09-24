@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import unicodedata
 from dataclasses import dataclass
 
 from longworld.synthesis import wiki_adapter
@@ -210,7 +211,35 @@ def _source_contains(value: str, source: str) -> bool:
             re.search(rf"(?<![\d.]){re.escape(number.group(1))}(?![\d.])", source)
             is not None
         )
-    return value.casefold() in source.casefold()
+    folded_value = _fold(value)
+    return bool(folded_value) and f" {folded_value} " in f" {_fold(source)} "
+
+
+def _fold(value: str) -> str:
+    """Compare answer surfaces across Unicode, case, and punctuation variants."""
+    normalized = unicodedata.normalize("NFKC", value).casefold()
+    return " ".join(
+        "".join(char if char.isalnum() else " " for char in normalized).split()
+    )
+
+
+def _row_partly_supports(answer: str, row: Row) -> bool:
+    """Reject a target that merely elaborates a visible first-row field."""
+    folded_answer = f" {_fold(answer)} "
+    for column, cell in row.columns:
+        if cell == row.name or _BAD_COLUMN.search(column):
+            continue
+        value = _value(cell.value)
+        if value is None:
+            continue
+        folded_value = _fold(value)
+        if (
+            len(folded_value) >= 5
+            and any(char.isalpha() for char in folded_value)
+            and f" {folded_value} " in folded_answer
+        ):
+            return True
+    return False
 
 
 def build_join_tasks(
@@ -274,9 +303,12 @@ def build_join_tasks(
                         answer = _value(target_cell.value)
                         if (
                             target_column == name_column
+                            or target_column == selector_column
                             or _BAD_COLUMN.search(target_column)
                             or _UNSAFE.search(target_column)
                             or answer is None
+                            or _fold(selector) == _fold(answer)
+                            or _row_partly_supports(answer, first_row)
                             or _source_contains(answer, first.text)
                         ):
                             continue
@@ -336,6 +368,8 @@ def build_join_tasks(
                             context=context,
                             alternatives=alternatives,
                         )
+                        if _source_contains(answer, task.question):
+                            continue
                         # Reject a repeated answer surface anywhere else in
                         # the final two-document reader context. This is a
                         # conservative exact/number-string duplicate check,

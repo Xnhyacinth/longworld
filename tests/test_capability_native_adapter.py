@@ -92,6 +92,31 @@ def test_probe_rejects_duplicate_family_and_unbounded_plan():
         adapter.probe({**CONFIG, "worlds_per_cell": 2}, max_shards=1)
 
 
+def test_unsupported_family_depth_is_reported_and_rejected_before_fresh_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    config = {
+        **CONFIG,
+        "depths": [3],
+        "consumed_by_depth": {"3": 200},
+        "token_targets_by_depth": {"3": [98304]},
+    }
+    planned = adapter.probe(config)
+    assert planned["unsupported_depth_shards"] == 1
+    assert planned["unsupported_depth_cells"] == [
+        {"family": "alias_locate", "depth": 3, "token_target": 98304, "shards": 1}
+    ]
+    config_path = tmp_path / "config.json"
+    _write_json(config_path, config)
+    monkeypatch.setattr(
+        adapter.native,
+        "run",
+        lambda *_args, **_kwargs: pytest.fail("unsupported job should not run"),
+    )
+    with pytest.raises(ValueError, match="unsupported family/depth"):
+        adapter.run_native(config_path, tmp_path / "fresh")
+
+
 def test_native_run_returns_verified_paths(tmp_path: Path, monkeypatch):
     config_path = tmp_path / "config.json"
     _write_json(config_path, CONFIG)

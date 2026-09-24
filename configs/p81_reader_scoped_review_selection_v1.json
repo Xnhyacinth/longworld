@@ -1,0 +1,19 @@
+{
+  "schema_version": "longworld.unified-candidate-selection.v1",
+  "selection_seed": 81001,
+  "source_kinds": ["real_wiki"],
+  "evidence_profiles": [
+    "complete_plain_year_table_rows_structurally_reconciled",
+    "two_table_rows_subject_header_value_checked",
+    "bounded_table_reader_dependency"
+  ],
+  "dependency_statuses": [
+    "scoped_table_insertion_replay",
+    "scoped_table_parser_year_cells_removed",
+    "two_cell_interventions_passed"
+  ],
+  "minimum_full_chat_tokens": 32768,
+  "maximum_views_per_semantic_task": 1,
+  "maximum_tasks_per_source_group": 32,
+  "maximum_tasks_per_operation": 48
+}

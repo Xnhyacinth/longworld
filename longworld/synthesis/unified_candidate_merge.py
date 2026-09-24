@@ -48,15 +48,9 @@ def _indexed_rows(
     use_native_row_index: bool = False,
     accepted_output_files: set[str] | None = None,
 ) -> Iterator[tuple[dict[str, Any], dict[str, Any], str]]:
-    """Join indexes with giant reader rows using byte offsets, never body maps."""
-    offsets: dict[str, list[int]] = {}
-    for split, path in paths.items():
-        offsets[split] = []
-        with path.open("rb") as stream:
-            while stream.readline():
-                offsets[split].append(stream.tell())
-        offsets[split].insert(0, 0)
-        offsets[split].pop()
+    """Join giant readers in one pass, retaining offsets only when revisited."""
+    offsets: dict[str, list[int]] = {name: [] for name in paths}
+    scanned_ends = {name: 0 for name in paths}
     cursors = Counter()
     with ExitStack() as stack:
         streams = {
@@ -78,12 +72,29 @@ def _indexed_rows(
                 else {"train.jsonl", "eval.jsonl", "short.jsonl"}
             ):
                 raise ValueError(f"invalid {index_name} output file")
-            position = index["row_index"] if use_native_row_index else cursors[file_key]
-            if type(position) is not int or not 0 <= position < len(offsets[file_key]):
-                raise ValueError(f"invalid {index_name} row index")
             stream = streams[file_key]
-            stream.seek(offsets[file_key][position])
-            row = json.loads(stream.readline())
+            if use_native_row_index:
+                position = index["row_index"]
+                if type(position) is not int or position < 0:
+                    raise ValueError(f"invalid {index_name} row index")
+                if position < len(offsets[file_key]):
+                    stream.seek(offsets[file_key][position])
+                    line = stream.readline()
+                else:
+                    stream.seek(scanned_ends[file_key])
+                    while len(offsets[file_key]) <= position:
+                        start = stream.tell()
+                        line = stream.readline()
+                        if not line:
+                            raise ValueError(f"invalid {index_name} row index")
+                        offsets[file_key].append(start)
+                    scanned_ends[file_key] = stream.tell()
+            else:
+                position = cursors[file_key]
+                line = stream.readline()
+            if not line:
+                raise ValueError(f"invalid {index_name} row index")
+            row = json.loads(line)
             cursors[file_key] += 1
             yield index, row, f"{paths[file_key]}:{position}"
 

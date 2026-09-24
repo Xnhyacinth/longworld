@@ -1,0 +1,22 @@
+{
+  "schema_version": "longworld.unified-candidate-selection.v1",
+  "selection_seed": 81002,
+  "source_kinds": [
+    "controlled_simulation",
+    "real_code_workflow",
+    "real_finance"
+  ],
+  "evidence_profiles": [
+    "native_solver_recheck",
+    "native_program_replay",
+    "native_visible_evidence"
+  ],
+  "dependency_statuses": [
+    "unmeasured",
+    "native_candidate"
+  ],
+  "minimum_full_chat_tokens": 32768,
+  "maximum_views_per_semantic_task": 1,
+  "maximum_tasks_per_source_group": 4,
+  "maximum_tasks_per_operation": 32
+}

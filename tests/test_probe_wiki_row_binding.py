@@ -13,7 +13,7 @@ from scripts import probe_wiki_row_binding
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "configs/p80_wiki_task_scale_v1.json"
-OUTPUT = ROOT / "data/candidates/p80_wiki_row_binding_probe_v3"
+OUTPUT = ROOT / "data/candidates/p80_wiki_row_binding_probe_v4"
 
 
 def _local_output() -> Path:
@@ -48,3 +48,26 @@ def test_export_rejects_wrong_split_local_row_index_even_with_rehashed_file(
     )
     with pytest.raises(ValueError, match="final reader mismatch"):
         probe_wiki_row_binding.verify_output(CONFIG, copied)
+
+
+def test_acquired_pool_sidecar_binds_pool_and_discovery(tmp_path: Path) -> None:
+    pool = tmp_path / "source_pool.json"
+    acquisition = tmp_path / "acquisition_manifest.json"
+    receipt = tmp_path / "source_pool_receipt.json"
+    pool.write_text("{}\n")
+    acquisition.write_text("{}\n")
+    receipt.write_text(
+        json.dumps(
+            {
+                "schema": "longworld.connected-wiki-intake.v1.source-pool-receipt",
+                "source_pool_sha256": hashlib.sha256(pool.read_bytes()).hexdigest(),
+                "acquisition_manifest_sha256": hashlib.sha256(
+                    acquisition.read_bytes()
+                ).hexdigest(),
+            }
+        )
+    )
+    probe_wiki_row_binding._verify_acquisition_sidecar(pool)
+    acquisition.write_text('{"changed":true}\n')
+    with pytest.raises(ValueError, match="lineage changed"):
+        probe_wiki_row_binding._verify_acquisition_sidecar(pool)
