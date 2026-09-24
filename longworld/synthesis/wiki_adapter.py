@@ -48,6 +48,7 @@ from typing import Any
 
 SOURCE_SNAPSHOT_SCHEMA = "longworld.source-snapshot.v1"
 SNAPSHOT_KIND = "mediawiki_category"
+TITLE_BUNDLE_KIND = "mediawiki_title_bundle"
 VALUE_TYPES = frozenset({"entity", "string", "quantity", "year", "date", "geo"})
 # Minimum surface length (chars) for non-link alias/label matching.
 _SURFACE_MIN_LEN = 4
@@ -740,8 +741,6 @@ def _span_of_line(line: StructuredLine, part: str) -> dict[str, Any]:
     }
 
 
-
-
 # ---------------------------------------------------------------------------
 # Entity linking (exact surface match only)
 # ---------------------------------------------------------------------------
@@ -879,7 +878,12 @@ def _cell_semantics(header: str, cell: str) -> tuple[str, str, str | None] | Non
         return "uses instrument", value, _date_from(cell)
     if header_l in ("telescope", "telescopes"):
         return "uses telescope", value, None
-    if header_l in ("established", "establishment"):
+    if header_l in (
+        "established",
+        "establishment",
+        "year of foundation",
+        "year offoundation",
+    ):
         # rows with a missing year shift cells left under the headers, so a
         # place name can sit in the Established column: require year-likeness
         if _YEARISH_RE.fullmatch(value):
@@ -1029,10 +1033,13 @@ def build_snapshot(
     frozen_at: str,
     fetched_via: str = "live-api",
     generator_params: dict[str, Any] | None = None,
+    collection_kind: str = "category",
 ) -> dict[str, Any]:
     """Assemble the §14 SourceSnapshot v1 from frozen inputs (pure function)."""
     if not _ISO_TS_RE.fullmatch(frozen_at):
         raise SnapshotError("frozen_at must be an ISO-8601 Z timestamp")
+    if collection_kind not in {"category", "title_bundle"}:
+        raise SnapshotError("unsupported source collection kind")
 
     ordered = sorted(pages.values(), key=lambda page: page.pageid)
     if not ordered:
@@ -1109,16 +1116,17 @@ def build_snapshot(
 
         # category membership: ungrounded by construction (listing-level
         # fact, no body span in the frozen docs) -> quarantine
-        quarantine.append(
-            {
-                "item_id": "q_cat_" + _entity_id(page.title)[2:],
-                "subject": page.title,
-                "relation": "member of category",
-                "value": category_title,
-                "reason": "category membership has no body-text span in the frozen documents",
-                "origin": "categorymembers listing",
-            }
-        )
+        if collection_kind == "category":
+            quarantine.append(
+                {
+                    "item_id": "q_cat_" + _entity_id(page.title)[2:],
+                    "subject": page.title,
+                    "relation": "member of category",
+                    "value": category_title,
+                    "reason": "category membership has no body-text span in the frozen documents",
+                    "origin": "categorymembers listing",
+                }
+            )
 
         _extract_facts_for_page(
             page=page,
@@ -1214,7 +1222,7 @@ def build_snapshot(
     quarantine.sort(key=lambda item: item["item_id"])
 
     source = {
-        "kind": SNAPSHOT_KIND,
+        "kind": SNAPSHOT_KIND if collection_kind == "category" else TITLE_BUNDLE_KIND,
         "license": {
             "text": rights["text"],
             "url": rights["url"],
@@ -1227,14 +1235,16 @@ def build_snapshot(
         },
         "revisions": {page.title: page.revid for page in ordered},
         "fetched_via": fetched_via,
-        "category": category_title,
+        "category": category_title if collection_kind == "category" else None,
+        "collection_label": category_title,
+        "collection_kind": collection_kind,
         "api": "https://en.wikipedia.org/w/api.php",
         "user_agent": USER_AGENT,
         "generator_params": generator_params or {},
     }
     snapshot = {
         "schema_version": SOURCE_SNAPSHOT_SCHEMA,
-        "snapshot_id": _snapshot_id(category_title, source, documents),
+        "snapshot_id": _snapshot_id(category_title, source, documents, fact_list),
         "frozen_at": frozen_at,
         "source": source,
         "documents": documents,
@@ -1707,12 +1717,30 @@ def snapshot_from_dict(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _snapshot_id(
-    category_title: str, source: dict[str, Any], documents: list[dict[str, Any]]
+    category_title: str,
+    source: dict[str, Any],
+    documents: list[dict[str, Any]],
+    facts: list[dict[str, Any]],
 ) -> str:
     revisions = json.dumps(source["revisions"], sort_keys=True, ensure_ascii=False)
-    doc_ids = json.dumps([doc["doc_id"] for doc in documents], sort_keys=True)
+    body = json.dumps(
+        [(doc["doc_id"], doc["text"]) for doc in documents],
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+    extracted = json.dumps(facts, sort_keys=True, ensure_ascii=False)
     digest = hashlib.sha256(
-        (category_title + "|" + revisions + "|" + doc_ids).encode("utf-8")
+        (
+            category_title
+            + "|"
+            + str(source["kind"])
+            + "|"
+            + revisions
+            + "|"
+            + body
+            + "|"
+            + extracted
+        ).encode("utf-8")
     ).hexdigest()
     return "snapshot_" + digest[:20]
 

@@ -97,6 +97,53 @@ def _snapshot() -> dict:
     )
 
 
+def test_explicit_title_bundle_does_not_claim_category_membership() -> None:
+    page = _page_record()
+    snapshot = wa.build_snapshot(
+        members=[wa.Member(pageid=page.pageid, title=page.title)],
+        pages={page.pageid: page},
+        link_meta=_link_meta(),
+        rights=_rights(),
+        category_title="Observatory lists bundle",
+        collection_kind="title_bundle",
+        frozen_at="2026-09-23T00:00:00Z",
+    )
+    assert snapshot["source"]["category"] is None
+    assert snapshot["source"]["collection_kind"] == "title_bundle"
+    assert snapshot["source"]["kind"] == "mediawiki_title_bundle"
+    assert not any(
+        item["relation"] == "member of category"
+        for item in snapshot["ungrounded_quarantine"]
+    )
+    wa.snapshot_from_dict(snapshot)
+
+
+def test_foundation_year_table_header_requires_a_plain_year() -> None:
+    assert wa._cell_semantics("Year offoundation", "1872") == (
+        "established in",
+        "1872",
+        None,
+    )
+    assert wa._cell_semantics("Year offoundation", "Aberystwyth") is None
+
+
+def test_snapshot_identity_changes_when_extraction_changes() -> None:
+    snapshot = _snapshot()
+    source = snapshot["source"]
+    docs = snapshot["documents"]
+    facts = snapshot["facts"]
+    label = source["collection_label"]
+    original = wa._snapshot_id(label, source, docs, facts)
+    changed_fact = [*facts[:-1], {**facts[-1], "relation": "corrected relation"}]
+    assert wa._snapshot_id(label, source, docs, changed_fact) != original
+    changed_docs = [*docs[:-1], {**docs[-1], "text": docs[-1]["text"] + "\n"}]
+    assert wa._snapshot_id(label, source, changed_docs, facts) != original
+    assert (
+        wa._snapshot_id(label, {**source, "kind": wa.TITLE_BUNDLE_KIND}, docs, facts)
+        != original
+    )
+
+
 # ---------------------------------------------------------------------------
 # Rendering
 # ---------------------------------------------------------------------------

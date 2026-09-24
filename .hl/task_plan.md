@@ -577,3 +577,20 @@ Goal: replace the one-object comparison pilot with a source-diverse batch whose 
 | P76.2 | Split multi-valued relations from revision state; preserve effective and disclosure time separately | planned | a list row never becomes as-of state; genuine revision fixture still resolves correctly |
 | P76.3 | Compile source comparison and table aggregation from checked rows | planned | independent execution, at least two visible source units, bounded text-redaction probe and exact chat-token map |
 | P76.4 | Batch and utility preparation | planned | versioned local candidate/eval exports, source-disjoint split with multiple relations; fixed-budget training arms specified before GPU execution |
+
+## P76 reset — source-native batch compilation, 2026-09-24
+
+User acceptance is a *distribution of independent, source-supported semantic tasks*, not one dataset product, repeated context views, or a few long examples. No new model training starts from the P75 24-row slice. Existing Finance, CodeForge, Wiki, OSV, IETF, ResearchLab and simulated compilers remain native; a thin batch contract joins their identities, source exposure, operation and verification state without claiming a common fact schema or upgrading historical gates.
+
+The next data decision requires a coverage report keyed by `source_kind × domain × topic × operation × capability × final-input length`, with separate counts for frozen sources, source worlds, unique semantic tasks, rendered rows and qualified long-dependency tasks. Input length, proof span, candidate-scan load and text necessity are different measurements. A task's 32K/64K/128K views retain one semantic identity and one source-disjoint split. If a length is infeasible from coherent sources, record the rejection; never pad it with repeated material.
+
+| Phase | Concrete output | Status | Exit check |
+| ----- | --------------- | ------ | ---------- |
+| P76.R0 | Cross-review native pipelines and literature; freeze task/world/view and truth labels | complete | P64/P66 CodeForge duplicate found; unmeasured dependency stays unmeasured |
+| P76.R1 | Streaming multi-producer coverage index and deterministic overlap/reject ledger | complete | 8,726 indexed rows / 8,596 independent tasks; 130 duplicate CodeForge rows; byte-stable rebuild |
+| P76.R2 | One reusable real table/list multi-evidence recipe on frozen Wiki sources | complete | 28 independent cross-document tasks, 52 views, oracle + gold-blind table replay + bounded text deletion |
+| P76.R3 | Batch run plus independent distribution and case audit | complete | eight title bundles/28 pages screened; 9,016 unique historical+new tasks indexed, 28 new Wiki tasks, 0 new-Wiki source-title split overlap, exact SFT mask verified |
+| P76.R4 | Scale plan for real, concatenated-real, grounded-mixed and controlled-sim sources | complete_as_design | `.hl/p76_execution.md` source-native routing, bounded parallel/resume, exact token bins and dependency-specific gates |
+| P76.R5 | Execute source-diverse quality scale batch before training | planned | >=100 independent worlds and >=1,000 *accepted* tasks across real/concatenated/mixed/simulated strata; source-connected split, reader checks and actual distribution; no count from historical inventory alone |
+
+The engineering gate before a utility training comparison is a source-diverse, quality-filtered batch: target at least 100 independent worlds and 1,000 independent accepted tasks, with real, coherent concatenated, controlled-simulation and grounded-mixed strata represented, multiple operations/domains in each feasible length bucket, and no dominant operation/domain over half the accepted tasks. This is a project target, not an observed count or a universal literature threshold. Training eligibility also requires gold-blind reader checks, equivalent-support/text interventions, source-connected-component split and an explicit sampling/replay budget. The first batch may fall short; report its exact gap rather than promoting it.

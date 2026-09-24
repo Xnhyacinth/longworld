@@ -19,6 +19,18 @@ def _rows(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines()]
 
 
+def _token_limit(manifest: dict) -> int:
+    if manifest.get("schema") == "longworld.p75-real-reader-export.v1":
+        limit = manifest["config"]["max_full_tokens"]
+    elif manifest.get("schema") == "longworld.p76-wiki-table-pairs.v5":
+        limit = 262144
+    else:
+        raise ValueError("unsupported reader export schema")
+    if not isinstance(limit, int) or isinstance(limit, bool) or limit <= 0:
+        raise ValueError("invalid max_full_tokens in reader manifest")
+    return limit
+
+
 def verify(directory: Path) -> dict:
     manifest = json.loads((directory / "manifest.json").read_text())
     for name, expected in manifest["files_sha256"].items():
@@ -37,6 +49,7 @@ def verify(directory: Path) -> dict:
         raise ValueError("duplicate example_id")
     groups = {"train": set(), "eval": set()}
     tokenizer = lc.get_tokenizer()
+    max_full_tokens = _token_limit(manifest)
     supervised = 0
     max_full = 0
     exact_mappings = 0
@@ -57,7 +70,7 @@ def verify(directory: Path) -> dict:
             if "program" in row or "proof" in row:
                 raise ValueError(f"audit field leaked into reader row: {example_id}")
             encoded = tokenize_assistant_only(
-                tokenizer, row["messages"], manifest["config"]["max_full_tokens"]
+                tokenizer, row["messages"], max_full_tokens
             )
             if len(encoded["input_ids"]) != index["full_chat_tokens"]:
                 raise ValueError(f"full chat length mismatch: {example_id}")
@@ -94,8 +107,13 @@ def verify(directory: Path) -> dict:
                 raise ValueError(f"missing fact value token span: {example_id}")
     if groups["train"] & groups["eval"]:
         raise ValueError("train/eval source worlds overlap")
+    verification_schema = (
+        "longworld.p75-real-reader-verification.v1"
+        if manifest["schema"] == "longworld.p75-real-reader-export.v1"
+        else "longworld.p76-wiki-table-verification.v1"
+    )
     result = {
-        "schema": "longworld.p75-real-reader-verification.v1",
+        "schema": verification_schema,
         "rows": {split: len(rows[split]) for split in ("train", "eval")},
         "source_groups": {split: len(groups[split]) for split in ("train", "eval")},
         "max_full_chat_tokens": max_full,
