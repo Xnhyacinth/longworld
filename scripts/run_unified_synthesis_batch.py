@@ -27,6 +27,7 @@ KINDS = {
     "codeforge_taskbank",
     "capability_records",
     "shared_record_taskbank",
+    "wiki_distance_compose",
 }
 
 
@@ -185,6 +186,41 @@ def _execute(entry: dict[str, Any], *, workers: int) -> dict[str, Any]:
             },
             "native_receipt_sha256": _sha(output / "manifest.json"),
         }
+    if kind == "wiki_distance_compose":
+        from scripts.compose_wiki_join_distance import run as compose_distance
+        from scripts.compose_wiki_join_distance import verify_output
+
+        if not output.exists():
+            compose_distance(config, output)
+        manifest = verify_output(config, output)
+        groups: set[str] = set()
+        domains: set[str] = set()
+        operations: Counter[str] = Counter()
+        with (output / "sample_index.jsonl").open(encoding="utf-8") as stream:
+            for line in stream:
+                row = json.loads(line)
+                groups.add(row["source_group"])
+                domains.add(row["domain"])
+                operations[row["operation"]] += 1
+        if len(groups) != 1 or sum(operations.values()) != manifest["views"]:
+            raise ValueError("distance-composed source grouping changed")
+        return {
+            "source_kind": "real_wiki",
+            "status": "verified_native_candidate",
+            "rows": manifest["views"],
+            "semantic_tasks": manifest["source_semantic_tasks_reused"],
+            "source_groups": len(groups),
+            "operations": dict(operations),
+            "domains": sorted(domains),
+            "train_ready": False,
+            "paths": {
+                "train": str(output / "train.jsonl"),
+                "eval": str(output / "eval.jsonl"),
+                "sample_index": str(output / "sample_index.jsonl"),
+                "manifest": str(output / "manifest.json"),
+            },
+            "native_receipt_sha256": _sha(output / "manifest.json"),
+        }
     if kind == "wiki_source_pool":
         from scripts.run_source_pool_batch import run
 
@@ -316,6 +352,8 @@ def _verified_base_batch(base_batch: Path) -> tuple[dict[str, Any], str]:
                 Path(paths["manifest"]),
                 *(Path(path) for path in lane["receipt_paths"]),
             ]
+        elif kind == "wiki_distance_compose":
+            native_paths = [Path(paths["manifest"])]
         else:
             continue
         actual = {_sha(path) for path in native_paths}

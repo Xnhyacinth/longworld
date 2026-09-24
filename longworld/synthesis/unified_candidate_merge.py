@@ -209,6 +209,38 @@ def _wiki_row_join(lane: dict[str, Any]) -> Iterator[tuple[Any, dict[str, Any], 
         )
 
 
+def _wiki_distance(
+    lane: dict[str, Any],
+) -> Iterator[tuple[Any, dict[str, Any], str]]:
+    paths = lane["paths"]
+    receipt = Path(paths["manifest"])
+    for index, row, ref in _indexed_rows(
+        Path(paths["sample_index"]),
+        {split: Path(paths[split]) for split in ("train", "eval")},
+        index_name="Wiki distance",
+        use_native_row_index=True,
+    ):
+        if index["output_file"] != f"{index['split']}.jsonl":
+            raise ValueError("Wiki distance split/output file mismatch")
+        context = row["messages"][0]["content"][: index["context_chars"]]
+        binding = _binding(
+            index,
+            receipt,
+            source_kind="real_wiki",
+            source_group=index["source_group"],
+            domain=index["domain"],
+            topic=index["topic"],
+            operation=index["operation"],
+            evidence_profile=index["evidence_profile"],
+            tokenizer_profile="pinned-chat-template",
+        )
+        yield (
+            normalize_native_candidate(index, row, binding, context_text=context),
+            row,
+            ref,
+        )
+
+
 def _simulation(lane: dict[str, Any]) -> Iterator[tuple[Any, dict[str, Any], str]]:
     paths = lane["paths"]
     receipt = Path(paths["manifest"])
@@ -450,6 +482,7 @@ READERS = {
     "wiki_source_pool": _wiki,
     "wiki_candidate_delta": _wiki_delta,
     "wiki_row_join_probe": _wiki_row_join,
+    "wiki_distance_compose": _wiki_distance,
     "capability_records": _simulation,
     "shared_record_taskbank": _shared_record,
     "finance_taskbank": _finance,

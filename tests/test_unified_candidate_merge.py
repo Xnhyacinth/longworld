@@ -15,6 +15,7 @@ from longworld.synthesis.unified_candidate_merge import (
     _indexed_rows,
     _simulation,
     _wiki_delta,
+    _wiki_distance,
     append,
     merge,
     verify_merge,
@@ -215,6 +216,57 @@ def test_simulation_hashes_source_without_question(
     candidate, _, _ = next(_simulation(lane))
     assert candidate.context_sha256 == hashlib.sha256(b"source text").hexdigest()
     assert candidate.input_tokens == 92
+
+
+def test_distance_view_reuses_semantic_task_on_new_reader_context(
+    tmp_path: Path,
+) -> None:
+    receipt = tmp_path / "manifest.json"
+    receipt.write_text("{}\n")
+    context = "first doc\n\nsecond doc"
+    row = {
+        "example_id": "distance-a",
+        "messages": [
+            {"role": "user", "content": context + "\n\nQUESTION\nquery"},
+            {"role": "assistant", "content": "answer"},
+        ],
+    }
+    index = {
+        "example_id": "distance-a",
+        "semantic_task_id": "original-task-a",
+        "source_group": "original-world-a",
+        "source_kind": "real_wiki",
+        "split": "train",
+        "domain": "nature",
+        "topic": "parks",
+        "operation": "cross_document_table_join",
+        "evidence_profile": "bounded_table_reader_dependency",
+        "output_file": "train.jsonl",
+        "row_index": 0,
+        "context_chars": len(context),
+        "context_sha256": hashlib.sha256(context.encode()).hexdigest(),
+        "input_tokens": 90,
+        "supervised_tokens": 10,
+        "full_chat_tokens": 100,
+    }
+    _write_rows(tmp_path / "train.jsonl", [row])
+    _write_rows(tmp_path / "eval.jsonl", [])
+    _write_rows(tmp_path / "sample_index.jsonl", [index])
+    candidate, _, _ = next(
+        _wiki_distance(
+            {
+                "paths": {
+                    "manifest": str(receipt),
+                    "sample_index": str(tmp_path / "sample_index.jsonl"),
+                    "train": str(tmp_path / "train.jsonl"),
+                    "eval": str(tmp_path / "eval.jsonl"),
+                }
+            }
+        )
+    )
+    assert candidate.semantic_task_id == "original-task-a"
+    assert candidate.source_group == "original-world-a"
+    assert candidate.context_sha256 == index["context_sha256"]
 
 
 def test_wiki_delta_joins_declared_split_and_checks_reader_identity(

@@ -1,0 +1,28 @@
+{
+  "schema_version": "longworld.wiki-join-distance-compose.v1",
+  "source_pool": {
+    "path": "data/capability_records/p81_connected_wiki_auto_v3/source_pool.json",
+    "sha256": "fd869ab0a997bec74169b2ad7c339d7cd100fb4823ac39ddcf85f97adbc4ad5a"
+  },
+  "source_name": "snapshot_6ee78829a1a03fc0c129",
+  "native_manifest": {
+    "path": "data/candidates/p81_connected_wiki_row_binding_v3/manifest.json",
+    "sha256": "b3e0422db9fba71f1c7d786152855c7e92bd9bb88cf3dbff0dd3caa7b39799fc"
+  },
+  "filler_pool": {
+    "path": "data/capability_records/p78_wiki_topic_discovery_broad_v1/source_pool.json",
+    "sha256": "c5acd537c30a09bac21885af095f739b3463dfc273fd0f7e9721f89664ce2a13"
+  },
+  "filler_source": "wiki_parks_lists",
+  "filler_titles": [
+    "List of national parks of the United States",
+    "List of national parks of Canada"
+  ],
+  "prior_unified_batch": {
+    "path": "data/candidates/p82_unified_shared_v2",
+    "manifest_sha256": "77ebb78e4908d4115c357818a8b836079271bfe938f7c8bcd2dcb7dc303c91ee"
+  },
+  "minimum_full_chat_tokens": 65536,
+  "maximum_full_chat_tokens": 131072,
+  "minimum_evidence_extent_tokens": 32768
+}
