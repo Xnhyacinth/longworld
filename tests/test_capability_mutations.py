@@ -54,34 +54,83 @@ def test_mutants_run_and_something_distinguished_families():
     assert seen_distinguished > 0
 
 
-def test_three_way_schema_erroring_mutant_not_semantically_distinguished():
-    # wrong_rule_family on a world whose demos leave the other rule family
-    # ambiguous: the shortcut program cannot produce a legal answer. Under
-    # the P74 §0.2 split that is applicable + invalid output + NOT
-    # semantically distinguished (the old rule counted it distinguished).
-    saw_error_outcome = saw_distinction = False
+def test_wrong_rule_family_applies_other_family_formula():
+    # W2-M redesign: the shortcut no longer re-infers the other family's rule
+    # from the demos (which correctly errors on ambiguity, 80/84 on the pilot
+    # bank). It APPLIES the other family's formula over the query entity's
+    # features under the world's declared parameters -- a valid wrong
+    # program, so it lands in the valid-output cell of the three-way schema,
+    # carries the other rule family in its answer, and mostly differs.
+    saw_both_families = set()
+    saw_distinction = 0
     for offset in range(6):
         world = _family_world("rule_holdout", 780030 + offset, 12, 2)
+        header, rows = families.parse_context(world["context"])
+        declared = header["rule_family"]
+        other = "parity_vote" if declared == "threshold_class" else "threshold_class"
+        entities = families._rule_entities(rows)
         for task in world["tasks"]:
             report = mut.witness_report(
                 "rule_holdout", world["context"], task["question"]
             )
             result = report["mutants"]["wrong_rule_family"]
-            if not result["valid_output"]:
-                saw_error_outcome = True
-                assert "error" in result
-                assert result["distinguished"] is False
-                assert result["semantic_distinguished"] is False
-                assert report["semantic_distinguished_count"] == sum(
-                    1 for r in report["mutants"].values() if r["semantic_distinguished"]
-                )
+            assert result["applicable"] is True
+            assert result["valid_output"] is True, result
+            answer = result["answer"]
+            terminal = task["question"]["steps"][-1]
+            if terminal["op"] == "label_list":
+                # the bare-list shape carries no rule_family key; the labels
+                # are checked directly against the formula below
+                named = terminal["entities"]
+                assert isinstance(answer, list) and len(answer) == len(named)
+                label_map = dict(zip(named, answer))
             else:
-                # a real wrong-family answer differs from the correct one on
-                # these worlds, but the assertion only guards the schema
-                if result["semantic_distinguished"]:
-                    saw_distinction = True
-                    assert result["answer"] is not None
-    assert saw_error_outcome, "expected at least one ambiguous-other-rule row"
+                # the answer names the rule family it actually applied
+                assert answer["rule_family"] == other
+                saw_both_families.add(other)
+                label_map = answer.get("labels", {})
+            # the shortcut's labels are the other family's formula over the
+            # entity features, recomputed independently here
+            for entity, label in label_map.items():
+                entity_rows = entities[entity]
+                if other == "threshold_class":
+                    value = (
+                        sum(r.x for r in entity_rows) + sum(r.y for r in entity_rows)
+                    ) % header["modulus"]
+                    expected = header["labels"][0] if value < 1 else header["labels"][1]
+                else:
+                    counted = sum(
+                        (r.x + r.y) % header["modulus"] == 0 for r in entity_rows
+                    )
+                    expected = header["labels"][counted % 2]
+                assert label == expected, (entity, label, expected)
+            if result["semantic_distinguished"]:
+                saw_distinction += 1
+    assert saw_distinction > 0, "wrong_rule_family should distinguish on some worlds"
+
+
+def test_three_way_schema_erroring_mutant_not_semantically_distinguished(monkeypatch):
+    # The schema rule "an erroring mutant is NOT semantically distinguished"
+    # (P74 §0.2) outlives the W2-M redesign: wrong_rule_family no longer
+    # errors naturally, so the error cell is exercised by breaking one
+    # mutant deliberately and checking the accounting.
+    world = _family_world("rule_holdout", 780031, 12, 2)
+    task = world["tasks"][0]
+
+    def boom(context, program, name):
+        raise ValueError("boom: synthetic mutant failure")
+
+    monkeypatch.setattr(mut, "_rule_mutant_answer", boom)
+    report = mut.witness_report("rule_holdout", world["context"], task["question"])
+    result = report["mutants"]["wrong_rule_family"]
+    assert result["applicable"] is True
+    assert result["valid_output"] is False
+    assert "error" in result
+    assert result["distinguished"] is False
+    assert result["semantic_distinguished"] is False
+    assert report["semantic_distinguished_count"] == sum(
+        1 for r in report["mutants"].values() if r["semantic_distinguished"]
+    )
 
 
 def test_not_applicable_mutants_carry_reasons():
@@ -114,6 +163,82 @@ def test_not_applicable_mutants_carry_reasons():
                 saw_both.add("applicable")
                 assert result["applicable"] is True
     assert "n/a" in saw_both and "applicable" in saw_both
+    # tighten_one_condition (W2-M): applicable only where a member sits
+    # exactly on the scope's numeric bound; both cells must appear across a
+    # seed sweep, and the not-applicable reason names the missing fact.
+    saw_tighten = set()
+    for offset in range(8):
+        world = _family_world("set_complete", 780050 + offset, 12, 1)
+        for task in world["tasks"]:
+            report = mut.witness_report(
+                "set_complete", world["context"], task["question"]
+            )
+            result = report["mutants"]["tighten_one_condition"]
+            if not result["applicable"]:
+                saw_tighten.add("n/a")
+                assert "numeric bound" in result["not_applicable_reason"]
+                assert result["valid_output"] is False
+                assert result["semantic_distinguished"] is False
+            else:
+                saw_tighten.add("applicable")
+                assert result["valid_output"] is True
+    assert "n/a" in saw_tighten and "applicable" in saw_tighten
+
+
+def test_tighten_not_applicable_without_numeric_bound():
+    # A scope of category/equality conditions only: the tightened program has
+    # no bound to sharpen, so the mutant is not applicable with that reason.
+    # Generated worlds always keep a numeric bound, so the fixture is built
+    # by hand from the world's own row vocabulary.
+    world = _family_world("set_complete", 780050, 12, 1)
+    header, rows = families.parse_context(world["context"])
+    categories = sorted({row.category for row in rows if row.type == "record"})
+    record = next(row for row in rows if row.type == "record")
+    other = next(c for c in categories if c != record.category)
+    program = {
+        "family": "set_complete",
+        "steps": [
+            {
+                "op": "scope",
+                "conditions": [
+                    {"field": "category", "op": "==", "value": record.category},
+                    {"field": "category", "op": "!=", "value": other},
+                ],
+            },
+            {"op": "set_list", "shape": "ids"},
+        ],
+    }
+    context = world["context"]
+    report = mut.witness_report("set_complete", context, program)
+    result = report["mutants"]["tighten_one_condition"]
+    assert result["applicable"] is False
+    assert "no numeric bound" in result["not_applicable_reason"]
+    # relax on a 2-condition scope: the other not-applicable cell, unchanged
+    assert report["mutants"]["relax_one_condition"]["applicable"] is False
+
+
+def test_nearest_lexical_not_applicable_reason():
+    # W2-M: when the lexically-nearest entity cannot produce the terminal's
+    # required answer shape (single-match / empty-declare), the shortcut has
+    # no legal answer -- an applicability fact, not an error and not a
+    # distinction. Both outcomes appear across a seed sweep.
+    saw = set()
+    for offset in range(8):
+        world = _family_world("alias_locate", 780060 + offset, 12, 2)
+        for task in world["tasks"]:
+            report = mut.witness_report(
+                "alias_locate", world["context"], task["question"]
+            )
+            result = report["mutants"]["nearest_lexical"]
+            if not result["applicable"]:
+                saw.add("n/a")
+                assert "no single-match target" in result["not_applicable_reason"]
+                assert result["valid_output"] is False
+                assert result["semantic_distinguished"] is False
+            else:
+                saw.add("applicable")
+                assert result["valid_output"] is True
+    assert "n/a" in saw and "applicable" in saw
 
 
 def test_latest_text_folds_in_reveal_order():

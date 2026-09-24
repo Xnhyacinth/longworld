@@ -393,13 +393,14 @@ def execute(
             env[step["out"]] = tuple(fact.value for fact in facts)
         elif op == "resolve_version":
             subject = bound(step, "subject")
-            entry = world.resolve_at(
-                subject, bound(step, "relation"), bound(step, "at")
-            )
+            resolved_relation = bound(step, "relation")
+            entry = world.resolve_at(subject, resolved_relation, bound(step, "at"))
             # The superseded entries are why the winner wins: their facts stay
             # in the proof so a revoked_at mutation shows up as a lineage hit.
+            # The relation may itself be a bound $ref — scan with the resolved
+            # value so the facts actually read enter the lineage.
             for fact in world.facts:
-                if fact.subject == subject and fact.relation == step["relation"]:
+                if fact.subject == subject and fact.relation == resolved_relation:
                     proof.append(_fact_item(world, index, step, fact))
             env[step["out"]] = entry.value
         elif op == "apply_rule":
@@ -664,13 +665,21 @@ def _map_position(offset: int, edits: list[_TextEdit]) -> int:
     own evidence, so a foreign span pointing INTO the old evidence still
     points at the region as a whole); positions after all edits shift by the
     accumulated length delta. One rule, no double counting.
+
+    All comparisons happen in ORIGINAL coordinates: the offset is never
+    mutated into new-text coordinates mid-loop; the shift from every edit
+    entirely BEFORE the offset accumulates in a separate delta. (Mutating the
+    offset would compare a new-coordinate position against the NEXT edit's
+    original bounds — a coordinate-system mix that double-counts when one
+    document carries two edits.)
     """
+    delta = 0
     for edit in edits:
         if offset >= edit.old_end:
-            offset += len(edit.new_text) - (edit.old_end - edit.start)
+            delta += len(edit.new_text) - (edit.old_end - edit.start)
         elif offset > edit.start:
-            return edit.start + len(edit.new_text)
-    return offset
+            return edit.start + delta + len(edit.new_text)
+    return offset + delta
 
 
 def _remap_spans(

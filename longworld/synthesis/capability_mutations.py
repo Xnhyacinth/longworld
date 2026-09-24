@@ -32,6 +32,7 @@ Design doc: .hl/design/p73_counterexample_synthesis.md §3.1/§3.2.
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any
 
 from longworld.synthesis import capability_families as families
@@ -84,12 +85,18 @@ _MUTANT_SETS: dict[str, dict[str, str]] = {
         "ignore_revocation": "treat set_aside/release as ordinary debits/credits",
     },
     "rule_holdout": {
-        "wrong_rule_family": "apply the other rule family's rule",
+        "wrong_rule_family": (
+            "apply the other rule family's formula over the query entity's "
+            "features under the world's declared parameters"
+        ),
         "ignore_demos": "label everything with the first declared label",
     },
     "set_complete": {
         "relax_one_condition": "drop one scope condition (superset error)",
-        "tighten_one_condition": "sharpen one scope bound (subset error)",
+        "tighten_one_condition": (
+            "sharpen one numeric scope bound by one unit (subset error); "
+            "not applicable when the scope has no numeric bound to sharpen"
+        ),
     },
 }
 
@@ -218,11 +225,14 @@ def _alias_mutant_answer(context: str, program: dict[str, Any], name: str) -> An
         raise ValueError("alias mutant: no declaration row")
     if name == "nearest_lexical":
         # The entity whose id sorts closest to the alias name -- the "picked by
-        # surface form" shortcut. Only entities with rows can be picked, and
-        # the mutant answer must stay a legal terminal answer: for a
-        # single-match terminal the shortcut picks a target that still yields
-        # exactly one row when possible, else the mutant errors (a shortcut
-        # that cannot produce the required shape is itself distinguished).
+        # surface form" shortcut. Only entities with rows can be picked. When
+        # the lexically-nearest entity cannot produce the terminal's required
+        # answer shape (a single-match terminal that locates not-exactly-one
+        # row, or an empty-match declaration whose rows matched), the shortcut
+        # has no legal single-match answer for that target: that is the
+        # charter's applicability question (the wrong program is not defined
+        # on this instance), not a distinction, so it surfaces as
+        # MutantNotApplicable instead of an error.
         targets = sorted(
             {
                 row.entity
@@ -233,6 +243,29 @@ def _alias_mutant_answer(context: str, program: dict[str, Any], name: str) -> An
         if not targets:
             raise ValueError("alias mutant: no entities")
         target = min(targets, key=lambda e: (abs(len(e) - len(alias)), e))
+        # alias programs bind through the declaration row, not an explicit
+        # entity key: re-point the declaration row's entity to the mutant
+        # target.
+        rebound = [
+            (
+                row
+                if not (row.type == "alias" and row.alias == alias)
+                else _row_with_entity(row, target)
+            )
+            for row in rows
+        ]
+        try:
+            return families._solve_alias(rebound, program)
+        except ValueError as exc:
+            message = str(exc)
+            if (
+                "the single-match query does not locate exactly one row" in message
+                or "the query declares an empty match but rows matched" in message
+            ):
+                raise MutantNotApplicable(
+                    "no single-match target for the lexically-nearest entity"
+                ) from exc
+            raise
     elif name == "last_declaration":
         # The spine enforces exactly one declaration row per alias handle
         # (_alias_bound: "the alias handle does not name exactly one entity"),
@@ -311,53 +344,132 @@ def _row_visible(row: Any) -> dict[str, Any]:
     return row.visible() if hasattr(row, "visible") else row
 
 
+def _wrong_rule_family_answer(
+    header: dict[str, Any], rows: list[Any], program: dict[str, Any]
+) -> Any:
+    """The wrong-family shortcut: apply the other family's formula directly.
+
+    A shortcut model that learned the wrong structure does not re-infer the
+    other family's parameters from the demonstrations (which correctly errors
+    when they are ambiguous -- 80/84 on the pilot bank). It *applies a rule it
+    shouldn't*: the formula of the other structural family over the query
+    entity's features, under the world's own declared parameters (the modulus
+    and the label alphabet in the header), with the other family's free
+    parameters at their canonical values:
+
+    * threshold_class, (a*x + b*y + c) mod m < t: (1, 1, 0, 1) -- "the summed
+      features' residue is the zero class", the first label on the zero class.
+    * parity_vote, the parity of how many rows fall in a counted residue
+      class: residue 0, flip 0 -- the first label on the even count.
+
+    That is a well-defined wrong program -- valid output, different rule, same
+    inputs -- so under the P74 §0.2 three-way schema it lands in the
+    valid-output cell instead of the error column, and its answer carries the
+    rule family it actually applied. The formula functions are the solver's
+    own (_threshold_label / _parity_label), so the shortcut is the other
+    family's real formula, not a re-implementation.
+    """
+    other = (
+        families.RULE_FAMILIES[
+            (families.RULE_FAMILIES.index(header.get("rule_family")) + 1)
+            % len(families.RULE_FAMILIES)
+        ]
+        if header.get("rule_family") in families.RULE_FAMILIES
+        else None
+    )
+    if other is None:
+        raise ValueError("rule mutant: no rule family in header")
+    # The world's own declared modulus and labels: parity_vote declares
+    # PARITY_MODULUS and threshold_class a MODULUS_POOL member, so each
+    # formula runs under the parameters the header actually pins.
+    modulus = header.get("modulus")
+    labels = header.get("labels") or []
+    if type(modulus) is not int or not isinstance(labels, list) or len(labels) != 2:
+        raise ValueError("rule mutant: no usable modulus or labels in header")
+
+    def shortcut_label(entity_rows: list[Any]) -> str:
+        if other == "threshold_class":
+            return families._threshold_label(
+                (1, 1, 0, 1),
+                (sum(row.x for row in entity_rows), sum(row.y for row in entity_rows)),
+                labels,
+                modulus,
+            )
+        return families._parity_label(
+            (0, 0), [(row.x, row.y) for row in entity_rows], labels, modulus
+        )
+
+    def shortcut_features(entity_rows: list[Any]) -> dict[str, int]:
+        # The features the shortcut itself computed, in the other family's
+        # own feature alphabet: the summed (x, y) for the threshold formula,
+        # the (rows, counted) pair for the parity formula (the counted
+        # residue under the world's declared modulus, not the parity family's
+        # own PARITY_MODULUS).
+        if other == "threshold_class":
+            return {
+                "x": sum(row.x for row in entity_rows),
+                "y": sum(row.y for row in entity_rows),
+            }
+        return {
+            "rows": len(entity_rows),
+            "counted": sum((row.x + row.y) % modulus == 0 for row in entity_rows),
+        }
+
+    entities = families._rule_entities(rows)
+    terminal = program["steps"][-1]
+    op = terminal["op"]
+    if op in ("label", "verify"):
+        entity = terminal.get("entity")
+        if not isinstance(entity, str) or entity not in entities:
+            raise ValueError("the query names an entity with no rows")
+        actual = shortcut_label(entities[entity])
+        if op == "verify":
+            claim = terminal.get("claim")
+            if not isinstance(claim, str) or claim not in labels:
+                raise ValueError("a verify query must claim a declared label")
+            return {
+                "rule_family": other,
+                "entity": entity,
+                "claim": claim,
+                "label": actual,
+                "holds": claim == actual,
+            }
+        return {
+            "rule_family": other,
+            "entity": entity,
+            "label": actual,
+            "features": shortcut_features(entities[entity]),
+        }
+    named = families._named_entities(terminal, entities)
+    table = {entity: shortcut_label(entities[entity]) for entity in named}
+    if op == "labels":
+        return {"rule_family": other, "labels": table, "count": len(named)}
+    if op == "label_list":
+        return [table[entity] for entity in named]
+    wanted = terminal.get("label")
+    if not isinstance(wanted, str) or wanted not in labels:
+        raise ValueError("the query must name a declared label")
+    if op == "label_set":
+        carried = sorted(entity for entity in named if table[entity] == wanted)
+        return {
+            "rule_family": other,
+            "label": wanted,
+            "entities": carried,
+            "count": len(carried),
+        }
+    return {
+        "rule_family": other,
+        "label": wanted,
+        "count": sum(table[entity] == wanted for entity in named),
+        "entities": len(named),
+    }
+
+
 def _rule_mutant_answer(context: str, program: dict[str, Any], name: str) -> Any:
     header, rows = families.parse_context(context)
-    import json as _json
 
     if name == "wrong_rule_family":
-        # Flip the world's rule family in the header, the program's claim and
-        # the registered contract text, then re-solve: the answer of the other
-        # rule inferred from the same demos.
-        other = (
-            families.RULE_FAMILIES[
-                (families.RULE_FAMILIES.index(header.get("rule_family")) + 1)
-                % len(families.RULE_FAMILIES)
-            ]
-            if header.get("rule_family") in families.RULE_FAMILIES
-            else None
-        )
-        if other is None:
-            raise ValueError("rule mutant: no rule family in header")
-        header = {
-            **header,
-            "rule_family": other,
-            "rule_structure": families.RULE_STRUCTURES[other],
-            # The modulus pool differs per family; the other rule needs a
-            # modulus valid for IT, not the world's own.
-            "modulus": (
-                families.PARITY_MODULUS
-                if other == "parity_vote"
-                else sorted(families.MODULUS_POOL)[0]
-            ),
-        }
-        program = {**program, "rule_family": other}
-        program = {
-            **program,
-            "steps": [
-                {**step, "rule_family": other}
-                if step.get("op") == "learn"
-                else dict(step)
-                for step in program["steps"]
-            ],
-        }
-        ctx = _render(header, rows)
-        # The other family's rule is often ambiguous on this world's demos
-        # (80/84 on the pilot bank); under the three-way schema that is an
-        # invalid-output outcome (the shortcut program cannot produce a
-        # legal answer on this instance), not a synthetic "ambiguous" answer
-        # counted as distinguished -- so the ValueError propagates.
-        return families.solve_visible(ctx, program)
+        return _wrong_rule_family_answer(header, rows, program)
     if name == "ignore_demos":
         # The "default label" shortcut: label every entity with the first
         # declared label without reading the demos. The inference still runs
@@ -390,18 +502,6 @@ def _row_with_label(row: Any, label: str) -> Any:
     return dataclasses.replace(row, label=label)
 
 
-def _render(header: dict, rows: list) -> str:
-    import json as _json
-
-    return "\n".join(
-        [_json.dumps(header, sort_keys=True, separators=(",", ":"))]
-        + [
-            _json.dumps(_row_visible(row), sort_keys=True, separators=(",", ":"))
-            for row in rows
-        ]
-    )
-
-
 def _set_mutant_answer(context: str, program: dict[str, Any], name: str) -> Any:
     steps = program["steps"]
     scope = steps[0]
@@ -417,13 +517,58 @@ def _set_mutant_answer(context: str, program: dict[str, Any], name: str) -> Any:
             )
         kept = list(scope["conditions"][1:])
     elif name == "tighten_one_condition":
-        # Sharpen the first numeric bound by one: the subset error.
+        # The subset error: sharpen the numeric bound a member sits exactly
+        # on, so that boundary member falls out of the set. The wrong program
+        # is DEFINED only where it can bite: the scope must carry a numeric
+        # bound to sharpen (amount or date with >= or <=) and a member must
+        # sit exactly on one, else the subset error has no boundary row to
+        # drop -- that is the charter's applicability question, not a
+        # distinction. Both facts are read from the set solver's own data
+        # (families._set_members over the parsed rows), and the bent program
+        # is re-executed so the solver's outcome -- including a valid answer
+        # that happens to coincide, e.g. a contains verdict whose named row
+        # is not the dropped boundary member -- counts honestly.
+        _, rows = families.parse_context(context)
         conds = list(scope["conditions"])
-        c = dict(conds[0])
-        if c["field"] == "amount" and c["op"] in (">=", "<="):
-            c["value"] = c["value"] + 1 if c["op"] == ">=" else c["value"] - 1
-            conds[0] = c
-        kept = conds
+        bounds = [
+            index
+            for index, cond in enumerate(conds)
+            if cond["field"] in ("amount", "date") and cond["op"] in (">=", "<=")
+        ]
+        if not bounds:
+            raise MutantNotApplicable(
+                "scope has no numeric bound condition; the tightened program "
+                "has no bound to sharpen"
+            )
+        members = families._set_members(rows, steps)
+
+        def member_on(index: int) -> bool:
+            cond = conds[index]
+            field = "amount" if cond["field"] == "amount" else "day"
+            return any(getattr(row, field) == cond["value"] for row in members)
+
+        hits = [index for index in bounds if member_on(index)]
+        if not hits:
+            raise MutantNotApplicable(
+                "no world member sits exactly on the scope's numeric bound; "
+                "the subset error has no boundary member to drop"
+            )
+        kept = [dict(cond) for cond in conds]
+        index = hits[0]
+        cond = kept[index]
+        if cond["field"] == "amount":
+            cond["value"] = (
+                cond["value"] + 1 if cond["op"] == ">=" else cond["value"] - 1
+            )
+        else:
+            bound = date.fromisoformat(cond["value"])
+            moved = (
+                bound + timedelta(days=1)
+                if cond["op"] == ">="
+                else bound - timedelta(days=1)
+            )
+            cond["value"] = moved.isoformat()
+        kept[index] = cond
     else:
         raise ValueError(f"unknown set mutant: {name}")
     mutated = {**program, "steps": [{**scope, "conditions": kept}, dict(steps[-1])]}

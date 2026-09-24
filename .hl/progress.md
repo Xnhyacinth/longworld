@@ -1128,3 +1128,18 @@ in`; no private-repository or upload claim was made.
   recorded) under data/capability_records/p74_wiki_snapshot_v1/. 75 tests
   green. Next: snapshot->world->task wiring, T3/T5/T6/T7; training still
   user-gated. See .hl/p74_execution.md.
+- P74 wave 2 (2026-09-24, 11 agents): wiki->world bridge (7 real snapshots,
+  zero fact loss), structure-driven task bank (no per-topic code), proof
+  certificates (minimal evidence via real re-execution, OR duplicates, W1!=W2),
+  length controller (calibrated, no padding), dual-path renderer (cross-
+  expression invariance), mutant refresh (wrong_rule_family 4->73/84 via
+  direct formula application), 6 new frozen wiki categories (805 spans
+  verbatim), p73_shared_v2 32K+64K multi-band bank (8K structurally
+  infeasible for multi-family sharing, recorded), support matrix with
+  visible infeasible cells, real-world INT demo (fold-gate chains on 6/7
+  snapshots, certificates filled). VER adversarial audit found 3 defects —
+  all fixed this wave (_map_position coordinate mix, resolve_version $ref
+  lineage, as_of_state self-answering degeneracy). 202 tests green. Honest
+  milestone verdict: locate+chains pass on real wiki; aggregate/multi_hop/
+  as_of skipped on real structure — needs richer sources, not code. See
+  .hl/p74_wave2_execution.md.
