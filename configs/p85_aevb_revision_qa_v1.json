@@ -1,0 +1,13 @@
+{
+  "schema": "longworld.p85-paper-revision-qa.v1",
+  "source_route": {
+    "path": "data/capability_records/p84_researchlab_source_route_v1/routing_receipt.json",
+    "sha256": "a0609914314b1b3cd9f35b4d6caf722cd5df730318f54ee60bb8ebad3887543b"
+  },
+  "family_id": "aevb-arxiv-1312.6114",
+  "version_pair": ["v4", "v5"],
+  "min_prose_chars": 120,
+  "min_final_tokens": 32769,
+  "max_final_tokens": 65536,
+  "min_evidence_extent_tokens": 8192
+}
