@@ -283,3 +283,32 @@ T4 adapter 产出该契约;漂移由 validator 在接线波次裁决。
 - T4 首片:Wiki 目录 adapter(冻结快照 + span 索引,无任务函数;本地缓存
   优先,网络不可达则如实报 blocker)。
 - T3 / T5 / T6 / T7 与"快照→世界"接线:下一波。
+
+## 16. 第二波执行切片(2026-09-24,用户指令:多 subagents 按规划执行)
+
+目标:完成 §15 未完项,产出 §13 首交付物的可运行形态。两批 agent,文件
+作用域互斥;GPU 不涉及;训练臂门控不变;快照只增不改;全程确定性。
+
+### 批 1(并行,7 个工作包)
+
+| 工作包 | 新/改文件 | 验收 |
+|---|---|---|
+| W2-A wiki→世界桥 | synthesis/wiki_world_bridge.py(+tests) | 真实冻结快照构建 SemanticWorld;≥1 条依赖链在真实正文上执行,proof 的 span 指向快照文本;版本/撤销字段缺失时如实降级并记录 |
+| W2-B 通用任务银行 | synthesis/world_task_bank.py(+tests) | 任意 SemanticWorld 结构驱动生成 ≥3 能力族任务,零逐题代码;每任务执行成功+非退化+多跳过折叠门;demo 世界每族 ≥5 任务 |
+| T3 证明与证书 | synthesis/proof_certificates.py(+tests) | 最小充分证据集(删除搜索);有界替代证明搜索;D_min 窗口;四证书;删最小证据→构造非唯一(W1≠W2);重复事实的 OR 行为可见 |
+| T5 长度控制器 | synthesis/length_controller.py(+script+tests) | 上限/区间双模式;容量估计校准误差如实报告;各档成功/失败分布;不降 K/H 不填空;三条拉长路径分别标注 |
+| T6 双路 renderer | synthesis/artifact_renderer.py(+tests) | A 路原文保留且 span 偏移不变;B 路受约束工件 span 重验;同语义跨 ≥3 文体答案不变 |
+| W2-M 变异刷新 | 改 capability_mutations.py(+audit/arms/tests) | wrong_rule_family 与 tighten 语义化重设计为有效错误程序;错误/不适用质量下降;审计重跑+C/D 重导 |
+| W2-W wiki 扩量 | 无代码改动(跑现有 CLI) | ≥4 个明显不同主题类目冻结成功;目录 manifest;全部 span 逐字验证 |
+
+### 批 2(批 1 落地后)
+
+- **INT 真实世界集成**:scripts/demo_p74_real_world.py——真实快照→桥→任务
+  银行→执行+证书→长度报告,§13 首交付物形态(≥3 任务族、≥1 折叠门链、
+  干预检查、证书齐全)。
+- **W2-P p73 多档银行 v2**:8K/32K/64K 三档(容量驱动);求解复核+塌缩门
+  +witness 审计(用刷新后变异)按档落盘;不可行格如实记录。
+- **T7 支持矩阵与漏斗**:scripts/p74_support_matrix.py 消费全波工件,输出
+  topic×能力×长度支持矩阵与六段漏斗;不可行格不消失。
+- **VER 独立核查**(数据侧+代码侧两个 agent):对抗式复核各包声明。
+- 收口提交/推送/报告:主线。
