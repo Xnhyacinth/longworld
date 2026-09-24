@@ -2,14 +2,17 @@
 """Export the C (matched control) and D (witness-rich) arms of a P73 bank.
 
 Design .hl/design/p73_counterexample_synthesis.md §4: D is every train row
-whose witness-audit distinguished_fraction clears the threshold (0.5 first);
-C is the same-size control matched to D per family — witness-poor rows first
-(the contrast the experiment needs), then a fill drawn from D's own rows that
-brings C's empty-answer count and answer-size histogram up to D's. Where the
-witness-poor pool is too thin (families whose rich rate is ~1.0), C necessarily
-overlaps D; the overlap is measured and recorded, never forced away (design
-§8: record honestly, do not force). Eval rows are never read: they stay the
-shared held-out measurement for both arms.
+whose witness-audit semantic_distinguished_fraction clears the threshold
+(0.5 first) — the P74 §0.2 three-way metric headline, which counts only
+valid-output mutant differences (erroring or not-applicable mutants do NOT
+count toward a row's richness); C is the same-size control matched to D per
+family — witness-poor rows first (the contrast the experiment needs), then
+a fill drawn from D's own rows that brings C's empty-answer count and
+answer-size histogram up to D's. Where the witness-poor pool is too thin
+(families whose rich rate is ~1.0), C necessarily overlaps D; the overlap is
+measured and recorded, never forced away (design §8: record honestly, do not
+force). Eval rows are never read: they stay the shared held-out measurement
+for both arms.
 
 Arms follow the p71 precedent (scripts/extract_arms.py): one directory per
 arm holding train.jsonl + sample_index.jsonl, sha-linked from arms.json at
@@ -172,7 +175,7 @@ def match_family(
     answer-size histogram (matched, deviations recorded) > length (recorded;
     the pilot bank's worlds are near-uniform ~64K).
     """
-    frac = lambda r: details[r["example_id"]]["distinguished_fraction"]
+    frac = lambda r: details[r["example_id"]]["semantic_distinguished_fraction"]
     size = lambda r: answer_size(family, details[r["example_id"]]["answer"])
     empty = lambda r: is_empty_answer(details[r["example_id"]]["answer"])
 
@@ -257,12 +260,12 @@ def _family_stats(
         "from_poor": sum(
             1
             for r in rows_arm
-            if details[r["example_id"]]["distinguished_fraction"] < threshold
+            if details[r["example_id"]]["semantic_distinguished_fraction"] < threshold
         ),
         "from_rich": sum(
             1
             for r in rows_arm
-            if details[r["example_id"]]["distinguished_fraction"] >= threshold
+            if details[r["example_id"]]["semantic_distinguished_fraction"] >= threshold
         ),
         "empty_rows": empties,
         "empty_fraction": round(empties / len(rows_arm), 4) if rows_arm else 0.0,
@@ -311,8 +314,11 @@ def _write_arm(
             new_row = dict(row)
             new_row["messages"] = _messages(row)
             new_row["arm"] = arm
-            new_row["distinguished_fraction"] = details[row["example_id"]][
-                "distinguished_fraction"
+            new_row["semantic_distinguished_fraction"] = details[row["example_id"]][
+                "semantic_distinguished_fraction"
+            ]
+            new_row["distinguished_fraction"] = new_row[
+                "semantic_distinguished_fraction"
             ]
             tokens = tokens_by_id.get(row["example_id"]) if tokens_by_id else None
             if tokens:
@@ -336,8 +342,11 @@ def _write_arm(
                 "language": "en",
                 "renderer": "jsonl",
                 "consumed_records": row["consumed_count"],
+                "semantic_distinguished_fraction": details[row["example_id"]][
+                    "semantic_distinguished_fraction"
+                ],
                 "distinguished_fraction": details[row["example_id"]][
-                    "distinguished_fraction"
+                    "semantic_distinguished_fraction"
                 ],
                 "arm": arm,
                 "output_file": "train.jsonl",
@@ -581,8 +590,10 @@ def main() -> int:
         "threshold": args.threshold,
         "selection_rule": {
             "d": (
-                "train rows with distinguished_fraction >= threshold "
-                "(eval rows excluded)"
+                "train rows with semantic_distinguished_fraction >= threshold "
+                "(eval rows excluded); the P74 §0.2 three-way metric headline "
+                "counts only valid-output mutant differences — erroring and "
+                "not-applicable mutants do not make a row rich"
             ),
             "c": (
                 "per family, quota = |D|; witness-poor rows (fraction < threshold) "

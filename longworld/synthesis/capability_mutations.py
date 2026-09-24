@@ -15,6 +15,18 @@ changes to bank generation. `measure_witness_coverage.py` consumes it;
 generation-time witness selection (the p73 pilot) is a later step that reuses
 the same functions.
 
+Three-way metric (P74 charter §0.2): every mutant result carries
+`applicable` (the wrong program is DEFINED on this instance), `valid_output`
+(it returned a result rather than erroring) and `distinguished` (valid output
+AND different from the correct answer). Syntax errors, type-unsupported
+programs and semantic wrong answers are never merged into one score: only
+valid-output differences count toward the headline
+`semantic_distinguished_fraction`, whose denominator stays ALL of the
+family's mutants (a dead or not-applicable mutant keeps diluting the score by
+design, so deadness stays visible in the family numbers). The legacy field
+names `distinguished`/`distinguished_fraction` carry the same semantic values;
+the old error-counts-as-distinguished rule is gone.
+
 Design doc: .hl/design/p73_counterexample_synthesis.md §3.1/§3.2.
 """
 
@@ -24,6 +36,22 @@ from typing import Any
 
 from longworld.synthesis import capability_families as families
 from longworld.synthesis import capability_records as records
+
+
+class MutantNotApplicable(ValueError):
+    """The wrong program is not defined on this instance, with a reason.
+
+    Not applicable is a property of the (instance, mutant) pair — e.g. the
+    relax mutant needs >=3 scope conditions so the bent program still clears
+    the solver's 2-to-4 gate — not an error in the audit: the mutant simply
+    has no output to distinguish, and the reason string is carried into the
+    report.
+    """
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
 
 # Records families share one executor and program schema, so their mutants are
 # expressed once per family below. F-family mutants are family-specific because
@@ -206,6 +234,14 @@ def _alias_mutant_answer(context: str, program: dict[str, Any], name: str) -> An
             raise ValueError("alias mutant: no entities")
         target = min(targets, key=lambda e: (abs(len(e) - len(alias)), e))
     elif name == "last_declaration":
+        # The spine enforces exactly one declaration row per alias handle
+        # (_alias_bound: "the alias handle does not name exactly one entity"),
+        # so "the last-declared binding" is always THE binding: the wrong
+        # program is not defined as a distinct program on any spine world.
+        if len(declarations) == 1:
+            raise MutantNotApplicable(
+                "spine enforces single declaration per alias handle"
+            )
         target = declarations[-1].entity
     else:
         raise ValueError(f"unknown alias mutant: {name}")
@@ -230,8 +266,14 @@ def _row_with_entity(row: Any, entity: str) -> Any:
 
 def _asof_mutant_answer(context: str, program: dict[str, Any], name: str) -> Any:
     if name == "latest_text":
-        # Fold in reveal order: the "use the last thing the text says" shortcut.
-        return families.solve_visible(context, program)
+        # The "use the last thing the text says" shortcut: fold the revealed
+        # events in reveal-date order (reading order) instead of the
+        # effective-date order the correct program uses. _solve_rows takes
+        # the fold order as a parameter, so the wrong program is the same
+        # solver run on the other order; where the two orders coincide on a
+        # world the mutant is legitimately non-distinguishing there.
+        header, rows = families.parse_context(context)
+        return families._solve_rows(header, rows, program, order="reveal")
     if name == "ignore_revocation":
         header, rows = families.parse_context(context)
         # Pretend set_aside/release never happened: swap their kinds so the
@@ -310,13 +352,12 @@ def _rule_mutant_answer(context: str, program: dict[str, Any], name: str) -> Any
             ],
         }
         ctx = _render(header, rows)
-        try:
-            return families.solve_visible(ctx, program)
-        except ValueError:
-            # The other family's rule is often ambiguous on this world's
-            # demos; a model using the wrong family cannot produce a unique
-            # answer, which itself distinguishes it from the correct program.
-            return {"ambiguous": True}
+        # The other family's rule is often ambiguous on this world's demos
+        # (80/84 on the pilot bank); under the three-way schema that is an
+        # invalid-output outcome (the shortcut program cannot produce a
+        # legal answer on this instance), not a synthetic "ambiguous" answer
+        # counted as distinguished -- so the ValueError propagates.
+        return families.solve_visible(ctx, program)
     if name == "ignore_demos":
         # The "default label" shortcut: label every entity with the first
         # declared label without reading the demos. The inference still runs
@@ -365,9 +406,16 @@ def _set_mutant_answer(context: str, program: dict[str, Any], name: str) -> Any:
     steps = program["steps"]
     scope = steps[0]
     if name == "relax_one_condition":
+        # Dropping one condition must leave the bent program inside the
+        # solver's 2-to-4 scope gate: a 2-condition scope drops to 1 and the
+        # wrong program is not defined (it would be rejected as a malformed
+        # scope, which is a legality error, not a semantic wrong answer).
+        if len(scope["conditions"]) < 3:
+            raise MutantNotApplicable(
+                "scope has fewer than 3 conditions; the relaxed program "
+                "falls below the solver's 2-to-4 condition gate"
+            )
         kept = list(scope["conditions"][1:])
-        if not kept:
-            raise ValueError("set mutant: single condition")
     elif name == "tighten_one_condition":
         # Sharpen the first numeric bound by one: the subset error.
         conds = list(scope["conditions"])
@@ -409,6 +457,15 @@ def witness_report(
     Returns {"unsupported": true} for families without a mutant surface
     (join_unanswerable, dense_aggregate, research_*): their contracts are
     single-step verdicts whose "wrong program" space is not yet modeled.
+
+    Three-way schema per mutant (P74 charter §0.2): `applicable` (the wrong
+    program is defined on this instance), `valid_output` (it returned an
+    answer rather than erroring), `distinguished` (valid output AND != correct
+    answer) with `semantic_distinguished` as its alias in the output dict.
+    Erroring mutants are NOT semantically distinguished. The denominator of
+    `semantic_distinguished_fraction` is every mutant of the family, so dead
+    or not-applicable mutants dilute the fraction and stay visible in the
+    family aggregation.
     """
     if family not in _MUTANT_SETS:
         return {"unsupported": True}
@@ -417,7 +474,7 @@ def witness_report(
     except Exception as exc:  # malformed rows must fail loud in the audit
         return {"unsupported": True, "error": f"correct answer failed: {exc}"}
     mutants: dict[str, Any] = {}
-    distinguished = 0
+    semantic_distinguished = 0
     for name in mutants_for(family):
         try:
             if family in _RECORDS_FAMILIES:
@@ -430,20 +487,46 @@ def witness_report(
                 mutated = _rule_mutant_answer(context, program, name)
             else:
                 mutated = _set_mutant_answer(context, program, name)
-            differs = not _equal(answer, mutated)
-        except Exception as exc:
-            # A mutant that cannot produce a legal answer cannot match the
-            # correct answer, so it is distinguished; the error text keeps the
-            # audit informative.
-            mutants[name] = {"error": str(exc), "distinguished": True}
-            distinguished += 1
+        except MutantNotApplicable as exc:
+            # The wrong program has no output on this instance: neither a
+            # valid output nor a distinction; the reason records why.
+            mutants[name] = {
+                "applicable": False,
+                "not_applicable_reason": exc.reason,
+                "valid_output": False,
+                "distinguished": False,
+                "semantic_distinguished": False,
+            }
             continue
-        mutants[name] = {"answer": mutated, "distinguished": differs}
+        except Exception as exc:
+            # An erroring mutant cannot produce a legal answer, so it is NOT
+            # semantically distinguished (the old error-is-distinguished rule
+            # conflated legality errors with semantic wrong answers); the
+            # error text keeps the audit informative.
+            mutants[name] = {
+                "applicable": True,
+                "valid_output": False,
+                "error": str(exc),
+                "distinguished": False,
+                "semantic_distinguished": False,
+            }
+            continue
+        differs = not _equal(answer, mutated)
         if differs:
-            distinguished += 1
+            semantic_distinguished += 1
+        mutants[name] = {
+            "applicable": True,
+            "valid_output": True,
+            "answer": mutated,
+            "distinguished": differs,
+            "semantic_distinguished": differs,
+        }
+    total = len(mutants_for(family))
     return {
         "answer": answer,
         "mutants": mutants,
-        "distinguished_count": distinguished,
-        "distinguished_fraction": round(distinguished / len(mutants_for(family)), 3),
+        "distinguished_count": semantic_distinguished,
+        "distinguished_fraction": round(semantic_distinguished / total, 3),
+        "semantic_distinguished_count": semantic_distinguished,
+        "semantic_distinguished_fraction": round(semantic_distinguished / total, 3),
     }

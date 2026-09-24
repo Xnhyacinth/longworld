@@ -1116,3 +1116,15 @@ in`; no private-repository or upload claim was made.
   C/D contrast weak at 42 worlds. Contract arms: answer-only cuts supervised
   tokens to 14% of full-provenance on the frozen arm_a bank. Training still
   user-gated; see .hl/p73_execution.md.
+- P74 wave 1 (2026-09-24, charter .hl/design/p74_real_shared_worlds.md):
+  W0 witness three-way metrics landed (latest_text now real: asof 0.964;
+  wrong_rule_family honestly 4/84; semantic C/D 360+360, set_complete 0%
+  overlap); W1 field-level decomposition (85.9% drop = 89.3% id enumeration
+  + 9.7% wrappers + 0.9% scalars, offset-exact); T1+T2 unified semantic
+  world + dependency operators with non-foldability gate, span-lineage proof,
+  intervention checks, scope-recovery-from-render (demo chain depth 7);
+  T4 wiki adapter with a REAL frozen snapshot (Category:Astronomical
+  observatories: 15 pages, revids pinned, 196/196 spans verbatim, CC-BY-SA
+  recorded) under data/capability_records/p74_wiki_snapshot_v1/. 75 tests
+  green. Next: snapshot->world->task wiring, T3/T5/T6/T7; training still
+  user-gated. See .hl/p74_execution.md.

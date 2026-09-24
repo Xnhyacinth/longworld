@@ -9,6 +9,15 @@ from the correct one. Rows whose worlds separate at least one mutant are
 "witness-rich"; a bank whose rows are uniformly witness-poor trains the same
 surface as one whose rows only guarantee an executable gold.
 
+P74 charter §0.2 three-way metric: per mutant the audit distinguishes
+`applicable` (the wrong program is defined on the instance) / `valid_output`
+(it returned an answer) / `distinguished` (valid output AND != correct).
+The headline `mean_semantic_distinguished_fraction` and per-row
+`semantic_distinguished_fraction` count only valid-output differences; an
+erroring or not-applicable mutant is NOT semantically distinguished and
+keeps diluting the denominator. `witness_rich` (>=1 semantic distinction)
+keeps its definition.
+
 Two shard layouts are read:
 - shared worlds (p73_shared_v1): shards/<world>/world.json is one JSON object
   whose `tasks` carry a family and a stored `solve_context` — the exact
@@ -72,9 +81,9 @@ def _audit_row(
             stats["error_samples"].append((world_id, task_id, report["error"]))
         return None
     stats["rows"] += 1
-    frac = report["distinguished_fraction"]
+    frac = report["semantic_distinguished_fraction"]
     stats["distinguished_fraction_sum"] += frac
-    if report["distinguished_count"] > 0:
+    if report["semantic_distinguished_count"] > 0:
         stats["witness_rich"] += 1
     answer = report["answer"]
     if (
@@ -84,14 +93,23 @@ def _audit_row(
     ):
         stats["empty_answer"] += 1
     for name, result in report["mutants"].items():
-        if result.get("distinguished"):
+        if result.get("applicable"):
+            stats["per_mutant_applicable"][name] += 1
+        else:
+            stats["per_mutant_not_applicable"][name] += 1
+            stats["not_applicable_reasons"][name][result["not_applicable_reason"]] += 1
+        if result.get("valid_output"):
+            stats["per_mutant_valid_output"][name] += 1
+        if result.get("semantic_distinguished"):
             stats["per_mutant_distinguished"][name] += 1
         elif "error" in result:
             stats["per_mutant_error"][name] += 1
     return {
         "family": fam,
         "distinguished_fraction": frac,
-        "distinguished_count": report["distinguished_count"],
+        "semantic_distinguished_fraction": frac,
+        "distinguished_count": report["semantic_distinguished_count"],
+        "semantic_distinguished_count": report["semantic_distinguished_count"],
         "answer": answer,
         "mutants": report["mutants"],
     }
@@ -130,6 +148,10 @@ def audit_bank(bank: Path, limit: int | None) -> dict:
             "distinguished_fraction_sum": 0.0,
             "per_mutant_distinguished": defaultdict(int),
             "per_mutant_error": defaultdict(int),
+            "per_mutant_applicable": defaultdict(int),
+            "per_mutant_valid_output": defaultdict(int),
+            "per_mutant_not_applicable": defaultdict(int),
+            "not_applicable_reasons": defaultdict(lambda: defaultdict(int)),
             "unsupported": 0,
             "errors": 0,
             "error_samples": [],
@@ -180,11 +202,27 @@ def audit_bank(bank: Path, limit: int | None) -> dict:
             "mean_distinguished_fraction": round(
                 stats["distinguished_fraction_sum"] / rows, 3
             ),
+            "mean_semantic_distinguished_fraction": round(
+                stats["distinguished_fraction_sum"] / rows, 3
+            ),
             "empty_answer_rows": stats["empty_answer"],
             "per_mutant_distinguished": dict(
                 sorted(stats["per_mutant_distinguished"].items())
             ),
             "per_mutant_error": dict(sorted(stats["per_mutant_error"].items())),
+            "per_mutant_applicable": dict(
+                sorted(stats["per_mutant_applicable"].items())
+            ),
+            "per_mutant_valid_output": dict(
+                sorted(stats["per_mutant_valid_output"].items())
+            ),
+            "per_mutant_not_applicable": dict(
+                sorted(stats["per_mutant_not_applicable"].items())
+            ),
+            "per_mutant_not_applicable_reasons": {
+                name: dict(sorted(reasons.items()))
+                for name, reasons in sorted(stats["not_applicable_reasons"].items())
+            },
         }
         if stats["error_samples"]:
             # capped so the report stays readable; the full error text is in
@@ -218,11 +256,12 @@ def main() -> int:
         mutants = ", ".join(
             f"{k}={v}/{stats['rows']}"
             for k, v in stats["per_mutant_distinguished"].items()
-        )
+        )  # per-mutant: semantically distinguished rows only (errors and
+        # not-applicable rows are counted in their own buckets below)
         rich = "{:.1%}".format(stats["witness_rich_rate"])
         print(
             f"{family:20s} rows={stats['rows']:5d} rich={rich:>5s} "
-            f"mean-frac={stats['mean_distinguished_fraction']:.3f} "
+            f"mean-sem-frac={stats['mean_semantic_distinguished_fraction']:.3f} "
             f"empty={stats['empty_answer_rows']} | {mutants}"
         )
     if args.details:

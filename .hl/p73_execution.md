@@ -129,11 +129,33 @@ Two late findings from the verification passes, landed after the first commit:
 
 ID-enumeration "~73% of supervision tokens" (findings.md:1549) remains
 UNVERIFIABLE as a number — no measurement artifact backs it. The honest
-on-disk replacement: full-provenance 2,802,609 vs answer-only 395,793
-supervised tokens on the same 3,972 rows = 85.9% of supervision sits in
-answer-side id enumeration (p73_contract_arms/arms.json, tokenized with the
-export's pinned Qwen recipe). Cite that number, not 73%, until a dedicated
-measurement lands.
+on-disk replacement is now field-level decomposed (W1, P74 wave):
+scripts/decompose_supervision.py attributes every token the answer-only
+contract removes (offset-mapping exact, region-based classification — hex
+ids tokenize into single characters, so per-token regexes miscount them):
+
+| removed-token class | tokens | share of the 2,406,816-token drop |
+|---|---:|---:|
+| id enumeration (r/k-hex, unit-*) | 2,148,442 | 89.3% |
+| key/label/structural wrappers | 233,720 | 9.7% |
+| scalar values | 21,754 | 0.9% |
+| tokenization-boundary residue | 5,636 | 0.2% |
+
+Per family (drop / id share): filter_aggregate 931,806 (85.4% id),
+group_compare 903,824 (91.1%), join_lookup 570,982 (92.8%), rule_holdout
+892 (id 0 — features/scalars only). asof_state contributes -688: its 172
+single-entity rows are field SWAPS (full's "active":true becomes answer-only's
+"entities":null, one token longer), not removals — counted separately in the
+script. Row-level cross-checks: 26 ids fully removed on a sample group row ->
+578 id tokens vs 47 structural; matched-region census shows only the field
+key name and `","` separators outside id regions. Classified buckets exceed
+the measured drop by 2,736 tokens (0.11%): removal seams retokenize
+(`}}`-join effects), reported as-is.
+
+Correct citation from now on: "the answer-only contract removes 85.9% of
+supervised tokens; 89.3% of what it removes is id enumeration, 9.7% key and
+structural wrappers, 0.9% scalars (measured, offset-exact, Qwen3.5-4B)".
+The old "~73%" should not be cited; the 85.9% alone is not "all ids".
 
 ## What is NOT claimed
 

@@ -95,7 +95,10 @@ def test_arms_family_quotas_match_and_fields_exist(tmp_path):
     for family, matched in receipt["matched"].items():
         assert matched["quota"] == matched["d"]["rows"] == matched["c"]["rows"], family
         assert matched["d"]["rows"] > 0, family
-    # D is exactly the rows clearing the threshold (deterministic selection rule)
+    # D is exactly the rows clearing the threshold (deterministic selection
+    # rule); the threshold reads the semantic_distinguished_fraction headline
+    # (P74 §0.2 three-way metric: erroring/not-applicable mutants do not
+    # make a row rich)
     details = json.loads((bank / "verification.witness.json").read_text())[
         "example_details"
     ]
@@ -106,7 +109,7 @@ def test_arms_family_quotas_match_and_fields_exist(tmp_path):
     expected = {
         row_id
         for row_id, detail in details.items()
-        if detail["distinguished_fraction"] >= 0.5
+        if detail["semantic_distinguished_fraction"] >= 0.5
     }
     assert d_index == expected
     # overlap accounting is present and truthful
@@ -152,6 +155,10 @@ def test_arms_rows_carry_messages_and_witness_fraction(tmp_path):
                 separators=(",", ":"),
             )
             assert (
-                row["distinguished_fraction"]
-                == details[row["example_id"]]["distinguished_fraction"]
+                row["semantic_distinguished_fraction"]
+                == details[row["example_id"]]["semantic_distinguished_fraction"]
+            )
+            # legacy field kept in sync for downstream consumers
+            assert (
+                row["distinguished_fraction"] == row["semantic_distinguished_fraction"]
             )
