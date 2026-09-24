@@ -50,7 +50,10 @@ For the P83 additions, all 69 final reader rows passed pinned-Qwen chat
 template, 262,144-token budget, and assistant-only loss-mask replay; 66 are
 train and three eval. The review selector caps exposure from the single park
 source group at 12 train views and retains all three eval tasks. It is a
-review-priority set, not a training release.
+review-priority set, not a training release. Even those 12 train views carry
+945,846 input tokens but only 88 supervised answer tokens under the current
+mask; any future training mix must account for this imbalance rather than
+equating the 12 rows with 12 short QA examples.
 
 ## Next source-capacity step
 
@@ -65,6 +68,13 @@ support, alternate-answer checks, a named intervention scope, actual token
 position/mask, and source-held-out evaluation. The controlled shared-world
 lane supplies a separate mechanism curriculum; natural-document transfer
 requires model experiments.
+
+The current unified append copies approximately 2.1 GB of reader JSONL on
+each frozen wave (about 1.6 GB train and 480 MB eval in P83). This is an I/O
+scaling limit; a larger production run should keep immutable native shards
+and compose a reference index, materializing final training bytes once after
+selection. The current bank deliberately remains a simple, inspectable
+materialized candidate export.
 
 Inspect this wave:
 

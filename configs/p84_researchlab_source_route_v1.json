@@ -1,0 +1,25 @@
+{
+  "schema": "longworld.p84-researchlab-source-route.v1",
+  "prior_bank_config": {
+    "path": "configs/p66_researchlab_taskbank_v1.json",
+    "sha256": "80d901df4a95f4cb36ade8df13c5db5079e3e1e762e743263b675da2bbe37776"
+  },
+  "families": [
+    {
+      "family_id": "adam-arxiv-1412.6980",
+      "split": "train",
+      "signed_bundle": {
+        "path": "data/source_inventory/p13_paper_adam_revision_history_v1/paper_source_workflow_bundle.p13.workspace-v2.signed.json",
+        "sha256": "db7358621d011ecafb1a6e5e6ec7d4b6ab0ad459d81533a341b99311c5d9318f"
+      }
+    },
+    {
+      "family_id": "aevb-arxiv-1312.6114",
+      "split": "train",
+      "signed_bundle": {
+        "path": "data/source_inventory/p13_paper_aevb_revision_history_v1/paper_source_workflow_bundle.p13.workspace-v2.signed.json",
+        "sha256": "b5ae05ed70ae5e1e81412d21734d10ecef0103bf3f3136a857bcfa89c1cd019b"
+      }
+    }
+  ]
+}
