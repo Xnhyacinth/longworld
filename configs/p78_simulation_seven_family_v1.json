@@ -1,0 +1,71 @@
+{
+  "schema_version": "longworld.record-world-config.v1",
+  "world_seed_base": 1000000,
+  "families": [
+    "filter_aggregate",
+    "group_compare",
+    "join_lookup",
+    "alias_locate",
+    "asof_state",
+    "rule_holdout",
+    "join_unanswerable"
+  ],
+  "depths": [
+    1
+  ],
+  "lengths": [
+    200,
+    800,
+    3200
+  ],
+  "consumed_by_depth": {
+    "1": 20,
+    "2": 60,
+    "3": 200
+  },
+  "variants_per_world": 4,
+  "worlds_per_cell": 4,
+  "worlds_per_cell_by_family": {
+    "filter_aggregate": 4,
+    "group_compare": 4,
+    "join_lookup": 4,
+    "alias_locate": 4,
+    "asof_state": 4,
+    "rule_holdout": 4,
+    "join_unanswerable": 4
+  },
+  "depths_by_family": {
+    "filter_aggregate": [
+      1
+    ],
+    "group_compare": [
+      1
+    ],
+    "join_lookup": [
+      1
+    ],
+    "alias_locate": [
+      1
+    ],
+    "asof_state": [
+      1
+    ],
+    "rule_holdout": [
+      1
+    ],
+    "join_unanswerable": [
+      1
+    ]
+  },
+  "token_targets_by_depth": {
+    "1": [
+      32768,
+      131072
+    ]
+  },
+  "workers": 2,
+  "trained_rule_family": "threshold_class",
+  "notes": {
+    "purpose": "P78 fresh seven-family bounded coverage; candidate only"
+  }
+}

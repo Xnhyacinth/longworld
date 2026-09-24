@@ -1,0 +1,39 @@
+{
+  "schema_version": "longworld.record-world-config.v1",
+  "world_seed_base": 900000,
+  "families": [
+    "filter_aggregate",
+    "asof_state"
+  ],
+  "depths": [
+    1
+  ],
+  "lengths": [
+    200,
+    800,
+    3200
+  ],
+  "consumed_by_depth": {
+    "1": 20,
+    "2": 60,
+    "3": 200
+  },
+  "variants_per_world": 4,
+  "worlds_per_cell": 4,
+  "worlds_per_cell_by_family": {
+    "filter_aggregate": 4,
+    "asof_state": 4
+  },
+  "depths_by_family": {},
+  "token_targets_by_depth": {
+    "1": [
+      32768,
+      131072
+    ]
+  },
+  "workers": 2,
+  "trained_rule_family": "threshold_class",
+  "notes": {
+    "purpose": "bounded new native simulation producer in unified synthesis pilot; candidate only"
+  }
+}

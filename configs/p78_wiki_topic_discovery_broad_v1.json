@@ -1,0 +1,18 @@
+{
+  "schema": "longworld.wiki-source-expansion.v1",
+  "base_pool": "data/capability_records/p78_wiki_topic_discovery_pilot_v1/source_pool.json",
+  "seeds": [
+    {"name": "wiki_bridges_broad", "domain": "infrastructure", "topic": "bridges", "split": "train", "mode": "search", "query": "intitle:\"List of\" bridges", "title_contains": "bridge", "max_pages": 12, "bundle_size": 2, "max_bundles": 1},
+    {"name": "wiki_railway_broad", "domain": "transport", "topic": "railway_stations", "split": "train", "mode": "search", "query": "intitle:\"List of\" railway stations", "title_contains": "railway station", "max_pages": 12, "bundle_size": 2, "max_bundles": 1},
+    {"name": "wiki_museums_broad", "domain": "culture", "topic": "museums", "split": "eval", "mode": "search", "query": "intitle:\"List of\" museums", "title_contains": "museum", "max_pages": 12, "bundle_size": 2, "max_bundles": 1},
+    {"name": "wiki_power_broad", "domain": "energy", "topic": "power_stations", "split": "train", "mode": "search", "query": "intitle:\"List of\" power stations", "title_contains": "power station", "max_pages": 12, "bundle_size": 2, "max_bundles": 1},
+    {"name": "wiki_schools_broad", "domain": "education", "topic": "schools", "split": "train", "mode": "search", "query": "intitle:\"List of\" schools", "title_contains": "school", "max_pages": 12, "bundle_size": 2, "max_bundles": 1},
+    {"name": "wiki_parks_broad", "domain": "nature", "topic": "parks", "split": "eval", "mode": "search", "query": "intitle:\"List of\" parks", "title_contains": "park", "max_pages": 12, "bundle_size": 2, "max_bundles": 1},
+    {"name": "wiki_hospitals_broad", "domain": "healthcare", "topic": "hospitals", "split": "train", "mode": "search", "query": "intitle:\"List of\" hospitals", "title_contains": "hospital", "max_pages": 12, "bundle_size": 2, "max_bundles": 1},
+    {"name": "wiki_airports_broad", "domain": "transport", "topic": "airports", "split": "train", "mode": "search", "query": "intitle:\"List of\" airports", "title_contains": "airport", "max_pages": 12, "bundle_size": 2, "max_bundles": 1},
+    {"name": "wiki_observatories_broad", "domain": "astronomy", "topic": "observatories", "split": "eval", "mode": "search", "query": "intitle:\"List of\" observatories", "title_contains": "observator", "max_pages": 12, "bundle_size": 2, "max_bundles": 1},
+    {"name": "wiki_ships_broad", "domain": "maritime", "topic": "ships", "split": "train", "mode": "search", "query": "intitle:\"List of\" ships", "title_contains": "ship", "max_pages": 12, "bundle_size": 2, "max_bundles": 1},
+    {"name": "wiki_dams_broad", "domain": "infrastructure", "topic": "dams", "split": "train", "mode": "search", "query": "intitle:\"List of\" dams", "title_contains": "dam", "max_pages": 12, "bundle_size": 2, "max_bundles": 1},
+    {"name": "wiki_stadiums_broad", "domain": "sports", "topic": "stadiums", "split": "eval", "mode": "search", "query": "intitle:\"List of\" stadiums", "title_contains": "stadium", "max_pages": 12, "bundle_size": 2, "max_bundles": 1}
+  ]
+}

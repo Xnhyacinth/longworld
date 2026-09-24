@@ -1,0 +1,21 @@
+{
+  "schema": "longworld.source-batch-pool.v2",
+  "prior_source_manifest": {
+    "path": "data/p75_real_reader_candidates_v1/source_manifest.jsonl",
+    "sha256": "436bc1623736dbefe00afd5d9d582380805e619792367bef02f8354b015be270"
+  },
+  "requested_recipes": ["wiki_table_lookup"],
+  "max_tasks_by_recipe": {"wiki_table_lookup": 4},
+  "sources": [
+    {
+      "name": "wiki_parks_hospitals_concat",
+      "domain": "nature_healthcare",
+      "topic": "parks_hospitals_source_composition",
+      "split": "train",
+      "snapshot": {
+        "path": "data/candidates/p78_wiki_concat_parks_hospitals_v1/composite_snapshot.json",
+        "sha256": "030e8054a94f39102b2f8b0cd9983e3b6c1c10268d3d7737321e075ce45ffe91"
+      }
+    }
+  ]
+}

@@ -14,6 +14,59 @@ from longworld.synthesis.world_task_bank import TaskSpec
 
 YEAR = re.compile(r"[12][0-9]{3}\Z")
 SAFE = re.compile(r"[\[\]{}|?]|https?://")
+SELECTOR_EXCLUDE = re.compile(
+    r"\b(?:photo|image|notes?|remarks?|summary|description|references?|refs?|"
+    r"coordinates?|latitude|longitude|url)\b",
+    re.IGNORECASE,
+)
+
+
+def _cell_offset(line: wiki_adapter.StructuredLine, index: int) -> tuple[int, int]:
+    parts = line.text.split(" | ")
+    start = line.start + sum(len(part) + 3 for part in parts[:index])
+    start += len(parts[index]) - len(parts[index].lstrip())
+    return start, start + len(line.cells[index])
+
+
+def _inverse_cells(
+    text: str, name_column: str, selector_column: str, selector: str
+) -> list[tuple[str, int, int]]:
+    """Read names in rows identified by one other, explicitly headed cell."""
+    header: tuple[str, ...] | None = None
+    found: list[tuple[str, int, int]] = []
+    for line in wiki_adapter.structured_lines(text):
+        if line.kind == "table_header":
+            header = line.cells
+            continue
+        if line.kind != "table_row":
+            header = None
+            continue
+        if (
+            header is None
+            or len(header) != len(line.cells)
+            or header.count(name_column) != 1
+            or header.count(selector_column) != 1
+            or name_column == selector_column
+        ):
+            continue
+        name_index = header.index(name_column)
+        selector_index = header.index(selector_column)
+        if (
+            wiki_adapter._name_column_index(header) != name_index
+            or line.cells[selector_index] != selector
+        ):
+            continue
+        name = line.cells[name_index]
+        if (
+            not name
+            or len(name) > 200
+            or SAFE.search(name)
+            or re.search(r"[A-Za-z]{3}", name) is None
+        ):
+            continue
+        start, end = _cell_offset(line, name_index)
+        found.append((name, start, end))
+    return found
 
 
 def _cells(
@@ -64,11 +117,91 @@ def _fact_matches_cell(world: SemanticWorld, fact: Any, value: Any) -> bool:
     return value == fact.value
 
 
+def _inverse_selector(world: SemanticWorld, fact: Any) -> tuple[str, str, str] | None:
+    """Choose a unique visible row key for a list-membership fact."""
+    if (
+        fact.relation != "includes facility"
+        or len(fact.supporting_spans) != 1
+        or not isinstance(fact.qualifiers.get("table_column"), str)
+    ):
+        return None
+    span = fact.supporting_spans[0]
+    doc = world._docs[span.doc_id]
+    if world.objects[fact.subject].label != doc.title:
+        return None
+    header: tuple[str, ...] | None = None
+    choices: list[tuple[int, str, str, str]] = []
+    for line in wiki_adapter.structured_lines(doc.text):
+        if line.kind == "table_header":
+            header = line.cells
+            continue
+        if line.kind != "table_row":
+            header = None
+            continue
+        if header is None or len(header) != len(line.cells):
+            continue
+        name_column = fact.qualifiers["table_column"]
+        if header.count(name_column) != 1:
+            continue
+        name_index = header.index(name_column)
+        if wiki_adapter._name_column_index(header) != name_index:
+            continue
+        start, end = _cell_offset(line, name_index)
+        name = line.cells[name_index]
+        if (
+            (span.start, span.end) != (start, end)
+            or not _fact_matches_cell(world, fact, name)
+            or SAFE.search(name)
+        ):
+            continue
+        for index, (column, selector) in enumerate(zip(header, line.cells)):
+            if (
+                index == name_index
+                or header.count(column) != 1
+                or SELECTOR_EXCLUDE.search(column)
+                or SAFE.search(column)
+                or not 3 <= len(selector) <= 80
+                or SAFE.search(selector)
+                or selector.casefold() in name.casefold()
+            ):
+                continue
+            cells = _inverse_cells(doc.text, name_column, column, selector)
+            if len(cells) == 1 and cells[0] == (name, start, end):
+                choices.append((len(selector), name_column, column, selector))
+    if not choices:
+        return None
+    _, name_column, column, selector = min(choices)
+    return name_column, column, selector
+
+
 def execute_lookup(world: SemanticWorld, program: dict[str, Any]) -> Any:
     """Native oracle checks the fact identity against the visible table cell."""
     if program.get("op") != "table_cell_lookup":
         raise ValueError("wrong table lookup operator")
     fact = world.facts_by_id[program["fact_id"]]
+    if "selector_column" in program:
+        if (
+            fact.relation != "includes facility"
+            or fact.qualifiers.get("table_column") != program["column"]
+            or len(fact.supporting_spans) != 1
+            or fact.supporting_spans[0].doc_id != program["doc_id"]
+            or _inverse_selector(world, fact)
+            != (
+                program["column"],
+                program["selector_column"],
+                program["selector"],
+            )
+        ):
+            raise ValueError("inverse table lookup fact/source binding drift")
+        cells = _inverse_cells(
+            world._docs[program["doc_id"]].text,
+            program["column"],
+            program["selector_column"],
+            program["selector"],
+        )
+        if len(cells) != 1 or not _fact_matches_cell(world, fact, cells[0][0]):
+            raise ValueError("inverse table source fact disagrees with visible cell")
+        return cells[0][0]
     if (
         fact.relation != program["relation"]
         or fact.qualifiers.get("table_column") != program["column"]
@@ -97,39 +230,64 @@ def build_lookup_tasks(
     buckets: dict[tuple[str, str, str], list[TaskSpec]] = defaultdict(list)
     for fact in sorted(world.facts, key=lambda item: item.fact_id):
         column = fact.qualifiers.get("table_column")
+        inverse = fact.relation == "includes facility"
         if (
             not isinstance(column, str)
-            or fact.relation
-            not in {"established in", "opened in", "located in", "located in region"}
+            or (
+                not inverse
+                and fact.relation
+                not in {
+                    "established in",
+                    "opened in",
+                    "located in",
+                    "located in region",
+                }
+            )
             or len(fact.supporting_spans) != 1
         ):
             continue
-        check = wiki_evidence.check_locate_fact(world, fact)
-        if not check.supported or not check.row:
-            continue
-        header = check.header.split(" | ") if check.header else []
-        row_cells = check.row.split(" | ")
-        subject_index = wiki_adapter._name_column_index(tuple(header))
-        if subject_index is None:
-            subject_index = 0
-        if subject_index >= len(row_cells):
-            continue
-        surface = row_cells[subject_index].strip()
-        if not surface or SAFE.search(surface):
-            continue
         span = fact.supporting_spans[0]
         doc = world._docs[span.doc_id]
-        cells = _cells(doc.text, surface, column, fact.relation)
-        if len(cells) != 1 or not _fact_matches_cell(world, fact, cells[0][0]):
-            continue
+        if inverse:
+            selector = _inverse_selector(world, fact)
+            if selector is None:
+                continue
+            _, selector_column, selector_value = selector
+            cells = _inverse_cells(doc.text, column, selector_column, selector_value)
+            if len(cells) != 1 or not _fact_matches_cell(world, fact, cells[0][0]):
+                continue
+            surface = cells[0][0]
+        else:
+            check = wiki_evidence.check_locate_fact(world, fact)
+            if not check.supported or not check.row:
+                continue
+            header = check.header.split(" | ") if check.header else []
+            row_cells = check.row.split(" | ")
+            subject_index = wiki_adapter._name_column_index(tuple(header))
+            if subject_index is None:
+                subject_index = 0
+            if subject_index >= len(row_cells):
+                continue
+            surface = row_cells[subject_index].strip()
+            if not surface or SAFE.search(surface):
+                continue
+            cells = _cells(doc.text, surface, column, fact.relation)
+            if len(cells) != 1 or not _fact_matches_cell(world, fact, cells[0][0]):
+                continue
         digest = hashlib.sha256(
             f"{doc.doc_id}|{fact.fact_id}|{column}".encode()
         ).hexdigest()[:16]
         task_id = f"wiki-table-lookup-{digest}"
-        question = (
-            f"In the {column!r} column of {doc.title}, what value is listed "
-            f"for {surface}?"
-        )
+        if inverse:
+            question = (
+                f"In {doc.title}, which {column!r} entry has "
+                f"{selector_value!r} in the {selector_column!r} column?"
+            )
+        else:
+            question = (
+                f"In the {column!r} column of {doc.title}, what value is listed "
+                f"for {surface}?"
+            )
         program = {
             "op": "table_cell_lookup",
             "fact_id": fact.fact_id,
@@ -138,6 +296,9 @@ def build_lookup_tasks(
             "surface": surface,
             "column": column,
         }
+        if inverse:
+            program["selector_column"] = selector_column
+            program["selector"] = selector_value
         answer = execute_lookup(world, program)
         proof = (
             ProofItem(
@@ -175,6 +336,14 @@ def build_lookup_tasks(
                 "lookup_doc_id": doc.doc_id,
                 "lookup_surface": surface,
                 "lookup_column": column,
+                **(
+                    {
+                        "lookup_selector_column": selector_column,
+                        "lookup_selector": selector_value,
+                    }
+                    if inverse
+                    else {}
+                ),
             },
             spread=(doc.doc_id, fact.relation, column),
         )
@@ -201,13 +370,21 @@ def reader_lookup(
     layout = next(
         item for item in rendered.layouts if item.doc_id == signals["lookup_doc_id"]
     )
-    relation = task.program["relation"]
-    cells = _cells(
-        context[layout.text_start : layout.text_end],
-        signals["lookup_surface"],
-        signals["lookup_column"],
-        relation,
-    )
+    doc_text = context[layout.text_start : layout.text_end]
+    if "lookup_selector_column" in signals:
+        cells = _inverse_cells(
+            doc_text,
+            signals["lookup_column"],
+            signals["lookup_selector_column"],
+            signals["lookup_selector"],
+        )
+    else:
+        cells = _cells(
+            doc_text,
+            signals["lookup_surface"],
+            signals["lookup_column"],
+            task.program["relation"],
+        )
     if len(cells) != 1:
         raise ValueError("reader table lookup lacks one unambiguous cell")
     value, start, end = cells[0]

@@ -1,0 +1,42 @@
+{
+  "schema": "longworld.wiki-source-expansion.v1",
+  "base_pool": "data/capability_records/p76_wiki_expansion_v3/source_pool.json",
+  "seeds": [
+    {
+      "name": "wiki_river_lists",
+      "domain": "geography",
+      "topic": "rivers",
+      "split": "train",
+      "mode": "search",
+      "query": "intitle:\"List of\" rivers",
+      "title_contains": "river",
+      "max_pages": 8,
+      "bundle_size": 2,
+      "max_bundles": 2
+    },
+    {
+      "name": "wiki_national_park_lists",
+      "domain": "nature",
+      "topic": "national_parks",
+      "split": "eval",
+      "mode": "search",
+      "query": "intitle:\"List of\" national parks",
+      "title_contains": "national park",
+      "max_pages": 8,
+      "bundle_size": 2,
+      "max_bundles": 2
+    },
+    {
+      "name": "wiki_element_lists",
+      "domain": "chemistry",
+      "topic": "chemical_elements",
+      "split": "train",
+      "mode": "search",
+      "query": "intitle:\"List of\" chemical elements",
+      "title_contains": "chemical element",
+      "max_pages": 8,
+      "bundle_size": 2,
+      "max_bundles": 2
+    }
+  ]
+}

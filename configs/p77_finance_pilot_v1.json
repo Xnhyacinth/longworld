@@ -1,0 +1,24 @@
+{
+  "schema_version": "longworld.finance-taskbank-long-catalog.v1",
+  "jobs": [
+    {
+      "issuer": "amazon",
+      "config": "configs/p64_finance_taskbank_amazon_v1.json",
+      "config_sha256": "d12a2846f7ad26f4eabff1a9688513a3ac6d591699cde188559f4432deec76d4",
+      "source_manifest": "data/source_inventory/p57_finance_amazon_ir_fy2021_2024_v1/issuer_ir_manifest.signed.json",
+      "source_manifest_sha256": "8e48f6c0688ae3bcbd9b9e9eade195e8ba70e297f7bf806573e2d95c90645bb6",
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/amazon/local_probe_trust.json"
+    },
+    {
+      "issuer": "amd",
+      "config": "configs/p64_finance_taskbank_amd_v1.json",
+      "config_sha256": "664ac3f5c92af21fcc47a18b4e9884c38745a37d4a477894c591132b4c97f67c",
+      "source_manifest": "data/source_inventory/p60_finance_amd_inline_fy2021_2024_v1/issuer_inline_manifest.signed.json",
+      "source_manifest_sha256": "4b8756fa1819883bbb706fb520516a64c17516cf1c44dbcfe018a5ebdfd67258",
+      "trust_file": "${QJIU_ROOT}/.longworld-scaleout-20260906-private/amd/local_probe_trust.json"
+    }
+  ],
+  "structure_holdout": "margin_extremes_cashflow_difference excluded from train",
+  "legacy_union_allowed": false,
+  "pilot_note": "bounded new native Finance synthesis under unified P77 pilot; source/trust pins unchanged"
+}

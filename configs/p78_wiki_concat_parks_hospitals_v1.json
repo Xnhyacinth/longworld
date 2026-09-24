@@ -1,0 +1,23 @@
+{
+  "schema": "longworld.wiki-snapshot-concat-config.v1",
+  "split": "train",
+  "domain": "nature_healthcare",
+  "topic": "parks_hospitals_source_composition",
+  "max_tasks": 4,
+  "source_pool_catalog": {
+    "path": "configs/p76_source_pool_v2.json",
+    "sha256": "6089c4210bb04f7379fe3716613e041299904cea980a5edb79903e0bbb0fe29b"
+  },
+  "components": [
+    {
+      "path": "data/capability_records/p76_wiki_titles_v4/parks_expansion_snapshot.json",
+      "sha256": "e5f1350d8c5520d3bfc22f623a9475fda188a0d343872c0417f43fad0c87b391",
+      "split": "train"
+    },
+    {
+      "path": "data/capability_records/p76_wiki_titles_v6/hospitals_snapshot.json",
+      "sha256": "95b16afb6fe9a7cf1fac768ec0540a7bfa9f92fa1f0c119f9845c9b1136f7a5e",
+      "split": "train"
+    }
+  ]
+}
