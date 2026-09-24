@@ -541,6 +541,11 @@ def describe_program(program: dict[str, Any]) -> str:
                 parts.append(
                     f"LET {out} = the {step.get('family')} object labeled {step['label']!r}"
                 )
+            elif step.get("entity_id"):
+                # entity_id-only binds (the bridge's chain constructors emit
+                # them): render the id directly — execute() accepts the shape,
+                # so the render path must not crash on it.
+                parts.append(f"LET {out} = the object {step['entity_id']}")
             else:
                 version = (
                     f" at version {step['version']}" if step.get("version") else ""
@@ -745,13 +750,24 @@ def _mutated_world(
                 (e for e in edits if e.doc_id == entity.doc_id),
                 key=lambda e: e.start,
             )
-            mentions = tuple(
-                EntityMention(
-                    _map_position(mention.start, doc_edits),
-                    _map_position(mention.end, doc_edits),
-                )
-                for mention in entity.mentions
-            )
+            if doc_edits:
+                doc_text = next(d.text for d in documents if d.doc_id == entity.doc_id)
+            else:
+                doc_text = None
+            kept = []
+            for mention in entity.mentions:
+                start = _map_position(mention.start, doc_edits)
+                end = _map_position(mention.end, doc_edits)
+                # A mention whose span the edit clobbered no longer carries
+                # the label verbatim; the world constructor REQUIRES every
+                # mention to carry its label, so drop the broken mention
+                # instead of failing the whole mutated world (real snapshots
+                # carry thousands of mentions; the demo worlds carry none —
+                # this is the seam INT hit). Entity is kept: its other
+                # mentions and facts survive.
+                if doc_text is None or entity.label in doc_text[start:end]:
+                    kept.append(EntityMention(start, end))
+            mentions = tuple(kept)
         entities.append(
             Entity(
                 entity.entity_id,

@@ -19,7 +19,7 @@
 | INT 真实世界端到端 | int-realworld | demo_p74_real_world.py:7 快照 × locate + 6/7 折叠门链(6-8 条/快照,证书 S/E/A/L 全填,D_min 记录,span 指向真实正文);JSON 摘要落 data/ |
 | VER 对抗核查 ×2 | ver-data/ver-code | 数据侧(报告后补)+ 代码侧全文审查 |
 
-## VER 代码侧发现与修复(本轮已修 3 处)
+## VER 代码侧发现与修复(本轮已修 3+2 处)
 
 ver-code 的对抗式审查(读所有 wave-2 模块 + 自写旁路 probe)判定:
 SOUND——proof_certificates(真重执行、W1/W2 无答案走私、OR 语义)、
@@ -40,10 +40,35 @@ span 语义正确)、bridge 事实账目(无损)。发现并已修:
    根因注记(ver-code):桥接的 LIST 实体表格列被挤进单一时间线,不同时刻
    多值静默折叠到最大时刻——feeds 退化;这是桥的已知语义不匹配(见其
    docstring 诚实声明),下波改进。
+4. **dependency_ops.describe_program 对 entity_id-only bind 崩溃**(INT
+   seam 2):桥的链构造器恰好产出该形态,execute() 接受但渲染路径
+   KeyError。已修:渲染分支支持 entity_id。
+5. **dependency_ops._mutated_world mention 重偏移不复检**(INT seam 3):
+   文本编辑破坏标签 mention 后,真实世界(数千 mention)的变异副本过不了
+   SemanticWorld 验证,干预检查全挂。已修:被编辑破坏的 mention 诚实丢弃
+   (实体与其余 mention 存活),新增回归测试。
+   两条均补回归测试(tests/test_dependency_ops.py 19 tests 含 2 新增)。
 
 结构性注记(未修,文档化):折叠门是**结构性**的(存在前驱绑定),不是答案
 级依赖证明——ver-code 构造了过门但语义平坦的程序(退化 resolve、死键
 链);语义依赖由 check_intervention 独立认证。两者分工如实入档。
+
+## VER 数据侧结论(全确认)
+
+ver-data 五项声明全部 CONFIRMED、零实质缺陷:805/805 span 逐字精确
+(非仅包含);v2 银行 30 行种子复检(重生成/重解/答案一致)、10 世界 token
+统计与存储逐 token 相等、8K 不可行独立复探(records 地板 20.5-25.0K,
+比 manifest 原措辞更高——措辞已更正)、0 切分泄漏;witness 审计重跑字节
+一致,wrong_rule_family 5/5 手推公式复验是真错误程序非洗白报错;INT demo
+与 T7 矩阵重跑深相等。两个 cosmetic nit(8K 地板措辞低报、demo 链值
+int 2023 vs '2023')均已修正(值修后 span 逐字复验仍过)。
+
+## W2-M 刷新后的 C/D 数字(最终口径)
+
+D 360→368 行(rule_holdout 56→62、set_complete 31→33),C 360→368,
+重叠 274(76.1%)→288(78.3%)。诚实代价:rule_holdout 的 poor 池 8→2 行
+(更多行真 witness-rich 的正确方向,但该族 C/D 对照现在只剩 2 行 poor)。
+w2m 结论:要强 C/D 分离,杠杆是更多 parity_vote 世界,不是继续改变异。
 
 ## 里程碑判定(章程 §11-1)
 

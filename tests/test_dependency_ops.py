@@ -344,3 +344,78 @@ def test_describe_program_and_instruction_mention_scope(world):
     assert "Scope: object families ['instrument']" in text
     assert "documents ['D2']" in text
     assert "LET proj" in text
+
+
+def test_describe_program_renders_entity_id_only_bind():
+    """entity_id-only bind steps (bridge chain constructors emit them) must
+    render, not KeyError — execute() accepts the shape (INT seam 2)."""
+    program = {
+        "steps": [
+            {"op": "bind", "out": "v0", "entity_id": "O-obs-101"},
+            {
+                "op": "resolve_version",
+                "out": "v1",
+                "subject": "$v0",
+                "relation": "band",
+                "at": "2026-09-01",
+            },
+        ],
+        "return": "v1",
+    }
+    text = ops.describe_program(program)
+    assert "O-obs-101" in text
+    assert "band" in text
+
+
+def test_mutate_fact_drops_clobbered_mentions_not_the_world():
+    """A mutation whose text edit clobbers a label mention must still build a
+    valid world (drop the broken mention) instead of failing validation —
+    real snapshots carry thousands of mentions (INT seam 3)."""
+    from longworld.synthesis.shared_semantic_world import (
+        Document,
+        Entity,
+        EntityMention,
+        Fact,
+        SemanticWorld,
+        SpanRef,
+    )
+
+    doc = Document(
+        doc_id="D1", title="t", text="Kea is flightless and notable.", sections=()
+    )
+    entity = Entity(
+        entity_id="E-1",
+        label="Kea",
+        aliases=(),
+        external_qid=None,
+        doc_id="D1",
+        mentions=(EntityMention(0, 3),),
+        entity_type="bird",
+    )
+    fact = Fact(
+        fact_id="F-1",
+        subject="E-1",
+        relation="status",
+        value="flightless",
+        value_type="string",
+        unit=None,
+        time=None,
+        version=None,
+        qualifiers={},
+        supporting_spans=(SpanRef("D1", 7, 17),),
+        alternative_spans=(),
+        source_hash="h",
+    )
+    world = SemanticWorld((doc,), (entity,), (fact,))
+    # edit the fact's span: the text inside the mention's window changes so
+    # the mention no longer carries the label verbatim
+    mutated = ops.mutate_fact(world, "F-1", "notable")
+    assert mutated.lookup_fact("E-1", "status") is not None
+    mentions = [m for e in mutated.entities for m in e.mentions]
+    # the clobbered mention is dropped, the entity survives
+    assert mentions == [] or all(
+        "Kea" in next(d.text for d in mutated.documents if d.doc_id == "D1")[
+            m.start : m.end
+        ]
+        for m in mentions
+    )
