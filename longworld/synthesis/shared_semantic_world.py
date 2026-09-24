@@ -106,9 +106,13 @@ class Document:
 class EntityMention:
     start: int
     end: int
+    surface_form: str | None = None
 
-    def to_dict(self) -> dict[str, int]:
-        return {"start": self.start, "end": self.end}
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"start": self.start, "end": self.end}
+        if self.surface_form is not None:
+            payload["surface_form"] = self.surface_form
+        return payload
 
 
 @dataclass(frozen=True)
@@ -315,7 +319,11 @@ def _entity_from_item(item: dict[str, Any]) -> Entity:
     )
     doc_id = item.get("doc_id")
     mentions = tuple(
-        EntityMention(start=int(m["start"]), end=int(m["end"]))
+        EntityMention(
+            start=int(m["start"]),
+            end=int(m["end"]),
+            surface_form=m.get("surface_form"),
+        )
         for m in item.get("mentions", [])
     )
     if doc_id is not None and mentions:
@@ -447,10 +455,17 @@ def _validate(
                 0 <= mention.start < mention.end <= len(text),
                 f"entity {entity.entity_id} has an out-of-range mention",
             )
-            _require(
-                entity.label in text[mention.start : mention.end],
-                f"entity {entity.entity_id} has a mention that is not its label",
-            )
+            surface = text[mention.start : mention.end]
+            if mention.surface_form is None:
+                _require(
+                    entity.label in surface,
+                    f"entity {entity.entity_id} has a mention that is not its label",
+                )
+            else:
+                _require(
+                    bool(mention.surface_form) and mention.surface_form == surface,
+                    f"entity {entity.entity_id} has a mention with mismatched surface_form",
+                )
 
 
 def _validate_span(span: SpanRef, docs: dict[str, Document], owner: str) -> None:

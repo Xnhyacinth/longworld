@@ -414,8 +414,48 @@ def test_mutate_fact_drops_clobbered_mentions_not_the_world():
     mentions = [m for e in mutated.entities for m in e.mentions]
     # the clobbered mention is dropped, the entity survives
     assert mentions == [] or all(
-        "Kea" in next(d.text for d in mutated.documents if d.doc_id == "D1")[
-            m.start : m.end
-        ]
+        "Kea"
+        in next(d.text for d in mutated.documents if d.doc_id == "D1")[m.start : m.end]
         for m in mentions
     )
+
+
+def test_mutate_fact_repositions_alias_surface_mention():
+    from longworld.synthesis.shared_semantic_world import (
+        Document,
+        Entity,
+        EntityMention,
+        Fact,
+        SemanticWorld,
+        SpanRef,
+    )
+
+    text = "TESS status active. Later, TESS remained visible."
+    fact_start = text.index("active")
+    alias_start = text.index("TESS", fact_start)
+    world = SemanticWorld(
+        (Document("D", "Satellite", text),),
+        (
+            Entity(
+                "E",
+                "Transiting Exoplanet Survey Satellite",
+                doc_id="D",
+                mentions=(EntityMention(alias_start, alias_start + 4, "TESS"),),
+            ),
+        ),
+        (
+            Fact(
+                "F",
+                "E",
+                "status",
+                "active",
+                "string",
+                supporting_spans=(SpanRef("D", fact_start, fact_start + 6),),
+            ),
+        ),
+    )
+    mutated = ops.mutate_fact(world, "F", "inactive")
+    mention = mutated.entities[0].mentions[0]
+    assert mention.surface_form == "TESS"
+    assert mention.start == alias_start + 2
+    assert mutated.documents[0].text[mention.start : mention.end] == "TESS"

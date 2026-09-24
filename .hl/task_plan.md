@@ -547,3 +547,21 @@ additional rule/world families, L4/L5 mechanisms and empirical controls.
 | Parallel generation/export | root | complete | 4workers;192shards;384rows/6144QA;1.724% supervision; complete-shard resume reverified |
 | Independent review | p65_handoff | complete | 77tests;6144/6144 exportedanswers;665paired16Ksuffix insufficiency witnesses; scoped local GO |
 | Model/utility controls | root | deferred_by_user | reusable evaluator implemented/tested; no network/GPU calls; not a production prerequisite |
+
+## P75 real-reader vertical slice — 2026-09-24
+
+Goal: turn the frozen P74 Wiki snapshots into inspectable local reader SFT candidates while keeping audit facts and program state outside model-visible text. This is a research candidate slice, not a production release or a measured training gain.
+
+Success: one deterministic multi-snapshot batch exports train/eval rows, source and task audit sidecars, final-input token counts and evidence offsets; train/eval are split by source world; no hidden fact index appears in reader messages. The support matrix and demo must use the same structural typing path. Real Wiki state questions with no revision semantics remain diagnostic, not qualified historical-state supervision.
+
+Assumptions: P74 frozen source snapshots remain immutable; existing tokenizer revision and local environment are used; no GPU training, promotion or publication is authorized by this slice. Task count and long-span metrics are reported as observed, never inferred from audit-render length.
+
+| Phase | Objective | Status | Verification |
+| --- | --- | --- | --- |
+| P75.0 | Review current source, artifacts, literature and reproduce the matrix/demo mismatch | complete | raw Wiki bank 0 tasks vs typed demo bank 6 locate + 6 as-of on observatories |
+| P75.1 | Preserve exact alias mentions and centralize structural typing | in_progress | focused tests; frozen snapshot mention and task accounting |
+| P75.2 | Compile document-only reader view and audit sidecar with exact final-input length and span map | in_progress | focused tests and real batch smoke; no FACTS/program/proof in messages |
+| P75.3 | Rebuild support matrix through the shared typing path and run batch validation | planned | matrix/demo alignment; deterministic manifest, source-world split, token budget and lineage checks |
+| P75.4 | Record supported scope, remaining real-semantic gaps and next source recipe | planned | report with actual counts and explicit unresolved long-text dependency / training utility |
+
+Next step: finish P75.1/P75.2 in disjoint files, then integrate P75.3 and verify the frozen seven-snapshot batch.

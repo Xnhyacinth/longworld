@@ -59,6 +59,34 @@ def test_snapshot_roundtrip_and_schema_strictness(world):
         ssw.SourceSnapshot.from_dict(payload)
 
 
+def test_alias_surface_mention_roundtrips_and_requires_exact_span():
+    text = "Transiting Exoplanet Survey Satellite is called TESS."
+    start = text.index("TESS")
+    payload = {
+        "snapshot_id": "alias-test",
+        "frozen_at": "2026-09-24",
+        "source": {"kind": "test"},
+        "documents": [{"doc_id": "D", "title": "Satellite", "text": text}],
+        "entities": [
+            {
+                "entity_id": "E",
+                "label": "Transiting Exoplanet Survey Satellite",
+                "doc_id": "D",
+                "mentions": [
+                    {"start": start, "end": start + 4, "surface_form": "TESS"}
+                ],
+            }
+        ],
+        "facts": [],
+    }
+    snapshot = ssw.SourceSnapshot.from_dict(payload)
+    assert snapshot.entities[0].mentions[0].surface_form == "TESS"
+    assert ssw.SourceSnapshot.from_dict(snapshot.to_dict()) == snapshot
+    payload["entities"][0]["mentions"][0]["surface_form"] = "TEST"
+    with pytest.raises(ValueError, match="mismatched surface_form"):
+        ssw.SourceSnapshot.from_dict(payload)
+
+
 def test_span_mismatch_rejected_at_load(world):
     payload = demo_snapshot(world).to_dict()
     # move a span off the fact's evidence

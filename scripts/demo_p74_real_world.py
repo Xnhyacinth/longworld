@@ -11,18 +11,18 @@ Pipeline per snapshot (data/capability_records/p74_wiki_snapshot_v1/):
 
     frozen snapshot (json)
       -> wiki_world_bridge.snapshot_to_world      (the W2-A bridge)
-      -> typed_view()                             (this script's adapter)
+      -> wiki_world_bridge.structurally_typed_world()
       -> world_task_bank.build_task_bank          (W2-B, no per-topic code)
       -> dependency_ops.execute per task          (answers + span proofs)
       -> proof_certificates.analyze per task      (bounded, four certificates)
       -> length_controller.measure / select_views (natural tokens + band)
       -> dep-chain probe (this script's adapter)  (§5 fold-gated chains)
 
-THE TYPING ADAPTER (the one seam this script owns).  The bridge leaves every
+THE STRUCTURAL TYPING VIEW.  The bridge leaves every
 entity untyped — §14 v1 snapshots carry no entity_type, a declared drift
 point in the bridge's own mismatch notes — and the task bank can only bind
 objects by family+label, so WITHOUT an adapter the bank yields zero tasks on
-every real snapshot.  typed_view() assigns structural families with three
+every real snapshot.  structurally_typed_world() assigns structural families with three
 rules, all derived from the world's own fact shape (no topic strings):
 
   1. outgoing signature: the set of relations an entity is a SUBJECT of;
@@ -110,96 +110,12 @@ MILESTONE_MIN_FAMILIES = 3
 
 
 # ---------------------------------------------------------------------------
-# Adapter 1: structural families for the untyped bridged world
+# Structural families for the untyped bridged world
 # ---------------------------------------------------------------------------
 
 
-def _family_name(signature: frozenset[str]) -> str:
-    """A readable, structure-derived family name (the world's own words)."""
-    core = "+".join(sorted(signature))
-    if len(core) > 60:
-        digest = hashlib.sha256(core.encode("utf-8")).hexdigest()[:8]
-        core = core[:48] + "..." + digest
-    return core
-
-
-def structural_families(world: SemanticWorld) -> dict[str, str]:
-    """entity_id -> structural family name; unlinked entities are omitted.
-
-    Rule 1: entities that are fact subjects get the maximal outgoing
-    signature containing their own signature (superset merge), prefixed
-    ``s:``.
-    Rule 2: fact-free entities referenced only as objects of entity facts
-    get the ``o:`` family of their incoming relations — a ROLE family, not
-    a subject family.  (They never adopt a subject family: an 'active in'
-    target is a country, not a rally, even when the rally's own signature
-    contains 'active in'.)
-    Rule 3: everything else (no facts, no incoming entity edges) is a
-    mention-only entity and stays untyped.
-    """
-    outgoing: dict[str, set[str]] = defaultdict(set)
-    incoming: dict[str, set[str]] = defaultdict(set)
-    for fact in world.facts:
-        outgoing[fact.subject].add(fact.relation)
-        if fact.value_type == "entity":
-            incoming[fact.value].add(fact.relation)
-    signatures = {entity_id: frozenset(rels) for entity_id, rels in outgoing.items()}
-    distinct = sorted(set(signatures.values()), key=lambda s: sorted(s))
-    maximal = [s for s in distinct if not any(s < t for t in distinct)]
-
-    families: dict[str, str] = {}
-    for entity in world.entities:
-        signature = signatures.get(entity.entity_id)
-        if signature is not None:
-            for candidate in maximal:
-                if signature <= candidate:
-                    families[entity.entity_id] = "s:" + _family_name(candidate)
-                    break
-        elif incoming.get(entity.entity_id):
-            relations = sorted(incoming[entity.entity_id])
-            families[entity.entity_id] = "o:" + _family_name(frozenset(relations))
-    return families
-
-
-def typed_view(world: SemanticWorld) -> tuple[SemanticWorld, dict[str, Any]]:
-    """Rebuild the bridged world with structural families (adapter 1).
-
-    Documents, facts, spans, mentions and the bridge report are carried
-    over untouched; only entity_type is filled in.  The typing stats record
-    how many entities each rule typed, so the adapter's effect is visible.
-    """
-    families = structural_families(world)
-    subjects = {f.subject for f in world.facts}
-    objects = {f.value for f in world.facts if f.value_type == "entity"}
-    stats = {
-        "rule_subject_family": sum(
-            1 for e in world.entities if e.entity_id in subjects
-        ),
-        "rule_object_role_family": sum(
-            1
-            for e in world.entities
-            if e.entity_id not in subjects and e.entity_id in objects
-        ),
-        "unlinked_untyped": sum(
-            1 for e in world.entities if e.entity_id not in families
-        ),
-        "families": len(set(families.values())),
-    }
-    entities = tuple(
-        Entity(
-            e.entity_id,
-            e.label,
-            e.aliases,
-            e.external_qid,
-            e.doc_id,
-            e.mentions,
-            families.get(e.entity_id),
-        )
-        for e in world.entities
-    )
-    typed = SemanticWorld(world.documents, entities, world.facts)
-    typed.bridging = world.bridging  # type: ignore[attr-defined]
-    return typed, stats
+structural_families = wwb.structural_families
+typed_view = wwb.structurally_typed_world
 
 
 # ---------------------------------------------------------------------------

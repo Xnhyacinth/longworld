@@ -758,15 +758,15 @@ def _mutated_world(
             for mention in entity.mentions:
                 start = _map_position(mention.start, doc_edits)
                 end = _map_position(mention.end, doc_edits)
-                # A mention whose span the edit clobbered no longer carries
-                # the label verbatim; the world constructor REQUIRES every
-                # mention to carry its label, so drop the broken mention
-                # instead of failing the whole mutated world (real snapshots
-                # carry thousands of mentions; the demo worlds carry none —
-                # this is the seam INT hit). Entity is kept: its other
-                # mentions and facts survive.
-                if doc_text is None or entity.label in doc_text[start:end]:
-                    kept.append(EntityMention(start, end))
+                # Drop mentions clobbered by the edit; preserve exact alias
+                # surfaces for all other re-offset mentions.
+                valid = (
+                    mention.surface_form == doc_text[start:end]
+                    if mention.surface_form is not None and doc_text is not None
+                    else doc_text is None or entity.label in doc_text[start:end]
+                )
+                if valid:
+                    kept.append(EntityMention(start, end, mention.surface_form))
             mentions = tuple(kept)
         entities.append(
             Entity(

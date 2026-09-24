@@ -153,9 +153,7 @@ def test_every_world_fact_span_is_verbatim(source, synthetic_snapshot, real_worl
         snapshot, world = real_world
     docs = _doc_texts(world)
     labels = _id_labels(world)
-    aliases_by_entity = {
-        entity.entity_id: entity.aliases for entity in world.entities
-    }
+    aliases_by_entity = {entity.entity_id: entity.aliases for entity in world.entities}
     assert world.facts
     for fact in world.facts:
         assert fact.supporting_spans
@@ -171,7 +169,7 @@ def test_every_world_fact_span_is_verbatim(source, synthetic_snapshot, real_worl
                 assert text == fact.value, (fact.fact_id, text)
 
 
-def test_real_snapshot_entity_mentions_point_at_labels(real_world):
+def test_real_snapshot_entity_mentions_preserve_exact_surfaces(real_world):
     _, world = real_world
     docs = _doc_texts(world)
     mentioned = 0
@@ -180,10 +178,9 @@ def test_real_snapshot_entity_mentions_point_at_labels(real_world):
             continue
         text = docs[entity.doc_id]
         for mention in entity.mentions:
-            assert entity.label in text[mention.start : mention.end]
+            assert mention.surface_form == text[mention.start : mention.end]
             mentioned += 1
-    # the real snapshot keeps 3684 label mentions after adaptation
-    assert mentioned == 3684
+    assert mentioned == 4687
 
 
 # --- honest degradation: unversioned timeline -------------------------------
@@ -224,9 +221,10 @@ def test_real_conflicting_rows_raise_instead_of_folding(real_world):
 def test_real_bridging_report_counts(real_world):
     snapshot, world = real_world
     report = world.bridging
-    assert report["mentions_dropped_alias_surface"] == 1003
-    assert report["mentions_kept"] == 3684
-    assert report["entities_orphaned"] == 460
+    assert report["mentions_dropped_alias_surface"] == 0
+    assert report["mentions_kept_alias_surface"] == 1003
+    assert report["mentions_kept"] == report["mentions_in"] == 4687
+    assert report["entities_orphaned"] == 0
     # 10 fact-subject surfaces never matched a frozen entity: stub objects
     assert report["stub_entities"] == 10
     stub_ids = {entity.entity_id for entity in world.entities if entity.doc_id is None}
@@ -344,10 +342,10 @@ def test_real_chain_rejects_folded_variant(real_world):
 def test_synthetic_mention_adaptation(synthetic_snapshot):
     world = bridge.snapshot_to_world(synthetic_snapshot)
     report = world.bridging
-    # the fixture's only alias-surface mention ('Schmidt camera') cannot
-    # satisfy the world's label-in-mention contract and is dropped
-    assert report["mentions_dropped_alias_surface"] == 1
-    assert report["entities_orphaned"] == 1
+    # The fixture's alias-surface mention ('Schmidt camera') remains linked.
+    assert report["mentions_dropped_alias_surface"] == 0
+    assert report["mentions_kept_alias_surface"] == 1
+    assert report["entities_orphaned"] == 0
     assert report["mentions_kept"] >= 1
     for entity in world.entities:
         if entity.doc_id is None:
@@ -355,7 +353,7 @@ def test_synthetic_mention_adaptation(synthetic_snapshot):
             continue
         text = _doc_texts(world)[entity.doc_id]
         for mention in entity.mentions:
-            assert entity.label in text[mention.start : mention.end]
+            assert mention.surface_form == text[mention.start : mention.end]
 
 
 def test_synthetic_year_coercion(synthetic_snapshot):

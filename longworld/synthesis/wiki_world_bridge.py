@@ -18,11 +18,8 @@ mismatch notes:
   world requires entity ids.  Surfaces resolve label -> alias -> normalized
   label; unresolved fact subjects and entity values become stub entities
   (id-hashed from the surface, no doc anchor, no mentions).
-- mentions: the adapter records alias-surface mentions (the mention text is
-  the link surface, not the label), but the world loader requires every
-  mention span to carry the entity's label.  Alias-surface mentions are
-  dropped and counted; entities whose label never appears in their anchor
-  doc end up with zero mentions (orphans, kept as objects).
+- mentions: preserve the exact surface form of every adapter mention,
+  including link surfaces that differ from the entity label.
 - types: the wiki snapshot has no ``entity_type`` (§14 v1 has no type slot),
   so every world object is untyped and bind-by-family is unavailable —
   binds use label/entity_id only.  A declared drift point for the T4 wave.
@@ -74,6 +71,8 @@ __all__ = [
     "TIMELINE_MODE",
     "build_adapted_snapshot",
     "snapshot_to_world",
+    "structural_families",
+    "structurally_typed_world",
     "as_of_location_program",
     "listing_grounded_locations_program",
 ]
@@ -102,6 +101,7 @@ class BridgeReport:
     mentions_in: int = 0
     mentions_kept: int = 0
     mentions_dropped_alias_surface: int = 0
+    mentions_kept_alias_surface: int = 0
     entities_orphaned: int = 0
     # facts
     facts_in: int = 0
@@ -139,6 +139,7 @@ class BridgeReport:
             "mentions_in": self.mentions_in,
             "mentions_kept": self.mentions_kept,
             "mentions_dropped_alias_surface": self.mentions_dropped_alias_surface,
+            "mentions_kept_alias_surface": self.mentions_kept_alias_surface,
             "entities_orphaned": self.entities_orphaned,
             "facts_in": self.facts_in,
             "facts_out": self.facts_out,
@@ -256,21 +257,27 @@ def build_adapted_snapshot(
     report = BridgeReport(snapshot_id=snapshot.get("snapshot_id", ""))
     docs = {doc["doc_id"]: doc for doc in snapshot["documents"]}
 
-    # --- entities: filter mentions down to label-bearing spans
+    # --- entities: preserve each mention's exact surface, including aliases
     resolver = _Resolver(snapshot["entities"])
     report.ambiguous_labels = resolver.ambiguous_labels
     entities: dict[str, dict[str, Any]] = {}
     for entity in snapshot["entities"]:
         report.entities_in += 1
         text = docs[entity["doc_id"]]["text"]
-        kept: list[dict[str, int]] = []
+        kept: list[dict[str, Any]] = []
         for mention in entity.get("mentions") or []:
             report.mentions_in += 1
-            if entity["label"] in text[mention["start"] : mention["end"]]:
-                kept.append({"start": mention["start"], "end": mention["end"]})
-                report.mentions_kept += 1
-            else:
-                report.mentions_dropped_alias_surface += 1
+            surface = text[mention["start"] : mention["end"]]
+            kept.append(
+                {
+                    "start": mention["start"],
+                    "end": mention["end"],
+                    "surface_form": surface,
+                }
+            )
+            report.mentions_kept += 1
+            if entity["label"] not in surface:
+                report.mentions_kept_alias_surface += 1
         if entity.get("mentions") and not kept:
             report.entities_orphaned += 1
         if entity.get("entity_type"):
@@ -482,15 +489,93 @@ def snapshot_to_world(snapshot: dict[str, Any]) -> ssw.SemanticWorld:
     return world
 
 
+def _family_name(signature: frozenset[str]) -> str:
+    """A short structural name derived only from relation names."""
+    core = "+".join(sorted(signature))
+    if len(core) > 60:
+        digest = hashlib.sha256(core.encode("utf-8")).hexdigest()[:8]
+        core = core[:48] + "..." + digest
+    return core
+
+
+def structural_families(world: ssw.SemanticWorld) -> dict[str, str]:
+    """Group linked objects by relation shape, without semantic type claims."""
+    outgoing: dict[str, set[str]] = {}
+    incoming: dict[str, set[str]] = {}
+    for fact in world.facts:
+        outgoing.setdefault(fact.subject, set()).add(fact.relation)
+        if fact.value_type == "entity":
+            incoming.setdefault(fact.value, set()).add(fact.relation)
+    signatures = {entity_id: frozenset(rels) for entity_id, rels in outgoing.items()}
+    distinct = sorted(set(signatures.values()), key=lambda s: sorted(s))
+    maximal = [s for s in distinct if not any(s < t for t in distinct)]
+
+    families: dict[str, str] = {}
+    for entity in world.entities:
+        signature = signatures.get(entity.entity_id)
+        if signature is not None:
+            for candidate in maximal:
+                if signature <= candidate:
+                    families[entity.entity_id] = "s:" + _family_name(candidate)
+                    break
+        elif incoming.get(entity.entity_id):
+            families[entity.entity_id] = "o:" + _family_name(
+                frozenset(incoming[entity.entity_id])
+            )
+    return families
+
+
+def structurally_typed_world(
+    world: ssw.SemanticWorld,
+) -> tuple[ssw.SemanticWorld, dict[str, Any]]:
+    """Make fact-linked objects bindable by shape for the task bank.
+
+    The assigned `entity_type` is a structural family key, not an inferred
+    semantic class such as observatory or instrument.
+    """
+    families = structural_families(world)
+    subjects = {f.subject for f in world.facts}
+    objects = {f.value for f in world.facts if f.value_type == "entity"}
+    stats = {
+        "rule_subject_family": sum(
+            1 for e in world.entities if e.entity_id in subjects
+        ),
+        "rule_object_role_family": sum(
+            1
+            for e in world.entities
+            if e.entity_id not in subjects and e.entity_id in objects
+        ),
+        "unlinked_untyped": sum(
+            1 for e in world.entities if e.entity_id not in families
+        ),
+        "families": len(set(families.values())),
+        "type_basis": "relation_shape",
+    }
+    entities = tuple(
+        ssw.Entity(
+            e.entity_id,
+            e.label,
+            e.aliases,
+            e.external_qid,
+            e.doc_id,
+            e.mentions,
+            families.get(e.entity_id),
+        )
+        for e in world.entities
+    )
+    typed = ssw.SemanticWorld(world.documents, entities, world.facts)
+    typed.bridging = getattr(world, "bridging", None)  # type: ignore[attr-defined]
+    return typed, stats
+
+
 _MISMATCH_NOTES = (
     "value vocabulary: wiki year/quantity -> world number (int/float), "
     "date/geo -> string; non-numeric quantities ('1970s') stay strings",
     "identity: fact subjects/values are wiki surface strings; resolved "
     "label -> alias -> normalized label, unresolved surfaces become stub "
     "objects with no doc anchor",
-    "mentions: the adapter records alias-surface mentions but the world "
-    "loader requires the label inside every mention span; alias-surface "
-    "mentions are dropped and orphaned entities counted",
+    "mentions: exact alias surfaces are preserved and validated against "
+    "their anchored document spans",
     "types: the snapshot has no entity_type (§14 v1 has no slot), so world "
     "objects are untyped and bind-by-family is unavailable",
     "timeline: no version and no revoked_at in wiki facts; every timeline "
@@ -504,7 +589,6 @@ _MISMATCH_NOTES = (
     "the world (enforced upstream by the adapter validator and re-checked "
     "here)",
 )
-
 
 
 # ---------------------------------------------------------------------------

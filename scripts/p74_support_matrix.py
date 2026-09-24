@@ -714,6 +714,7 @@ def _gather_wiki(manifest: dict[str, Any], snapshot_dir: Path) -> list[dict[str,
         snapshot = json.loads(path.read_text())
         try:
             world = wb.snapshot_to_world(snapshot)
+            world, typing_stats = wb.structurally_typed_world(world)
         except Exception as error:  # bridge failure is a matrix row, not a crash
             details.append(
                 {
@@ -758,7 +759,8 @@ def _gather_wiki(manifest: dict[str, Any], snapshot_dir: Path) -> list[dict[str,
             "note": (
                 f"bridged: {bridging.get('facts_in', '?')} facts in / "
                 f"{bridging.get('facts_out', '?')} out, timeline mode "
-                f"'{bridging.get('timeline', '?')}'"
+                f"'{bridging.get('timeline', '?')}'; structural typing "
+                f"{typing_stats['families']} families"
             ),
         }
         detail.update(_measure_bank(world))
