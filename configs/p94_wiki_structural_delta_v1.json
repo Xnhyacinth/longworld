@@ -1,0 +1,11 @@
+{
+  "schema": "longworld.p94-wiki-structural-delta.v1",
+  "old_pool": {
+    "path": "data/capability_records/p94_wiki_structural_merge_v1/source_pool.json",
+    "sha256": "09eb89979f282fb0c61faf2583a362d72385362e85eaa9c23db65158c9c5acab"
+  },
+  "new_pool": {
+    "path": "data/capability_records/p94_wiki_structural_merge_v2/source_pool.json",
+    "sha256": "6bf837dccdf83fe34f0c687458d3983dfc636db8066622a4b90648971b0c73ef"
+  }
+}

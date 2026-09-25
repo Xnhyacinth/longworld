@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.codeforge-taskbank-config.v1",
+  "source_bundle": "configs/p16_codeforge_duckdb_failure_recovery_v1_bundle.json",
+  "source_bundle_sha256": "813a72c03b13a5379e91e13a1424956e93a18fd3c077747f25547c76ccf85ea7",
+  "source_group_id": "https://github.com/duckdb/duckdb",
+  "split": "train",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true
+  }
+}

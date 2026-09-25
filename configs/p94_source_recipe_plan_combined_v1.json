@@ -1,0 +1,23 @@
+{
+  "schema": "longworld.p94-source-recipe-plan.v1",
+  "source_matrix": {
+    "path": "data/capability_records/p94_wiki_source_router_v1/manifest.json",
+    "sha256": "34e82ee88e7be2ab2abd2c3defdeacdfee9b89f7e8ae87b250678447825348a2"
+  },
+  "native_source_pool": {
+    "path": "data/capability_records/p94_wiki_source_router_v1/consolidated_wiki_pool.json",
+    "sha256": "3c494faa7dfb3d47b4a6f210bc43910fb89be33c89ce34032424be4af6e823cd"
+  },
+  "prior_source_matrix": {
+    "path": "data/capability_records/p92_source_router_v5/manifest.json",
+    "sha256": "7ab78fadb1047bf645c61d6797604c30f7917f7f4eaa03b21713d3aee4c35776"
+  },
+  "length_policies": [
+    "native_whole_pages",
+    "paired_32k_64k_or_native",
+    "target_32768",
+    "target_65536",
+    "target_131072",
+    "target_262144"
+  ]
+}

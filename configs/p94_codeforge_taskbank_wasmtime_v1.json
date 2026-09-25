@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.codeforge-taskbank-config.v1",
+  "source_bundle": "configs/p59_code_wasmtime_latest3_v1_bundle.json",
+  "source_bundle_sha256": "64ae460178f6a84662e95277881e1a06db509b1873999a06cf7aeb9b716039be",
+  "source_group_id": "https://github.com/bytecodealliance/wasmtime",
+  "split": "eval",
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true
+  }
+}

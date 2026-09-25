@@ -1,0 +1,35 @@
+{
+  "max_tasks_by_recipe": {
+    "wiki_table_pair": 16
+  },
+  "prior_source_manifest": {
+    "path": "data/p75_real_reader_candidates_v1/source_manifest.jsonl",
+    "sha256": "436bc1623736dbefe00afd5d9d582380805e619792367bef02f8354b015be270"
+  },
+  "requested_recipes": [
+    "wiki_table_pair"
+  ],
+  "schema": "longworld.source-batch-pool.v2",
+  "sources": [
+    {
+      "domain": "education",
+      "name": "p93_universities_01_02",
+      "snapshot": {
+        "path": "data/capability_records/p94_wiki_structural_institutions_v1/snapshots/p93_universities_01_02_snapshot.json",
+        "sha256": "91b1f6d2b19a6fd1a1145283b18c5f9c9a755a3471c1dbf59e4914d91549a7b6"
+      },
+      "split": "eval",
+      "topic": "universities"
+    },
+    {
+      "domain": "nature",
+      "name": "p93_national_parks_01_03",
+      "snapshot": {
+        "path": "data/capability_records/p94_wiki_structural_institutions_v1/snapshots/p93_national_parks_01_03_snapshot.json",
+        "sha256": "17056906d6d3d2840c560050d6bd8f8837dbb8d1fd8d2470a5847152f22a1aa9"
+      },
+      "split": "eval",
+      "topic": "national_parks"
+    }
+  ]
+}

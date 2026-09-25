@@ -1,0 +1,19 @@
+{
+  "schema_version": "longworld.unified-synthesis-plan.v1",
+  "sources": [
+    {
+      "name": "p94_duckdb",
+      "kind": "codeforge_taskbank",
+      "config": "configs/p94_codeforge_duckdb_catalog_v1.json",
+      "output": "data/candidates/p94_codeforge_duckdb_v1",
+      "generation": "new_p94"
+    },
+    {
+      "name": "p94_wasmtime",
+      "kind": "codeforge_taskbank",
+      "config": "configs/p94_codeforge_wasmtime_catalog_v1.json",
+      "output": "data/candidates/p94_codeforge_wasmtime_v1",
+      "generation": "new_p94"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": "longworld.codeforge-reading-proof-config.v1",
+  "source_catalog": "configs/p94_codeforge_duckdb_catalog_v1.json",
+  "primary_root": "data/candidates/p94_codeforge_duckdb_v1",
+  "profile_id": "p65-codeforge-filename-copy-content-backed-v1",
+  "grammar_id": "ascii-case-insensitive-full-path-basename-json-url-copy-v1",
+  "windows": [4096, 8192, 16384],
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+    "local_files_only": true
+  },
+  "counterfactual_views": false,
+  "raw_profile_id": "p65-codeforge-filename-copy-aggregation-v1",
+  "content_control": "record-texts-sha-normalized-preserve-filename-aliases-v1"
+}
