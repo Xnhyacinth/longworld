@@ -61,6 +61,9 @@ def _fake_probe(job: tuple[str, str, str, int]) -> tuple[str, dict]:
         "source_identity": "snapshot_one",
         "world_group_id": "snapshot_one",
         "document_count": 2,
+        "document_identities": [
+            {"title": "List of volcanoes", "revision_url": "https://example.test/1"}
+        ],
         "fact_count": 10,
         "native_structure": {
             "lookup_probe_tasks": 1,
@@ -135,4 +138,48 @@ def test_prior_index_novelty_is_bound_to_real_candidate_rows(tmp_path, monkeypat
     assert novelty["supported_operation_cells_absent_from_index"] == {}
     refs.write_text(refs.read_text() + "\n")
     with pytest.raises(ValueError, match="prior candidate index pin mismatch"):
+        router.route(config, tmp_path)
+
+
+def test_same_wiki_page_in_different_snapshots_blocks_both_splits():
+    sources = [
+        {
+            "source_kind": "real_wiki",
+            "world_group_id": f"snapshot_{split}",
+            "split": split,
+            "document_identities": [{"title": title}],
+            "cells": [router._cell("wiki_table_lookup", "probe_supported")],
+        }
+        for split, title in (("train", "List of Parks"), ("eval", "list of parks"))
+    ]
+    assert router._block_page_split_conflicts(sources) == ["list of parks"]
+    assert {source["split"] for source in sources} == {"conflict"}
+    assert all(
+        cell["status"] == "blocked_split_conflict"
+        for source in sources
+        for cell in source["cells"]
+    )
+
+
+def test_pinned_pool_catalog_ignores_new_glob_matches(tmp_path, monkeypatch):
+    config = _fixture(tmp_path)
+    monkeypatch.setattr(router, "_probe_wiki", _fake_probe)
+    pools = sorted(tmp_path.glob("pools/*/source_pool.json"))
+    config.pop("wiki_source_pool_glob")
+    config["wiki_source_pools"] = [
+        {
+            "path": str(path.relative_to(tmp_path)),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+        for path in pools
+    ]
+    first = router.route(config, tmp_path)
+    _write(
+        tmp_path,
+        "pools/new/source_pool.json",
+        {"schema": "longworld.source-batch-pool.v2", "sources": []},
+    )
+    assert router.route(config, tmp_path) == first
+    config["wiki_source_pools"][0]["sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="Wiki source-pool pin changed"):
         router.route(config, tmp_path)

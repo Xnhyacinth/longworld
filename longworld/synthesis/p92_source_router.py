@@ -67,6 +67,38 @@ def _cell(
     }
 
 
+def _block_page_split_conflicts(sources: list[dict[str, Any]]) -> list[str]:
+    """Block snapshots sharing a Wiki title across train and eval."""
+    page_splits: dict[str, set[str]] = defaultdict(set)
+    for source in sources:
+        if source["source_kind"] != "real_wiki" or source["split"] == "conflict":
+            continue
+        for doc in source["document_identities"]:
+            page_splits[doc["title"].casefold()].add(source["split"])
+    conflicted = sorted(
+        title for title, splits in page_splits.items() if len(splits) > 1
+    )
+    if not conflicted:
+        return conflicted
+    conflict_set = set(conflicted)
+    for source in sources:
+        if source["source_kind"] != "real_wiki" or not any(
+            doc["title"].casefold() in conflict_set
+            for doc in source["document_identities"]
+        ):
+            continue
+        source["split"] = "conflict"
+        source["cells"] = [
+            _cell(
+                cell["operation"],
+                "blocked_split_conflict",
+                reason="same Wiki page appears in train and eval snapshots",
+            )
+            for cell in source["cells"]
+        ]
+    return conflicted
+
+
 def _source_shape(facts: list[dict[str, Any]]) -> dict[str, Any]:
     """Record parsed dimensions without promoting them to semantic truth."""
     return {
@@ -207,10 +239,31 @@ def _probe_wiki(job: tuple[str, str, str, int]) -> tuple[str, dict[str, Any]]:
     }
 
 
-def _wiki_entries(root: Path, glob: str) -> tuple[list[dict[str, Any]], dict[str, str]]:
+def _wiki_entries(
+    root: Path, catalog: str | list[dict[str, str]]
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
     jobs = []
     bindings = {}
-    for pool_path in sorted(root.glob(glob)):
+    if isinstance(catalog, str):
+        paths = sorted(root.glob(catalog))
+    elif isinstance(catalog, list) and catalog:
+        paths = []
+        seen: set[str] = set()
+        for pin in catalog:
+            if not isinstance(pin, dict) or set(pin) != {"path", "sha256"}:
+                raise ValueError("Wiki source-pool pin is incomplete")
+            relative = pin["path"]
+            if relative in seen:
+                raise ValueError("duplicate Wiki source-pool pin")
+            seen.add(relative)
+            path = _path(root, relative)
+            if sha(path) != pin["sha256"]:
+                raise ValueError(f"Wiki source-pool pin changed: {relative}")
+            paths.append(path)
+        paths.sort()
+    else:
+        raise ValueError("Wiki source-pool catalog must be a glob or pinned list")
+    for pool_path in paths:
         relative = str(pool_path.relative_to(root))
         pool = _json(root, relative)
         if pool.get("schema") != "longworld.source-batch-pool.v2":
@@ -260,7 +313,8 @@ def route(config: dict[str, Any], root: Path, *, workers: int = 1) -> dict[str, 
     """Return a deterministic, source-deduplicated support matrix."""
     if config.get("schema") != SCHEMA or workers < 1:
         raise ValueError("invalid source router config or workers")
-    jobs, bindings = _wiki_entries(root, config["wiki_source_pool_glob"])
+    catalog = config.get("wiki_source_pools", config.get("wiki_source_pool_glob"))
+    jobs, bindings = _wiki_entries(root, catalog)
     prior = config["prior_source_manifest"]
     if sha(_path(root, prior["path"])) != prior["sha256"]:
         raise ValueError("prior source manifest pin mismatch")
@@ -453,6 +507,7 @@ def route(config: dict[str, Any], root: Path, *, workers: int = 1) -> dict[str, 
                 }
             )
 
+    document_split_conflicts = _block_page_split_conflicts(sources)
     ids = [source["world_group_id"] for source in sources]
     if len(ids) != len(set(ids)):
         raise ValueError("world group collision across frozen sources")
@@ -488,6 +543,7 @@ def route(config: dict[str, Any], root: Path, *, workers: int = 1) -> dict[str, 
         "wiki_pool_references": len(jobs),
         "wiki_unique_snapshots": len(grouped),
         "split_conflict_worlds": split_conflicts,
+        "document_split_conflict_titles": document_split_conflicts,
         "prior_index_novelty": {
             "wiki_worlds_already_indexed": sum(
                 bool(source["prior_indexed_operations"]) for source in wiki_sources

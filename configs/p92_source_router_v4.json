@@ -1,0 +1,88 @@
+{
+  "max_native_probe_bytes": 2000000,
+  "observed_receipts": {
+    "code": "reports/p64_codeforge_taskbank_inventory_20260909.json",
+    "finance": "data/candidates/p64_finance_taskbank_v2/BATCH_RECEIPT.json",
+    "paper": "data/candidates/p86_frozen_paper_batch_v2/manifest.json",
+    "rfc_hybrid": "data/candidates/p87_hybrid_rfc9114_pilot_v6/manifest.json"
+  },
+  "prior_candidate_index": {
+    "path": "data/candidates/p91_final_candidate_refs_v2/candidate_refs.jsonl",
+    "sha256": "1ba1fedbdcf466ed2ceb105c653813f98fcee56baf477f7301d63aaf8462b405"
+  },
+  "prior_source_manifest": {
+    "path": "data/p75_real_reader_candidates_v1/source_manifest.jsonl",
+    "sha256": "436bc1623736dbefe00afd5d9d582380805e619792367bef02f8354b015be270"
+  },
+  "schema": "longworld.p92-source-router.v1",
+  "wiki_source_pools": [
+    {
+      "path": "data/capability_records/p76_wiki_expansion_v1/source_pool.json",
+      "sha256": "e68eebe0b1e2157d5589e2aebd7460180514de920577087fee8bee7fe40fb741"
+    },
+    {
+      "path": "data/capability_records/p76_wiki_expansion_v2/source_pool.json",
+      "sha256": "85bf52678842d03babe2a61c5657b444292c392393c6cd48f5c74e7de3325c71"
+    },
+    {
+      "path": "data/capability_records/p76_wiki_expansion_v3/source_pool.json",
+      "sha256": "a31b1c4ded567ffe947c250ecbf45cac1481c168a2a38c682121cad97c632ff7"
+    },
+    {
+      "path": "data/capability_records/p78_wiki_topic_discovery_broad_v1/source_pool.json",
+      "sha256": "c5acd537c30a09bac21885af095f739b3463dfc273fd0f7e9721f89664ce2a13"
+    },
+    {
+      "path": "data/capability_records/p78_wiki_topic_discovery_pilot_v1/source_pool.json",
+      "sha256": "69ea01a46b40428a5ea9fcf2bcb6209595f4a99b52e218cbb1ff3a287565c9e8"
+    },
+    {
+      "path": "data/capability_records/p81_connected_wiki_auto_v1/source_pool.json",
+      "sha256": "fd869ab0a997bec74169b2ad7c339d7cd100fb4823ac39ddcf85f97adbc4ad5a"
+    },
+    {
+      "path": "data/capability_records/p81_connected_wiki_auto_v2/source_pool.json",
+      "sha256": "fd869ab0a997bec74169b2ad7c339d7cd100fb4823ac39ddcf85f97adbc4ad5a"
+    },
+    {
+      "path": "data/capability_records/p81_connected_wiki_auto_v3/source_pool.json",
+      "sha256": "fd869ab0a997bec74169b2ad7c339d7cd100fb4823ac39ddcf85f97adbc4ad5a"
+    },
+    {
+      "path": "data/capability_records/p82_connected_wiki_scale_v1/source_pool.json",
+      "sha256": "b3a49b18ae75aa41fc93a6f09ca4d83dfafd1e5fd05e3fd9660b8ca778b0ec0d"
+    },
+    {
+      "path": "data/capability_records/p82_wiki_anchor_bootstrap_v1/source_pool.json",
+      "sha256": "ce1d92e7b089e7926d65a2e4eab9382b51ab3e256e827df002c02ba77df0a87d"
+    },
+    {
+      "path": "data/capability_records/p82_wiki_anchor_join_pool_v1/source_pool.json",
+      "sha256": "7fe6a33423e2ae9ade1e2cd5808cfcb453a91e8bfea30d15e3931e6a94ead022"
+    },
+    {
+      "path": "data/capability_records/p82_wiki_new_anchor_join_v1/source_pool.json",
+      "sha256": "ce1d92e7b089e7926d65a2e4eab9382b51ab3e256e827df002c02ba77df0a87d"
+    },
+    {
+      "path": "data/capability_records/p82_wiki_preview_bootstrap_v2/source_pool.json",
+      "sha256": "ce1d92e7b089e7926d65a2e4eab9382b51ab3e256e827df002c02ba77df0a87d"
+    },
+    {
+      "path": "data/capability_records/p82_wiki_preview_bootstrap_v3/source_pool.json",
+      "sha256": "b3f0161b4c8efee83869794928f34ed327fd0a0e4a6293140ae5c066198a7b18"
+    },
+    {
+      "path": "data/capability_records/p83_frozen_wiki_row_index_v2/source_pool.json",
+      "sha256": "0feee72ed16e50cd76189993c3c7896020a5c0d4493ae99bee63b1f0fd095d06"
+    },
+    {
+      "path": "data/capability_records/p89_frozen_wiki_row_index_v1/source_pool.json",
+      "sha256": "ce1d92e7b089e7926d65a2e4eab9382b51ab3e256e827df002c02ba77df0a87d"
+    },
+    {
+      "path": "data/capability_records/p89_wiki_typed_lists_v1/source_pool.json",
+      "sha256": "8ce824bb1efd2ccb09cb94c5e87d02c2f56b5fc70e45fb09aa069b2a9dfa9a98"
+    }
+  ]
+}
