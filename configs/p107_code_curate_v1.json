@@ -1,0 +1,23 @@
+{
+  "schema": "longworld.p107-code-curation.v1.config",
+  "native_config": {
+    "path": "configs/p107_code_oxc_expansion_v1.json",
+    "sha256": "10842a899c51c4568a6593c1b3832fca000594cc6e6ffc7e372a1f675a6c8780"
+  },
+  "prior_native_manifest": {
+    "path": "data/candidates/p99_code_content_v4/manifest.json",
+    "sha256": "6d10615e98f61e07c1a67c3ea88916af3324519eef6989b25ac8ef43740e3b58"
+  },
+  "raw_native_manifest": {
+    "path": "data/candidates/p107_code_oxc_raw_v1/manifest.json",
+    "sha256": "ffdca4b286691f50809b31b8c81907cdbbcaf6b059508877b3ed22011ffcac5c"
+  },
+  "raw_unified_manifest": {
+    "path": "data/candidates/p107_code_oxc_unified_raw_v1/manifest.json",
+    "sha256": "1c9e28cf1f878e814d5240c2521b74f6fa7821235f5d568d6cadc05684e85f26"
+  },
+  "raw_all_mask_manifest": {
+    "path": "data/candidates/p107_code_oxc_unified_raw_mask_v1/manifest.json",
+    "sha256": "f63e7909c823848093468b0035b1b27b06dce483339db247ea92631cc67fd675"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": "longworld.p99-code-content.v1",
+  "min_evidence_span_tokens": 16384,
+  "max_chat_tokens": 262144,
+  "max_tasks_per_repository": 190,
+  "banks": [
+    {
+      "bank_root": "data/candidates/p64_codeforge_taskbank_v2/oxc",
+      "receipt_sha256": "d458cb35029bb8f43ed2a7fd19940936ab31aceb073930030ef9683112362a46",
+      "source_group_id": "https://github.com/oxc-project/oxc",
+      "split": "train"
+    }
+  ]
+}
