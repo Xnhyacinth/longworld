@@ -20,6 +20,13 @@ available pair combinations. The [capacity and four-process replay
 receipt](../data/capability_records/p107_code_parallel_replay_v1/manifest.json)
 has SHA-256 `2d7a866916b8c02df1acaea42f7b943d544c1524e5e911ce0bc2ccc994c5b9c7`.
 
+The reader's user message starts with the **question**, followed by
+`Source records:` and the long source context. The 16K gate and the
+17,191–75,856 token range below measure the distance **between the two
+selected added-code witnesses inside the source records**. They do not
+measure a last-evidence-to-trailing-query gap: there is no trailing query in
+this reader layout. Query placement remains the frozen P99 contract.
+
 P107 removed that per-repository cap for the **same frozen Oxc world** and
 ran the unchanged P99 compiler over all 190 PR pairs. It yielded 82 raw
 content-proven tasks and 108 rejected pairs: 99 lacked two distinct
@@ -60,9 +67,11 @@ retokenized and all assistant masks passed. No GPU job was run and
 This adds supervised examples inside **one** existing code world, not repo,
 domain, source-style or operation diversity. The content certificate only
 covers the specified whole-identifier grammar, two selected witnesses and
-one contiguous 16K raw-context window. It does not exclude an arbitrary
-semantic shortcut, multi-window retrieval or pretraining knowledge, and it
-does not prove model improvement. A separate Deno source bundle exists in
+one contiguous 16K raw-context window. The early question means this is
+distributed code-evidence integration rather than late-query retrieval. It
+does not exclude an arbitrary semantic shortcut, multi-window retrieval or
+pretraining knowledge, and it does not prove model improvement. A separate
+Deno source bundle exists in
 the older frozen inventory, but current source-role trust replay rejects its
 attestation; no Deno bank was constructed by bypassing that validation.
 Broader code-world scaling requires newly acquired, source-attested repo/PR
