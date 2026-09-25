@@ -1,5 +1,8 @@
 # P104 current candidate index and selected reader pack
 
+**Historical snapshot, superseded by P105.** The latest candidate index and
+selected pack are in [`p105_integrated_status.md`](p105_integrated_status.md).
+
 `data/candidates/p104_candidate_refs_v1` extends P103 only with the
 quality-curated P104 real-paper reference shard. The raw P104 three-task
 paper batch and the P104 Wiki grid audit are **not** indexed as admitted
