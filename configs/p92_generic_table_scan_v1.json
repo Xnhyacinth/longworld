@@ -1,0 +1,15 @@
+{
+  "schema": "longworld.p92-generic-table-scan.v1",
+  "source_pool": {
+    "path": "data/capability_records/p89_wiki_typed_lists_v1/source_pool.json",
+    "sha256": "8ce824bb1efd2ccb09cb94c5e87d02c2f56b5fc70e45fb09aa069b2a9dfa9a98"
+  },
+  "prior_task_audits": [
+    {
+      "path": "data/candidates/p76_wiki_table_scan_v2_parks/audit.jsonl",
+      "sha256": "293bd14c921c4d91390ee8ad19f863a5595af498979d26149e4e722c3d359161"
+    }
+  ],
+  "max_tasks_per_table": 4,
+  "max_full_tokens": 131072
+}
