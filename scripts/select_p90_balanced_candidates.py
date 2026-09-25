@@ -18,6 +18,7 @@ from typing import Any
 
 from longworld.synthesis.sharded_candidate_bank import verify_index
 from longworld.synthesis.unified_candidate_contract import physical_length_bin
+from longworld.synthesis.unified_candidate_merge import verify_merge
 
 SCHEMA = "longworld.balanced-candidate-selection.v1"
 ROOT = Path(__file__).resolve().parents[1]
@@ -308,6 +309,142 @@ def _code_content_eligible(
     }
 
 
+def _curated_code_membership(pin: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Bind expanded raw P99 proofs to the independently curated P107 subset."""
+    curated_path = _pinned_proof_path(pin["curated_manifest"])
+    mask_path = _pinned_proof_path(pin["curated_mask_manifest"])
+    prior_path = _pinned_proof_path(pin["prior_native_manifest"])
+    curated = verify_merge(curated_path.parent)
+    mask = json.loads(mask_path.read_text())
+    ledger_path = curated_path.parent / "quality_ledger.jsonl"
+    index_path = curated_path.parent / "sample_index.jsonl"
+    if (
+        curated.get("curation_schema") != "longworld.p107-code-curation.v1"
+        or curated.get("train_ready") is not False
+        or curated.get("raw_native_manifest_sha256") != pin["native_manifest"]["sha256"]
+        or curated.get("raw_unified_manifest_sha256")
+        != pin["unified_manifest"]["sha256"]
+        or curated.get("raw_all_mask_manifest_sha256") != pin["mask_manifest"]["sha256"]
+        or curated.get("prior_native_manifest_sha256")
+        != pin["prior_native_manifest"]["sha256"]
+        or _sha(prior_path) != curated["prior_native_manifest_sha256"]
+        or _sha(ledger_path) != curated.get("quality_ledger_sha256")
+        or mask.get("schema_version") != "longworld.unified-reader-mask-all.v1"
+        or mask.get("train_ready") is not False
+        or mask.get("source_manifest_sha256") != pin["curated_manifest"]["sha256"]
+        or mask.get("source_index_sha256")
+        != curated.get("files_sha256", {}).get("sample_index.jsonl")
+        or mask.get("audited_views") != curated.get("candidate_views")
+    ):
+        raise ValueError("P107 curator membership or mask differs")
+    members = {}
+    for line in index_path.read_text().splitlines():
+        row = json.loads(line)
+        sample_id = row["sample_id"]
+        if (
+            sample_id in members
+            or row.get("receipt_sha256") != pin["native_manifest"]["sha256"]
+        ):
+            raise ValueError("P107 curated task repeats or has wrong native receipt")
+        members[sample_id] = row
+    ledger = [json.loads(line) for line in ledger_path.read_text().splitlines()]
+    accepted = {
+        row["sample_id"]: row
+        for row in ledger
+        if row["status"] == "accepted_new_pr_pair"
+    }
+    if (
+        len(members) != curated["candidate_views"]
+        or len(accepted) != len(members)
+        or set(accepted) != set(members)
+        or len(ledger) != curated["gross_reader_views"]
+        or len(ledger) - len(accepted) != curated["rejected_prior_pr_pairs"]
+        or any(
+            accepted[sample_id][key] != row[key]
+            for sample_id, row in members.items()
+            for key in ("semantic_task_id", "source_group", "split")
+        )
+    ):
+        raise ValueError("P107 curated index and quality ledger disagree")
+    return members
+
+
+def _code_content_eligible_many(
+    entries: list[dict[str, Any]], pins: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Independently replay each raw proof package; reject unpinned receipts."""
+    if not isinstance(pins, list) or not pins:
+        raise ValueError("code-content proof packages must be a nonempty list")
+    if any(not isinstance(pin, dict) for pin in pins):
+        raise ValueError("code-content proof package must be an object")
+    curated_pins = [pin for pin in pins if "curated_manifest" in pin]
+    if not curated_pins or any(
+        not all(
+            key in pin
+            for key in (
+                "curated_manifest",
+                "curated_mask_manifest",
+                "prior_native_manifest",
+            )
+        )
+        for pin in curated_pins
+    ):
+        raise ValueError("expanded code-content proofs require curator membership")
+    prior_receipts = {pin["prior_native_manifest"]["sha256"] for pin in curated_pins}
+    by_receipt: dict[str, dict[str, Any]] = {}
+    for pin in pins:
+        if not isinstance(pin, dict) or "native_manifest" not in pin:
+            raise ValueError("code-content proof package lacks native receipt")
+        receipt = pin["native_manifest"]["sha256"]
+        if receipt in by_receipt:
+            raise ValueError("code-content proof package repeats native receipt")
+        if "curated_manifest" not in pin and receipt not in prior_receipts:
+            raise ValueError("new code-content receipt lacks curator membership")
+        by_receipt[receipt] = pin
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for entry in entries:
+        grouped[entry["candidate"].get("receipt_sha256", "")].append(entry)
+    eligible = []
+    reports = []
+    for receipt, pin in by_receipt.items():
+        raw_eligible, report = _code_content_eligible(grouped.pop(receipt, []), pin)
+        if "curated_manifest" in pin:
+            members = _curated_code_membership(pin)
+            kept = []
+            for entry in raw_eligible:
+                row = entry["candidate"]
+                member = members.get(row["sample_id"])
+                if member is None or any(
+                    member.get(key) != row.get(key)
+                    for key in (
+                        "semantic_task_id",
+                        "source_group",
+                        "split",
+                        "native_audit_ref",
+                        "receipt_sha256",
+                    )
+                ):
+                    continue
+                kept.append(entry)
+            report["curated_membership_views"] = len(kept)
+            report["excluded_outside_curated_subset"] = len(raw_eligible) - len(kept)
+            raw_eligible = kept
+        eligible.extend(raw_eligible)
+        reports.append(report)
+    tasks = [
+        (entry["candidate"]["source_group"], entry["candidate"]["semantic_task_id"])
+        for entry in eligible
+    ]
+    if len(tasks) != len(set(tasks)):
+        raise ValueError("code-content proof packages repeat a semantic task")
+    return eligible, {
+        "kind": "p99_added_code_multiple_proof_packages_v1",
+        "packages": reports,
+        "excluded_unpinned_receipt": sum(map(len, grouped.values())),
+        "content_backed_views": len(eligible),
+    }
+
+
 def _choose(
     entries: list[dict[str, Any]],
     *,
@@ -552,6 +689,7 @@ def select(
     max_supervised_tokens_by_kind: dict[str, int] | None = None,
     codeforge_proofs: list[dict[str, Any]] | None = None,
     code_content_proof: dict[str, Any] | None = None,
+    code_content_proofs: list[dict[str, Any]] | None = None,
     shared_world_rebalance: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     if (
@@ -589,6 +727,7 @@ def select(
                 or not 0 <= shared_world_rebalance["max_source_group_loss"] <= 5
             )
         )
+        or (code_content_proof is not None and code_content_proofs is not None)
     ):
         raise ValueError("new output, nonnegative seed and positive caps required")
     source = verify_index(index_dir)
@@ -618,7 +757,9 @@ def select(
     )
     if content_entries:
         content_eligible, content_gate = (
-            _code_content_eligible(content_entries, code_content_proof)
+            _code_content_eligible_many(content_entries, code_content_proofs)
+            if code_content_proofs is not None
+            else _code_content_eligible(content_entries, code_content_proof)
             if code_content_proof is not None
             else (
                 [],
@@ -709,6 +850,7 @@ def verify_selection(
     max_supervised_tokens_by_kind: dict[str, int] | None = None,
     codeforge_proofs: list[dict[str, Any]] | None = None,
     code_content_proof: dict[str, Any] | None = None,
+    code_content_proofs: list[dict[str, Any]] | None = None,
     shared_world_rebalance: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     stored = json.loads((output_dir / "manifest.json").read_text())
@@ -728,6 +870,7 @@ def verify_selection(
             max_supervised_tokens_by_kind=max_supervised_tokens_by_kind,
             codeforge_proofs=codeforge_proofs,
             code_content_proof=code_content_proof,
+            code_content_proofs=code_content_proofs,
             shared_world_rebalance=shared_world_rebalance,
         )
         if (
@@ -757,6 +900,7 @@ def main() -> None:
         "max_supervised_tokens_by_kind": config.get("max_supervised_tokens_by_kind"),
         "codeforge_proofs": config.get("codeforge_proofs"),
         "code_content_proof": config.get("code_content_proof"),
+        "code_content_proofs": config.get("code_content_proofs"),
         "shared_world_rebalance": config.get("shared_world_rebalance"),
     }
     result = (

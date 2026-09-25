@@ -212,3 +212,26 @@ def test_optional_shared_world_policy_is_verified_during_materialization(
         index, selection, config, output, max_seq_len=1000, verify_only=True
     )
     assert calls == [policy, policy]
+
+
+def test_multiple_code_proof_packages_are_reverified_during_materialization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    index, selection, config, _shard, _readers = _fixture(tmp_path, monkeypatch)
+    value = json.loads(config.read_text())
+    packages = [{"native_manifest": {"sha256": "prior"}}]
+    value["code_content_proofs"] = packages
+    config.write_text(json.dumps(value))
+    calls = []
+
+    def verify(_index: Path, _selection: Path, **kwargs: object) -> dict:
+        calls.append(kwargs["code_content_proofs"])
+        return json.loads((selection / "manifest.json").read_text())
+
+    monkeypatch.setattr(materialize, "verify_selection", verify)
+    output = tmp_path / "multi-proof"
+    materialize.run(index, selection, config, output, max_seq_len=1000)
+    materialize.run(
+        index, selection, config, output, max_seq_len=1000, verify_only=True
+    )
+    assert calls == [packages, packages]

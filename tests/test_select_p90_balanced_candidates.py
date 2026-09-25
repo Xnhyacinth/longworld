@@ -462,3 +462,157 @@ def test_p99_added_code_proof_gate_requires_pinned_positive_audit(
     audit_path.write_text(audit_path.read_text() + "{}\n")
     with pytest.raises(ValueError, match="CodeForge proof pin mismatch"):
         balanced._code_content_eligible([entry], pin)
+
+
+def test_multiple_code_proofs_reject_unpinned_and_uncurated_receipts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old = _entry("old", group="repo", task="old-task")
+    new = _entry("new", group="repo", task="new-task")
+    unknown = _entry("unknown", group="repo", task="unknown-task")
+    for entry, receipt in ((old, "prior"), (new, "expanded"), (unknown, "unknown")):
+        entry["candidate"].update(
+            receipt_sha256=receipt, source_kind="real_code_workflow"
+        )
+    prior = {"native_manifest": {"sha256": "prior"}}
+    expanded = {
+        "native_manifest": {"sha256": "expanded"},
+        "prior_native_manifest": {"sha256": "prior"},
+        "curated_manifest": {"sha256": "curated"},
+        "curated_mask_manifest": {"sha256": "mask"},
+    }
+    monkeypatch.setattr(
+        balanced,
+        "_code_content_eligible",
+        lambda rows, pin: (
+            rows,
+            {"proof_pin": pin, "counts": {"content_backed_views": len(rows)}},
+        ),
+    )
+    monkeypatch.setattr(
+        balanced,
+        "_curated_code_membership",
+        lambda _pin: {
+            "new": {
+                key: new["candidate"].get(key)
+                for key in (
+                    "semantic_task_id",
+                    "source_group",
+                    "split",
+                    "native_audit_ref",
+                    "receipt_sha256",
+                )
+            }
+        },
+    )
+    eligible, receipt = balanced._code_content_eligible_many(
+        [old, new, unknown], [prior, expanded]
+    )
+    assert eligible == [old, new]
+    assert receipt["excluded_unpinned_receipt"] == 1
+    assert receipt["content_backed_views"] == 2
+
+    with pytest.raises(ValueError, match="curator membership"):
+        balanced._code_content_eligible_many(
+            [old, new], [prior, {"native_manifest": {"sha256": "expanded"}}]
+        )
+    with pytest.raises(ValueError, match="repeats native receipt"):
+        balanced._code_content_eligible_many([old], [prior, expanded, expanded])
+
+
+def test_multiple_code_proofs_filter_raw_task_outside_curator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prior = {"native_manifest": {"sha256": "prior"}}
+    expanded = {
+        "native_manifest": {"sha256": "expanded"},
+        "prior_native_manifest": {"sha256": "prior"},
+        "curated_manifest": {"sha256": "curated"},
+        "curated_mask_manifest": {"sha256": "mask"},
+    }
+    raw_only = _entry("raw-only", group="repo", task="raw-only")
+    raw_only["candidate"]["receipt_sha256"] = "expanded"
+    monkeypatch.setattr(
+        balanced, "_code_content_eligible", lambda rows, pin: (rows, {"proof_pin": pin})
+    )
+    monkeypatch.setattr(balanced, "_curated_code_membership", lambda _pin: {})
+    eligible, receipt = balanced._code_content_eligible_many(
+        [raw_only], [prior, expanded]
+    )
+    assert eligible == []
+    assert receipt["packages"][1]["excluded_outside_curated_subset"] == 1
+
+
+def test_curated_code_membership_rejects_quality_ledger_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(balanced, "ROOT", tmp_path)
+    curated_dir = tmp_path / "curated"
+    curated_dir.mkdir()
+    prior = tmp_path / "prior.json"
+    prior.write_text("{}\n")
+    index = curated_dir / "sample_index.jsonl"
+    row = {
+        "sample_id": "new",
+        "semantic_task_id": "task",
+        "source_group": "repo",
+        "split": "train",
+        "receipt_sha256": "raw-native",
+    }
+    index.write_text(json.dumps(row) + "\n")
+    ledger = curated_dir / "quality_ledger.jsonl"
+    ledger.write_text(json.dumps({**row, "status": "accepted_new_pr_pair"}) + "\n")
+    curated = {
+        "curation_schema": "longworld.p107-code-curation.v1",
+        "train_ready": False,
+        "raw_native_manifest_sha256": "raw-native",
+        "raw_unified_manifest_sha256": "raw-unified",
+        "raw_all_mask_manifest_sha256": "raw-mask",
+        "prior_native_manifest_sha256": hashlib.sha256(prior.read_bytes()).hexdigest(),
+        "quality_ledger_sha256": hashlib.sha256(ledger.read_bytes()).hexdigest(),
+        "files_sha256": {
+            "sample_index.jsonl": hashlib.sha256(index.read_bytes()).hexdigest()
+        },
+        "candidate_views": 1,
+        "gross_reader_views": 1,
+        "rejected_prior_pr_pairs": 0,
+    }
+    manifest = curated_dir / "manifest.json"
+    manifest.write_text(json.dumps(curated) + "\n")
+    mask = curated_dir / "mask.json"
+    mask.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.unified-reader-mask-all.v1",
+                "train_ready": False,
+                "source_manifest_sha256": hashlib.sha256(
+                    manifest.read_bytes()
+                ).hexdigest(),
+                "source_index_sha256": curated["files_sha256"]["sample_index.jsonl"],
+                "audited_views": 1,
+            }
+        )
+        + "\n"
+    )
+    monkeypatch.setattr(balanced, "verify_merge", lambda _path: curated)
+    pin = {
+        "native_manifest": {"sha256": "raw-native"},
+        "unified_manifest": {"sha256": "raw-unified"},
+        "mask_manifest": {"sha256": "raw-mask"},
+        "curated_manifest": {
+            "path": "curated/manifest.json",
+            "sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+        },
+        "curated_mask_manifest": {
+            "path": "curated/mask.json",
+            "sha256": hashlib.sha256(mask.read_bytes()).hexdigest(),
+        },
+        "prior_native_manifest": {
+            "path": "prior.json",
+            "sha256": hashlib.sha256(prior.read_bytes()).hexdigest(),
+        },
+    }
+    assert balanced._curated_code_membership(pin) == {"new": row}
+    ledger.write_text("{}\n")
+    with pytest.raises(ValueError, match="curator membership"):
+        balanced._curated_code_membership(pin)

@@ -65,6 +65,7 @@ def _selected(
         max_supervised_tokens_by_kind=config.get("max_supervised_tokens_by_kind"),
         codeforge_proofs=config["codeforge_proofs"],
         code_content_proof=config.get("code_content_proof"),
+        code_content_proofs=config.get("code_content_proofs"),
         shared_world_rebalance=config.get("shared_world_rebalance"),
     )
     selection = json.loads((selection_dir / "manifest.json").read_text())
