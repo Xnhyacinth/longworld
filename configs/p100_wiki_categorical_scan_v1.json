@@ -1,0 +1,9 @@
+{
+  "schema": "longworld.p100-wiki-categorical-scan.v1",
+  "source_pool": {
+    "path": "data/capability_records/p97_wiki_gated_delta_v1/source_pool.json",
+    "sha256": "094353d647ae888821ede5683fd912d125f336018317ffc9364b40b7cd840268"
+  },
+  "max_tasks_per_table": 6,
+  "max_full_tokens": 131072
+}
