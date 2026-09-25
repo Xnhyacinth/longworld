@@ -187,3 +187,28 @@ def test_rejects_selection_without_pinned_codeforge_gate(
     config.write_text(json.dumps(value))
     with pytest.raises(ValueError, match="CodeForge proof gate"):
         materialize.run(index, selection, config, tmp_path / "unqualified")
+
+
+def test_optional_shared_world_policy_is_verified_during_materialization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    index, selection, config, _shard, _readers = _fixture(tmp_path, monkeypatch)
+    policy = {"max_source_group_loss": 5}
+    value = json.loads(config.read_text())
+    value["shared_world_rebalance"] = policy
+    config.write_text(json.dumps(value))
+    calls = []
+
+    def verify(_index: Path, _selection: Path, **kwargs: object) -> dict:
+        calls.append(kwargs["shared_world_rebalance"])
+        if kwargs["shared_world_rebalance"] != policy:
+            raise ValueError("shared-world policy was not verified")
+        return json.loads((selection / "manifest.json").read_text())
+
+    monkeypatch.setattr(materialize, "verify_selection", verify)
+    output = tmp_path / "shared"
+    materialize.run(index, selection, config, output, max_seq_len=1000)
+    materialize.run(
+        index, selection, config, output, max_seq_len=1000, verify_only=True
+    )
+    assert calls == [policy, policy]

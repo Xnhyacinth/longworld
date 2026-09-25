@@ -189,6 +189,93 @@ def test_select_replays_exact_bytes_and_detects_selected_ref_change(
         balanced.verify_selection(index, first, **kwargs)
 
 
+def test_optional_shared_world_rebalance_completes_second_operation_and_replays(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = _entry("first-join", group="first", task="join")
+    second = _entry(
+        "first-aggregate", group="first", task="aggregate", operation="aggregate"
+    )
+    donor_id = min(
+        (f"donor-{number}" for number in range(100)),
+        key=lambda sample: balanced._tie(
+            _entry(sample, group="donor", task="donor", operation="aggregate"), 94
+        ),
+    )
+    donor = _entry(donor_id, group="donor", task="donor", operation="aggregate")
+    # The donor wins the aggregate cell's original tie, leaving the first
+    # group with one selected operation and one proof-eligible completion.
+    assert balanced._tie(donor, 94) < balanced._tie(second, 94)
+    index = _index(tmp_path, monkeypatch, [first, second, donor])
+    kwargs = {
+        "seed": 94,
+        "max_per_group": 2,
+        "max_per_cell": 1,
+        "max_per_kind_by_split": {"train": 2, "eval": 1},
+    }
+    baseline = balanced.select(index, tmp_path / "baseline", **kwargs)
+    policy = {"max_source_group_loss": 1}
+    report = balanced.select(
+        index,
+        tmp_path / "shared",
+        **kwargs,
+        shared_world_rebalance=policy,
+    )
+    arm = report["shared_world_rebalance"]
+    assert baseline["after"]["source_groups"] == 2
+    assert report["after"]["source_groups"] == 1
+    assert arm["before_multiop_by_kind"] == {}
+    assert arm["after_multiop_by_kind"] == {"real_wiki": 1}
+    assert (arm["before_multiop_groups"], arm["after_multiop_groups"]) == (0, 1)
+    assert arm["before_rebalance"] == baseline["after"]
+    assert arm["swaps"] == [
+        {
+            "from_sample_id": donor_id,
+            "to_sample_id": "first-aggregate",
+            "cell": "train|real_wiki|aggregate|lt32k",
+            "source_group": "first",
+        }
+    ]
+    assert all(arm["histogram_invariants"].values())
+    assert report["after"]["by_cell"] == baseline["after"]["by_cell"]
+    assert (
+        balanced.verify_selection(
+            index,
+            tmp_path / "shared",
+            **kwargs,
+            shared_world_rebalance=policy,
+        )
+        == report
+    )
+    with pytest.raises(ValueError, match="selection differs"):
+        balanced.verify_selection(index, tmp_path / "shared", **kwargs)
+
+
+def test_shared_world_rebalance_respects_group_and_token_caps() -> None:
+    first = _entry("first-join", group="first", task="join")
+    second = _entry(
+        "first-aggregate", group="first", task="aggregate", operation="aggregate"
+    )
+    second["candidate"]["supervised_tokens"] = 11
+    second["candidate"]["input_tokens"] = 99
+    donor = _entry("donor", group="donor", task="donor", operation="aggregate")
+    eligible = [first, second, donor]
+    baseline = [first, donor]
+    for group_cap, token_cap, group_loss in ((1, 100, 1), (2, 20, 1), (2, 100, 0)):
+        selected, receipt = balanced._rebalance_shared_world(
+            eligible,
+            baseline,
+            seed=94,
+            max_per_group=group_cap,
+            max_per_cell=1,
+            max_per_kind_by_split={"train": 2, "eval": 1},
+            max_supervised_tokens_by_kind={"real_wiki": token_cap},
+            max_source_group_loss=group_loss,
+        )
+        assert selected == baseline
+        assert receipt["swaps"] == []
+
+
 def test_pinned_codeforge_proof_gate_keeps_only_content_backed_views(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

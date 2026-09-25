@@ -368,6 +368,179 @@ def _choose(
     return selected
 
 
+def _multiop_groups(entries: list[dict[str, Any]]) -> dict[str, int]:
+    operations: dict[tuple[str, str], set[str]] = defaultdict(set)
+    for entry in entries:
+        operations[_group(entry)].add(entry["candidate"]["operation"])
+    return dict(
+        sorted(
+            Counter(
+                kind for (kind, _), values in operations.items() if len(values) > 1
+            ).items()
+        )
+    )
+
+
+def _rebalance_shared_world(
+    eligible: list[dict[str, Any]],
+    baseline: list[dict[str, Any]],
+    *,
+    seed: int,
+    max_per_group: int,
+    max_per_cell: int,
+    max_per_kind_by_split: dict[str, int],
+    max_supervised_tokens_by_kind: dict[str, int] | None,
+    max_source_group_loss: int,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Complete a second operation in selected worlds by same-cell swaps."""
+    rows = list(baseline)
+    before = _coverage(rows)
+    chosen_ids = {_key(entry) for entry in rows}
+    chosen_tasks = {_task(entry) for entry in rows}
+    group_counts = Counter(_group(entry) for entry in rows)
+    domain_counts = Counter(entry["candidate"]["domain"] for entry in rows)
+    topic_counts = Counter(entry["candidate"]["topic"] for entry in rows)
+    kind_tokens = Counter()
+    for entry in rows:
+        kind_tokens[entry["candidate"]["source_kind"]] += entry["candidate"][
+            "supervised_tokens"
+        ]
+    token_caps = max_supervised_tokens_by_kind or {}
+    available_ops: dict[tuple[str, str], set[str]] = defaultdict(set)
+    by_cell: dict[tuple[str, str, str, str], list[dict[str, Any]]] = defaultdict(list)
+    for entry in eligible:
+        available_ops[_group(entry)].add(entry["candidate"]["operation"])
+        by_cell[_cell(entry)].append(entry)
+    for candidates in by_cell.values():
+        candidates.sort(key=lambda entry: (_tie(entry, seed), _key(entry)))
+    swaps = []
+    while True:
+        group_ops: dict[tuple[str, str], Counter[str]] = defaultdict(Counter)
+        donors: dict[tuple[str, str, str, str], list[tuple[int, dict[str, Any]]]] = (
+            defaultdict(list)
+        )
+        for rank, entry in enumerate(rows):
+            group_ops[_group(entry)][entry["candidate"]["operation"]] += 1
+            donors[_cell(entry)].append((rank, entry))
+        best = None
+        for cell, candidates in sorted(by_cell.items()):
+            for added in candidates:
+                group = _group(added)
+                if (
+                    group not in group_counts
+                    or len(group_ops[group]) != 1
+                    or added["candidate"]["operation"] in group_ops[group]
+                    or group_counts[group] >= max_per_group
+                    or _key(added) in chosen_ids
+                    or _task(added) in chosen_tasks
+                ):
+                    continue
+                for rank, removed in donors[cell]:
+                    old_group = _group(removed)
+                    old_op = removed["candidate"]["operation"]
+                    if old_group == group or (
+                        group_counts[old_group] == 1
+                        and len(group_counts)
+                        <= before["source_groups"] - max_source_group_loss
+                    ):
+                        continue
+                    if (
+                        len(group_ops[old_group]) == 2
+                        and group_ops[old_group][old_op] == 1
+                    ):
+                        continue
+                    if (
+                        domain_counts[removed["candidate"]["domain"]] == 1
+                        and removed["candidate"]["domain"]
+                        != added["candidate"]["domain"]
+                    ) or (
+                        topic_counts[removed["candidate"]["topic"]] == 1
+                        and removed["candidate"]["topic"] != added["candidate"]["topic"]
+                    ):
+                        continue
+                    if kind_tokens[cell[1]] - removed["candidate"][
+                        "supervised_tokens"
+                    ] + added["candidate"]["supervised_tokens"] > token_caps.get(
+                        cell[1], float("inf")
+                    ):
+                        continue
+                    score = (
+                        group_counts[old_group] == 1,
+                        -len(available_ops[group]),
+                        _tie(added, seed),
+                        _key(added),
+                        _tie(removed, seed),
+                        _key(removed),
+                    )
+                    if best is None or score < best[0]:
+                        best = (score, rank, removed, added)
+        if best is None:
+            break
+        _, rank, removed, added = best
+        rows[rank] = added
+        swaps.append(
+            {
+                "from_sample_id": _key(removed),
+                "to_sample_id": _key(added),
+                "cell": "|".join(_cell(added)),
+                "source_group": added["candidate"]["source_group"],
+            }
+        )
+        chosen_ids.remove(_key(removed))
+        chosen_ids.add(_key(added))
+        chosen_tasks.remove(_task(removed))
+        chosen_tasks.add(_task(added))
+        group_counts[_group(removed)] -= 1
+        if group_counts[_group(removed)] == 0:
+            del group_counts[_group(removed)]
+        group_counts[_group(added)] += 1
+        domain_counts[removed["candidate"]["domain"]] -= 1
+        domain_counts[added["candidate"]["domain"]] += 1
+        topic_counts[removed["candidate"]["topic"]] -= 1
+        topic_counts[added["candidate"]["topic"]] += 1
+        kind_tokens[_cell(added)[1]] += (
+            added["candidate"]["supervised_tokens"]
+            - removed["candidate"]["supervised_tokens"]
+        )
+    _validate_entries(rows)
+    after = _coverage(rows)
+    histograms = ("by_cell", "by_split", "by_source_kind", "by_operation", "by_length")
+    invariants = {name: before[name] == after[name] for name in histograms}
+    if (
+        not all(invariants.values())
+        or len(rows) != len(chosen_ids)
+        or len(rows) != len(chosen_tasks)
+        or after["source_groups"] < before["source_groups"] - max_source_group_loss
+        or set(after["by_domain"]) != set(before["by_domain"])
+        or set(after["by_topic"]) != set(before["by_topic"])
+        or any(value > max_per_group for value in group_counts.values())
+        or any(value > max_per_cell for value in after["by_cell"].values())
+        or any(
+            count > max_per_kind_by_split[split]
+            for (split, _kind), count in Counter(
+                (entry["candidate"]["split"], entry["candidate"]["source_kind"])
+                for entry in rows
+            ).items()
+        )
+        or any(kind_tokens[kind] > cap for kind, cap in token_caps.items())
+    ):
+        raise ValueError("shared-world rebalance violated selection constraints")
+    return rows, {
+        "policy": "same_cell_multi_operation_completion_v1",
+        "max_source_group_loss": max_source_group_loss,
+        "before_rebalance": before,
+        "before_source_groups": before["source_groups"],
+        "after_source_groups": after["source_groups"],
+        "before_multiop_by_kind": _multiop_groups(baseline),
+        "after_multiop_by_kind": _multiop_groups(rows),
+        "before_multiop_groups": sum(_multiop_groups(baseline).values()),
+        "after_multiop_groups": sum(_multiop_groups(rows).values()),
+        "histogram_invariants": invariants,
+        "domain_topic_label_sets_preserved": True,
+        "swaps": swaps,
+    }
+
+
 def select(
     index_dir: Path,
     output_dir: Path,
@@ -379,6 +552,7 @@ def select(
     max_supervised_tokens_by_kind: dict[str, int] | None = None,
     codeforge_proofs: list[dict[str, Any]] | None = None,
     code_content_proof: dict[str, Any] | None = None,
+    shared_world_rebalance: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     if (
         output_dir.exists()
@@ -404,6 +578,15 @@ def select(
                     or cap < 1
                     for kind, cap in max_supervised_tokens_by_kind.items()
                 )
+            )
+        )
+        or (
+            shared_world_rebalance is not None
+            and (
+                not isinstance(shared_world_rebalance, dict)
+                or set(shared_world_rebalance) != {"max_source_group_loss"}
+                or type(shared_world_rebalance["max_source_group_loss"]) is not int
+                or not 0 <= shared_world_rebalance["max_source_group_loss"] <= 5
             )
         )
     ):
@@ -455,6 +638,18 @@ def select(
         max_per_kind_by_split=max_per_kind_by_split,
         max_supervised_tokens_by_kind=max_supervised_tokens_by_kind,
     )
+    rebalance_report = None
+    if shared_world_rebalance is not None:
+        selected, rebalance_report = _rebalance_shared_world(
+            eligible,
+            selected,
+            seed=seed,
+            max_per_group=max_per_group,
+            max_per_cell=max_per_cell,
+            max_per_kind_by_split=max_per_kind_by_split,
+            max_supervised_tokens_by_kind=max_supervised_tokens_by_kind,
+            max_source_group_loss=shared_world_rebalance["max_source_group_loss"],
+        )
     output_dir.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix="p90-balanced-", dir=output_dir.parent
@@ -491,6 +686,9 @@ def select(
                 else {}
             ),
             "after": _coverage(selected),
+            **(
+                {"shared_world_rebalance": rebalance_report} if rebalance_report else {}
+            ),
             "selected_refs_sha256": _sha(selected_path),
             "selection_scope": "candidate_only_source_aware_balancing",
             "train_ready": False,
@@ -511,6 +709,7 @@ def verify_selection(
     max_supervised_tokens_by_kind: dict[str, int] | None = None,
     codeforge_proofs: list[dict[str, Any]] | None = None,
     code_content_proof: dict[str, Any] | None = None,
+    shared_world_rebalance: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     stored = json.loads((output_dir / "manifest.json").read_text())
     if stored.get("selected_refs_sha256") != _sha(output_dir / "selected_refs.jsonl"):
@@ -529,6 +728,7 @@ def verify_selection(
             max_supervised_tokens_by_kind=max_supervised_tokens_by_kind,
             codeforge_proofs=codeforge_proofs,
             code_content_proof=code_content_proof,
+            shared_world_rebalance=shared_world_rebalance,
         )
         if (
             rebuilt != stored
@@ -557,6 +757,7 @@ def main() -> None:
         "max_supervised_tokens_by_kind": config.get("max_supervised_tokens_by_kind"),
         "codeforge_proofs": config.get("codeforge_proofs"),
         "code_content_proof": config.get("code_content_proof"),
+        "shared_world_rebalance": config.get("shared_world_rebalance"),
     }
     result = (
         verify_selection(index_dir, args.output, **kwargs)
