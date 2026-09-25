@@ -1,4 +1,4 @@
-"""Normalize verified P86 paper and state readers into one small candidate shard.
+"""Normalize verified native readers into one small candidate shard.
 
 This does not promote training eligibility. Native audits remain sidecars;
 the model-visible export contains only sample_id and two messages.
@@ -236,12 +236,70 @@ def _hybrid(hybrid_dir: Path) -> Iterator[tuple[Any, dict[str, Any], str]]:
         raise ValueError("hybrid native row counts disagree")
 
 
+def _wiki_numeric(directory: Path) -> Iterator[tuple[Any, dict[str, Any], str]]:
+    manifest_path = directory / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    if manifest.get("schema") != "longworld.p91-wiki-numeric-table.v1.result":
+        raise ValueError("wrong Wiki numeric native schema")
+    _verified_files(directory, manifest)
+    readers = _rows(directory / "train.jsonl")
+    audits = _rows(directory / "audit.jsonl")
+    count = 0
+    tasks: set[str] = set()
+    for index in _rows(directory / "sample_index.jsonl"):
+        reader = next(readers, None)
+        audit = next(audits, None)
+        if reader is None or audit is None:
+            raise ValueError("Wiki numeric reader or audit is missing")
+        sample_id = index["example_id"]
+        answer = json.loads(reader["messages"][1]["content"])
+        rows = audit.get("candidate_rows", [])
+        if (
+            reader.get("sample_id") != sample_id
+            or audit.get("example_id") != sample_id
+            or audit.get("answer") != answer
+            or index["split"] != "train"
+            or index["operation"] != "closed_numeric_table_interval"
+            or index.get("task_type") != index["operation"]
+            or len(rows) != index["candidate_rows"]
+            or sum(bool(row["selected"]) for row in rows) != index["selected_rows"]
+            or not audit.get("intervention", {}).get("hit_answer")
+            or audit["intervention"]["hit_answer"] == answer
+        ):
+            raise ValueError("Wiki numeric index, reader or evidence disagree")
+        binding = AdapterBinding(
+            source_kind="real_wiki",
+            source_group=index["source_group"],
+            domain=index["domain"],
+            topic=index["topic"],
+            operation=index["operation"],
+            evidence_profile="closed_numeric_table_all_rows_replayed",
+            tokenizer_profile="pinned-chat-template",
+            receipt_path=manifest_path,
+            receipt_sha256=_sha(manifest_path),
+        )
+        candidate = normalize_native_candidate(
+            index, reader, binding, context_text=_context(reader["messages"])
+        )
+        tasks.add(candidate.semantic_task_id)
+        count += 1
+        yield candidate, reader, f"{directory}/train.jsonl:{count - 1}"
+    if (
+        count != manifest["candidate_views"]
+        or len(tasks) != manifest["independent_tasks"]
+        or next(readers, None) is not None
+        or next(audits, None) is not None
+    ):
+        raise ValueError("Wiki numeric native row counts disagree")
+
+
 def build(
     paper_dir: Path,
     state_dir: Path,
     output: Path,
     *,
     hybrid_dir: Path | None = None,
+    wiki_numeric_dir: Path | None = None,
 ) -> dict[str, Any]:
     if output.exists():
         raise ValueError("canonical P86 output must be new")
@@ -263,6 +321,8 @@ def build(
             lanes = [("paper_p86", _paper(paper_dir)), ("state_p86", _state(state_dir))]
             if hybrid_dir is not None:
                 lanes.append(("hybrid_p87", _hybrid(hybrid_dir)))
+            if wiki_numeric_dir is not None:
+                lanes.append(("wiki_numeric_p91", _wiki_numeric(wiki_numeric_dir)))
             for lane, iterator in lanes:
                 for candidate, reader, ref in iterator:
                     ledger.add(candidate)
@@ -309,6 +369,15 @@ def build(
                     if hybrid_dir is not None
                     else {}
                 ),
+                **(
+                    {
+                        "wiki_numeric_manifest_sha256": _sha(
+                            wiki_numeric_dir / "manifest.json"
+                        )
+                    }
+                    if wiki_numeric_dir is not None
+                    else {}
+                ),
             },
             "files_sha256": {
                 name: _sha(temp / name)
@@ -333,6 +402,7 @@ def verify(
     output: Path,
     *,
     hybrid_dir: Path | None = None,
+    wiki_numeric_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Recompile from the pinned native lanes and compare final reader hashes."""
     stored = verify_merge(output)
@@ -340,7 +410,11 @@ def verify(
         prefix="p86-unified-replay-", dir=output.parent
     ) as raw:
         rebuilt = build(
-            paper_dir, state_dir, Path(raw) / "merged", hybrid_dir=hybrid_dir
+            paper_dir,
+            state_dir,
+            Path(raw) / "merged",
+            hybrid_dir=hybrid_dir,
+            wiki_numeric_dir=wiki_numeric_dir,
         )
         if rebuilt != stored:
             raise ValueError("P86 unified shard differs from native replay")
@@ -352,14 +426,25 @@ def main() -> None:
     parser.add_argument("--paper-dir", type=Path, required=True)
     parser.add_argument("--state-dir", type=Path, required=True)
     parser.add_argument("--hybrid-dir", type=Path)
+    parser.add_argument("--wiki-numeric-dir", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args()
     result = (
-        verify(args.paper_dir, args.state_dir, args.output, hybrid_dir=args.hybrid_dir)
+        verify(
+            args.paper_dir,
+            args.state_dir,
+            args.output,
+            hybrid_dir=args.hybrid_dir,
+            wiki_numeric_dir=args.wiki_numeric_dir,
+        )
         if args.verify_only
         else build(
-            args.paper_dir, args.state_dir, args.output, hybrid_dir=args.hybrid_dir
+            args.paper_dir,
+            args.state_dir,
+            args.output,
+            hybrid_dir=args.hybrid_dir,
+            wiki_numeric_dir=args.wiki_numeric_dir,
         )
     )
     print(json.dumps(result, sort_keys=True))

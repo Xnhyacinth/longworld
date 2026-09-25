@@ -1,0 +1,17 @@
+{
+  "schema": "longworld.p91-wiki-numeric-table.v1",
+  "source_snapshot": {
+    "path": "data/capability_records/p89_wiki_typed_lists_v1/snapshots/wiki_skyscrapers_p89_01_snapshot.json",
+    "sha256": "595143faa7617c14c45af7319f2b35a792cbaf12be542a7363e45d36d92a9c1c"
+  },
+  "table_shape": {
+    "heading": "## Current tallest buildings",
+    "header": "Rank | Name | Image | Location | Height | Floors | Year",
+    "next_heading": "## Under construction"
+  },
+  "split": "train",
+  "domain": "architecture",
+  "topic": "tallest_buildings",
+  "intervals": [[80, 100], [90, 130], [70, 80]],
+  "max_full_tokens": 65536
+}
