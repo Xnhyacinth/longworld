@@ -1,5 +1,8 @@
 # P105 current candidate index and selected reader pack
 
+**Historical snapshot, superseded by P106.** The latest candidate index and
+selected pack are in [`p106_integrated_status.md`](p106_integrated_status.md).
+
 `data/candidates/p105_candidate_refs_v1` extends the P104 curated bank with
 the 25 P105 exact-revision Wiki table tasks. It includes only P105 native v3,
 whose source chain, complete-table answers, reader-cell interventions and
