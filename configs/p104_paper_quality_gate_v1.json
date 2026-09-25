@@ -1,0 +1,23 @@
+{
+  "schema": "longworld.p104-paper-quality-gate.v1.config",
+  "discovery_manifest": {
+    "path": "data/capability_records/p104_paper_source_discovery_v1/manifest.json",
+    "sha256": "fc2d5aa666e427356e9dafe623d64e819d86e3d1e6e8f04c286ca9a6400a02d7"
+  },
+  "native_manifest": {
+    "path": "data/candidates/p104_paper_reference_native_v1/manifest.json",
+    "sha256": "1bb8076296cb5f96be9d8a8eb89b9557ea6440061285206dfc2cd5de771710e1"
+  },
+  "native_mask": {
+    "path": "data/candidates/p104_paper_reference_native_v1/mask_audit.json",
+    "sha256": "c37436e7e8faa12b51b24332fbd0989882ca2c5624e8cd1fab6b5ab016d4268a"
+  },
+  "unified_manifest": {
+    "path": "data/candidates/p104_paper_reference_unified_v1/manifest.json",
+    "sha256": "49fcf923a84fc98d4605c268497b6dc1cd2be2c761156ba8e2ab85e2f4697da1"
+  },
+  "unified_mask": {
+    "path": "data/candidates/p104_paper_reference_mask_v1/manifest.json",
+    "sha256": "540d59a17bf7499703aaaca378a3a1afaf3f282c6a7316519bedaf54fe1ddb01"
+  }
+}
