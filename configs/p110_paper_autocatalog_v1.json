@@ -1,0 +1,30 @@
+{
+  "schema": "longworld.p110-paper-autocatalog.v1.config",
+  "taxonomy_url": "https://arxiv.org/category_taxonomy",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "content_use": "local_research_only_no_redistribution",
+  "queries": 30,
+  "max_per_group": 4,
+  "shard_size": 10,
+  "page_size": 100,
+  "request_interval_seconds": 3.2,
+  "frozen_inventory_root": "data/source_inventory",
+  "prior_catalog_config": {
+    "path": "configs/p105_paper_catalog_v1.json",
+    "sha256": "e372104cd0c8beb5a85333ae8bec374865f54ef27bb88969ad19e3ff040bfda3"
+  },
+  "prior_source_configs": [
+    {
+      "path": "configs/p86_frozen_paper_batch_v2.json",
+      "sha256": "e01b869098660032cdd7b07d8ab79151a15b7e0a60039a343d4532089fa59ed7"
+    },
+    {
+      "path": "data/capability_records/p104_paper_source_discovery_v1/source_config.json",
+      "sha256": "f295b451fed6267449da0255adef9aa197e0425ae685e7e9c6b4893ad7025ff3"
+    }
+  ],
+  "prior_candidate_index": {
+    "path": "data/candidates/p109_candidate_refs_v1/manifest.json",
+    "sha256": "05873d2a585e2962db54bfe9e5711ffa8592b882ff8ef4c964dc6decd06975c3"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "longworld.p110-paper-target-resample.v1.config",
+  "probe_config": {
+    "path": "configs/p110_paper_probe_v1.json",
+    "sha256": "8336749bfbc3f32825d3a35ba87dabecaeb43c9cafa93b77ffc7009f01f393d6"
+  },
+  "probe_manifest": {
+    "path": "data/capability_records/p110_paper_probe_v1/probe_manifest.json",
+    "sha256": "95f8790185dd6fc4519d4ace846e2756e1c2643a51d046c7148973d97bd0fcd0"
+  },
+  "quality_config": {
+    "path": "configs/p110_paper_reference_quality_v1.json",
+    "sha256": "c957697c51d7f9103c5b5d2375b92e14eac9e640da94aa5e7650241c1a619d60"
+  }
+}
