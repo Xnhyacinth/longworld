@@ -1,5 +1,9 @@
 # P107 candidate index and selected reader pack
 
+Historical snapshot: P108 adds separately verified Oxc content tasks and two
+remote-selector Wiki tasks; see `.hl/p108_integrated_status.md` for the later
+index and candidate selection arm.
+
 `data/candidates/p107_candidate_refs_v1` adds the eight P105 multi-category
 arXiv raw-TeX tasks to the P106 bank. The paper shard passed its frozen-source,
 source/reader quality, and shared all-reader mask receipts (8/8). The complete
@@ -13,6 +17,10 @@ simulation, 2,647 real Wiki, 2,314 real finance, 881 real code workflow,
 labels and 123 operation strings measure metadata coverage, not 111 distinct
 semantic world mechanisms. Views include physical-length alternatives and
 must not be counted as independent tasks.
+Among the 1,389 typed groups, 370 expose more than one operation string:
+332 controlled simulation, 18 real Wiki, nine real code, eight real finance,
+two grounded simulation and one real paper source. Most shared-world
+multi-operation coverage is still synthetic.
 
 `configs/p107_balanced_selection_v1.json` applies the P106 source-aware caps
 to the enlarged index. It selects **967 independent tasks** (684 train,
