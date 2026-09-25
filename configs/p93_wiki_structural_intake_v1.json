@@ -1,0 +1,50 @@
+{
+  "schema": "longworld.p93-wiki-structural-intake.v1",
+  "base_pool": {
+    "path": "data/capability_records/p92_source_router_v2/consolidated_wiki_pool.json",
+    "sha256": "7a2e9ddcc91039a6b14e84bdd7247889b66392b22b49d2ed67d7c0147b3f1876"
+  },
+  "eval_families": ["marine_transport"],
+  "families": [
+    {
+      "name": "energy_facilities",
+      "domain": "energy",
+      "mode": "search",
+      "query_template": "intitle:\"List of {term}\"",
+      "terms": ["wind farms", "nuclear power stations"],
+      "max_results_per_term": 12,
+      "bundle_size": 4,
+      "max_bundles_per_term": 1
+    },
+    {
+      "name": "earth_systems",
+      "domain": "earth_science",
+      "mode": "search",
+      "query_template": "intitle:\"List of {term}\"",
+      "terms": ["earthquakes", "glaciers"],
+      "max_results_per_term": 12,
+      "bundle_size": 4,
+      "max_bundles_per_term": 1
+    },
+    {
+      "name": "civic_heritage",
+      "domain": "cultural_heritage",
+      "mode": "search",
+      "query_template": "intitle:\"List of {term}\"",
+      "terms": ["national monuments", "historic districts"],
+      "max_results_per_term": 12,
+      "bundle_size": 4,
+      "max_bundles_per_term": 1
+    },
+    {
+      "name": "marine_transport",
+      "domain": "maritime",
+      "mode": "search",
+      "query_template": "intitle:\"List of {term}\"",
+      "terms": ["lighthouses", "shipwrecks"],
+      "max_results_per_term": 12,
+      "bundle_size": 4,
+      "max_bundles_per_term": 1
+    }
+  ]
+}
