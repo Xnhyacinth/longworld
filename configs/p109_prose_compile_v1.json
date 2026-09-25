@@ -1,0 +1,15 @@
+{
+  "max_full_tokens": 131072,
+  "records_per_state": 16,
+  "schema": "longworld.p109-prose-numeric-rule.v1.config",
+  "split": "train",
+  "state_seeds": [
+    11,
+    29
+  ],
+  "support_ledger": {
+    "path": "data/capability_records/p109_prose_support_v1/ledger.json",
+    "sha256": "115a9e96b10ace6efe0e9641cefde9e70b9e2ef40a01a1fa6a779c6802a1b9c8"
+  },
+  "workers": 2
+}

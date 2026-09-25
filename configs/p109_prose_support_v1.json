@@ -1,0 +1,33 @@
+{
+  "annual_report_ledger": {
+    "path": "data/capability_records/p103_report_support_matrix_v2/ledger.json",
+    "sha256": "5e824a33274c6b3b1a70fb99c698c3ae9f9f16294868fb317c0eca503afeef63"
+  },
+  "rfc_inventories": [
+    {
+      "path": "data/source_inventory/p57_ietf_tls13_family_v1/ietf_fetch_inventory.json",
+      "sha256": "d0a424cd7045e18a7fbd49782b0fb37485afe0bfb563135fbb49c8af6b62ebe3"
+    },
+    {
+      "path": "data/source_inventory/p57_ietf_http2_graph_v1/ietf_fetch_inventory.json",
+      "sha256": "c9c2f1e3065ea45fa056f0f51558a4780268c43b31e624132bc0db30746b9960"
+    },
+    {
+      "path": "data/source_inventory/p57_ietf_quic_http3_family_v1/ietf_fetch_inventory.json",
+      "sha256": "ea2407056a71a82e53a00950c01762b1dd153caaa5704b8e84df3c3dc987c963"
+    },
+    {
+      "path": "data/source_inventory/p57_ietf_pkix_family_v1/ietf_fetch_inventory.json",
+      "sha256": "0271493e80a906041a6887e16fc79991443e4bfa46e692546f1690003cc404b5"
+    },
+    {
+      "path": "data/source_inventory/p57_ietf_dnssec_family_v1/ietf_fetch_inventory.json",
+      "sha256": "19ad4005dd14446b2202a99605da29a27f1cc567e4623f72f12f540874bf3420"
+    },
+    {
+      "path": "data/source_inventory/p57_ietf_ssh_family_v1/ietf_fetch_inventory.json",
+      "sha256": "08c83c5f17c1cb5912ebdf93d0138926e93acbe5fe1cd17001166b0b63d99ff7"
+    }
+  ],
+  "schema": "longworld.p109-prose-rule-support.v1.config"
+}
