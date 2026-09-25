@@ -1,0 +1,41 @@
+{
+  "index": "data/candidates/p95_candidate_refs_v4",
+  "lane_operations": {
+    "wiki_generic_year_p94": [
+      "closed_year_table_interval"
+    ],
+    "wiki_generic_year_p95": [
+      "closed_year_table_interval"
+    ],
+    "wiki_p94_delta_new_only": [
+      "dense_table_interval_scan"
+    ],
+    "wiki_p94_school_shared_world": [
+      "dense_table_interval_scan"
+    ],
+    "wiki_p94_structural_pool": [
+      "table_pair_earlier_year"
+    ],
+    "wiki_p95_vocabulary_pool": [
+      "table_pair_earlier_year"
+    ],
+    "wiki_real_pair_length_p94": [
+      "table_pair_earlier_year"
+    ],
+    "wiki_real_scan_length_p94": [
+      "dense_table_interval_scan"
+    ]
+  },
+  "max_full_chat_tokens": 262144,
+  "schema": "longworld.sharded-candidate-subset.v1",
+  "source_pools": [
+    {
+      "path": "data/capability_records/p92_source_router_v5/consolidated_wiki_pool.json",
+      "sha256": "6afa77f6aed86e020b9544859ff198f7837bfe684a190de04ed63c78507bc1c6"
+    },
+    {
+      "path": "data/capability_records/p95_wiki_structural_merge_v1/source_pool.json",
+      "sha256": "5456d0af8a3566c704d74b524816d74915e48f17d7d746b077ee8d7226c33a9e"
+    }
+  ]
+}

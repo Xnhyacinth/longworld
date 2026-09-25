@@ -1,0 +1,58 @@
+{
+  "schema": "longworld.p93-wiki-structural-intake.v1",
+  "base_pool": {
+    "path": "data/capability_records/p94_wiki_structural_merge_v2/source_pool.json",
+    "sha256": "6bf837dccdf83fe34f0c687458d3983dfc636db8066622a4b90648971b0c73ef"
+  },
+  "eval_families": ["arts", "heritage"],
+  "families": [
+    {
+      "name": "science", "domain": "science", "mode": "search",
+      "query_template": "intitle:\"List of {term}\" \"Established\"",
+      "terms": ["observatories", "research institutes", "laboratories", "scientific societies", "astronomical observatories"],
+      "max_results_per_term": 12, "bundle_size": 4, "max_bundles_per_term": 2
+    },
+    {
+      "name": "technology", "domain": "technology", "mode": "search",
+      "query_template": "intitle:\"List of {term}\" \"Established\"",
+      "terms": ["software companies", "technology companies", "semiconductor companies", "computer companies", "telecommunications companies"],
+      "max_results_per_term": 12, "bundle_size": 4, "max_bundles_per_term": 2
+    },
+    {
+      "name": "finance_lists", "domain": "finance", "mode": "search",
+      "query_template": "intitle:\"List of {term}\" \"Established\"",
+      "terms": ["banks", "insurance companies", "stock exchanges", "financial institutions", "credit unions"],
+      "max_results_per_term": 12, "bundle_size": 4, "max_bundles_per_term": 2
+    },
+    {
+      "name": "infrastructure", "domain": "infrastructure", "mode": "search",
+      "query_template": "intitle:\"List of {term}\" \"Established\"",
+      "terms": ["bridges", "dams", "lighthouses", "ports", "power plants"],
+      "max_results_per_term": 12, "bundle_size": 4, "max_bundles_per_term": 2
+    },
+    {
+      "name": "arts", "domain": "arts", "mode": "search",
+      "query_template": "intitle:\"List of {term}\" \"Established\"",
+      "terms": ["theatres", "cinemas", "concert halls", "art galleries", "opera houses"],
+      "max_results_per_term": 12, "bundle_size": 4, "max_bundles_per_term": 2
+    },
+    {
+      "name": "heritage", "domain": "heritage", "mode": "search",
+      "query_template": "intitle:\"List of {term}\" \"Established\"",
+      "terms": ["cathedrals", "monasteries", "archaeological sites", "historic buildings", "forts"],
+      "max_results_per_term": 12, "bundle_size": 4, "max_bundles_per_term": 2
+    },
+    {
+      "name": "media", "domain": "media", "mode": "search",
+      "query_template": "intitle:\"List of {term}\" \"Established\"",
+      "terms": ["newspapers", "radio stations", "television stations", "magazines", "publishers"],
+      "max_results_per_term": 12, "bundle_size": 4, "max_bundles_per_term": 2
+    },
+    {
+      "name": "industry", "domain": "industry", "mode": "search",
+      "query_template": "intitle:\"List of {term}\" \"Established\"",
+      "terms": ["breweries", "automobile manufacturers", "pharmaceutical companies", "airlines", "hotels"],
+      "max_results_per_term": 12, "bundle_size": 4, "max_bundles_per_term": 2
+    }
+  ]
+}

@@ -187,3 +187,84 @@ def test_select_replays_exact_bytes_and_detects_selected_ref_change(
     (first / "selected_refs.jsonl").write_text("changed\n")
     with pytest.raises(ValueError, match="selected references changed"):
         balanced.verify_selection(index, first, **kwargs)
+
+
+def test_pinned_codeforge_proof_gate_keeps_only_content_backed_views(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    code = [
+        _entry(name, group=name, task=name)
+        for name in ("certified", "failed", "uncovered")
+    ]
+    for entry in code:
+        entry["candidate"]["source_kind"] = "real_code_workflow"
+    wiki = _entry("wiki", group="wiki", task="wiki")
+    index = _index(tmp_path, monkeypatch, [*code, wiki])
+    proofs = []
+    for name, positive in (("certified", True), ("failed", False)):
+        proofs.append(
+            {
+                "source_group_id": name,
+                "semantic_task_id": name,
+                "sample_id": name,
+                "split": "train",
+                "full_message_tokens": 110,
+                "classification": (
+                    "scoped_long_input_file_aggregation_certificate"
+                    if positive
+                    else "outside_filename_copy_grammar"
+                ),
+                "scoped_long_input_certificate": positive,
+                "content_backed_scoped_certificate": positive,
+            }
+        )
+    proof_path = tmp_path / "proofs.jsonl"
+    proof_path.write_text("".join(json.dumps(row) + "\n" for row in proofs))
+    proof_hash = hashlib.sha256(proof_path.read_bytes()).hexdigest()
+    receipt_path = tmp_path / "receipt.json"
+    receipt_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.codeforge-reading-proof-build.v2",
+                "profile_id": "p65-codeforge-filename-copy-content-backed-v1",
+                "files": {"proofs.jsonl": proof_hash},
+                "primary_rows": 2,
+                "qualified_existing_semantic_tasks": 1,
+            }
+        )
+    )
+    monkeypatch.setattr(balanced, "ROOT", tmp_path)
+    pins = [
+        {
+            "receipt": {
+                "path": "receipt.json",
+                "sha256": hashlib.sha256(receipt_path.read_bytes()).hexdigest(),
+            },
+            "proofs": {"path": "proofs.jsonl", "sha256": proof_hash},
+        }
+    ]
+    kwargs = {
+        "seed": 95,
+        "max_per_group": 2,
+        "max_per_cell": 4,
+        "max_per_kind_by_split": {"train": 4, "eval": 4},
+        "codeforge_proofs": pins,
+    }
+    report = balanced.select(index, tmp_path / "selection", **kwargs)
+    assert report["quality_gate"]["counts"] == {
+        "code_views": 3,
+        "content_backed_views": 1,
+        "excluded_failed_proof": 1,
+        "excluded_without_proof": 1,
+        "proof_identity_match_views": 2,
+        "proof_record_views": 2,
+    }
+    assert report["eligible"]["views"] == 2
+    assert report["after"]["by_source_kind"] == {
+        "real_code_workflow": 1,
+        "real_wiki": 1,
+    }
+    assert balanced.verify_selection(index, tmp_path / "selection", **kwargs) == report
+    proof_path.write_text(proof_path.read_text() + "{}\n")
+    with pytest.raises(ValueError, match="CodeForge proof pin mismatch"):
+        balanced.verify_selection(index, tmp_path / "selection", **kwargs)

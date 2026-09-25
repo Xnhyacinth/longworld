@@ -1,0 +1,37 @@
+{
+  "schema": "longworld.p95-wiki-table-sweep.v1",
+  "source_pools": [
+    {
+      "path": "data/capability_records/p92_source_router_v5/consolidated_wiki_pool.json",
+      "sha256": "6afa77f6aed86e020b9544859ff198f7837bfe684a190de04ed63c78507bc1c6"
+    },
+    {
+      "path": "data/capability_records/p94_wiki_structural_merge_v2/source_pool.json",
+      "sha256": "6bf837dccdf83fe34f0c687458d3983dfc636db8066622a4b90648971b0c73ef"
+    }
+  ],
+  "prior_candidate_index": {
+    "path": "data/candidates/p94_candidate_refs_v5/manifest.json",
+    "sha256": "b8df4481a5c7dbbb15a116b8d02838575b8a198d7c79f291697aebc43672a6a9"
+  },
+  "prior_task_audits": [
+    {
+      "path": "data/candidates/p76_wiki_table_scan_v2_parks/audit.jsonl",
+      "sha256": "293bd14c921c4d91390ee8ad19f863a5595af498979d26149e4e722c3d359161"
+    },
+    {
+      "path": "data/candidates/p76_wiki_table_scan_v2_hospitals/audit.jsonl",
+      "sha256": "ca172c990da54d3e0a372be71fc4dee3baa3810e6ddd6826e81566e659e64405"
+    },
+    {
+      "path": "data/candidates/p76_wiki_table_scan_v2_universities/audit.jsonl",
+      "sha256": "784831f4fe9046bb0a7d7ae0b04fe09566003ce417ea81559dac4ceb75ad44e6"
+    },
+    {
+      "path": "data/candidates/p92_generic_table_scan_v6/audit.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "max_tasks_per_table": 8,
+  "max_full_tokens": 131072
+}

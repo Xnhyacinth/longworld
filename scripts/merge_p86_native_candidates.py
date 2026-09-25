@@ -389,7 +389,11 @@ def _wiki_new_only(directory: Path) -> Iterator[tuple[Any, dict[str, Any], str]]
 def _wiki_generic_year(directory: Path) -> Iterator[tuple[Any, dict[str, Any], str]]:
     manifest_path = directory / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
-    if manifest.get("schema") != "longworld.p92-generic-table-scan.v1.result":
+    if manifest.get("schema") not in {
+        "longworld.p92-generic-table-scan.v1.result",
+        "longworld.p95-wiki-table-sweep.v1.result",
+        "longworld.p95-semiclosed-year-table.v1.result",
+    }:
         raise ValueError("wrong generic Wiki year-table schema")
     _verified_files(directory, manifest)
     mask_path = directory / "mask_audit.json"
@@ -454,7 +458,11 @@ def _wiki_generic_year(directory: Path) -> Iterator[tuple[Any, dict[str, Any], s
             domain=index["domain"],
             topic=index["topic"],
             operation=index["operation"],
-            evidence_profile="complete_visible_year_table_rows_replayed",
+            evidence_profile=(
+                "complete_visible_projected_year_table_rows_replayed"
+                if manifest["schema"] == "longworld.p95-semiclosed-year-table.v1.result"
+                else "complete_visible_year_table_rows_replayed"
+            ),
             tokenizer_profile="pinned-chat-template",
             receipt_path=manifest_path,
             receipt_sha256=_sha(manifest_path),

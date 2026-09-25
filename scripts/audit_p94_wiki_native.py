@@ -37,18 +37,20 @@ def audit(native_dir: Path, kind: str) -> dict:
     manifest_path = native_dir / "manifest.json"
     native_manifest = json.loads(manifest_path.read_text())
     index_rows = _rows(native_dir / "sample_index.jsonl")
+    if len({row["example_id"] for row in index_rows}) != len(index_rows):
+        raise ValueError("native index example IDs repeat")
     audit_rows = _rows(native_dir / "audit.jsonl")
     by_audit = {row["example_id"]: row for row in audit_rows}
     if len(by_audit) != len(audit_rows):
         raise ValueError("native audit IDs repeat")
-    readers = {
-        row["example_id"]: row
-        for split in ("train", "eval")
-        for row in _rows(native_dir / f"{split}.jsonl")
+    reader_files = {
+        split: _rows(native_dir / f"{split}.jsonl") for split in ("train", "eval")
     }
-    if len(readers) != sum(
-        len(_rows(native_dir / f"{split}.jsonl")) for split in ("train", "eval")
-    ):
+    readers = {row["example_id"]: row for rows in reader_files.values() for row in rows}
+    physical_split = {
+        row["example_id"]: split for split, rows in reader_files.items() for row in rows
+    }
+    if len(readers) != sum(len(rows) for rows in reader_files.values()):
         raise ValueError("native reader IDs repeat")
     if {row["example_id"] for row in index_rows} != set(readers) or set(readers) != set(
         by_audit
@@ -59,14 +61,22 @@ def audit(native_dir: Path, kind: str) -> dict:
     for index in index_rows:
         sample_id = index["example_id"]
         reader, row_audit = readers[sample_id], by_audit[sample_id]
+        if physical_split[sample_id] != index["split"]:
+            raise ValueError("native reader physical split differs from index")
+        row_kind = (
+            "pair"
+            if kind == "source_pool"
+            and row_audit.get("task_type") == "table_pair_earlier_year"
+            else kind
+        )
         expected = (
             row_audit["oracle_replay"]["supervised_answer"]
-            if kind == "pair"
+            if row_kind == "pair"
             else row_audit["answer"]
-            if kind == "generic_year"
+            if row_kind == "generic_year"
             else row_audit["value_blind_reader_parser_answer"]
         )
-        if kind == "pair" and (
+        if row_kind == "pair" and (
             row_audit["oracle_replay"]["program_answer"] != expected
             or row_audit["oracle_replay"]["value_blind_reader_parser_answer"]
             != expected
@@ -78,7 +88,9 @@ def audit(native_dir: Path, kind: str) -> dict:
         if kind == "generic_year" and not row_audit["intervention"].get("hit_answer"):
             raise ValueError("generic table intervention missing")
         if kind == "source_pool":
-            if row_audit["task_type"] == "table_cell_lookup":
+            if row_kind == "pair":
+                pass  # The two-cell deletion and both oracle replays were checked above.
+            elif row_audit["task_type"] == "table_cell_lookup":
                 if (
                     row_audit["reader_text_intervention"]["status"]
                     != "scoped_named_table_cell_removed"

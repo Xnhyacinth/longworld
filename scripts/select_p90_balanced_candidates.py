@@ -60,6 +60,20 @@ def _tie(entry: dict[str, Any], seed: int) -> str:
     return hashlib.sha256(f"{seed}|{_key(entry)}".encode()).hexdigest()
 
 
+def _validate_entries(entries: list[dict[str, Any]]) -> None:
+    split_by_group: dict[tuple[str, str], str] = {}
+    for entry in entries:
+        row = entry["candidate"]
+        group = _group(entry)
+        if group in split_by_group and split_by_group[group] != row["split"]:
+            raise ValueError("source group crosses train/eval split")
+        split_by_group[group] = row["split"]
+        if row["input_tokens"] + row["supervised_tokens"] != row["full_chat_tokens"]:
+            raise ValueError("candidate token accounting changed")
+        if row["length_bin"] != physical_length_bin(row["full_chat_tokens"]):
+            raise ValueError("candidate physical length bin changed")
+
+
 def _coverage(entries: list[dict[str, Any]]) -> dict[str, Any]:
     rows = [entry["candidate"] for entry in entries]
     groups = {_group(entry) for entry in entries}
@@ -112,6 +126,93 @@ def _read_entries(index_dir: Path) -> list[dict[str, Any]]:
     return entries
 
 
+def _pinned_proof_path(pin: dict[str, str]) -> Path:
+    relative = Path(pin["path"])
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError("CodeForge proof path must be workspace-relative")
+    path = ROOT / relative
+    if not path.is_file() or _sha(path) != pin["sha256"]:
+        raise ValueError(f"CodeForge proof pin mismatch: {relative}")
+    return path
+
+
+def _codeforge_eligible(
+    entries: list[dict[str, Any]], proof_pins: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Require a pinned, content-backed scoped proof for every kept code view."""
+    if not isinstance(proof_pins, list) or not proof_pins:
+        raise ValueError("CodeForge proof gate requires pinned receipts")
+    proofs: dict[tuple[str, str], dict[str, Any]] = {}
+    for pin in proof_pins:
+        receipt_path = _pinned_proof_path(pin["receipt"])
+        proofs_path = _pinned_proof_path(pin["proofs"])
+        receipt = json.loads(receipt_path.read_text())
+        if (
+            receipt.get("schema_version")
+            != "longworld.codeforge-reading-proof-build.v2"
+            or receipt.get("profile_id")
+            != "p65-codeforge-filename-copy-content-backed-v1"
+            or receipt.get("files", {}).get("proofs.jsonl") != pin["proofs"]["sha256"]
+        ):
+            raise ValueError("CodeForge proof receipt or profile differs")
+        rows = [
+            json.loads(line) for line in proofs_path.read_text().splitlines() if line
+        ]
+        if (
+            len(rows) != receipt["primary_rows"]
+            or sum(row.get("content_backed_scoped_certificate") is True for row in rows)
+            != receipt["qualified_existing_semantic_tasks"]
+        ):
+            raise ValueError("CodeForge proof inventory differs from receipt")
+        for row in rows:
+            key = row["source_group_id"], row["semantic_task_id"]
+            if key in proofs:
+                raise ValueError("CodeForge proof task appears in multiple receipts")
+            if row.get("content_backed_scoped_certificate") is True and (
+                row.get("classification")
+                != "scoped_long_input_file_aggregation_certificate"
+                or row.get("scoped_long_input_certificate") is not True
+            ):
+                raise ValueError("CodeForge positive proof lacks scoped certificate")
+            proofs[key] = row
+    eligible: list[dict[str, Any]] = []
+    counts: Counter[str] = Counter()
+    for entry in entries:
+        candidate = entry["candidate"]
+        if candidate["source_kind"] != "real_code_workflow":
+            eligible.append(entry)
+            continue
+        counts["code_views"] += 1
+        proof = proofs.get((candidate["source_group"], candidate["semantic_task_id"]))
+        if proof is None:
+            counts["excluded_without_proof"] += 1
+            continue
+        identity_matches = (
+            proof["sample_id"] == candidate["sample_id"]
+            and proof["split"] == candidate["split"]
+            and proof["full_message_tokens"] == candidate["full_chat_tokens"]
+        )
+        counts["proof_record_views"] += 1
+        if identity_matches:
+            counts["proof_identity_match_views"] += 1
+        if proof["content_backed_scoped_certificate"] is not True:
+            counts["excluded_failed_proof"] += 1
+            if not identity_matches:
+                counts["failed_proof_identity_mismatch"] += 1
+            continue
+        if not identity_matches:
+            counts["excluded_positive_identity_mismatch"] += 1
+            continue
+        counts["content_backed_views"] += 1
+        eligible.append(entry)
+    return eligible, {
+        "kind": "codeforge_content_backed_scoped_v1",
+        "proof_pins": proof_pins,
+        "counts": dict(sorted(counts.items())),
+        "scope": "positive scoped filename-content certificate for code views only; other kinds remain candidates",
+    }
+
+
 def _choose(
     entries: list[dict[str, Any]],
     *,
@@ -121,18 +222,9 @@ def _choose(
     max_per_kind_by_split: dict[str, int],
     max_supervised_tokens_by_kind: dict[str, int] | None = None,
 ) -> list[dict[str, Any]]:
+    _validate_entries(entries)
     buckets: dict[tuple[str, str, str, str], list[dict[str, Any]]] = defaultdict(list)
-    split_by_group: dict[tuple[str, str], str] = {}
     for entry in entries:
-        row = entry["candidate"]
-        group = _group(entry)
-        if group in split_by_group and split_by_group[group] != row["split"]:
-            raise ValueError("source group crosses train/eval split")
-        split_by_group[group] = row["split"]
-        if row["input_tokens"] + row["supervised_tokens"] != row["full_chat_tokens"]:
-            raise ValueError("candidate token accounting changed")
-        if row["length_bin"] != physical_length_bin(row["full_chat_tokens"]):
-            raise ValueError("candidate physical length bin changed")
         buckets[_cell(entry)].append(entry)
     for bucket in buckets.values():
         bucket.sort(key=lambda entry: (_tie(entry, seed), _key(entry)))
@@ -190,6 +282,7 @@ def select(
     max_per_cell: int,
     max_per_kind_by_split: dict[str, int],
     max_supervised_tokens_by_kind: dict[str, int] | None = None,
+    codeforge_proofs: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     if (
         output_dir.exists()
@@ -227,8 +320,15 @@ def select(
         entry["candidate"]["source_kind"] for entry in entries
     }:
         raise ValueError("supervised token cap names an absent source kind")
+    if codeforge_proofs is not None:
+        _validate_entries(entries)
+    eligible, quality_gate = (
+        _codeforge_eligible(entries, codeforge_proofs)
+        if codeforge_proofs is not None
+        else (entries, None)
+    )
     selected = _choose(
-        entries,
+        eligible,
         seed=seed,
         max_per_group=max_per_group,
         max_per_cell=max_per_cell,
@@ -265,6 +365,11 @@ def select(
                 else {}
             ),
             "before": _coverage(entries),
+            **(
+                {"eligible": _coverage(eligible), "quality_gate": quality_gate}
+                if quality_gate is not None
+                else {}
+            ),
             "after": _coverage(selected),
             "selected_refs_sha256": _sha(selected_path),
             "selection_scope": "candidate_only_source_aware_balancing",
@@ -284,6 +389,7 @@ def verify_selection(
     max_per_cell: int,
     max_per_kind_by_split: dict[str, int],
     max_supervised_tokens_by_kind: dict[str, int] | None = None,
+    codeforge_proofs: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     stored = json.loads((output_dir / "manifest.json").read_text())
     if stored.get("selected_refs_sha256") != _sha(output_dir / "selected_refs.jsonl"):
@@ -300,6 +406,7 @@ def verify_selection(
             max_per_cell=max_per_cell,
             max_per_kind_by_split=max_per_kind_by_split,
             max_supervised_tokens_by_kind=max_supervised_tokens_by_kind,
+            codeforge_proofs=codeforge_proofs,
         )
         if (
             rebuilt != stored
@@ -326,6 +433,7 @@ def main() -> None:
         "max_per_cell": config["max_per_cell"],
         "max_per_kind_by_split": config["max_per_source_kind_by_split"],
         "max_supervised_tokens_by_kind": config.get("max_supervised_tokens_by_kind"),
+        "codeforge_proofs": config.get("codeforge_proofs"),
     }
     result = (
         verify_selection(index_dir, args.output, **kwargs)

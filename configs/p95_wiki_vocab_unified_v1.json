@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.unified-synthesis-plan.v1",
+  "sources": [
+    {
+      "name": "wiki_p95_vocabulary_pool",
+      "kind": "wiki_source_pool",
+      "config": "data/capability_records/p95_wiki_structural_delta_v1/source_pool.json",
+      "output": "data/candidates/p95_wiki_vocab_native_v2",
+      "generation": "new_p95"
+    }
+  ]
+}

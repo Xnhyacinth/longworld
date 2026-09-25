@@ -199,6 +199,48 @@ def test_generic_year_table_lane_requires_final_mask_and_visible_intervention(
         )
 
 
+def test_p95_generic_year_table_sweep_uses_same_final_reader_contract(
+    tmp_path: Path,
+) -> None:
+    native = (
+        Path(__file__).resolve().parents[1] / "data/candidates/p95_wiki_table_sweep_v1"
+    )
+    if not (native / "mask_audit.json").exists():
+        pytest.skip("frozen P95 generic Wiki table sweep is not mounted")
+    result = merged.build(
+        None,
+        None,
+        tmp_path / "merged",
+        wiki_generic_year_dir=native,
+        generation="p95",
+    )
+    assert result["candidate_views"] == result["independent_semantic_tasks"] == 4
+    assert result["views_by_lane"] == {"wiki_generic_year_p95": 4}
+
+
+def test_p95_projected_year_table_marks_its_evidence_profile(tmp_path: Path) -> None:
+    native = (
+        Path(__file__).resolve().parents[1] / "data/candidates/p95_semiclosed_table_v1"
+    )
+    if not (native / "mask_audit.json").exists():
+        pytest.skip("frozen P95 projected Wiki tables are not mounted")
+    result = merged.build(
+        None,
+        None,
+        tmp_path / "merged",
+        wiki_generic_year_dir=native,
+        generation="p95",
+    )
+    assert result["candidate_views"] == result["independent_semantic_tasks"] == 14
+    rows = [
+        json.loads(line)
+        for line in (tmp_path / "merged/sample_index.jsonl").read_text().splitlines()
+    ]
+    assert {row["evidence_profile"] for row in rows} == {
+        "complete_visible_projected_year_table_rows_replayed"
+    }
+
+
 def test_real_pair_length_views_reuse_native_tasks_and_bind_reader_proof(
     tmp_path: Path,
 ) -> None:

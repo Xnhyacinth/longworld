@@ -64,7 +64,9 @@ def _positioned_world(world: SemanticWorld, required: tuple[str, str]) -> Semant
     return SemanticWorld(documents, world.entities, world.facts)
 
 
-def _selected_docs(world: Any, task: Any, tokenizer: Any) -> dict[str, tuple[str, ...]]:
+def _selected_docs(
+    world: Any, task: Any, tokenizer: Any
+) -> tuple[dict[str, tuple[str, ...]], dict[str, str]]:
     """Choose nested, whole-page scopes with a margin from both bin edges."""
     required = set(task.scope.documents)
     optional = [
@@ -77,6 +79,7 @@ def _selected_docs(world: Any, task: Any, tokenizer: Any) -> dict[str, tuple[str
     optional.sort(key=lambda doc: (-len(doc.text), doc.doc_id))
     chosen = set(required)
     scopes: dict[str, tuple[str, ...]] = {}
+    unsupported: dict[str, str] = {}
     for target, (low, high) in TOKEN_BINS.items():
         while True:
             doc_ids = tuple(
@@ -100,15 +103,25 @@ def _selected_docs(world: Any, task: Any, tokenizer: Any) -> dict[str, tuple[str
                 scopes[target] = doc_ids
                 break
             if tokens >= high - 256:
+                if target == "64k" and scopes:
+                    unsupported[target] = (
+                        f"whole source page would exceed 64K upper bound: {tokens}"
+                    )
+                    break
                 raise ValueError(
                     f"no whole-page {target} scope below upper bound: {tokens}"
                 )
             if not optional:
+                if target == "64k" and scopes:
+                    unsupported[target] = (
+                        f"complete source pages reach only {tokens} tokens"
+                    )
+                    break
                 raise ValueError(
                     f"source lacks enough whole-page material for {target}: {tokens}"
                 )
             chosen.add(optional.pop(0).doc_id)
-    return scopes
+    return scopes, unsupported
 
 
 def export(
@@ -135,9 +148,10 @@ def export(
     positioned = _positioned_world(world, tasks[0].scope.documents)
     tokenizer = length_controller.get_tokenizer()
     try:
-        scopes = _selected_docs(positioned, tasks[0], tokenizer)
+        scopes, unsupported_lengths = _selected_docs(positioned, tasks[0], tokenizer)
         unsupported_lengths = {
-            "128k": "available complete source pages do not produce a suitable 128K view under the source composition rules"
+            **unsupported_lengths,
+            "128k": "available complete source pages do not produce a suitable 128K view under the source composition rules",
         }
     except ValueError as error:
         if "source lacks enough whole-page material for 32k" not in str(error):

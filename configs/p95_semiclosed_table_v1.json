@@ -1,0 +1,19 @@
+{
+  "schema": "longworld.p95-semiclosed-year-table.v1",
+  "source_pools": [
+    {
+      "path": "data/capability_records/p92_source_router_v5/consolidated_wiki_pool.json",
+      "sha256": "6afa77f6aed86e020b9544859ff198f7837bfe684a190de04ed63c78507bc1c6"
+    },
+    {
+      "path": "data/capability_records/p94_wiki_structural_merge_v2/source_pool.json",
+      "sha256": "6bf837dccdf83fe34f0c687458d3983dfc636db8066622a4b90648971b0c73ef"
+    }
+  ],
+  "prior_candidate_index": {
+    "path": "data/candidates/p94_candidate_refs_v5/manifest.json",
+    "sha256": "b8df4481a5c7dbbb15a116b8d02838575b8a198d7c79f291697aebc43672a6a9"
+  },
+  "max_tasks_per_table": 8,
+  "max_full_tokens": 131072
+}

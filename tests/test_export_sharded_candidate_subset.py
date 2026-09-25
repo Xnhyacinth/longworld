@@ -2,14 +2,77 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
 import pytest
 
+from scripts import export_sharded_candidate_subset as subset
 from scripts.export_sharded_candidate_subset import export, verify
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_source_worlds_accept_two_pinned_pools_without_repeated_group(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(subset, "ROOT", tmp_path)
+    pools = []
+    for group, split in (("g1", "train"), ("g2", "eval")):
+        snapshot = {
+            "snapshot_id": group,
+            "source": {"license": "CC BY-SA", "revisions": {group: 7}},
+            "documents": [
+                {
+                    "title": group,
+                    "page_url": f"https://example.test/{group}",
+                    "revision_url": f"https://example.test/{group}?oldid=7",
+                }
+            ],
+        }
+        snapshot_path = tmp_path / f"{group}.json"
+        snapshot_path.write_text(json.dumps(snapshot))
+        pool_path = tmp_path / f"{group}_pool.json"
+        pool_path.write_text(
+            json.dumps(
+                {
+                    "schema": "longworld.source-batch-pool.v2",
+                    "sources": [
+                        {
+                            "split": split,
+                            "domain": "test",
+                            "topic": group,
+                            "snapshot": {
+                                "path": snapshot_path.name,
+                                "sha256": hashlib.sha256(
+                                    snapshot_path.read_bytes()
+                                ).hexdigest(),
+                            },
+                        }
+                    ],
+                }
+            )
+        )
+        pools.append(pool_path)
+    worlds = subset._source_worlds(pools, {"g1": "train", "g2": "eval"})
+    assert {(world["source_group"], world["split"]) for world in worlds} == {
+        ("g1", "train"),
+        ("g2", "eval"),
+    }
+    with pytest.raises(ValueError, match="world repeated"):
+        subset._source_worlds([pools[0], pools[0]], {"g1": "train"})
+    second = json.loads((tmp_path / "g2.json").read_text())
+    second["documents"][0]["title"] = "g1"
+    second["source"]["revisions"] = {"g1": 7}
+    (tmp_path / "g2.json").write_text(json.dumps(second))
+    second_pool = json.loads(pools[1].read_text())
+    second_pool["sources"][0]["snapshot"]["sha256"] = hashlib.sha256(
+        (tmp_path / "g2.json").read_bytes()
+    ).hexdigest()
+    pools[1].write_text(json.dumps(second_pool))
+    with pytest.raises(ValueError, match="page crosses train/eval"):
+        subset._source_worlds(pools, {"g1": "train", "g2": "eval"})
 
 
 def test_subset_rejects_unhashable_operation_config(tmp_path: Path) -> None:

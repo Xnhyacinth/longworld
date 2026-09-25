@@ -58,38 +58,55 @@ def _write_lines(path: Path, rows: list[dict[str, Any]]) -> None:
             stream.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
 
 
-def _source_worlds(pool_path: Path, groups: dict[str, str]) -> list[dict[str, Any]]:
-    pool = json.loads(pool_path.read_text())
-    if pool.get("schema") != "longworld.source-batch-pool.v2":
-        raise ValueError("subset source pool schema changed")
+def _source_worlds(
+    pool_paths: list[Path], groups: dict[str, str]
+) -> list[dict[str, Any]]:
     worlds = {}
-    for entry in pool["sources"]:
-        pin = entry["snapshot"]
-        snapshot = json.loads(_pin(pin).read_text())
-        group = snapshot["snapshot_id"]
-        if group not in groups:
-            continue
-        if group in worlds or entry["split"] != groups[group]:
-            raise ValueError("subset world repeated or split changed")
-        worlds[group] = {
-            "source_group": group,
-            "split": entry["split"],
-            "domain": entry["domain"],
-            "topic": entry["topic"],
-            "snapshot": pin,
-            "license": snapshot["source"]["license"],
-            "documents": [
-                {
-                    "title": doc["title"],
-                    "page_url": doc["page_url"],
-                    "revision_url": doc["revision_url"],
-                    "revision": snapshot["source"]["revisions"][doc["title"]],
-                }
-                for doc in snapshot["documents"]
-            ],
-        }
+    for pool_path in pool_paths:
+        pool = json.loads(pool_path.read_text())
+        if pool.get("schema") != "longworld.source-batch-pool.v2":
+            raise ValueError("subset source pool schema changed")
+        for entry in pool["sources"]:
+            pin = entry["snapshot"]
+            snapshot = json.loads(_pin(pin).read_text())
+            group = snapshot["snapshot_id"]
+            if group not in groups:
+                continue
+            if group in worlds or entry["split"] != groups[group]:
+                raise ValueError("subset world repeated or split changed")
+            worlds[group] = {
+                "source_group": group,
+                "split": entry["split"],
+                "domain": entry["domain"],
+                "topic": entry["topic"],
+                "snapshot": pin,
+                "license": snapshot["source"]["license"],
+                "documents": [
+                    {
+                        "title": doc["title"],
+                        "page_url": doc["page_url"],
+                        "revision_url": doc["revision_url"],
+                        "revision": snapshot["source"]["revisions"][doc["title"]],
+                    }
+                    for doc in snapshot["documents"]
+                ],
+            }
     if set(worlds) != set(groups):
         raise ValueError("subset task world absent from pinned source pool")
+    titles: dict[str, str] = {}
+    urls: dict[str, str] = {}
+    for world in worlds.values():
+        split = world["split"]
+        for doc in world["documents"]:
+            for key, seen in (
+                (doc["title"].casefold(), titles),
+                (doc["page_url"], urls),
+            ):
+                if not key:
+                    continue
+                previous = seen.setdefault(key, split)
+                if previous != split:
+                    raise ValueError("subset page crosses train/eval source pools")
     return [worlds[key] for key in sorted(worlds)]
 
 
@@ -97,9 +114,9 @@ def export(config_path: Path, output_dir: Path) -> dict[str, Any]:
     if output_dir.exists():
         raise ValueError("subset output must be new")
     config = json.loads(config_path.read_text())
+    common = {"schema", "index", "lane_operations", "max_full_chat_tokens"}
     if (
-        set(config)
-        != {"schema", "index", "source_pool", "lane_operations", "max_full_chat_tokens"}
+        set(config) not in (common | {"source_pool"}, common | {"source_pools"})
         or config["schema"] != SCHEMA
         or not isinstance(config["lane_operations"], dict)
         or not config["lane_operations"]
@@ -125,7 +142,17 @@ def export(config_path: Path, output_dir: Path) -> dict[str, Any]:
         raise ValueError("subset index escapes workspace")
     index_dir = ROOT / index_path
     bank = verify_index(index_dir, full_readers=True)
-    source_pool = _pin(config["source_pool"])
+    source_pins = (
+        [config["source_pool"]] if "source_pool" in config else config["source_pools"]
+    )
+    if (
+        not isinstance(source_pins, list)
+        or not source_pins
+        or len(source_pins)
+        != len({json.dumps(pin, sort_keys=True) for pin in source_pins})
+    ):
+        raise ValueError("subset source pools must be unique pinned entries")
+    source_pools = [_pin(pin) for pin in source_pins]
     selected = []
     groups: dict[str, str] = {}
     for ref in _rows(index_dir / "candidate_refs.jsonl"):
@@ -146,7 +173,7 @@ def export(config_path: Path, output_dir: Path) -> dict[str, Any]:
         "eval",
     }:
         raise ValueError("subset must have train and eval readers")
-    world_manifest = _source_worlds(source_pool, groups)
+    world_manifest = _source_worlds(source_pools, groups)
     shards = {entry["name"]: entry for entry in bank["shards"]}
     targets: dict[tuple[str, str], dict[int, dict[str, Any]]] = defaultdict(dict)
     for ref in selected:
@@ -237,7 +264,11 @@ def export(config_path: Path, output_dir: Path) -> dict[str, Any]:
             "config_sha256": _sha(config_path),
             "index_manifest_sha256": _sha(index_dir / "manifest.json"),
             "index_refs_sha256": bank["refs_sha256"],
-            "source_pool_sha256": _sha(source_pool),
+            **(
+                {"source_pool_sha256": _sha(source_pools[0])}
+                if "source_pool" in config
+                else {"source_pools_sha256": [_sha(path) for path in source_pools]}
+            ),
             "candidate_views": len(sample_index),
             "independent_semantic_tasks": len(task_specs),
             "source_groups": len(groups),
