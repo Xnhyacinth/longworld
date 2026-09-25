@@ -1,0 +1,63 @@
+{
+  "codeforge_proofs": [
+    {
+      "proofs": {
+        "path": "data/candidates/p65_codeforge_reading_proof_v1/proofs.jsonl",
+        "sha256": "2914fd221ddb1b5a4ef040751f176093fecce4c213fc129e93a8f190ad57f5ba"
+      },
+      "receipt": {
+        "path": "data/candidates/p65_codeforge_reading_proof_v1/BUILD_RECEIPT.json",
+        "sha256": "1b3c3951743de3aecde7af94d4ea458a1f6580e1b3acf520da068c36b204c4fd"
+      }
+    },
+    {
+      "proofs": {
+        "path": "data/candidates/p94_codeforge_duckdb_reading_proof_v1/proofs.jsonl",
+        "sha256": "79519b8ac73c2aaff94846e1cb9c990e993ca92bbc80b87031d77696e100d462"
+      },
+      "receipt": {
+        "path": "data/candidates/p94_codeforge_duckdb_reading_proof_v1/BUILD_RECEIPT.json",
+        "sha256": "58002d8f55e88c3c8af5c624509ed65e07617e3854aec808735b82f26742e303"
+      }
+    },
+    {
+      "proofs": {
+        "path": "data/candidates/p94_codeforge_wasmtime_reading_proof_v1/proofs.jsonl",
+        "sha256": "2484585b5d819a6efb5570e8da64500d5445708b39ae3016c497eea188a83fc6"
+      },
+      "receipt": {
+        "path": "data/candidates/p94_codeforge_wasmtime_reading_proof_v1/BUILD_RECEIPT.json",
+        "sha256": "99e25fc8849a2fcc0acc1bbc9b6f933441caffafe12831eb77a2cbc40b8fae1c"
+      }
+    }
+  ],
+  "code_content_proof": {
+    "native_manifest": {
+      "path": "data/candidates/p99_code_content_v4/manifest.json",
+      "sha256": "6d10615e98f61e07c1a67c3ea88916af3324519eef6989b25ac8ef43740e3b58"
+    },
+    "native_audit": {
+      "path": "data/candidates/p99_code_content_v4/audit.jsonl",
+      "sha256": "4b0ee9bcd4a286ca4d44dc9f8966ab5c246c5b789886788623ebe9c2a1b1667e"
+    },
+    "unified_manifest": {
+      "path": "data/candidates/p99_code_unified_v2/manifest.json",
+      "sha256": "62cd143ee7a96198de89b8bee78b111bf28d5be76802fa88c2a4fb312bd0472a"
+    },
+    "mask_manifest": {
+      "path": "data/candidates/p99_code_unified_mask_v2/manifest.json",
+      "sha256": "eb74c5c821f8c4e70c694ab59e1f17cc8d832a5e312c9901598dc4698254ab0a"
+    }
+  },
+  "input_index": "data/candidates/p100_candidate_refs_v2",
+  "max_per_cell": 48,
+  "max_per_source_group": 24,
+  "max_per_source_kind_by_split": {
+    "eval": 100,
+    "train": 400
+  },
+  "max_supervised_tokens_by_kind": {
+    "controlled_simulation": 40000
+  },
+  "seed": 94
+}

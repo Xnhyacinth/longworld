@@ -213,6 +213,101 @@ def _codeforge_eligible(
     }
 
 
+def _code_content_eligible(
+    entries: list[dict[str, Any]], pin: dict[str, Any]
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Admit P99 code rows only with their pinned added-line certificate."""
+    native_path = _pinned_proof_path(pin["native_manifest"])
+    audit_path = _pinned_proof_path(pin["native_audit"])
+    unified_path = _pinned_proof_path(pin["unified_manifest"])
+    mask_path = _pinned_proof_path(pin["mask_manifest"])
+    native = json.loads(native_path.read_text())
+    unified = json.loads(unified_path.read_text())
+    mask = json.loads(mask_path.read_text())
+    native_index_path = native_path.parent / "sample_index.jsonl"
+    if (
+        native.get("schema_version") != "longworld.p99-code-content.v1"
+        or native.get("train_ready") is not False
+        or native.get("files_sha256", {}).get("audit.jsonl")
+        != pin["native_audit"]["sha256"]
+        or native.get("files_sha256", {}).get("sample_index.jsonl")
+        != _sha(native_index_path)
+        or unified.get("schema_version") != "longworld.unified-candidates.v1"
+        or unified.get("train_ready") is not False
+        or unified.get("native_manifest_sha256") != pin["native_manifest"]["sha256"]
+        or unified.get("native_audit_sha256") != pin["native_audit"]["sha256"]
+        or mask.get("schema_version") != "longworld.unified-reader-mask-all.v1"
+        or mask.get("train_ready") is not False
+        or mask.get("source_manifest_sha256") != pin["unified_manifest"]["sha256"]
+        or mask.get("source_index_sha256")
+        != unified.get("files_sha256", {}).get("sample_index.jsonl")
+        or mask.get("audited_views") != unified.get("candidate_views")
+        or native.get("semantic_tasks") != unified.get("independent_semantic_tasks")
+        or native.get("views") != unified.get("candidate_views")
+    ):
+        raise ValueError("P99 code-content proof receipt or mask differs")
+    native_index = {}
+    for line in native_index_path.read_text().splitlines():
+        row = json.loads(line)
+        key = row["source_group"], row["semantic_task_id"]
+        if key in native_index:
+            raise ValueError("P99 code-content native task repeats")
+        native_index[key] = row
+    proofs = {}
+    for line_number, line in enumerate(audit_path.read_text().splitlines()):
+        row = json.loads(line)
+        key = row["source_group"], row["semantic_task_id"]
+        if key in proofs:
+            raise ValueError("P99 code-content proof task repeats")
+        proofs[key] = (row, f"{pin['native_audit']['path']}:{line_number}")
+    if len(proofs) != native["semantic_tasks"]:
+        raise ValueError("P99 code-content audit inventory differs")
+    if len(native_index) != len(proofs):
+        raise ValueError("P99 code-content native index inventory differs")
+    eligible = []
+    counts: Counter[str] = Counter()
+    for entry in entries:
+        row = entry["candidate"]
+        counts["code_content_views"] += 1
+        key = row["source_group"], row["semantic_task_id"]
+        proof_entry = proofs.get(key)
+        proof, audit_ref = proof_entry if proof_entry is not None else ({}, None)
+        native_row = native_index.get(key, {})
+        if (
+            row.get("source_kind") != "real_code_workflow"
+            or native_row.get("source_kind") != "real_code_workflow"
+            or row.get("source_name") != "p99_code_content"
+            or row.get("receipt_sha256") != pin["native_manifest"]["sha256"]
+            or row.get("dependency_status")
+            != "content_backed_two_source_scoped_certificate"
+            or row.get("native_audit_ref") != audit_ref
+            or proof.get("sample_id") != row["sample_id"]
+            or native_row.get("sample_id") != row["sample_id"]
+            or native_row.get("split") != row["split"]
+            or native_row.get("full_chat_tokens") != row["full_chat_tokens"]
+            or proof.get("reader_visible_replay") is not True
+            or proof.get("filename_preserving_added_code_removal_changes_answer")
+            is not True
+            or proof.get("all_selected_identifiers_absent_after_added_code_removal")
+            is not True
+            or proof.get("single_raw_16k_window_insufficient_for_both_witnesses")
+            is not True
+            or proof.get("evidence_token_span", 0) <= 16384
+            or proof.get("evidence_token_span")
+            != row.get("observed_witness_span_tokens")
+        ):
+            counts["excluded_without_positive_content_proof"] += 1
+            continue
+        eligible.append(entry)
+        counts["content_backed_views"] += 1
+    return eligible, {
+        "kind": "p99_added_code_two_source_scoped_v1",
+        "proof_pin": pin,
+        "counts": dict(sorted(counts.items())),
+        "scope": "two added-line witnesses and filename-preserving code removal; no unrestricted dependency claim",
+    }
+
+
 def _choose(
     entries: list[dict[str, Any]],
     *,
@@ -283,6 +378,7 @@ def select(
     max_per_kind_by_split: dict[str, int],
     max_supervised_tokens_by_kind: dict[str, int] | None = None,
     codeforge_proofs: list[dict[str, Any]] | None = None,
+    code_content_proof: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if (
         output_dir.exists()
@@ -322,11 +418,35 @@ def select(
         raise ValueError("supervised token cap names an absent source kind")
     if codeforge_proofs is not None:
         _validate_entries(entries)
+    content_entries = [
+        entry
+        for entry in entries
+        if entry["candidate"].get("source_name") == "p99_code_content"
+    ]
+    legacy_entries = [
+        entry
+        for entry in entries
+        if entry["candidate"].get("source_name") != "p99_code_content"
+    ]
     eligible, quality_gate = (
-        _codeforge_eligible(entries, codeforge_proofs)
+        _codeforge_eligible(legacy_entries, codeforge_proofs)
         if codeforge_proofs is not None
-        else (entries, None)
+        else (legacy_entries, None)
     )
+    if content_entries:
+        content_eligible, content_gate = (
+            _code_content_eligible(content_entries, code_content_proof)
+            if code_content_proof is not None
+            else (
+                [],
+                {
+                    "kind": "p99_added_code_two_source_scoped_v1",
+                    "counts": {"excluded_without_pin": len(content_entries)},
+                },
+            )
+        )
+        eligible.extend(content_eligible)
+        quality_gate = {"legacy": quality_gate, "code_content": content_gate}
     selected = _choose(
         eligible,
         seed=seed,
@@ -390,6 +510,7 @@ def verify_selection(
     max_per_kind_by_split: dict[str, int],
     max_supervised_tokens_by_kind: dict[str, int] | None = None,
     codeforge_proofs: list[dict[str, Any]] | None = None,
+    code_content_proof: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     stored = json.loads((output_dir / "manifest.json").read_text())
     if stored.get("selected_refs_sha256") != _sha(output_dir / "selected_refs.jsonl"):
@@ -407,6 +528,7 @@ def verify_selection(
             max_per_kind_by_split=max_per_kind_by_split,
             max_supervised_tokens_by_kind=max_supervised_tokens_by_kind,
             codeforge_proofs=codeforge_proofs,
+            code_content_proof=code_content_proof,
         )
         if (
             rebuilt != stored
@@ -434,6 +556,7 @@ def main() -> None:
         "max_per_kind_by_split": config["max_per_source_kind_by_split"],
         "max_supervised_tokens_by_kind": config.get("max_supervised_tokens_by_kind"),
         "codeforge_proofs": config.get("codeforge_proofs"),
+        "code_content_proof": config.get("code_content_proof"),
     }
     result = (
         verify_selection(index_dir, args.output, **kwargs)

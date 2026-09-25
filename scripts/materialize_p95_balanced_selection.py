@@ -64,6 +64,7 @@ def _selected(
         max_per_kind_by_split=config["max_per_source_kind_by_split"],
         max_supervised_tokens_by_kind=config.get("max_supervised_tokens_by_kind"),
         codeforge_proofs=config["codeforge_proofs"],
+        code_content_proof=config.get("code_content_proof"),
     )
     selection = json.loads((selection_dir / "manifest.json").read_text())
     if (

@@ -268,3 +268,110 @@ def test_pinned_codeforge_proof_gate_keeps_only_content_backed_views(
     proof_path.write_text(proof_path.read_text() + "{}\n")
     with pytest.raises(ValueError, match="CodeForge proof pin mismatch"):
         balanced.verify_selection(index, tmp_path / "selection", **kwargs)
+
+
+def test_p99_added_code_proof_gate_requires_pinned_positive_audit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(balanced, "ROOT", tmp_path)
+    proof = {
+        "source_group": "repo",
+        "semantic_task_id": "task",
+        "sample_id": "sample",
+        "reader_visible_replay": True,
+        "filename_preserving_added_code_removal_changes_answer": True,
+        "all_selected_identifiers_absent_after_added_code_removal": True,
+        "single_raw_16k_window_insufficient_for_both_witnesses": True,
+        "evidence_token_span": 20000,
+    }
+    audit_path = tmp_path / "audit.jsonl"
+    audit_path.write_text(json.dumps(proof) + "\n")
+    audit_sha = hashlib.sha256(audit_path.read_bytes()).hexdigest()
+    native_index_path = tmp_path / "sample_index.jsonl"
+    native_index_path.write_text(
+        json.dumps(
+            {
+                "source_group": "repo",
+                "semantic_task_id": "task",
+                "sample_id": "sample",
+                "source_kind": "real_code_workflow",
+                "split": "train",
+                "full_chat_tokens": 110,
+            }
+        )
+        + "\n"
+    )
+    native_index_sha = hashlib.sha256(native_index_path.read_bytes()).hexdigest()
+    native_path = tmp_path / "native.json"
+    native_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.p99-code-content.v1",
+                "files_sha256": {
+                    "audit.jsonl": audit_sha,
+                    "sample_index.jsonl": native_index_sha,
+                },
+                "semantic_tasks": 1,
+                "views": 1,
+                "train_ready": False,
+            }
+        )
+    )
+    native_sha = hashlib.sha256(native_path.read_bytes()).hexdigest()
+    unified_path = tmp_path / "unified.json"
+    unified_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.unified-candidates.v1",
+                "native_manifest_sha256": native_sha,
+                "native_audit_sha256": audit_sha,
+                "candidate_views": 1,
+                "independent_semantic_tasks": 1,
+                "files_sha256": {"sample_index.jsonl": "indexed-sample-hash"},
+                "train_ready": False,
+            }
+        )
+    )
+    unified_sha = hashlib.sha256(unified_path.read_bytes()).hexdigest()
+    mask_path = tmp_path / "mask.json"
+    mask_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.unified-reader-mask-all.v1",
+                "source_manifest_sha256": unified_sha,
+                "source_index_sha256": "indexed-sample-hash",
+                "audited_views": 1,
+                "train_ready": False,
+            }
+        )
+    )
+    pin = {
+        name: {
+            "path": path.name,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+        for name, path in (
+            ("native_manifest", native_path),
+            ("native_audit", audit_path),
+            ("unified_manifest", unified_path),
+            ("mask_manifest", mask_path),
+        )
+    }
+    entry = _entry("sample", group="repo", task="task")
+    row = entry["candidate"]
+    row.update(
+        source_kind="real_code_workflow",
+        source_name="p99_code_content",
+        receipt_sha256=native_sha,
+        dependency_status="content_backed_two_source_scoped_certificate",
+        native_audit_ref="audit.jsonl:0",
+        observed_witness_span_tokens=20000,
+    )
+    eligible, receipt = balanced._code_content_eligible([entry], pin)
+    assert eligible == [entry]
+    assert receipt["counts"]["content_backed_views"] == 1
+    row["observed_witness_span_tokens"] = 19999
+    assert balanced._code_content_eligible([entry], pin)[0] == []
+    audit_path.write_text(audit_path.read_text() + "{}\n")
+    with pytest.raises(ValueError, match="CodeForge proof pin mismatch"):
+        balanced._code_content_eligible([entry], pin)
