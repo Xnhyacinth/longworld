@@ -1,0 +1,55 @@
+{
+  "schema": "longworld.p86-frozen-paper-batch.v1",
+  "workers": 3,
+  "tokenizer": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "min_prose_chars": 120,
+  "min_final_tokens": 32769,
+  "max_final_tokens": 65536,
+  "min_evidence_extent_tokens": 8192,
+  "max_path_trials": 3,
+  "families": [
+    {
+      "family_id": "mlrc-arxiv-2203.01928",
+      "split": "train",
+      "inventory": {
+        "path": "data/source_inventory/arxiv_p11_mlrc_v1/paper_fetch_inventory.json",
+        "sha256": "513b26f79b0e2f8e2dd3ac6b23b5bfc6b9702ad9525af39d5a2162147326ede9"
+      }
+    },
+    {
+      "family_id": "attention-arxiv-1706.03762",
+      "split": "train",
+      "inventory": {
+        "path": "data/source_inventory/p12_paper_attention_fetch_v1/paper_fetch_inventory.json",
+        "sha256": "d02977d2f3b746cb63dd853a5f770a5bb7eaedfeb762789bffa017a4bf9e5308"
+      }
+    },
+    {
+      "family_id": "megatron-arxiv-1909.08053",
+      "split": "train",
+      "inventory": {
+        "path": "data/source_inventory/p12_wave3_paper_megatron_v1/paper_fetch_inventory.json",
+        "sha256": "4d0c8f3ed7a8de7b79958a0347bd96db6be5b1aac41796ab1f3cdd4c1e449c54"
+      }
+    },
+    {
+      "family_id": "aevb-arxiv-1312.6114",
+      "split": "train",
+      "inventory": {
+        "path": "data/source_inventory/p13_paper_aevb_revision_history_v1/paper_fetch_inventory.json",
+        "sha256": "176b34f17c675a26126dd746fd7aa505152b56496583b75db4898668b22e9d4c"
+      }
+    },
+    {
+      "family_id": "gpt3-arxiv-2005.14165",
+      "split": "train",
+      "inventory": {
+        "path": "data/source_inventory/p14_paper_gpt3_revision_preflight_v1/paper_fetch_inventory.json",
+        "sha256": "6333fbd610514fd67fed0eeec4a9dce1c2ad0d5ce3411b9f21a108119c24ddff"
+      }
+    }
+  ]
+}

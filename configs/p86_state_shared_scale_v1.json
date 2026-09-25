@@ -1,0 +1,15 @@
+{
+  "schema_version": "longworld.p86-state-shared-batch-config.v1",
+  "seed_base": 862000,
+  "cells": [
+    {"length_records": 400, "depth": 2, "worlds": 30},
+    {"length_records": 400, "depth": 3, "worlds": 30},
+    {"length_records": 800, "depth": 2, "worlds": 15},
+    {"length_records": 800, "depth": 3, "worlds": 15},
+    {"length_records": 1600, "depth": 2, "worlds": 5},
+    {"length_records": 1600, "depth": 3, "worlds": 5}
+  ],
+  "consumed_records": 20,
+  "variants": 2,
+  "max_full_chat_tokens": 262144
+}

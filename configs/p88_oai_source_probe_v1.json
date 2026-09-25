@@ -1,0 +1,17 @@
+{
+  "schema": "longworld.p88-oai-source-probe.v1",
+  "oai_url": "https://oaipmh.arxiv.org/oai",
+  "oai_set": "cs:cs:CL",
+  "metadata_prefix": "arXivRaw",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "minimum_request_interval_seconds": 3.2,
+  "maximum_network_requests": 2,
+  "source_archive_limit": 1,
+  "exclude_work_ids": [
+    "1312.6114", "1412.6980", "1706.03762", "1909.08053", "2005.14165",
+    "2112.11446", "2203.01928", "2204.02311", "2303.12712", "2407.21783"
+  ],
+  "content_use": "local_research_only_no_redistribution",
+  "official_oai_docs": "https://info.arxiv.org/help/oa/index.html",
+  "official_api_terms": "https://info.arxiv.org/help/api/tou.html"
+}

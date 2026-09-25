@@ -1,0 +1,31 @@
+{
+  "schema": "longworld.p86-public-paper-acquisition-plan.v1",
+  "status": "planned_not_fetched",
+  "metadata_api": "https://export.arxiv.org/api/query",
+  "api_manual": "https://info.arxiv.org/help/api/user-manual.html",
+  "terms_review": "https://info.arxiv.org/help/api/tou.html",
+  "query_categories": ["cs.CL", "cs.LG", "stat.ML", "physics.med-ph", "q-bio.MN", "econ.EM", "math.ST"],
+  "sort_by": "submittedDate",
+  "sort_order": "ascending",
+  "page_size": 100,
+  "minimum_request_interval_seconds": 3,
+  "max_simultaneous_connections": 1,
+  "metadata_page_limit_per_category": 3,
+  "source_archive_limit_total": 80,
+  "minimum_distinct_revisions": 2,
+  "content_redistribution": "prohibited_without_recorded_holder_permission_or_permissive_source_license",
+  "work_split_rule": "sha256(arxiv_work_id) modulo 10; residues 0-1 eval, 2-9 train",
+  "exclude_existing_work_ids": [
+    "1312.6114", "1412.6980", "1706.03762", "1909.08053", "2005.14165",
+    "2112.11446", "2203.01928", "2204.02311", "2303.12712", "2407.21783"
+  ],
+  "required_source_receipt": [
+    "metadata_response_sha256", "work_id", "revision_id", "retrieval_url",
+    "source_archive_sha256", "source_license", "retrieved_at", "parser_revision"
+  ],
+  "admission_after_fetch": [
+    "work_level_deduplication", "source_license_review", "archive_hash_verification",
+    "native_text_capacity_index", "substantive_prose_hunk_filter",
+    "reader_replay_and_exact_support_check", "final_token_position_and_mask_check"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "schema": "longworld.p87-arxiv-bounded-acquisition.v1",
+  "api_url": "https://export.arxiv.org/api/query",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "categories": ["cs.CL", "stat.ML", "physics.med-ph", "q-bio.MN", "econ.EM", "math.ST"],
+  "sort_by": "lastUpdatedDate",
+  "sort_order": "descending",
+  "page_size": 25,
+  "minimum_request_interval_seconds": 3.2,
+  "metadata_request_limit": 6,
+  "source_work_limit": 4,
+  "source_archive_limit": 8,
+  "minimum_latest_version": 2,
+  "exclude_work_ids": [
+    "1312.6114", "1412.6980", "1706.03762", "1909.08053", "2005.14165",
+    "2112.11446", "2203.01928", "2204.02311", "2303.12712", "2407.21783"
+  ],
+  "split_rule": "sha256(arxiv_work_id) first eight bytes modulo 10; 0-1 eval, 2-9 train",
+  "content_use": "local_research_only_no_redistribution",
+  "api_manual": "https://info.arxiv.org/help/api/user-manual.html",
+  "api_terms": "https://info.arxiv.org/help/api/tou.html"
+}
