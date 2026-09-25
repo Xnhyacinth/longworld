@@ -1,5 +1,8 @@
 # P106 current candidate index and selected reader pack
 
+Historical snapshot: P107 adds eight independently curated paper-source tasks;
+see `.hl/p107_integrated_status.md` for the later index and selection.
+
 `data/candidates/p106_candidate_refs_v1` extends P105 with the 46 audited
 P95 exact-revision Wiki grid tasks. The native source/reader auditor and the
 shared all-reader mask independently passed **46/46**, including 20 train and
