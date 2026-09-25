@@ -1,0 +1,10 @@
+{
+  "input_index": "data/candidates/p89_final_candidate_refs_v1",
+  "seed": 90,
+  "max_per_source_group": 24,
+  "max_per_cell": 48,
+  "max_per_source_kind_by_split": {
+    "train": 400,
+    "eval": 100
+  }
+}
