@@ -1,0 +1,27 @@
+{
+  "schema": "longworld.p102-admitted-union.v1",
+  "gates": [
+    {
+      "name": "network_pilot",
+      "manifest": {
+        "path": "data/capability_records/p102_connected_admitted_v1/manifest.json",
+        "sha256": "29a2253549e56889fe7ddc72a1b2f76c0ebd4dc48269b7accbaf413a4c287153"
+      },
+      "source_pool": {
+        "path": "data/capability_records/p102_connected_admitted_v1/source_pool.json",
+        "sha256": "e46ff2120e3a20208d543ff6e163331a7e05914e6cd2da96b849a707a358b7df"
+      }
+    },
+    {
+      "name": "frozen_recovery",
+      "manifest": {
+        "path": "data/capability_records/p102_connected_admitted_v2/manifest.json",
+        "sha256": "caa21925a7d15e8c3a6352dccf319a13c104ed1608022b7dec46373fd59751c5"
+      },
+      "source_pool": {
+        "path": "data/capability_records/p102_connected_admitted_v2/source_pool.json",
+        "sha256": "bfa363ae3f406f71f7490e9dcf6f9abf8d03e1870660b3b315936eb5d2bc009b"
+      }
+    }
+  ]
+}

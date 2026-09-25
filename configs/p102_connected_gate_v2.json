@@ -1,0 +1,25 @@
+{
+  "schema": "longworld.p102-connected-wiki-gate.v1",
+  "prior_router": {
+    "path": "data/capability_records/p92_source_router_v5/manifest.json",
+    "sha256": "7ab78fadb1047bf645c61d6797604c30f7917f7f4eaa03b21713d3aee4c35776"
+  },
+  "prior_pools": [
+    {
+      "path": "data/capability_records/p95_wiki_structural_merge_v1/source_pool.json",
+      "sha256": "5456d0af8a3566c704d74b524816d74915e48f17d7d746b077ee8d7226c33a9e"
+    },
+    {
+      "path": "data/capability_records/p97_wiki_gated_delta_v1/source_pool.json",
+      "sha256": "094353d647ae888821ede5683fd912d125f336018317ffc9364b40b7cd840268"
+    }
+  ],
+  "acquisition_manifest": {
+    "path": "data/capability_records/p102_connected_recovery_salvaged_v2/acquisition_manifest.json",
+    "sha256": "9b850b6277e1b8dd7d75ea134d6edcf062f34342b4c4ce26b607d0c17ec02746"
+  },
+  "acquisition_pool": {
+    "path": "data/capability_records/p102_connected_recovery_salvaged_v2/source_pool.json",
+    "sha256": "304c20619f6f5b1ef4c5cc09bc7d2102a7acbd7d2c1895cee6ceb7cada439294"
+  }
+}

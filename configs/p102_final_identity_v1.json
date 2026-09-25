@@ -1,0 +1,15 @@
+{
+  "schema": "longworld.p102-wiki-join-identity.v1",
+  "source_pool": {
+    "path": "data/capability_records/p102_final_connected_pool_v1/source_pool.json",
+    "sha256": "8310ed9aa66748e1ceab16b40dcb6d96f80c030052ccb173a3265b4da19396d7"
+  },
+  "native_manifest": {
+    "path": "data/candidates/p102_final_connected_native_v1/manifest.json",
+    "sha256": "e332ed6156617b2ae0acbbe43012e16d9ecdd0db43a34ac8dc9f4eccb286164d"
+  },
+  "unified_manifest": {
+    "path": "data/candidates/p102_final_connected_unified_v1/merged/manifest.json",
+    "sha256": "045b616bece7047af7def395f398fc7f366605bc1922c09f52a4b80513932bce"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema": "longworld.p102-connected-recovery.v1",
+  "base_pool": {
+    "path": "data/capability_records/p97_wiki_gated_delta_v1/source_pool.json",
+    "sha256": "094353d647ae888821ede5683fd912d125f336018317ffc9364b40b7cd840268"
+  },
+  "original_config": {
+    "path": "configs/p102_connected_wiki_pilot_v1.json",
+    "sha256": "37e9cf2f9ca9753c860994891f27074c09bbe249875150dfdd0a842af6da5438"
+  },
+  "original_manifest": {
+    "path": "data/capability_records/p102_connected_wiki_pilot_v1/acquisition_manifest.json",
+    "sha256": "6f73e904ef9535760b4ec20ba1f3e7cbd2c69b9b3356ca6f71a31298d8edd842"
+  },
+  "max_previews_per_seed": 4,
+  "max_freezes_per_seed": 1
+}

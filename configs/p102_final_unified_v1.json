@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.unified-synthesis-plan.v1",
+  "sources": [
+    {
+      "name": "wiki_p102_connected_final",
+      "kind": "wiki_row_join_probe",
+      "config": "data/capability_records/p102_final_connected_pool_v1/source_pool.json",
+      "output": "data/candidates/p102_final_connected_native_v1",
+      "generation": "new_p102"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "longworld.connected-wiki-intake.v1",
+  "base_pool": "data/capability_records/p97_wiki_gated_delta_v1/source_pool.json",
+  "base_pool_sha256": "094353d647ae888821ede5683fd912d125f336018317ffc9364b40b7cd840268",
+  "prior_unified_batch": {
+    "path": "data/candidates/p101_wiki_row_join_unified_v1",
+    "manifest_sha256": "4017aca6af5ba5e770db2f4b45a07a9cf42962d72c74e4b16c6f76757ca72a89"
+  },
+  "auto_sources": {
+    "domains": "*",
+    "max_sources": 14,
+    "max_per_domain": 1,
+    "max_queries": 3,
+    "results_per_query": 8,
+    "max_previews": 4,
+    "max_freezes": 1
+  }
+}

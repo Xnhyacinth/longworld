@@ -1,5 +1,12 @@
 # P101 current candidate index and reader delivery
 
+**Historical snapshot, superseded by P102.** A later reader-visible identity
+audit rejected three of the five Imperial Valley JOINs: their same-name rows
+did not establish a sufficiently precise shared entity. The current index
+starts from P100 and includes only the two Heber tasks accepted by the P102
+identity gate, plus four curated P102 tasks. See
+[`p102_integrated_status.md`](p102_integrated_status.md) for current counts.
+
 The latest sharded candidate index is `data/candidates/p101_candidate_refs_v1`.
 It extends the [P100 integrated index](p100_integrated_status.md) with five
 real-Wiki, two-document row-JOIN tasks from one newly productive frozen source

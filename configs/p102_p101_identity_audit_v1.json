@@ -1,0 +1,11 @@
+{
+  "schema": "longworld.p102-wiki-join-identity.v1",
+  "source_pool": {
+    "path": "data/capability_records/p97_wiki_gated_delta_v1/source_pool.json",
+    "sha256": "094353d647ae888821ede5683fd912d125f336018317ffc9364b40b7cd840268"
+  },
+  "native_manifest": {
+    "path": "data/candidates/p101_wiki_row_binding_native_v1/manifest.json",
+    "sha256": "8c6d11fad61493e213963ca1fb3ec5ad3c3048b71873458f798839c01c353d92"
+  }
+}

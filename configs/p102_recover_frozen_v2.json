@@ -1,0 +1,37 @@
+{
+  "schema": "longworld.p102-frozen-recovery.v1",
+  "base_pool": {
+    "path": "data/capability_records/p97_wiki_gated_delta_v1/source_pool.json",
+    "sha256": "094353d647ae888821ede5683fd912d125f336018317ffc9364b40b7cd840268"
+  },
+  "failed_acquisition": {
+    "path": "data/capability_records/p102_connected_recovery_v1/acquisition_manifest.json",
+    "sha256": "dd4bb7e01f893415fd17c320a3476c6805dcbb072fb2799b069d474fc69dc2fc"
+  },
+  "frozen_pairs": [
+    {
+      "anchor_source": "p93_p97_sports_v_5fd01e31b4_01_02",
+      "target_title": "List of football stadiums in Serbia",
+      "snapshot": {
+        "path": "data/capability_records/p102_connected_recovery_v1/snapshots/p102_recover_4b151a040074e77b37.json",
+        "sha256": "a9d8b4011e411d8b2f8280ea70009969ecf53c5d64a0a2814894ae8437f0a9d3"
+      },
+      "freeze_log": {
+        "path": "data/capability_records/p102_connected_recovery_v1/snapshots/p102_recover_4b151a040074e77b37.freeze-log.json",
+        "sha256": "22114a0326dcd8b5caca112de226a851c62fc6b76d7d52813ceae005cf4c4deb"
+      }
+    },
+    {
+      "anchor_source": "p93_p97_sports_v_5fd01e31b4_01_02",
+      "target_title": "List of second division football clubs in UEFA countries",
+      "snapshot": {
+        "path": "data/capability_records/p102_connected_recovery_v1/snapshots/p102_recover_7ab52f9ef96839aabf.json",
+        "sha256": "b8b89e512edf2b0b5011747a31329b6713e68e91ec43be08f59620728bf73b59"
+      },
+      "freeze_log": {
+        "path": "data/capability_records/p102_connected_recovery_v1/snapshots/p102_recover_7ab52f9ef96839aabf.freeze-log.json",
+        "sha256": "578b7c4e0cd5a63e0452fb8ba858efd7b412f9a2e99dfb408a423070920fa235"
+      }
+    }
+  ]
+}
