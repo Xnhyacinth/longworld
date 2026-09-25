@@ -1,0 +1,32 @@
+{
+  "schema": "longworld.p99-wiki-campaign.v1",
+  "catalog": {
+    "path": "configs/p97_wiki_intake_catalog_v1.json",
+    "sha256": "0a23ea1d4548ff95e91119f2aa2b1468f8e3b18372aa4990ff4e07c8b04c7676"
+  },
+  "plan_manifest": {
+    "path": "data/capability_records/p97_wiki_intake_plan_v2/manifest.json",
+    "sha256": "1e80adbcf59b697aa64b9c2af9f2df390cfe0d94c204e055a3558d73fd2219a4"
+  },
+  "base_pool": {
+    "path": "data/capability_records/p94_wiki_structural_merge_v2/source_pool.json",
+    "sha256": "6bf837dccdf83fe34f0c687458d3983dfc636db8066622a4b90648971b0c73ef"
+  },
+  "dedup_prior_pool": {
+    "path": "data/capability_records/p95_wiki_structural_merge_v1/source_pool.json",
+    "sha256": "5456d0af8a3566c704d74b524816d74915e48f17d7d746b077ee8d7226c33a9e"
+  },
+  "dedup_prior_router": {
+    "path": "data/capability_records/p92_source_router_v5/manifest.json",
+    "sha256": "7ab78fadb1047bf645c61d6797604c30f7917f7f4eaa03b21713d3aee4c35776"
+  },
+  "shards": [0, 1, 2, 3],
+  "frozen_intakes": [
+    {"shard": 0, "manifest": {"path": "data/capability_records/p97_wiki_intake_actual_shard_0000_v1/manifest.json", "sha256": "c9b7d9a745ee4a70bad3999dd1298af338982c423a3e5dccf0e8bd1fd19dd519"}},
+    {"shard": 1, "manifest": {"path": "data/capability_records/p97_wiki_intake_actual_shard_0001_v1/manifest.json", "sha256": "4eb4f26d79cae5d2fe228b0772de98bbd6ea46fa42c8431afd98ae058121407e"}},
+    {"shard": 2, "manifest": {"path": "data/capability_records/p97_wiki_intake_actual_shard_0002_v1/manifest.json", "sha256": "46258fead3c49339e4fbf933d3206c67e60bb92c2b9798c32d310da82f23f9fd"}},
+    {"shard": 3, "manifest": {"path": "data/capability_records/p97_wiki_intake_actual_shard_0003_v1/manifest.json", "sha256": "5ce6cbbaee9797da199aa364c08e27daed420f91e95b258a73874e35d140387c"}}
+  ],
+  "intake_workers": 4,
+  "task_workers": 4
+}
