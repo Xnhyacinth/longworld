@@ -1,0 +1,24 @@
+{
+  "schema": "longworld.p105-paper-catalog.v1.config",
+  "api_url": "https://export.arxiv.org/api/query",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "content_use": "local_research_only_no_redistribution",
+  "queries": [
+    "cat:cs.CL", "cat:cs.LG", "cat:stat.ML", "cat:cs.CV", "cat:cs.AI",
+    "cat:cs.RO", "cat:physics.med-ph", "cat:q-bio.MN", "cat:econ.EM", "cat:astro-ph.CO"
+  ],
+  "page_size": 100,
+  "request_interval_seconds": 3.2,
+  "minimum_latest_version": 2,
+  "per_query_work_limit": 2,
+  "work_limit": 20,
+  "frozen_inventory_root": "data/source_inventory",
+  "prior_source_configs": [
+    {"path": "configs/p86_frozen_paper_batch_v2.json", "sha256": "e01b869098660032cdd7b07d8ab79151a15b7e0a60039a343d4532089fa59ed7"},
+    {"path": "data/capability_records/p104_paper_source_discovery_v1/source_config.json", "sha256": "f295b451fed6267449da0255adef9aa197e0425ae685e7e9c6b4893ad7025ff3"}
+  ],
+  "prior_candidate_index": {
+    "path": "data/candidates/p104_candidate_refs_v1/manifest.json",
+    "sha256": "a2da614cb565e6ea14180b0b324bfa8773f8fdce844a36964e2581648f3a5e9b"
+  }
+}

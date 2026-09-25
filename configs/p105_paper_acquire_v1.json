@@ -1,0 +1,21 @@
+{
+  "schema": "longworld.p105-paper-acquisition.v1.config",
+  "catalog_manifest": {
+    "path": "data/capability_records/p105_paper_catalog_v1/manifest.json",
+    "sha256": "75c1ece3f0fe1a766aaf4433d0931880c3dea2fd3328c3d0af6cf131cfa73a30"
+  },
+  "content_use": "local_research_only_no_redistribution",
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "request_interval_seconds": 3.2,
+  "workers": 4,
+  "work_limit": 20,
+  "max_archive_bytes_total": 500000000,
+  "qa_template": {
+    "path": "configs/p96_paper_reference_qa_v1.json",
+    "sha256": "1f71375f067f0bd5d77816f60085cae9aceb5dbabbdab9a45aff147c6f85f582"
+  },
+  "prior_candidate_index": {
+    "path": "data/candidates/p104_candidate_refs_v1/manifest.json",
+    "sha256": "a2da614cb565e6ea14180b0b324bfa8773f8fdce844a36964e2581648f3a5e9b"
+  }
+}
