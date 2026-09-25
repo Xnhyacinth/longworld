@@ -1,0 +1,28 @@
+{
+  "schema": "longworld.p106-wiki-grid-category.v1",
+  "raw_manifest": {
+    "path": "data/candidates/p106_wiki_width_raw_p95_v1/manifest.json",
+    "sha256": "9736a0f5ea7c86c39e1d4b8393e605a703c81519484a3f02e65e3ecd95a07935"
+  },
+  "target_ledger": {
+    "path": "data/candidates/p106_wiki_width_target_support_p95_v1.json",
+    "sha256": "be4f281e69d8c3addd5c6135a35b0fbd2019f35b6ac0b678ecb7e35b399ab2bc"
+  },
+  "source_pool": {
+    "path": "data/capability_records/p95_wiki_structural_merge_v1/source_pool.json",
+    "sha256": "5456d0af8a3566c704d74b524816d74915e48f17d7d746b077ee8d7226c33a9e"
+  },
+  "source_gate": {
+    "path": "data/capability_records/p95_wiki_structural_merge_v1/manifest.json",
+    "sha256": "9244e3c94b416e841e709ca051f04d701eb87fc68377354266ba19ac45bd03fc"
+  },
+  "prior_p97_pool": {
+    "path": "data/capability_records/p97_wiki_gated_delta_v1/source_pool.json",
+    "sha256": "094353d647ae888821ede5683fd912d125f336018317ffc9364b40b7cd840268"
+  },
+  "p105_compiler_sha256": "f12ebba9b04c2e9f59885237e51be695aec9a4b1fdea8c1f9069ec7b0e8f287b",
+  "p105_reader_sha256": "68933b169009aa0483068e866329db3642b2cd356481982719f03cdcbb049c27",
+  "max_tasks_per_table": 3,
+  "max_full_tokens": 131072,
+  "workers": 4
+}

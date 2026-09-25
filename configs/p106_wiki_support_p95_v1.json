@@ -1,0 +1,16 @@
+{
+  "schema": "longworld.p106-wiki-width-support-plan.v1",
+  "raw_manifest": {
+    "path": "data/candidates/p106_wiki_width_raw_p95_v1/manifest.json",
+    "sha256": "9736a0f5ea7c86c39e1d4b8393e605a703c81519484a3f02e65e3ecd95a07935"
+  },
+  "page_audit": {
+    "path": "data/candidates/p103_wiki_categorical_p95_native_v1/page_audit.jsonl",
+    "sha256": "9ff3eb2bd761886f5a8844cb63df1159a5c405bfb32927efbf8524cc007cafcb"
+  },
+  "source_pool": {
+    "path": "data/capability_records/p95_wiki_structural_merge_v1/source_pool.json",
+    "sha256": "5456d0af8a3566c704d74b524816d74915e48f17d7d746b077ee8d7226c33a9e"
+  },
+  "max_tasks_per_table": 3
+}
