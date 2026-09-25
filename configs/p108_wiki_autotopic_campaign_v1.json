@@ -1,0 +1,27 @@
+{
+  "base_pool": {
+    "path": "data/capability_records/p108_wiki_autotopic_prior_v1/source_pool.json",
+    "sha256": "e20c54654061b82e2b1648b85067eda69ea4e3e071bbbc014c721302c56edda2"
+  },
+  "catalog": {
+    "path": "data/capability_records/p108_wiki_autotopic_catalog_v2/catalog.json",
+    "sha256": "197dd4d96babe800c8b252587e2594d9c46060192cfdfee49383d8808c9527d4"
+  },
+  "dedup_prior_pool": {
+    "path": "data/capability_records/p108_wiki_autotopic_prior_v1/source_pool.json",
+    "sha256": "e20c54654061b82e2b1648b85067eda69ea4e3e071bbbc014c721302c56edda2"
+  },
+  "dedup_prior_router": {
+    "path": "data/capability_records/p92_source_router_v5/manifest.json",
+    "sha256": "7ab78fadb1047bf645c61d6797604c30f7917f7f4eaa03b21713d3aee4c35776"
+  },
+  "frozen_intakes": [],
+  "intake_workers": 2,
+  "plan_manifest": {
+    "path": "data/capability_records/p108_wiki_autotopic_plan_v1/manifest.json",
+    "sha256": "032077549c1631f3956f0992406b50d89b53365a923e836f3636767d0508ed60"
+  },
+  "schema": "longworld.p99-wiki-campaign.v1",
+  "shards": "all",
+  "task_workers": 4
+}

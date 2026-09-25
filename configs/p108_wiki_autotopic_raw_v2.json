@@ -1,0 +1,21 @@
+{
+  "max_workers": 4,
+  "page_audit": {
+    "path": "data/capability_records/p108_wiki_autotopic_support_v1/page_audit.jsonl",
+    "sha256": "a980bfc7e905981da4e30be2e6111e5a7b03051ff365c54843ef36bf029151d5"
+  },
+  "prior_p97_pool": {
+    "path": "data/capability_records/p108_wiki_autotopic_prior_v1/source_pool.json",
+    "sha256": "e20c54654061b82e2b1648b85067eda69ea4e3e071bbbc014c721302c56edda2"
+  },
+  "requests_per_second": 2.0,
+  "schema": "longworld.p106-wiki-raw-revision-plan.v1",
+  "source_gate": {
+    "path": "data/capability_records/p108_wiki_autotopic_gate_bridge_v1/manifest.json",
+    "sha256": "68c4331f06fbfc5fb0a7515a1028c0b82f45405f6df065da567e9c102c432b12"
+  },
+  "source_pool": {
+    "path": "data/capability_records/p108_wiki_autotopic_campaign_v1/gate/source_pool.json",
+    "sha256": "c0daa878bc32db3a7599ca01709d620d25b6e1ebd69ccf679846e3cad3785fc6"
+  }
+}

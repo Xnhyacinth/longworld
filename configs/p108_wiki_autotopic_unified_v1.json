@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.unified-synthesis-plan.v1",
+  "sources": [
+    {
+      "config": "data/capability_records/p108_wiki_autotopic_campaign_v1/gate/source_pool.json",
+      "generation": "new_p108",
+      "kind": "wiki_source_pool",
+      "name": "wiki_p108_autotopic_pool",
+      "output": "data/capability_records/p108_wiki_autotopic_campaign_v1/batch"
+    }
+  ]
+}

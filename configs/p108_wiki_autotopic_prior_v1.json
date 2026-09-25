@@ -1,0 +1,13 @@
+{
+  "pools": [
+    {
+      "path": "data/capability_records/p95_wiki_structural_merge_v1/source_pool.json",
+      "sha256": "5456d0af8a3566c704d74b524816d74915e48f17d7d746b077ee8d7226c33a9e"
+    },
+    {
+      "path": "data/capability_records/p97_wiki_gated_delta_v1/source_pool.json",
+      "sha256": "094353d647ae888821ede5683fd912d125f336018317ffc9364b40b7cd840268"
+    }
+  ],
+  "schema": "longworld.p108-wiki-autotopic-prior.v1"
+}

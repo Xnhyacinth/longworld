@@ -1,0 +1,28 @@
+{
+  "max_full_tokens": 131072,
+  "max_tasks_per_table": 3,
+  "p105_compiler_sha256": "f12ebba9b04c2e9f59885237e51be695aec9a4b1fdea8c1f9069ec7b0e8f287b",
+  "p105_reader_sha256": "68933b169009aa0483068e866329db3642b2cd356481982719f03cdcbb049c27",
+  "prior_p97_pool": {
+    "path": "data/capability_records/p108_wiki_autotopic_prior_v1/source_pool.json",
+    "sha256": "e20c54654061b82e2b1648b85067eda69ea4e3e071bbbc014c721302c56edda2"
+  },
+  "raw_manifest": {
+    "path": "data/candidates/p108_wiki_width_raw_v1/manifest.json",
+    "sha256": "90fc25e512ef46ca9b8b186b7cba47c7b0bc5386a0f8e538344c0f2f8d2b9301"
+  },
+  "schema": "longworld.p106-wiki-grid-category.v1",
+  "source_gate": {
+    "path": "data/capability_records/p108_wiki_autotopic_gate_bridge_v1/manifest.json",
+    "sha256": "68c4331f06fbfc5fb0a7515a1028c0b82f45405f6df065da567e9c102c432b12"
+  },
+  "source_pool": {
+    "path": "data/capability_records/p108_wiki_autotopic_campaign_v1/gate/source_pool.json",
+    "sha256": "c0daa878bc32db3a7599ca01709d620d25b6e1ebd69ccf679846e3cad3785fc6"
+  },
+  "target_ledger": {
+    "path": "data/candidates/p108_wiki_width_target_support_v1.json",
+    "sha256": "437ff99164592a20a326e1b10a291f98afa490799e06b3c9cea9a6ccb8f62ca3"
+  },
+  "workers": 4
+}

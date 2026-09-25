@@ -1,0 +1,16 @@
+{
+  "max_tasks_per_table": 3,
+  "page_audit": {
+    "path": "data/capability_records/p108_wiki_autotopic_support_v1/page_audit.jsonl",
+    "sha256": "a980bfc7e905981da4e30be2e6111e5a7b03051ff365c54843ef36bf029151d5"
+  },
+  "raw_manifest": {
+    "path": "data/candidates/p108_wiki_width_raw_v1/manifest.json",
+    "sha256": "90fc25e512ef46ca9b8b186b7cba47c7b0bc5386a0f8e538344c0f2f8d2b9301"
+  },
+  "schema": "longworld.p106-wiki-width-support-plan.v1",
+  "source_pool": {
+    "path": "data/capability_records/p108_wiki_autotopic_campaign_v1/gate/source_pool.json",
+    "sha256": "c0daa878bc32db3a7599ca01709d620d25b6e1ebd69ccf679846e3cad3785fc6"
+  }
+}

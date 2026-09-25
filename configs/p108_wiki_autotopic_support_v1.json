@@ -1,0 +1,13 @@
+{
+  "max_options_per_table": 6,
+  "native_result": {
+    "path": "data/capability_records/p108_wiki_autotopic_campaign_v1/batch/result.json",
+    "sha256": "583404f57c2b1c4b0351d516d71ce88460cae369bd94b5e25edbd72d4a68b2e8"
+  },
+  "schema": "longworld.p108-wiki-autotopic-table-support.v1",
+  "source_pool": {
+    "path": "data/capability_records/p108_wiki_autotopic_campaign_v1/gate/source_pool.json",
+    "sha256": "c0daa878bc32db3a7599ca01709d620d25b6e1ebd69ccf679846e3cad3785fc6"
+  },
+  "workers": 4
+}

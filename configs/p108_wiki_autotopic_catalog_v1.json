@@ -1,0 +1,16 @@
+{
+  "base_pool": {
+    "path": "data/capability_records/p108_wiki_autotopic_prior_v1/source_pool.json",
+    "sha256": "e20c54654061b82e2b1648b85067eda69ea4e3e071bbbc014c721302c56edda2"
+  },
+  "bundle_size": 4,
+  "eval_modulus": 5,
+  "inventory": {
+    "path": "data/capability_records/p108_wiki_autotopic_inventory_v1/manifest.json",
+    "sha256": "b3dd9a7192c1f31757265ab973deee3a8e7c44765f9ae9c6e4c3a027b47175b9"
+  },
+  "max_bundles_per_term": 1,
+  "max_results_per_term": 12,
+  "max_terms": 120,
+  "schema": "longworld.p108-wiki-autotopic-catalog.v1"
+}

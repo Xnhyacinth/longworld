@@ -1,0 +1,11 @@
+{
+  "schema": "longworld.p108-wiki-autotopic-gate-bridge.v1",
+  "source_pool": {
+    "path": "data/capability_records/p108_wiki_autotopic_campaign_v1/gate/source_pool.json",
+    "sha256": "c0daa878bc32db3a7599ca01709d620d25b6e1ebd69ccf679846e3cad3785fc6"
+  },
+  "upstream_gate": {
+    "path": "data/capability_records/p108_wiki_autotopic_campaign_v1/gate/manifest.json",
+    "sha256": "c435dd5bf80d78529a33f42cfbed671bc136ee0e3c9390827493550005eec1a8"
+  }
+}
