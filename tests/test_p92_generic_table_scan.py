@@ -88,19 +88,28 @@ def test_real_frozen_table_is_inferred_without_title_rules() -> None:
     assert len(intervals(tables[0], 4)) == 4
 
 
-def test_sorted_year_table_cannot_use_unordered_boundary_replay() -> None:
+@pytest.mark.parametrize(
+    ("years", "expected_name", "order"),
+    [
+        ([1960, 1970, 1980, 1985, 1990, 1995, 2000, 2010], "Beta Park", "ascending"),
+        ([2010, 2000, 1995, 1990, 1985, 1980, 1970, 1960], "Eta Park", "descending"),
+    ],
+)
+def test_sorted_year_table_uses_order_preserving_boundary_replay(
+    years: list[int], expected_name: str, order: str
+) -> None:
     text = _table_text().replace("Beta Park | 1970", "Beta Park | 1981")
-    # Construct a fully monotonic table without changing the parser contract.
     lines = text.splitlines()
-    years = [1960, 1970, 1980, 1985, 1990, 1995, 2000, 2010]
     for index, year in enumerate(years, start=2):
         parts = lines[index].split(" | ")
         parts[1] = str(year)
         lines[index] = " | ".join(parts)
     sorted_text = "\n".join(lines) + "\n"
     table = parse_tables(sorted_text)[0][0]
-    with pytest.raises(ValueError, match="year-sorted"):
-        boundary_replay(sorted_text, table, 1980, 1990)
+    receipt = boundary_replay(sorted_text, table, 1980, 1990)
+    assert receipt["changed_row"] == expected_name
+    assert receipt["original_year_order"] == order
+    assert receipt["hit_answer"]["count"] == answer(table, 1980, 1990)["count"] + 1
 
 
 def test_blank_line_does_not_certify_open_table_boundary() -> None:

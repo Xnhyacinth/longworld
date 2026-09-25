@@ -125,6 +125,37 @@ def test_kind_split_cap_preserves_rare_operation_cell() -> None:
     assert {balanced._cell(entry)[2] for entry in selected} == {"join", "aggregate"}
 
 
+def test_supervised_token_cap_limits_a_dominant_kind_without_dropping_other_kinds() -> (
+    None
+):
+    entries = [
+        _entry("wiki-1", group="one", task="one"),
+        _entry("wiki-2", group="two", task="two"),
+        _entry("wiki-3", group="three", task="three"),
+        _entry("finance", group="four", task="four"),
+    ]
+    entries[-1]["candidate"]["source_kind"] = "real_finance"
+    selected = balanced._choose(
+        entries,
+        seed=90,
+        max_per_group=2,
+        max_per_cell=4,
+        max_per_kind_by_split={"train": 4, "eval": 4},
+        max_supervised_tokens_by_kind={"real_wiki": 15},
+    )
+    assert len(selected) == 2
+    assert balanced._coverage(selected)["by_source_kind"] == {
+        "real_finance": 1,
+        "real_wiki": 1,
+    }
+    assert (
+        balanced._coverage(selected)["by_source_kind_tokens"]["real_wiki"][
+            "supervised_tokens"
+        ]
+        == 10
+    )
+
+
 def test_select_replays_exact_bytes_and_detects_selected_ref_change(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -16,8 +16,10 @@ task audits before tokenizing. For each novel admitted task it checks
 the assistant-only mask, offsets for **all** candidate rows, exact same-line
 alternate support outside the table, and a visible-text hit/near-miss replay.
 The replay is a bounded information intervention; it does not claim a
-historically valid change to the public source. Year-sorted tables are rejected
-because changing one year can violate their ordering contract.
+historically valid change to the public source. The P94 parser update chooses
+a below-range boundary row whose changed year and near miss both preserve
+ascending or descending year order. If no such row exists, the table/task is
+still rejected.
 
 Run:
 
@@ -35,7 +37,9 @@ complete table was admitted: 35 rows of the Japanese national-parks page in
 `snapshot_c363c5af8780a75d524b` (`train`). Four interval candidates were
 considered, but **all four already exist** in the pinned P76 parks table-scan
 bank with the same snapshot, document, column and year boundaries. The
-final net-new yield is **zero**. The earlier `v4` probe materialized two rows
+final net-new yield is **zero**. Replaying the same 38-group pool after the
+P94 sorted-table update again found one complete table and zero net-new
+tasks; four candidate intervals remain duplicates. The earlier `v4` probe materialized two rows
 before this cross-bank check; they also duplicate existing questions and must
 not be appended to a final candidate bank. Those rows had 55,587 and 55,661
 full-chat tokens, a 1,243-token candidate-row extent and valid masks, but

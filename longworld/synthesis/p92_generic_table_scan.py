@@ -182,14 +182,33 @@ def boundary_replay(text: str, table: Table, low: int, high: int) -> dict:
     """Promote a visible nonmatch and independently reparse changed bytes."""
     baseline = answer(table, low, high)
     years = [row.year for row in table.rows]
-    if years == sorted(years) or years == sorted(years, reverse=True):
-        raise ValueError(
-            "year-sorted table has no order-preserving boundary intervention"
+    ascending = years == sorted(years)
+    descending = years == sorted(years, reverse=True)
+
+    def preserves_order(position: int, value: int) -> bool:
+        if ascending and (
+            (position > 0 and years[position - 1] > value)
+            or (position + 1 < len(years) and value > years[position + 1])
+        ):
+            return False
+        return not descending or not (
+            (position > 0 and years[position - 1] < value)
+            or (position + 1 < len(years) and value < years[position + 1])
         )
-    misses = [row for row in table.rows if row.year < low]
+
+    misses = [
+        (position, row)
+        for position, row in enumerate(table.rows)
+        if row.year < low
+        and preserves_order(position, low)
+        and preserves_order(position, low - 1)
+    ]
     if not misses or low < 1001:
         raise ValueError("no legal below-range row")
-    target = misses[0]
+    # At a sorted table's range boundary this changes one row without
+    # invalidating the table's visible ordering; unsorted tables retain the
+    # original first-miss choice.
+    position, target = misses[-1] if ascending else misses[0]
     replacement = str(low)
     near = str(low - 1)
 
@@ -218,4 +237,8 @@ def boundary_replay(text: str, table: Table, low: int, high: int) -> dict:
         "hit_value": replacement,
         "hit_answer": hit,
         "near_miss_value": near,
+        "original_year_order": (
+            "ascending" if ascending else "descending" if descending else "unsorted"
+        ),
+        "changed_row_position": position,
     }

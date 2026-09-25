@@ -119,6 +119,7 @@ def _choose(
     max_per_group: int,
     max_per_cell: int,
     max_per_kind_by_split: dict[str, int],
+    max_supervised_tokens_by_kind: dict[str, int] | None = None,
 ) -> list[dict[str, Any]]:
     buckets: dict[tuple[str, str, str, str], list[dict[str, Any]]] = defaultdict(list)
     split_by_group: dict[tuple[str, str], str] = {}
@@ -140,6 +141,8 @@ def _choose(
     chosen_tasks: set[tuple[str, str]] = set()
     group_counts: Counter[tuple[str, str]] = Counter()
     kind_split_counts: Counter[tuple[str, str]] = Counter()
+    kind_supervised_tokens: Counter[str] = Counter()
+    token_caps = max_supervised_tokens_by_kind or {}
     # Iterate one pass over each occupied cell per round. Rare cells retain
     # representation while common cells cannot consume the entire selection.
     for _ in range(max_per_cell):
@@ -152,6 +155,9 @@ def _choose(
                 and group_counts[_group(entry)] < max_per_group
                 and kind_split_counts[(cell[0], cell[1])]
                 < max_per_kind_by_split[cell[0]]
+                and kind_supervised_tokens[cell[1]]
+                + entry["candidate"]["supervised_tokens"]
+                <= token_caps.get(cell[1], float("inf"))
             )
             pick = min(
                 eligible,
@@ -168,6 +174,7 @@ def _choose(
             chosen_tasks.add(_task(pick))
             group_counts[_group(pick)] += 1
             kind_split_counts[(cell[0], cell[1])] += 1
+            kind_supervised_tokens[cell[1]] += pick["candidate"]["supervised_tokens"]
             progressed = True
         if not progressed:
             break
@@ -182,6 +189,7 @@ def select(
     max_per_group: int,
     max_per_cell: int,
     max_per_kind_by_split: dict[str, int],
+    max_supervised_tokens_by_kind: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     if (
         output_dir.exists()
@@ -196,18 +204,36 @@ def select(
             type(value) is not int or value < 1
             for value in max_per_kind_by_split.values()
         )
+        or (
+            max_supervised_tokens_by_kind is not None
+            and (
+                not isinstance(max_supervised_tokens_by_kind, dict)
+                or any(
+                    not isinstance(kind, str)
+                    or not kind
+                    or type(cap) is not int
+                    or cap < 1
+                    for kind, cap in max_supervised_tokens_by_kind.items()
+                )
+            )
+        )
     ):
         raise ValueError("new output, nonnegative seed and positive caps required")
     source = verify_index(index_dir)
     entries = _read_entries(index_dir)
     if len(entries) != source["candidate_views"]:
         raise ValueError("candidate reference count changed")
+    if max_supervised_tokens_by_kind and not set(max_supervised_tokens_by_kind) <= {
+        entry["candidate"]["source_kind"] for entry in entries
+    }:
+        raise ValueError("supervised token cap names an absent source kind")
     selected = _choose(
         entries,
         seed=seed,
         max_per_group=max_per_group,
         max_per_cell=max_per_cell,
         max_per_kind_by_split=max_per_kind_by_split,
+        max_supervised_tokens_by_kind=max_supervised_tokens_by_kind,
     )
     output_dir.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
@@ -233,6 +259,11 @@ def select(
             "max_per_source_group": max_per_group,
             "max_per_cell": max_per_cell,
             "max_per_source_kind_by_split": max_per_kind_by_split,
+            **(
+                {"max_supervised_tokens_by_kind": max_supervised_tokens_by_kind}
+                if max_supervised_tokens_by_kind is not None
+                else {}
+            ),
             "before": _coverage(entries),
             "after": _coverage(selected),
             "selected_refs_sha256": _sha(selected_path),
@@ -252,6 +283,7 @@ def verify_selection(
     max_per_group: int,
     max_per_cell: int,
     max_per_kind_by_split: dict[str, int],
+    max_supervised_tokens_by_kind: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     stored = json.loads((output_dir / "manifest.json").read_text())
     if stored.get("selected_refs_sha256") != _sha(output_dir / "selected_refs.jsonl"):
@@ -267,6 +299,7 @@ def verify_selection(
             max_per_group=max_per_group,
             max_per_cell=max_per_cell,
             max_per_kind_by_split=max_per_kind_by_split,
+            max_supervised_tokens_by_kind=max_supervised_tokens_by_kind,
         )
         if (
             rebuilt != stored
@@ -292,6 +325,7 @@ def main() -> None:
         "max_per_group": config["max_per_source_group"],
         "max_per_cell": config["max_per_cell"],
         "max_per_kind_by_split": config["max_per_source_kind_by_split"],
+        "max_supervised_tokens_by_kind": config.get("max_supervised_tokens_by_kind"),
     }
     result = (
         verify_selection(index_dir, args.output, **kwargs)
