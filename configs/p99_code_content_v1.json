@@ -1,0 +1,17 @@
+{
+  "schema_version": "longworld.p99-code-content.v1",
+  "min_evidence_span_tokens": 16384,
+  "max_chat_tokens": 262144,
+  "max_tasks_per_repository": 12,
+  "banks": [
+    {"bank_root": "data/candidates/p64_codeforge_taskbank_v2/ruff", "receipt_sha256": "5a7f0f31eb4115028eefe36439183dab5d4835b426dbd981210066f9638bb66d", "source_group_id": "https://github.com/astral-sh/ruff", "split": "train"},
+    {"bank_root": "data/candidates/p64_codeforge_taskbank_v2/oxc", "receipt_sha256": "d458cb35029bb8f43ed2a7fd19940936ab31aceb073930030ef9683112362a46", "source_group_id": "https://github.com/oxc-project/oxc", "split": "train"},
+    {"bank_root": "data/candidates/p64_codeforge_taskbank_v2/dprint", "receipt_sha256": "dd8331fa8d11f30d617e7cb5aef1b016800650c68e2b94bc67dda8532a6ae1d2", "source_group_id": "https://github.com/dprint/dprint", "split": "train"},
+    {"bank_root": "data/candidates/p64_codeforge_taskbank_v2/uv", "receipt_sha256": "e120122624321643b3d2ccb4bd20a05f7d41c8939611bbfe7e3c2e44378f213f", "source_group_id": "https://github.com/astral-sh/uv", "split": "eval"},
+    {"bank_root": "data/candidates/p64_codeforge_taskbank_v2/pulumi", "receipt_sha256": "44c68a88e69910827163ad0a683ba4dd642c2fce1cc23a7ebf5f390b1dde2490", "source_group_id": "https://github.com/pulumi/pulumi", "split": "train"},
+    {"bank_root": "data/candidates/p64_codeforge_taskbank_v2/transformers", "receipt_sha256": "51307df0624fde249ec3f677e05b33b66926b6a60ec99c9097706a9777ccd1de", "source_group_id": "https://github.com/huggingface/transformers", "split": "train"},
+    {"bank_root": "data/candidates/p64_codeforge_taskbank_v2/opensearch", "receipt_sha256": "a03cb642b4a9f1fc581eb58ba2316589d94dbe45d25f33b039db14b5f92acfba", "source_group_id": "https://github.com/opensearch-project/opensearch-php", "split": "eval"},
+    {"bank_root": "data/candidates/p94_codeforge_duckdb_v1.native_banks/duckdb", "receipt_sha256": "28f0e2676027dfee27877d722adbcfc0bb18bcac6016173d9cb605319cfc8823", "source_group_id": "https://github.com/duckdb/duckdb", "split": "train"},
+    {"bank_root": "data/candidates/p94_codeforge_wasmtime_v1.native_banks/wasmtime", "receipt_sha256": "ec66c44b14357efdfdd935dcb321877b606c2c2fd77c8af1bbe4030c3e560086", "source_group_id": "https://github.com/bytecodealliance/wasmtime", "split": "eval"}
+  ]
+}
