@@ -1,0 +1,15 @@
+{
+  "schema": "longworld.p92-source-router.v1",
+  "wiki_source_pool_glob": "data/capability_records/*/source_pool.json",
+  "max_native_probe_bytes": 2000000,
+  "prior_source_manifest": {
+    "path": "data/p75_real_reader_candidates_v1/source_manifest.jsonl",
+    "sha256": "436bc1623736dbefe00afd5d9d582380805e619792367bef02f8354b015be270"
+  },
+  "observed_receipts": {
+    "paper": "data/candidates/p86_frozen_paper_batch_v2/manifest.json",
+    "finance": "data/candidates/p64_finance_taskbank_v2/BATCH_RECEIPT.json",
+    "code": "reports/p64_codeforge_taskbank_inventory_20260909.json",
+    "rfc_hybrid": "data/candidates/p87_hybrid_rfc9114_pilot_v6/manifest.json"
+  }
+}

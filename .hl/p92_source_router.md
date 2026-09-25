@@ -1,0 +1,21 @@
+# P92 frozen-source routing and capacity
+
+The executable source matrix is `data/capability_records/p92_source_router_v2/manifest.json`; its runnable, deduplicated Wiki pool is `data/capability_records/p92_source_router_v2/consolidated_wiki_pool.json`. The v1 receipt remains a historical pre-novelty audit. Neither matrix is training data.
+
+Run and verify from the repository root:
+
+```bash
+UV_LINK_MODE=copy uv run --offline python scripts/build_p92_source_router.py --config configs/p92_source_router_v2.json --output-dir data/capability_records/p92_source_router_v2 --workers 4 --verify-only
+cat data/capability_records/p92_source_router_v2/manifest.json
+cat data/capability_records/p92_source_router_v2/consolidated_wiki_pool.json
+```
+
+The router binds the 17 existing Wiki pool files, all referenced frozen snapshots, the P91 candidate index, and the paper/finance/code/RFC candidate receipts by SHA-256. It deduplicates on the frozen snapshot digest and uses the native `snapshot_id` as the Wiki world group. It refuses train/eval split conflicts. Wiki support is probed with the existing lookup, cross-document pair and closed-table scan builders; other lanes are marked **observed candidate**, which records prior output rather than promising new task yield. The one 7.5 MB snapshot above the 2 MB native-probe limit is retained as `unprobed_oversize`, not classified as unsupported.
+
+The routed inventory contains 75 groups: 54 Wiki, 5 paper revision, 8 issuer reports, 7 repository histories and 1 real RFC rule plus simulated events. Its 170 Wiki pool references reduce to 54 unique frozen snapshots. Native Wiki probes find 30 lookup worlds, 2 cross-document pair worlds and 5 worlds with one closed table each. Against the pinned P91 index, 27 Wiki worlds are already indexed and 27 are absent; only 6 absent worlds have a supported native operation, and the 9 supported operation cells absent from the index are all lookup. This is source/operation *capacity*, not 9 accepted reader tasks. The aggregate historical finance/code/paper/RFC receipt counts are not additive with the P91 index.
+
+The consolidated pool contains 30 conflict-free Wiki worlds with at least one successful native probe (19 train, 11 eval; 13 recorded domain labels and 21 topic labels). Feeding it to the existing `scripts.run_source_pool_batch._planned` yields 37 legal jobs: 30 lookup, 2 pair and 5 scan; the planner reports 105 unsupported source/recipe/page cells. Recompilation must still pass full reader, deduplication, dependency and mask checks before export. `book`, general report prose and agentic trajectory remain unconnected because there is no frozen source plus corresponding native reader compiler in this route.
+
+The next intake should be selected by source structure before topic breadth. `scripts/expand_wiki_source_pool.py` already supports bounded `search`/`category` discovery, revision freeze, ≤100 seed queries, ≤30 pages per query, ≤10 pages per bundle and native support probes. A scalable query catalog should target pages with an explicit bounded table, a named row key, a stable `Established`/year column or another parser-declared column, and adjacent object pages with a resolvable join key. Discover titles first, then fetch and parse a bounded page sample; retain parser/header/row rejection counts per query, and only then freeze larger groups. Domain/topic should be recorded from the source or a trusted taxonomy after structural admission; changing their strings cannot create new L2/L3 evidence. For report, paper, code and agentic lanes, add native adapters with their own source structure and evidence contract, rather than passing their documents through the Wiki parser.
+
+This wave ran no new source acquisition, reader generation, SWIFT/Megatron preprocessing or model training. Focused tests: `4 passed`; Ruff check/format pass; v2 receipt `--verify-only` passed. `train_ready=false` throughout.
