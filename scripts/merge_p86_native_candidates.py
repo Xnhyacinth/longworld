@@ -24,9 +24,12 @@ from longworld.synthesis.length_controller import (
 from longworld.synthesis.unified_candidate_contract import (
     AdapterBinding,
     CandidateLedger,
+    _answer_hash,
     normalize_native_candidate,
 )
 from longworld.synthesis.unified_candidate_merge import verify_merge
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _sha(path: Path) -> str:
@@ -383,6 +386,334 @@ def _wiki_new_only(directory: Path) -> Iterator[tuple[Any, dict[str, Any], str]]
         raise ValueError("Wiki new-only native row counts disagree")
 
 
+def _wiki_generic_year(directory: Path) -> Iterator[tuple[Any, dict[str, Any], str]]:
+    manifest_path = directory / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    if manifest.get("schema") != "longworld.p92-generic-table-scan.v1.result":
+        raise ValueError("wrong generic Wiki year-table schema")
+    _verified_files(directory, manifest)
+    mask_path = directory / "mask_audit.json"
+    mask = json.loads(mask_path.read_text())
+    if (
+        mask.get("schema_version") != "longworld.p94-wiki-native-mask-audit.v1"
+        or mask.get("source_manifest_sha256") != _sha(manifest_path)
+        or mask.get("source_index_sha256") != _sha(directory / "sample_index.jsonl")
+        or mask.get("source_audit_sha256") != _sha(directory / "audit.jsonl")
+        or mask.get("tokenizer")
+        != {"model_id": TOKENIZER_MODEL, "revision": TOKENIZER_REVISION}
+        or mask.get("checked_rows") != manifest["candidate_views"]
+        or mask.get("scope")
+        != "native_oracle_and_scoped_intervention_plus_training_assistant_mask"
+        or mask.get("train_ready") is not False
+    ):
+        raise ValueError("generic Wiki year-table mask receipt disagrees")
+    readers = {
+        split: _rows(directory / f"{split}.jsonl") for split in ("train", "eval")
+    }
+    audits = _rows(directory / "audit.jsonl")
+    counts: Counter[str] = Counter()
+    tasks: set[str] = set()
+    full_tokens = supervised_tokens = 0
+    for index in _rows(directory / "sample_index.jsonl"):
+        split = index["split"]
+        if split not in readers:
+            raise ValueError("generic Wiki year-table split invalid")
+        reader = next(readers[split], None)
+        audit = next(audits, None)
+        if reader is None or audit is None:
+            raise ValueError("generic Wiki year-table reader or audit missing")
+        sample_id = index["sample_id"]
+        reader_hash = hashlib.sha256(
+            json.dumps(
+                {"sample_id": sample_id, "messages": reader["messages"]},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        answer = json.loads(reader["messages"][1]["content"])
+        rows = audit.get("candidate_rows", [])
+        intervention = audit.get("intervention", {})
+        if (
+            reader.get("sample_id") != sample_id
+            or audit.get("sample_id") != sample_id
+            or mask.get("reader_sha256", {}).get(sample_id) != reader_hash
+            or audit.get("answer") != answer
+            or index["operation"] != "closed_year_table_interval"
+            or index.get("task_type") != index["operation"]
+            or len(rows) != index["candidate_rows"]
+            or sum(bool(row["selected"]) for row in rows) != index["selected_rows"]
+            or answer.get("count") != index["selected_rows"]
+            or intervention.get("hit_answer") == answer
+            or intervention.get("near_miss_value") is None
+        ):
+            raise ValueError("generic Wiki year-table evidence or answer differs")
+        binding = AdapterBinding(
+            source_kind="real_wiki",
+            source_group=index["source_group"],
+            domain=index["domain"],
+            topic=index["topic"],
+            operation=index["operation"],
+            evidence_profile="complete_visible_year_table_rows_replayed",
+            tokenizer_profile="pinned-chat-template",
+            receipt_path=manifest_path,
+            receipt_sha256=_sha(manifest_path),
+        )
+        candidate = normalize_native_candidate(
+            index, reader, binding, context_text=_context(reader["messages"])
+        )
+        counts[split] += 1
+        tasks.add(candidate.semantic_task_id)
+        full_tokens += candidate.full_chat_tokens
+        supervised_tokens += candidate.supervised_tokens
+        yield candidate, reader, f"{directory}/{split}.jsonl:{counts[split] - 1}"
+    if (
+        sum(counts.values()) != manifest["candidate_views"]
+        or len(tasks) != manifest["independent_tasks"]
+        or set(mask.get("reader_sha256", {}))
+        != {row["sample_id"] for row in _rows(directory / "sample_index.jsonl")}
+        or dict(counts) != mask.get("splits")
+        or full_tokens != mask.get("full_chat_tokens")
+        or supervised_tokens != mask.get("supervised_tokens")
+        or next(audits, None) is not None
+        or any(next(stream, None) is not None for stream in readers.values())
+    ):
+        raise ValueError("generic Wiki year-table native counts disagree")
+
+
+def _wiki_real_pair_length(
+    directory: Path, config_path: Path
+) -> Iterator[tuple[Any, dict[str, Any], str]]:
+    manifest_path = directory / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    if manifest.get("schema") != "longworld.p94-real-pair-length.v1.export.v1":
+        raise ValueError("wrong real Wiki pair-length schema")
+    _verified_files(directory, manifest)
+    config = json.loads(config_path.read_text())
+    if (
+        config.get("schema") != "longworld.p94-real-pair-length.v1"
+        or manifest.get("config_sha256") != _sha(config_path)
+        or manifest.get("composer_sha256")
+        != _sha(ROOT / "scripts/compose_p94_real_pair_length.py")
+        or manifest.get("tokenizer")
+        != {"model_id": TOKENIZER_MODEL, "revision": TOKENIZER_REVISION}
+    ):
+        raise ValueError("real Wiki pair-length code, config or tokenizer changed")
+    for name, field in (
+        ("source_pool", "source_pool_sha256"),
+        ("native_manifest", "native_manifest_sha256"),
+        ("native_mask_audit", "native_mask_audit_sha256"),
+    ):
+        pin = config[name]
+        relative = Path(pin["path"])
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or _sha(ROOT / relative) != pin["sha256"]
+            or manifest[field] != pin["sha256"]
+        ):
+            raise ValueError(f"real Wiki pair-length source pin changed: {name}")
+    native_dir = ROOT / Path(config["native_manifest"]["path"]).parent
+    _verified_files(native_dir, json.loads((native_dir / "manifest.json").read_text()))
+    native_index = {
+        row["example_id"]: row for row in _rows(native_dir / "sample_index.jsonl")
+    }
+    native_readers = {
+        row["example_id"]: row for row in _rows(native_dir / "eval.jsonl")
+    }
+    readers = _rows(directory / "eval.jsonl")
+    audits = _rows(directory / "audit.jsonl")
+    tasks: set[str] = set()
+    lengths: Counter[str] = Counter()
+    count = 0
+    for index in _rows(directory / "sample_index.jsonl"):
+        reader = next(readers, None)
+        audit = next(audits, None)
+        if reader is None or audit is None:
+            raise ValueError("real Wiki pair-length reader or audit missing")
+        sample_id = index["example_id"]
+        native = native_index.get(index["native_example_id"])
+        original = native_readers.get(index["native_example_id"])
+        answer = reader["messages"][1]["content"]
+        reader_hash = hashlib.sha256(
+            json.dumps(
+                {"sample_id": sample_id, "messages": reader["messages"]},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        spans = audit.get("evidence_token_spans", [])
+        if (
+            reader["example_id"] != sample_id
+            or audit.get("example_id") != sample_id
+            or native is None
+            or original is None
+            or index["semantic_task_id"] != native["task_id"]
+            or index["source_group"] != native["source_group"]
+            or index["split"] != native["split"]
+            or index["operation"] != native["task_type"]
+            or answer != original["messages"][1]["content"]
+            or index["answer_sha256"] != _answer_hash(answer)
+            or audit.get("mask_reader_sha256") != reader_hash
+            or audit.get("semantic_task_id") != index["semantic_task_id"]
+            or audit.get("reader_intervention", {}).get("status")
+            != "two_named_source_year_cells_independently_removed"
+            or len(spans) != 2
+            or audit.get("evidence_extent_tokens")
+            != max(span[1] for span in spans) - min(span[0] for span in spans)
+            or index["evidence_extent_tokens"] != audit["evidence_extent_tokens"]
+        ):
+            raise ValueError("real Wiki pair-length task, mask or evidence differs")
+        binding = AdapterBinding(
+            source_kind="real_wiki",
+            source_group=index["source_group"],
+            domain=index["domain"],
+            topic=index["topic"],
+            operation=index["operation"],
+            evidence_profile="two_named_table_year_cells_scoped_reader_replay",
+            tokenizer_profile="pinned-chat-template",
+            receipt_path=manifest_path,
+            receipt_sha256=_sha(manifest_path),
+        )
+        normalized_reader = {"sample_id": sample_id, "messages": reader["messages"]}
+        candidate = normalize_native_candidate(
+            index, normalized_reader, binding, context_text=_context(reader["messages"])
+        )
+        tasks.add(candidate.semantic_task_id)
+        lengths[candidate.length_bin] += 1
+        yield candidate, normalized_reader, f"{directory}/eval.jsonl:{count}"
+        count += 1
+    if (
+        count != manifest["views"]
+        or len(tasks) != manifest["semantic_tasks_reused"]
+        or dict(lengths) != manifest["views_by_length"]
+        or next(readers, None) is not None
+        or next(audits, None) is not None
+    ):
+        raise ValueError("real Wiki pair-length native row counts disagree")
+
+
+def _wiki_real_scan_length(
+    directory: Path, config_path: Path
+) -> Iterator[tuple[Any, dict[str, Any], str]]:
+    manifest_path = directory / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    if manifest.get("schema") != "longworld.p94-real-scan-length.v1.export.v1":
+        raise ValueError("wrong real Wiki scan-length schema")
+    _verified_files(directory, manifest)
+    config = json.loads(config_path.read_text())
+    if (
+        config.get("schema") != "longworld.p94-real-scan-length.v1"
+        or manifest.get("config_sha256") != _sha(config_path)
+        or manifest.get("composer_sha256")
+        != _sha(ROOT / "scripts/compose_p94_real_scan_length.py")
+        or manifest.get("pair_helpers_sha256")
+        != _sha(ROOT / "scripts/compose_p94_real_pair_length.py")
+        or manifest.get("tokenizer")
+        != {"model_id": TOKENIZER_MODEL, "revision": TOKENIZER_REVISION}
+    ):
+        raise ValueError("real Wiki scan-length code, config or tokenizer changed")
+    for name, field in (
+        ("source_pool", "source_pool_sha256"),
+        ("native_manifest", "native_manifest_sha256"),
+    ):
+        pin = config[name]
+        relative = Path(pin["path"])
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or _sha(ROOT / relative) != pin["sha256"]
+            or manifest[field] != pin["sha256"]
+        ):
+            raise ValueError(f"real Wiki scan-length source pin changed: {name}")
+    native_dir = ROOT / Path(config["native_manifest"]["path"]).parent
+    _verified_files(native_dir, json.loads((native_dir / "manifest.json").read_text()))
+    native_index = {
+        row["example_id"]: row for row in _rows(native_dir / "sample_index.jsonl")
+    }
+    native_readers = {
+        row["example_id"]: row for row in _rows(native_dir / "train.jsonl")
+    }
+    readers = _rows(directory / "train.jsonl")
+    audits = _rows(directory / "audit.jsonl")
+    tasks: set[str] = set()
+    lengths: Counter[str] = Counter()
+    count = 0
+    for index in _rows(directory / "sample_index.jsonl"):
+        reader = next(readers, None)
+        audit = next(audits, None)
+        if reader is None or audit is None:
+            raise ValueError("real Wiki scan-length reader or audit missing")
+        sample_id = index["example_id"]
+        native = native_index.get(index["native_example_id"])
+        original = native_readers.get(index["native_example_id"])
+        answer = reader["messages"][1]["content"]
+        reader_hash = hashlib.sha256(
+            json.dumps(
+                {"sample_id": sample_id, "messages": reader["messages"]},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        spans = audit.get("evidence_token_spans", [])
+        intervention = audit.get("reader_intervention", {})
+        if (
+            reader["example_id"] != sample_id
+            or audit.get("example_id") != sample_id
+            or native is None
+            or original is None
+            or index["semantic_task_id"] != native["task_id"]
+            or index["source_group"] != native["source_group"]
+            or index["split"] != native["split"]
+            or index["operation"] != native["task_type"]
+            or index["operation"] != "dense_table_interval_scan"
+            or answer != original["messages"][1]["content"]
+            or index["answer_sha256"] != _answer_hash(answer)
+            or audit.get("mask_reader_sha256") != reader_hash
+            or audit.get("semantic_task_id") != index["semantic_task_id"]
+            or intervention.get("status")
+            != "scoped_named_table_hit_and_near_miss_replayed"
+            or intervention.get("eligible_row_count") != len(spans)
+            or intervention.get("near_miss_answer") != json.loads(answer)
+            or len(spans) < 8
+            or audit.get("evidence_extent_tokens")
+            != max(span[1] for span in spans) - min(span[0] for span in spans)
+            or index["evidence_extent_tokens"] != audit["evidence_extent_tokens"]
+            or index["last_evidence_to_query_tokens"]
+            != audit.get("last_evidence_to_query_tokens")
+        ):
+            raise ValueError("real Wiki scan-length task, mask or evidence differs")
+        binding = AdapterBinding(
+            source_kind="real_wiki",
+            source_group=index["source_group"],
+            domain=index["domain"],
+            topic=index["topic"],
+            operation=index["operation"],
+            evidence_profile="complete_named_table_scan_scoped_reader_replay",
+            tokenizer_profile="pinned-chat-template",
+            receipt_path=manifest_path,
+            receipt_sha256=_sha(manifest_path),
+        )
+        normalized_reader = {"sample_id": sample_id, "messages": reader["messages"]}
+        candidate = normalize_native_candidate(
+            index, normalized_reader, binding, context_text=_context(reader["messages"])
+        )
+        tasks.add(candidate.semantic_task_id)
+        lengths[candidate.length_bin] += 1
+        yield candidate, normalized_reader, f"{directory}/train.jsonl:{count}"
+        count += 1
+    if (
+        count != manifest["views"]
+        or len(tasks) != manifest["semantic_tasks_reused"]
+        or dict(lengths) != manifest["views_by_length"]
+        or next(readers, None) is not None
+        or next(audits, None) is not None
+    ):
+        raise ValueError("real Wiki scan-length native row counts disagree")
+
+
 def build(
     paper_dir: Path | None,
     state_dir: Path | None,
@@ -391,12 +722,21 @@ def build(
     hybrid_dir: Path | None = None,
     wiki_numeric_dir: Path | None = None,
     wiki_new_only_dir: Path | None = None,
+    wiki_generic_year_dir: Path | None = None,
+    wiki_real_pair_length_dir: Path | None = None,
+    wiki_real_pair_length_config: Path | None = None,
+    wiki_real_scan_length_dir: Path | None = None,
+    wiki_real_scan_length_config: Path | None = None,
     generation: str | None = None,
 ) -> dict[str, Any]:
     if output.exists():
         raise ValueError("canonical P86 output must be new")
     if generation is not None and not re.fullmatch(r"p[0-9]+", generation):
         raise ValueError("generation must be a p-number label")
+    if bool(wiki_real_pair_length_dir) != bool(wiki_real_pair_length_config):
+        raise ValueError("pair-length directory and config must be provided together")
+    if bool(wiki_real_scan_length_dir) != bool(wiki_real_scan_length_config):
+        raise ValueError("scan-length directory and config must be provided together")
     output.parent.mkdir(parents=True, exist_ok=True)
     ledger = CandidateLedger()
     positions = Counter()
@@ -448,6 +788,37 @@ def build(
                     (
                         f"wiki_new_{generation}" if generation else "wiki_new_p92",
                         _wiki_new_only(wiki_new_only_dir),
+                    )
+                )
+            if wiki_generic_year_dir is not None:
+                lanes.append(
+                    (
+                        f"wiki_generic_year_{generation}"
+                        if generation
+                        else "wiki_generic_year_p94",
+                        _wiki_generic_year(wiki_generic_year_dir),
+                    )
+                )
+            if wiki_real_pair_length_dir is not None:
+                lanes.append(
+                    (
+                        f"wiki_real_pair_length_{generation}"
+                        if generation
+                        else "wiki_real_pair_length_p94",
+                        _wiki_real_pair_length(
+                            wiki_real_pair_length_dir, wiki_real_pair_length_config
+                        ),
+                    )
+                )
+            if wiki_real_scan_length_dir is not None:
+                lanes.append(
+                    (
+                        f"wiki_real_scan_length_{generation}"
+                        if generation
+                        else "wiki_real_scan_length_p94",
+                        _wiki_real_scan_length(
+                            wiki_real_scan_length_dir, wiki_real_scan_length_config
+                        ),
                     )
                 )
             if not lanes:
@@ -527,6 +898,36 @@ def build(
                     if wiki_new_only_dir is not None
                     else {}
                 ),
+                **(
+                    {
+                        "wiki_generic_year_manifest_sha256": _sha(
+                            wiki_generic_year_dir / "manifest.json"
+                        ),
+                        "wiki_generic_year_mask_sha256": _sha(
+                            wiki_generic_year_dir / "mask_audit.json"
+                        ),
+                    }
+                    if wiki_generic_year_dir is not None
+                    else {}
+                ),
+                **(
+                    {
+                        "wiki_real_pair_length_manifest_sha256": _sha(
+                            wiki_real_pair_length_dir / "manifest.json"
+                        )
+                    }
+                    if wiki_real_pair_length_dir is not None
+                    else {}
+                ),
+                **(
+                    {
+                        "wiki_real_scan_length_manifest_sha256": _sha(
+                            wiki_real_scan_length_dir / "manifest.json"
+                        )
+                    }
+                    if wiki_real_scan_length_dir is not None
+                    else {}
+                ),
             },
             "files_sha256": {
                 name: _sha(temp / name)
@@ -553,6 +954,11 @@ def verify(
     hybrid_dir: Path | None = None,
     wiki_numeric_dir: Path | None = None,
     wiki_new_only_dir: Path | None = None,
+    wiki_generic_year_dir: Path | None = None,
+    wiki_real_pair_length_dir: Path | None = None,
+    wiki_real_pair_length_config: Path | None = None,
+    wiki_real_scan_length_dir: Path | None = None,
+    wiki_real_scan_length_config: Path | None = None,
     generation: str | None = None,
 ) -> dict[str, Any]:
     """Recompile from the pinned native lanes and compare final reader hashes."""
@@ -567,6 +973,11 @@ def verify(
             hybrid_dir=hybrid_dir,
             wiki_numeric_dir=wiki_numeric_dir,
             wiki_new_only_dir=wiki_new_only_dir,
+            wiki_generic_year_dir=wiki_generic_year_dir,
+            wiki_real_pair_length_dir=wiki_real_pair_length_dir,
+            wiki_real_pair_length_config=wiki_real_pair_length_config,
+            wiki_real_scan_length_dir=wiki_real_scan_length_dir,
+            wiki_real_scan_length_config=wiki_real_scan_length_config,
             generation=generation,
         )
         if rebuilt != stored:
@@ -581,6 +992,11 @@ def main() -> None:
     parser.add_argument("--hybrid-dir", type=Path)
     parser.add_argument("--wiki-numeric-dir", type=Path)
     parser.add_argument("--wiki-new-only-dir", type=Path)
+    parser.add_argument("--wiki-generic-year-dir", type=Path)
+    parser.add_argument("--wiki-real-pair-length-dir", type=Path)
+    parser.add_argument("--wiki-real-pair-length-config", type=Path)
+    parser.add_argument("--wiki-real-scan-length-dir", type=Path)
+    parser.add_argument("--wiki-real-scan-length-config", type=Path)
     parser.add_argument("--generation")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--verify-only", action="store_true")
@@ -593,6 +1009,11 @@ def main() -> None:
             hybrid_dir=args.hybrid_dir,
             wiki_numeric_dir=args.wiki_numeric_dir,
             wiki_new_only_dir=args.wiki_new_only_dir,
+            wiki_generic_year_dir=args.wiki_generic_year_dir,
+            wiki_real_pair_length_dir=args.wiki_real_pair_length_dir,
+            wiki_real_pair_length_config=args.wiki_real_pair_length_config,
+            wiki_real_scan_length_dir=args.wiki_real_scan_length_dir,
+            wiki_real_scan_length_config=args.wiki_real_scan_length_config,
             generation=args.generation,
         )
         if args.verify_only
@@ -603,6 +1024,11 @@ def main() -> None:
             hybrid_dir=args.hybrid_dir,
             wiki_numeric_dir=args.wiki_numeric_dir,
             wiki_new_only_dir=args.wiki_new_only_dir,
+            wiki_generic_year_dir=args.wiki_generic_year_dir,
+            wiki_real_pair_length_dir=args.wiki_real_pair_length_dir,
+            wiki_real_pair_length_config=args.wiki_real_pair_length_config,
+            wiki_real_scan_length_dir=args.wiki_real_scan_length_dir,
+            wiki_real_scan_length_config=args.wiki_real_scan_length_config,
             generation=args.generation,
         )
     )

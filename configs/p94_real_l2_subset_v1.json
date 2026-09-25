@@ -1,0 +1,17 @@
+{
+  "schema": "longworld.sharded-candidate-subset.v1",
+  "index": "data/candidates/p94_candidate_refs_v5",
+  "source_pool": {
+    "path": "data/capability_records/p94_wiki_structural_merge_v2/source_pool.json",
+    "sha256": "6bf837dccdf83fe34f0c687458d3983dfc636db8066622a4b90648971b0c73ef"
+  },
+  "lane_operations": {
+    "wiki_p94_structural_pool": ["table_pair_earlier_year"],
+    "wiki_generic_year_p94": ["closed_year_table_interval"],
+    "wiki_p94_school_shared_world": ["dense_table_interval_scan"],
+    "wiki_p94_delta_new_only": ["dense_table_interval_scan"],
+    "wiki_real_pair_length_p94": ["table_pair_earlier_year"],
+    "wiki_real_scan_length_p94": ["dense_table_interval_scan"]
+  },
+  "max_full_chat_tokens": 262144
+}

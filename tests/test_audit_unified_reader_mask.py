@@ -8,7 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from scripts.audit_unified_reader_mask import audit, audit_reader
+from scripts.audit_unified_reader_mask import (
+    audit,
+    audit_all,
+    audit_reader,
+    verify_all,
+)
 from scripts.train_sft import _render_chat, assistant_prefix_length
 
 
@@ -122,6 +127,28 @@ def test_candidate_mask_audit_binds_reader_and_keeps_candidate_status(
     assert row["supervised_tokens"] > 0
     with pytest.raises(ValueError, match="already exists"):
         audit(merged, selected, tmp_path / "out", tokenizer=CharTokenizer())
+
+
+def test_all_reader_mask_audit_replays_every_shard_row(tmp_path: Path) -> None:
+    merged, _, _, _ = _fixture(tmp_path)
+    result = audit_all(
+        merged, tmp_path / "all", max_seq_len=1000, tokenizer=CharTokenizer()
+    )
+    assert result["audited_views"] == 1
+    assert result["by_split"] == {"train": 1}
+    assert result["scope"] == "all_candidate_masks_and_reader_shape_only"
+    assert result["train_ready"] is False
+    assert (
+        verify_all(
+            merged, tmp_path / "all", max_seq_len=1000, tokenizer=CharTokenizer()
+        )
+        == result
+    )
+    with pytest.raises(ValueError, match="new output"):
+        audit_all(merged, tmp_path / "all", tokenizer=CharTokenizer())
+    (tmp_path / "all/audit_index.jsonl").write_text("changed\n")
+    with pytest.raises(ValueError, match="audit index changed"):
+        verify_all(merged, tmp_path / "all", tokenizer=CharTokenizer())
 
 
 def test_mask_audit_rejects_truncation_and_source_index_drift(tmp_path: Path) -> None:

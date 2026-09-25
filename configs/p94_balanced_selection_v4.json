@@ -1,0 +1,13 @@
+{
+  "input_index": "data/candidates/p94_candidate_refs_v5",
+  "seed": 94,
+  "max_per_source_group": 24,
+  "max_per_cell": 48,
+  "max_per_source_kind_by_split": {
+    "train": 400,
+    "eval": 100
+  },
+  "max_supervised_tokens_by_kind": {
+    "controlled_simulation": 40000
+  }
+}

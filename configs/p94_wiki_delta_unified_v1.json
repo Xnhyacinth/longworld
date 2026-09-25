@@ -1,0 +1,19 @@
+{
+  "schema_version": "longworld.unified-synthesis-plan.v1",
+  "sources": [
+    {
+      "name": "wiki_p94_school_shared_world",
+      "kind": "wiki_source_pool",
+      "config": "configs/p94_wiki_school_train_pilot_v1.json",
+      "output": "data/candidates/p94_wiki_school_train_pilot_v1",
+      "generation": "new_p94"
+    },
+    {
+      "name": "wiki_p94_delta_new_only",
+      "kind": "wiki_candidate_delta",
+      "config": "configs/p94_wiki_delta_lane_v1.json",
+      "output": "data/candidates/p94_wiki_delta_new_only_v1",
+      "generation": "new_p94"
+    }
+  ]
+}

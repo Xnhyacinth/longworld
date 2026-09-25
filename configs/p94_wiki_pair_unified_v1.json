@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.unified-synthesis-plan.v1",
+  "sources": [
+    {
+      "name": "wiki_p94_pair_pilot",
+      "kind": "wiki_source_pool",
+      "config": "configs/p94_wiki_pair_pilot_v1.json",
+      "output": "data/candidates/p94_wiki_pair_pilot_v1",
+      "generation": "new_p94"
+    }
+  ]
+}

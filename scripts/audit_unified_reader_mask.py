@@ -240,23 +240,134 @@ def audit(
     return manifest
 
 
+def audit_all(
+    merged_dir: Path,
+    output_dir: Path,
+    *,
+    max_seq_len: int = 262144,
+    tokenizer: Any | None = None,
+) -> dict[str, Any]:
+    """Replay every reader in one verified candidate shard without a selection."""
+    if max_seq_len < 2 or output_dir.exists():
+        raise ValueError("all-reader audit needs a new output and valid token cap")
+    source = verify_merge(merged_dir)
+    tokenizer = tokenizer or get_tokenizer()
+    readers = {
+        split: _rows_for_all(merged_dir / f"candidate_{split}.jsonl")
+        for split in ("train", "eval")
+    }
+    positions = Counter()
+    results = []
+    with (merged_dir / "sample_index.jsonl").open(encoding="utf-8") as stream:
+        for line in stream:
+            index = json.loads(line)
+            split = index["split"]
+            if (
+                split not in readers
+                or index["output_file"] != f"candidate_{split}.jsonl"
+                or index["row_index"] != positions[split]
+            ):
+                raise ValueError("all-reader index position or split changed")
+            reader = next(readers[split], None)
+            if reader is None:
+                raise ValueError("all-reader body is missing")
+            results.append(audit_reader(reader, index, tokenizer, max_seq_len))
+            positions[split] += 1
+    if len(results) != source["candidate_views"] or any(
+        next(stream, None) is not None for stream in readers.values()
+    ):
+        raise ValueError("all-reader shard row count differs")
+    results.sort(key=lambda row: row["sample_id"])
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(
+        prefix="reader-mask-all-", dir=output_dir.parent
+    ) as raw:
+        temp = Path(raw)
+        index_path = temp / "audit_index.jsonl"
+        with index_path.open("x", encoding="utf-8") as stream:
+            for row in results:
+                stream.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+        manifest = {
+            "schema_version": "longworld.unified-reader-mask-all.v1",
+            "source_manifest_sha256": _sha(merged_dir / "manifest.json"),
+            "source_index_sha256": _sha(merged_dir / "sample_index.jsonl"),
+            "tokenizer": {"model": TOKENIZER_MODEL, "revision": TOKENIZER_REVISION},
+            "max_seq_len": max_seq_len,
+            "audited_views": len(results),
+            "by_split": dict(sorted(positions.items())),
+            "full_chat_tokens": sum(row["full_chat_tokens"] for row in results),
+            "supervised_tokens": sum(row["supervised_tokens"] for row in results),
+            "audit_index_sha256": _sha(index_path),
+            "scope": "all_candidate_masks_and_reader_shape_only",
+            "train_ready": False,
+        }
+        (temp / "manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2) + "\n"
+        )
+        os.rename(temp, output_dir)
+    return manifest
+
+
+def _rows_for_all(path: Path):
+    with path.open(encoding="utf-8") as stream:
+        for line in stream:
+            if not line.strip():
+                raise ValueError("blank reader row")
+            yield json.loads(line)
+
+
+def verify_all(
+    merged_dir: Path,
+    output_dir: Path,
+    *,
+    max_seq_len: int = 262144,
+    tokenizer: Any | None = None,
+) -> dict[str, Any]:
+    stored = _json(output_dir / "manifest.json")
+    if stored.get("audit_index_sha256") != _sha(output_dir / "audit_index.jsonl"):
+        raise ValueError("all-reader audit index changed")
+    with tempfile.TemporaryDirectory(
+        prefix="reader-mask-all-verify-", dir=output_dir.parent
+    ) as raw:
+        rebuilt_dir = Path(raw) / "audit"
+        rebuilt = audit_all(
+            merged_dir,
+            rebuilt_dir,
+            max_seq_len=max_seq_len,
+            tokenizer=tokenizer,
+        )
+        if rebuilt != stored:
+            raise ValueError("all-reader mask audit replay differs")
+    return stored
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("merged_dir", type=Path)
-    parser.add_argument("--selection", type=Path, required=True)
+    route = parser.add_mutually_exclusive_group(required=True)
+    route.add_argument("--selection", type=Path)
+    route.add_argument("--all", action="store_true")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-seq-len", type=int, default=262144)
+    parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args()
-    print(
-        json.dumps(
-            audit(
-                args.merged_dir,
-                args.selection,
-                args.output,
-                max_seq_len=args.max_seq_len,
-            )
+    if args.verify_only and not args.all:
+        parser.error("--verify-only currently requires --all")
+    result = (
+        (
+            verify_all(args.merged_dir, args.output, max_seq_len=args.max_seq_len)
+            if args.verify_only
+            else audit_all(args.merged_dir, args.output, max_seq_len=args.max_seq_len)
+        )
+        if args.all
+        else audit(
+            args.merged_dir,
+            args.selection,
+            args.output,
+            max_seq_len=args.max_seq_len,
         )
     )
+    print(json.dumps(result))
 
 
 if __name__ == "__main__":

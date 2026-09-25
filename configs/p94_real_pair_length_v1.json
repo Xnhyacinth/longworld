@@ -1,0 +1,22 @@
+{
+  "schema": "longworld.p94-real-pair-length.v1",
+  "source_pool": {
+    "path": "data/capability_records/p94_wiki_structural_merge_v2/source_pool.json",
+    "sha256": "6bf837dccdf83fe34f0c687458d3983dfc636db8066622a4b90648971b0c73ef"
+  },
+  "source_name": "p93_universities_01_02",
+  "native_manifest": {
+    "path": "data/candidates/p94_wiki_pair_pilot_v1/merged/manifest.json",
+    "sha256": "417e30c3a638eebe1d7b12ac89c9c453dbc65ea8788035a037cf44c6e0175c89"
+  },
+  "native_mask_audit": {
+    "path": "data/candidates/p94_wiki_pair_pilot_v1/merged/mask_audit.json",
+    "sha256": "a1c2483daa240d358e6a372312bb7498a8753dca3945720e3a90bdfd3af42939"
+  },
+  "minimum_filler_chars": 300,
+  "target_bins": [
+    ["32k", 32768, 65536],
+    ["64k", 65536, 131072],
+    ["128k", 131072, 262144]
+  ]
+}

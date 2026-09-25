@@ -29,6 +29,28 @@ separate from balancing. The cap does not make a low-quality real task useful,
 and it cannot create missing real L2/L3 tasks. The P91 frozen selection
 replayed byte-for-byte after this optional change, so its old configuration
 remains compatible.
+In the 782-view P94 v2 set, 283 rows have no dependency status and another
+192 finance rows carry only `native_candidate`; neither label certifies
+reader-text necessity. This is why the selection remains candidate-only.
+
+After the P94 real-source expansion, `configs/p94_balanced_selection_v3.json`
+reuses the same 40,000-token simulation cap on
+`data/candidates/p94_candidate_refs_v3`. It selects 824 distinct tasks from
+171 groups and 80,043 supervised tokens, of which 39,998 are controlled
+simulation (49.97%). It retains all 12 new train Wiki dense-table scans and
+all 7 new eval Wiki L2 pair/interval tasks. The selected 27 new CodeForge
+tasks remain research candidates: their stronger P65 content-backed
+reader-dependency certificate is 0/43 for the entire new CodeForge batch.
+Balancing must not silently upgrade their quality status.
+
+On the final P94 index with 48 additional real-document length views,
+`configs/p94_balanced_selection_v4.json` selects 827 unique tasks from
+171 groups and 80,124 supervised tokens, with 39,998 simulated (49.92%).
+Its selected physical bins are 166 under 32K, 245 at 32K–64K, 228 at
+64K–128K and 188 at 128K–256K. It keeps one view per semantic task:
+all four new cross-page comparison tasks use a selected 32K/64K/128K
+view, while eight of the 12 school dense-scan tasks use a selected
+64K/128K view. This is a distribution pilot, not a training release.
 
 Inspect and replay:
 

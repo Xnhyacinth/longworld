@@ -160,3 +160,117 @@ def test_wiki_new_only_rejects_wrong_mask_tokenizer(tmp_path: Path) -> None:
             wiki_new_only_dir=altered,
             generation="p92",
         )
+
+
+def test_generic_year_table_lane_requires_final_mask_and_visible_intervention(
+    tmp_path: Path,
+) -> None:
+    native = (
+        Path(__file__).resolve().parents[1]
+        / "data/candidates/p94_wiki_generic_table_v1"
+    )
+    if not (native / "mask_audit.json").exists():
+        pytest.skip("frozen P94 generic Wiki table audit is not mounted")
+    result = merged.build(
+        None,
+        None,
+        tmp_path / "merged",
+        wiki_generic_year_dir=native,
+        generation="p94",
+    )
+    assert result["candidate_views"] == result["independent_semantic_tasks"] == 3
+    assert result["views_by_lane"] == {"wiki_generic_year_p94": 3}
+    assert result["native_receipts"]["wiki_generic_year_mask_sha256"] == merged._sha(
+        native / "mask_audit.json"
+    )
+    altered = tmp_path / "altered"
+    shutil.copytree(native, altered)
+    mask_path = altered / "mask_audit.json"
+    mask = json.loads(mask_path.read_text())
+    mask["reader_sha256"][next(iter(mask["reader_sha256"]))] = "0" * 64
+    mask_path.write_text(json.dumps(mask))
+    with pytest.raises(ValueError, match="evidence or answer differs"):
+        merged.build(
+            None,
+            None,
+            tmp_path / "rejected",
+            wiki_generic_year_dir=altered,
+            generation="p94",
+        )
+
+
+def test_real_pair_length_views_reuse_native_tasks_and_bind_reader_proof(
+    tmp_path: Path,
+) -> None:
+    root = Path(__file__).resolve().parents[1]
+    native = root / "data/candidates/p94_real_pair_length_v2"
+    config = root / "configs/p94_real_pair_length_v1.json"
+    if not (native / "manifest.json").exists():
+        pytest.skip("frozen P94 real pair length views are not mounted")
+    result = merged.build(
+        None,
+        None,
+        tmp_path / "merged",
+        wiki_real_pair_length_dir=native,
+        wiki_real_pair_length_config=config,
+        generation="p94",
+    )
+    assert result["candidate_views"] == 12
+    assert result["independent_semantic_tasks"] == 4
+    assert result["length_bins"] == {"32k": 4, "64k": 4, "128k": 4}
+    altered = tmp_path / "altered"
+    shutil.copytree(native, altered)
+    audit_path = altered / "audit.jsonl"
+    audits = [json.loads(line) for line in audit_path.read_text().splitlines()]
+    audits[0]["evidence_token_spans"][1][0] += 1
+    audit_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in audits), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="native output changed"):
+        merged.build(
+            None,
+            None,
+            tmp_path / "rejected",
+            wiki_real_pair_length_dir=altered,
+            wiki_real_pair_length_config=config,
+            generation="p94",
+        )
+
+
+def test_real_scan_length_views_reuse_dense_scan_tasks_and_mask_receipts(
+    tmp_path: Path,
+) -> None:
+    root = Path(__file__).resolve().parents[1]
+    native = root / "data/candidates/p94_real_scan_length_v1"
+    config = root / "configs/p94_real_scan_length_v1.json"
+    if not (native / "manifest.json").exists():
+        pytest.skip("frozen P94 real scan length views are not mounted")
+    result = merged.build(
+        None,
+        None,
+        tmp_path / "merged",
+        wiki_real_scan_length_dir=native,
+        wiki_real_scan_length_config=config,
+        generation="p94",
+    )
+    assert result["candidate_views"] == 36
+    assert result["independent_semantic_tasks"] == 12
+    assert result["length_bins"] == {"32k": 12, "64k": 12, "128k": 12}
+    assert result["splits"] == {"train": 36}
+    altered = tmp_path / "altered"
+    shutil.copytree(native, altered)
+    index_path = altered / "sample_index.jsonl"
+    indexes = [json.loads(line) for line in index_path.read_text().splitlines()]
+    indexes[0]["semantic_task_id"] = "wrong-task"
+    index_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in indexes), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="native output changed"):
+        merged.build(
+            None,
+            None,
+            tmp_path / "rejected",
+            wiki_real_scan_length_dir=altered,
+            wiki_real_scan_length_config=config,
+            generation="p94",
+        )
