@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.unified-candidate-selection.v1",
+  "selection_seed": 89,
+  "source_kinds": ["real_wiki"],
+  "source_names": ["wiki_p89_typed_lists"],
+  "evidence_profiles": ["table_subject_header_value_structurally_checked"],
+  "dependency_statuses": ["scoped_named_table_cell_removed"],
+  "minimum_full_chat_tokens": 0,
+  "maximum_views_per_semantic_task": 1,
+  "maximum_tasks_per_source_group": 32,
+  "maximum_tasks_per_operation": 32
+}

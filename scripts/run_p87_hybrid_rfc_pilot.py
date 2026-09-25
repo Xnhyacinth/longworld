@@ -62,19 +62,24 @@ def _rules(text: str) -> dict[str, str]:
 
 def _records(seed: int, count: int) -> list[dict[str, str]]:
     rng = random.Random(seed)
-    records = []
-    # Paired independent status dimensions guarantee both rule flips change
-    # the answer; the shuffle removes a fixed position-to-answer codebook.
+    # The same opaque IDs appear in every paired world, in the same order.
+    # Only their states change, so an ID-only reader sees identical inputs
+    # with different gold answers across worlds of the same length.
     variants = [
         (alpn, first)
         for alpn in ("h3", "h2", "h3-29")
         for first in ("SETTINGS", "HEADERS", "DATA")
     ]
+    assigned = [variants[i % len(variants)] for i in range(count)]
+    rng.shuffle(assigned)
+    records = []
     for i in range(count):
-        alpn, first = variants[i % len(variants)]
-        records.append({"id": f"cx-{seed:02d}-{i:03d}", "alpn": alpn, "first": first})
-    rng.shuffle(records)
-    return records
+        alpn, first = assigned[i]
+        opaque = _sha(f"p87-v6-opaque-connection-{i}".encode())[:12]
+        records.append({"id": f"cx-{opaque}", "alpn": alpn, "first": first})
+    if len({row["id"] for row in records}) != count:
+        raise ValueError("opaque connection ID collision")
+    return sorted(records, key=lambda row: row["id"])
 
 
 def _oracle(
@@ -186,6 +191,18 @@ def _solve_visible(operation: str, context: str) -> list[str] | None:
     return _oracle(operation, rule, records)
 
 
+def _id_only_projection(context: str) -> str:
+    """Keep the full source and visible ID order but remove record attributes."""
+    heading = "SIMULATED connection inspection records (not an IETF publication):\n"
+    source, states = context.split(heading, 1)
+    identifiers = [line.split(": ", 1)[0] for line in states.splitlines()]
+    if not identifiers or any(
+        not item.startswith("Connection cx-") for item in identifiers
+    ):
+        raise ValueError("cannot build an ID-only projection")
+    return source + heading + "\n".join(identifiers)
+
+
 def _compile_one(
     payload: tuple[dict, dict[str, str], str, int],
 ) -> tuple[list[dict], list[dict]]:
@@ -261,7 +278,8 @@ def _compile_one(
                 raise ValueError("negative evidence position")
         except ValueError as error:
             reason = str(error)
-        sample_id = _sha(f"p87|{seed}|{len(filler)}|{operation}".encode())[:24]
+        revision = config["generator_revision"]
+        sample_id = _sha(f"{revision}|{seed}|{len(filler)}|{operation}".encode())[:24]
         if reason:
             rejected.append(
                 {"sample_id": sample_id, "operation": operation, "reason": reason}
@@ -270,12 +288,17 @@ def _compile_one(
         accepted.append(
             {
                 "sample_id": sample_id,
-                "semantic_task_id": _sha(f"p87|{seed}|{operation}".encode())[:24],
+                "semantic_task_id": _sha(f"{revision}|{seed}|{operation}".encode())[
+                    :24
+                ],
                 "source_group": config["source_group"],
-                "world_id": f"p87-rfc9114-sim-{seed}",
+                "world_id": f"p87-rfc9114-sim-v6-{seed}",
                 "split": config["split"],
                 "operation": operation,
                 "context_sha256": _sha(context.encode()),
+                "id_only_projection_sha256": _sha(
+                    _id_only_projection(context).encode()
+                ),
                 "answer_sha256": _answer_hash(messages[1]["content"]),
                 "full_chat_tokens": len(encoded["input_ids"]),
                 "input_tokens": input_tokens,
@@ -300,6 +323,8 @@ def run(config_path: Path, output: Path, workers: int = 2) -> dict:
     config = json.loads(config_path.read_text())
     if config.get("schema_version") != "longworld.p87-hybrid-rfc-pilot-config.v1":
         raise ValueError("wrong P87 config")
+    if config.get("generator_revision") != "p87-hybrid-v6":
+        raise ValueError("P87 generator revision is not the shortcut-repaired v6")
     if config.get("split") != "train":
         raise ValueError("P87 pilot exports only its train-split source group")
     inventory = json.loads(_pin(config["inventory"], config["inventory_sha256"]))
@@ -318,6 +343,24 @@ def run(config_path: Path, output: Path, workers: int = 2) -> dict:
             raise ValueError("source digest disagrees with frozen fetch inventory")
     rules = _rules(_pin(config["rules_source"], config["rules_sha256"]))
     filler_source = _pin(config["filler_source"], config["filler_sha256"])
+    if len(config["seeds"]) < 2 or len(set(config["seeds"])) != len(config["seeds"]):
+        raise ValueError("at least two distinct paired worlds are required")
+    id_only_contradictions = Counter()
+    for count in config["filler_chars"]:
+        filler = _filler(filler_source, count)
+        paired = [_world(config, rules, filler, seed) for seed in config["seeds"]]
+        id_orders = [
+            tuple(row["id"] for row in specs[0]["records"]) for _, specs in paired
+        ]
+        if len(set(id_orders)) != 1:
+            raise ValueError("paired worlds expose different ID-only inputs")
+        for operation in OPERATIONS:
+            answers = {
+                tuple(_solve_visible(operation, context) or ()) for context, _ in paired
+            }
+            if len(answers) < 2:
+                raise ValueError("ID-only and question-only answer shortcut remains")
+            id_only_contradictions[operation] += 1
     jobs = [
         (config, rules, _filler(filler_source, count), seed)
         for count in config["filler_chars"]
@@ -327,6 +370,14 @@ def run(config_path: Path, output: Path, workers: int = 2) -> dict:
         results = list(pool.map(_compile_one, jobs))
     accepted = [row for good, _ in results for row in good]
     rejected = [row for _, bad in results for row in bad]
+    id_only_groups: dict[tuple[str, str], set[str]] = {}
+    for row in accepted:
+        key = (row["operation"], row["id_only_projection_sha256"])
+        id_only_groups.setdefault(key, set()).add(row["answer_sha256"])
+    if len(id_only_groups) != len(config["filler_chars"]) * len(OPERATIONS) or any(
+        len(answers) < 2 for answers in id_only_groups.values()
+    ):
+        raise ValueError("frozen reader rows still admit an ID-only shortcut")
     if len({row["sample_id"] for row in accepted + rejected}) != len(
         accepted + rejected
     ):
@@ -351,6 +402,9 @@ def run(config_path: Path, output: Path, workers: int = 2) -> dict:
                 key: config[key]
                 for key in ("inventory_sha256", "rules_sha256", "filler_sha256")
             },
+            "generator_revision": config["generator_revision"],
+            "id_only_contradiction_lengths": dict(id_only_contradictions),
+            "id_only_conflicting_reader_groups": len(id_only_groups),
             "candidate_views": len(accepted),
             "independent_tasks": len({row["semantic_task_id"] for row in accepted}),
             "source_groups": 1 if accepted else 0,
@@ -383,7 +437,7 @@ def run(config_path: Path, output: Path, workers: int = 2) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--config", type=Path, default=Path("configs/p87_hybrid_rfc9114_pilot_v1.json")
+        "--config", type=Path, default=Path("configs/p87_hybrid_rfc9114_pilot_v6.json")
     )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--workers", type=int, default=2)

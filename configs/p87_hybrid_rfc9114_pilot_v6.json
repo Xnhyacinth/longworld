@@ -1,0 +1,18 @@
+{
+  "schema_version": "longworld.p87-hybrid-rfc-pilot-config.v1",
+  "inventory": "data/source_inventory/p57_ietf_http3_quic_requirement_graph_v1/ietf_fetch_inventory.json",
+  "inventory_sha256": "de96d1c8ee143c87427539ac09a8c2dfa69bad5c5481b38f5011dc2ca1b41634",
+  "rules_source": "data/source_inventory/p57_ietf_http3_quic_requirement_graph_v1/rfc9114.txt",
+  "rules_sha256": "6b84555c88eeebcf5d2b2e1d9d7b58630abc97ab877b2cf62dee4cd635db34e4",
+  "filler_source": "data/source_inventory/p57_ietf_http3_quic_requirement_graph_v1/rfc9000.txt",
+  "filler_sha256": "f88aae47f8b18e102024916e975e919201d8dde689cba79b01079eaedd402e22",
+  "source_group": "ietf:rfc9114:p87-hybrid-train-v6",
+  "generator_revision": "p87-hybrid-v6",
+  "split": "train",
+  "filler_chars": [60000, 160000, 240000],
+  "seeds": [11, 29],
+  "records_per_world": 24,
+  "tokenizer_model": "Qwen/Qwen3.5-4B",
+  "tokenizer_revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e",
+  "max_seq_len": 262144
+}

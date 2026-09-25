@@ -1,0 +1,42 @@
+{
+  "schema": "longworld.wiki-source-expansion.v1",
+  "base_pool": "data/capability_records/p78_wiki_topic_discovery_broad_v1/source_pool.json",
+  "seeds": [
+    {
+      "name": "wiki_skyscrapers_p89",
+      "domain": "architecture",
+      "topic": "tallest_buildings",
+      "split": "train",
+      "mode": "search",
+      "query": "intitle:\"List of tallest buildings\"",
+      "title_contains": "tallest buildings",
+      "max_pages": 10,
+      "bundle_size": 4,
+      "max_bundles": 1
+    },
+    {
+      "name": "wiki_heritage_p89",
+      "domain": "cultural_heritage",
+      "topic": "world_heritage_sites",
+      "split": "eval",
+      "mode": "search",
+      "query": "intitle:\"List of World Heritage Sites in\"",
+      "title_contains": "World Heritage Sites",
+      "max_pages": 10,
+      "bundle_size": 4,
+      "max_bundles": 1
+    },
+    {
+      "name": "wiki_volcanoes_p89",
+      "domain": "geology",
+      "topic": "volcanoes",
+      "split": "train",
+      "mode": "search",
+      "query": "intitle:\"List of volcanoes in\"",
+      "title_contains": "volcanoes",
+      "max_pages": 10,
+      "bundle_size": 4,
+      "max_bundles": 1
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schema": "longworld.frozen-wiki-row-index.v1",
+  "source_pools": [
+    {"path": "data/capability_records/p76_wiki_expansion_v1/source_pool.json", "sha256": "e68eebe0b1e2157d5589e2aebd7460180514de920577087fee8bee7fe40fb741"},
+    {"path": "data/capability_records/p76_wiki_expansion_v2/source_pool.json", "sha256": "85bf52678842d03babe2a61c5657b444292c392393c6cd48f5c74e7de3325c71"},
+    {"path": "data/capability_records/p76_wiki_expansion_v3/source_pool.json", "sha256": "a31b1c4ded567ffe947c250ecbf45cac1481c168a2a38c682121cad97c632ff7"},
+    {"path": "data/capability_records/p78_wiki_topic_discovery_broad_v1/source_pool.json", "sha256": "c5acd537c30a09bac21885af095f739b3463dfc273fd0f7e9721f89664ce2a13"},
+    {"path": "data/capability_records/p81_connected_wiki_auto_v3/source_pool.json", "sha256": "fd869ab0a997bec74169b2ad7c339d7cd100fb4823ac39ddcf85f97adbc4ad5a"},
+    {"path": "data/capability_records/p82_connected_wiki_scale_v1/source_pool.json", "sha256": "b3a49b18ae75aa41fc93a6f09ca4d83dfafd1e5fd05e3fd9660b8ca778b0ec0d"},
+    {"path": "data/capability_records/p82_wiki_preview_bootstrap_v3/source_pool.json", "sha256": "b3f0161b4c8efee83869794928f34ed327fd0a0e4a6293140ae5c066198a7b18"},
+    {"path": "data/capability_records/p89_wiki_typed_lists_v1/new_source_pool.json", "sha256": "e62ae8f6c2e0158acc763ff64fcaaab2beac337ee5adc46601328b0c8853a50c"}
+  ],
+  "prior_task_indexes": [
+    {"path": "data/candidates/p80_wiki_row_binding_probe_v4/sample_index.jsonl", "sha256": "600bb4d51de49adffd05fc2b4a50ae1a0485ca3b4819008308088ca8db30dc73"},
+    {"path": "data/candidates/p81_connected_wiki_row_binding_v3/sample_index.jsonl", "sha256": "6358b75ba9e9e4365c83ccbbb246b4ea635e2f0d1f741b47795cd3d8078c5bdd"},
+    {"path": "data/candidates/p82_connected_wiki_row_binding_v1/sample_index.jsonl", "sha256": "b9e40bccc739067d1df794f1217815fd22900ddbeacafb2daf3bf75ebdf222eb"},
+    {"path": "data/candidates/p83_frozen_wiki_row_join_v1/sample_index.jsonl", "sha256": "7f5253c310fe4618428ef649b22d21fed96182c66102b9f2f33832e0293f93b4"}
+  ],
+  "max_pairs": 100,
+  "max_tasks_per_pair": 1000
+}
