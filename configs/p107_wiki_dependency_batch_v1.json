@@ -1,0 +1,21 @@
+{
+  "schema": "longworld.p107-wiki-dependent-scan.v1",
+  "support": {
+    "path": "data/candidates/p107_wiki_dependency_support_v2.json",
+    "sha256": "e59524ee648a667cc8050d877572c5e7b7a8f2216af67cf64cc94519e8e24357"
+  },
+  "native_manifest": {
+    "path": "data/candidates/p106_wiki_grid_native_p95_v1/manifest.json",
+    "sha256": "8ee97d46c262f2ef823b027c213adffcb66a94146ac4c718121cb1a930dafadd"
+  },
+  "native_final_audit": {
+    "path": "data/candidates/p106_wiki_grid_native_p95_v1/mask_audit.json",
+    "sha256": "8bdca66c3534a0de88ecdd36be53272032ffa03445f224de9eb40e13d241cd5b"
+  },
+  "source_pool": {
+    "path": "data/capability_records/p95_wiki_structural_merge_v1/source_pool.json",
+    "sha256": "5456d0af8a3566c704d74b524816d74915e48f17d7d746b077ee8d7226c33a9e"
+  },
+  "workers": 2,
+  "max_full_tokens": 131072
+}

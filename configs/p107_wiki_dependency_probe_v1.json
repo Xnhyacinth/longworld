@@ -1,0 +1,37 @@
+{
+  "schema": "longworld.p107-wiki-dependent-scan-probe.v1",
+  "native_sources": [
+    {
+      "name": "p105_p97",
+      "manifest": {
+        "path": "data/candidates/p105_wiki_grid_native_v3/manifest.json",
+        "sha256": "b425a40ab976855f5368883bb071538e4f26ff391de50e87f33f9fa7ee1c674d"
+      },
+      "final_audit": {
+        "path": "data/candidates/p105_wiki_grid_native_v3/mask_audit.json",
+        "sha256": "a6169d5ecd6f45af8569da962c23efdc4af72a021b92e2ede4c984debc51afdd"
+      }
+    },
+    {
+      "name": "p106_p95",
+      "manifest": {
+        "path": "data/candidates/p106_wiki_grid_native_p95_v1/manifest.json",
+        "sha256": "8ee97d46c262f2ef823b027c213adffcb66a94146ac4c718121cb1a930dafadd"
+      },
+      "final_audit": {
+        "path": "data/candidates/p106_wiki_grid_native_p95_v1/mask_audit.json",
+        "sha256": "8bdca66c3534a0de88ecdd36be53272032ffa03445f224de9eb40e13d241cd5b"
+      }
+    }
+  ],
+  "source_pools": [
+    {
+      "path": "data/capability_records/p97_wiki_gated_delta_v1/source_pool.json",
+      "sha256": "094353d647ae888821ede5683fd912d125f336018317ffc9364b40b7cd840268"
+    },
+    {
+      "path": "data/capability_records/p95_wiki_structural_merge_v1/source_pool.json",
+      "sha256": "5456d0af8a3566c704d74b524816d74915e48f17d7d746b077ee8d7226c33a9e"
+    }
+  ]
+}
