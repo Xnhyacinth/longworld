@@ -66,6 +66,35 @@ def _root_output(value: str) -> Path:
     return parent / path.name
 
 
+def _wiki_resume_output(output: Path) -> Path:
+    """Reuse the path spelling recorded by a completed native Wiki batch."""
+    inventory = output / "batch/inventory_inputs.json"
+    if not inventory.exists():
+        return output
+    inputs = _json(inventory).get("inputs")
+    if not isinstance(inputs, list) or not inputs:
+        raise ValueError("Wiki batch inventory has no inputs")
+    first = inputs[0].get("index") if isinstance(inputs[0], dict) else None
+    if not isinstance(first, str):
+        raise TypeError("Wiki batch inventory has no index path")
+    index = Path(first)
+    if (
+        ".." in index.parts
+        or index.name != "sample_index.jsonl"
+        or index.parent.parent.name != "jobs"
+    ):
+        raise ValueError("Wiki batch inventory index path is invalid")
+    if not index.is_absolute() and Path.cwd().resolve() != ROOT.resolve():
+        raise ValueError("relative Wiki inventory requires project-root cwd")
+    recorded_batch = index.parents[2]
+    if recorded_batch.resolve(strict=True) != inventory.parent.resolve(strict=True):
+        raise ValueError("Wiki batch inventory points to another batch")
+    recorded_output = recorded_batch.parent
+    if recorded_output.resolve(strict=True) != output.resolve(strict=True):
+        raise ValueError("Wiki batch inventory points to another output")
+    return recorded_output
+
+
 def plan(config_path: Path) -> dict[str, Any]:
     config = _json(config_path)
     if config.get("schema_version") != SCHEMA:
@@ -224,16 +253,7 @@ def _execute(entry: dict[str, Any], *, workers: int) -> dict[str, Any]:
     if kind == "wiki_source_pool":
         from scripts.run_source_pool_batch import run
 
-        native_output = output
-        inventory = output / "batch/inventory_inputs.json"
-        if inventory.exists():
-            first = _json(inventory)["inputs"][0]["index"]
-            if not Path(first).is_absolute():
-                if Path.cwd().resolve() != ROOT.resolve():
-                    raise ValueError(
-                        "relative Wiki inventory requires project-root cwd"
-                    )
-                native_output = Path(entry["output"])
+        native_output = _wiki_resume_output(output)
         result = run(config, native_output, workers=workers, resume=output.exists())
         return {
             "source_kind": "real_wiki",
