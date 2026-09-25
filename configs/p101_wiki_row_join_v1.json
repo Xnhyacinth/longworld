@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.unified-synthesis-plan.v1",
+  "sources": [
+    {
+      "name": "wiki_p101_p97_row_join",
+      "kind": "wiki_row_join_probe",
+      "config": "data/capability_records/p97_wiki_gated_delta_v1/source_pool.json",
+      "output": "data/candidates/p101_wiki_row_binding_native_v1",
+      "generation": "verified_reuse"
+    }
+  ]
+}
