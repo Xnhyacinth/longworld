@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.unified-synthesis-plan.v1",
+  "sources": [
+    {
+      "name": "wiki_p97_vocabulary_pool",
+      "kind": "wiki_source_pool",
+      "config": "data/capability_records/p97_wiki_gated_delta_v1/source_pool.json",
+      "output": "data/candidates/p97_wiki_vocab_native_v1",
+      "generation": "new_p97"
+    }
+  ]
+}

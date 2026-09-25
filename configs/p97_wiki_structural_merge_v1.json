@@ -1,0 +1,45 @@
+{
+  "intakes": [
+    {
+      "path": "data/capability_records/p94_wiki_structural_institutions_v1/manifest.json",
+      "sha256": "edc1a3a62ebc1766839633c727f053d986110f821be39afeb1e6f903376dfe69"
+    },
+    {
+      "path": "data/capability_records/p94_wiki_structural_infrastructure_v1/manifest.json",
+      "sha256": "749d279a02e447b6bb625449eb55f8d8e4dcc0b68460a03220a3e1e099c72b48"
+    },
+    {
+      "path": "data/capability_records/p94_wiki_structural_culture_v1/manifest.json",
+      "sha256": "11b6e5f32833e92f86f7f03ec78d8aca51e38db7814b3202b4b813fe779c2e8e"
+    },
+    {
+      "path": "data/capability_records/p94_wiki_train_pair_probe_v1/manifest.json",
+      "sha256": "fc166a076233190f6c9dc06428e0e72a70381b7e597176eecab4a43820e7c1bb"
+    },
+    {
+      "path": "data/capability_records/p95_wiki_vocab_intake_v1/manifest.json",
+      "sha256": "c2408aec9c7b637209558716195ac46e3e7456b7ff824463b1de6644c3700234"
+    },
+    {
+      "path": "data/capability_records/p97_wiki_intake_actual_shard_0000_v1/manifest.json",
+      "sha256": "c9b7d9a745ee4a70bad3999dd1298af338982c423a3e5dccf0e8bd1fd19dd519"
+    },
+    {
+      "path": "data/capability_records/p97_wiki_intake_actual_shard_0001_v1/manifest.json",
+      "sha256": "4eb4f26d79cae5d2fe228b0772de98bbd6ea46fa42c8431afd98ae058121407e"
+    },
+    {
+      "path": "data/capability_records/p97_wiki_intake_actual_shard_0002_v1/manifest.json",
+      "sha256": "46258fead3c49339e4fbf933d3206c67e60bb92c2b9798c32d310da82f23f9fd"
+    },
+    {
+      "path": "data/capability_records/p97_wiki_intake_actual_shard_0003_v1/manifest.json",
+      "sha256": "5ce6cbbaee9797da199aa364c08e27daed420f91e95b258a73874e35d140387c"
+    }
+  ],
+  "prior_router": {
+    "path": "data/capability_records/p92_source_router_v5/manifest.json",
+    "sha256": "7ab78fadb1047bf645c61d6797604c30f7917f7f4eaa03b21713d3aee4c35776"
+  },
+  "schema": "longworld.p94-wiki-structural-merge.v1"
+}
