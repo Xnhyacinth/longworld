@@ -1,0 +1,11 @@
+{
+  "schema": "longworld.p103-report-support-matrix.v1.config",
+  "source_catalog": {
+    "path": "configs/p64_finance_taskbank_catalog_v1.json",
+    "sha256": "064700ca0de425a22090ca0121e5c354dc53948a3257b213757f11b521a4059f"
+  },
+  "p98_ledger": {
+    "path": "data/capability_records/p98_report_note_probe_v1/ledger.json",
+    "sha256": "a68ace437d7cb6a9fa4a36b8e75ef7a2eb9d98f30b54ad0f9b2cc4a83e40f324"
+  }
+}

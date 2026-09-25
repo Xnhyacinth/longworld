@@ -1,0 +1,9 @@
+{
+  "schema": "longworld.p100-wiki-categorical-scan.v1",
+  "source_pool": {
+    "path": "data/capability_records/p95_wiki_structural_merge_v1/source_pool.json",
+    "sha256": "5456d0af8a3566c704d74b524816d74915e48f17d7d746b077ee8d7226c33a9e"
+  },
+  "max_tasks_per_table": 6,
+  "max_full_tokens": 131072
+}

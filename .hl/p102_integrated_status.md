@@ -1,5 +1,8 @@
 # P102 identity-curated candidate index and reader delivery
 
+**Historical snapshot, superseded by P103.** The current index and selected
+reader pack are recorded in [`p103_integrated_status.md`](p103_integrated_status.md).
+
 The current index is `data/candidates/p102_candidate_refs_v1`. It starts from
 P100, then adds only the P101 Heber JOINs accepted by the reader-visible
 identity gate (2 tasks) and the curated P102 connected-source JOINs (4 tasks).
