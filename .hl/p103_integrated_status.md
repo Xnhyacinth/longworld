@@ -1,5 +1,8 @@
 # P103 current candidate index and reader delivery
 
+**Historical snapshot, superseded by P104.** The latest candidate index and
+selected pack are in [`p104_integrated_status.md`](p104_integrated_status.md).
+
 `data/candidates/p103_candidate_refs_v1` extends the P102 identity-curated
 bank with a nonoverlapping P95 frozen-source categorical-scan shard. Full
 reader-file SHA verification passes. The bank has **11,926 views / 11,401
