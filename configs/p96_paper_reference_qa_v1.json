@@ -1,0 +1,16 @@
+{
+  "schema": "longworld.p96-paper-reference-qa.v1",
+  "source_config": {
+    "path": "configs/p86_frozen_paper_batch_v2.json",
+    "sha256": "e01b869098660032cdd7b07d8ab79151a15b7e0a60039a343d4532089fa59ed7"
+  },
+  "prior_candidate_index": {
+    "path": "data/candidates/p95_candidate_refs_v3/manifest.json",
+    "sha256": "2ac5a17444affd7e61d87e6dfdb83dc4b7e7ef4b7429f03da67e3175cc505bad"
+  },
+  "workers": 3,
+  "max_tasks_per_work": 5,
+  "min_full_tokens": 8192,
+  "max_full_tokens": 262144,
+  "min_evidence_extent_tokens": 1024
+}
