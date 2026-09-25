@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.unified-synthesis-plan.v1",
+  "sources": [
+    {
+      "name": "wiki_p93_structural_intake",
+      "kind": "wiki_source_pool",
+      "config": "data/capability_records/p93_wiki_structural_intake_v3/pilot_source_pool.json",
+      "output": "data/candidates/p93_wiki_structural_pilot_v1",
+      "generation": "new_p93"
+    }
+  ]
+}

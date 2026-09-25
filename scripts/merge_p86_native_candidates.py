@@ -10,12 +10,17 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import tempfile
 from collections import Counter
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+from longworld.synthesis.length_controller import (
+    TOKENIZER_MODEL,
+    TOKENIZER_REVISION,
+)
 from longworld.synthesis.unified_candidate_contract import (
     AdapterBinding,
     CandidateLedger,
@@ -293,16 +298,105 @@ def _wiki_numeric(directory: Path) -> Iterator[tuple[Any, dict[str, Any], str]]:
         raise ValueError("Wiki numeric native row counts disagree")
 
 
+def _wiki_new_only(directory: Path) -> Iterator[tuple[Any, dict[str, Any], str]]:
+    manifest_path = directory / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    if manifest.get(
+        "schema_version"
+    ) != "longworld.p92-factorial-batch.v1.wiki-new-only.v2" or manifest.get(
+        "global_semantic_tasks"
+    ) != manifest.get("candidate_views"):
+        raise ValueError("wrong Wiki new-only native schema")
+    _verified_files(directory, manifest)
+    mask = json.loads((directory / "mask_audit.json").read_text())
+    if (
+        mask.get("schema_version")
+        != "longworld.p92-factorial-batch.v1.wiki-new-only-mask.v1"
+        or mask.get("tokenizer")
+        != {"model_id": TOKENIZER_MODEL, "revision": TOKENIZER_REVISION}
+        or mask.get("source_manifest_sha256") != _sha(manifest_path)
+        or mask.get("checked_rows") != manifest["candidate_views"]
+        or mask.get("status") != "all_final_reader_assistant_masks_checked"
+        or mask.get("splits") != manifest["splits"]
+        or mask.get("train_ready") is not False
+    ):
+        raise ValueError("Wiki new-only final mask receipt disagrees")
+    readers = {
+        split: _rows(directory / f"{split}.jsonl") for split in ("train", "eval")
+    }
+    audits = _rows(directory / "audit.jsonl")
+    count = 0
+    split_counts: Counter[str] = Counter()
+    tasks: set[tuple[str, str]] = set()
+    full_tokens = 0
+    supervised_tokens = 0
+    for index in _rows(directory / "sample_index.jsonl"):
+        split = index["split"]
+        if split not in readers:
+            raise ValueError("invalid Wiki new-only split")
+        reader = next(readers[split], None)
+        audit = next(audits, None)
+        if reader is None or audit is None:
+            raise ValueError("Wiki new-only reader or audit is missing")
+        sample_id = index["example_id"]
+        messages = reader["messages"]
+        intervention = audit.get("reader_text_intervention", {})
+        if (
+            reader["example_id"] != sample_id
+            or audit.get("example_id") != sample_id
+            or audit.get("source_group") != index["source_group"]
+            or index["task_type"] != "table_cell_lookup"
+            or intervention.get("status") != index.get("dependency_status")
+            or json.loads(messages[1]["content"])
+            != audit.get("value_blind_reader_parser_answer")
+        ):
+            raise ValueError("Wiki new-only index, reader or audit disagree")
+        binding = AdapterBinding(
+            source_kind="real_wiki",
+            source_group=index["source_group"],
+            domain=index["domain"],
+            topic=index["topic"],
+            operation=index["task_type"],
+            evidence_profile=index["evidence_status"],
+            tokenizer_profile="pinned-chat-template",
+            receipt_path=manifest_path,
+            receipt_sha256=_sha(manifest_path),
+        )
+        candidate = normalize_native_candidate(
+            index, reader, binding, context_text=_context(messages)
+        )
+        count += 1
+        split_counts[split] += 1
+        tasks.add((candidate.source_group, candidate.semantic_task_id))
+        full_tokens += candidate.full_chat_tokens
+        supervised_tokens += candidate.supervised_tokens
+        yield candidate, reader, f"{directory}/{split}.jsonl:{split_counts[split] - 1}"
+    if (
+        count != manifest["candidate_views"]
+        or len(tasks) != manifest["source_scoped_semantic_tasks"]
+        or dict(split_counts) != manifest["splits"]
+        or full_tokens != mask["full_chat_tokens"]
+        or supervised_tokens != mask["supervised_tokens"]
+        or next(audits, None) is not None
+        or any(next(stream, None) is not None for stream in readers.values())
+    ):
+        raise ValueError("Wiki new-only native row counts disagree")
+
+
 def build(
-    paper_dir: Path,
-    state_dir: Path,
+    paper_dir: Path | None,
+    state_dir: Path | None,
     output: Path,
     *,
     hybrid_dir: Path | None = None,
     wiki_numeric_dir: Path | None = None,
+    wiki_new_only_dir: Path | None = None,
+    generation: str | None = None,
 ) -> dict[str, Any]:
     if output.exists():
         raise ValueError("canonical P86 output must be new")
+    if generation is not None and not re.fullmatch(r"p[0-9]+", generation):
+        raise ValueError("generation must be a p-number label")
     output.parent.mkdir(parents=True, exist_ok=True)
     ledger = CandidateLedger()
     positions = Counter()
@@ -318,11 +412,46 @@ def build(
             (temp / "sample_index.jsonl").open("x", encoding="utf-8") as index_file,
         ):
             files = {"train": train, "eval": eval_file}
-            lanes = [("paper_p86", _paper(paper_dir)), ("state_p86", _state(state_dir))]
+            lanes = []
+            if paper_dir is not None:
+                lanes.append(
+                    (
+                        f"paper_{generation}" if generation else "paper_p86",
+                        _paper(paper_dir),
+                    )
+                )
+            if state_dir is not None:
+                lanes.append(
+                    (
+                        f"state_{generation}" if generation else "state_p86",
+                        _state(state_dir),
+                    )
+                )
             if hybrid_dir is not None:
-                lanes.append(("hybrid_p87", _hybrid(hybrid_dir)))
+                lanes.append(
+                    (
+                        f"hybrid_{generation}" if generation else "hybrid_p87",
+                        _hybrid(hybrid_dir),
+                    )
+                )
             if wiki_numeric_dir is not None:
-                lanes.append(("wiki_numeric_p91", _wiki_numeric(wiki_numeric_dir)))
+                lanes.append(
+                    (
+                        f"wiki_numeric_{generation}"
+                        if generation
+                        else "wiki_numeric_p91",
+                        _wiki_numeric(wiki_numeric_dir),
+                    )
+                )
+            if wiki_new_only_dir is not None:
+                lanes.append(
+                    (
+                        f"wiki_new_{generation}" if generation else "wiki_new_p92",
+                        _wiki_new_only(wiki_new_only_dir),
+                    )
+                )
+            if not lanes:
+                raise ValueError("at least one native candidate lane is required")
             for lane, iterator in lanes:
                 for candidate, reader, ref in iterator:
                     ledger.add(candidate)
@@ -362,8 +491,16 @@ def build(
             "splits": dict(positions),
             "length_bins": dict(sorted(lengths.items())),
             "native_receipts": {
-                "paper_manifest_sha256": _sha(paper_dir / "manifest.json"),
-                "state_manifest_sha256": _sha(state_dir / "manifest.json"),
+                **(
+                    {"paper_manifest_sha256": _sha(paper_dir / "manifest.json")}
+                    if paper_dir is not None
+                    else {}
+                ),
+                **(
+                    {"state_manifest_sha256": _sha(state_dir / "manifest.json")}
+                    if state_dir is not None
+                    else {}
+                ),
                 **(
                     {"hybrid_manifest_sha256": _sha(hybrid_dir / "manifest.json")}
                     if hybrid_dir is not None
@@ -376,6 +513,18 @@ def build(
                         )
                     }
                     if wiki_numeric_dir is not None
+                    else {}
+                ),
+                **(
+                    {
+                        "wiki_new_only_manifest_sha256": _sha(
+                            wiki_new_only_dir / "manifest.json"
+                        ),
+                        "wiki_new_only_mask_sha256": _sha(
+                            wiki_new_only_dir / "mask_audit.json"
+                        ),
+                    }
+                    if wiki_new_only_dir is not None
                     else {}
                 ),
             },
@@ -397,12 +546,14 @@ def build(
 
 
 def verify(
-    paper_dir: Path,
-    state_dir: Path,
+    paper_dir: Path | None,
+    state_dir: Path | None,
     output: Path,
     *,
     hybrid_dir: Path | None = None,
     wiki_numeric_dir: Path | None = None,
+    wiki_new_only_dir: Path | None = None,
+    generation: str | None = None,
 ) -> dict[str, Any]:
     """Recompile from the pinned native lanes and compare final reader hashes."""
     stored = verify_merge(output)
@@ -415,6 +566,8 @@ def verify(
             Path(raw) / "merged",
             hybrid_dir=hybrid_dir,
             wiki_numeric_dir=wiki_numeric_dir,
+            wiki_new_only_dir=wiki_new_only_dir,
+            generation=generation,
         )
         if rebuilt != stored:
             raise ValueError("P86 unified shard differs from native replay")
@@ -423,10 +576,12 @@ def verify(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--paper-dir", type=Path, required=True)
-    parser.add_argument("--state-dir", type=Path, required=True)
+    parser.add_argument("--paper-dir", type=Path)
+    parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--hybrid-dir", type=Path)
     parser.add_argument("--wiki-numeric-dir", type=Path)
+    parser.add_argument("--wiki-new-only-dir", type=Path)
+    parser.add_argument("--generation")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args()
@@ -437,6 +592,8 @@ def main() -> None:
             args.output,
             hybrid_dir=args.hybrid_dir,
             wiki_numeric_dir=args.wiki_numeric_dir,
+            wiki_new_only_dir=args.wiki_new_only_dir,
+            generation=args.generation,
         )
         if args.verify_only
         else build(
@@ -445,6 +602,8 @@ def main() -> None:
             args.output,
             hybrid_dir=args.hybrid_dir,
             wiki_numeric_dir=args.wiki_numeric_dir,
+            wiki_new_only_dir=args.wiki_new_only_dir,
+            generation=args.generation,
         )
     )
     print(json.dumps(result, sort_keys=True))

@@ -1,0 +1,92 @@
+{
+  "schema_version": "longworld.p92-factorial-batch.v2",
+  "recipes": [
+    {
+      "name": "shared_state_200",
+      "kind": "shared_state",
+      "base_config": "configs/p86_state_shared_scale_v1.json",
+      "overrides": {
+        "seed_base": 920000,
+        "cells": [
+          {
+            "length_records": 400,
+            "depth": 2,
+            "worlds": 60
+          },
+          {
+            "length_records": 400,
+            "depth": 3,
+            "worlds": 60
+          },
+          {
+            "length_records": 800,
+            "depth": 2,
+            "worlds": 40
+          },
+          {
+            "length_records": 800,
+            "depth": 3,
+            "worlds": 40
+          }
+        ]
+      },
+      "domain": "simulation",
+      "topic": "shared_record_state",
+      "operations": [
+        "group_compare",
+        "filter_aggregate",
+        "asof_sum",
+        "asof_complete_set"
+      ]
+    },
+    {
+      "name": "rfc_rules_new_worlds",
+      "kind": "hybrid_rfc",
+      "base_config": "configs/p87_hybrid_rfc9114_pilot_v6.json",
+      "overrides": {
+        "seeds": [
+          43,
+          67
+        ],
+        "filler_chars": [
+          60000,
+          160000,
+          240000
+        ],
+        "source_group": "ietf:rfc9114:p92-hybrid-train-v1"
+      },
+      "domain": "protocol",
+      "topic": "http3_quic",
+      "operations": [
+        "http3_support_set",
+        "first_control_frame_violations"
+      ]
+    },
+    {
+      "name": "wiki_numeric_intervals",
+      "kind": "wiki_numeric",
+      "base_config": "configs/p91_wiki_numeric_table_v1.json",
+      "overrides": {
+        "intervals": [
+          [
+            80,
+            110
+          ],
+          [
+            100,
+            130
+          ],
+          [
+            75,
+            105
+          ]
+        ]
+      },
+      "domain": "architecture",
+      "topic": "tallest_buildings",
+      "operations": [
+        "closed_numeric_table_interval"
+      ]
+    }
+  ]
+}

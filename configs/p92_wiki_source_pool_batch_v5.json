@@ -1,0 +1,18 @@
+{
+  "schema_version": "longworld.p92-factorial-batch.v2",
+  "recipes": [
+    {
+      "name": "consolidated_wiki_sources_v5",
+      "kind": "wiki_source_pool",
+      "base_config": "data/capability_records/p92_source_router_v5/consolidated_wiki_pool.json",
+      "overrides": {},
+      "domain": "from_pinned_sources",
+      "topic": "from_pinned_sources",
+      "operations": [
+        "table_cell_lookup",
+        "table_pair_earlier_year",
+        "dense_table_interval_scan"
+      ]
+    }
+  ]
+}

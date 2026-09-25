@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -85,3 +86,77 @@ def test_numeric_wiki_lane_uses_the_native_audit_and_shared_source_group(
         row["evidence_profile"] == "closed_numeric_table_all_rows_replayed"
         for row in rows
     )
+
+
+def test_new_generation_merges_only_its_native_lanes(tmp_path: Path) -> None:
+    batch = (
+        Path(__file__).resolve().parents[1]
+        / "data/candidates/p92_factorial_batch_v2_final"
+    )
+    if not (batch / "manifest.json").exists():
+        pytest.skip("frozen P92 native batch is not mounted")
+    native = {
+        kind: next(batch.glob(f"{prefix}-*/native"))
+        for kind, prefix in (
+            ("state", "shared_state_200"),
+            ("hybrid", "rfc_rules_new_worlds"),
+            ("numeric", "wiki_numeric_intervals"),
+        )
+    }
+    result = merged.build(
+        None,
+        native["state"],
+        tmp_path / "merged",
+        hybrid_dir=native["hybrid"],
+        wiki_numeric_dir=native["numeric"],
+        generation="p92",
+    )
+    assert result["candidate_views"] == 1615
+    assert result["independent_semantic_tasks"] == 1607
+    assert result["views_by_lane"] == {
+        "state_p92": 1600,
+        "hybrid_p92": 12,
+        "wiki_numeric_p92": 3,
+    }
+    assert result["train_ready"] is False
+
+
+def test_globally_deduped_wiki_reader_lane_binds_mask_receipt(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1] / "data/candidates"
+    native = root / "p92_wiki_new_only_60_v2"
+    if not (native / "manifest.json").exists():
+        pytest.skip("frozen P92 Wiki novelty shard is not mounted")
+    result = merged.build(
+        None,
+        None,
+        tmp_path / "merged",
+        wiki_new_only_dir=native,
+        generation="p92",
+    )
+    assert result["candidate_views"] == result["independent_semantic_tasks"] == 60
+    assert result["views_by_lane"] == {"wiki_new_p92": 60}
+    assert result["splits"] == {"train": 22, "eval": 38}
+    assert result["native_receipts"]["wiki_new_only_mask_sha256"] == merged._sha(
+        native / "mask_audit.json"
+    )
+
+
+def test_wiki_new_only_rejects_wrong_mask_tokenizer(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1] / "data/candidates"
+    native = root / "p92_wiki_new_only_60_v2"
+    if not (native / "manifest.json").exists():
+        pytest.skip("frozen P92 Wiki novelty shard is not mounted")
+    altered = tmp_path / "altered"
+    shutil.copytree(native, altered)
+    receipt_path = altered / "mask_audit.json"
+    receipt = json.loads(receipt_path.read_text())
+    receipt["tokenizer"]["revision"] = "wrong-revision"
+    receipt_path.write_text(json.dumps(receipt))
+    with pytest.raises(ValueError, match="mask receipt disagrees"):
+        merged.build(
+            None,
+            None,
+            tmp_path / "merged",
+            wiki_new_only_dir=altered,
+            generation="p92",
+        )
