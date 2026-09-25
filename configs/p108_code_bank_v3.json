@@ -1,0 +1,25 @@
+{
+  "hf_home": "/volume/pt-dev/qjiu/.hf",
+  "local_probe_only": true,
+  "materializer": {
+    "path": "scripts/materialize_codeforge_taskbank.py",
+    "sha256": "669d5295d93f84ebe64d04e994e0b72fbebec0a149fa420f9af36e336f170a9d"
+  },
+  "public_policy_sha256": "dd39cfef6803b01b08cc476acef805265a7f10d62378889e1d56cb8603cb4c60",
+  "schema": "longworld.p108-code-bank.v1.config",
+  "source_client_sha256": "6086221a44452bf857a6c2eff4c0587f3c36bc14b6143ae41453182dfa597bdd",
+  "source_manifest": {
+    "path": "data/capability_records/p108_code_sources_v4/manifest.json",
+    "sha256": "e32b41dce596a2e896edfb3e4ffe7246e187c4ca0f0b249b4b1ac20ee63aa19a"
+  },
+  "tokenizer": {
+    "local_files_only": true,
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "trust_wrapper": {
+    "path": "scripts/run_with_local_probe_trust.py",
+    "sha256": "a1ae2ac1ae54a3e3858406629637be8c3d49e4122d12d1df12d54278bf1212df"
+  },
+  "workers": 4
+}

@@ -1,0 +1,20 @@
+{
+  "content_control": "record-texts-sha-normalized-preserve-filename-aliases-v1",
+  "counterfactual_views": false,
+  "grammar_id": "ascii-case-insensitive-full-path-basename-json-url-copy-v1",
+  "primary_root": "data/candidates/p108_code_primary_v1",
+  "profile_id": "p65-codeforge-filename-copy-content-backed-v1",
+  "raw_profile_id": "p65-codeforge-filename-copy-aggregation-v1",
+  "schema_version": "longworld.codeforge-reading-proof-config.v1",
+  "source_catalog": "configs/p108_code_taskbank_catalog_v1.json",
+  "tokenizer": {
+    "local_files_only": true,
+    "model_id": "Qwen/Qwen3.5-4B",
+    "revision": "a7b0d22b993d71000cf2eadfb37222a67cee521e"
+  },
+  "windows": [
+    4096,
+    8192,
+    16384
+  ]
+}

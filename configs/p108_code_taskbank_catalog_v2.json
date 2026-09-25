@@ -1,0 +1,31 @@
+{
+  "approved_policy_sha256": [
+    "dd39cfef6803b01b08cc476acef805265a7f10d62378889e1d56cb8603cb4c60"
+  ],
+  "jobs": [
+    {
+      "config": "data/candidates/p108_code_banks_v3/configs/bitcoin__bitcoin.json",
+      "output": "data/candidates/p108_code_banks_v3/banks/bitcoin__bitcoin",
+      "repository": "bitcoin__bitcoin"
+    },
+    {
+      "config": "data/candidates/p108_code_banks_v3/configs/denoland__deno.json",
+      "output": "data/candidates/p108_code_banks_v3/banks/denoland__deno",
+      "repository": "denoland__deno"
+    },
+    {
+      "config": "data/candidates/p108_code_banks_v3/configs/godotengine__godot.json",
+      "output": "data/candidates/p108_code_banks_v3/banks/godotengine__godot",
+      "repository": "godotengine__godot"
+    },
+    {
+      "config": "data/candidates/p108_code_banks_v3/configs/psf__requests.json",
+      "output": "data/candidates/p108_code_banks_v3/banks/psf__requests",
+      "repository": "psf__requests"
+    }
+  ],
+  "schema_version": "longworld.codeforge-taskbank-catalog.v1",
+  "source_bank_manifest_sha256": "c7d32a0377db5b65a027c2d7fa9d74e050656ebcc2fe8b7eb8a50a05531b8708",
+  "source_client_sha256": "6086221a44452bf857a6c2eff4c0587f3c36bc14b6143ae41453182dfa597bdd",
+  "trust_file": "${QJIU_ROOT}/.longworld-agent-probe/p12-probe-12-v2/p17-codeforge-trust/local_probe_trust.json"
+}

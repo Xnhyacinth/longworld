@@ -1,0 +1,28 @@
+{
+  "acquisition_config": {
+    "path": "configs/p108_code_acquire_v2.json",
+    "sha256": "6d041fcfb2ab4d5e8c93809cfd34cb6695b316ce564f043917076162f07d6d2e"
+  },
+  "local_probe_only": true,
+  "prior_failure_ledger": {
+    "path": "data/capability_records/p108_code_sources_v2/failure_ledger.json",
+    "sha256": "f72502ae9de4a9d74949065157fcce7efd0b5efed5ab4fd46fb5e651415cf233"
+  },
+  "probe_manifest": {
+    "path": "data/capability_records/p108_code_probe_v2/manifest.json",
+    "sha256": "4aaba275266aaa058d1c3a7e267312ec7eead858a0f1d2a9020393dbd98b6cfe"
+  },
+  "schema": "longworld.p108-code-export.v1.config",
+  "trust_wrapper": {
+    "path": "scripts/run_with_local_probe_trust.py",
+    "sha256": "a1ae2ac1ae54a3e3858406629637be8c3d49e4122d12d1df12d54278bf1212df"
+  },
+  "verify_bundle": {
+    "path": "scripts/p108_code_verify_bundle.py",
+    "sha256": "0f32116e29fb90a2854607c38046373c6b41916ed31a0ca723b8ba4fdc0b2a06"
+  },
+  "verify_export_v2": {
+    "path": "scripts/p108_code_verify_export_v2.py",
+    "sha256": "266cb83bb08a278adb4396fcce8305f8d72a5a08a4f45c53bb4d00fe7c306971"
+  }
+}

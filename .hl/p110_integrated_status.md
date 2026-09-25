@@ -18,6 +18,10 @@ bins are 3,166 below 32K, 3,543 at 32–64K, 3,952 at 64–128K and 1,960 at
 simulation, 3,184 real Wiki, 2,314 finance, 955 code, 17 paper source and
 seven paper revision. These are candidate counts; labels and alternate
 length views do not establish independent worlds or long dependency.
+Summing the index metadata gives 998,777,040 full-chat tokens and 3,364,649
+assistant-supervised tokens across all candidate views. Controlled simulation
+accounts for 503,091,951 full-chat and 3,092,363 supervised tokens, so this
+raw bank cannot be treated as a balanced training mixture.
 
 The fixed P110 balanced arm selects **1,120 independent tasks** (791 train,
 329 eval) from 290 groups. It admits all 13 new tasks while replacing three

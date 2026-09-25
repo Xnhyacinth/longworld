@@ -1,0 +1,27 @@
+{
+  "schema": "longworld.p108-code-acquisition.v1.config",
+  "catalog_config": {
+    "path": "configs/p108_code_catalog_v1.json",
+    "sha256": "e128f8ea79155584af1cab84eff4e054dedf6c20d02235e7b669e443fda95d07"
+  },
+  "catalog_manifest": {
+    "path": "data/capability_records/p108_code_catalog_v1/manifest.json",
+    "sha256": "6b854c91becbd59690e8cd4b73fc6d6900b01dcd9240527a1a2e75829230db78"
+  },
+  "exporter": {
+    "path": "scripts/export_github_workflow.py",
+    "sha256": "27fe78f4b194f0d5de136e8efbe4f35f3d5bb826b3354881f567edbe380802b1"
+  },
+  "verify_export": {
+    "path": "scripts/p108_code_verify_export.py",
+    "sha256": "d09a9d4b51aea01c1e12cd6209be4b61ce464fed26ce00c20b92565dd352c7af"
+  },
+  "bundle_builder": {
+    "path": "scripts/extend_episode_bundle.py",
+    "sha256": "3399368c817e300c307b6dae3c82026cf0d5f3ed8d2a1a46e5b7eba3b8acb642"
+  },
+  "workers": 4,
+  "max_selected_prs_per_repository": 8,
+  "target_frozen_episodes_per_repository": 4,
+  "local_probe_only": true
+}

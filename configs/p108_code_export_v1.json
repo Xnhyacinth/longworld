@@ -1,0 +1,12 @@
+{
+  "schema": "longworld.p108-code-export.v1.config",
+  "acquisition_config": {
+    "path": "configs/p108_code_acquire_v1.json",
+    "sha256": "f962ffae63b5ae1155249f17b42123edacee7908371dc34bebae42d8a767105f"
+  },
+  "probe_manifest": {
+    "path": "data/capability_records/p108_code_probe_v1/manifest.json",
+    "sha256": "21dd4b687b91139f844348c1284ee9e7dfccbe131e072bc85d00525c76f4eb68"
+  },
+  "local_probe_only": true
+}

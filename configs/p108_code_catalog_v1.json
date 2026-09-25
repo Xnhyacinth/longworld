@@ -1,0 +1,27 @@
+{
+  "schema": "longworld.p108-code-catalog.v1.config",
+  "allowlist": {
+    "path": "configs/public_repo_allowlist.yaml",
+    "sha256": "dd39cfef6803b01b08cc476acef805265a7f10d62378889e1d56cb8603cb4c60"
+  },
+  "prior_code_banks": {
+    "path": "configs/p99_code_content_v1.json",
+    "sha256": "7a2f9bc845b08cff382a8c4cb8b9f93f48428d16394263653cba3bc60e870f06"
+  },
+  "prior_deno_split": {
+    "path": "configs/p12_wave3_codeforge_deno_three_cycle_v1.yaml",
+    "sha256": "9cfc115b6166b83c7afd2989f2a64dba6aae6ba4af0c713ffec12ae455692801"
+  },
+  "source_client": {
+    "path": "scripts/p108_code_gh_client.py",
+    "sha256": "6086221a44452bf857a6c2eff4c0587f3c36bc14b6143ae41453182dfa597bdd"
+  },
+  "max_new_repositories": 4,
+  "page_size": 100,
+  "max_selected_prs_per_repository": 8,
+  "target_frozen_episodes_per_repository": 4,
+  "minimum_request_interval_seconds": 1.0,
+  "split_seed": "",
+  "existing_split_reservations": {"denoland/deno": "train"},
+  "local_probe_only": true
+}

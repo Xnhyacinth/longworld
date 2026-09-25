@@ -1,0 +1,33 @@
+{
+  "banks": [
+    {
+      "bank_root": "data/candidates/p108_code_banks_v3/banks/bitcoin__bitcoin",
+      "receipt_sha256": "f01f5d2cda69f0c4d3b89a738185a014d7ab3286c0fe9923af55d28153d5e878",
+      "source_group_id": "https://github.com/bitcoin/bitcoin",
+      "split": "train"
+    },
+    {
+      "bank_root": "data/candidates/p108_code_banks_v3/banks/denoland__deno",
+      "receipt_sha256": "e7042b0035726f9e87a0741b083df8fc586c39c04076bf17afd673f2155e7caa",
+      "source_group_id": "https://github.com/denoland/deno",
+      "split": "train"
+    },
+    {
+      "bank_root": "data/candidates/p108_code_banks_v3/banks/godotengine__godot",
+      "receipt_sha256": "3b9a28426ed6f3367b98db36c1131be5ea869b4a2c7f554a85903548ab673247",
+      "source_group_id": "https://github.com/godotengine/godot",
+      "split": "eval"
+    },
+    {
+      "bank_root": "data/candidates/p108_code_banks_v3/banks/psf__requests",
+      "receipt_sha256": "c4ea6d76549aa0427706e5310af8eea5b40cc4560f35ff6bb6a80cd0fc75bc98",
+      "source_group_id": "https://github.com/psf/requests",
+      "split": "train"
+    }
+  ],
+  "max_chat_tokens": 262144,
+  "max_tasks_per_repository": 12,
+  "min_evidence_span_tokens": 16384,
+  "schema_version": "longworld.p99-code-content.v1",
+  "source_bank_manifest_sha256": "c7d32a0377db5b65a027c2d7fa9d74e050656ebcc2fe8b7eb8a50a05531b8708"
+}

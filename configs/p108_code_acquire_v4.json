@@ -1,0 +1,38 @@
+{
+  "bundle_builder": {
+    "path": "scripts/extend_episode_bundle.py",
+    "sha256": "3399368c817e300c307b6dae3c82026cf0d5f3ed8d2a1a46e5b7eba3b8acb642"
+  },
+  "catalog_config": {
+    "path": "configs/p108_code_catalog_v2.json",
+    "sha256": "b51bc0d974ded7d32bac495d3e15dc36cd3e778794191861376a523fb5285e4f"
+  },
+  "catalog_manifest": {
+    "path": "data/capability_records/p108_code_catalog_v2/manifest.json",
+    "sha256": "999e551a5b0d44066581116524d32111f533f77f6709f3273dca096311fcb42b"
+  },
+  "exporter": {
+    "path": "scripts/export_github_workflow.py",
+    "sha256": "27fe78f4b194f0d5de136e8efbe4f35f3d5bb826b3354881f567edbe380802b1"
+  },
+  "local_probe_only": true,
+  "max_selected_prs_per_repository": 24,
+  "prior_probe_ancestors": [
+    {
+      "path": "data/capability_records/p108_code_probe_v1/manifest.json",
+      "sha256": "21dd4b687b91139f844348c1284ee9e7dfccbe131e072bc85d00525c76f4eb68"
+    }
+  ],
+  "prior_probe_manifest": {
+    "path": "data/capability_records/p108_code_probe_v2/manifest.json",
+    "sha256": "4aaba275266aaa058d1c3a7e267312ec7eead858a0f1d2a9020393dbd98b6cfe"
+  },
+  "schema": "longworld.p108-code-acquisition.v1.config",
+  "target_frozen_episodes_per_repository": 12,
+  "target_structurally_eligible_per_repository": 12,
+  "verify_export": {
+    "path": "scripts/p108_code_verify_export.py",
+    "sha256": "d09a9d4b51aea01c1e12cd6209be4b61ce464fed26ce00c20b92565dd352c7af"
+  },
+  "workers": 4
+}
