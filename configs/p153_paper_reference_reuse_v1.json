@@ -1,0 +1,11 @@
+{
+  "schema": "longworld.p153-paper-reference-batch.v1.config",
+  "prior_paper_manifest": {"path": "data/candidates/p127_same_file_paper_reference_v5/manifest.json", "sha256": "4cb425da04d8f9814d7987d7826b7a1aa93bb60123e0b2f529a383e2b4889e62"},
+  "prior_refs": {"path": "data/candidates/p149_candidate_refs_probe_v1/candidate_refs.jsonl", "sha256": "3bc43e7902acec2cbf94b3643d72a4d7eef5be07556a8605868140d1c6f83cff"},
+  "workers": 4,
+  "max_tasks_per_work": 8,
+  "min_full_chat_tokens": 16384,
+  "max_full_chat_tokens": 262144,
+  "min_support_gap_tokens": 12288,
+  "min_unexposed_answer_words": 3
+}

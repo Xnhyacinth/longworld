@@ -1,0 +1,17 @@
+{
+  "schema": "longworld.p153-paper-source-cohort.v1.config",
+  "taxonomy_plan": {"path": "data/capability_records/p110_paper_autocatalog_v1/manifest.json", "sha256": "31107045972ae84f9498cde1babb6626a156b34408bd6556fceb9107d81bb4c0"},
+  "metadata_manifests": [
+    {"path": "data/capability_records/p110_paper_metadata_00_v1/manifest.json", "sha256": "a3feba69691acbce9d8aaa4fb175fa935853ea289e97f32620f993534842fd04"},
+    {"path": "data/capability_records/p110_paper_metadata_01_v1/manifest.json", "sha256": "2c1895a3ef1236adeb4b37d6e6ac0b745f19dd6be7c2eea810276b57831e409e"},
+    {"path": "data/capability_records/p110_paper_metadata_02_v1/manifest.json", "sha256": "a8791fa87164c5dc47d56af12743760357717b92a6ec17e663b8a7b3494f2c30"}
+  ],
+  "prior_paper_manifest": {"path": "data/candidates/p127_same_file_paper_reference_v5/manifest.json", "sha256": "4cb425da04d8f9814d7987d7826b7a1aa93bb60123e0b2f529a383e2b4889e62"},
+  "prior_candidate_index": {"path": "data/candidates/p149_candidate_refs_probe_v1/manifest.json", "sha256": "817f899c8d0330883acec0169af8ffd0995e09e4c5a1b0c98b393833dcb1a636"},
+  "qa_template": {"path": "configs/p96_paper_reference_qa_v1.json", "sha256": "1f71375f067f0bd5d77816f60085cae9aceb5dbabbdab9a45aff147c6f85f582"},
+  "user_agent": "LongWorld/0.1 xnhyacinth@users.noreply.github.com",
+  "content_use": "local_research_only_no_redistribution",
+  "work_limit": 16,
+  "max_per_category": 1,
+  "request_interval_seconds": 3.2
+}
