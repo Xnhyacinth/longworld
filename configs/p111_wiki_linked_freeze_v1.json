@@ -1,0 +1,17 @@
+{
+  "schema": "longworld.p111-wiki-linked-exact-list-freeze.v1.config",
+  "source_pool": {
+    "path": "data/capability_records/p108_wiki_autotopic_campaign_v1/gate/source_pool.json",
+    "sha256": "c0daa878bc32db3a7599ca01709d620d25b6e1ebd69ccf679846e3cad3785fc6"
+  },
+  "gate_result": {
+    "path": "data/capability_records/p108_wiki_autotopic_campaign_v1/gate_result.json",
+    "sha256": "7ad246c3a8c396ad138897994874b95ee6995670af58162c0dd3be69981710b7"
+  },
+  "prior_raw_manifest": {
+    "path": "data/candidates/p108_wiki_width_raw_v1/manifest.json",
+    "sha256": "90fc25e512ef46ca9b8b186b7cba47c7b0bc5386a0f8e538344c0f2f8d2b9301"
+  },
+  "workers": 4,
+  "requests_per_second": 2.0
+}
