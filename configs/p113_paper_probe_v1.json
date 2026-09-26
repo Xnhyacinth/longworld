@@ -1,0 +1,21 @@
+{
+  "acquire_config": {
+    "path": "data/capability_records/p113_paper_cohort_v1/acquire_config.json",
+    "sha256": "1800c6c5291caa6677c29881687d3fe2e5b03956c95b6a110aa848b71224792d"
+  },
+  "fetch_manifest": {
+    "path": "data/capability_records/p113_paper_sources_v1/manifest.json",
+    "sha256": "31eed3417053912e871d9b1b36ac8a172364234185857afa03c3dc9b51f89b02"
+  },
+  "hard_archive_bytes": 250000000,
+  "prior_candidate_index": {
+    "path": "data/candidates/p109_candidate_refs_v1/manifest.json",
+    "sha256": "05873d2a585e2962db54bfe9e5711ffa8592b882ff8ef4c964dc6decd06975c3"
+  },
+  "qa_template": {
+    "path": "configs/p96_paper_reference_qa_v1.json",
+    "sha256": "1f71375f067f0bd5d77816f60085cae9aceb5dbabbdab9a45aff147c6f85f582"
+  },
+  "schema": "longworld.p110-paper-probe.v1.config",
+  "workers": 4
+}

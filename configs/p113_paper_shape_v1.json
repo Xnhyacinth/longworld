@@ -1,0 +1,35 @@
+{
+  "cohorts": [
+    {
+      "admitted_quality_ledger": {
+        "path": "data/candidates/p104_paper_reference_curated_v1/quality_ledger.jsonl",
+        "sha256": "6f3383b99e45d7532535b7decfb8606a9c7964cae0e2e258f2a57a7f72f87299"
+      },
+      "capacity_index": {
+        "path": "data/capability_records/p104_paper_source_discovery_v1/capacity_index.jsonl",
+        "sha256": "708fbb186dc97746bdb53a65aba67cae71b01dca220b4247b4f976ccc76dcbbc"
+      },
+      "name": "p104"
+    },
+    {
+      "admitted_quality_ledger": {
+        "path": "data/candidates/p105_paper_reference_curated_v1/quality_ledger.jsonl",
+        "sha256": "a854372bd5c4fbfac16d2c4927457025d00ded78441d22c58ca702a13f92ad37"
+      },
+      "capacity_index": {
+        "path": "data/capability_records/p105_paper_sources_v1/capacity_index.jsonl",
+        "sha256": "28ae12a71525525a6e19a6fbcb2b59edd748593a44dbaa60273a2847727378a1"
+      },
+      "name": "p105"
+    },
+    {
+      "capacity_index": {
+        "path": "data/capability_records/p110_paper_probe_v1/capacity_index.jsonl",
+        "sha256": "5b95d73f06168ac9c505b3ddabdeef768ba143fb8d1b8a795a9822e077139e4b"
+      },
+      "name": "p110"
+    }
+  ],
+  "schema": "longworld.p113-paper-shape.v1.config",
+  "workers": 4
+}

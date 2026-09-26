@@ -1,0 +1,27 @@
+{
+  "prior_candidate_index": {
+    "path": "data/candidates/p109_candidate_refs_v1/manifest.json",
+    "sha256": "05873d2a585e2962db54bfe9e5711ffa8592b882ff8ef4c964dc6decd06975c3"
+  },
+  "probe_config": {
+    "path": "configs/p113_paper_probe_v1.json",
+    "sha256": "2f2287ee8f18a58ef833211cb2b54532daa3584a698056461a699a7e6cb43fa5"
+  },
+  "probe_manifest": {
+    "path": "data/capability_records/p113_paper_probe_v1/probe_manifest.json",
+    "sha256": "3f89db3d9ced85774850426871a6338c9ca0392d664c2a403f4effeb1f24f321"
+  },
+  "qa_template": {
+    "path": "configs/p96_paper_reference_qa_v1.json",
+    "sha256": "1f71375f067f0bd5d77816f60085cae9aceb5dbabbdab9a45aff147c6f85f582"
+  },
+  "schema": "longworld.p113-paper-route.v1.config",
+  "shape_config": {
+    "path": "configs/p113_paper_shape_new_v1.json",
+    "sha256": "71ee681eca8f6477745313e0ef59b9ede77f93b30c5249c331d6ba4707c1c00c"
+  },
+  "shape_manifest": {
+    "path": "data/capability_records/p113_paper_shape_new_v1/manifest.json",
+    "sha256": "8fcfa3a00d5a9db683903ce497e7efbaefabf2fdc4f2b5f3a24ae17ad4abc190"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "acquire_config": {
+    "path": "data/capability_records/p113_paper_cohort_v1/acquire_config.json",
+    "sha256": "1800c6c5291caa6677c29881687d3fe2e5b03956c95b6a110aa848b71224792d"
+  },
+  "fetch_manifest": {
+    "path": "data/capability_records/p113_paper_sources_v1/manifest.json",
+    "sha256": "31eed3417053912e871d9b1b36ac8a172364234185857afa03c3dc9b51f89b02"
+  },
+  "probe_manifest": {
+    "path": "data/capability_records/p113_paper_probe_v1/probe_manifest.json",
+    "sha256": "3f89db3d9ced85774850426871a6338c9ca0392d664c2a403f4effeb1f24f321"
+  },
+  "revision_template": {
+    "path": "configs/p86_frozen_paper_batch_v2.json",
+    "sha256": "e01b869098660032cdd7b07d8ab79151a15b7e0a60039a343d4532089fa59ed7"
+  },
+  "schema": "longworld.p110-paper-revision-plan.v1.config"
+}

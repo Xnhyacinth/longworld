@@ -1,0 +1,17 @@
+{
+  "acquire_template": {
+    "path": "data/capability_records/p110_paper_cohort_v1/acquire_config.json",
+    "sha256": "d9c6cfaa11a0a1c1235d464de7771febac3b60a768bc063fcd6f803f27ec1619"
+  },
+  "max_new_works": 6,
+  "metadata_catalog": {
+    "path": "data/capability_records/p110_paper_cohort_v1/admitted_catalog.json",
+    "sha256": "e90047c2d5dab85d1c5dc51e17f16f8db6c6ba09416514feef583652eb5ec072"
+  },
+  "prior_fetch_manifest": {
+    "path": "data/capability_records/p110_paper_sources_v2/manifest.json",
+    "sha256": "8c14082c42a4422d24c2992483f3cb79e4f48d12692cf4ac8a8bf96271057fda"
+  },
+  "schema": "longworld.p113-paper-cohort.v1.config",
+  "workers": 4
+}

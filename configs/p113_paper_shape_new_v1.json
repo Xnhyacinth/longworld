@@ -1,0 +1,14 @@
+{
+  "cohorts": [
+    {
+      "capacity_index": {
+        "path": "data/capability_records/p113_paper_probe_v1/capacity_index.jsonl",
+        "sha256": "3703f3d0ba3b4055becb073dd3b2c2c1bdd98537fb12f1fea62750689df80975"
+      },
+      "evaluation": false,
+      "name": "p113_new"
+    }
+  ],
+  "schema": "longworld.p113-paper-shape.v1.config",
+  "workers": 4
+}
