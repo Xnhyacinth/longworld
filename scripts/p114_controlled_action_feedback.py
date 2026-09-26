@@ -14,7 +14,7 @@ import os
 import sys
 import tempfile
 from bisect import bisect_right
-from collections import Counter
+from collections import Counter, defaultdict
 from concurrent.futures import ProcessPoolExecutor
 from functools import lru_cache
 from itertools import pairwise
@@ -36,6 +36,7 @@ from scripts.run_shared_record_taskbank import _tokenizer
 from scripts.train_sft import _render_chat, tokenize_assistant_only
 
 SCHEMA = "longworld.p114-controlled-action-feedback.v1"
+OUTPUT_SCHEMA = "longworld.p114-controlled-action-feedback.v2"
 MARKER = "\n\nQUESTION\n"
 ACTIONS = ("ADD_500", "REMOVE_500")
 
@@ -108,6 +109,18 @@ def _drop(context: str, fact_id: str) -> str:
         if fact_id.startswith("e")
         else state._drop_record_support(context, fact_id)
     )
+
+
+def _intervention_scope(context: str, fact_id: str) -> tuple[str, list[str]]:
+    """Report every model-visible row actually removed by a valid intervention."""
+    reduced = _drop(context, fact_id)
+    original = {json.loads(line)["id"] for line in context.splitlines()[1:]}
+    remaining = {json.loads(line)["id"] for line in reduced.splitlines()[1:]}
+    removed = sorted(original - remaining)
+    kind = "single_event" if fact_id.startswith("e") else "record_support_group"
+    if fact_id not in removed or (kind == "single_event" and removed != [fact_id]):
+        raise ValueError("intervention scope does not match visible rows")
+    return kind, removed
 
 
 def _flipping_facts(
@@ -256,6 +269,7 @@ def _compile_world(args: tuple[str, dict[str, Any]]) -> list[dict[str, Any]]:
         )
         if after_action == chosen:
             raise ValueError("selected visible fact does not flip policy")
+        intervention_kind, removed_ids = _intervention_scope(context, witness_id)
         split = "eval" if world["seed"] % 5 == 0 else "train"
         sample_id = f"p114:{world['world_id']}:{'above' if sign > 0 else 'below'}"
         reader = {"sample_id": sample_id, "messages": messages}
@@ -272,7 +286,9 @@ def _compile_world(args: tuple[str, dict[str, Any]]) -> list[dict[str, Any]]:
             "input_tokens": input_tokens,
             "supervised_tokens": supervised,
             "context_sha256": hashlib.sha256(context.encode()).hexdigest(),
-            "dependency_status": "visible_fact_deletion_flips_policy_action;bounded_decisive_gap",
+            "dependency_status": (
+                f"visible_{intervention_kind}_deletion_flips_policy_action;bounded_decisive_gap"
+            ),
             "evidence_status": "source_state_solver_and_action_outcomes_replayed",
         }
         binding = AdapterBinding(
@@ -307,13 +323,21 @@ def _compile_world(args: tuple[str, dict[str, Any]]) -> list[dict[str, Any]]:
             "chosen_action": chosen,
             "action_outcomes": outcomes,
             "decisive_fact_id": witness_id,
+            "intervention_kind": intervention_kind,
+            "intervention_removed_fact_ids": removed_ids,
+            "intervention_visible_rows_removed": len(removed_ids),
             "decisive_fact_token_span": list(positions[witness_id]),
             "query_start_token": query_start,
             "decisive_to_query_tokens": gap,
             "reader_minus_state_balance": changed_balance,
             "reader_minus_best_action": after_action,
             "reader_minus_action_outcomes": changed_outcomes,
-            "bounded_scope": "one chosen fact deletion flips action; alternative supports and global minimum proof unsearched",
+            "bounded_scope": (
+                "one event row removed"
+                if intervention_kind == "single_event"
+                else "record and referencing event support rows removed"
+            )
+            + "; alternative supports and global minimum proof unsearched",
         }
         results.append(
             {
@@ -438,10 +462,12 @@ def compile_pilot(
         ordered
     ):
         raise ValueError("P114 world/task multiplicity differs")
-    group_splits = {
-        row["candidate"]["source_group"]: row["candidate"]["split"] for row in ordered
-    }
-    if len(group_splits) != len(world_paths):
+    group_splits: dict[str, set[str]] = defaultdict(set)
+    for item in ordered:
+        group_splits[item["candidate"]["source_group"]].add(item["candidate"]["split"])
+    if len(group_splits) != len(world_paths) or any(
+        len(splits) != 1 for splits in group_splits.values()
+    ):
         raise ValueError("P114 source worlds are not split atomically")
     if actions != {"ADD_500": len(world_paths), "REMOVE_500": len(world_paths)}:
         raise ValueError("P114 action labels are not balanced")
@@ -455,7 +481,7 @@ def compile_pilot(
     if first_action_correct * 2 != len(ordered):
         raise ValueError("P114 first-menu shortcut is not balanced")
     manifest = {
-        "schema_version": SCHEMA,
+        "schema_version": OUTPUT_SCHEMA,
         "source_manifest_sha256": config["source_manifest_sha256"],
         "config_sha256": sha(config_path),
         "training_contract": "isolated_simulated_agent_policy_action_candidate",
@@ -465,6 +491,19 @@ def compile_pilot(
         "split_views": dict(sorted(split_positions.items())),
         "source_group_split_overlap": 0,
         "actions": dict(sorted(actions.items())),
+        "intervention_kinds": dict(
+            sorted(
+                Counter(item["proof"]["intervention_kind"] for item in ordered).items()
+            )
+        ),
+        "intervention_visible_rows_removed": dict(
+            sorted(
+                Counter(
+                    item["proof"]["intervention_visible_rows_removed"]
+                    for item in ordered
+                ).items()
+            )
+        ),
         "menu_first_actions": dict(sorted(menu_first.items())),
         "choose_first_without_history_correct": first_action_correct,
         "target_only_threshold_probe": _no_history_probe(ordered),
@@ -485,7 +524,7 @@ def compile_pilot(
             name: hashlib.sha256("".join(lines).encode()).hexdigest()
             for name, lines in streams.items()
         },
-        "claim_limit": "simulated one-step action feedback; one deletion flips policy, no global shortest proof, no model gain",
+        "claim_limit": "simulated one-step action feedback; 24 single-event and 24 record-support-group deletions flip policy, no global shortest proof, no model gain",
         "train_ready": False,
     }
     streams["manifest.json"] = [dump(manifest) + "\n"]

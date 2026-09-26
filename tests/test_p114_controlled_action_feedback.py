@@ -32,6 +32,14 @@ def test_real_state_solver_fact_removal_flips_both_policy_targets() -> None:
     assert remove_witnesses and all(
         fact.startswith("r") for fact, _ in remove_witnesses
     )
+    event_kind, event_removed = policy._intervention_scope(context, add_witnesses[0][0])
+    record_kind, record_removed = policy._intervention_scope(
+        context, remove_witnesses[0][0]
+    )
+    assert (event_kind, event_removed) == ("single_event", [add_witnesses[0][0]])
+    assert record_kind == "record_support_group"
+    assert len(record_removed) == 2
+    assert remove_witnesses[0][0] in record_removed
 
 
 def test_question_exposes_actions_and_reward_rule_without_gold_balance() -> None:

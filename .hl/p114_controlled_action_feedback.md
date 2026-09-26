@@ -5,11 +5,14 @@ controlled base worlds**. Each world provides two opposite-target decisions
 over the same as-of record state. This is new action-conditioned simulation,
 not a relabeling of the old as-of QA: the compiler executes both actions,
 computes next state and feedback for each, chooses the higher-feedback action,
-and deletes a visible source fact to verify that the chosen action flips.
+and removes scoped reader-visible support to verify that the chosen action flips.
 
-The frozen output is `data/candidates/p114_controlled_action_feedback_v1`
+The authoritative corrected output is `data/candidates/p114_controlled_action_feedback_v2`
 (`manifest.json` SHA-256
-`ce7e219fceb34eafa71b324fc7ac96f1c015bbc95cc125085314ab616f7f5a01`).
+`cbce40e3ade1e497b124b0d42c3108e028f9a0acd8c65bfc333291ab0fa24e2c`).
+The earlier v1 reader bytes are identical, but its proof and index described
+all 48 interventions as single-fact deletion. That scope was wrong for 24
+record interventions; use v2 proof/index/manifest for assessment.
 `policy_train.jsonl` and `policy_eval.jsonl` form a **separate simulated agent
 policy candidate**. They are not inserted into the reader SFT candidate index.
 The assistant target is only `{"action":"ADD_500"}` or
@@ -26,7 +29,8 @@ outcomes, next balances, rewards and source interventions live in
 | Choose-first-without-history correct | 24 / 48 |
 | Final chat length 32–64K / 64–128K / 128–256K | 20 / 18 / 10 |
 | Final chat / supervised tokens | 4,180,974 / 528 |
-| Action-flipping visible fact deletions | 48 / 48 |
+| Single visible revoke-event deletion flips action | 24 / 24 ADD tasks |
+| Record plus referencing-event support-group deletion flips action | 24 / 24 REMOVE tasks |
 | Decisive fact → question start, exact final-chat tokens | 28,555–153,645 |
 | Exact final-chat assistant mask | 48 / 48 |
 
@@ -36,11 +40,14 @@ to obtain current balance (S). The two available actions change it to
 above (S), one below, so the same world gives opposite action labels. In 47
 tasks the target offset magnitude is 250; one source world needed 150 to make
 a text deletion change the action. The selected proof fact is a disclosed
-revocation for the ADD action or an active record for the REMOVE action;
-deleting it from reader text and rerunning the state solver reverses the best
-action. The rule/header and every alternative support were **not** exhaustively
-removed. The distance is to a certified action-flipping fact in this bounded
-intervention, not a global shortest natural-language proof.
+revocation for the ADD action or an active record for the REMOVE action. The
+ADD intervention removes exactly that one event line. The REMOVE intervention
+must remove the record **and its referencing revoke-event line** to keep the
+world well formed; all 24 selected REMOVE witnesses remove two lines. Both
+scopes flip the best action when the state solver reruns. The rule/header and
+every alternative support were **not** exhaustively removed. The distance is
+to a selected action-flipping witness line under that bounded intervention,
+not a global shortest natural-language proof.
 
 A bounded no-history diagnostic fitted the best one-dimensional target-value
 threshold on train tasks: 22/38 correct there and 6/10 on source-disjoint eval
@@ -51,18 +58,18 @@ menu order prevent a constant-action or first-choice answer from exceeding
 
 The four-process compiler is pinned to the P112 base manifest and every P86
 world receipt. It independently replays state from reader-visible records,
-executes both actions, checks action-flipping text deletion, maps exact fact
+executes both actions, checks action-flipping scoped text deletion, maps exact fact
 and question positions through the final chat tokenizer, and rechecks the
 assistant-only mask. Full byte-for-byte replay passed:
 
 ```bash
 UV_LINK_MODE=copy uv run --offline python scripts/p114_controlled_action_feedback.py \
   --config configs/p114_controlled_action_feedback_v1.json \
-  --output data/candidates/p114_controlled_action_feedback_v1 --verify-only
+  --output data/candidates/p114_controlled_action_feedback_v2 --verify-only
 UV_LINK_MODE=copy uv run --offline pytest -q tests/test_p114_controlled_action_feedback.py
-cat data/candidates/p114_controlled_action_feedback_v1/manifest.json
-less -R data/candidates/p114_controlled_action_feedback_v1/proofs.jsonl
-less -R data/candidates/p114_controlled_action_feedback_v1/mask_audit.jsonl
+cat data/candidates/p114_controlled_action_feedback_v2/manifest.json
+less -R data/candidates/p114_controlled_action_feedback_v2/proofs.jsonl
+less -R data/candidates/p114_controlled_action_feedback_v2/mask_audit.jsonl
 ```
 
 This is a controlled one-step environment, with executable outcomes for both
