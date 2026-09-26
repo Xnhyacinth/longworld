@@ -1,0 +1,26 @@
+{
+  "schema": "longworld.p115-real-source-shape.v1.config",
+  "paper_hist": {
+    "manifest": {"path": "data/capability_records/p113_paper_shape_v2/manifest.json", "sha256": "e5cd4c8d1bf4351c829cf1909e263321c68ada2ce794335603e6125d79d9531c"},
+    "matrix": {"path": "data/capability_records/p113_paper_shape_v2/work_matrix.jsonl", "sha256": "4f25827e8c9aafbcf2a8250ce1672eadc2adaf304b2c8a532c897f0038ba0d7d"}
+  },
+  "paper_new": {
+    "manifest": {"path": "data/capability_records/p113_paper_shape_new_v1/manifest.json", "sha256": "8fcfa3a00d5a9db683903ce497e7efbaefabf2fdc4f2b5f3a24ae17ad4abc190"},
+    "matrix": {"path": "data/capability_records/p113_paper_shape_new_v1/work_matrix.jsonl", "sha256": "285929458ecf13c048efe6c1cece25a6e44541a0ab1b58878732d08f99866cd1"}
+  },
+  "finance_batch": {"path": "data/candidates/p96_finance_factorial_wide_batch_v1/batch_manifest.json", "sha256": "2d9af180308ea51c0ac1b93605283e0dde1f0c590f3b22867c7ac62f824f1327"},
+  "finance_batch_dir": "data/candidates/p96_finance_factorial_wide_batch_v1",
+  "finance_final_audit": {"path": "data/candidates/p96_finance_factorial_wide_batch_v1/final_audit.json", "sha256": "7fa2db2a5ddd32df22d3b5e16c48d96cb881193ba2a30d713f504c0ddf739f89"},
+  "prior_index": {
+    "manifest": {"path": "data/candidates/p113_book_quarantined_refs_v1/manifest.json", "sha256": "02d71742c182f5bab4c8694e0990c4f1ad848da9586e55ba6008e4cf2076a422"},
+    "refs": {"path": "data/candidates/p113_book_quarantined_refs_v1/candidate_refs.jsonl", "sha256": "fdee46dc9bc419c5ed40c8047ac83362722480f9581b10e4bf9252c9d84f9304"}
+  },
+  "current_index": {
+    "manifest": {"path": "data/candidates/p114_book_scale_refs_v1/manifest.json", "sha256": "beaa162c0ff7a3eb0d3c5e929104f5b1c8aa6489f10debc308c43958c2749e82"},
+    "refs": {"path": "data/candidates/p114_book_scale_refs_v1/candidate_refs.jsonl", "sha256": "b4c2ae89a64c19c83991bcbb14f5ec9472b8c15e58dbfb0076f87bb3e023863c"}
+  },
+  "max_full_chat_tokens": 262144,
+  "min_exact_support_span_tokens": 16384,
+  "max_report_value_occurrences": 20,
+  "workers": 4
+}
