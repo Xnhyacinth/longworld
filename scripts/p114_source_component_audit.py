@@ -308,17 +308,31 @@ def _source_support_rows(
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Resolve joint-answer views to both pinned native parent tasks."""
     shards = {item["name"]: item for item in index["shards"]}
+    joint_shards = set()
+    for name in {entry["shard"] for entry in selected}:
+        shard = shards[name]
+        manifest_path = (index_dir / shard["path"]).resolve() / "manifest.json"
+        if sha(manifest_path) != shard["manifest_sha256"]:
+            raise ValueError("selected shard manifest differs")
+        schema = _json(manifest_path).get("p125_schema")
+        if schema is not None:
+            if schema != "longworld.p125-joint-task-compiler.v1":
+                raise ValueError("unknown joint-answer shard schema")
+            joint_shards.add(name)
     joint_cache: dict[Path, tuple[dict[str, Any], dict[str, dict], dict[str, dict]]] = {}
     materialized_cache: dict[Path, tuple[str, dict[str, dict]]] = {}
     support_rows = []
     derived_pins = {}
     for entry in selected:
         row = entry["candidate"]
-        if row["operation"] != "joint_multi_operation_answer":
+        is_joint_name = row.get("source_name") == "p125_joint_multi_operation"
+        is_joint_operation = row["operation"] == "joint_multi_operation_answer"
+        is_joint_shard = entry["shard"] in joint_shards
+        if is_joint_name != is_joint_operation or is_joint_name != is_joint_shard:
+            raise ValueError("joint-answer shard, source and operation tags disagree")
+        if not is_joint_shard:
             support_rows.append(row)
             continue
-        if row.get("source_name") != "p125_joint_multi_operation":
-            raise ValueError("unknown joint-answer source contract")
         shard = shards[entry["shard"]]
         shard_dir = (index_dir / shard["path"]).resolve()
         if shard_dir not in joint_cache:
@@ -328,6 +342,13 @@ def _source_support_rows(
             manifest = _json(shard_dir / "manifest.json")
             if manifest.get("p125_schema") != "longworld.p125-joint-task-compiler.v1":
                 raise ValueError("unknown joint-answer lineage schema")
+            if not {
+                "sample_index.jsonl",
+                "pair_lineage.jsonl",
+                "candidate_train.jsonl",
+                "candidate_eval.jsonl",
+            } <= manifest.get("files_sha256", {}).keys():
+                raise ValueError("joint-answer shard lacks pinned lineage or readers")
             joint_rows = _rows(shard_dir / "sample_index.jsonl")
             lineages = _rows(shard_dir / "pair_lineage.jsonl")
             by_id = {item["sample_id"]: item for item in joint_rows}
@@ -347,7 +368,13 @@ def _source_support_rows(
         if by_id.get(row["sample_id"]) != row or lineage is None:
             raise ValueError("selected joint-answer row lacks pinned lineage")
         ref = row["native_row_ref"].split("/sample_index.jsonl:", 1)
-        if len(ref) != 2:
+        parent_ids = lineage["component_sample_ids"]
+        if (
+            len(ref) != 2
+            or len(parent_ids) != 2
+            or len(set(parent_ids)) != 2
+            or ref[1] != "+".join(parent_ids)
+        ):
             raise ValueError("joint-answer materialized source path differs")
         materialized_dir = Path(ref[0])
         if not materialized_dir.is_absolute():
@@ -361,6 +388,10 @@ def _source_support_rows(
             source = _json(materialized_path)
             if source.get("schema_version") != "longworld.p95-balanced-materialized-candidates.v1":
                 raise ValueError("joint-answer source materialization schema differs")
+            if not {"sample_index.jsonl", "train.jsonl", "eval.jsonl"} <= source.get(
+                "files_sha256", {}
+            ).keys():
+                raise ValueError("joint-answer parent index or readers are unpinned")
             for name, digest in source["files_sha256"].items():
                 if sha(materialized_dir / name) != digest:
                     raise ValueError("joint-answer source materialization file differs")
@@ -373,7 +404,7 @@ def _source_support_rows(
         materialized_sha, parent_by_id = materialized_cache[materialized_dir]
         if row["receipt_sha256"] != materialized_sha or lineage["context_sha256"] != row["context_sha256"]:
             raise ValueError("joint-answer source or context pin differs")
-        parents = [parent_by_id.get(sample_id) for sample_id in lineage["component_sample_ids"]]
+        parents = [parent_by_id.get(sample_id) for sample_id in parent_ids]
         if len(parents) != 2 or any(parent is None for parent in parents):
             raise ValueError("joint-answer parent tasks missing")
         for position, parent in enumerate(parents):
@@ -382,6 +413,9 @@ def _source_support_rows(
                 or parent["semantic_task_id"] != lineage["component_semantic_task_ids"][position]
                 or parent["operation"] != lineage["component_operations"][position]
                 or parent["answer_sha256"] != lineage["answer_projection_hashes"][position]
+                or not parent.get("dependency_status")
+                or parent["dependency_status"]
+                != lineage["component_dependency_status"][position]
             ):
                 raise ValueError("joint-answer parent source binding differs")
             support_rows.append(parent)

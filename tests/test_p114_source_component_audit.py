@@ -80,6 +80,7 @@ def test_joint_answer_source_binding_uses_both_pinned_parent_tasks(
             "semantic_task_id": f"task-{i}",
             "operation": f"operation-{i}",
             "answer_sha256": f"answer-{i}",
+            "dependency_status": f"bounded-{i}",
         }
         for i in range(2)
     ]
@@ -87,13 +88,18 @@ def test_joint_answer_source_binding_uses_both_pinned_parent_tasks(
     source_index.write_text(
         "".join(json.dumps({"candidate": parent}) + "\n" for parent in parents)
     )
+    for name in ("train.jsonl", "eval.jsonl"):
+        (materialized / name).write_text("")
     source_manifest = materialized / "manifest.json"
     source_manifest.write_text(
         json.dumps(
             {
                 "schema_version": "longworld.p95-balanced-materialized-candidates.v1",
                 "selected_views": 2,
-                "files_sha256": {"sample_index.jsonl": source_audit.sha(source_index)},
+                "files_sha256": {
+                    name: source_audit.sha(materialized / name)
+                    for name in ("sample_index.jsonl", "train.jsonl", "eval.jsonl")
+                },
             }
         )
     )
@@ -115,17 +121,26 @@ def test_joint_answer_source_binding_uses_both_pinned_parent_tasks(
         "component_semantic_task_ids": ["task-0", "task-1"],
         "component_operations": ["operation-0", "operation-1"],
         "answer_projection_hashes": ["answer-0", "answer-1"],
+        "component_dependency_status": ["bounded-0", "bounded-1"],
     }
     (joint / "pair_lineage.jsonl").write_text(json.dumps(lineage) + "\n")
+    for name in ("candidate_train.jsonl", "candidate_eval.jsonl"):
+        (joint / name).write_text("")
     joint_manifest = joint / "manifest.json"
-    joint_manifest.write_text(
-        json.dumps(
-            {
-                "p125_schema": "longworld.p125-joint-task-compiler.v1",
-                "source_materialized_manifest_sha256": source_audit.sha(source_manifest),
-            }
-        )
-    )
+    joint_receipt = {
+        "p125_schema": "longworld.p125-joint-task-compiler.v1",
+        "source_materialized_manifest_sha256": source_audit.sha(source_manifest),
+        "files_sha256": {
+            name: source_audit.sha(joint / name)
+            for name in (
+                "sample_index.jsonl",
+                "pair_lineage.jsonl",
+                "candidate_train.jsonl",
+                "candidate_eval.jsonl",
+            )
+        },
+    }
+    joint_manifest.write_text(json.dumps(joint_receipt))
     index_dir = tmp_path / "index"
     index_dir.mkdir()
     index = {
@@ -142,6 +157,39 @@ def test_joint_answer_source_binding_uses_both_pinned_parent_tasks(
     assert rows == parents
     assert report["selected_joint_views"] == 1
     assert report["source_support_rows"] == 2
+    with pytest.raises(ValueError, match="source and operation tags disagree"):
+        source_audit._source_support_rows(
+            index_dir,
+            index,
+            [{"shard": "joint", "candidate": {**derived, "operation": "lookup"}}],
+        )
+    with pytest.raises(ValueError, match="shard, source and operation tags disagree"):
+        source_audit._source_support_rows(
+            index_dir,
+            index,
+            [
+                {
+                    "shard": "joint",
+                    "candidate": {
+                        **derived,
+                        "operation": "lookup",
+                        "source_name": "ordinary",
+                    },
+                }
+            ],
+        )
+    unpinned = dict(joint_receipt)
+    unpinned["files_sha256"] = {
+        name: digest
+        for name, digest in joint_receipt["files_sha256"].items()
+        if name != "pair_lineage.jsonl"
+    }
+    joint_manifest.write_text(json.dumps(unpinned))
+    index["shards"][0]["manifest_sha256"] = source_audit.sha(joint_manifest)
+    with pytest.raises(ValueError, match="lacks pinned lineage"):
+        source_audit._source_support_rows(index_dir, index, selection)
+    joint_manifest.write_text(json.dumps(joint_receipt))
+    index["shards"][0]["manifest_sha256"] = source_audit.sha(joint_manifest)
     lineage["answer_projection_hashes"][1] = "wrong"
     (joint / "pair_lineage.jsonl").write_text(json.dumps(lineage) + "\n")
     with pytest.raises(ValueError, match="parent source binding differs"):
