@@ -63,6 +63,35 @@ def pin(value: dict[str, str]) -> Path:
     return path
 
 
+def pool_labels(pages: list[dict], sources: list[dict]) -> dict[str, dict]:
+    """Bind each HTML page to its exact frozen snapshot's catalog labels."""
+    by_snapshot = {}
+    for source in sources:
+        key = (source["snapshot"]["path"], source["snapshot"]["sha256"])
+        if key in by_snapshot:
+            raise ValueError("duplicate source-pool snapshot")
+        by_snapshot[key] = source
+    labels = {}
+    for page in pages:
+        key = (page["snapshot"]["path"], page["snapshot"]["sha256"])
+        source = by_snapshot.get(key)
+        if source is None:
+            raise ValueError("HTML page absent from pinned source pool")
+        if (page["domain"], page["split"]) != (source["domain"], source["split"]):
+            raise ValueError("HTML page source labels disagree")
+        snapshot = json.loads(pin(page["snapshot"]).read_text())
+        if (
+            len(snapshot["documents"]) != 1
+            or snapshot["documents"][0]["title"] != page["title"]
+            or snapshot["documents"][0]["revision_url"] != page["revision_url"]
+        ):
+            raise ValueError("HTML page does not match pinned snapshot document")
+        if page["title"] in labels:
+            raise ValueError("duplicate HTML page title")
+        labels[page["title"]] = {"topic": source["topic"], "source_group": snapshot["snapshot_id"]}
+    return labels
+
+
 def singular(word: str) -> str:
     if word.endswith("ies") and len(word) > 4:
         return word[:-3] + "y"
@@ -254,17 +283,21 @@ def compile(config_path: Path, output: Path, *, verify_only: bool = False) -> di
     ):
         raise ValueError("invalid P126 config")
     source_manifest = pin(config["source_manifest"])
+    source_pool_path = pin(config["source_pool"])
     grid_manifest = pin(config["grid_manifest"])
     source = json.loads(source_manifest.read_text())
+    source_pool = json.loads(source_pool_path.read_text())
     grid_receipt = json.loads(grid_manifest.read_text())
     if (
         source.get("schema") != "longworld.p122-wiki-html-grid.v2.source"
+        or source_pool.get("schema") != "longworld.source-batch-pool.v2"
         or grid_receipt.get("schema") != "longworld.p122-wiki-html-grid.v2.grid"
         or grid_receipt["source_manifest_sha256"] != sha(source_manifest)
         or grid_receipt["files_sha256"]["valid_grids.jsonl"] != sha(grid_manifest.parent / "valid_grids.jsonl")
     ):
         raise ValueError("P122 source/grid receipts disagree")
     source_pages = {row["title"]: row for row in source["records"]}
+    labels = pool_labels(source["records"], source_pool["sources"])
     entries = [json.loads(raw) for raw in (grid_manifest.parent / "valid_grids.jsonl").read_text().splitlines()]
     if len(entries) != grid_receipt["grid_valid_tables"]:
         raise ValueError("valid grid inventory changed")
@@ -346,7 +379,7 @@ def compile(config_path: Path, output: Path, *, verify_only: bool = False) -> di
                     semantic_id = digest(dump({"table": entry["table_id"], "key": key, "target": target, "category": category}))[:24]
                     sample_id = "p126-wiki-table-" + semantic_id
                     reader = {"sample_id": sample_id, "messages": messages}
-                    raw_index = {"sample_id": sample_id, "task_id": semantic_id, "source_kind": "real_wiki", "source_group": json.loads(pin(page["snapshot"]).read_text())["snapshot_id"], "domain": entry["domain"], "topic": re.sub(r"[^a-z0-9]+", "_", entry["title"].casefold()).strip("_")[:48], "operation": "html_complete_categorical_table_scan", "split": entry["split"], "dependency_status": "bounded_full_reader_row_scan_and_hit_control_edit", "tokenizer_profile": "pinned-chat-template", "full_chat_tokens": full, "input_tokens": full - supervised, "supervised_tokens": supervised, "answer_sha256": _answer_hash(answer)}
+                    raw_index = {"sample_id": sample_id, "task_id": semantic_id, "source_kind": "real_wiki", "source_group": labels[entry["title"]]["source_group"], "domain": entry["domain"], "topic": labels[entry["title"]]["topic"], "operation": "html_complete_categorical_table_scan", "split": entry["split"], "dependency_status": "bounded_full_reader_row_scan_and_hit_control_edit", "tokenizer_profile": "pinned-chat-template", "full_chat_tokens": full, "input_tokens": full - supervised, "supervised_tokens": supervised, "answer_sha256": _answer_hash(answer)}
                     audit_reader(reader, raw_index, tokenizer, config["max_seq_len"])
                     binding = AdapterBinding(source_kind="real_wiki", source_group=raw_index["source_group"], domain=raw_index["domain"], topic=raw_index["topic"], operation=raw_index["operation"], evidence_profile="p122_complete_html_grid_reader", tokenizer_profile="pinned-chat-template", receipt_path=grid_manifest, receipt_sha256=sha(grid_manifest))
                     candidate = normalize_native_candidate(raw_index, reader, binding, context_text=context)
@@ -368,7 +401,7 @@ def compile(config_path: Path, output: Path, *, verify_only: bool = False) -> di
     files = {"candidate_train.jsonl": "".join(dump(row) + "\n" for row in readers["train"]).encode(), "candidate_eval.jsonl": "".join(dump(row) + "\n" for row in readers["eval"]).encode(), "sample_index.jsonl": "".join(dump(row) + "\n" for row in indexes).encode(), "audit.jsonl": "".join(dump(row) + "\n" for row in audits).encode(), "decision_ledger.jsonl": "".join(dump(row) + "\n" for row in decisions).encode()}
     reasons = Counter(row["reason"] for row in decisions if row.get("reason"))
     reasons.update(reason for row in decisions for reason in row.get("reasons", {}))
-    result = {"schema_version": "longworld.unified-candidates.v1", "p126_schema": SCHEMA, "code_sha256": sha(Path(__file__)), "config_sha256": sha(config_path), "source_manifest_sha256": sha(source_manifest), "grid_manifest_sha256": sha(grid_manifest), "gross_grids": len(entries), "key_target_supported_grids": supported_tables, "candidate_views": ledger.rows, "source_scoped_semantic_tasks": ledger.independent_tasks, "independent_semantic_tasks": ledger.independent_semantic_tasks, "views_by_lane": {"p126_wiki_html_table_scan": ledger.rows}, "splits": {split: len(readers[split]) for split in ("train", "eval")}, "source_pages_with_tasks": len(by_page), "domains_with_tasks": dict(sorted(Counter(row["domain"] for row in indexes).items())), "length_bins": dict(sorted(Counter(row["length_bin"] for row in indexes).items())), "full_chat_tokens": sum(row["full_chat_tokens"] for row in indexes), "supervised_tokens": sum(row["supervised_tokens"] for row in indexes), "rejection_reasons": dict(sorted(reasons.items())), "files_sha256": {name: hashlib.sha256(data).hexdigest() for name, data in files.items()}, "claim_limit": "structured HTML table complete scan and bounded reader-cell edits; no full-page prose alternative-proof or long-distance/model-gain claim", "train_ready": False}
+    result = {"schema_version": "longworld.unified-candidates.v1", "p126_schema": SCHEMA, "code_sha256": sha(Path(__file__)), "config_sha256": sha(config_path), "source_manifest_sha256": sha(source_manifest), "source_pool_sha256": sha(source_pool_path), "grid_manifest_sha256": sha(grid_manifest), "gross_grids": len(entries), "key_target_supported_grids": supported_tables, "candidate_views": ledger.rows, "source_scoped_semantic_tasks": ledger.independent_tasks, "independent_semantic_tasks": ledger.independent_semantic_tasks, "views_by_lane": {"p126_wiki_html_table_scan": ledger.rows}, "splits": {split: len(readers[split]) for split in ("train", "eval")}, "source_pages_with_tasks": len(by_page), "domains_with_tasks": dict(sorted(Counter(row["domain"] for row in indexes).items())), "length_bins": dict(sorted(Counter(row["length_bin"] for row in indexes).items())), "full_chat_tokens": sum(row["full_chat_tokens"] for row in indexes), "supervised_tokens": sum(row["supervised_tokens"] for row in indexes), "rejection_reasons": dict(sorted(reasons.items())), "files_sha256": {name: hashlib.sha256(data).hexdigest() for name, data in files.items()}, "claim_limit": "structured HTML table complete scan and bounded reader-cell edits; no full-page prose alternative-proof or long-distance/model-gain claim", "train_ready": False}
     files["manifest.json"] = (json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode()
     if verify_only:
         if {path.name for path in output.iterdir()} != set(files):

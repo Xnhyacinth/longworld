@@ -1,10 +1,16 @@
 """Behavioral checks for the bounded HTML table reader route."""
 
+import json
+
+import pytest
+
+from scripts import p126_wiki_html_table_tasks as adapter
 from scripts.p126_wiki_html_table_tasks import (
     answer_from_reader,
     column_options,
     identity_header,
     intervention,
+    pool_labels,
     render_context,
 )
 
@@ -96,3 +102,19 @@ def test_multiline_target_rejects_instead_of_splitting_category() -> None:
     options, rejected = column_options(grid, "<td>Museum 0</td>", "List of museums")
     assert not any(target == 1 for _, target, _ in options)
     assert rejected["target_cell_missing_multiline_spanned_or_qualified"] > 0
+
+
+def test_topic_comes_from_exact_pinned_source_pool_entry(tmp_path, monkeypatch) -> None:
+    snapshot_path = tmp_path / "snapshot.json"
+    snapshot_path.write_text(json.dumps({
+        "snapshot_id": "snapshot-7",
+        "documents": [{"title": "List of stadiums", "revision_url": "https://example.test/oldid=7"}],
+    }))
+    monkeypatch.setattr(adapter, "pin", lambda _: snapshot_path)
+    page = {"title": "List of stadiums", "revision_url": "https://example.test/oldid=7", "domain": "sports", "split": "eval", "snapshot": {"path": "data/snapshot.json", "sha256": "abc"}}
+    source = {"domain": "sports", "topic": "lists_of_stadiums", "split": "eval", "snapshot": page["snapshot"]}
+    assert pool_labels([page], [source])[page["title"]] == {"topic": "lists_of_stadiums", "source_group": "snapshot-7"}
+    with pytest.raises(ValueError, match="absent from pinned source pool"):
+        pool_labels([page], [{**source, "snapshot": {"path": "data/other.json", "sha256": "abc"}}])
+    with pytest.raises(ValueError, match="source labels disagree"):
+        pool_labels([page], [{**source, "split": "train"}])

@@ -1,0 +1,18 @@
+{
+  "grid_manifest": {
+    "path": "data/candidates/p122_wiki_html_grid_v2/manifest.json",
+    "sha256": "74a029df87a6059d5ac8615cfd6be157735bf5418387e83ab37b2b4c92075f0c"
+  },
+  "max_seq_len": 131072,
+  "max_tasks_per_page": 3,
+  "max_tasks_per_table": 2,
+  "schema": "longworld.p126-wiki-html-table-tasks.v1.config",
+  "source_manifest": {
+    "path": "data/candidates/p122_wiki_html_source_v2/source_manifest.json",
+    "sha256": "eb8d0b724bd156a9b46ac5af4e35b809249fd50e35b434bdfc75975549e0de1d"
+  },
+  "source_pool": {
+    "path": "data/candidates/p119_wiki_structural_intake_v2/source_pool.json",
+    "sha256": "82b95cbd1a1de9726b82e43703a757e8f13ee5e3481e712c5106b848373d4464"
+  }
+}
