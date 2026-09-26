@@ -56,6 +56,27 @@ def test_deduplicates_views_but_counts_token_exposure() -> None:
     assert report["capabilities"]["locate"]["input_tokens"] == 79990
     assert report["null_dependency_status_views"] == 2
     assert report["actual_length_bin_mismatch_views"] == 0
+    cell = report["capability_source_length"]["locate"]["real_wiki"]["32k"]
+    assert cell == {
+        "views": 2,
+        "tasks": 1,
+        "typed_source_groups": 1,
+        "input_tokens": 79990,
+        "supervised_tokens": 10,
+    }
+
+
+def test_cross_cells_use_actual_final_length_and_reconcile_tokens() -> None:
+    long_view = _entry("long", "task", full=70000)
+    # The metadata bucket is deliberately stale; the cross-cell route uses
+    # final-chat tokens and leaves a visible mismatch counter.
+    report = audit.summarize([_entry("short", "task"), long_view], ROUTES)
+    locate = report["capability_source_length"]["locate"]["real_wiki"]
+    assert set(locate) == {"32k", "64k"}
+    assert locate["32k"]["tasks"] == locate["64k"]["tasks"] == 1
+    assert report["actual_length_bin_mismatch_views"] == 1
+    assert sum(cell["input_tokens"] for cell in locate.values()) == report["input_tokens"]
+    assert sum(cell["supervised_tokens"] for cell in locate.values()) == report["supervised_tokens"]
 
 
 def test_unknown_and_ambiguous_are_not_guessed() -> None:

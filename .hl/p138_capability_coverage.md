@@ -1,14 +1,17 @@
 # P138 versioned capability coverage (2026-09-27)
 
 P138 inventories the pinned P137 candidate bank and P137 v3 selected refs.
-The report is `data/candidates/p138_capability_coverage_v1/report.json` and the
+The current report is `data/candidates/p138_capability_coverage_v2/report.json` and the
 explicit taxonomy is `configs/p138_capability_taxonomy_v1.json`. Both scopes
 count **semantic tasks separately from length views**. Capability names are
 task-operation families; they are not independent cognitive mechanisms or a
 claim of model improvement.
 
-Report SHA-256: `f991134165e51482ab0398ed2e01c2cd36d627c8e06708039a4283d55a70ea5f`.
+Report v2 SHA-256: `462b567726f2324078e16e29845f94ca04a1a11c5ed14ed0f918b16528b514c1`.
 Taxonomy SHA-256: `263b7a10ebffd575bd3f3c75f5d67a0b1cc4f7d052b09d21370523c32325c4c3`.
+The frozen v1 report remains at `data/candidates/p138_capability_coverage_v1/report.json`
+(SHA-256 `f991134165e51482ab0398ed2e01c2cd36d627c8e06708039a4283d55a70ea5f`).
+V2 adds `capability_source_length` without changing the taxonomy or input pins.
 
 | Scope | Views | Independent tasks | Typed groups | Known multi-capability groups | Input tokens | Supervised tokens | Null dependency status |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -22,6 +25,25 @@ length bins are <32K 514, 32–64K 574, 64–128K 554, and 128–256K 155; all 1
 length labels match bins recomputed from final-chat token counts. Candidate
 and selected label vocabularies are 34/180 and 30/161 domain/topic strings;
 these strings do not measure independent semantics.
+
+The new cross matrix contains 93 nonempty candidate cells and 63 nonempty
+selected cells. Each capability × source kind × **actual final-chat length**
+cell gives views, distinct semantic tasks, typed source groups, input tokens,
+and supervised tokens. Views of the same task at two lengths count once *in
+each cell*; the cell task counts must not be summed to infer the global number
+of independent tasks. Cell view and token totals do reconcile exactly with
+the scope totals. Examples from the selected set:
+
+| Capability | <32K | 32–64K | 64–128K | 128–256K |
+|---|---:|---:|---:|---:|
+| Cross-chapter trace | 10 | 133 | 161 | 76 |
+| Complete-set scan | 220 | 70 | 6 | 10 |
+| State aggregation | 14 | 39 | 40 | 0 |
+| Code review/diff join | 2 | 2 | 5 | 3 |
+
+Thus selected complete-set supervision is concentrated below 32K, even though
+the selection as a whole spans longer buckets. The matrix shows exposure,
+not whether every token or distant span is necessary.
 
 The highest-volume selected declared capabilities are cross-chapter trace 380,
 complete-set scan 306, locate 305, aggregate/compare 291, cross-chapter

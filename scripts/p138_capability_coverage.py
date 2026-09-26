@@ -16,7 +16,7 @@ from typing import Any
 from scripts.p113_coverage_matrix import build_report as base_coverage
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA = "longworld.p138-capability-coverage.v1"
+SCHEMA = "longworld.p138-capability-coverage.v2"
 CONFIG_SCHEMA = "longworld.p138-capability-taxonomy.v1"
 MATCH_FIELDS = ("source_kind", "source_name", "topic", "evidence_profile")
 
@@ -89,6 +89,9 @@ def summarize(entries: list[dict[str, Any]], routes: list[dict[str, Any]]) -> di
     by_capability: dict[str, dict[str, Any]] = defaultdict(
         lambda: {"views": 0, "tasks": set(), "groups": set(), "input_tokens": 0, "supervised_tokens": 0}
     )
+    cross_cells: dict[tuple[str, str, str], dict[str, Any]] = defaultdict(
+        lambda: {"views": 0, "tasks": set(), "groups": set(), "input_tokens": 0, "supervised_tokens": 0}
+    )
     labels = {name: Counter() for name in ("source_kind", "source_name", "domain", "topic", "length_bin", "split", "dependency_status", "evidence_profile")}
     mechanisms: dict[str, dict[str, Any]] = defaultdict(
         lambda: {"views": 0, "tasks": set(), "groups": set(), "capabilities": set()}
@@ -121,6 +124,12 @@ def summarize(entries: list[dict[str, Any]], routes: list[dict[str, Any]]) -> di
         slot["groups"].add(group)
         slot["input_tokens"] += row["input_tokens"]
         slot["supervised_tokens"] += row["supervised_tokens"]
+        cross = cross_cells[(capability, row["source_kind"], length_bin)]
+        cross["views"] += 1
+        cross["tasks"].add(task)
+        cross["groups"].add(group)
+        cross["input_tokens"] += row["input_tokens"]
+        cross["supervised_tokens"] += row["supervised_tokens"]
         group_tasks[group].add(task)
         if capability not in ("unknown", "composite_reuse"):
             group_classes[group].add(capability)
@@ -157,6 +166,23 @@ def summarize(entries: list[dict[str, Any]], routes: list[dict[str, Any]]) -> di
                 "supervised_tokens": slot["supervised_tokens"],
             }
             for key, slot in sorted(by_capability.items())
+        },
+        "capability_source_length": {
+            capability: {
+                kind: {
+                    length: {
+                        "views": cell["views"],
+                        "tasks": len(cell["tasks"]),
+                        "typed_source_groups": len(cell["groups"]),
+                        "input_tokens": cell["input_tokens"],
+                        "supervised_tokens": cell["supervised_tokens"],
+                    }
+                    for (cell_capability, cell_kind, length), cell in sorted(cross_cells.items())
+                    if cell_capability == capability and cell_kind == kind
+                }
+                for kind in sorted({cell_kind for cell_capability, cell_kind, _ in cross_cells if cell_capability == capability})
+            }
+            for capability in sorted({cell_capability for cell_capability, _, _ in cross_cells})
         },
         "native_mechanisms": {
             key: {
@@ -216,7 +242,7 @@ def build_report(config_path: Path) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=ROOT / "configs/p138_capability_taxonomy_v1.json")
-    parser.add_argument("--output", type=Path, default=ROOT / "data/candidates/p138_capability_coverage_v1/report.json")
+    parser.add_argument("--output", type=Path, default=ROOT / "data/candidates/p138_capability_coverage_v2/report.json")
     parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args()
     report = build_report(args.config)
