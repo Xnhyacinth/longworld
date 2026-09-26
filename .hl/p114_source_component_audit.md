@@ -65,3 +65,44 @@ UV_LINK_MODE=copy uv run --offline python scripts/p114_source_component_audit.py
 UV_LINK_MODE=copy uv run --offline pytest -q tests/test_p114_source_component_audit.py
 cat data/candidates/p114_source_component_audit_v1/report.json
 ```
+
+## P114 book-scale selection extension
+
+The authoritative report for `p114_book_scale_refs_v1` and
+`p114_book_scale_selection_v1` is
+`data/candidates/p114_source_component_audit_v3/report.json` (SHA-256
+`a04d42db9bf9978fdd7764c66576a85bcf4109f92552bbf0235d0d4a0248abc0`).
+The earlier v1 and v2 reports remain immutable and describe earlier selections.
+The v3 report binds index manifest `beaa162c0ff7a3eb0d3c5e929104f5b1c8aa6489f10debc308c43958c2749e82`
+and selection manifest `89c598d2027bf23cf729d4c63429399c8797ca0d567901884da6aa44e43327d6`.
+
+| Scope | Selected views | Groups | Components | Train/eval conflicts | Result |
+|---|---:|---:|---:|---:|---|
+| Wiki | 676 | 162 | 137 | 0 | CERTIFIED within pinned snapshot identities |
+| Books, P113 and P114 together | 171 | 53 | 51 | 0 | CERTIFIED within pinned catalog/work/source identities |
+| Other kinds | 499 | — | — | unknown | UNKNOWN |
+| Total | 1,346 | — | — | no certified-kind conflict | UNKNOWN overall |
+
+The selected books comprise 42 P113 and 129 P114 tasks from 14 and 39
+source groups respectively. Both full frozen source manifests are pinned, as
+is the common Gutenberg catalog SHA-256 `9965df5b1fdd56f19c876054c891c09b2a98d65ab910bee6e91fa734e645f31d`.
+Across all 73 frozen books, the audit rejects repeated ebook, source-group,
+work, raw hash or body hash identities, and any catalog work or author
+component spanning train/eval. Same-author books within one split remain a
+single connected component. Selected book raw/body bytes and selected Wiki
+snapshot pins are replayed. The 499 other selected views remain UNKNOWN;
+their source-group strings do not certify a complete source component graph.
+
+The CLI accepts repeated `--book-source` arguments while the old single-source
+v1 replay remains unchanged:
+
+```bash
+UV_LINK_MODE=copy uv run --offline python scripts/p114_source_component_audit.py \
+  --index data/candidates/p114_book_scale_refs_v1 \
+  --selection data/candidates/p114_book_scale_selection_v1 \
+  --book-source data/sources/p113_book_cohort_v6 \
+  --book-source data/sources/p114_book_cohort_v2 \
+  --output data/candidates/p114_source_component_audit_v3/report.json --verify-only
+UV_LINK_MODE=copy uv run --offline pytest -q tests/test_p114_source_component_audit.py
+UV_LINK_MODE=copy uv run --offline ruff check scripts/p114_source_component_audit.py tests/test_p114_source_component_audit.py
+```

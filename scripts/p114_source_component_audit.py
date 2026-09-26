@@ -7,6 +7,8 @@ this audit. Other lanes remain UNKNOWN even if their group strings differ.
 from __future__ import annotations
 
 import argparse
+import csv
+import gzip
 import hashlib
 import json
 import re
@@ -25,6 +27,7 @@ WIKI_POOLS = (
     ROOT / "configs/p80_wiki_task_scale_v1.json",
     ROOT / "configs/p78_wiki_concat_parks_hospitals_source_pool_v1.json",
 )
+BOOK_CATALOG = ROOT / "data/sources/p113_book_catalog_v1/pg_catalog.csv.gz"
 
 
 def sha(path: Path) -> str:
@@ -133,35 +136,128 @@ def components(groups: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _catalog_author_keys(author: str) -> set[str]:
+    keys = set()
+    for fragment in author.split(";"):
+        parts = fragment.split(",")
+        family = " ".join(re.findall(r"[a-z0-9]+", parts[0].casefold()))
+        given = (
+            " ".join(re.findall(r"[a-z0-9]+", parts[1].casefold()))
+            if len(parts) > 1
+            else ""
+        )
+        if family:
+            keys.add(family + "|" + given)
+    return keys
+
+
+def _book_catalog_authors(expected_sha: str) -> dict[int, set[str]]:
+    if sha(BOOK_CATALOG) != expected_sha:
+        raise ValueError("book catalog SHA differs from source manifest pin")
+    with gzip.open(BOOK_CATALOG, "rt", encoding="utf-8-sig", newline="") as stream:
+        return {
+            int(row["Text#"]): _catalog_author_keys(row["Authors"])
+            for row in csv.DictReader(stream)
+            if row["Type"] == "Text" and row["Language"] == "en"
+        }
+
+
+def _check_book_source_components(records: list[dict[str, Any]]) -> None:
+    """Reject reused frozen sources and train/eval work or author overlap."""
+    by_identity: dict[str, set[str]] = defaultdict(set)
+    for record in records:
+        for key in (
+            "source_group",
+            "ebook_id",
+            "catalog_work_key",
+            "raw_sha256",
+            "body_sha256",
+        ):
+            identity = f"{key}:{record[key]}"
+            if (
+                key == "catalog_work_key"
+                and by_identity[identity]
+                and record["split"] not in by_identity[identity]
+            ):
+                raise ValueError(
+                    f"book work or author component crosses train/eval: {identity}"
+                )
+            if by_identity[identity]:
+                raise ValueError(
+                    f"duplicate book source identity across manifests: {identity}"
+                )
+            by_identity[identity].add(record["split"])
+        for author in record["catalog_author_keys"]:
+            by_identity["catalog_author:" + author].add(record["split"])
+    for identity, splits in by_identity.items():
+        if len(splits) > 1 and identity.startswith(
+            ("catalog_work_key:", "catalog_author:")
+        ):
+            raise ValueError(
+                f"book work or author component crosses train/eval: {identity}"
+            )
+
+
 def _book_groups(
-    rows: list[dict[str, Any]], source_dir: Path
+    rows: list[dict[str, Any]], source_dirs: list[Path]
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    manifest_path = source_dir / "manifest.json"
-    manifest = _json(manifest_path)
-    if (
-        manifest.get("schema") != "longworld.p113-book-source-freeze.v1"
-        or manifest.get("train_ready") is not False
-    ):
-        raise ValueError("book source manifest is not frozen candidate material")
-    records = {record["source_group"]: record for record in manifest["records"]}
-    if len(records) != len(manifest["records"]):
-        raise ValueError("book source group repeats")
+    if not source_dirs or len(set(source_dirs)) != len(source_dirs):
+        raise ValueError("book source directories must be nonempty and distinct")
+    records: dict[str, tuple[dict[str, Any], Path]] = {}
+    manifests = []
+    all_records = []
+    for source_dir in source_dirs:
+        manifest_path = source_dir / "manifest.json"
+        manifest = _json(manifest_path)
+        if (
+            manifest.get("schema") != "longworld.p113-book-source-freeze.v1"
+            or manifest.get("train_ready") is not False
+        ):
+            raise ValueError("book source manifest is not frozen candidate material")
+        manifests.append({"path": str(source_dir), "sha256": sha(manifest_path)})
+        for record in manifest["records"]:
+            group = record["source_group"]
+            if group in records:
+                raise ValueError(
+                    "duplicate book source identity across manifests: source_group:"
+                    + group
+                )
+            records[group] = record, source_dir
+            all_records.append(record)
+    if len(source_dirs) > 1:
+        catalog_pins = {
+            _json(source_dir / "manifest.json").get("catalog_sha256")
+            for source_dir in source_dirs
+        }
+        if len(catalog_pins) != 1 or not next(iter(catalog_pins)):
+            raise ValueError("book manifests lack a shared pinned author catalog")
+        catalog_authors = _book_catalog_authors(next(iter(catalog_pins)))
+        for record in all_records:
+            author_keys = catalog_authors.get(record["ebook_id"])
+            if not author_keys or (
+                "author_keys" in record and set(record["author_keys"]) != author_keys
+            ):
+                raise ValueError("book source lacks pinned catalog author identity")
+            record["catalog_author_keys"] = sorted(author_keys)
+        _check_book_source_components(all_records)
     splits: dict[str, set[str]] = defaultdict(set)
     for row in rows:
         splits[row["source_group"]].add(row["split"])
     groups = []
     for group, seen_splits in sorted(splits.items()):
-        record = records.get(group)
+        binding = records.get(group)
         if (
-            record is None
+            binding is None
             or len(seen_splits) != 1
-            or record["split"] not in seen_splits
+            or binding[0]["split"] not in seen_splits
         ):
             raise ValueError(
                 "selected book group has missing or crossing source binding"
             )
+        record, source_dir = binding
         body = source_dir / record["body_file"]
-        if sha(body) != record["body_sha256"]:
+        raw = source_dir / record["raw_file"]
+        if sha(body) != record["body_sha256"] or sha(raw) != record["raw_sha256"]:
             raise ValueError("book source body changed")
         identities = [
             "book:ebook:" + str(record["ebook_id"]),
@@ -169,6 +265,10 @@ def _book_groups(
             "book:author:" + author_key(record["author"]),
             "book:body_sha256:" + record["body_sha256"],
         ]
+        if len(source_dirs) > 1:
+            identities.extend(
+                "book:catalog_author:" + key for key in record["catalog_author_keys"]
+            )
         groups.append(
             {
                 "group": group,
@@ -180,9 +280,15 @@ def _book_groups(
                 "body_sha256": record["body_sha256"],
             }
         )
+    if len(source_dirs) == 1:
+        return groups, {
+            "source_manifest_sha256": manifests[0]["sha256"],
+            "identity_scope": "ebook_id, catalog_work_key, normalized catalog author, exact frozen body SHA-256",
+        }
     return groups, {
-        "source_manifest_sha256": sha(manifest_path),
-        "identity_scope": "ebook_id, catalog_work_key, normalized catalog author, exact frozen body SHA-256",
+        "source_manifests": manifests,
+        "catalog_sha256": next(iter(catalog_pins)),
+        "identity_scope": "ebook_id, catalog work and author keys, normalized printed author, exact frozen body SHA-256 across all pinned book cohorts",
     }
 
 
@@ -318,8 +424,11 @@ def _wiki_groups(
 
 
 def audit(
-    index_dir: Path, selection_dir: Path, book_source_dir: Path
+    index_dir: Path, selection_dir: Path, book_source_dirs: Path | list[Path]
 ) -> dict[str, Any]:
+    source_dirs = (
+        [book_source_dirs] if isinstance(book_source_dirs, Path) else book_source_dirs
+    )
     index = verify_index(index_dir)
     selection_path = selection_dir / "selected_refs.jsonl"
     selection = _json(selection_dir / "manifest.json")
@@ -354,7 +463,7 @@ def audit(
     reports = {}
     for kind, kind_rows in sorted(by_kind.items()):
         if kind == "real_book":
-            groups, pins = _book_groups(kind_rows, book_source_dir)
+            groups, pins = _book_groups(kind_rows, source_dirs)
         elif kind == "real_wiki":
             groups, pins = _wiki_groups(kind_rows)
         else:
@@ -385,12 +494,11 @@ def audit(
         for kind, report in reports.items()
         if report["status"] == "CONFLICT"
     }
-    return {
+    report = {
         "schema_version": SCHEMA,
         "index_manifest_sha256": sha(index_dir / "manifest.json"),
         "selected_refs_sha256": sha(selection_path),
         "selection_manifest_sha256": sha(selection_dir / "manifest.json"),
-        "book_source_manifest_sha256": sha(book_source_dir / "manifest.json"),
         "selected_views": len(rows),
         "by_source_kind": reports,
         "certified_views": len(rows) - unknown_views,
@@ -404,13 +512,21 @@ def audit(
         "scope": "source identity graph only; no gold, semantic-dependency or training-readiness certificate",
         "train_ready": False,
     }
+    if len(source_dirs) == 1:
+        report["book_source_manifest_sha256"] = sha(source_dirs[0] / "manifest.json")
+    else:
+        report["book_source_manifests"] = [
+            {"path": str(path), "sha256": sha(path / "manifest.json")}
+            for path in source_dirs
+        ]
+    return report
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--index", type=Path, required=True)
     parser.add_argument("--selection", type=Path, required=True)
-    parser.add_argument("--book-source", type=Path, required=True)
+    parser.add_argument("--book-source", type=Path, action="append", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args()

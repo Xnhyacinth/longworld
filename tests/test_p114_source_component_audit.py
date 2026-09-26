@@ -5,11 +5,53 @@ from __future__ import annotations
 import pytest
 
 from scripts.p114_source_component_audit import (
+    _check_book_source_components,
     author_key,
     components,
     page_key,
     revision_key,
 )
+
+
+def _book_record(group: str, split: str, *, ebook: int, work: str, author: str) -> dict:
+    return {
+        "source_group": group,
+        "split": split,
+        "ebook_id": ebook,
+        "catalog_work_key": work,
+        "raw_sha256": "raw-" + group,
+        "body_sha256": "body-" + group,
+        "catalog_author_keys": [author],
+    }
+
+
+def test_cross_manifest_book_source_identity_rejected_even_with_same_split() -> None:
+    first = _book_record("book-a", "train", ebook=1, work="a|work", author="a|one")
+    second = _book_record("book-b", "train", ebook=1, work="b|work", author="b|two")
+    with pytest.raises(ValueError, match="duplicate book source identity"):
+        _check_book_source_components([first, second])
+
+
+def test_cross_manifest_duplicate_work_rejected_even_with_same_split() -> None:
+    first = _book_record("book-a", "train", ebook=1, work="a|work", author="a|one")
+    second = _book_record("book-b", "train", ebook=2, work="a|work", author="b|two")
+    with pytest.raises(ValueError, match="duplicate book source identity"):
+        _check_book_source_components([first, second])
+
+
+@pytest.mark.parametrize("shared_field", ["catalog_work_key", "catalog_author_keys"])
+def test_cross_manifest_book_work_or_author_split_rejected(shared_field: str) -> None:
+    first = _book_record("book-a", "train", ebook=1, work="a|work", author="a|one")
+    second = _book_record("book-b", "eval", ebook=2, work="b|work", author="b|two")
+    second[shared_field] = first[shared_field]
+    with pytest.raises(ValueError, match="work or author component crosses train/eval"):
+        _check_book_source_components([first, second])
+
+
+def test_same_author_same_split_is_allowed_for_distinct_books() -> None:
+    first = _book_record("book-a", "train", ebook=1, work="a|work", author="a|one")
+    second = _book_record("book-b", "train", ebook=2, work="a|other", author="a|one")
+    _check_book_source_components([first, second])
 
 
 def test_author_alias_connects_distinct_book_groups_across_split() -> None:
