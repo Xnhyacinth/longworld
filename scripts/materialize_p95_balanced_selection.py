@@ -67,6 +67,7 @@ def _selected(
         code_content_proof=config.get("code_content_proof"),
         code_content_proofs=config.get("code_content_proofs"),
         shared_world_rebalance=config.get("shared_world_rebalance"),
+        require_dependency_status=config.get("require_dependency_status", False),
     )
     selection = json.loads((selection_dir / "manifest.json").read_text())
     if (

@@ -235,3 +235,25 @@ def test_multiple_code_proof_packages_are_reverified_during_materialization(
         index, selection, config, output, max_seq_len=1000, verify_only=True
     )
     assert calls == [packages, packages]
+
+
+def test_dependency_status_filter_is_reverified_during_materialization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    index, selection, config, _shard, _readers = _fixture(tmp_path, monkeypatch)
+    value = json.loads(config.read_text())
+    value["require_dependency_status"] = True
+    config.write_text(json.dumps(value))
+    calls = []
+
+    def verify(_index: Path, _selection: Path, **kwargs: object) -> dict:
+        calls.append(kwargs["require_dependency_status"])
+        if kwargs["require_dependency_status"] is not True:
+            raise ValueError("dependency status filter was not verified")
+        return json.loads((selection / "manifest.json").read_text())
+
+    monkeypatch.setattr(materialize, "verify_selection", verify)
+    output = tmp_path / "strict"
+    materialize.run(index, selection, config, output, max_seq_len=1000)
+    materialize.run(index, selection, config, output, max_seq_len=1000, verify_only=True)
+    assert calls == [True, True]
