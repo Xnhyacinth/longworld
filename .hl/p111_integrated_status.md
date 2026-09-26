@@ -52,6 +52,17 @@ same-world Wiki view exists for one already-counted task and is not in the
 index. These cases do not establish model improvement, broad natural prose
 coverage or unrestricted shortest-proof distance. `train_ready=false`.
 
+**Post-integration quality correction:** four of the five Wiki tasks have a
+list row label equal to or contained in the target article title. A reader
+may bind the target by title even after the link is deleted, while the formal
+solver requires a link token and reports failure. They therefore do **not**
+have established reader-text link necessity. The subsequent pinned
+`p112_wiki_link_strict_unified_v1` gate rejects those four and retains one
+28,289-token task (independent mask 1/1). The P111 pack remains a historical
+candidate diagnostic containing four known shortcut risks; it must not be
+promoted unchanged. The stricter shard will replace the P111 Wiki shard in
+the next integrated index.
+
 The P111 source and selector code prevents a new P108 proof receipt from
 counting old CodeForge tasks again: a pinned unified shard limits which
 positive records the newer receipt contributes, with exact sample identity.

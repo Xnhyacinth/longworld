@@ -37,6 +37,15 @@ The exact Wikipedia revision URLs and CC BY-SA source attribution are retained
 in the frozen source manifests; no redistribution or production promotion is
 claimed by this local candidate receipt.
 
+Post-integration reader-visible shortcut audit found that four of the five
+primary list row names are equal to, or contained in, their target article
+titles. The symbolic solver's link-deletion failure is therefore insufficient
+to prove that a reader needs the link. The pinned P112 shortcut screen rejects
+those four and keeps only the `Ariljača` → `Harilaq Fortress` case. This is a
+lexical screen, not an exhaustive semantic shortcut proof. The P111 five-row
+shard is retained as a diagnostic and is superseded for future selection by
+`data/candidates/p112_wiki_link_strict_unified_v1`.
+
 Inspect and replay:
 
 ```bash
