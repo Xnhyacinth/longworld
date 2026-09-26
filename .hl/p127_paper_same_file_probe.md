@@ -43,6 +43,16 @@ bounded to source-visible TeX links and exact answer strings; they do not
 prove no paraphrased title or other semantic path exists, nor that the model
 learns long-context reasoning.
 
+An independent read-only review re-opened both source archives and checked
+**2/2** final context bytes, source reference/target/gold spans, unique cue
+and exact answer, both deletion hashes, and final assistant masks. It also
+confirmed both source groups are absent from the pinned P120 bank. This does
+not satisfy the generic source-component audit: P127's `sample_index.jsonl`
+does not carry the `native_row_ref` used by that auditor to trace paper rows.
+The shard stays separate until a provenance adapter binds each candidate to
+its pinned archive, work split and native source row and the component audit
+passes. Do not count these two tasks in the integrated bank or selected pack.
+
 The other source-native options remain limited: P113's new six frozen works
 had zero cross-file-reference work, while its separate revision route made
 one task; P115's 40 report cells yielded three Amazon threshold tasks, 15
@@ -57,8 +67,8 @@ more verified relations before another acquisition wave.
 All 34 source records have an unreported license URI (`21`
 `not_recorded_in_capacity`, `13` `not_reported_by_atom`), so this artifact is
 `local_research_only_no_redistribution`. It has no gold-blind model test,
-train/eval release, GPU run or training-benefit claim. Independent adversarial
-review remains separate from the producer's replay.
+train/eval release, GPU run or training-benefit claim. The independent review
+is a bounded source/answer check, not a model evaluation or integration gate.
 
 ```bash
 cat data/candidates/p127_same_file_paper_reference_v4/manifest.json
