@@ -65,9 +65,14 @@ all-reader `mask_rows.jsonl`, `compile_ledger.jsonl` and
 `aca51cff1b8d7dadc08c5fa1b4ff2fc32d731edd9d12c7735c7e1683c64b7fb5`
 is pinned in both screen and unified manifests. The 34/34 final-chat mask
 audit, two complete frozen byte replays, focused pytest and Ruff checks passed.
-Independent adversarial review of v3 has found no definite wrong gold in its
-first pass; final source/token review is pending. Research screening and
-model-readout remain necessary. The data directory is
+Independent adversarial review checked all 34 readers against frozen source
+chapters, printed-name gold, split, answer leakage, masks and token spans.
+Across 53 selected chapters it found no overlap with the unknown-tag evidence
+ledger and no missed support from an external known-label broad scan. It also
+replayed 82 shared-label deletions and 68 negative-name insertions, with zero
+P114/P115 exact sample/task/answer-SHA overlap. These are bounded checks under
+the declared syntactic task, not a proof of every natural-language alternative.
+Model-readout remains necessary. The data directory is
 an immutable local candidate artifact and is not tracked in Git.
 
 ```bash
