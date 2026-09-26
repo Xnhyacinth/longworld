@@ -39,6 +39,62 @@ def test_short_later_quote_and_reverse_speech_are_visible_to_both_parsers() -> N
     ) == ("Alice", "Wait,")
 
 
+def test_postposed_speech_tags_keep_adverbial_modifiers_out_of_name() -> None:
+    examples = [
+        (
+            "“What trial is it?” Alice panted as she ran",
+            "What trial is it?",
+            "Alice",
+            "panted",
+        ),
+        (
+            "“What a topping place!” exclaimed Craddock enthusiastically.",
+            "What a topping place!",
+            "Craddock",
+            "exclaimed",
+        ),
+        (
+            "“She’s stolen a march on us on the last lap,” declared Heavitree when the bell rang.",
+            "She’s stolen a march on us on the last lap,",
+            "Heavitree",
+            "declared",
+        ),
+        (
+            "“She was only going back to her old habits,” said Michael bitterly.",
+            "She was only going back to her old habits,",
+            "Michael",
+            "said",
+        ),
+        (
+            "“Have you any riding clothes?” Penelope whispered to him.",
+            "Have you any riding clothes?",
+            "Penelope",
+            "whispered",
+        ),
+        (
+            "“The carriage is ready,” said Mrs. Bennet sharply.",
+            "The carriage is ready,",
+            "Mrs. Bennet",
+            "said",
+        ),
+    ]
+    for source, quote, label, verb in examples:
+        expected = [(quote, label, verb)]
+        assert [(x.quote, x.label, x.verb) for x in speeches(source)] == expected
+        assert [(x.quote, x.label, x.verb) for x in audit_speeches(source)] == expected
+
+    context = (
+        "=== SECTION: Chapter I ===\n"
+        "“The silver key is missing, surely,” said Alice.\n\n"
+        "=== SECTION: Chapter X ===\n"
+        "“It’s the first position in dancing.” said Alice.\n"
+        "“What trial is it?” Alice panted as she ran.\n"
+    )
+    assert _scan(
+        context, "Chapter I", "Chapter X", "The silver key is missing, surely,"
+    ) == ("Alice", "What trial is it?")
+
+
 def test_speaker_alias_or_pronoun_is_not_certified() -> None:
     text = "“Please wait here,” said Holmes.\n“Now come in,” replied Sherlock Holmes.\n“Go,” said he."
     labels = {x.label for x in audit_speeches(text)}

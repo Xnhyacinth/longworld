@@ -19,6 +19,60 @@ remaining figures below describe a historical diagnostic build, not admitted
 training data. The frozen raw source and rejection ledgers remain useful for
 rebuilding with a corrected truth contract.
 
+## Corrected P113 candidate (not yet in global index)
+
+The replacement freezes `data/sources/p113_book_cohort_v5/manifest.json`
+(SHA-256 `08ceb2706e039775468d9bebca1500e7a389756bb981f6ab3d0b31fc90a097eb`)
+with the corrected truth-parser SHA and the same 67-file mirror download
+receipt. The generator and independent quote-first verifier now recognize
+named speech tags followed by lowercase adverbs or clauses, including
+`Alice panted as she ran`, `exclaimed Craddock enthusiastically`, `declared
+Heavitree when`, `said Michael bitterly` and `Penelope whispered to him`.
+Behavioral regression tests cover all five forms and a later utterance
+changing the blind answer.
+
+The corrected native set is
+`data/candidates/p113_book_native_v7/manifest.json` (SHA-256
+`2951dc010bd17c4b1a3496f1fb11fa9b5e434a082a86eac95e9123521e1f6425`).
+It has **44 independent tasks** from 14 productive source works: 34 train,
+10 eval; 38 tasks come from newly cataloged works. Physical final-chat lengths
+are 13 at 32–64K, 23 at 64–128K and eight at 128–256K. Executed source to
+answer token envelopes are 16,612–148,527 (median 63,994.5); final chat
+contains 3,785,454 tokens and 464 assistant-supervised tokens. These remain
+one literal cross-chapter binding operation, not a broad narrative reasoning
+or L5 policy product.
+
+The corrected unified shard is
+`data/candidates/p113_book_unified_v4/manifest.json` (SHA-256
+`dc5be273da1ea07cc50d855da5b3ad7512c87bcfafb0c0aab03fb094f7c8c6a8`),
+with full-row mask receipt
+`data/candidates/p113_book_unified_mask_v4/manifest.json` (SHA-256
+`9af104c8cae2b942dcccf2d7f6e76899ea8ffbdfafd1f46a2f90ef5b0fad5a27`).
+Native independent audit and final mask both report 44/44. A separate
+read-only review rescanned all 44 source and target chapters with wider
+syntax and found no new wrong gold in the declared printed-name/verb scope;
+it verified full chapter bytes and unified/native reader equality. The old
+five wrong-gold sample IDs are absent. Four corrected answers reappear under
+new IDs; the fifth source pair is not selected. This is still a local
+candidate with `train_ready=false` and no measured model gain.
+
+```bash
+cat data/sources/p113_book_cohort_v5/manifest.json
+less -R data/sources/p113_book_cohort_v5/attempt_ledger.jsonl
+cat data/candidates/p113_book_native_v7/manifest.json
+less -R data/candidates/p113_book_native_v7/proofs.jsonl
+cat data/candidates/p113_book_native_v7/independent_audit_manifest.json
+cat data/candidates/p113_book_unified_v4/manifest.json
+cat data/candidates/p113_book_unified_mask_v4/manifest.json
+UV_LINK_MODE=copy uv run --offline python scripts/p113_book_sources.py --config configs/p113_book_catalog_v1.json --plan data/sources/p113_book_catalog_v1/plan_v2.json --attempt-dir data/sources/p113_books_v1 --prior-source-dir data/sources/p112_books_v1 --output data/sources/p113_book_cohort_v5 --verify-only
+UV_LINK_MODE=copy uv run --offline python scripts/p113_book_tasks.py --source-dir data/sources/p113_book_cohort_v5 --output data/candidates/p113_book_native_v7 --workers 4 --max-tasks-per-book 4 --min-lineage-tokens 16384 --verify-only
+UV_LINK_MODE=copy uv run --offline python scripts/p113_book_audit.py --source-dir data/sources/p113_book_cohort_v5 --native-dir data/candidates/p113_book_native_v7 --verify-only
+UV_LINK_MODE=copy uv run --offline python scripts/p113_book_to_unified.py --source-dir data/sources/p113_book_cohort_v5 --native-dir data/candidates/p113_book_native_v7 --output data/candidates/p113_book_unified_v4 --verify-only
+UV_LINK_MODE=copy uv run --offline python scripts/p113_book_unified_mask.py --unified-dir data/candidates/p113_book_unified_v4 --output data/candidates/p113_book_unified_mask_v4 --verify-only
+```
+
+## Historical quarantined v3 build
+
 This wave replaces the quarantined P112 book answers with a new truth
 contract. The old 20 P112 rows remain excluded from the corrected global
 index. P113 reuses three frozen *source texts* but regenerates all questions,

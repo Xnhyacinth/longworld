@@ -35,7 +35,7 @@ QUOTE = r"(?P<open>[\"“])(?P<quote>[^\"”\n]{1,2000})(?P<close>[\"”])"
 _V = "(?i:" + "|".join(sorted(VERBS)) + ")"
 AFTER = re.compile(
     QUOTE
-    + rf"[ \t]*[,;]?[ \t]*(?:(?P<verb_a>{_V})[ \t]+(?P<name_a>{NAME})|(?P<name_b>{NAME})[ \t]+(?P<verb_b>{_V}))(?=[,.;:!?\n]|$)"
+    + rf"[ \t]*[,;—-]?[ \t]*(?:(?P<verb_a>{_V})[ \t]+(?P<name_a>{NAME})|(?P<name_b>{NAME})[ \t]+(?P<verb_b>{_V}))(?=[,.;:!?—\n]|[ \t]+[a-z]|$)"
 )
 BEFORE = re.compile(
     rf"(?P<name_c>{NAME})[ \t]+(?P<verb_c>{_V})[ \t]*[,;:]?[ \t]*" + QUOTE
@@ -258,21 +258,26 @@ def audit_speeches(text: str) -> list[Attribution]:
             after = text[close + 1 : min(len(text), close + 120)].split("\n", 1)[0]
             before = text[max(0, start - 120) : start].split("\n")[-1]
             # Match whitespace-delimited words after tokenizing the local tag.
-            tail = re.match(r"^[ \t]*[,;]?[ \t]*(.+)", after)
+            tail = re.match(r"^[ \t]*[,;—-]?[ \t]*(.+)", after)
             found = None
             if tail:
                 segment = tail.group(1)
                 # End the tag at the next punctuation boundary. A subsequent
                 # sentence starting with a capital must not extend the name.
-                stop = re.search(
-                    r"[,.!:;?]", segment.replace("Mr.", "Mr_").replace("Dr.", "Dr_")
-                )
+                protected = segment
+                for title in ("Mr.", "Mrs.", "Ms.", "Dr.", "St."):
+                    protected = protected.replace(title, title[:-1] + "_")
+                stop = re.search(r"[,.!:;?]", protected)
                 if stop:
                     segment = segment[: stop.start()]
                 terms = list(re.finditer(r"[A-Za-z][A-Za-z'’.-]*", segment))
                 if terms:
                     if terms[0].group().casefold() in VERBS:
-                        label_parts = terms[1:]
+                        label_parts = []
+                        for term in terms[1:]:
+                            if not term.group()[:1].isupper():
+                                break
+                            label_parts.append(term)
                         if 1 <= len(label_parts) <= 4 and all(
                             term.group()[:1].isupper() for term in label_parts
                         ):
@@ -281,17 +286,20 @@ def audit_speeches(text: str) -> list[Attribution]:
                                 " ".join(term.group() for term in label_parts),
                                 terms[0].group().casefold(),
                                 close + 1 + rel,
-                                close + 1 + tail.start(1) + terms[-1].end(),
+                                close + 1 + tail.start(1) + label_parts[-1].end(),
                                 "quote_then_tag",
                             )
                     elif terms[0].group()[:1].isupper():
-                        verb_idx = len(terms) - 1
-                        if (
-                            1 <= verb_idx <= 4
-                            and terms[verb_idx].group().casefold() in VERBS
-                            and all(
-                                term.group()[:1].isupper() for term in terms[:verb_idx]
-                            )
+                        verb_idx = next(
+                            (
+                                idx
+                                for idx, term in enumerate(terms[1:5], start=1)
+                                if term.group().casefold() in VERBS
+                            ),
+                            None,
+                        )
+                        if verb_idx is not None and all(
+                            term.group()[:1].isupper() for term in terms[:verb_idx]
                         ):
                             found = (
                                 " ".join(term.group() for term in terms[:verb_idx]),
