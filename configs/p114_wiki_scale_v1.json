@@ -1,0 +1,18 @@
+{
+  "schema": "longworld.p114-wiki-scale.v1.config",
+  "inventory": {"path": "data/capability_records/p114_wiki_scale_inventory_v1/manifest.json", "sha256": "e3e8021759ac061cdc8594a08b75b90f6997f190c948b4562824dec77ffc411a"},
+  "prior_pool": {"path": "data/capability_records/p114_wiki_scale_prior_v1/manifest.json", "sha256": "9867e338fe84a193cd234f2a800921ec2b1a79ef5b929e3ce315e38fffe44e40"},
+  "catalog": {"path": "data/capability_records/p114_wiki_scale_catalog_v1/manifest.json", "sha256": "07331c31b39bc88b0502219e565d257e434d45f897d916e3d49027131bc68bc3"},
+  "sharded_catalog": {"path": "data/capability_records/p114_wiki_scale_catalog_sharded_v1/catalog.json", "sha256": "d47f28b01f04f6a9bd4a6e6e4ff9b7d0860849b9f26b93749228632074f45eb3"},
+  "plan": {"path": "data/capability_records/p114_wiki_scale_plan_sharded_v1/manifest.json", "sha256": "2b27f6d36ca00aba9da477d17451814e73736996eec73902571714b20a9d1322"},
+  "gate": {"path": "data/capability_records/p114_wiki_scale_campaign_sharded_v1/gate_result.json", "sha256": "3f4d64263203fcb627b93faa943cb96dec214f929ba016ff7b6d77139fa1476d"},
+  "campaign": {"path": "data/capability_records/p114_wiki_scale_campaign_sharded_v1/result.json", "sha256": "57332790507680b4244f4b1f8135703a7d9b3ba28db04cbc4b4476042c61d93b"},
+  "native_batch": {"path": "data/capability_records/p114_wiki_scale_campaign_sharded_v1/batch/result.json", "sha256": "c5647fa029b558bc5983660c55432bb029275bedc434a481d0c50856c3fa6655"},
+  "unified": {"path": "data/candidates/p114_wiki_scale_unified_v1/merged/manifest.json", "sha256": "586473627e560866c27fd1452b73b0bb2f8964e495350c4a1ee32c6ae0f90ba2"},
+  "mask": {"path": "data/candidates/p114_wiki_scale_mask_v1/manifest.json", "sha256": "97c54bc97a70dd5a3dd53fd07d333eb4dba178f0768e80f6306ccb883fcdf25b"},
+  "prior_index": {
+    "manifest": {"path": "data/candidates/p113_book_quarantined_refs_v1/manifest.json", "sha256": "02d71742c182f5bab4c8694e0990c4f1ad848da9586e55ba6008e4cf2076a422"},
+    "refs": {"path": "data/candidates/p113_book_quarantined_refs_v1/candidate_refs.jsonl", "sha256": "fdee46dc9bc419c5ed40c8047ac83362722480f9581b10e4bf9252c9d84f9304"}
+  },
+  "max_same_answer_per_source": 2
+}
