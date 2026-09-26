@@ -357,6 +357,88 @@ def test_pinned_codeforge_proof_gate_keeps_only_content_backed_views(
         balanced.verify_selection(index, tmp_path / "selection", **kwargs)
 
 
+def test_codeforge_proof_scope_admits_new_tasks_without_duplicate_old_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(balanced, "ROOT", tmp_path)
+
+    def proof(name: str) -> dict:
+        return {
+            "source_group_id": "repo",
+            "semantic_task_id": name,
+            "sample_id": name,
+            "split": "train",
+            "full_message_tokens": 110,
+            "classification": "scoped_long_input_file_aggregation_certificate",
+            "scoped_long_input_certificate": True,
+            "content_backed_scoped_certificate": True,
+        }
+
+    def package(name: str, rows: list[dict]) -> dict:
+        proof_path = tmp_path / f"{name}_proofs.jsonl"
+        proof_path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+        proof_hash = hashlib.sha256(proof_path.read_bytes()).hexdigest()
+        receipt_path = tmp_path / f"{name}_receipt.json"
+        receipt_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "longworld.codeforge-reading-proof-build.v2",
+                    "profile_id": "p65-codeforge-filename-copy-content-backed-v1",
+                    "files": {"proofs.jsonl": proof_hash},
+                    "primary_rows": len(rows),
+                    "qualified_existing_semantic_tasks": len(rows),
+                }
+            )
+        )
+        return {
+            "receipt": {
+                "path": receipt_path.name,
+                "sha256": hashlib.sha256(receipt_path.read_bytes()).hexdigest(),
+            },
+            "proofs": {"path": proof_path.name, "sha256": proof_hash},
+        }
+
+    old = package("old", [proof("old")])
+    new = package("new", [proof("old"), proof("new")])
+    scope_dir = tmp_path / "scope"
+    scope_dir.mkdir()
+    scope_index = scope_dir / "sample_index.jsonl"
+    scope_index.write_text(
+        json.dumps(
+            {"source_group": "repo", "semantic_task_id": "new", "sample_id": "new"}
+        )
+        + "\n"
+    )
+    scope_manifest = scope_dir / "manifest.json"
+    scope_manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.unified-candidates.v1",
+                "candidate_views": 1,
+                "files_sha256": {
+                    "sample_index.jsonl": hashlib.sha256(
+                        scope_index.read_bytes()
+                    ).hexdigest()
+                },
+            }
+        )
+    )
+    new["scope_unified_manifest"] = {
+        "path": "scope/manifest.json",
+        "sha256": hashlib.sha256(scope_manifest.read_bytes()).hexdigest(),
+    }
+    entries = [_entry(name, group="repo", task=name) for name in ("old", "new")]
+    for entry in entries:
+        entry["candidate"]["source_kind"] = "real_code_workflow"
+    eligible, report = balanced._codeforge_eligible(entries, [old, new])
+    assert len(eligible) == 2
+    assert report["counts"]["content_backed_views"] == 2
+
+    scope_index.write_text(scope_index.read_text().replace('"new"', '"old"'))
+    with pytest.raises(ValueError, match="CodeForge proof scope index differs"):
+        balanced._codeforge_eligible(entries, [old, new])
+
+
 def test_p99_added_code_proof_gate_requires_pinned_positive_audit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

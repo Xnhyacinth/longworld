@@ -165,6 +165,47 @@ def _codeforge_eligible(
             != receipt["qualified_existing_semantic_tasks"]
         ):
             raise ValueError("CodeForge proof inventory differs from receipt")
+        scope_pin = pin.get("scope_unified_manifest")
+        if scope_pin is not None:
+            scope_path = _pinned_proof_path(scope_pin)
+            scope_manifest = json.loads(scope_path.read_text())
+            if (
+                scope_manifest.get("schema_version")
+                != "longworld.unified-candidates.v1"
+            ):
+                raise ValueError("CodeForge proof scope manifest differs")
+            index_path = scope_path.parent / "sample_index.jsonl"
+            if _sha(index_path) != scope_manifest.get("files_sha256", {}).get(
+                "sample_index.jsonl"
+            ):
+                raise ValueError("CodeForge proof scope index differs")
+            scope = {
+                (item["source_group"], item["semantic_task_id"]): item
+                for item in (
+                    json.loads(line)
+                    for line in index_path.read_text().splitlines()
+                    if line
+                )
+            }
+            if len(scope) != scope_manifest.get("candidate_views"):
+                raise ValueError("CodeForge proof scope repeats a task")
+            rows = [
+                row
+                for row in rows
+                if (row["source_group_id"], row["semantic_task_id"]) in scope
+            ]
+            scoped = {
+                (row["source_group_id"], row["semantic_task_id"]): row for row in rows
+            }
+            if (
+                set(scoped) != set(scope)
+                or len(rows) != len(scoped)
+                or any(
+                    row["sample_id"] != scope[key]["sample_id"]
+                    for key, row in scoped.items()
+                )
+            ):
+                raise ValueError("CodeForge proof scope identity differs")
         for row in rows:
             key = row["source_group_id"], row["semantic_task_id"]
             if key in proofs:
