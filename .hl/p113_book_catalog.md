@@ -1,5 +1,24 @@
 # P113 catalog-driven real-book source and explicit-speech tasks
 
+**QUARANTINED (2026-09-26):** The P113 `native_v6 → unified_v3 →
+unified_mask_v3` chain's 43/43 parser-agreement and mask checks did not prove
+correct gold. An independent target-chapter scan found at least five wrong
+answers, all caused by a listed speech verb and printed name followed by a
+modifier that both original parsers skipped. Affected samples:
+
+```text
+book-explicit-f72db90573fc9a3bce42-v1
+book-explicit-3e5ba3a65a16ce15c488-v1
+book-explicit-e72a12727d8443bc5d0d-v1
+book-explicit-b94402ad7754f483393e-v1
+book-explicit-b29750267446add4fc8a-v1
+```
+
+All 43 P113 book rows are excluded from the current candidate index; the
+remaining figures below describe a historical diagnostic build, not admitted
+training data. The frozen raw source and rejection ledgers remain useful for
+rebuilding with a corrected truth contract.
+
 This wave replaces the quarantined P112 book answers with a new truth
 contract. The old 20 P112 rows remain excluded from the corrected global
 index. P113 reuses three frozen *source texts* but regenerates all questions,
@@ -81,14 +100,15 @@ exhaustive shortest-proof certificate, and the short answers make this one
 L2 binding lane rather than a balanced long-context curriculum. The catalog
 does not prove hundreds of domains; all selected works are English literature.
 
-Independent native audit, unified candidate merge and full-row assistant mask
-replays passed **43/43**. The final unified manifest SHA-256 is
+The original native audit, unified merge and full-row assistant mask replays
+passed **43/43 under the faulty parser**. This agreement did not detect the
+modifier cases above. The quarantined unified manifest SHA-256 is
 `2d1e0aadec7483ff7a2bc1777c7057a144cd2d3eb1864b46dd6dfade6eb1d013`;
 the mask rows SHA-256 is
 `5076b07d5d1bc2d51ab0fc63f8bb723c7e40dd32398fee688182b10f8b101b2c`.
-No source group or normalized work key crosses train/eval. These checks admit
-the shard as a local candidate; they do not establish model improvement or
-release eligibility, and `train_ready=false`.
+No source group or normalized work key crossed train/eval. These checks do not
+admit the shard; no model improvement or release eligibility is established,
+and `train_ready=false`.
 Earlier diagnostic builds are not interchangeable: initial 46 tasks became
 43 after preserving more evaluation works and adding missed speech verbs.
 The comparison has 29 identical task IDs, 17 removed and 14 added; this is a
