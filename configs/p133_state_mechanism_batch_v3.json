@@ -1,0 +1,25 @@
+{
+  "schema_version": "longworld.p133-state-mechanism-batch.v1",
+  "mechanisms": ["partial_reversal", "authorization_hold"],
+  "length_records": [400, 800],
+  "seeds_per_cell": 16,
+  "seed_base": 1331000,
+  "consumed_records": 20,
+  "depth": 2,
+  "scope_variants": 2,
+  "action_delta": 500,
+  "target_margins": [100, 50],
+  "minimum_witness_to_query_tokens": 16384,
+  "max_full_chat_tokens": 262144,
+  "workers": 4,
+  "prior_world_sets": [
+    {
+      "path": "data/candidates/p133_state_mechanism_batch_v1/manifest.json",
+      "sha256": "7a9a537b74e7a56c90548778ca2f94bfb4e470902f8cb5d5663357bc52e9e61c"
+    },
+    {
+      "path": "data/candidates/p112_world_factor_campaign_v2/base/manifest.json",
+      "sha256": "9d67b91951d2d044368aa495ec3ab90a7b8b3bf0572b6d1bc27fab2dcffc282d"
+    }
+  ]
+}
