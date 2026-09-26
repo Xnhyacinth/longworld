@@ -1,0 +1,9 @@
+{
+  "schema": "longworld.p136-book-window-request.v1",
+  "parent_config": {"path": "configs/p121_book_primary_author_v3.json", "sha256": "6acd3aa7e3155e143b81a71aa3c705d18e1ff0a78b06fcf9cf90e94b44abf7e1"},
+  "parent_plan": {"path": "data/sources/p121_book_primary_plan_v3/plan.json", "sha256": "76e18f6dfd66843aaab77bde2ac3c9c820db810f964de2fa54100cf9842875fa"},
+  "start_offset": 180,
+  "window_size": 180,
+  "prior_added_source": {"path": "data/sources/p124_book_cohort_v1/manifest.json", "sha256": "e9194731c7fa456ec0f57acff3734ccd0ec2df67c97886df817580891f2a9293"},
+  "prior_added_attempts": {"path": "data/sources/p124_book_attempts_v1/download_manifest.json", "sha256": "b6cd1c22e4c5f941eb87ed3abc17231efd7df43327b20906d5fe37ff2402b7d0"}
+}

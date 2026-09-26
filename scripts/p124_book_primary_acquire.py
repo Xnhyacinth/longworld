@@ -22,6 +22,7 @@ from scripts.p121_book_primary_author import _config
 
 PLAN_SCHEMA = "longworld.p114-book-scale-plan.v1"
 SOURCE_SCHEMA = "longworld.p113-book-source-freeze.v1"
+WINDOW_SCHEMA = "longworld.p136-book-window-plan.v1"
 
 
 def _sha(raw: bytes) -> str:
@@ -39,6 +40,33 @@ def _inputs(config_path: Path, plan_path: Path) -> tuple[dict, dict]:
         or len(plan.get("candidates", [])) < cfg["max_attempts"]
     ):
         raise ValueError("P121 primary-author plan/config pin differs")
+    if plan.get("p136_schema") is not None:
+        parent_pin = plan.get("parent_plan")
+        if not isinstance(parent_pin, dict):
+            raise ValueError("P136 window parent plan pin missing")
+        relative = Path(parent_pin.get("path", ""))
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError("P136 window parent plan path is unsafe")
+        parent_path = ROOT / relative
+        if _sha(parent_path.read_bytes()) != parent_pin.get("sha256"):
+            raise ValueError("P136 window parent plan SHA differs")
+        parent = json.loads(parent_path.read_text())
+        start = plan.get("start_offset")
+        count = cfg["max_attempts"]
+        ids = [item["ebook_id"] for item in plan["candidates"]]
+        if (
+            plan["p136_schema"] != WINDOW_SCHEMA
+            or type(start) is not int
+            or start < 0
+            or plan.get("window_size") != count
+            or len(plan["candidates"]) != count
+            or parent.get("schema") != PLAN_SCHEMA
+            or parent.get("config_sha256") != plan["config_sha256"]
+            or parent.get("catalog_sha256") != plan["catalog_sha256"]
+            or plan["candidates"] != parent["candidates"][start : start + count]
+            or plan.get("window_ebook_ids_sha256") != _sha(_encoded(ids))
+        ):
+            raise ValueError("P136 attempt window differs from pinned parent plan")
     return cfg, plan
 
 
@@ -55,6 +83,13 @@ def acquire(
             "status_counts"
         ) != dict(sorted(Counter(row["status"] for row in receipt["records"]).items())):
             raise ValueError("P124 mirror receipt accounting differs")
+        if plan.get("p136_schema") is not None and (
+            receipt.get("p136_start_offset") != plan["start_offset"]
+            or receipt.get("p136_parent_plan_sha256") != plan["parent_plan"]["sha256"]
+            or receipt.get("p136_window_ebook_ids_sha256")
+            != plan["window_ebook_ids_sha256"]
+        ):
+            raise ValueError("P136 mirror window receipt differs")
         return receipt
     output.mkdir(parents=True, exist_ok=True)
     limiter = _RateLimiter(cfg["requests_per_second"])
@@ -95,6 +130,12 @@ def acquire(
         "records": ordered,
         "train_ready": False,
     }
+    if plan.get("p136_schema") is not None:
+        receipt.update(
+            p136_start_offset=plan["start_offset"],
+            p136_parent_plan_sha256=plan["parent_plan"]["sha256"],
+            p136_window_ebook_ids_sha256=plan["window_ebook_ids_sha256"],
+        )
     _write(output / "download_manifest.json", _encoded(receipt), verify_only=False)
     return receipt
 

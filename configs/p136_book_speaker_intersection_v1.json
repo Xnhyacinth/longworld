@@ -1,0 +1,10 @@
+{
+  "schema": "longworld.p116-book-speaker-intersection-request.v1",
+  "compiler_revision": "edge-attribution-v3",
+  "source_dir": "data/sources/p136_book_cohort_v1",
+  "prior_unified_dir": "data/candidates/p124_book_intersection_unified_v1",
+  "workers": 4,
+  "max_tasks_per_book": 3,
+  "min_lineage_tokens": 16384,
+  "max_chat_tokens": 262144
+}
