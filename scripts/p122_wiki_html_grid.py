@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 from longworld.synthesis.wiki_adapter import WikiHttpFetcher
 from scripts.run_source_pool_batch import _snapshot
 
-SCHEMA = "longworld.p122-wiki-html-grid.v1"
+SCHEMA = "longworld.p122-wiki-html-grid.v2"
 
 
 def sha(data: bytes) -> str:
@@ -66,6 +66,11 @@ def clean(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
+def clean_cell(value: str) -> str:
+    """Keep explicit HTML line breaks while collapsing source formatting spaces."""
+    return "\n".join(clean(part) for part in value.split("\n")).strip(" \n")
+
+
 class Tables(HTMLParser):
     """Read DOM cell boundaries while retaining source offsets and citations."""
 
@@ -84,6 +89,9 @@ class Tables(HTMLParser):
         self.section_path: list[str] = []
         self.caption = False
         self.reference = False
+        self.reference_text = ""
+        self.div_navigation: list[bool] = []
+        self.nav_depth = 0
 
     def _char_offset(self) -> int:
         row, column = self.getpos()
@@ -91,6 +99,16 @@ class Tables(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         a = {key: value or "" for key, value in attrs}
+        if tag == "div":
+            classes = set(a.get("class", "").split())
+            self.div_navigation.append(
+                (self.div_navigation[-1] if self.div_navigation else False)
+                or a.get("id", "").casefold() == "toc"
+                or "toc" in classes
+                or a.get("role") == "navigation"
+            )
+        elif tag == "nav":
+            self.nav_depth += 1
         if tag == "table":
             self.depth += 1
             if self.depth == 1:
@@ -108,7 +126,13 @@ class Tables(HTMLParser):
         if self.depth > 1:
             return
         if self.depth == 0 and tag in {"h2", "h3", "h4", "h5", "h6"}:
-            self.heading = {"level": int(tag[1]), "text": ""}
+            self.heading = {
+                "level": int(tag[1]),
+                "text": "",
+                "navigation": self.nav_depth > 0
+                or bool(self.div_navigation and self.div_navigation[-1])
+                or a.get("id", "").casefold().startswith("toc"),
+            }
         if tag == "li" and a.get("id", "").startswith("cite_note-"):
             self.note = {"id": a["id"], "text": ""}
         if self.table is None:
@@ -124,12 +148,15 @@ class Tables(HTMLParser):
             self.cell = {
                 "kind": tag,
                 "text": "",
+                "raw_visible_text": "",
                 "rowspan": a.get("rowspan", "1"),
                 "colspan": a.get("colspan", "1"),
                 "scope": a.get("scope", ""),
                 "headers": a.get("headers", ""),
                 "links": [],
                 "refs": [],
+                "citation_markers": [],
+                "unscoped_citation_links": [],
                 "start": self._char_offset(),
                 "end": None,
             }
@@ -140,12 +167,19 @@ class Tables(HTMLParser):
             and "reference" in a.get("class", "").split()
         ):
             self.reference = True
+            self.reference_text = ""
+        elif tag == "br" and self.cell is not None:
+            self.cell["raw_visible_text"] += "\n"
+            if not self.reference:
+                self.cell["text"] += "\n"
         elif tag == "a" and self.cell is not None:
             href = a.get("href", "")
             if href:
                 self.cell["links"].append(href)
                 if self.reference and href.startswith("#cite_note-"):
                     self.cell["refs"].append(href[1:])
+                elif href.startswith("#cite_note-"):
+                    self.cell["unscoped_citation_links"].append(href[1:])
         elif tag == "img" and self.cell is not None and a.get("alt"):
             self.cell["image_alt"] = a["alt"]
 
@@ -155,15 +189,27 @@ class Tables(HTMLParser):
         if self.heading is not None:
             self.heading["text"] += data
         if self.depth == 1 and self.cell is not None:
-            self.cell["text"] += data
+            visible = re.sub(r"\s+", " ", data)
+            self.cell["raw_visible_text"] += visible
+            if self.reference:
+                self.reference_text += visible
+            else:
+                self.cell["text"] += visible
         elif self.depth == 1 and self.caption and self.table is not None:
             self.table["caption"] += data
 
     def handle_endtag(self, tag: str) -> None:
+        if tag == "div" and self.div_navigation:
+            self.div_navigation.pop()
+        elif tag == "nav":
+            self.nav_depth = max(0, self.nav_depth - 1)
         if tag in {"h2", "h3", "h4", "h5", "h6"} and self.heading is not None:
             level, value = self.heading["level"], clean(self.heading["text"])
-            self.section_path = self.section_path[: max(0, level - 2)]
-            if value:
+            if not self.heading["navigation"] and value.casefold() not in {
+                "contents",
+                "table of contents",
+            }:
+                self.section_path = self.section_path[: max(0, level - 2)]
                 self.section_path.append(value)
             self.heading = None
         if tag == "li" and self.note is not None:
@@ -185,7 +231,10 @@ class Tables(HTMLParser):
         elif self.depth == 1 and tag == "caption":
             self.caption = False
         elif self.depth == 1 and tag == "sup":
+            if self.reference and self.cell is not None:
+                self.cell["citation_markers"].append(clean(self.reference_text))
             self.reference = False
+            self.reference_text = ""
 
 
 def grid(table: dict, notes: dict[str, str], html: str) -> tuple[dict, list[str]]:
@@ -227,9 +276,14 @@ def grid(table: dict, notes: dict[str, str], html: str) -> tuple[dict, list[str]
             refs = list(dict.fromkeys(source_cell["refs"]))
             if any(ref not in notes for ref in refs):
                 reasons.append("unresolved_citation")
+            if source_cell["unscoped_citation_links"]:
+                reasons.append("unscoped_citation_link")
             origins[cell_id] = {
                 "kind": source_cell["kind"],
-                "text": clean(source_cell["text"]),
+                "text": clean_cell(source_cell["text"]),
+                "raw_visible_text": clean_cell(source_cell["raw_visible_text"]),
+                "citation_markers": source_cell["citation_markers"],
+                "multiline": "\n" in clean_cell(source_cell["text"]),
                 "rowspan": rowspan,
                 "colspan": colspan,
                 "scope": source_cell["scope"],
@@ -337,6 +391,7 @@ def sources(config: dict) -> list[dict]:
             {
                 "title": title,
                 "domain": source["domain"],
+                "split": source["split"],
                 "oldid": snap["source"]["revisions"][title],
                 "page_url": doc["page_url"],
                 "revision_url": doc["revision_url"],
@@ -366,7 +421,11 @@ def freeze(config_path: Path, output: Path, *, verify_only: bool = False) -> dic
     fetcher = WikiHttpFetcher(config.get("api", "https://en.wikipedia.org/w/api.php"))
     records = []
     for index, source in enumerate(selected):
-        html_path = output / "html" / (sha(source["title"].encode())[:16] + ".html")
+        key = sha(f"{source['title']}\0{source['oldid']}".encode())[:20]
+        html_path = output / "html" / f"{key}.html"
+        receipt_path = output / "html" / f"{key}.receipt.json"
+        if html_path.exists() != receipt_path.exists():
+            raise ValueError("unbound or incomplete oldid HTML cache")
         if not html_path.exists():
             if verify_only:
                 raise ValueError("frozen HTML missing")
@@ -389,16 +448,44 @@ def freeze(config_path: Path, output: Path, *, verify_only: bool = False) -> dic
             ):
                 raise ValueError("MediaWiki oldid/title/content changed")
             html_path.parent.mkdir(parents=True, exist_ok=True)
-            html_path.write_bytes(parsed["text"].encode())
+            html_data = parsed["text"].encode()
+            if not html_data or len(html_data) > config["max_html_bytes_per_page"]:
+                raise ValueError("HTML exceeds cap or is empty")
+            receipt = {
+                "requested_title": source["title"],
+                "requested_oldid": source["oldid"],
+                "parsed_title": parsed["title"],
+                "parsed_revid": parsed["revid"],
+                "html_sha256": sha(html_data),
+                "html_bytes": len(html_data),
+                "snapshot_sha256": source["snapshot"]["sha256"],
+            }
+            html_path.write_bytes(html_data)
+            receipt_path.write_bytes(encoded(receipt))
         html = html_path.read_bytes()
         if not html or len(html) > config["max_html_bytes_per_page"]:
             raise ValueError("HTML exceeds cap or is empty")
+        receipt = json.loads(receipt_path.read_text())
+        if (
+            receipt.get("requested_title") != source["title"]
+            or receipt.get("requested_oldid") != source["oldid"]
+            or receipt.get("parsed_title") != source["title"]
+            or receipt.get("parsed_revid") != source["oldid"]
+            or receipt.get("snapshot_sha256") != source["snapshot"]["sha256"]
+            or receipt.get("html_sha256") != sha(html)
+            or receipt.get("html_bytes") != len(html)
+        ):
+            raise ValueError("oldid HTML cache receipt differs")
         records.append(
             {
                 **source,
                 "html_path": str(html_path.relative_to(ROOT)),
                 "html_bytes": len(html),
                 "html_sha256": sha(html),
+                "fetch_receipt": {
+                    "path": str(receipt_path.relative_to(ROOT)),
+                    "sha256": sha(receipt_path.read_bytes()),
+                },
             }
         )
     result = {
@@ -431,6 +518,17 @@ def compile_grids(source_dir: Path, output: Path, *, verify_only: bool = False) 
     ledger, accepted = [], []
     for page in source["records"]:
         html_path = pinned({"path": page["html_path"], "sha256": page["html_sha256"]})
+        receipt = json.loads(pinned(page["fetch_receipt"]).read_text())
+        if (
+            receipt["requested_title"] != page["title"]
+            or receipt["requested_oldid"] != page["oldid"]
+            or receipt["parsed_title"] != page["title"]
+            or receipt["parsed_revid"] != page["oldid"]
+            or receipt["html_sha256"] != page["html_sha256"]
+            or receipt["html_bytes"] != page["html_bytes"]
+            or receipt["snapshot_sha256"] != page["snapshot"]["sha256"]
+        ):
+            raise ValueError("source HTML oldid receipt differs")
         html = html_path.read_text()
         parser = Tables(html)
         parser.feed(html)
@@ -447,6 +545,7 @@ def compile_grids(source_dir: Path, output: Path, *, verify_only: bool = False) 
                     "table_id": table_id,
                     "title": page["title"],
                     "domain": page["domain"],
+                    "split": page["split"],
                     "status": status,
                     "reasons": reasons,
                     "width": value["width"],
@@ -462,6 +561,13 @@ def compile_grids(source_dir: Path, output: Path, *, verify_only: bool = False) 
                     "citation_refs": sum(
                         len(cell["footnote_refs"]) for cell in value["origins"].values()
                     ),
+                    "citation_marked_cells": sum(
+                        bool(cell["citation_markers"])
+                        for cell in value["origins"].values()
+                    ),
+                    "multiline_cells": sum(
+                        cell["multiline"] for cell in value["origins"].values()
+                    ),
                 }
             )
             if not reasons:
@@ -470,6 +576,7 @@ def compile_grids(source_dir: Path, output: Path, *, verify_only: bool = False) 
                         "table_id": table_id,
                         "title": page["title"],
                         "domain": page["domain"],
+                        "split": page["split"],
                         "oldid": page["oldid"],
                         "revision_url": page["revision_url"],
                         "html_sha256": page["html_sha256"],
@@ -499,6 +606,10 @@ def compile_grids(source_dir: Path, output: Path, *, verify_only: bool = False) 
         ),
         "domain_valid_tables": dict(
             Counter(row["domain"] for row in ledger if row["status"] == "grid_valid")
+        ),
+        "source_split_pages": dict(Counter(row["split"] for row in source["records"])),
+        "valid_table_splits": dict(
+            Counter(row["split"] for row in ledger if row["status"] == "grid_valid")
         ),
         "files_sha256": {name: sha(data) for name, data in files.items()},
         "train_ready": False,

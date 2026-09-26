@@ -1,5 +1,13 @@
 # P122 exact-oldid Wiki HTML grid pilot
 
+The current audit-only output is v2: `data/candidates/p122_wiki_html_source_v2/source_manifest.json` (SHA-256 `eb8d0b724bd156a9b46ac5af4e35b809249fd50e35b434bdfc75975549e0de1d`) and `data/candidates/p122_wiki_html_grid_v2/manifest.json` (`74a029df87a6059d5ac8615cfd6be157735bf5418387e83ab37b2b4c92075f0c`), pinned to parser code SHA-256 `2a659f467363e8a2783f7d92d4ed720e3deebca15034cddd250b93bf6b80803a`. Both stages replay byte-for-byte offline. The table count remains 12 pages / 53 gross / 25 strict grids / 1,902 rows. This is **0 QA**, `train_ready=false`, pending an independent v2 review.
+
+V2 repairs source and visible-text defects found during independent review of v1. It carries the P119 split into every source/table row (six train and six eval pages; ten train and fifteen eval accepted grids). The cache name binds title **and oldid**; a per-page receipt records requested and returned title/revision, HTML SHA/length and source snapshot SHA. Reuse checks both file and receipt; an existing HTML file without a matching receipt is rejected. The 12 v2 pages were fetched again at no more than 0.5 requests/second instead of trusting the title-only v1 cache. Cell text retains explicit HTML `<br>` as a newline: 93 accepted origin cells are multiline, including the Bandar Lampung hospital name and its second line. Visible citation markers are separated from normalized cell text but retained in `raw_visible_text` and `citation_markers` (612 accepted origins); references and full notes remain linked. Navigation and TOC headings are omitted from section paths; Barcelona's table now has no fabricated `Contents` section. Hidden-coordinate cells remain rejected rather than silently changing visibility semantics.
+
+V2 focused tests include an unbound/stale cache regression, multiline entity text, citation separation, TOC heading exclusion, Barcelona mixed row headers, row/colspans, missing notes, nested and ragged tables. P122 plus P119 focused tests: nine passed. Source and grid verify-only and Ruff check passed. These are implementation checks; independent review of v2 is still required before any task adapter.
+
+The v1 manifests and HTML remain immutable diagnostics. V1's historical compiler is commit `35bba2f`; the current script implements v2 and therefore does not replay the old code SHA. The following v1 analysis explains how the route was chosen, but its cell-text and provenance claims are superseded by v2.
+
 P119's 98 frozen Wikipedia pages produced no P117 table task because its plain-text renderer drops empty table cells and leaves template pipes inside cell text. P122 checks one reusable source route: fetch [MediaWiki's parsed HTML for an exact oldid](https://www.mediawiki.org/wiki/API:Parsing_wikitext), pin the returned HTML bytes, and expand the HTML table cells into a lossless grid. This pilot **does not produce QA or training data**. train_ready=false.
 
 The frozen source is data/candidates/p122_wiki_html_source_v1/source_manifest.json (SHA-256 8e05ec92d019d1182bfd046ec731851528be7a29c7b3bfd8e0f946679fdf49fe), compiled by scripts/p122_wiki_html_grid.py (282a1fff1a39e59b96feab0970c4a6fcc68df9734640ab1f592641fc989dfc8c). The grid report is data/candidates/p122_wiki_html_grid_v1/manifest.json (944f31b728892a704d26a04f118c71024824578c47179946b4b7c1c2571fab2d). Both source and grid byte replay pass offline. The sample is two risk-selected pages from each of the six P119 domains that actually froze; it is **not a random estimate of yield across all 98 pages**. Twelve API requests were made sequentially at at most 0.5 requests/second. The P119 snapshot oldid and rendered-body SHA are recorded alongside every HTML SHA and source URL. MediaWiki's parsed HTML can depend on templates, so the frozen HTML bytes are authoritative for this wave.
@@ -41,14 +49,14 @@ This is a structural result. Several valid grids have ambiguous semantic choices
 
 No QA was compiled because the source grid alone has not passed these semantic, alternative-support and final-reader gates. Domain labels and the 1,902 rows are not training examples or evidence of a model improvement.
 
-Reproduce and inspect:
+Reproduce and inspect v2:
 
 ~~~bash
-UV_LINK_MODE=copy uv run --offline python scripts/p122_wiki_html_grid.py --phase freeze --config configs/p122_wiki_html_grid_v1.json --output data/candidates/p122_wiki_html_source_v1 --verify-only
-UV_LINK_MODE=copy uv run --offline python scripts/p122_wiki_html_grid.py --phase grid --source-dir data/candidates/p122_wiki_html_source_v1 --output data/candidates/p122_wiki_html_grid_v1 --verify-only
+UV_LINK_MODE=copy uv run --offline python scripts/p122_wiki_html_grid.py --phase freeze --config configs/p122_wiki_html_grid_v2.json --output data/candidates/p122_wiki_html_source_v2 --verify-only
+UV_LINK_MODE=copy uv run --offline python scripts/p122_wiki_html_grid.py --phase grid --source-dir data/candidates/p122_wiki_html_source_v2 --output data/candidates/p122_wiki_html_grid_v2 --verify-only
 UV_LINK_MODE=copy uv run --offline pytest -q tests/test_p122_wiki_html_grid.py tests/test_p119_wiki_structural_discovery.py
-cat data/candidates/p122_wiki_html_source_v1/source_manifest.json
-cat data/candidates/p122_wiki_html_grid_v1/manifest.json
-less -R data/candidates/p122_wiki_html_grid_v1/table_ledger.jsonl
-less -R data/candidates/p122_wiki_html_grid_v1/valid_grids.jsonl
+cat data/candidates/p122_wiki_html_source_v2/source_manifest.json
+cat data/candidates/p122_wiki_html_grid_v2/manifest.json
+less -R data/candidates/p122_wiki_html_grid_v2/table_ledger.jsonl
+less -R data/candidates/p122_wiki_html_grid_v2/valid_grids.jsonl
 ~~~

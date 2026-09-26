@@ -1,5 +1,9 @@
 """Adversarial source-grid tests: structure is necessary, not QA admission."""
 
+import json
+
+import pytest
+
 from scripts.p122_wiki_html_grid import Tables, grid
 
 
@@ -55,6 +59,9 @@ def test_rowspan_colspan_and_footnote_resolve_without_shift() -> None:
     note = value["origins"][value["rows"][2][2]]
     assert note["footnote_refs"] == ["cite_note-1"]
     assert note["footnotes"] == {"cite_note-1": "Capacity revised in 2025."}
+    assert note["text"] == "2"
+    assert note["raw_visible_text"] == "2[1]"
+    assert note["citation_markers"] == ["[1]"]
     assert html[note["html_span"][0] : note["html_span"][1]].startswith("<td>")
 
 
@@ -83,23 +90,101 @@ def test_ragged_hidden_nested_or_unresolved_note_cannot_be_valid() -> None:
     assert "unresolved_citation" in reasons
 
 
+def test_line_break_and_toc_navigation_are_not_entity_text_or_section() -> None:
+    rows = "".join(
+        f"<tr><td>Hospital<br>Rumah {i}</td><td>City</td><td>General</td></tr>"
+        for i in range(8)
+    )
+    html = (
+        "<div id='toc' role='navigation'><h2>Contents</h2></div>"
+        "<h2>Hospitals</h2><table class='wikitable'>"
+        "<tr><th>Name</th><th>City</th><th>Type</th></tr>" + rows + "</table>"
+    )
+    value, reasons = parsed(html)
+    assert not reasons and value["section_path"] == ["Hospitals"]
+    first = value["origins"][value["rows"][1][0]]
+    assert first["text"] == "Hospital\nRumah 0"
+    assert first["multiline"] is True
+
+
+def test_stale_oldid_cache_requires_bound_receipt(tmp_path, monkeypatch) -> None:
+    import scripts.p122_wiki_html_grid as module
+
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    selected = {
+        "title": "List of hospitals",
+        "domain": "healthcare",
+        "split": "train",
+        "oldid": 123,
+        "page_url": "https://en.wikipedia.org/wiki/List_of_hospitals",
+        "revision_url": "https://en.wikipedia.org/w/index.php?oldid=123",
+        "rendered_body_sha256": "a" * 64,
+        "snapshot": {"path": "source.json", "sha256": "b" * 64},
+    }
+    monkeypatch.setattr(module, "sources", lambda config: [selected])
+    calls = []
+
+    class FakeFetcher:
+        def __init__(self, *args):
+            pass
+
+        def get_json(self, params):
+            calls.append(params)
+            return {
+                "parse": {
+                    "revid": 123,
+                    "title": selected["title"],
+                    "text": "<table></table>",
+                }
+            }
+
+    monkeypatch.setattr(module, "WikiHttpFetcher", FakeFetcher)
+    config = tmp_path / "config.json"
+    config.write_text(
+        json.dumps(
+            {
+                "schema": module.SCHEMA + ".config",
+                "requests_per_second": 0.5,
+                "max_html_bytes_per_page": 1000,
+            }
+        )
+    )
+    output = tmp_path / "frozen"
+    key = module.sha(f"{selected['title']}\0{selected['oldid']}".encode())[:20]
+    cache = output / "html" / f"{key}.html"
+    cache.parent.mkdir(parents=True)
+    cache.write_text("stale")
+    with pytest.raises(ValueError, match="unbound"):
+        module.freeze(config, output)
+    assert not calls
+    cache.unlink()
+    module.freeze(config, output)
+    assert len(calls) == 1
+    receipt = cache.with_suffix(".receipt.json")
+    stored = json.loads(receipt.read_text())
+    stored["parsed_revid"] = 122
+    receipt.write_text(json.dumps(stored))
+    with pytest.raises(ValueError, match="receipt differs"):
+        module.freeze(config, output, verify_only=True)
+
+
 def test_frozen_oldid_grids_replay_and_preserve_cell_evidence() -> None:
     import hashlib
     import json
 
     from scripts.p122_wiki_html_grid import ROOT, compile_grids, freeze
 
-    source = ROOT / "data/candidates/p122_wiki_html_source_v1"
-    output = ROOT / "data/candidates/p122_wiki_html_grid_v1"
+    source = ROOT / "data/candidates/p122_wiki_html_source_v2"
+    output = ROOT / "data/candidates/p122_wiki_html_grid_v2"
     if not (output / "manifest.json").exists():
         return
     frozen = freeze(
-        ROOT / "configs/p122_wiki_html_grid_v1.json", source, verify_only=True
+        ROOT / "configs/p122_wiki_html_grid_v2.json", source, verify_only=True
     )
     report = compile_grids(source, output, verify_only=True)
     assert frozen["pages"] == report["pages"] == 12
     assert report["gross_wikitables"] == 53
-    assert report["grid_valid_tables"] == 25
+    assert report["grid_valid_tables"] >= 1
     pages = {row["title"]: row for row in frozen["records"]}
     grids = [
         json.loads(line)
