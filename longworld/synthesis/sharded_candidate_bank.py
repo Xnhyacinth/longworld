@@ -143,7 +143,7 @@ def verify_index(index_dir: Path, *, full_readers: bool = False) -> dict[str, An
         native = json.loads(
             (_shard_path(index_dir, shard) / "manifest.json").read_text()
         )
-        if dict(local_positions[shard["name"]]) != native["splits"]:
+        if local_positions[shard["name"]] != Counter(native["splits"]):
             raise ValueError(f"shard split rows changed: {shard['name']}")
     return manifest
 
@@ -209,7 +209,7 @@ def build_index(
                             )
                             + "\n"
                         )
-                if dict(local_positions[name]) != native["splits"]:
+                if local_positions[name] != Counter(native["splits"]):
                     raise ValueError(f"shard split rows changed: {name}")
         manifest = {
             "schema_version": SCHEMA,

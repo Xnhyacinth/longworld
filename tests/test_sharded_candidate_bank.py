@@ -165,3 +165,16 @@ def test_two_train_shards_get_global_materialized_row_positions(tmp_path: Path) 
         for line in (output / "sample_index.jsonl").read_text().splitlines()
     ]
     assert [row["row_index"] for row in rows] == [0, 1]
+
+
+def test_accepts_explicit_zero_view_split_in_shard_manifest(tmp_path: Path) -> None:
+    shard = tmp_path / "train-only"
+    _shard(shard, "a", split="train", task="task-a", group="group-a")
+    manifest_path = shard / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["splits"]["eval"] = 0
+    manifest_path.write_text(json.dumps(manifest) + "\n")
+
+    index = tmp_path / "index"
+    build_index(index, [("train-only", shard)])
+    assert verify_index(index, full_readers=True)["splits"] == {"train": 1}
