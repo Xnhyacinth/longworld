@@ -434,8 +434,16 @@ def _work_job(args: tuple[dict, dict, str, set]) -> tuple[dict, list[dict], list
     return result, ledger, accepted
 
 
-def build(config_path: Path) -> dict[str, bytes]:
+def build(config_path: Path, output: Path) -> dict[str, bytes]:
     cfg = _config(config_path)
+    relative_output = output.relative_to(ROOT) if output.is_absolute() else output
+    if ".." in relative_output.parts or not relative_output.parts:
+        raise ValueError("P127 output path must stay under the workspace")
+    frozen_v4 = None
+    if "frozen_v4_manifest" in cfg:
+        frozen_v4 = json.loads(_pin(cfg["frozen_v4_manifest"]).read_text())
+        if frozen_v4.get("candidate_views") != 2:
+            raise ValueError("P127 frozen v4 reader baseline differs")
     matrix_paths = [_pin(pin) for pin in cfg["work_matrices"]]
     works = [
         json.loads(line)
@@ -488,6 +496,9 @@ def build(config_path: Path) -> dict[str, bytes]:
                 )
             )
             split = index["split"]
+            index["native_row_ref"] = (
+                str(relative_output / "audit.jsonl") + ":" + str(len(proofs))
+            )
             index.update(
                 output_file=f"candidate_{split}.jsonl",
                 row_index=len(readers[split]),
@@ -502,6 +513,7 @@ def build(config_path: Path) -> dict[str, bytes]:
         "candidate_eval.jsonl": b"".join(_dump(row) for row in readers["eval"]),
         "sample_index.jsonl": b"".join(_dump(row) for row in indices),
         "proofs.jsonl": b"".join(_dump(row) for row in proofs),
+        "audit.jsonl": b"".join(_dump(row) for row in proofs),
         "mask_rows.jsonl": b"".join(_dump(row) for row in masks),
         "support_matrix.jsonl": b"".join(_dump(row) for row in support),
         "decision_ledger.jsonl": b"".join(_dump(row) for row in rejections),
@@ -511,6 +523,9 @@ def build(config_path: Path) -> dict[str, bytes]:
         "p127_schema": SCHEMA + ".result",
         "compiler_sha256": _sha(Path(__file__).read_bytes()),
         "config_sha256": _sha(config_path.read_bytes()),
+        "frozen_v4_manifest_sha256": (
+            cfg["frozen_v4_manifest"]["sha256"] if frozen_v4 is not None else None
+        ),
         "source_matrix_sha256": {
             pin["path"]: pin["sha256"] for pin in cfg["work_matrices"]
         },
@@ -539,6 +554,21 @@ def build(config_path: Path) -> dict[str, bytes]:
         "claim_limit": "same-file raw-TeX reference and exact target under two visible text deletions; no compiled-PDF, unrestricted semantic-proof, license clearance or model-gain claim",
         "train_ready": False,
     }
+    if frozen_v4 is not None:
+        for name in (
+            "candidate_train.jsonl",
+            "candidate_eval.jsonl",
+            "mask_rows.jsonl",
+        ):
+            old = cfg["frozen_v4_manifest"]["path"]
+            old_path = ROOT / Path(old).parent / name
+            if (
+                _sha(old_path.read_bytes()) != frozen_v4["files_sha256"][name]
+                or _sha(files[name]) != frozen_v4["files_sha256"][name]
+            ):
+                raise ValueError(f"P127 v4 final reader or mask bytes changed: {name}")
+        if len(indices) != frozen_v4["candidate_views"]:
+            raise ValueError("P127 v4 reader inventory changed")
     files["manifest.json"] = (
         json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
     ).encode()
@@ -550,7 +580,7 @@ def run(config_path: Path, output: Path, *, verify_only: bool = False) -> dict:
         frozen = json.loads((output / "manifest.json").read_text())
         if frozen.get("compiler_sha256") != _sha(Path(__file__).read_bytes()):
             raise ValueError("P127 compiler code changed since source freeze")
-    files = build(config_path)
+    files = build(config_path, output)
     if verify_only:
         if not output.is_dir() or {path.name for path in output.iterdir()} != set(
             files

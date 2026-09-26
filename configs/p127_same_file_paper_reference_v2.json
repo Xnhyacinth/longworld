@@ -1,0 +1,27 @@
+{
+  "schema": "longworld.p127-same-file-paper-reference-request.v1",
+  "work_matrices": [
+    {
+      "path": "data/capability_records/p113_paper_shape_v2/work_matrix.jsonl",
+      "sha256": "4f25827e8c9aafbcf2a8250ce1672eadc2adaf304b2c8a532c897f0038ba0d7d"
+    },
+    {
+      "path": "data/capability_records/p113_paper_shape_new_v1/work_matrix.jsonl",
+      "sha256": "285929458ecf13c048efe6c1cece25a6e44541a0ab1b58878732d08f99866cd1"
+    }
+  ],
+  "prior_candidate_refs": {
+    "path": "data/candidates/p120_candidate_refs_v1/candidate_refs.jsonl",
+    "sha256": "a060b1a76a59b0a0c76c1512ab226db4dea3401e7795df674a03a7c01f74b19c"
+  },
+  "frozen_v4_manifest": {
+    "path": "data/candidates/p127_same_file_paper_reference_v4/manifest.json",
+    "sha256": "eeeb39a92590de937491ed200cd4f2d9ce30a48a78b4fc981407a913b1e12ec5"
+  },
+  "workers": 4,
+  "max_tasks_per_work": 2,
+  "min_full_chat_tokens": 16384,
+  "min_support_gap_tokens": 12288,
+  "max_full_chat_tokens": 262144,
+  "min_unexposed_answer_words": 3
+}
