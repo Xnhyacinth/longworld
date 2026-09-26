@@ -1,0 +1,12 @@
+{
+  "schema": "longworld.p112-book-source-request.v1",
+  "source_policy": "Project Gutenberg public-domain-in-the-United-States works; local research candidates only. Check jurisdiction and Gutenberg trademark/redistribution terms before any release.",
+  "policy_url": "https://www.gutenberg.org/policy/license",
+  "max_bytes_per_book": 2000000,
+  "requests_per_second": 0.5,
+  "books": [
+    {"ebook_id": 11, "title": "Alice's Adventures in Wonderland", "author": "Lewis Carroll", "domain": "literature", "topic": "fantasy", "split": "train"},
+    {"ebook_id": 1342, "title": "Pride and Prejudice", "author": "Jane Austen", "domain": "literature", "topic": "social_novel", "split": "eval"},
+    {"ebook_id": 1661, "title": "The Adventures of Sherlock Holmes", "author": "Arthur Conan Doyle", "domain": "literature", "topic": "detective_fiction", "split": "train"}
+  ]
+}
