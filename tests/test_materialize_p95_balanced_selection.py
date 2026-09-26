@@ -257,3 +257,23 @@ def test_dependency_status_filter_is_reverified_during_materialization(
     materialize.run(index, selection, config, output, max_seq_len=1000)
     materialize.run(index, selection, config, output, max_seq_len=1000, verify_only=True)
     assert calls == [True, True]
+
+
+def test_dependency_status_exclusion_is_reverified_during_materialization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    index, selection, config, _shard, _readers = _fixture(tmp_path, monkeypatch)
+    value = json.loads(config.read_text())
+    value["exclude_dependency_statuses"] = ["formal_only"]
+    config.write_text(json.dumps(value))
+    calls = []
+
+    def verify(_index: Path, _selection: Path, **kwargs: object) -> dict:
+        calls.append(kwargs["exclude_dependency_statuses"])
+        return json.loads((selection / "manifest.json").read_text())
+
+    monkeypatch.setattr(materialize, "verify_selection", verify)
+    output = tmp_path / "strict-exclusion"
+    materialize.run(index, selection, config, output, max_seq_len=1000)
+    materialize.run(index, selection, config, output, max_seq_len=1000, verify_only=True)
+    assert calls == [["formal_only"], ["formal_only"]]

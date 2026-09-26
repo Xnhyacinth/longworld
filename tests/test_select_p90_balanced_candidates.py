@@ -161,6 +161,38 @@ def test_optional_dependency_status_filter_preserves_historical_default(
     )
 
 
+def test_explicit_dependency_status_exclusion_is_replayed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    entries = [
+        _entry("formal", group="group-a", task="task-a"),
+        _entry("visible", group="group-b", task="task-b"),
+    ]
+    entries[0]["candidate"]["dependency_status"] = "formal_only"
+    entries[1]["candidate"]["dependency_status"] = "visible_deletion"
+    index = _index(tmp_path, monkeypatch, entries)
+    kwargs = {
+        "seed": 1,
+        "max_per_group": 2,
+        "max_per_cell": 2,
+        "max_per_kind_by_split": {"train": 2, "eval": 2},
+        "require_dependency_status": True,
+        "exclude_dependency_statuses": ["formal_only"],
+    }
+    selected = balanced.select(index, tmp_path / "strict", **kwargs)
+    assert selected["after"]["views"] == 1
+    assert selected["quality_gate"]["excluded_dependency_statuses"]["counts"] == {
+        "formal_only": 1
+    }
+    balanced.verify_selection(index, tmp_path / "strict", **kwargs)
+    with pytest.raises(ValueError, match="selection differs"):
+        balanced.verify_selection(
+            index,
+            tmp_path / "strict",
+            **{**kwargs, "exclude_dependency_statuses": ["visible_deletion"]},
+        )
+
+
 def test_balances_cells_and_groups_without_repeating_semantic_task() -> None:
     entries = [
         _entry("a", group="big", task="one"),

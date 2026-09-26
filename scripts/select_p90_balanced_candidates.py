@@ -812,6 +812,7 @@ def select(
     code_content_proofs: list[dict[str, Any]] | None = None,
     shared_world_rebalance: dict[str, int] | None = None,
     require_dependency_status: bool = False,
+    exclude_dependency_statuses: list[str] | None = None,
 ) -> dict[str, Any]:
     if (
         output_dir.exists()
@@ -850,6 +851,18 @@ def select(
         )
         or (code_content_proof is not None and code_content_proofs is not None)
         or type(require_dependency_status) is not bool
+        or (
+            exclude_dependency_statuses is not None
+            and (
+                not isinstance(exclude_dependency_statuses, list)
+                or not exclude_dependency_statuses
+                or any(
+                    not isinstance(status, str) or not status
+                    for status in exclude_dependency_statuses
+                )
+                or len(set(exclude_dependency_statuses)) != len(exclude_dependency_statuses)
+            )
+        )
     ):
         raise ValueError("new output, nonnegative seed and positive caps required")
     source = verify_index(index_dir)
@@ -917,6 +930,26 @@ def select(
                 "claim_limit": "status presence is not a reader dependency certificate",
             },
         }
+    if exclude_dependency_statuses is not None:
+        excluded = Counter(
+            entry["candidate"].get("dependency_status")
+            for entry in eligible
+            if entry["candidate"].get("dependency_status")
+            in exclude_dependency_statuses
+        )
+        eligible = [
+            entry for entry in eligible
+            if entry["candidate"].get("dependency_status")
+            not in exclude_dependency_statuses
+        ]
+        quality_gate = {
+            "prior": quality_gate,
+            "excluded_dependency_statuses": {
+                "statuses": exclude_dependency_statuses,
+                "counts": dict(sorted(excluded.items())),
+                "claim_limit": "remaining status labels do not certify unrestricted reader necessity",
+            },
+        }
     selected = _choose(
         eligible,
         seed=seed,
@@ -966,6 +999,10 @@ def select(
                 if require_dependency_status else {}
             ),
             **(
+                {"exclude_dependency_statuses": exclude_dependency_statuses}
+                if exclude_dependency_statuses is not None else {}
+            ),
+            **(
                 {"max_supervised_tokens_by_kind": max_supervised_tokens_by_kind}
                 if max_supervised_tokens_by_kind is not None
                 else {}
@@ -1003,6 +1040,7 @@ def verify_selection(
     code_content_proofs: list[dict[str, Any]] | None = None,
     shared_world_rebalance: dict[str, int] | None = None,
     require_dependency_status: bool = False,
+    exclude_dependency_statuses: list[str] | None = None,
 ) -> dict[str, Any]:
     stored = json.loads((output_dir / "manifest.json").read_text())
     if stored.get("selected_refs_sha256") != _sha(output_dir / "selected_refs.jsonl"):
@@ -1024,6 +1062,7 @@ def verify_selection(
             code_content_proofs=code_content_proofs,
             shared_world_rebalance=shared_world_rebalance,
             require_dependency_status=require_dependency_status,
+            exclude_dependency_statuses=exclude_dependency_statuses,
         )
         if (
             rebuilt != stored
@@ -1055,6 +1094,7 @@ def main() -> None:
         "code_content_proofs": config.get("code_content_proofs"),
         "shared_world_rebalance": config.get("shared_world_rebalance"),
         "require_dependency_status": config.get("require_dependency_status", False),
+        "exclude_dependency_statuses": config.get("exclude_dependency_statuses"),
     }
     result = (
         verify_selection(index_dir, args.output, **kwargs)
