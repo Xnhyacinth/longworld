@@ -1,0 +1,18 @@
+{
+  "schema": "longworld.p158-dependency-quality-inventory.v1",
+  "pins": [
+    {"role": "index_manifest", "path": "data/candidates/p156_candidate_refs_probe_v1/manifest.json", "sha256": "ec787abdbbd06f299e407488e91600c73d22dc64141f04403f5ad3995eb70a58"},
+    {"role": "index_refs", "path": "data/candidates/p156_candidate_refs_probe_v1/candidate_refs.jsonl", "sha256": "e4208081e5e689d17aac4142de6e280fcb7f75ad1a134199c4ff27cde073b7d8"},
+    {"role": "selection_manifest", "path": "data/candidates/p156_strict_dependency_selection_v3/manifest.json", "sha256": "02d1d7e51a7d133b2d0e3f98081dbca821787baa4d03dd8edff701536517805f"},
+    {"role": "selection_refs", "path": "data/candidates/p156_strict_dependency_selection_v3/selected_refs.jsonl", "sha256": "569ef386a9c63b0846c66623ed3671cc215edc9f8ce303d3c3b5e6d32c1d6d21"},
+    {"role": "taxonomy", "path": "configs/p156_capability_taxonomy_v1.json", "sha256": "370e8956ce59215f2e9a34737a833d851d934cac6e5974288e35872e9025b45a"},
+    {"role": "baseline_refs", "path": "data/candidates/p152_candidate_selection_probe_v1/selected_refs.jsonl", "sha256": "d28ff5526265eeb1832feb9192f385ff19d2e4ceb3e11112c748b1009eae3c8d"}
+  ],
+  "native_proofs": [
+    {"path": "data/candidates/p133_state_mechanism_batch_v4/proofs.jsonl", "sha256": "12dcc7eda7459bb0407d6b83b8bf2a1dcb1947352ea05506654232d0f9224ca7"},
+    {"path": "data/candidates/p144_state_batch_scale_v1/batch_000/campaign/proofs.jsonl", "sha256": "dee229823ac7a98ccc7e4f061f7db656038ca2728ea894db0d4f3330ece054d2"},
+    {"path": "data/candidates/p144_state_batch_scale_v1/batch_001/campaign/proofs.jsonl", "sha256": "92e00134a238deaafd0b4ee4a16f6a86b2ba0189ec4f59c232b433204c5c4426"},
+    {"path": "data/candidates/p154_typed_grid_grammar_v1/audit.jsonl", "sha256": "756d4404e468e0348d96afdfe8c20e1f82008ed06fdde9ba03553df8a236f09d"},
+    {"path": "data/candidates/p146_real_paper_reference_v6/audit.jsonl", "sha256": "af22e858e38fece71f0d3531dbaf44419b9d765ba18ac6cc5141c192e475b10e"}
+  ]
+}
