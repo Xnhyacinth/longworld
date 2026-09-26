@@ -1,0 +1,11 @@
+{
+  "schema_version": "longworld.p114-controlled-action-feedback.v1",
+  "source_base": "data/candidates/p112_world_factor_campaign_v2/base",
+  "source_manifest_sha256": "9d67b91951d2d044368aa495ec3ab90a7b8b3bf0572b6d1bc27fab2dcffc282d",
+  "split_rule": "seed_mod5_zero_eval",
+  "action_delta": 500,
+  "target_margins": [250, 150],
+  "minimum_decisive_to_query_tokens": 16384,
+  "max_full_chat_tokens": 262144,
+  "workers": 4
+}
