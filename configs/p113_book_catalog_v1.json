@@ -1,0 +1,22 @@
+{
+  "schema": "longworld.p113-book-catalog-request.v1",
+  "catalog_url": "https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv.gz",
+  "catalog_sha256": "9965df5b1fdd56f19c876054c891c09b2a98d65ab910bee6e91fa734e645f31d",
+  "mirror_base": "https://gutenberg.pglaf.org/cache/epub",
+  "policy_url": "https://www.gutenberg.org/policy/license",
+  "max_candidates": 72,
+  "max_frozen_books": 12,
+  "max_bytes_per_book": 2000000,
+  "requests_per_second": 0.5,
+  "split_salt": "p113-gutenberg-work-v1",
+  "eval_fraction": 0.2,
+  "exclude_ebook_ids": [11, 1342, 1661],
+  "topics": {
+    "adventure_fiction": ["adventure stories", "adventure fiction"],
+    "detective_fiction": ["detective and mystery stories", "detective fiction"],
+    "fantasy_fiction": ["fantasy fiction", "fantasy literature"],
+    "historical_fiction": ["historical fiction", "historical novels"],
+    "social_fiction": ["domestic fiction", "social life and customs -- fiction"],
+    "juvenile_fiction": ["juvenile fiction", "children's stories"]
+  }
+}
