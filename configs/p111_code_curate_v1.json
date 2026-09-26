@@ -1,0 +1,35 @@
+{
+  "native_config": {
+    "path": "configs/p108_code_content_v2.json",
+    "sha256": "48765014319f2f087762370c38a508cf13053a33007e4cde3f147a72bca7b4be"
+  },
+  "prior_native_manifest": {
+    "path": "data/candidates/p99_code_content_v4/manifest.json",
+    "sha256": "6d10615e98f61e07c1a67c3ea88916af3324519eef6989b25ac8ef43740e3b58"
+  },
+  "raw_all_mask_manifest": {
+    "path": "data/candidates/p108_code_content_mask_v2/manifest.json",
+    "sha256": "b36215ae4662b3d47479440ec1437dc32045516b16d1268373f7122a829b0761"
+  },
+  "raw_native_manifest": {
+    "path": "data/candidates/p108_code_content_native_v2/manifest.json",
+    "sha256": "798dc32186fbb0a248a4b57c1feeb9b737a0d0389265365130b5e8df49a397b2"
+  },
+  "raw_unified_manifest": {
+    "path": "data/candidates/p108_code_content_unified_v2/manifest.json",
+    "sha256": "4ea65cfadd675d9d6aeedbe32e2b1d3649f5a75585a7ccb12f9e156316cf31a2"
+  },
+  "schema": "longworld.p107-code-curation.v1.config",
+  "second_prior_curated_manifest": {
+    "path": "data/candidates/p107_code_curated_v1/manifest.json",
+    "sha256": "55abbb13d73cb0c65a75c8c53f4e4c2d150c4b657addba413fad996e53a1997d"
+  },
+  "second_prior_mask_manifest": {
+    "path": "data/candidates/p107_code_curated_mask_v1/manifest.json",
+    "sha256": "159d2ec0e6cbb8f555e76b5e7416e54c0382f8034ec507876de072e6ba9ee218"
+  },
+  "second_prior_native_manifest": {
+    "path": "data/candidates/p107_code_oxc_raw_v1/manifest.json",
+    "sha256": "ffdca4b286691f50809b31b8c81907cdbbcaf6b059508877b3ed22011ffcac5c"
+  }
+}
