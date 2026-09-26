@@ -1,0 +1,42 @@
+{
+  "schema": "longworld.p113-legal-cell-plan.v1",
+  "inventories": [
+    {
+      "kind": "wiki_pool",
+      "pin": {
+        "path": "configs/p76_source_pool_v2.json",
+        "sha256": "6089c4210bb04f7379fe3716613e041299904cea980a5edb79903e0bbb0fe29b"
+      }
+    },
+    {
+      "kind": "finance_catalog",
+      "pin": {
+        "path": "configs/p64_finance_taskbank_catalog_v1.json",
+        "sha256": "064700ca0de425a22090ca0121e5c354dc53948a3257b213757f11b521a4059f"
+      },
+      "split_pin": {
+        "path": "data/candidates/p96_finance_factorial_wide_batch_v1/batch_manifest.json",
+        "sha256": "2d9af180308ea51c0ac1b93605283e0dde1f0c590f3b22867c7ac62f824f1327"
+      }
+    }
+  ],
+  "recipes": [
+    {
+      "name": "wiki_table_preflight",
+      "source_kind": "wiki_snapshot",
+      "required_shape": "wiki_list_document",
+      "semantic_parameters": {"operation": ["cell_lookup", "closed_interval_scan"]}
+    },
+    {
+      "name": "finance_period_selection_preflight",
+      "source_kind": "annual_reports",
+      "required_shape": "four_annual_reports",
+      "semantic_parameters": {
+        "selector_kind": ["max_value", "min_value"],
+        "baseline_endpoint": ["earliest", "latest"]
+      }
+    }
+  ],
+  "renderers": ["source_native"],
+  "target_lengths": [65536]
+}
