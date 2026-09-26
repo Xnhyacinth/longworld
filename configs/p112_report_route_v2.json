@@ -1,0 +1,13 @@
+{
+  "max_tasks_per_world": 12,
+  "schema": "longworld.p112-report-route.v2.config",
+  "source_batch_dir": "data/candidates/p96_finance_factorial_wide_batch_v1",
+  "source_batch_manifest": {
+    "path": "data/candidates/p96_finance_factorial_wide_batch_v1/batch_manifest.json",
+    "sha256": "2d9af180308ea51c0ac1b93605283e0dde1f0c590f3b22867c7ac62f824f1327"
+  },
+  "source_final_audit": {
+    "path": "data/candidates/p96_finance_factorial_wide_batch_v1/final_audit.json",
+    "sha256": "7fa2db2a5ddd32df22d3b5e16c48d96cb881193ba2a30d713f504c0ddf739f89"
+  }
+}
