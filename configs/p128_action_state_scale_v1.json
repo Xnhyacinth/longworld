@@ -1,0 +1,15 @@
+{
+  "schema_version": "longworld.p128-action-state-scale.v1",
+  "source_base": "data/candidates/p112_world_factor_campaign_v2/base",
+  "source_manifest_sha256": "9d67b91951d2d044368aa495ec3ab90a7b8b3bf0572b6d1bc27fab2dcffc282d",
+  "prior_policy_manifest": "data/candidates/p114_controlled_action_feedback_v2/manifest.json",
+  "prior_policy_manifest_sha256": "cbce40e3ade1e497b124b0d42c3108e028f9a0acd8c65bfc333291ab0fa24e2c",
+  "source_task_ids": ["q0:asof_sum", "q1:asof_sum"],
+  "state_variants": ["base", "effective_plus_one", "disclosure_plus_one"],
+  "exclude_prior_q0_base": true,
+  "action_delta": 500,
+  "target_margins": [250, 150],
+  "minimum_decisive_to_query_tokens": 16384,
+  "max_full_chat_tokens": 262144,
+  "workers": 4
+}
