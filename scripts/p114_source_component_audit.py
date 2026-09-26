@@ -23,6 +23,7 @@ from longworld.synthesis.sharded_candidate_bank import verify_index
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = "longworld.p114-source-component-audit.v1"
+P118_SCHEMA = "longworld.p118-source-component-audit.v1"
 WIKI_POOLS = (
     ROOT / "configs/p76_source_pool_v2.json",
     ROOT / "configs/p80_wiki_task_scale_v1.json",
@@ -639,12 +640,249 @@ def _finance_groups(
     }
 
 
+def _code_groups(
+    rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Bind selected code rows to frozen task metadata and raw-source banks."""
+    native_cache: dict[Path, dict[str, dict[str, Any]]] = {}
+    native_file_pins: dict[Path, dict[str, str]] = {}
+    native_pins: dict[str, str] = {}
+    reader_pins: dict[Path, str] = {}
+    bank_cache: dict[Path, dict[str, Any]] = {}
+    bank_pins: dict[str, str] = {}
+    groups: dict[str, dict[str, Any]] = {}
+    code_configs = {
+        sha(path): (path, _json(path))
+        for path in (
+            ROOT / "configs/p99_code_content_v1.json",
+            ROOT / "configs/p107_code_oxc_expansion_v1.json",
+            ROOT / "configs/p108_code_content_v2.json",
+        )
+    }
+
+
+    for row in rows:
+        native_dir = _native_dir(row)
+        if native_dir not in native_cache:
+            receipt_path = native_dir / "BUILD_RECEIPT.json"
+            if receipt_path.is_file():
+                receipt = _json(receipt_path)
+                pins = receipt["files"]
+                metadata_path = native_dir / "metadata.jsonl"
+                if sha(metadata_path) != pins["metadata.jsonl"]:
+                    raise ValueError("code native metadata pin differs")
+                metadata = _rows(metadata_path)
+                native_pins[str(receipt_path)] = sha(receipt_path)
+            else:
+                receipt_path = native_dir / "manifest.json"
+                receipt = _json(receipt_path)
+                pins = receipt.get("files_sha256", {})
+                metadata_path = native_dir / "sample_index.jsonl"
+                if sha(metadata_path) != pins.get("sample_index.jsonl"):
+                    raise ValueError("code native index pin differs")
+                metadata = _rows(metadata_path)
+                native_pins[str(receipt_path)] = sha(receipt_path)
+            if len({item["sample_id"] for item in metadata}) != len(metadata):
+                raise ValueError("code native sample ID repeats")
+            native_cache[native_dir] = {item["sample_id"]: item for item in metadata}
+            native_file_pins[native_dir] = pins
+        meta = native_cache[native_dir].get(row["sample_id"])
+        if meta is None:
+            raise ValueError("selected code task lacks pinned native metadata")
+        reader_ref = row["native_row_ref"]
+        if ".jsonl:" not in reader_ref:
+            raise ValueError("selected code task lacks native reader row")
+        reader_name, reader_number = reader_ref.rsplit(":", 1)
+        reader_path = Path(reader_name)
+        if not reader_path.is_absolute():
+            reader_path = ROOT / reader_path
+        if (reader_path.parent != native_dir or not reader_number.isdigit()
+                or reader_path.name not in {"train.jsonl", "eval.jsonl"}):
+            raise ValueError("selected code reader row path differs")
+        if reader_path not in reader_pins:
+            if sha(reader_path) != native_file_pins[native_dir].get(reader_path.name):
+                raise ValueError("code native reader pin differs")
+            reader_pins[reader_path] = native_file_pins[native_dir][reader_path.name]
+        if "row_index" in meta and (meta["row_index"] != int(reader_number)
+                                    or meta.get("output_file") != reader_path.name):
+            raise ValueError("selected code metadata row position differs")
+        group = row["source_group"]
+        if (meta.get("source_group_id", meta.get("source_group")) != group
+                or meta["split"] != row["split"]):
+            raise ValueError("selected code task has mismatched native source or split")
+        if row["source_name"] == "p99_code_content":
+            config_sha = _json(native_dir / "manifest.json")["config_sha256"]
+            binding = code_configs.get(config_sha)
+            if binding is None:
+                raise ValueError("P99 code bank config differs")
+            entry = next((entry for entry in binding[1]["banks"] if entry["source_group_id"] == group), None)
+            if entry is None or entry["split"] != row["split"]:
+                raise ValueError("P99 code bank source/split differs")
+            bank_dir = ROOT / entry["bank_root"]
+            expected_receipt_sha = entry["receipt_sha256"]
+        else:
+            bank_dir = Path(meta["bank_directory"])
+            expected_receipt_sha = None
+        if bank_dir not in bank_cache:
+            bank_receipt_path = bank_dir / "BUILD_RECEIPT.json"
+            actual_receipt_sha = sha(bank_receipt_path)
+            if expected_receipt_sha and actual_receipt_sha != expected_receipt_sha:
+                raise ValueError("code bank receipt differs from config pin")
+            bank = _json(bank_receipt_path)
+            if sha(bank_dir / "world.json") != bank["files"]["world.json"]:
+                raise ValueError("code bank world pin differs")
+            world = _json(bank_dir / "world.json")
+            if (world["source_group_id"] != bank["source_group_id"]
+                    or world["split"] != bank["split"]
+                    or not bank.get("source_bindings")):
+                raise ValueError("code bank source identity differs")
+            for binding in bank["source_bindings"]:
+                path = Path(binding["path"])
+                if not path.is_file() and str(path).startswith("/workspace/wynckeliao/longworld-worlds/"):
+                    path = ROOT / str(path).removeprefix("/workspace/wynckeliao/longworld-worlds/")
+                if not path.is_file() or sha(path) != binding["sha256"]:
+                    raise ValueError("code raw source binding pin differs")
+            bank_cache[bank_dir] = bank
+            bank_pins[str(bank_receipt_path)] = actual_receipt_sha
+        bank = bank_cache[bank_dir]
+        if bank["source_group_id"] != group or bank["split"] != row["split"]:
+            raise ValueError("selected code row lacks pinned bank source binding")
+        if meta.get("world_instance_id") and meta["world_instance_id"] != _json(bank_dir / "world.json")["world_instance_id"]:
+            raise ValueError("code task world instance differs")
+        if group in groups and groups[group]["split"] != row["split"]:
+            raise ValueError("code repository crosses train/eval")
+        target = groups.setdefault(group, {"group": group, "split": row["split"], "identities": set(), "banks": set()})
+        target["identities"].add("code:repository:" + group.casefold().rstrip("/"))
+        target["banks"].add(str(bank_dir))
+    return [
+        {**item, "identities": sorted(item["identities"]), "banks": sorted(item["banks"])}
+        for item in sorted(groups.values(), key=lambda value: value["group"])
+    ], {
+        "native_pins": native_pins,
+        "reader_pins": {str(path): digest for path, digest in reader_pins.items()},
+        "bank_pins": bank_pins,
+        "code_config_pins": {str(path): digest for digest, (path, _) in code_configs.items()},
+        "identity_scope": "canonical GitHub repository from selected native task metadata and hash-pinned CodeForge bank world/raw source bindings",
+    }
+
+
+def _simulation_groups(
+    rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Resolve generated-world identity from pinned native shards, not labels."""
+    legacy: dict[Path, tuple[dict[str, Any], dict[str, Any], dict[str, Any]]] = {}
+    shard_cache: dict[Path, tuple[dict[str, Any], dict[str, Any], dict[str, Any]]] = {}
+    groups: dict[str, dict[str, Any]] = {}
+    source_pins: dict[str, str] = {}
+    factor_dir = ROOT / "data/candidates/p112_world_factor_campaign_v2"
+    factor_manifest = _json(factor_dir / "manifest.json")
+    if sha(factor_dir / "sample_index.jsonl") != factor_manifest["files_sha256"]["sample_index.jsonl"]:
+        raise ValueError("P112 simulation adapter index pin differs")
+    factor_index = {item["sample_id"]: item for item in _rows(factor_dir / "sample_index.jsonl")}
+    for row in rows:
+        native_dir = _native_dir(row)
+        group = row["source_group"]
+        split = row["split"]
+        if (native_dir / "sample_index.jsonl").is_file():
+            if native_dir not in legacy:
+                manifest_path = native_dir / "manifest.json"
+                manifest = _json(manifest_path)
+                index_path = native_dir / "sample_index.jsonl"
+                if sha(index_path) != manifest["files"]["sample_index.jsonl"]:
+                    raise ValueError("legacy simulation sample index pin differs")
+                index_rows = _rows(index_path)
+                if len({item["example_id"] for item in index_rows}) != len(index_rows):
+                    raise ValueError("legacy simulation sample ID repeats")
+                shards = {item["world_id"]: item for item in manifest["shards"]}
+                if len(shards) != len(manifest["shards"]):
+                    raise ValueError("legacy simulation world repeats in manifest")
+                legacy[native_dir] = (
+                    {item["example_id"]: item for item in index_rows},
+                    shards,
+                    manifest,
+                )
+                source_pins[str(manifest_path)] = sha(manifest_path)
+            indexes, shards, _ = legacy[native_dir]
+            meta = indexes.get(row["sample_id"])
+            if (meta is None or meta["world_id"] != group or meta["split"] != split
+                    or meta["output_file"] not in {"train.jsonl", "eval.jsonl"}):
+                raise ValueError("legacy simulation selected row lacks world binding")
+            shard = shards.get(group)
+            if shard is None or shard["split"] != split:
+                raise ValueError("legacy simulation shard split differs")
+            shard_dir = native_dir / "shards" / shard["shard_id"]
+            for name in ("world.json", "rows.jsonl"):
+                if sha(shard_dir / name) != shard["files"][name]:
+                    raise ValueError("legacy simulation shard pin differs")
+            world = _json(shard_dir / "world.json")
+            if world["world_id"] != group:
+                raise ValueError("legacy simulation world ID differs")
+            world_id = world["world_id"]
+            context = world["context"]
+            source_pins[str(shard_dir / "world.json")] = shard["files"]["world.json"]
+        else:
+            if native_dir not in shard_cache:
+                receipt_path = native_dir / "receipt.json"
+                receipt = _json(receipt_path)
+                if (sha(native_dir / "world.json") != receipt["world_sha256"]
+                        or sha(native_dir / "rows.jsonl") != receipt["rows_sha256"]):
+                    raise ValueError("simulation state shard receipt pin differs")
+                world = _json(native_dir / "world.json")
+                if world["world_id"] != receipt["world_id"]:
+                    raise ValueError("simulation state shard world ID differs")
+                native_rows = _rows(native_dir / "rows.jsonl")
+                if len({item["example_id"] for item in native_rows}) != len(native_rows):
+                    raise ValueError("simulation state shard task repeats")
+                shard_cache[native_dir] = (
+                    receipt,
+                    world,
+                    {item["example_id"]: item for item in native_rows},
+                )
+                source_pins[str(receipt_path)] = sha(receipt_path)
+            receipt, world, native_rows = shard_cache[native_dir]
+            if row["source_name"] == "p112_world_factor_campaign":
+                adapter = factor_index.get(row["sample_id"])
+                if (adapter is None or adapter["source_group"] != group
+                        or adapter["split"] != split
+                        or adapter["native_row_ref"] != row["native_row_ref"]):
+                    raise ValueError("P112 simulation alias lacks pinned adapter binding")
+                native_id = row["semantic_task_id"]
+            else:
+                native_id = row["sample_id"]
+            native = native_rows.get(native_id)
+            if (native is None or native["world_id"] != receipt["world_id"]
+                    or native["split"] != split):
+                raise ValueError("selected simulation task lacks pinned shard row")
+            if row["source_name"] != "p112_world_factor_campaign" and native["source_group"] != group:
+                raise ValueError("simulation native source group differs")
+            world_id = world["world_id"]
+            context = world["reader_context"]
+            if hashlib.sha256(context.encode()).hexdigest() != world["context_sha256"]:
+                raise ValueError("simulation state context hash differs")
+        if group in groups and groups[group]["split"] != split:
+            raise ValueError("simulation group crosses train/eval")
+        target = groups.setdefault(group, {"group": group, "split": split, "identities": set(), "world_ids": set()})
+        target["identities"].update({
+            "sim:world:" + world_id,
+            "sim:reader_context_sha256:" + hashlib.sha256(context.encode()).hexdigest(),
+        })
+        target["world_ids"].add(world_id)
+    return [
+        {**item, "identities": sorted(item["identities"]), "world_ids": sorted(item["world_ids"])}
+        for item in sorted(groups.values(), key=lambda value: value["group"])
+    ], {
+        "source_pins": source_pins,
+        "p112_adapter_manifest_sha256": sha(factor_dir / "manifest.json"),
+        "identity_scope": "hash-pinned native generated world and final reader-context bytes, including P112 source-group alias to underlying world",
+    }
+
 def _wiki_registry(
     selected_groups: dict[str, tuple[str, str, str]],
+    extra_source_pools: list[Path] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     pool_paths = sorted(
         (ROOT / "data/capability_records").rglob("*source_pool.json")
-    ) + list(WIKI_POOLS)
+    ) + list(WIKI_POOLS) + list(extra_source_pools or [])
     seen_snapshots: dict[Path, tuple[str, dict[str, Any]]] = {}
     found: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for pool_path in pool_paths:
@@ -699,6 +937,7 @@ def _wiki_registry(
 
 def _wiki_groups(
     rows: list[dict[str, Any]],
+    extra_source_pools: list[Path] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     splits: dict[str, set[str]] = defaultdict(set)
     metadata: dict[str, set[tuple[str, str, str]]] = defaultdict(set)
@@ -710,7 +949,8 @@ def _wiki_groups(
             "Wiki source group has inconsistent domain/topic/split binding"
         )
     registry = _wiki_registry(
-        {group: next(iter(values)) for group, values in metadata.items()}
+        {group: next(iter(values)) for group, values in metadata.items()},
+        extra_source_pools,
     )
     groups = []
     document_occurrences = 0
@@ -776,7 +1016,11 @@ def audit(
     book_source_dirs: Path | list[Path],
     *,
     extended_source_kinds: bool = False,
+    p118_code_and_simulation: bool = False,
+    wiki_source_pools: list[Path] | None = None,
 ) -> dict[str, Any]:
+    if wiki_source_pools and not p118_code_and_simulation:
+        raise ValueError("additional Wiki source pools require P118 audit scope")
     source_dirs = (
         [book_source_dirs] if isinstance(book_source_dirs, Path) else book_source_dirs
     )
@@ -816,7 +1060,7 @@ def audit(
         if kind == "real_book":
             groups, pins = _book_groups(kind_rows, source_dirs)
         elif kind == "real_wiki":
-            groups, pins = _wiki_groups(kind_rows)
+            groups, pins = _wiki_groups(kind_rows, wiki_source_pools)
         elif extended_source_kinds and kind in {
             "real_paper_source",
             "real_paper_revision",
@@ -826,6 +1070,10 @@ def audit(
             groups, pins = _grounded_groups(kind_rows)
         elif extended_source_kinds and kind == "real_finance":
             groups, pins = _finance_groups(kind_rows)
+        elif p118_code_and_simulation and kind == "real_code_workflow":
+            groups, pins = _code_groups(kind_rows)
+        elif p118_code_and_simulation and kind == "controlled_simulation":
+            groups, pins = _simulation_groups(kind_rows)
         else:
             reports[kind] = {
                 "status": "UNKNOWN",
@@ -860,7 +1108,7 @@ def audit(
         if report["status"] == "CONFLICT"
     }
     report = {
-        "schema_version": SCHEMA,
+        "schema_version": P118_SCHEMA if p118_code_and_simulation else SCHEMA,
         "index_manifest_sha256": sha(index_dir / "manifest.json"),
         "selected_refs_sha256": sha(selection_path),
         "selection_manifest_sha256": sha(selection_dir / "manifest.json"),
@@ -922,12 +1170,16 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--verify-only", action="store_true")
     parser.add_argument("--extended-source-kinds", action="store_true")
+    parser.add_argument("--p118-code-and-simulation", action="store_true")
+    parser.add_argument("--wiki-source-pool", type=Path, action="append")
     args = parser.parse_args()
     report = audit(
         args.index,
         args.selection,
         args.book_source,
         extended_source_kinds=args.extended_source_kinds,
+        p118_code_and_simulation=args.p118_code_and_simulation,
+        wiki_source_pools=args.wiki_source_pool,
     )
     if args.verify_only:
         if _json(args.output) != report:

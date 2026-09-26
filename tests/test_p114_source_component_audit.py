@@ -230,3 +230,87 @@ def test_invalid_article_revision_and_duplicate_group_rejected() -> None:
                 {"group": "same", "split": "eval", "identities": []},
             ]
         )
+
+
+def test_code_source_component_requires_raw_source_pin(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(source_audit, "ROOT", tmp_path)
+    config = tmp_path / "configs/p99_code_content_v1.json"
+    config.parent.mkdir()
+    for name in ("p107_code_oxc_expansion_v1", "p108_code_content_v2"):
+        (config.parent / f"{name}.json").write_text('{"banks": []}')
+    group = "https://github.com/example/repo"
+    raw = tmp_path / "source/pr.json"
+    raw.parent.mkdir()
+    raw.write_text("frozen pull request")
+    bank = tmp_path / "bank"
+    bank.mkdir()
+    world = {"source_group_id": group, "split": "train", "world_instance_id": "world-a"}
+    (bank / "world.json").write_text(json.dumps(world))
+    receipt = {
+        "source_group_id": group,
+        "split": "train",
+        "files": {"world.json": source_audit.sha(bank / "world.json")},
+        "source_bindings": [{"path": str(raw), "sha256": source_audit.sha(raw)}],
+    }
+    (bank / "BUILD_RECEIPT.json").write_text(json.dumps(receipt))
+    config.write_text(json.dumps({"banks": [{
+        "bank_root": "bank", "source_group_id": group, "split": "train",
+        "receipt_sha256": source_audit.sha(bank / "BUILD_RECEIPT.json"),
+    }]}))
+    native = tmp_path / "native"
+    native.mkdir()
+    (native / "sample_index.jsonl").write_text(json.dumps({
+        "sample_id": "task-a", "source_group": group, "split": "train",
+    }) + "\n")
+    (native / "train.jsonl").write_text(json.dumps({"example_id": "task-a"}) + "\n")
+    (native / "manifest.json").write_text(json.dumps({
+        "config_sha256": source_audit.sha(config),
+        "files_sha256": {name: source_audit.sha(native / name) for name in (
+            "sample_index.jsonl", "train.jsonl"
+        )},
+    }))
+    row = {
+        "sample_id": "task-a", "source_group": group, "split": "train",
+        "source_name": "p99_code_content",
+        "native_row_ref": str(native / "train.jsonl") + ":0",
+    }
+    groups, _ = source_audit._code_groups([row])
+    assert groups[0]["identities"] == ["code:repository:" + group]
+    raw.write_text("changed pull request")
+    with pytest.raises(ValueError, match="raw source binding pin"):
+        source_audit._code_groups([row])
+
+
+def test_simulation_content_alias_reveals_cross_split_component(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(source_audit, "ROOT", tmp_path)
+    factor = tmp_path / "data/candidates/p112_world_factor_campaign_v2"
+    factor.mkdir(parents=True)
+    (factor / "sample_index.jsonl").write_text("")
+    (factor / "manifest.json").write_text(json.dumps({
+        "files_sha256": {"sample_index.jsonl": source_audit.sha(factor / "sample_index.jsonl")}
+    }))
+    selected = []
+    for group, split in (("world-a", "train"), ("world-b", "eval")):
+        shard = tmp_path / group
+        shard.mkdir()
+        (shard / "world.json").write_text(json.dumps({
+            "world_id": group, "reader_context": "identical source world",
+            "context_sha256": hashlib.sha256(b"identical source world").hexdigest(),
+        }))
+        (shard / "rows.jsonl").write_text(json.dumps({
+            "example_id": group + ":q0", "world_id": group,
+            "source_group": group, "split": split,
+        }) + "\n")
+        (shard / "receipt.json").write_text(json.dumps({
+            "world_id": group, "world_sha256": source_audit.sha(shard / "world.json"),
+            "rows_sha256": source_audit.sha(shard / "rows.jsonl"),
+        }))
+        selected.append({
+            "sample_id": group + ":q0", "source_group": group, "split": split,
+            "source_name": "state_p86",
+            "native_row_ref": str(shard / "rows.jsonl") + ":0",
+        })
+    groups, _ = source_audit._simulation_groups(selected)
+    assert components(groups)["conflicts"][0]["groups"] == ["world-a", "world-b"]
