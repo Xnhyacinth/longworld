@@ -1,5 +1,7 @@
 # P113 legal-cell native dispatch: bounded Wiki and report cohorts
 
+**Current novelty comparison:** `data/candidates/p113_legal_cell_recompare_v1/manifest.json` supersedes the index comparison embedded in the native release below. The release used `p113_candidate_refs_v1`, later quarantined after five book gold errors. The new receipt pins `p113_book_quarantined_refs_v1`, verifies the unchanged native release and its old lineage, then compares task IDs and answer hashes again without rerunning compilers. It confirms the same net **one Amazon task / two views**. Neither receipt promotes it to training: comparative-text alternatives remain unchecked.
+
 `scripts/p113_legal_cell_dispatch.py` executes two source cohorts selected from the P113 legal-cell plan through existing native compilers. It does not reinterpret each preflight job as one QA: the selected Wiki lookup cell maps to multiple table-cell tasks, and the selected Amazon source maps four selector/baseline preflight cells to the native report-route program matrix. Every accepted sample retains its native semantic task ID and its P113 preflight cell ID in `lineage.jsonl`.
 
 Frozen result: `data/candidates/p113_legal_cell_execution_v2_release/`. It pins the P113 planned-job JSONL, P76 Wiki source pool, P96/P112 finance inputs, and the frozen `p113_candidate_refs_v1` index (`sha256:7f00ce2ee1c14a016d052bca15c1c6e953a7aacfddde585a40264b753afb3a3c`). `--verify-only` re-executes both native producers into a persistent temporary directory and byte-compares their output, then replays the independent P112 answer/reader/mask audit and unified conversion. The v1 preflight artifact remains unchanged. Earlier `p113_legal_cell_execution_v2`, `_v2_current` and `_v2_final` were diagnostic runs; use `_v2_release` for these figures.
@@ -21,6 +23,10 @@ The Amazon native matrix checked 80 program cells: 12 selected, 6 rejected by ba
 Reproduce the exact verification and inspect cases:
 
 ```bash
+UV_LINK_MODE=copy uv run --offline python scripts/p113_legal_cell_recompare.py \
+  --config configs/p113_legal_cell_recompare_v1.json \
+  --output data/candidates/p113_legal_cell_recompare_v1/manifest.json --verify-only
+cat data/candidates/p113_legal_cell_recompare_v1/manifest.json
 UV_LINK_MODE=copy uv run --offline python scripts/p113_legal_cell_dispatch.py \
   --config configs/p113_legal_cell_dispatch_v2.json \
   --output data/candidates/p113_legal_cell_execution_v2_release --verify-only

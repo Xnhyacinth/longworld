@@ -1,0 +1,19 @@
+{
+  "schema": "longworld.p113-legal-cell-recompare.v1.config",
+  "dispatch_config": {
+    "path": "configs/p113_legal_cell_dispatch_v2.json",
+    "sha256": "f2f73869fe1e10509bed989140d6625574e2c2efa787eda892528e765fdf2fff"
+  },
+  "release_manifest": {
+    "path": "data/candidates/p113_legal_cell_execution_v2_release/manifest.json",
+    "sha256": "fa466a9e8fc65b6be826d950296f97561b6a05d359bb9cf6355052ed7470d19c"
+  },
+  "new_index_manifest": {
+    "path": "data/candidates/p113_book_quarantined_refs_v1/manifest.json",
+    "sha256": "02d71742c182f5bab4c8694e0990c4f1ad848da9586e55ba6008e4cf2076a422"
+  },
+  "new_index_refs": {
+    "path": "data/candidates/p113_book_quarantined_refs_v1/candidate_refs.jsonl",
+    "sha256": "fdee46dc9bc419c5ed40c8047ac83362722480f9581b10e4bf9252c9d84f9304"
+  }
+}
