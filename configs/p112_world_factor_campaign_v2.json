@@ -1,0 +1,25 @@
+{
+  "schema": "longworld.p112-world-factor-campaign.v1",
+  "base": {
+    "schema_version": "longworld.p86-state-shared-batch-config.v1",
+    "seed_base": 1123000,
+    "cells": [
+      {"length_records": 400, "depth": 2, "worlds": 4},
+      {"length_records": 400, "depth": 3, "worlds": 4},
+      {"length_records": 800, "depth": 2, "worlds": 4},
+      {"length_records": 800, "depth": 3, "worlds": 4},
+      {"length_records": 1600, "depth": 2, "worlds": 4},
+      {"length_records": 1600, "depth": 3, "worlds": 4}
+    ],
+    "consumed_records": 20,
+    "variants": 2,
+    "max_full_chat_tokens": 262144
+  },
+  "profiles": [
+    {"domain": "laboratory", "topic": "instrument_inspection", "record": "inspection", "event": "invalidate", "entity": "instrument", "category": "assay_class", "amount": "reading", "record_id": "inspection_id"},
+    {"domain": "logistics", "topic": "shipment_reconciliation", "record": "shipment", "event": "cancel", "entity": "route", "category": "cargo_class", "amount": "units", "record_id": "shipment_id"},
+    {"domain": "finance", "topic": "invoice_restatement", "record": "invoice", "event": "void", "entity": "account", "category": "ledger_class", "amount": "value", "record_id": "invoice_id"},
+    {"domain": "software", "topic": "build_run_validity", "record": "build_run", "event": "invalidate", "entity": "service", "category": "build_class", "amount": "metric", "record_id": "build_run_id"}
+  ],
+  "workers": 4
+}

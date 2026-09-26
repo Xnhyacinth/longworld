@@ -1,0 +1,12 @@
+{
+  "schema": "longworld.p112-grounded-rule-campaign.v1",
+  "support_ledger": {
+    "path": "data/capability_records/p109_prose_support_v1/ledger.json",
+    "sha256": "115a9e96b10ace6efe0e9641cefde9e70b9e2ef40a01a1fa6a779c6802a1b9c8"
+  },
+  "state_seeds": [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
+  "records_per_state": 16,
+  "max_full_tokens": 131072,
+  "workers": 4,
+  "split": "train"
+}
