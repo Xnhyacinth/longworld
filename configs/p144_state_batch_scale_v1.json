@@ -1,0 +1,15 @@
+{
+  "schema_version": "longworld.p144-state-batch-scale.v1",
+  "template": {
+    "path": "configs/p133_state_mechanism_batch_v4.json",
+    "sha256": "1289735a343df949fd03bfd25e5145c6aea4cd555b1181a92270e3d7fc284432"
+  },
+  "prior_campaign": {
+    "path": "data/candidates/p133_state_mechanism_batch_v4/manifest.json",
+    "sha256": "36c60c383f9d2297c47c9f866bff047d51d6e310f319fa5d772664beda871e79"
+  },
+  "seed_base": 1440000,
+  "seeds_per_cell": 32,
+  "batch_count": 2,
+  "batch_workers": 2
+}
