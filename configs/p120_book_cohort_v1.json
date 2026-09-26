@@ -1,0 +1,47 @@
+{
+  "schema": "longworld.p113-book-catalog-request.v1",
+  "p114_scale_schema": "longworld.p114-book-scale-request.v1",
+  "p120_schema": "longworld.p120-book-cohort-request.v1",
+  "catalog_url": "https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv.gz",
+  "catalog_sha256": "9965df5b1fdd56f19c876054c891c09b2a98d65ab910bee6e91fa734e645f31d",
+  "mirror_base": "https://gutenberg.pglaf.org/cache/epub",
+  "policy_url": "https://www.gutenberg.org/policy/license",
+  "prior_source_manifests": [
+    "data/sources/p113_book_cohort_v6/manifest.json",
+    "data/sources/p114_book_cohort_v2/manifest.json"
+  ],
+  "prior_attempt_manifests": [
+    "data/sources/p114_book_attempts_v1/download_manifest.json"
+  ],
+  "prior_source_manifest": "data/sources/p120_book_plan_v1/prior_manifest.json",
+  "prior_unified_dir": "data/candidates/p116_book_intersection_unified_v3",
+  "max_candidates": 1000,
+  "max_attempts": 180,
+  "max_frozen_books": 80,
+  "max_books_per_author_component": 2,
+  "max_bytes_per_book": 2000000,
+  "requests_per_second": 0.5,
+  "workers": 4,
+  "split_salt": "p120-gutenberg-full-catalog-author-component-v1",
+  "eval_fraction": 0.2,
+  "topics": {
+    "adventure_fiction": ["adventure stories", "adventure fiction"],
+    "detective_fiction": ["detective and mystery stories", "mystery and detective stories"],
+    "fantasy_fiction": ["fantasy fiction", "fantasy literature"],
+    "historical_fiction": ["historical fiction", "historical novels"],
+    "juvenile_fiction": ["juvenile fiction", "children's stories"],
+    "social_fiction": ["domestic fiction", "social life and customs -- fiction"],
+    "science_fiction": ["science fiction"],
+    "sea_stories": ["sea stories"],
+    "western_stories": ["western stories"],
+    "romance_stories": ["love stories", "romance fiction"],
+    "ghost_stories": ["ghost stories"],
+    "war_stories": ["war stories"],
+    "humorous_stories": ["humorous stories"],
+    "political_fiction": ["political fiction"],
+    "gothic_fiction": ["gothic fiction"],
+    "pirate_fiction": ["pirates -- fiction"],
+    "school_stories": ["school stories"],
+    "satirical_fiction": ["satire -- fiction", "satirical fiction"]
+  }
+}
