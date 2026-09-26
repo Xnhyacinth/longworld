@@ -20,6 +20,7 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from longworld.synthesis.sharded_candidate_bank import verify_index
+from longworld.synthesis.unified_candidate_merge import verify_merge
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = "longworld.p114-source-component-audit.v1"
@@ -300,6 +301,98 @@ def _native_dir(row: dict[str, Any]) -> Path:
         raise ValueError("selected row lacks native JSONL provenance")
     path = Path(ref.rsplit(".jsonl:", 1)[0] + ".jsonl")
     return path.parent if path.is_absolute() else ROOT / path.parent
+
+
+def _source_support_rows(
+    index_dir: Path, index: dict[str, Any], selected: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Resolve joint-answer views to both pinned native parent tasks."""
+    shards = {item["name"]: item for item in index["shards"]}
+    joint_cache: dict[Path, tuple[dict[str, Any], dict[str, dict], dict[str, dict]]] = {}
+    materialized_cache: dict[Path, tuple[str, dict[str, dict]]] = {}
+    support_rows = []
+    derived_pins = {}
+    for entry in selected:
+        row = entry["candidate"]
+        if row["operation"] != "joint_multi_operation_answer":
+            support_rows.append(row)
+            continue
+        if row.get("source_name") != "p125_joint_multi_operation":
+            raise ValueError("unknown joint-answer source contract")
+        shard = shards[entry["shard"]]
+        shard_dir = (index_dir / shard["path"]).resolve()
+        if shard_dir not in joint_cache:
+            if sha(shard_dir / "manifest.json") != shard["manifest_sha256"]:
+                raise ValueError("joint-answer shard manifest differs")
+            verify_merge(shard_dir)
+            manifest = _json(shard_dir / "manifest.json")
+            if manifest.get("p125_schema") != "longworld.p125-joint-task-compiler.v1":
+                raise ValueError("unknown joint-answer lineage schema")
+            joint_rows = _rows(shard_dir / "sample_index.jsonl")
+            lineages = _rows(shard_dir / "pair_lineage.jsonl")
+            by_id = {item["sample_id"]: item for item in joint_rows}
+            by_lineage = {item["sample_id"]: item for item in lineages}
+            if (
+                len(by_id) != len(joint_rows)
+                or len(by_lineage) != len(lineages)
+                or set(by_id) != set(by_lineage)
+            ):
+                raise ValueError("joint-answer lineage inventory differs")
+            joint_cache[shard_dir] = manifest, by_id, by_lineage
+            derived_pins[str(shard_dir / "manifest.json")] = sha(
+                shard_dir / "manifest.json"
+            )
+        manifest, by_id, by_lineage = joint_cache[shard_dir]
+        lineage = by_lineage.get(row["sample_id"])
+        if by_id.get(row["sample_id"]) != row or lineage is None:
+            raise ValueError("selected joint-answer row lacks pinned lineage")
+        ref = row["native_row_ref"].split("/sample_index.jsonl:", 1)
+        if len(ref) != 2:
+            raise ValueError("joint-answer materialized source path differs")
+        materialized_dir = Path(ref[0])
+        if not materialized_dir.is_absolute():
+            materialized_dir = ROOT / materialized_dir
+        materialized_dir = materialized_dir.resolve()
+        if materialized_dir not in materialized_cache:
+            materialized_path = materialized_dir / "manifest.json"
+            materialized_sha = sha(materialized_path)
+            if materialized_sha != manifest["source_materialized_manifest_sha256"]:
+                raise ValueError("joint-answer source materialization differs")
+            source = _json(materialized_path)
+            if source.get("schema_version") != "longworld.p95-balanced-materialized-candidates.v1":
+                raise ValueError("joint-answer source materialization schema differs")
+            for name, digest in source["files_sha256"].items():
+                if sha(materialized_dir / name) != digest:
+                    raise ValueError("joint-answer source materialization file differs")
+            parents = _rows(materialized_dir / "sample_index.jsonl")
+            parent_by_id = {item["candidate"]["sample_id"]: item["candidate"] for item in parents}
+            if len(parent_by_id) != len(parents) or len(parents) != source["selected_views"]:
+                raise ValueError("joint-answer parent inventory differs")
+            materialized_cache[materialized_dir] = materialized_sha, parent_by_id
+            derived_pins[str(materialized_path)] = materialized_sha
+        materialized_sha, parent_by_id = materialized_cache[materialized_dir]
+        if row["receipt_sha256"] != materialized_sha or lineage["context_sha256"] != row["context_sha256"]:
+            raise ValueError("joint-answer source or context pin differs")
+        parents = [parent_by_id.get(sample_id) for sample_id in lineage["component_sample_ids"]]
+        if len(parents) != 2 or any(parent is None for parent in parents):
+            raise ValueError("joint-answer parent tasks missing")
+        for position, parent in enumerate(parents):
+            if (
+                any(parent[field] != row[field] for field in ("source_kind", "source_group", "split", "domain", "topic", "context_sha256"))
+                or parent["semantic_task_id"] != lineage["component_semantic_task_ids"][position]
+                or parent["operation"] != lineage["component_operations"][position]
+                or parent["answer_sha256"] != lineage["answer_projection_hashes"][position]
+            ):
+                raise ValueError("joint-answer parent source binding differs")
+            support_rows.append(parent)
+    return support_rows, {
+        "selected_joint_views": sum(
+            entry["candidate"]["operation"] == "joint_multi_operation_answer"
+            for entry in selected
+        ),
+        "source_support_rows": len(support_rows),
+        "source_pins": derived_pins,
+    }
 
 
 def _paper_groups(
@@ -1055,8 +1148,10 @@ def audit(
         }:
             raise ValueError("selected source row differs from index")
         rows.append(row)
+    support_rows, derived = _source_support_rows(index_dir, index, selected)
+    selected_by_kind = Counter(row["source_kind"] for row in rows)
     by_kind: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in rows:
+    for row in support_rows:
         by_kind[row["source_kind"]].append(row)
     reports = {}
     for kind, kind_rows in sorted(by_kind.items()):
@@ -1080,7 +1175,7 @@ def audit(
         else:
             reports[kind] = {
                 "status": "UNKNOWN",
-                "views": len(kind_rows),
+                "views": selected_by_kind[kind],
                 "typed_source_groups": len({r["source_group"] for r in kind_rows}),
                 "reason": "complete source-document component mapping is not pinned in this audit",
             }
@@ -1093,8 +1188,13 @@ def audit(
         graph = components(groups)
         reports[kind] = {
             "status": "CONFLICT" if graph["conflicts"] else "CERTIFIED",
-            "views": len(kind_rows),
-            "mapped_views": len(kind_rows),
+            "views": selected_by_kind[kind],
+            "mapped_views": selected_by_kind[kind],
+            **(
+                {"source_support_rows": len(kind_rows)}
+                if derived["selected_joint_views"]
+                else {}
+            ),
             "identity_scope": pins["identity_scope"],
             "graph": graph,
             "source_pins": {
@@ -1116,6 +1216,11 @@ def audit(
         "selected_refs_sha256": sha(selection_path),
         "selection_manifest_sha256": sha(selection_dir / "manifest.json"),
         "selected_views": len(rows),
+        **(
+            {"derived_joint_source_binding": derived}
+            if derived["selected_joint_views"]
+            else {}
+        ),
         "by_source_kind": reports,
         "certified_views": len(rows) - unknown_views,
         "unknown_views": unknown_views,

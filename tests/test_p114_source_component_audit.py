@@ -59,6 +59,95 @@ def test_same_author_same_split_is_allowed_for_distinct_books() -> None:
     _check_book_source_components([first, second])
 
 
+def test_joint_answer_source_binding_uses_both_pinned_parent_tasks(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(source_audit, "verify_merge", lambda _: None)
+    materialized = tmp_path / "materialized"
+    materialized.mkdir()
+    base = {
+        "source_kind": "real_finance",
+        "source_group": "issuer-1",
+        "split": "train",
+        "domain": "finance",
+        "topic": "issuer",
+        "context_sha256": "context-sha",
+    }
+    parents = [
+        {
+            **base,
+            "sample_id": f"parent-{i}",
+            "semantic_task_id": f"task-{i}",
+            "operation": f"operation-{i}",
+            "answer_sha256": f"answer-{i}",
+        }
+        for i in range(2)
+    ]
+    source_index = materialized / "sample_index.jsonl"
+    source_index.write_text(
+        "".join(json.dumps({"candidate": parent}) + "\n" for parent in parents)
+    )
+    source_manifest = materialized / "manifest.json"
+    source_manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.p95-balanced-materialized-candidates.v1",
+                "selected_views": 2,
+                "files_sha256": {"sample_index.jsonl": source_audit.sha(source_index)},
+            }
+        )
+    )
+    derived = {
+        **base,
+        "sample_id": "joint-1",
+        "operation": "joint_multi_operation_answer",
+        "source_name": "p125_joint_multi_operation",
+        "native_row_ref": str(source_index) + ":parent-0+parent-1",
+        "receipt_sha256": source_audit.sha(source_manifest),
+    }
+    joint = tmp_path / "joint"
+    joint.mkdir()
+    (joint / "sample_index.jsonl").write_text(json.dumps(derived) + "\n")
+    lineage = {
+        "sample_id": "joint-1",
+        "context_sha256": "context-sha",
+        "component_sample_ids": ["parent-0", "parent-1"],
+        "component_semantic_task_ids": ["task-0", "task-1"],
+        "component_operations": ["operation-0", "operation-1"],
+        "answer_projection_hashes": ["answer-0", "answer-1"],
+    }
+    (joint / "pair_lineage.jsonl").write_text(json.dumps(lineage) + "\n")
+    joint_manifest = joint / "manifest.json"
+    joint_manifest.write_text(
+        json.dumps(
+            {
+                "p125_schema": "longworld.p125-joint-task-compiler.v1",
+                "source_materialized_manifest_sha256": source_audit.sha(source_manifest),
+            }
+        )
+    )
+    index_dir = tmp_path / "index"
+    index_dir.mkdir()
+    index = {
+        "shards": [
+            {
+                "name": "joint",
+                "path": "../joint",
+                "manifest_sha256": source_audit.sha(joint_manifest),
+            }
+        ]
+    }
+    selection = [{"shard": "joint", "candidate": derived}]
+    rows, report = source_audit._source_support_rows(index_dir, index, selection)
+    assert rows == parents
+    assert report["selected_joint_views"] == 1
+    assert report["source_support_rows"] == 2
+    lineage["answer_projection_hashes"][1] = "wrong"
+    (joint / "pair_lineage.jsonl").write_text(json.dumps(lineage) + "\n")
+    with pytest.raises(ValueError, match="parent source binding differs"):
+        source_audit._source_support_rows(index_dir, index, selection)
+
+
 def test_author_alias_connects_distinct_book_groups_across_split() -> None:
     assert author_key("Austen, Jane") == author_key("Jane Austen")
     graph = components(
