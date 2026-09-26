@@ -222,6 +222,9 @@ def build(
         "source_truth_code_sha256": _sha(
             (ROOT / "scripts/p113_book_truth.py").read_bytes()
         ),
+        "broad_gate_code_sha256": _sha(
+            (ROOT / "scripts/p114_book_broad_gate.py").read_bytes()
+        ),
         "catalog_sha256": cfg["catalog_sha256"],
         "catalog_plan_sha256": _sha(plan.read_bytes()),
         "mirror_attempt_manifest_sha256": _sha(

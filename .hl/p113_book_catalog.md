@@ -1,5 +1,56 @@
 # P113 catalog-driven real-book source and explicit-speech tasks
 
+**Current status (2026-09-26):** The earlier `native_v7 → unified_v4 →
+unified_mask_v4` chain is also **quarantined**. A later independent full-chapter
+scan found two wrong gold answers in which a single-line quotation had a
+printed attribution split across lines: `book-explicit-39464761c5841f454e0e-v1`
+(`cried\nJane`) and `book-explicit-fe8e14493b13a36c837c-v1`
+(`Michael\nsaid`). Its 44 rows must not enter training or evaluation. The
+earlier 43-row v3 chain remains quarantined for the five wrong gold answers
+listed below. Parser agreement alone did not establish answer truth.
+
+## New conservative P113 candidate
+
+The replacement chain is `data/sources/p113_book_cohort_v6/manifest.json`
+(SHA-256 `01b94df31b060ef50ae8dac106b51c16c7fdefe121837242258b9c0823e521dc`)
+→ `data/candidates/p113_book_native_v8/manifest.json`
+(`4be2573f493c53eac7d26043e1e9d1aaa337593dd413853c753facf5325f5f65`)
+→ `data/candidates/p113_book_unified_v5/manifest.json`
+(`5ccebc6f88c4ea75b3d39dc22afd2197a41829e5dd429916a576f8b0cfa389a6`)
+→ `data/candidates/p113_book_unified_mask_v5/manifest.json`
+(`0b9e328804db807b6847423c4ba308242614abc4da309e1fcec60bde4aaf7d69`).
+The source receipt pins truth-parser SHA
+`804c7cb77c5a9d8cb4531991bf36e2022cd6ad65b663a88f0fa3d0d3f0a27033`
+and independent broad-veto SHA
+`97c3b94034b55ac8e170640ef5a41adf7317a281f313d06082199553b14892e6`.
+This veto scans later quotations in the full target chapter for the same
+printed name and listed speech verb in either order, with modifiers and
+attribution line breaks; any plausible later match rejects the candidate.
+It does not relabel an uncertain quote as gold.
+
+The four-process compiler produced **42 tasks** from 14 productive works
+(33 train, nine eval). The new veto rejected 266 chapter-pair/label proposals;
+these are not 266 unique tasks. Against the old 44-task v7 set, 32 sample IDs
+remain, 12 are removed and ten new candidates fill later positions. The native
+final-reader audit and all-mask replay each checked 42/42. The separate
+adversarial reviewer found no later direct same-name attribution in the 42
+target chapters under a broader modifier/newline scan and independently
+checked all 42 final readers and masks. This is a bounded
+single-operation real-book lane with `train_ready=false`, not a model-gain claim.
+
+```bash
+cat data/sources/p113_book_cohort_v6/manifest.json
+less -R data/candidates/p113_book_native_v8/proofs.jsonl
+cat data/candidates/p113_book_native_v8/independent_audit_manifest.json
+cat data/candidates/p113_book_unified_v5/manifest.json
+cat data/candidates/p113_book_unified_mask_v5/manifest.json
+UV_LINK_MODE=copy uv run --offline python scripts/p113_book_sources.py --config configs/p113_book_catalog_v1.json --plan data/sources/p113_book_catalog_v1/plan_v2.json --attempt-dir data/sources/p113_books_v1 --prior-source-dir data/sources/p112_books_v1 --output data/sources/p113_book_cohort_v6 --verify-only
+UV_LINK_MODE=copy uv run --offline python scripts/p113_book_tasks.py --source-dir data/sources/p113_book_cohort_v6 --output data/candidates/p113_book_native_v8 --workers 4 --max-tasks-per-book 4 --min-lineage-tokens 16384 --verify-only
+UV_LINK_MODE=copy uv run --offline python scripts/p113_book_audit.py --source-dir data/sources/p113_book_cohort_v6 --native-dir data/candidates/p113_book_native_v8 --verify-only
+UV_LINK_MODE=copy uv run --offline python scripts/p113_book_to_unified.py --source-dir data/sources/p113_book_cohort_v6 --native-dir data/candidates/p113_book_native_v8 --output data/candidates/p113_book_unified_v5 --verify-only
+UV_LINK_MODE=copy uv run --offline python scripts/p113_book_unified_mask.py --unified-dir data/candidates/p113_book_unified_v5 --output data/candidates/p113_book_unified_mask_v5 --verify-only
+```
+
 **QUARANTINED (2026-09-26):** The P113 `native_v6 → unified_v3 →
 unified_mask_v3` chain's 43/43 parser-agreement and mask checks did not prove
 correct gold. An independent target-chapter scan found at least five wrong
@@ -19,7 +70,7 @@ remaining figures below describe a historical diagnostic build, not admitted
 training data. The frozen raw source and rejection ledgers remain useful for
 rebuilding with a corrected truth contract.
 
-## Corrected P113 candidate (not yet in global index)
+## Historical v4 candidate (quarantined after the later newline scan)
 
 The replacement freezes `data/sources/p113_book_cohort_v5/manifest.json`
 (SHA-256 `08ceb2706e039775468d9bebca1500e7a389756bb981f6ab3d0b31fc90a097eb`)

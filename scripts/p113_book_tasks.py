@@ -24,6 +24,10 @@ from scripts.p113_book_truth import (
     chapters,
     speeches,
 )
+from scripts.p114_book_broad_gate import (
+    assert_verb_contract,
+    later_named_quote_suspicions,
+)
 from scripts.train_sft import _render_chat, tokenize_assistant_only
 
 SCHEMA = "longworld.p113-book-explicit-speech-reader.v1"
@@ -64,6 +68,7 @@ def _scan(
 def _compile_book(
     book: dict, source_dir: Path, max_tasks: int, min_extent: int
 ) -> dict:
+    assert_verb_contract(VERBS)
     body = (source_dir / book["body_file"]).read_bytes()
     if _sha(body) != book["body_sha256"]:
         raise ValueError("frozen book body changed")
@@ -102,6 +107,9 @@ def _compile_book(
                 answer = target_attributions[-1]
                 if len(answer.quote) > 200 or text.count(answer.quote) != 1:
                     rejects["target_answer_not_short_unique"] += 1
+                    continue
+                if later_named_quote_suspicions(cs[j].text, label, answer.quote_end):
+                    rejects["later_plausible_named_quote_uncertainty"] += 1
                     continue
                 source_audit = [
                     x for x in audits[i] if x.label.casefold() == label.casefold()
@@ -362,6 +370,8 @@ def run(
         source["schema"] != "longworld.p113-book-source-freeze.v1"
         or source.get("source_truth_code_sha256")
         != _sha((ROOT / "scripts/p113_book_truth.py").read_bytes())
+        or source.get("broad_gate_code_sha256")
+        != _sha((ROOT / "scripts/p114_book_broad_gate.py").read_bytes())
         or not 1 <= workers <= 8
         or not 1 <= max_tasks_per_book <= 32
     ):

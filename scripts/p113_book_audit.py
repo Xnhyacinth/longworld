@@ -18,6 +18,10 @@ from scripts.p112_book_freeze import _body
 from scripts.p112_book_tasks import SEP, _dump, _reader_sections
 from scripts.p113_book_tasks import QUESTION
 from scripts.p113_book_truth import VERBS, alias_uncertain, audit_speeches, chapters
+from scripts.p114_book_broad_gate import (
+    assert_verb_contract,
+    later_named_quote_suspicions,
+)
 from scripts.train_sft import _render_chat, tokenize_assistant_only
 
 SCHEMA = "longworld.p113-book-independent-final-reader-audit.v1"
@@ -50,12 +54,15 @@ def _blind(
 
 
 def audit(source_dir: Path, native_dir: Path, *, verify_only: bool = False) -> dict:
+    assert_verb_contract(VERBS)
     source_manifest = json.loads((source_dir / "manifest.json").read_text())
     native = json.loads((native_dir / "manifest.json").read_text())
     if (
         source_manifest.get("schema") != "longworld.p113-book-source-freeze.v1"
         or source_manifest.get("source_truth_code_sha256")
         != _sha((ROOT / "scripts/p113_book_truth.py").read_bytes())
+        or source_manifest.get("broad_gate_code_sha256")
+        != _sha((ROOT / "scripts/p114_book_broad_gate.py").read_bytes())
         or native.get("schema") != "longworld.p113-book-explicit-speech-reader.v1"
         or native["source_manifest_sha256"]
         != _sha((source_dir / "manifest.json").read_bytes())
@@ -174,6 +181,10 @@ def audit(source_dir: Path, native_dir: Path, *, verify_only: bool = False) -> d
             or target_hits[-1].quote != proof["answer"]
         ):
             raise ValueError("full-section source/target attribution differs")
+        if later_named_quote_suspicions(
+            parsed[target_title], proof["speaker_label"], target_hits[-1].quote_end
+        ):
+            raise ValueError("later plausible named quotation defeats gold")
         source = source_hits[0]
         source_marker = f"=== SECTION: {source_title} ===\n"
         target_marker = f"=== SECTION: {target_title} ===\n"
