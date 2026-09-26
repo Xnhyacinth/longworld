@@ -1,0 +1,9 @@
+{
+  "materialized_manifest": {
+    "path": "data/candidates/p120_candidate_materialized_shared_v1/manifest.json",
+    "sha256": "66e0c5ca1536fae58a2a114b68e3eb11c06e1b21cc504644efa962d2d67a53ef"
+  },
+  "max_seq_len": 262144,
+  "max_worlds": 100,
+  "schema": "longworld.p125-joint-task-compiler.v1.config"
+}
