@@ -196,6 +196,126 @@ def test_joint_answer_source_binding_uses_both_pinned_parent_tasks(
         source_audit._source_support_rows(index_dir, index, selection)
 
 
+def test_p133_state_reader_resolves_pinned_world_and_base_record(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(source_audit, "ROOT", tmp_path)
+    factor = tmp_path / "data/candidates/p112_world_factor_campaign_v2"
+    factor.mkdir(parents=True)
+    (factor / "sample_index.jsonl").write_text("")
+    (factor / "manifest.json").write_text(
+        json.dumps(
+            {"files_sha256": {"sample_index.jsonl": source_audit.sha(factor / "sample_index.jsonl")}}
+        )
+    )
+    campaign = tmp_path / "data/candidates/p133_state_mechanism_batch_v4"
+    world_dir = campaign / "worlds/p133-world-a"
+    world_dir.mkdir(parents=True)
+    context = "visible state context"
+    context_sha = hashlib.sha256(context.encode()).hexdigest()
+    world_path = world_dir / "world.json"
+    world_path.write_text(
+        json.dumps(
+            {
+                "world_id": "p133-world-a",
+                "reader_context": context,
+                "context_sha256": context_sha,
+                "base_record_world_id": "shared-record-a",
+                "base_record_context_sha256": "base-context-a",
+                "tasks": [{"task_id": "task-a"}],
+            }
+        )
+    )
+    receipt_path = world_dir / "receipt.json"
+    receipt_path.write_text(
+        json.dumps(
+            {
+                "world_id": "p133-world-a",
+                "world_sha256": source_audit.sha(world_path),
+                "base_record_world_id": "shared-record-a",
+                "base_record_context_sha256": "base-context-a",
+            }
+        )
+    )
+    native = {
+        "sample_id": "p133-world-a:task-a",
+        "source_group": "p133-world-a",
+        "split": "train",
+        "domain": "simulated_state",
+        "topic": "partial_reversal",
+        "operation": "net_sum",
+        "answer_sha256": "answer-a",
+        "context_sha256": context_sha,
+        "semantic_task_id": "p133-world-a:task-a",
+        "dependency_status": "bounded",
+        "source_name": "p133_executed_state_qa",
+        "native_row_ref": "p133-world-a",
+        "receipt_sha256": source_audit.sha(receipt_path),
+    }
+    index_path = campaign / "sample_index.jsonl"
+    index_path.write_text(json.dumps(native) + "\n")
+    manifest_path = campaign / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.p133-state-mechanism-output.v1",
+                "source_world_ids": ["p133-world-a"],
+                "files_sha256": {"sample_index.jsonl": source_audit.sha(index_path)},
+                "world_files_sha256": {
+                    "worlds/p133-world-a/world.json": source_audit.sha(world_path),
+                    "worlds/p133-world-a/receipt.json": source_audit.sha(receipt_path),
+                },
+            }
+        )
+    )
+    selected = {
+        **native,
+        "source_name": "p133_state_reader_QA",
+        "native_row_ref": str(world_path) + ":task-a",
+        "source_world_path": str(world_path),
+        "source_world_sha256": source_audit.sha(world_path),
+        "source_receipt_path": str(receipt_path),
+        "source_receipt_sha256": source_audit.sha(receipt_path),
+        "source_campaign_manifest_sha256": source_audit.sha(manifest_path),
+        "source_sample_id": "p133-world-a:task-a",
+        "source_task_id": "task-a",
+    }
+    groups, pins = source_audit._simulation_groups([selected])
+    assert groups[0]["identities"] == sorted(
+        [
+            "sim:base_record_context_sha256:base-context-a",
+            "sim:base_record_world:shared-record-a",
+            "sim:reader_context_sha256:" + context_sha,
+            "sim:world:p133-world-a",
+        ]
+    )
+    assert str(manifest_path) in pins["source_pins"]
+    with pytest.raises(ValueError, match="pinned state source binding"):
+        source_audit._simulation_groups([{**selected, "answer_sha256": "wrong"}])
+    with pytest.raises(ValueError, match="world or receipt pin differs"):
+        source_audit._simulation_groups([{**selected, "source_receipt_sha256": "wrong"}])
+    wrong_world = json.loads(world_path.read_text())
+    wrong_world["world_id"] = "wrong-world"
+    world_path.write_text(json.dumps(wrong_world))
+    changed_receipt = json.loads(receipt_path.read_text())
+    changed_receipt["world_sha256"] = source_audit.sha(world_path)
+    receipt_path.write_text(json.dumps(changed_receipt))
+    changed_manifest = json.loads(manifest_path.read_text())
+    changed_manifest["world_files_sha256"] = {
+        "worlds/p133-world-a/world.json": source_audit.sha(world_path),
+        "worlds/p133-world-a/receipt.json": source_audit.sha(receipt_path),
+    }
+    manifest_path.write_text(json.dumps(changed_manifest))
+    rehashed = {
+        **selected,
+        "source_world_sha256": source_audit.sha(world_path),
+        "source_receipt_sha256": source_audit.sha(receipt_path),
+        "source_campaign_manifest_sha256": source_audit.sha(manifest_path),
+    }
+    with pytest.raises(ValueError, match="pinned state source binding"):
+        source_audit._simulation_groups([rehashed])
+
+
 def test_author_alias_connects_distinct_book_groups_across_split() -> None:
     assert author_key("Austen, Jane") == author_key("Jane Austen")
     graph = components(

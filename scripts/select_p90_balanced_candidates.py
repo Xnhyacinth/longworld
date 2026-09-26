@@ -137,6 +137,85 @@ def _pinned_proof_path(pin: dict[str, str]) -> Path:
     return path
 
 
+def _p132_review_eligible(
+    entries: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Admit only review/diff tasks bound to a positive frozen native audit."""
+    by_native: dict[Path, list[dict[str, Any]]] = defaultdict(list)
+    for entry in entries:
+        row = entry["candidate"]
+        ref = row.get("native_audit_ref", "")
+        path_part, separator, offset = ref.rpartition(".jsonl:")
+        path = Path(path_part + ".jsonl")
+        if (
+            not separator
+            or not offset.isdecimal()
+            or path.is_absolute()
+            or ".." in path.parts
+            or path.name != "audit.jsonl"
+        ):
+            raise ValueError("P132 review task lacks native audit reference")
+        by_native[ROOT / path.parent].append(entry)
+    eligible = []
+    pins = {}
+    for native_dir, native_entries in by_native.items():
+        manifest_path = native_dir / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        required = {"audit.jsonl", "sample_index.jsonl", "train.jsonl", "eval.jsonl"}
+        if (
+            manifest.get("schema_version") != "longworld.p132-review-diff-join.v1"
+            or not required <= manifest.get("files_sha256", {}).keys()
+        ):
+            raise ValueError("P132 review native audit manifest differs")
+        for name in required:
+            if _sha(native_dir / name) != manifest["files_sha256"][name]:
+                raise ValueError("P132 review native audit or reader pin differs")
+        audits = [json.loads(line) for line in (native_dir / "audit.jsonl").read_text().splitlines()]
+        native_rows = {
+            row["sample_id"]: row
+            for row in (
+                json.loads(line)
+                for line in (native_dir / "sample_index.jsonl").read_text().splitlines()
+            )
+        }
+        if len(native_rows) != manifest["semantic_tasks"] or len(audits) != len(native_rows):
+            raise ValueError("P132 review native audit inventory differs")
+        for entry in native_entries:
+            row = entry["candidate"]
+            offset = int(row["native_audit_ref"].rpartition(":")[2])
+            audit = audits[offset] if offset < len(audits) else None
+            native = native_rows.get(row["sample_id"])
+            if (
+                row["receipt_sha256"] != _sha(manifest_path)
+                or row["source_kind"] != "real_code_workflow"
+                or native is None
+                or audit is None
+                or audit["sample_id"] != row["sample_id"]
+                or native["sample_id"] != row["sample_id"]
+                or any(
+                    native[field] != row[field]
+                    for field in ("semantic_task_id", "source_kind", "source_group", "split", "operation", "full_chat_tokens")
+                )
+                or native["output_file"] != f"{row['split']}.jsonl"
+                or audit["semantic_task_id"] != row["semantic_task_id"]
+                or audit["source_group"] != row["source_group"]
+                or audit["context_sha256"] != row["context_sha256"]
+                or audit["final_chat_tokens"] != row["full_chat_tokens"]
+                or audit["assistant_tokens"] != row["supervised_tokens"]
+                or audit["assistant_mask_prefix_tokens"] != row["input_tokens"]
+                or hashlib.sha256(
+                    json.dumps(audit["answer"], sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+                ).hexdigest() != row["answer_sha256"]
+                or audit["reader_visible_replay"] is not True
+                or audit["comment_and_target_text_interventions_change_answer"] is not True
+                or audit["evidence"]["long_answer_members"] < 1
+            ):
+                raise ValueError("P132 review selected row lacks positive pinned audit")
+            eligible.append(entry)
+        pins[str(manifest_path.relative_to(ROOT))] = _sha(manifest_path)
+    return eligible, {"eligible_views": len(eligible), "native_manifest_pins": pins}
+
+
 def _codeforge_eligible(
     entries: list[dict[str, Any]], proof_pins: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -786,10 +865,16 @@ def select(
         for entry in entries
         if entry["candidate"].get("source_name") == "p99_code_content"
     ]
+    review_entries = [
+        entry
+        for entry in entries
+        if entry["candidate"].get("source_name") == "p132_review_diff_join"
+    ]
     legacy_entries = [
         entry
         for entry in entries
-        if entry["candidate"].get("source_name") != "p99_code_content"
+        if entry["candidate"].get("source_name")
+        not in {"p99_code_content", "p132_review_diff_join"}
     ]
     eligible, quality_gate = (
         _codeforge_eligible(legacy_entries, codeforge_proofs)
@@ -812,6 +897,10 @@ def select(
         )
         eligible.extend(content_eligible)
         quality_gate = {"legacy": quality_gate, "code_content": content_gate}
+    if review_entries:
+        review_eligible, review_gate = _p132_review_eligible(review_entries)
+        eligible.extend(review_eligible)
+        quality_gate = {"prior": quality_gate, "review_diff": review_gate}
     selected = _choose(
         eligible,
         seed=seed,

@@ -901,12 +901,112 @@ def _simulation_groups(
     shard_cache: dict[Path, tuple[dict[str, Any], dict[str, Any], dict[str, Any]]] = {}
     groups: dict[str, dict[str, Any]] = {}
     source_pins: dict[str, str] = {}
+    p133_campaigns: dict[Path, tuple[dict[str, Any], dict[str, dict[str, Any]]]] = {}
     factor_dir = ROOT / "data/candidates/p112_world_factor_campaign_v2"
     factor_manifest = _json(factor_dir / "manifest.json")
     if sha(factor_dir / "sample_index.jsonl") != factor_manifest["files_sha256"]["sample_index.jsonl"]:
         raise ValueError("P112 simulation adapter index pin differs")
     factor_index = {item["sample_id"]: item for item in _rows(factor_dir / "sample_index.jsonl")}
     for row in rows:
+        if row["source_name"] == "p133_state_reader_QA":
+            ref = row["native_row_ref"]
+            world_ref, separator, task_id = ref.partition(".json:")
+            world_path = Path(world_ref + ".json")
+            if (
+                not separator
+                or not task_id
+                or not world_path.is_absolute()
+                or ".." in world_path.parts
+                or world_path.name != "world.json"
+                or world_path.parent.parent.name != "worlds"
+                or not world_path.is_relative_to(ROOT)
+            ):
+                raise ValueError("P133 state world reference differs")
+            campaign_dir = world_path.parent.parent.parent
+            manifest_path = campaign_dir / "manifest.json"
+            if campaign_dir not in p133_campaigns:
+                manifest = _json(manifest_path)
+                if (
+                    manifest.get("schema_version")
+                    != "longworld.p133-state-mechanism-output.v1"
+                    or sha(campaign_dir / "sample_index.jsonl")
+                    != manifest["files_sha256"]["sample_index.jsonl"]
+                ):
+                    raise ValueError("P133 campaign source index pin differs")
+                indexes = _rows(campaign_dir / "sample_index.jsonl")
+                by_id = {item["sample_id"]: item for item in indexes}
+                if len(by_id) != len(indexes):
+                    raise ValueError("P133 campaign sample ID repeats")
+                p133_campaigns[campaign_dir] = manifest, by_id
+                source_pins[str(manifest_path)] = sha(manifest_path)
+                source_pins[str(campaign_dir / "sample_index.jsonl")] = manifest[
+                    "files_sha256"
+                ]["sample_index.jsonl"]
+            manifest, indexes = p133_campaigns[campaign_dir]
+            group = row["source_group"]
+            split = row["split"]
+            world_relative = f"worlds/{group}/world.json"
+            receipt_relative = f"worlds/{group}/receipt.json"
+            receipt_path = world_path.parent / "receipt.json"
+            if (
+                world_path != campaign_dir / world_relative
+                or group not in manifest["source_world_ids"]
+                or sha(manifest_path) != row["source_campaign_manifest_sha256"]
+                or sha(world_path) != manifest["world_files_sha256"][world_relative]
+                or sha(receipt_path)
+                != manifest["world_files_sha256"][receipt_relative]
+                or str(world_path) != row["source_world_path"]
+                or str(receipt_path) != row["source_receipt_path"]
+                or sha(world_path) != row["source_world_sha256"]
+                or sha(receipt_path) != row["source_receipt_sha256"]
+            ):
+                raise ValueError("P133 state world or receipt pin differs")
+            world = _json(world_path)
+            receipt = _json(receipt_path)
+            native = indexes.get(row["sample_id"])
+            if (
+                native is None
+                or any(
+                    native[field] != row[field]
+                    for field in (
+                        "sample_id", "source_group", "split", "domain", "topic",
+                        "operation", "answer_sha256", "context_sha256",
+                        "semantic_task_id", "dependency_status",
+                    )
+                )
+                or native["source_name"] != "p133_executed_state_qa"
+                or native["native_row_ref"] != group
+                or row["source_sample_id"] != native["sample_id"]
+                or row["source_task_id"] != task_id
+                or native["receipt_sha256"] != sha(receipt_path)
+                or world["world_id"] != group
+                or receipt["world_id"] != group
+                or receipt["world_sha256"] != sha(world_path)
+                or world["base_record_world_id"] != receipt["base_record_world_id"]
+                or world["base_record_context_sha256"]
+                != receipt["base_record_context_sha256"]
+                or hashlib.sha256(world["reader_context"].encode()).hexdigest()
+                != world["context_sha256"]
+                or world["context_sha256"] != row["context_sha256"]
+                or task_id not in {task["task_id"] for task in world["tasks"]}
+            ):
+                raise ValueError("P133 selected task lacks pinned state source binding")
+            if group in groups and groups[group]["split"] != split:
+                raise ValueError("P133 state world crosses train/eval")
+            target = groups.setdefault(
+                group,
+                {"group": group, "split": split, "identities": set(), "world_ids": set()},
+            )
+            target["identities"].update({
+                "sim:world:" + group,
+                "sim:reader_context_sha256:" + world["context_sha256"],
+                "sim:base_record_world:" + world["base_record_world_id"],
+                "sim:base_record_context_sha256:" + world["base_record_context_sha256"],
+            })
+            target["world_ids"].add(group)
+            source_pins[str(world_path)] = sha(world_path)
+            source_pins[str(receipt_path)] = sha(receipt_path)
+            continue
         native_dir = _native_dir(row)
         group = row["source_group"]
         split = row["split"]

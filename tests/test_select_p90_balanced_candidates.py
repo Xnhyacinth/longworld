@@ -57,6 +57,81 @@ def _index(
     return path
 
 
+def test_p132_review_gate_requires_frozen_positive_text_intervention(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(balanced, "ROOT", tmp_path)
+    native_dir = tmp_path / "native"
+    native_dir.mkdir()
+    candidate = {
+        "sample_id": "review-a",
+        "semantic_task_id": "task-a",
+        "source_kind": "real_code_workflow",
+        "source_group": "https://github.com/org/repo",
+        "split": "train",
+        "operation": "reviewed_final_diff_paths",
+        "full_chat_tokens": 40000,
+        "input_tokens": 39990,
+        "supervised_tokens": 10,
+        "context_sha256": "context-a",
+        "native_audit_ref": "native/audit.jsonl:0",
+        "answer_sha256": hashlib.sha256(b"[]").hexdigest(),
+    }
+    native = {
+        key: candidate[key]
+        for key in (
+            "sample_id", "semantic_task_id", "source_kind", "source_group", "split", "operation",
+            "full_chat_tokens",
+        )
+    }
+    native["output_file"] = "train.jsonl"
+    audit = {
+        **native,
+        "context_sha256": "context-a",
+        "final_chat_tokens": 40000,
+        "assistant_tokens": 10,
+        "assistant_mask_prefix_tokens": 39990,
+        "reader_visible_replay": True,
+        "comment_and_target_text_interventions_change_answer": True,
+        "evidence": {"long_answer_members": 1},
+        "answer": [],
+    }
+    for name, value in (
+        ("audit.jsonl", json.dumps(audit) + "\n"),
+        ("sample_index.jsonl", json.dumps(native) + "\n"),
+        ("train.jsonl", "reader bytes\n"),
+        ("eval.jsonl", ""),
+    ):
+        (native_dir / name).write_text(value)
+    manifest_path = native_dir / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "longworld.p132-review-diff-join.v1",
+                "semantic_tasks": 1,
+                "files_sha256": {
+                    name: balanced._sha(native_dir / name)
+                    for name in (
+                        "audit.jsonl", "sample_index.jsonl", "train.jsonl", "eval.jsonl"
+                    )
+                },
+            }
+        )
+    )
+    candidate["receipt_sha256"] = balanced._sha(manifest_path)
+    entries = [{"candidate": candidate}]
+    kept, report = balanced._p132_review_eligible(entries)
+    assert kept == entries
+    assert report["eligible_views"] == 1
+    with pytest.raises(ValueError, match="positive pinned audit"):
+        balanced._p132_review_eligible(
+            [{"candidate": {**candidate, "context_sha256": "wrong"}}]
+        )
+    with pytest.raises(ValueError, match="audit or reader pin differs"):
+        (native_dir / "audit.jsonl").write_text("{}\n")
+        balanced._p132_review_eligible(entries)
+
+
 def test_balances_cells_and_groups_without_repeating_semantic_task() -> None:
     entries = [
         _entry("a", group="big", task="one"),
