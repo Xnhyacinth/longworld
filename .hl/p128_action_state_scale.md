@@ -4,15 +4,17 @@ P128 compiles **one-step simulated policy decisions** from additional executed
 states of the already pinned P112/P86 ledger worlds. This is a separate policy
 candidate, not a reader-QA addition, new world mechanism, or multi-turn agent
 trajectory. The authoritative artifact is
-`data/candidates/p128_action_state_scale_v2/manifest.json` (SHA-256
-`926176288d862afb143e1c7dbc4b23cb1047e187dfd8f0468d4c55dd0e22195b`).
+`data/candidates/p128_action_state_scale_v3/manifest.json` (SHA-256
+`a56b1588641b5f764ab4f47193f3b8e41bcf310a61af9ce70bef0e5867febff8`).
 The checked compiler file SHA-256 is
-`f3d5f1047a551348631eb2b8a5beba3bfc518958b47de0c4ecabc8476d9042c6`.
-The v1 artifact is an earlier diagnostic with identical reader/proof/mask bytes;
-v2 adds explicit source-world reuse to the manifest. `train_ready=false`.
+`aaa07400a539a12a62e89f6b4ac61126a843482a5a3f548b0ef99c0869277ea6`,
+also pinned inside the v3 manifest and checked before verify-only replay.
+The v1/v2 artifacts are earlier diagnostics with identical reader/proof/mask
+bytes; v2 added explicit source-world reuse, and v3 pins the compiler code.
+`train_ready=false`.
 
 The source is the same 24 world IDs used by P114's 48-task pilot and the P112
-controlled QA campaign. The v2 manifest lists those IDs and pins the P112 base
+controlled QA campaign. The v3 manifest lists those IDs and pins the P112 base
 manifest and P114 policy manifest. **There are zero new source worlds and zero
 new environment mechanisms.** P112's four domain profiles are vocabulary
 renderings of the same executable ledger state machine; they are not four
@@ -60,24 +62,25 @@ the target from the question, recomputed the balance from reader-visible text,
 executed both action rewards, and repeated the selected text intervention;
 all 240 matched the answer and sidecar. The 240 final reader/sample-index/proof/
 mask IDs align, 240 masks report `exact_assistant_mask_checked`, and no sample
-ID overlaps P114. Full compiler byte replay and three focused tests passed.
+ID overlaps P114. Full compiler byte replay and four focused tests passed.
 All 24 source-world split labels match the P112 base QA rows and P114 policy
 rows; there are no cross-contract source-world split conflicts.
 Independent subagent review confirmed 240/240 question/gold/outcome/deletion
 rows and exact masks plus witness/query offsets on six length-bin extrema.
 It found no task blocker. The final compiler fix reserves the P114 active-state
-signature during deduplication; the v2 artifact was byte-replayed again after
-that change. There is no GPU training or measured model gain.
+signature during deduplication; the v3 artifact has the same six non-manifest
+file hashes as reviewed v2 and adds an enforced compiler SHA. There is no GPU
+training or measured model gain.
 
 ```bash
 UV_LINK_MODE=copy uv run --offline python scripts/p128_action_state_scale.py \
   --config configs/p128_action_state_scale_v1.json \
-  --output data/candidates/p128_action_state_scale_v2 --verify-only
+  --output data/candidates/p128_action_state_scale_v3 --verify-only
 UV_LINK_MODE=copy uv run --offline pytest -q tests/test_p128_action_state_scale.py
-cat data/candidates/p128_action_state_scale_v2/manifest.json
-less -R data/candidates/p128_action_state_scale_v2/state_ledger.jsonl
-less -R data/candidates/p128_action_state_scale_v2/proofs.jsonl
-less -R data/candidates/p128_action_state_scale_v2/mask_audit.jsonl
+cat data/candidates/p128_action_state_scale_v3/manifest.json
+less -R data/candidates/p128_action_state_scale_v3/state_ledger.jsonl
+less -R data/candidates/p128_action_state_scale_v3/proofs.jsonl
+less -R data/candidates/p128_action_state_scale_v3/mask_audit.jsonl
 ```
 
 Further agentic scaling requires new state-world seeds/processes or genuinely

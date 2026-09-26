@@ -33,7 +33,7 @@ from scripts.audit_unified_reader_mask import audit_reader
 from scripts.train_sft import tokenize_assistant_only
 
 SCHEMA = "longworld.p128-action-state-scale.v1"
-OUTPUT_SCHEMA = "longworld.p128-action-state-scale-output.v2"
+OUTPUT_SCHEMA = "longworld.p128-action-state-scale-output.v3"
 
 
 def _dump(value: Any) -> str:
@@ -338,6 +338,11 @@ def compile_batch(
     config_path: Path, output: Path, *, verify_only: bool = False
 ) -> dict[str, Any]:
     config = _config(config_path)
+    compiler_sha256 = prior.sha(Path(__file__))
+    if verify_only:
+        frozen = json.loads((output / "manifest.json").read_text())
+        if frozen.get("compiler_sha256") != compiler_sha256:
+            raise ValueError("frozen P128 compiler SHA-256 differs")
     base = ROOT / config["source_base"]
     if prior.sha(base / "manifest.json") != config["source_manifest_sha256"]:
         raise ValueError("source base manifest changed")
@@ -449,6 +454,7 @@ def compile_batch(
         raise ValueError("state attempt ledger incomplete")
     manifest = {
         "schema_version": OUTPUT_SCHEMA,
+        "compiler_sha256": compiler_sha256,
         "config_sha256": prior.sha(config_path),
         "source_manifest_sha256": config["source_manifest_sha256"],
         "prior_policy_manifest_sha256": config["prior_policy_manifest_sha256"],

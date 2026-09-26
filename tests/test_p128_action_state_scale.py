@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from longworld.synthesis import p86_state_shared_world as state
 from scripts import p114_controlled_action_feedback as prior
 from scripts import p128_action_state_scale as scale
@@ -59,3 +61,13 @@ def test_pinned_config_excludes_prior_state() -> None:
     config = scale._config(Path("configs/p128_action_state_scale_v1.json"))
     assert config["exclude_prior_q0_base"] is True
     assert config["source_task_ids"] == ["q0:asof_sum", "q1:asof_sum"]
+
+
+def test_verify_rejects_artifact_with_different_compiler(tmp_path: Path) -> None:
+    (tmp_path / "manifest.json").write_text('{"compiler_sha256":"stale"}')
+    with pytest.raises(ValueError, match="compiler SHA-256 differs"):
+        scale.compile_batch(
+            Path("configs/p128_action_state_scale_v1.json"),
+            tmp_path,
+            verify_only=True,
+        )
