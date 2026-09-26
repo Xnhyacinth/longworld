@@ -1,0 +1,13 @@
+{
+  "schema": "longworld.p150-wiki-numeric-interval.v1.config",
+  "source_manifest": {"path": "data/candidates/p148_wiki_category_catalog_v1/p122_source/source_manifest.json", "sha256": "20b8aa312faf216cf06809dbeb0e360fbdd559c90aca8d8d7b2bb8610f6c4b4a"},
+  "source_pool": {"path": "data/candidates/p148_wiki_category_catalog_v1/p119/source_pool.json", "sha256": "619841dde94341a5408a9c353cb173ae523a960bbb3569b43e8e35d6dad1370d"},
+  "grid_manifest": {"path": "data/candidates/p148_wiki_category_catalog_v1/p122_grid/manifest.json", "sha256": "7ceab9beffd870d0f56b19d4062788cde43568b483057a7f49dff586996718a1"},
+  "minimum_numeric_rows": 10,
+  "minimum_hits": 3,
+  "minimum_near_misses": 3,
+  "maximum_hits": 30,
+  "max_tasks_per_table": 2,
+  "max_tasks_per_page": 2,
+  "max_seq_len": 131072
+}
