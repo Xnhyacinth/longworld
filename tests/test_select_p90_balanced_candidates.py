@@ -132,6 +132,35 @@ def test_p132_review_gate_requires_frozen_positive_text_intervention(
         balanced._p132_review_eligible(entries)
 
 
+def test_optional_dependency_status_filter_preserves_historical_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    entries = [
+        _entry("missing", group="group-a", task="task-a"),
+        _entry("present", group="group-b", task="task-b"),
+    ]
+    entries[1]["candidate"]["dependency_status"] = "bounded"
+    index = _index(tmp_path, monkeypatch, entries)
+    kwargs = {
+        "seed": 1,
+        "max_per_group": 2,
+        "max_per_cell": 2,
+        "max_per_kind_by_split": {"train": 2, "eval": 2},
+    }
+    prior = balanced.select(index, tmp_path / "prior", **kwargs)
+    filtered = balanced.select(
+        index, tmp_path / "filtered", require_dependency_status=True, **kwargs
+    )
+    assert prior["after"]["views"] == 2
+    assert filtered["after"]["views"] == 1
+    assert filtered["quality_gate"]["dependency_status_present"][
+        "excluded_missing_status"
+    ] == 1
+    balanced.verify_selection(
+        index, tmp_path / "filtered", require_dependency_status=True, **kwargs
+    )
+
+
 def test_balances_cells_and_groups_without_repeating_semantic_task() -> None:
     entries = [
         _entry("a", group="big", task="one"),

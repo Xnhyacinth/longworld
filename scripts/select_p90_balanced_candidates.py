@@ -811,6 +811,7 @@ def select(
     code_content_proof: dict[str, Any] | None = None,
     code_content_proofs: list[dict[str, Any]] | None = None,
     shared_world_rebalance: dict[str, int] | None = None,
+    require_dependency_status: bool = False,
 ) -> dict[str, Any]:
     if (
         output_dir.exists()
@@ -848,6 +849,7 @@ def select(
             )
         )
         or (code_content_proof is not None and code_content_proofs is not None)
+        or type(require_dependency_status) is not bool
     ):
         raise ValueError("new output, nonnegative seed and positive caps required")
     source = verify_index(index_dir)
@@ -901,6 +903,20 @@ def select(
         review_eligible, review_gate = _p132_review_eligible(review_entries)
         eligible.extend(review_eligible)
         quality_gate = {"prior": quality_gate, "review_diff": review_gate}
+    if require_dependency_status:
+        missing_dependency = sum(
+            not entry["candidate"].get("dependency_status") for entry in eligible
+        )
+        eligible = [
+            entry for entry in eligible if entry["candidate"].get("dependency_status")
+        ]
+        quality_gate = {
+            "prior": quality_gate,
+            "dependency_status_present": {
+                "excluded_missing_status": missing_dependency,
+                "claim_limit": "status presence is not a reader dependency certificate",
+            },
+        }
     selected = _choose(
         eligible,
         seed=seed,
@@ -946,6 +962,10 @@ def select(
             "max_per_cell": max_per_cell,
             "max_per_source_kind_by_split": max_per_kind_by_split,
             **(
+                {"require_dependency_status": True}
+                if require_dependency_status else {}
+            ),
+            **(
                 {"max_supervised_tokens_by_kind": max_supervised_tokens_by_kind}
                 if max_supervised_tokens_by_kind is not None
                 else {}
@@ -982,6 +1002,7 @@ def verify_selection(
     code_content_proof: dict[str, Any] | None = None,
     code_content_proofs: list[dict[str, Any]] | None = None,
     shared_world_rebalance: dict[str, int] | None = None,
+    require_dependency_status: bool = False,
 ) -> dict[str, Any]:
     stored = json.loads((output_dir / "manifest.json").read_text())
     if stored.get("selected_refs_sha256") != _sha(output_dir / "selected_refs.jsonl"):
@@ -1002,6 +1023,7 @@ def verify_selection(
             code_content_proof=code_content_proof,
             code_content_proofs=code_content_proofs,
             shared_world_rebalance=shared_world_rebalance,
+            require_dependency_status=require_dependency_status,
         )
         if (
             rebuilt != stored
@@ -1032,6 +1054,7 @@ def main() -> None:
         "code_content_proof": config.get("code_content_proof"),
         "code_content_proofs": config.get("code_content_proofs"),
         "shared_world_rebalance": config.get("shared_world_rebalance"),
+        "require_dependency_status": config.get("require_dependency_status", False),
     }
     result = (
         verify_selection(index_dir, args.output, **kwargs)
