@@ -1,0 +1,8 @@
+{
+  "schema": "longworld.p131-wiki-html-new-only.v1.config",
+  "campaign_manifest": {"path": "data/candidates/p131_wiki_html_campaign_v1/manifest.json", "sha256": "0a1c207092bd983650bcb1b34522c8352990ee2d918a5ac11f51ab8f01123bc6"},
+  "prior_p126_manifest": {"path": "data/candidates/p126_wiki_html_table_tasks_v4/manifest.json", "sha256": "e504e3646ebbc397824a7d5ad34fa58e166f606ddd53d02d0ef4a3c24df0e46f"},
+  "prior_p130_manifest": {"path": "data/candidates/p130_candidate_refs_probe_v1/manifest.json", "sha256": "749888432d8374a8143a4b1a32e78c7fff3acd4e8705eeb1d8dca75dd156a122"},
+  "prior_p130_refs": {"path": "data/candidates/p130_candidate_refs_probe_v1/candidate_refs.jsonl", "sha256": "78d6dd2bb5e7e166fc606b5328930fcae03c0c1fc22f84ea11b739531d63a2ac"},
+  "max_seq_len": 131072
+}
