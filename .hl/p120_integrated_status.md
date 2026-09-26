@@ -13,6 +13,8 @@
 
 The selected pack is 1,155 train / 411 eval. Source-kind counts are Wiki 709, books **358**, finance reports 192, code workflow 140, controlled simulation 108, grounded simulation 34, paper-source 17 and paper-revision eight. Final-chat bins are 461 below 32K, 430 at 32–64K, 479 at 64–128K and 196 at 128–256K. The full bank has 32 domain, 169 topic and 176 operation *labels*; selected counts are 32/165/118. They do not measure independent ontologies, mechanisms or true long dependencies. The most common selected operations remain `table_cell_lookup` 318 and `cross_chapter_named_speech_follow` 279. Selected supervision is only 90,552/106,228,130 final-chat tokens (0.0852%). All 1,566 mask rows have positive assistant supervision, `loss_mask_start == input_tokens` and exact input+supervised=full token accounting; book answers have median eight supervised tokens.
 
+The eight source kinds are all reader-QA or completion-style candidates, including code *workflow reading*. A separate P114 controlled **one-step policy** pilot has 48 action-feedback tasks from 24 simulated worlds with executed two-action outcomes, exact mask and bounded text interventions. It is not in the 14,028-view reader bank and is not a multi-turn agent trajectory or real PR repair policy. The bank therefore should not be described as already covering broad L5 agentic behavior.
+
 | Selected source kind | Tasks | Source groups | Groups with >1 operation |
 | --- | ---: | ---: | ---: |
 | Real Wiki | 709 | 167 | 16 |
