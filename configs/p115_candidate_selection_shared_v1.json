@@ -1,0 +1,152 @@
+{
+  "code_content_proofs": [
+    {
+      "mask_manifest": {
+        "path": "data/candidates/p99_code_unified_mask_v2/manifest.json",
+        "sha256": "eb74c5c821f8c4e70c694ab59e1f17cc8d832a5e312c9901598dc4698254ab0a"
+      },
+      "native_audit": {
+        "path": "data/candidates/p99_code_content_v4/audit.jsonl",
+        "sha256": "4b0ee9bcd4a286ca4d44dc9f8966ab5c246c5b789886788623ebe9c2a1b1667e"
+      },
+      "native_manifest": {
+        "path": "data/candidates/p99_code_content_v4/manifest.json",
+        "sha256": "6d10615e98f61e07c1a67c3ea88916af3324519eef6989b25ac8ef43740e3b58"
+      },
+      "unified_manifest": {
+        "path": "data/candidates/p99_code_unified_v2/manifest.json",
+        "sha256": "62cd143ee7a96198de89b8bee78b111bf28d5be76802fa88c2a4fb312bd0472a"
+      }
+    },
+    {
+      "curated_manifest": {
+        "path": "data/candidates/p107_code_curated_v1/manifest.json",
+        "sha256": "55abbb13d73cb0c65a75c8c53f4e4c2d150c4b657addba413fad996e53a1997d"
+      },
+      "curated_mask_manifest": {
+        "path": "data/candidates/p107_code_curated_mask_v1/manifest.json",
+        "sha256": "159d2ec0e6cbb8f555e76b5e7416e54c0382f8034ec507876de072e6ba9ee218"
+      },
+      "mask_manifest": {
+        "path": "data/candidates/p107_code_oxc_unified_raw_mask_v1/manifest.json",
+        "sha256": "f63e7909c823848093468b0035b1b27b06dce483339db247ea92631cc67fd675"
+      },
+      "native_audit": {
+        "path": "data/candidates/p107_code_oxc_raw_v1/audit.jsonl",
+        "sha256": "794636600bb7a6ddc173ed724dbc1949a70d64b380e943c8b02fa19c376ac2f3"
+      },
+      "native_manifest": {
+        "path": "data/candidates/p107_code_oxc_raw_v1/manifest.json",
+        "sha256": "ffdca4b286691f50809b31b8c81907cdbbcaf6b059508877b3ed22011ffcac5c"
+      },
+      "prior_native_manifest": {
+        "path": "data/candidates/p99_code_content_v4/manifest.json",
+        "sha256": "6d10615e98f61e07c1a67c3ea88916af3324519eef6989b25ac8ef43740e3b58"
+      },
+      "unified_manifest": {
+        "path": "data/candidates/p107_code_oxc_unified_raw_v1/manifest.json",
+        "sha256": "1c9e28cf1f878e814d5240c2521b74f6fa7821235f5d568d6cadc05684e85f26"
+      }
+    },
+    {
+      "curated_manifest": {
+        "path": "data/candidates/p111_code_curated_v1/manifest.json",
+        "sha256": "2ea9f715ec479a0a4b7220c91f83f00597dff689668e7dce200ef97fc9746417"
+      },
+      "curated_mask_manifest": {
+        "path": "data/candidates/p111_code_curated_mask_v1/manifest.json",
+        "sha256": "90a69051250c67c34354cbf121422a16f5132c540513d7b0d73fb4c92552c00e"
+      },
+      "mask_manifest": {
+        "path": "data/candidates/p108_code_content_mask_v2/manifest.json",
+        "sha256": "b36215ae4662b3d47479440ec1437dc32045516b16d1268373f7122a829b0761"
+      },
+      "native_audit": {
+        "path": "data/candidates/p108_code_content_native_v2/audit.jsonl",
+        "sha256": "f17e1fe4b250fc2f592fa208d3c390b4ce63408d9a5d7eb05a24d074202504ba"
+      },
+      "native_manifest": {
+        "path": "data/candidates/p108_code_content_native_v2/manifest.json",
+        "sha256": "798dc32186fbb0a248a4b57c1feeb9b737a0d0389265365130b5e8df49a397b2"
+      },
+      "prior_native_manifest": {
+        "path": "data/candidates/p99_code_content_v4/manifest.json",
+        "sha256": "6d10615e98f61e07c1a67c3ea88916af3324519eef6989b25ac8ef43740e3b58"
+      },
+      "unified_manifest": {
+        "path": "data/candidates/p108_code_content_unified_v2/manifest.json",
+        "sha256": "4ea65cfadd675d9d6aeedbe32e2b1d3649f5a75585a7ccb12f9e156316cf31a2"
+      }
+    }
+  ],
+  "codeforge_proofs": [
+    {
+      "proofs": {
+        "path": "data/candidates/p65_codeforge_reading_proof_v1/proofs.jsonl",
+        "sha256": "2914fd221ddb1b5a4ef040751f176093fecce4c213fc129e93a8f190ad57f5ba"
+      },
+      "receipt": {
+        "path": "data/candidates/p65_codeforge_reading_proof_v1/BUILD_RECEIPT.json",
+        "sha256": "1b3c3951743de3aecde7af94d4ea458a1f6580e1b3acf520da068c36b204c4fd"
+      }
+    },
+    {
+      "proofs": {
+        "path": "data/candidates/p94_codeforge_duckdb_reading_proof_v1/proofs.jsonl",
+        "sha256": "79519b8ac73c2aaff94846e1cb9c990e993ca92bbc80b87031d77696e100d462"
+      },
+      "receipt": {
+        "path": "data/candidates/p94_codeforge_duckdb_reading_proof_v1/BUILD_RECEIPT.json",
+        "sha256": "58002d8f55e88c3c8af5c624509ed65e07617e3854aec808735b82f26742e303"
+      }
+    },
+    {
+      "proofs": {
+        "path": "data/candidates/p94_codeforge_wasmtime_reading_proof_v1/proofs.jsonl",
+        "sha256": "2484585b5d819a6efb5570e8da64500d5445708b39ae3016c497eea188a83fc6"
+      },
+      "receipt": {
+        "path": "data/candidates/p94_codeforge_wasmtime_reading_proof_v1/BUILD_RECEIPT.json",
+        "sha256": "99e25fc8849a2fcc0acc1bbc9b6f933441caffafe12831eb77a2cbc40b8fae1c"
+      }
+    },
+    {
+      "proofs": {
+        "path": "data/candidates/p108_code_filename_proof_v1/proofs.jsonl",
+        "sha256": "4a02b5670ab4cfd31f891987bafd43f62f11c022abd887e9ce1a74fedab81b96"
+      },
+      "receipt": {
+        "path": "data/candidates/p108_code_filename_proof_v1/BUILD_RECEIPT.json",
+        "sha256": "161f205b95da3e49cd351d71b35f940ff57665a3476882d0881327990949a88f"
+      }
+    },
+    {
+      "proofs": {
+        "path": "data/candidates/p108_code_filename_proof_v2/proofs.jsonl",
+        "sha256": "918490c022d0699ee947297c71348acdfe9d70d71c4cd23b1bfdb36928a24ce3"
+      },
+      "receipt": {
+        "path": "data/candidates/p108_code_filename_proof_v2/BUILD_RECEIPT.json",
+        "sha256": "d327c6060a948ae8b276b63631040f18d813ff64cc7b8e8f0e658554d4760783"
+      },
+      "scope_unified_manifest": {
+        "path": "data/candidates/p108_code_filename_unified_expanded_v1/manifest.json",
+        "sha256": "0b87b68a0ae2df953c86f33a9a31f6585a1175ed4bce44a1553642a294fe5dc6"
+      }
+    }
+  ],
+  "input_index": "data/candidates/p115_candidate_refs_v1",
+  "max_per_cell": 96,
+  "max_per_source_group": 24,
+  "max_per_source_kind_by_split": {
+    "eval": 180,
+    "train": 550
+  },
+  "max_supervised_tokens_by_kind": {
+    "controlled_simulation": 40000
+  },
+  "seed": 94,
+  "shared_world_rebalance": {
+    "max_source_group_loss": 5
+  }
+}
