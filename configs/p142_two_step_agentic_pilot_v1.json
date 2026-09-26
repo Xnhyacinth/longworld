@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.p142-two-step-agentic.v1",
+  "source_manifest": "data/candidates/p133_state_mechanism_batch_v4/manifest.json",
+  "source_manifest_sha256": "36c60c383f9d2297c47c9f866bff047d51d6e310f319fa5d772664beda871e79",
+  "mechanisms": ["partial_reversal", "authorization_hold"],
+  "length_records": [400, 800],
+  "train_worlds_per_cell": 2,
+  "eval_worlds_per_cell": 1,
+  "minimum_event_to_first_query_tokens": 16384,
+  "max_full_chat_tokens": 262144,
+  "workers": 4
+}
