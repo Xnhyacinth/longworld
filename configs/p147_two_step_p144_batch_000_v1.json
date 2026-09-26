@@ -1,0 +1,12 @@
+{
+  "schema_version": "longworld.p142-two-step-agentic.v1",
+  "source_manifest": "data/candidates/p144_state_batch_scale_v1/batch_000/campaign/manifest.json",
+  "source_manifest_sha256": "5568a1015c40b5002466df89a1225fa97531322c10483dc0cc680518e6674e89",
+  "mechanisms": ["partial_reversal", "authorization_hold"],
+  "length_records": [400, 800],
+  "train_worlds_per_cell": 8,
+  "eval_worlds_per_cell": 3,
+  "minimum_event_to_first_query_tokens": 16384,
+  "max_full_chat_tokens": 262144,
+  "workers": 4
+}
