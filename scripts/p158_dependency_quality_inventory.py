@@ -261,21 +261,36 @@ def build_report(config_path: Path) -> dict[str, Any]:
             raise ValueError(f"pinned input changed: {item['path']}")
     paths = {item["role"]: ROOT / item["path"] for item in config["pins"]}
     verified = verify_selection(paths["index_manifest"].parent, paths["selection_manifest"].parent)
+    diagnostic_verified = verify_selection(paths["index_manifest"].parent, paths["diagnostic_manifest"].parent)
     selected = rows(paths["selection_refs"])
     if len(selected) != verified["selected"]["views"]:
         raise ValueError("selection verification count differs")
+    diagnostic = rows(paths["diagnostic_refs"])
+    if len(diagnostic) != diagnostic_verified["selected"]["views"]:
+        raise ValueError("diagnostic verification count differs")
     routes = json.loads(paths["taxonomy"].read_text(encoding="utf-8"))["routes"]
     baseline = rows(paths["baseline_refs"])
     summary = summarize(selected, routes, _proofs(config))
     old_ids = {entry["candidate"]["sample_id"] for entry in baseline}
     new_ids = {entry["candidate"]["sample_id"] for entry in selected}
+    diagnostic_ids = {entry["candidate"]["sample_id"] for entry in diagnostic}
+    diagnostic_grades = Counter(grade(entry["candidate"].get("dependency_status")) for entry in diagnostic)
     return {
         "schema": SCHEMA,
         "config_sha256": sha(config_path),
         "input_sha256": {item["path"]: item["sha256"] for item in config["pins"] + config["native_proofs"]},
         "baseline_p152": {"views": len(baseline), "retained_sample_ids": len(old_ids & new_ids),
                            "only_baseline": len(old_ids - new_ids), "only_p156": len(new_ids - old_ids)},
-        "selected_p156_v3": summary,
+        "selected_p156_v1": summary,
+        "diagnostic_p156_v3": {
+            "views": len(diagnostic),
+            "retained_primary_sample_ids": len(new_ids & diagnostic_ids),
+            "only_diagnostic": len(diagnostic_ids - new_ids),
+            "only_primary": len(new_ids - diagnostic_ids),
+            "source_kinds": dict(sorted(Counter(entry["candidate"]["source_kind"] for entry in diagnostic).items())),
+            "grades": dict(sorted(diagnostic_grades.items())),
+            "scope": "Expanded-eval diagnostic, not the fixed-budget primary selection",
+        },
         "interpretation": "Classes record bounded intervention shapes. Their presence, physical length and measured token gap do not prove unrestricted reader-text necessity, all-proof minimum distance, or model gains.",
         "train_ready": False,
     }
@@ -296,7 +311,7 @@ def main() -> None:
         with args.output.open("x", encoding="utf-8") as stream:
             json.dump(report, stream, ensure_ascii=False, sort_keys=True, indent=2)
             stream.write("\n")
-    print(json.dumps({"selected": report["selected_p156_v3"]["views"], "output": str(args.output)}))
+    print(json.dumps({"selected": report["selected_p156_v1"]["views"], "output": str(args.output)}))
 
 
 if __name__ == "__main__":

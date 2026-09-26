@@ -3,8 +3,10 @@
   "pins": [
     {"role": "index_manifest", "path": "data/candidates/p156_candidate_refs_probe_v1/manifest.json", "sha256": "ec787abdbbd06f299e407488e91600c73d22dc64141f04403f5ad3995eb70a58"},
     {"role": "index_refs", "path": "data/candidates/p156_candidate_refs_probe_v1/candidate_refs.jsonl", "sha256": "e4208081e5e689d17aac4142de6e280fcb7f75ad1a134199c4ff27cde073b7d8"},
-    {"role": "selection_manifest", "path": "data/candidates/p156_strict_dependency_selection_v3/manifest.json", "sha256": "02d1d7e51a7d133b2d0e3f98081dbca821787baa4d03dd8edff701536517805f"},
-    {"role": "selection_refs", "path": "data/candidates/p156_strict_dependency_selection_v3/selected_refs.jsonl", "sha256": "569ef386a9c63b0846c66623ed3671cc215edc9f8ce303d3c3b5e6d32c1d6d21"},
+    {"role": "selection_manifest", "path": "data/candidates/p156_strict_dependency_selection_v1/manifest.json", "sha256": "31fd08ddc6885330fc3325763b34ef7f05e07b1bd601c738232c4964ba0bf28c"},
+    {"role": "selection_refs", "path": "data/candidates/p156_strict_dependency_selection_v1/selected_refs.jsonl", "sha256": "e020ee8a73e452a40062a3ddbab0467de66b09e71087266920b3207a62f09c3d"},
+    {"role": "diagnostic_manifest", "path": "data/candidates/p156_strict_dependency_selection_v3/manifest.json", "sha256": "02d1d7e51a7d133b2d0e3f98081dbca821787baa4d03dd8edff701536517805f"},
+    {"role": "diagnostic_refs", "path": "data/candidates/p156_strict_dependency_selection_v3/selected_refs.jsonl", "sha256": "569ef386a9c63b0846c66623ed3671cc215edc9f8ce303d3c3b5e6d32c1d6d21"},
     {"role": "taxonomy", "path": "configs/p156_capability_taxonomy_v1.json", "sha256": "370e8956ce59215f2e9a34737a833d851d934cac6e5974288e35872e9025b45a"},
     {"role": "baseline_refs", "path": "data/candidates/p152_candidate_selection_probe_v1/selected_refs.jsonl", "sha256": "d28ff5526265eeb1832feb9192f385ff19d2e4ceb3e11112c748b1009eae3c8d"}
   ],

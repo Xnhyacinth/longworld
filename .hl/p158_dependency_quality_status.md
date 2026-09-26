@@ -1,28 +1,28 @@
 # P158 pinned dependency-quality inventory (2026-09-27)
 
-P158 grades the **recorded bounded intervention** for the frozen P156 v3
-reader selection. It does not certify unrestricted necessity, a globally
+P158 grades the **recorded bounded intervention** for the fixed-budget P156 v1
+reader selection; P156 v3 is an expanded-eval diagnostic. It does not certify unrestricted necessity, a globally
 minimum evidence window, or model improvement. The machine-readable matrix is
 `data/candidates/p158_dependency_quality_v1/report.json` (SHA-256
-`90a571faab1fc5a3598c3aed98daee129a85f8e48e36dac6c279432ec0f493cd`).
+`fdcdd1f6f3903c5dc3526adfd0b0c9784f6e1fac5c0f53184475445c9a6a87bc`).
 It has one row for each nonempty **source kind × declared capability × actual
 final-chat length × intervention class × exact dependency status** cell.
 P158 pins P156 index/selection manifests and refs, the P156 taxonomy, P152
 selection refs for comparison, and five native proof files. The existing P113
 bank/selection verifier runs before counting.
 
-| Measure | P156 v3 selected reader set |
+| Measure | P156 v1 selected reader set |
 | --- | ---: |
-| Independent tasks/views | 2,696 / 2,696 |
-| Real Wiki / books / finance / code / paper | 1,028 / 664 / 79 / 69 / 28 |
+| Independent tasks/views | 2,546 / 2,546 |
+| Real Wiki / books / finance / code / paper | 878 / 664 / 79 / 69 / 28 |
 | Controlled state simulation | 828 |
-| Bounded single or set edit / multiple support edits / scoped shortcut screen only | 1,806 / 889 / 1 |
+| Bounded single or set edit / multiple support edits / scoped shortcut screen only | 1,656 / 889 / 1 |
 | Physical 128–256K views | 157 |
-| P152 retained / replaced out / newly selected | 2,428 / 322 / 268 |
+| P152 retained / replaced out / newly selected | 2,377 / 373 / 169 |
 
 Both grade names refer to intervention *shape* and its stated scope. Even the
 multiple-support class can leave paraphrases, alternative comparisons or
-other reader-visible proofs unsearched. The report preserves all 23 exact
+other reader-visible proofs unsearched. The report preserves all 22 exact
 status strings; a future unclassified string makes replay fail rather than
 being assigned a reassuring grade. Task capability names come from the pinned
 P156 taxonomy, not from a test of distinct cognitive mechanisms.
@@ -32,13 +32,13 @@ Final-token distances are deliberately sparse and separated by meaning:
 | Native measure | Selected views with a value | At least 16K (where inspected) |
 | --- | ---: | ---: |
 | P133 decisive fact to question | 828 | 828 |
-| Evidence extent | 156 | 38 |
-| Last support to question | 125 | 1 |
+| Evidence extent | 116 | 38 |
+| Last support to question | 85 | 1 |
 | Gap between specified supports | 23 | 16 |
 
 For P133, the distant **selected decisive** event or record is checked against
 its pinned proof, world hash, task ID and final-token offsets. Its proof says
-alternative supports and global minimum proof are unsearched. For P154, 114
+alternative supports and global minimum proof are unsearched. For P154, 74
 Wiki typed-grid tasks have native cell token spans, but none has a 16K
 evidence extent; these are bounded row-cell edit tasks, including rows that
 did not match. The nine P146 paper proofs and direct metadata for two P127
@@ -57,15 +57,21 @@ audits; it identifies the missing common final-token evidence interface.
 No controlled state world in P156 v3 reaches 128K.
 
 Shared-evidence overlap is computed only where native identities exist. Among
-2,175 within-source-group, cross-capability task pairs, 745 have comparable
-native witness sets; 388 share at least one recorded witness. Controlled
+2,055 within-source-group, cross-capability task pairs, 660 have comparable
+native witness sets; 340 share at least one recorded witness. Controlled
 simulation contributes 602 measurable pairs and 295 shared selected decisive
-fact IDs. P154 Wiki contributes 143 measurable pairs and 93 shared examined
-source HTML cells. The remaining 1,430 pairs—including all book, code and
+fact IDs. P154 Wiki contributes 58 measurable pairs and 45 shared examined
+source HTML cells. The remaining 1,395 pairs—including all book, code and
 finance pairs in this inventory—are **unmeasurable**, not disjoint. Sharing a
 selected decisive fact or an examined table cell does not establish that the
 full minimal evidence sets are the same. Paper has no cross-capability pair
 in the pinned selection.
+
+The pinned P156 v3 diagnostic has 2,696 tasks. It is **not** simply a superset
+of the fixed-budget primary selection: 2,544 sample IDs overlap, 152 occur only
+in v3, and two only in v1. V3 contains 150 more eval rows and the same 1,849
+train rows, but changes two selected identities. P158 retains this comparison
+without treating expanded eval coverage as fixed-budget yield.
 
 This result gives the next compiler a precise target: propagate audited
 source-span IDs and final-chat token positions into the common candidate
