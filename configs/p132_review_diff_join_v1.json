@@ -1,0 +1,10 @@
+{
+  "schema_version": "longworld.p132-review-diff-join.v1",
+  "source_configs": [
+    {"path": "configs/p99_code_content_v1.json", "sha256": "7a2f9bc845b08cff382a8c4cb8b9f93f48428d16394263653cba3bc60e870f06"},
+    {"path": "configs/p108_code_content_v2.json", "sha256": "48765014319f2f087762370c38a508cf13053a33007e4cde3f147a72bca7b4be"}
+  ],
+  "max_tasks_per_repository": 4,
+  "min_pair_gap_tokens": 8192,
+  "max_chat_tokens": 262144
+}
