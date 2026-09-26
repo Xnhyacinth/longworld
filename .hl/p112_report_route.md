@@ -33,6 +33,31 @@ These are observed, bounded checks. Alternative semantic paraphrases or
 equivalent values in unrestricted prose were not exhaustively searched.
 `train_ready=false`; no model learning claim.
 
+**Post-review dependency boundary:** the target-support deletion in the
+native auditor removes a key from its `proof_cells` mapping while leaving
+the model-visible `context` unchanged. It proves formal program-lineage
+necessity only. Selector and target **edits** do change the visible numeric
+text and answer, but do not exclude every substitute reading path. One
+Amazon reader (`p112:71eb4672aafaac986c6142f8f1f7491c594dc994e414d63b38427578edef0630`)
+repeats the 2021 target value `24,879` in its 2021, 2022 and 2023 report
+chunks and the 2024 value `68,593` twice in its 2024 chunk. The same-report
+shortcut scan rejects a report containing **both** values, so this survives
+despite alternative support for each target. The answer may be correct, but
+its executed evidence span is not a certified minimum reader-text distance.
+Before training promotion, generate a `reader_context_minus` that removes
+all equivalent visible supports and check whether the answer becomes
+underdetermined. The P112 report shard remains a research candidate.
+
+P113 ran a separate visible-text numeric-surface audit over all 152 reader
+views. Of 304 target observations, 201 still had the same numeric surface
+somewhere in the reader after the proof-span number was masked. Its 304
+gold-free `reader_context_minus` texts are recorded in
+`data/candidates/p113_report_text_audit_v2` and explained in
+`.hl/p113_report_text_audit.md`. This detects possible duplicate support;
+it does not decide whether those numbers carry equivalent row/period/metric
+semantics or whether the answer remains recoverable. The report shard is
+still `train_ready=false`.
+
 This changes operation coverage inside existing finance source worlds. It
 does not add eight new issuers, domains or document licenses. The global
 balanced arm can admit only part of these tasks under its per-source-group

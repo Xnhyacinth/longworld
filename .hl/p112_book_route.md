@@ -21,7 +21,7 @@ print the speaker or target answer. These are literal attribution tasks;
 implicit speech, motives, themes and broader narrative inference are outside
 this pilot's truth contract.
 
-Three-process compilation yields **20 independent semantic tasks**: five
+Three-process compilation emitted **20 candidate semantic tasks**: five
 Alice, seven Pride and eight Holmes; 13 train and seven eval, with work-level
 split. All 20 have a directly measured source-to-target evidence envelope of
 at least 16,384 tokens. Observed lineage extent is 17,240–126,221 tokens
@@ -39,6 +39,19 @@ Concrete cases for inspection:
   source quotation 2,518–2,529, target 29,991–30,003.
 * `book-cross-8e76cb972bd5373ee10d-v1`: Alice Chapter II → IX;
   source quotation 3,336–3,344, target 28,830–28,841.
+
+**Post-review quarantine:** the 20/20 replay is not an independent semantic
+truth check. `speeches()` recognizes only a 25–130-character curly quotation
+followed by literal `said NAME`, and treats names such as `Holmes` and
+`Sherlock Holmes` as different people. An independent broader attribution
+scan found later explicitly attributed quotations for at least 12/20 gold
+rows and same-person counterfactual errors. For example
+`book-cross-d95a1e3fd087dc189638-v1` misses a later Sherlock Holmes quote
+in its target chapter. **All 20 P112 book rows are quarantined and excluded
+from the corrected integrated index and selection.** The length/mask counts
+above describe a failed diagnostic producer, not admitted book training data.
+P113 will rebuild the attribution truth contract and use a different full-book
+audit before any book task re-enters selection.
 
 The current intake is small and literary English only. A scalable source
 planner should consume Gutenberg's machine-readable catalog, sample by
