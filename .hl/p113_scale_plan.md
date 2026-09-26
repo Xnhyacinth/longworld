@@ -2,6 +2,8 @@
 
 Status: active research plan, not a training release. The current corrected P112 bank is described in `.hl/p112_integrated_status.md`. This plan fixes the unit of scaling: a pinned source world and an independently solved semantic task. Domain/topic names, question paraphrases, renderer profiles, and length views are orthogonal exposure controls, not additional semantic worlds.
 
+P113 follow-up: an adversarial review found at least five wrong golds in the first 43-row catalog-driven book shard despite its producer/auditor agreement. That entire shard is quarantined; see `.hl/p113_integrated_status.md`. Source-capacity scale is useful only after the independent semantic truth gate holds.
+
 ## Accepted claim and target
 
 Compile many capability tasks from a shared, source-backed world without hand-writing an issuer, book, paper or topic function. Grow source breadth through catalog intake and source-shape routing; grow capability breadth through reusable native operations. Evaluate yield as **independent semantically correct tasks per source and compute cost**, not downloaded files, planned combinations, full-chat tokens or display labels. No forced cross product: every legal and unsupported cell is counted.
