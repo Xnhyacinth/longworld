@@ -1,0 +1,23 @@
+{
+  "schema": "longworld.p113-legal-cell-dispatch.v2.config",
+  "planned_jobs": {
+    "path": "data/candidates/p113_legal_cell_plan_v1/supported_jobs.jsonl",
+    "sha256": "380fda652d9c572477f2420014f04cafd82ff656eb6d84c5cc3cabbdcc9d07fa"
+  },
+  "prior_candidate_index": {
+    "path": "data/candidates/p113_candidate_refs_v1/candidate_refs.jsonl",
+    "sha256": "7f00ce2ee1c14a016d052bca15c1c6e953a7aacfddde585a40264b753afb3a3c"
+  },
+  "wiki_plan_semantic_id": "96e826f14c4dcb5b0db36edd",
+  "wiki_max_tasks": 4,
+  "wiki_source_pool": {
+    "path": "configs/p76_source_pool_v2.json",
+    "sha256": "6089c4210bb04f7379fe3716613e041299904cea980a5edb79903e0bbb0fe29b"
+  },
+  "finance_source_id": "amazon",
+  "finance_max_tasks": 24,
+  "finance_route_config": {
+    "path": "configs/p112_report_route_v2.json",
+    "sha256": "24b45d6fc0f9822fd6d25b318ba9207f3146d8562d5e9b5de07483a5348966f0"
+  }
+}
