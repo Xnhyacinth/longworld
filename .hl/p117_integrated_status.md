@@ -12,6 +12,7 @@
 | Assistant-supervised tokens | 3,571,628 | 89,144 |
 
 The selection is 1,039 train / 374 eval. Source-kind counts are Wiki **709**, finance reports 192, code workflow 140, books **205**, controlled simulation 108, grounded simulation 34, paper-source 17 and paper-revision eight. Its final-chat bins are 460 below 32K, 361 at 32–64K, 420 at 64–128K and 172 at 128–256K. Full-bank domain/topic/operation label counts are 32/162/176; selected counts are 32/158/118. These are metadata vocabularies, not counts of independent semantic ontologies or mechanisms. Only 89,144/94,400,777 selected tokens (0.0944%) are assistant-supervised. Correct mask geometry alone does not establish useful training signal.
+All 1,413 final mask rows have `loss_mask_start == input_tokens`, positive supervision, and `input_tokens + supervised_tokens == full_chat_tokens`; supervised tokens range from four to 6,003, with median 22. The 205 book tasks have median eight supervised tokens; the 709 Wiki tasks have median 12. This imbalance is relevant to any eventual training mixture.
 The most common selected operation labels are `table_cell_lookup` 318, `cross_chapter_named_speech_follow` 171, and `closed_categorical_table_scan` 155: together 644/1,413 tasks. The largest domain labels are literature 205, finance 197, education 154, codeforge 140 and simulation 102. This concentration matters more than the raw vocabulary of 158 topic labels; 74 selected tasks still carry `topic=unknown`.
 
 | Selected source kind | Tasks | Source groups | Groups with >1 operation |
