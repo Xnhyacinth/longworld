@@ -882,7 +882,10 @@ def _wiki_registry(
 ) -> dict[str, list[dict[str, Any]]]:
     pool_paths = sorted(
         (ROOT / "data/capability_records").rglob("*source_pool.json")
-    ) + list(WIKI_POOLS) + list(extra_source_pools or [])
+    ) + list(WIKI_POOLS) + [
+        path if path.is_absolute() else ROOT / path
+        for path in extra_source_pools or []
+    ]
     seen_snapshots: dict[Path, tuple[str, dict[str, Any]]] = {}
     found: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for pool_path in pool_paths:

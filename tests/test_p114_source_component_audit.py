@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 
 import pytest
 
@@ -98,6 +99,38 @@ def test_same_wiki_page_across_revisions_connects_source_groups() -> None:
     )
     assert graph["components"] == 2
     assert graph["conflicts"][0]["groups"] == ["snapshot-a", "snapshot-b"]
+
+
+def test_extra_wiki_source_pool_accepts_workspace_relative_path(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(source_audit, "ROOT", tmp_path)
+    monkeypatch.setattr(source_audit, "WIKI_POOLS", ())
+    snapshot = tmp_path / "snapshot.json"
+    snapshot.write_text(json.dumps({"snapshot_id": "group", "documents": []}))
+    pool = tmp_path / "pool.json"
+    pool.write_text(
+        json.dumps(
+            {
+                "sources": [
+                    {
+                        "name": "group",
+                        "domain": "nature",
+                        "topic": "parks",
+                        "split": "train",
+                        "snapshot": {
+                            "path": "snapshot.json",
+                            "sha256": hashlib.sha256(snapshot.read_bytes()).hexdigest(),
+                        },
+                    }
+                ]
+            }
+        )
+    )
+    found = source_audit._wiki_registry(
+        {"group": ("nature", "parks", "train")}, [Path("pool.json")]
+    )
+    assert found["group"][0]["pool_path"] == "pool.json"
 
 
 def test_paper_audit_uses_archive_bytes_and_work_identity(
