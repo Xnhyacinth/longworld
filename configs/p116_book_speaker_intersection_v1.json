@@ -1,0 +1,9 @@
+{
+  "schema": "longworld.p116-book-speaker-intersection-request.v1",
+  "source_dir": "data/sources/p114_book_cohort_v2",
+  "prior_unified_dir": "data/candidates/p114_book_unified_v2",
+  "workers": 4,
+  "max_tasks_per_book": 3,
+  "min_lineage_tokens": 16384,
+  "max_chat_tokens": 262144
+}
