@@ -33,6 +33,9 @@ coverage or a model-learning gain. The target pool and source groups are
 versioned; train/eval title and canonical URL collisions are rejected. The
 text deletion checks operate within the declared two-article relation and
 do not prove a global shortest natural-language proof. `train_ready=false`.
+The exact Wikipedia revision URLs and CC BY-SA source attribution are retained
+in the frozen source manifests; no redistribution or production promotion is
+claimed by this local candidate receipt.
 
 Inspect and replay:
 
