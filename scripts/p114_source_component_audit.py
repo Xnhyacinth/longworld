@@ -1,7 +1,8 @@
 """Audit train/eval source components for a frozen selected candidate bank.
 
-Only books and Wikipedia snapshots have complete source-document mappings in
-this audit. Other lanes remain UNKNOWN even if their group strings differ.
+Books and Wikipedia snapshots are mapped by default. Extended mode also
+replays pinned paper, RFC and finance provenance. Unmapped lanes remain UNKNOWN
+even when their group strings differ.
 """
 
 from __future__ import annotations
@@ -292,6 +293,352 @@ def _book_groups(
     }
 
 
+def _native_dir(row: dict[str, Any]) -> Path:
+    ref = row.get("native_row_ref", "")
+    if ".jsonl:" not in ref:
+        raise ValueError("selected row lacks native JSONL provenance")
+    path = Path(ref.rsplit(".jsonl:", 1)[0] + ".jsonl")
+    return path.parent if path.is_absolute() else ROOT / path.parent
+
+
+def _paper_groups(
+    rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Resolve each selected paper task through its pinned native audit."""
+    by_native: dict[Path, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        by_native[_native_dir(row)].append(row)
+    groups: dict[str, dict[str, Any]] = {}
+    native_pins = []
+    archive_pins: dict[str, str] = {}
+    for native_dir, selected in sorted(by_native.items()):
+        manifest_path = native_dir / "manifest.json"
+        manifest = _json(manifest_path)
+        file_pins = manifest.get("files_sha256", {})
+        if not all(name in file_pins for name in ("audit.jsonl", "sample_index.jsonl")):
+            raise ValueError("paper native manifest lacks complete audit/index pins")
+        for name in ("audit.jsonl", "sample_index.jsonl"):
+            if sha(native_dir / name) != file_pins[name]:
+                raise ValueError("paper native audit or index SHA differs")
+        audits = {item["sample_id"]: item for item in _rows(native_dir / "audit.jsonl")}
+        indexes = {
+            item["sample_id"]: item for item in _rows(native_dir / "sample_index.jsonl")
+        }
+        if len(audits) != len(_rows(native_dir / "audit.jsonl")) or len(indexes) != len(
+            _rows(native_dir / "sample_index.jsonl")
+        ):
+            raise ValueError("paper native sample ID repeats")
+        native_pins.append(
+            {
+                "path": str(native_dir.relative_to(ROOT)),
+                "manifest_sha256": sha(manifest_path),
+                "audit_sha256": file_pins["audit.jsonl"],
+                "index_sha256": file_pins["sample_index.jsonl"],
+            }
+        )
+        for row in selected:
+            sample_id = row["sample_id"]
+            native = indexes.get(sample_id)
+            audit_row = audits.get(sample_id)
+            if (
+                native is None
+                or audit_row is None
+                or native.get("source_group") != row["source_group"]
+                or native.get("split") != row["split"]
+            ):
+                raise ValueError(
+                    "selected paper row lacks matching pinned native audit"
+                )
+            archives = audit_row.get("source_archives") or [
+                audit_row.get("source_archive")
+            ]
+            if not archives or any(not isinstance(item, dict) for item in archives):
+                raise ValueError("paper audit lacks complete source archive list")
+            identities = set()
+            for archive in archives:
+                path = ROOT / archive["path"]
+                digest = archive["sha256"]
+                match = re.fullmatch(
+                    r"arxiv-([0-9]+\.[0-9]+)v([0-9]+)\.source\.tar", path.name
+                )
+                if (
+                    match is None
+                    or sha(path) != digest
+                    or row["source_group"] != "researchlab:arxiv:" + match.group(1)
+                    or archive.get("version") != "v" + match.group(2)
+                ):
+                    raise ValueError("paper source archive pin/work/revision differs")
+                archive_pins[str(path.relative_to(ROOT))] = digest
+                identities.add("paper:work:arxiv:" + match.group(1))
+                identities.add("paper:archive_sha256:" + digest)
+            group = row["source_group"]
+            if group in groups and groups[group]["split"] != row["split"]:
+                raise ValueError("paper source group crosses split")
+            item = groups.setdefault(
+                group, {"group": group, "split": row["split"], "identities": set()}
+            )
+            item["identities"].update(identities)
+    return [
+        {**item, "identities": sorted(item["identities"])}
+        for item in sorted(groups.values(), key=lambda value: value["group"])
+    ], {
+        "native_pins": native_pins,
+        "archive_pins": archive_pins,
+        "identity_scope": "all selected-task source archives from hash-pinned native audit rows: arXiv work and exact revision tar SHA-256",
+    }
+
+
+def _grounded_groups(
+    rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Resolve RFC text pins and controlled-state IDs for selected tasks."""
+    p112_dir = ROOT / "data/candidates/p112_world_grounded_rules_v1"
+    p112_manifest = _json(p112_dir / "manifest.json")
+    if (
+        sha(p112_dir / "proofs.jsonl") != p112_manifest["proofs_sha256"]
+        or sha(ROOT / "data/capability_records/p109_prose_support_v1/ledger.json")
+        != p112_manifest["official_rule_support_sha256"]
+    ):
+        raise ValueError("P112 grounded proof or RFC support pin differs")
+    support_ledger = _json(
+        ROOT / "data/capability_records/p109_prose_support_v1/ledger.json"
+    )
+    p112_proofs = {item["sample_id"]: item for item in _rows(p112_dir / "proofs.jsonl")}
+    p109_dir = ROOT / "data/candidates/p109_prose_native_v4"
+    p109_manifest = _json(p109_dir / "manifest.json")
+    for name in ("sample_index.jsonl", "audit.jsonl"):
+        if sha(p109_dir / name) != p109_manifest["files_sha256"][name]:
+            raise ValueError("P109 native RFC audit pin differs")
+    p109_index = {
+        item["sample_id"]: item for item in _rows(p109_dir / "sample_index.jsonl")
+    }
+
+    p109_audits = {item["sample_id"]: item for item in _rows(p109_dir / "audit.jsonl")}
+    native_cache: dict[Path, tuple[dict[str, Any], dict[str, Any]]] = {}
+    groups: dict[str, dict[str, Any]] = {}
+    source_pins: dict[str, str] = {}
+    for row in rows:
+        group = row["source_group"]
+        split = row["split"]
+        sample_id = row["sample_id"]
+        identities = set()
+        if sample_id in p112_proofs or sample_id in p109_audits:
+            proof = p112_proofs.get(sample_id) or p109_audits[sample_id]
+            if proof["source_group"] != group or proof["split"] != split:
+                raise ValueError("selected numeric RFC proof source/split differs")
+            if sample_id in p109_audits and (
+                p109_index[sample_id]["source_group"] != group
+                or p109_index[sample_id]["split"] != split
+            ):
+                raise ValueError("P109 native index source/split differs")
+            source = proof["source"]
+            path = ROOT / source["source_path"]
+            if (
+                source not in support_ledger["sources"]
+                or sha(path) != source["source_sha256"]
+                or sha(ROOT / source["inventory_path"]) != source["inventory_sha256"]
+            ):
+                raise ValueError("numeric RFC source text SHA differs")
+            source_pins[str(path.relative_to(ROOT))] = source["source_sha256"]
+            identities.update(
+                {
+                    "rfc:document:" + source["rfc_id"],
+                    "rfc:text_sha256:" + source["source_sha256"],
+                    "rfc:simulated_state:"
+                    + source["source_sha256"]
+                    + ":"
+                    + str(proof["seed"]),
+                }
+            )
+        else:
+            native_dir = _native_dir(row)
+            if native_dir not in native_cache:
+                manifest = _json(native_dir / "manifest.json")
+                config_path = (
+                    ROOT / "configs/p87_hybrid_rfc9114_pilot_v6.json"
+                    if native_dir
+                    == ROOT / "data/candidates/p87_hybrid_rfc9114_pilot_v6"
+                    else native_dir.parent / "config.json"
+                )
+                config = _json(config_path)
+                if sha(config_path) != manifest["config_sha256"]:
+                    raise ValueError("hybrid RFC config pin differs")
+                for field, path_field in (
+                    ("inventory_sha256", "inventory"),
+                    ("rules_sha256", "rules_source"),
+                    ("filler_sha256", "filler_source"),
+                ):
+                    if (
+                        config[field] != manifest["source_pins"][field]
+                        or sha(ROOT / config[path_field]) != config[field]
+                    ):
+                        raise ValueError("hybrid RFC source pin differs")
+                if (
+                    sha(native_dir / "sample_index.jsonl")
+                    != manifest["files_sha256"]["sample_index.jsonl"]
+                ):
+                    raise ValueError("hybrid RFC native index pin differs")
+                index = {
+                    item["sample_id"]: item
+                    for item in _rows(native_dir / "sample_index.jsonl")
+                }
+                native_cache[native_dir] = config, index
+            config, index = native_cache[native_dir]
+            native = index.get(sample_id)
+            if (
+                native is None
+                or native["source_group"] != group
+                or native["split"] != split
+                or config["source_group"] != group
+                or config["split"] != split
+            ):
+                raise ValueError("selected hybrid RFC task lacks pinned source binding")
+            for path_field, sha_field in (
+                ("rules_source", "rules_sha256"),
+                ("filler_source", "filler_sha256"),
+            ):
+                path = config[path_field]
+                digest = config[sha_field]
+                source_pins[path] = digest
+                identities.add("rfc:text_sha256:" + digest)
+                match = re.fullmatch(r"rfc([0-9]+)\.txt", Path(path).name)
+                if match is None:
+                    raise ValueError("hybrid RFC source filename lacks document ID")
+                identities.add("rfc:document:rfc" + match.group(1))
+            identities.add("rfc:simulated_state:" + native["world_id"])
+        if group in groups and groups[group]["split"] != split:
+            raise ValueError("grounded RFC group crosses train/eval")
+        target = groups.setdefault(
+            group, {"group": group, "split": split, "identities": set()}
+        )
+        target["identities"].update(identities)
+    return [
+        {**item, "identities": sorted(item["identities"])}
+        for item in sorted(groups.values(), key=lambda value: value["group"])
+    ], {
+        "p112_manifest_sha256": sha(p112_dir / "manifest.json"),
+        "p109_manifest_sha256": sha(p109_dir / "manifest.json"),
+        "hybrid_native_manifests": {
+            str(path.relative_to(ROOT)): sha(path / "manifest.json")
+            for path in native_cache
+        },
+        "source_text_pins": source_pins,
+        "identity_scope": "hash-pinned RFC rule/filler text and selected simulated-state IDs/seeds",
+    }
+
+
+def _finance_groups(
+    rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Trace every selected issuer task to its frozen filing manifest."""
+    native_cache: dict[Path, tuple[dict[str, Any], set[str], str]] = {}
+    source_cache: dict[Path, tuple[str, dict[str, Any]]] = {}
+    groups: dict[str, dict[str, Any]] = {}
+    native_pins = {}
+    for row in rows:
+        native_dir = _native_dir(row)
+        if native_dir not in native_cache:
+            receipt_path = native_dir / "BUILD_RECEIPT.json"
+            if receipt_path.is_file():
+                receipt = _json(receipt_path)
+                candidate_path = native_dir / "sft_candidates.jsonl"
+                if sha(candidate_path) != receipt["files"][candidate_path.name]:
+                    raise ValueError("legacy finance candidate receipt differs")
+                sample_ids = {item["sample_id"] for item in _rows(candidate_path)}
+                group = receipt["split_group_id"]
+                split = receipt["split"]
+                source_ref = receipt["source_manifest"]
+                pin_path = receipt_path
+            else:
+                manifest_path = native_dir / "manifest.json"
+                manifest = _json(manifest_path)
+                pins = manifest.get("file_sha256", manifest.get("files_sha256", {}))
+                index_path = native_dir / "sample_index.jsonl"
+                if sha(index_path) != pins.get("sample_index.jsonl"):
+                    raise ValueError("finance native index pin differs")
+                index_rows = _rows(index_path)
+                sample_ids = {item["sample_id"] for item in index_rows}
+                if len(sample_ids) != len(index_rows):
+                    raise ValueError("finance native sample ID repeats")
+                group = manifest["source_group"]
+                split = manifest["split"]
+                source_ref = manifest.get("source_manifest")
+                if source_ref is None:
+                    upstream = (
+                        ROOT
+                        / "data/candidates/p96_finance_factorial_wide_batch_v1"
+                        / native_dir.name
+                        / "manifest.json"
+                    )
+                    if sha(upstream) != manifest["source_manifest_sha256"]:
+                        raise ValueError("P112 finance source batch pin differs")
+                    source_ref = _json(upstream)["source_manifest"]
+                pin_path = manifest_path
+            source_path = Path(source_ref["path"])
+            if not source_path.is_absolute():
+                source_path = ROOT / source_path
+            if sha(source_path) != source_ref["sha256"]:
+                raise ValueError("finance signed source manifest pin differs")
+            native_cache[native_dir] = (
+                {"group": group, "split": split, "source_path": source_path},
+                sample_ids,
+                str(pin_path),
+            )
+            native_pins[str(pin_path)] = sha(pin_path)
+        binding, sample_ids, _ = native_cache[native_dir]
+        if (
+            row["sample_id"] not in sample_ids
+            or row["source_group"] != binding["group"]
+            or row["split"] != binding["split"]
+        ):
+            raise ValueError("selected finance row lacks pinned issuer binding")
+        source_path = binding["source_path"]
+        if source_path not in source_cache:
+            source_cache[source_path] = sha(source_path), _json(source_path)
+        source_sha, source = source_cache[source_path]
+        group = row["source_group"]
+        issuer = source.get("issuer", {})
+        if issuer.get("cik") is not None and issuer["cik"] != group:
+            raise ValueError("finance source issuer CIK differs")
+        identities = {
+            "finance:issuer_cik:" + group,
+            "finance:source_manifest_sha256:" + source_sha,
+        }
+        records = source.get("records", [])
+        if not records:
+            raise ValueError("finance source manifest has no filing records")
+        for record in records:
+            if record.get("cik") is not None and record["cik"] != group:
+                raise ValueError("finance filing record CIK differs")
+            if not isinstance(record.get("source_url"), str):
+                raise TypeError("finance filing lacks source URL")
+            identities.add("finance:filing_url:" + record["source_url"])
+            body = record.get("raw_text", record.get("text"))
+            if not isinstance(body, str) or not body:
+                raise ValueError("finance filing lacks frozen text")
+            identities.add(
+                "finance:filing_text_sha256:"
+                + hashlib.sha256(body.encode()).hexdigest()
+            )
+        if group in groups and groups[group]["split"] != row["split"]:
+            raise ValueError("finance issuer crosses train/eval")
+        target = groups.setdefault(
+            group, {"group": group, "split": row["split"], "identities": set()}
+        )
+        target["identities"].update(identities)
+    return [
+        {**item, "identities": sorted(item["identities"])}
+        for item in sorted(groups.values(), key=lambda value: value["group"])
+    ], {
+        "native_pins": native_pins,
+        "source_manifests": {
+            str(path.relative_to(ROOT) if path.is_relative_to(ROOT) else path): digest
+            for path, (digest, _) in source_cache.items()
+        },
+        "identity_scope": "all selected-task native issuer receipts and full frozen filing manifests: CIK, filing URL and exact embedded filing text hash",
+    }
+
+
 def _wiki_registry(
     selected_groups: dict[str, tuple[str, str, str]],
 ) -> dict[str, list[dict[str, Any]]]:
@@ -424,7 +771,11 @@ def _wiki_groups(
 
 
 def audit(
-    index_dir: Path, selection_dir: Path, book_source_dirs: Path | list[Path]
+    index_dir: Path,
+    selection_dir: Path,
+    book_source_dirs: Path | list[Path],
+    *,
+    extended_source_kinds: bool = False,
 ) -> dict[str, Any]:
     source_dirs = (
         [book_source_dirs] if isinstance(book_source_dirs, Path) else book_source_dirs
@@ -466,6 +817,15 @@ def audit(
             groups, pins = _book_groups(kind_rows, source_dirs)
         elif kind == "real_wiki":
             groups, pins = _wiki_groups(kind_rows)
+        elif extended_source_kinds and kind in {
+            "real_paper_source",
+            "real_paper_revision",
+        }:
+            groups, pins = _paper_groups(kind_rows)
+        elif extended_source_kinds and kind == "grounded_simulation":
+            groups, pins = _grounded_groups(kind_rows)
+        elif extended_source_kinds and kind == "real_finance":
+            groups, pins = _finance_groups(kind_rows)
         else:
             reports[kind] = {
                 "status": "UNKNOWN",
@@ -473,6 +833,11 @@ def audit(
                 "typed_source_groups": len({r["source_group"] for r in kind_rows}),
                 "reason": "complete source-document component mapping is not pinned in this audit",
             }
+            if extended_source_kinds:
+                reports[kind]["native_refs_without_adjacent_manifest"] = sum(
+                    not (_native_dir(row) / "manifest.json").is_file()
+                    for row in kind_rows
+                )
             continue
         graph = components(groups)
         reports[kind] = {
@@ -519,6 +884,33 @@ def audit(
             {"path": str(path), "sha256": sha(path / "manifest.json")}
             for path in source_dirs
         ]
+    if extended_source_kinds:
+        paper_groups = [
+            item
+            for kind in ("real_paper_source", "real_paper_revision")
+            for item in reports.get(kind, {}).get("group_inventory", [])
+        ]
+        if paper_groups:
+            merged: dict[str, dict[str, Any]] = {}
+            for item in paper_groups:
+                group = item["group"]
+                if group in merged and merged[group]["split"] != item["split"]:
+                    raise ValueError("paper work crosses kind-level train/eval split")
+                target = merged.setdefault(
+                    group,
+                    {"group": group, "split": item["split"], "identities": set()},
+                )
+                target["identities"].update(item["identities"])
+            graph = components(
+                [
+                    {**item, "identities": sorted(item["identities"])}
+                    for item in merged.values()
+                ]
+            )
+            report["cross_kind_paper_graph"] = graph
+            if graph["conflicts"]:
+                report["overall_status"] = "CONFLICT"
+                report["conflicts"]["cross_kind_paper"] = graph["conflicts"]
     return report
 
 
@@ -529,8 +921,14 @@ def main() -> None:
     parser.add_argument("--book-source", type=Path, action="append", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--verify-only", action="store_true")
+    parser.add_argument("--extended-source-kinds", action="store_true")
     args = parser.parse_args()
-    report = audit(args.index, args.selection, args.book_source)
+    report = audit(
+        args.index,
+        args.selection,
+        args.book_source,
+        extended_source_kinds=args.extended_source_kinds,
+    )
     if args.verify_only:
         if _json(args.output) != report:
             raise ValueError("source-component audit does not replay")

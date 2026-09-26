@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+
 import pytest
 
+import scripts.p114_source_component_audit as source_audit
 from scripts.p114_source_component_audit import (
     _check_book_source_components,
     author_key,
@@ -94,6 +98,124 @@ def test_same_wiki_page_across_revisions_connects_source_groups() -> None:
     )
     assert graph["components"] == 2
     assert graph["conflicts"][0]["groups"] == ["snapshot-a", "snapshot-b"]
+
+
+def test_paper_audit_uses_archive_bytes_and_work_identity(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(source_audit, "ROOT", tmp_path)
+    archive = tmp_path / "source/arxiv-1234.5678v2.source.tar"
+    archive.parent.mkdir()
+    archive.write_bytes(b"frozen paper source")
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    native = tmp_path / "native"
+    native.mkdir()
+    audit = {
+        "sample_id": "paper-task",
+        "source_archive": {
+            "path": str(archive.relative_to(tmp_path)),
+            "sha256": digest,
+            "version": "v2",
+        },
+    }
+    index = {
+        "sample_id": "paper-task",
+        "source_group": "researchlab:arxiv:1234.5678",
+        "split": "train",
+    }
+    (native / "audit.jsonl").write_text(json.dumps(audit) + "\n")
+    (native / "sample_index.jsonl").write_text(json.dumps(index) + "\n")
+    (native / "manifest.json").write_text(
+        json.dumps(
+            {
+                "files_sha256": {
+                    name: source_audit.sha(native / name)
+                    for name in ("audit.jsonl", "sample_index.jsonl")
+                }
+            }
+        )
+    )
+    rows = [{**index, "native_row_ref": "native/train.jsonl:0"}]
+    groups, _ = source_audit._paper_groups(rows)
+    assert "paper:work:arxiv:1234.5678" in groups[0]["identities"]
+    archive.write_bytes(b"changed")
+    with pytest.raises(ValueError, match="archive pin"):
+        source_audit._paper_groups(rows)
+
+
+def test_shared_rfc_filler_connects_rules_across_split() -> None:
+    graph = components(
+        [
+            {
+                "group": "rfc9114-world",
+                "split": "train",
+                "identities": ["rfc:text_sha256:shared-rfc9000-filler"],
+            },
+            {
+                "group": "rfc9000-world",
+                "split": "eval",
+                "identities": ["rfc:text_sha256:shared-rfc9000-filler"],
+            },
+        ]
+    )
+    assert graph["conflicts"][0]["groups"] == [
+        "rfc9000-world",
+        "rfc9114-world",
+    ]
+
+
+def test_finance_native_receipt_binds_issuer_and_filing_bytes(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(source_audit, "ROOT", tmp_path)
+    source = tmp_path / "source/manifest.json"
+    source.parent.mkdir()
+    source.write_text(
+        json.dumps(
+            {
+                "issuer": {"cik": "0000000001"},
+                "records": [
+                    {
+                        "cik": "0000000001",
+                        "source_url": "https://example.test/filing",
+                        "raw_text": "frozen annual filing",
+                    }
+                ],
+            }
+        )
+    )
+    native = tmp_path / "native"
+    native.mkdir()
+    index = {"sample_id": "finance-task"}
+    (native / "sample_index.jsonl").write_text(json.dumps(index) + "\n")
+    (native / "manifest.json").write_text(
+        json.dumps(
+            {
+                "file_sha256": {
+                    "sample_index.jsonl": source_audit.sha(
+                        native / "sample_index.jsonl"
+                    )
+                },
+                "source_group": "0000000001",
+                "split": "train",
+                "source_manifest": {
+                    "path": "source/manifest.json",
+                    "sha256": source_audit.sha(source),
+                },
+            }
+        )
+    )
+    row = {
+        "sample_id": "finance-task",
+        "source_group": "0000000001",
+        "split": "train",
+        "native_row_ref": "native/reader.jsonl:0",
+    }
+    groups, _ = source_audit._finance_groups([row])
+    assert "finance:issuer_cik:0000000001" in groups[0]["identities"]
+    source.write_text(source.read_text().replace("frozen", "changed"))
+    with pytest.raises(ValueError, match="source manifest pin"):
+        source_audit._finance_groups([row])
 
 
 def test_invalid_article_revision_and_duplicate_group_rejected() -> None:

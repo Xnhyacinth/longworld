@@ -106,3 +106,67 @@ UV_LINK_MODE=copy uv run --offline python scripts/p114_source_component_audit.py
 UV_LINK_MODE=copy uv run --offline pytest -q tests/test_p114_source_component_audit.py
 UV_LINK_MODE=copy uv run --offline ruff check scripts/p114_source_component_audit.py tests/test_p114_source_component_audit.py
 ```
+
+## P114/P115 extended native-source mapping
+
+The extended audit traces selected paper, grounded RFC and finance tasks
+through their hash-pinned native audits or build receipts to source archives,
+RFC texts and filing manifests. The P114 result is
+`data/candidates/p114_source_component_audit_v5/report.json` (SHA-256
+`223e89401923462e3e47fd12fae7ff3e496a796e2f26ece911919c23d2e107fe`).
+The separately frozen P115 selection result is
+`data/candidates/p114_source_component_audit_v6_p115/report.json` (SHA-256
+`b971d7587a230d7e66199dd92b6440190cfd29811957549a77b6e12be782ed2d`).
+Both select 1,346 views and have the same kind-level counts:
+
+| Kind | Views | Source components | Split conflicts | Status |
+|---|---:|---:|---:|---|
+| Wiki | 676 | 137 | 0 | CERTIFIED |
+| Books | 171 | 51 | 0 | CERTIFIED |
+| Finance | 192 | 8 | 0 | CERTIFIED |
+| Paper source + revision | 25 | 10 jointly across kinds | 0 | CERTIFIED |
+| Grounded RFC + simulated state | 34 | 2 | 0 | CERTIFIED |
+| Code workflow | 140 | unknown | unknown | UNKNOWN |
+| Controlled simulation | 108 | unknown | unknown | UNKNOWN |
+| Total | 1,346 | — | no certified-kind conflict | UNKNOWN overall |
+
+The finance graph follows legacy P77/P78 `BUILD_RECEIPT.json` and newer
+P95/P96/P112/P115 issuer manifests to eight pinned filing manifests. A group
+is tied to its CIK and the full manifest's filing URLs and embedded filing
+text hashes. The two selected P115 Amazon tasks use the existing Amazon CIK
+component; they add no source group. For papers, selected native audit rows
+pin every source tar and revision; a separate combined graph checks work
+overlap across source-QA and revision-QA kinds. For grounded RFCs, the rule
+and filler texts are both included in the graph. Three of the four groups
+connect through shared RFC 9000 text; all selected tasks in that connected
+component are train. The simulated state identifiers or seeds are recorded
+separately from the public rule text.
+
+Code workflow and controlled simulation still lack a complete joined source
+and base-world graph in this audit. Their source-group labels and local split
+counts are insufficient to certify cross-split source independence. In the
+P115 selection, 108/140 selected code rows and 34/108 controlled rows lack
+an adjacent native manifest; some older lanes have other receipts, which
+would need lane-specific replay. These views remain UNKNOWN rather than being
+counted as clean. The certificate concerns source overlap only, not answer
+correctness, long-context dependency or training readiness.
+
+Reproduce both extended reports, leaving v1–v4 immutable:
+
+```bash
+UV_LINK_MODE=copy uv run --offline python scripts/p114_source_component_audit.py \
+  --index data/candidates/p114_book_scale_refs_v1 \
+  --selection data/candidates/p114_book_scale_selection_v1 \
+  --book-source data/sources/p113_book_cohort_v6 \
+  --book-source data/sources/p114_book_cohort_v2 \
+  --extended-source-kinds \
+  --output data/candidates/p114_source_component_audit_v5/report.json --verify-only
+UV_LINK_MODE=copy uv run --offline python scripts/p114_source_component_audit.py \
+  --index data/candidates/p115_candidate_refs_v1 \
+  --selection data/candidates/p115_candidate_selection_shared_v1 \
+  --book-source data/sources/p113_book_cohort_v6 \
+  --book-source data/sources/p114_book_cohort_v2 \
+  --extended-source-kinds \
+  --output data/candidates/p114_source_component_audit_v6_p115/report.json --verify-only
+UV_LINK_MODE=copy uv run --offline pytest -q tests/test_p114_source_component_audit.py
+```
