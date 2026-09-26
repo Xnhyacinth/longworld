@@ -1,0 +1,282 @@
+{
+  "schema": "longworld.p138-capability-taxonomy.v1",
+  "input": {
+    "index": "data/candidates/p152_candidate_refs_probe_v1",
+    "index_manifest_sha256": "9c0149caa4967e2d34f98a511ad9d90e96f43876fa433995e7b0d97bcd901cd3",
+    "index_refs_sha256": "61758a0353a988efd1fbf3cdba802cbce26ee4e12412436ac73478ef3671f087",
+    "selection": "data/candidates/p152_candidate_selection_probe_v1",
+    "selection_manifest_sha256": "7edcf72e7bd1f59511c375634c6a87c33c0c3992fd2bcea1e1dcc45841d8313b",
+    "selection_refs_sha256": "d28ff5526265eeb1832feb9192f385ff19d2e4ceb3e11112c748b1009eae3c8d"
+  },
+  "routes": [
+    {
+      "source_name": "p125_joint_multi_operation",
+      "operation": [
+        "joint_multi_operation_answer"
+      ],
+      "evidence_profile": "two_audited_same_context_tasks",
+      "capability": "composite_reuse"
+    },
+    {
+      "source_kind": "controlled_simulation",
+      "source_name": "p133_state_reader_QA",
+      "source_group_prefix": "p133-partial_reversal-",
+      "topic": "partial_reversal",
+      "evidence_profile": "controlled_state_transition",
+      "operation": [
+        "net_sum"
+      ],
+      "capability": "state_aggregate",
+      "native_mechanism": "partial_reversal"
+    },
+    {
+      "source_kind": "controlled_simulation",
+      "source_name": "p133_state_reader_QA",
+      "source_group_prefix": "p133-partial_reversal-",
+      "topic": "partial_reversal",
+      "evidence_profile": "controlled_state_transition",
+      "operation": [
+        "residual_entries"
+      ],
+      "capability": "state_complete_set",
+      "native_mechanism": "partial_reversal"
+    },
+    {
+      "source_kind": "controlled_simulation",
+      "source_name": "p133_state_reader_QA",
+      "source_group_prefix": "p133-authorization_hold-",
+      "topic": "authorization_hold",
+      "evidence_profile": "controlled_state_transition",
+      "operation": [
+        "net_sum"
+      ],
+      "capability": "state_aggregate",
+      "native_mechanism": "authorization_hold"
+    },
+    {
+      "source_kind": "controlled_simulation",
+      "source_name": "p133_state_reader_QA",
+      "source_group_prefix": "p133-authorization_hold-",
+      "topic": "authorization_hold",
+      "evidence_profile": "controlled_state_transition",
+      "operation": [
+        "residual_entries"
+      ],
+      "capability": "state_complete_set",
+      "native_mechanism": "authorization_hold"
+    },
+    {
+      "source_kind": "controlled_simulation",
+      "operation": [
+        "alias_locate"
+      ],
+      "capability": "locate"
+    },
+    {
+      "source_kind": "controlled_simulation",
+      "operation": [
+        "join_lookup",
+        "join_unanswerable"
+      ],
+      "capability": "relational_join"
+    },
+    {
+      "source_kind": "controlled_simulation",
+      "operation": [
+        "filter_aggregate",
+        "dense_aggregate",
+        "group_compare"
+      ],
+      "capability": "aggregate_compare"
+    },
+    {
+      "source_kind": "controlled_simulation",
+      "operation": [
+        "set_complete"
+      ],
+      "capability": "complete_set_scan"
+    },
+    {
+      "source_kind": "controlled_simulation",
+      "operation": [
+        "asof_state",
+        "asof_sum",
+        "asof_complete_set"
+      ],
+      "capability": "temporal_state"
+    },
+    {
+      "source_kind": "controlled_simulation",
+      "operation": [
+        "rule_holdout"
+      ],
+      "capability": "rule_application"
+    },
+    {
+      "source_kind": "grounded_simulation",
+      "operation": [
+        "http3_support_set",
+        "first_control_frame_violations",
+        "real_rule_numeric_minimum_violation_set"
+      ],
+      "capability": "grounded_rule_application"
+    },
+    {
+      "source_kind": "real_book",
+      "operation": [
+        "cross_chapter_named_speech_follow"
+      ],
+      "capability": "cross_chapter_trace"
+    },
+    {
+      "source_kind": "real_book",
+      "operation": [
+        "cross_chapter_complete_printed_speaker_intersection"
+      ],
+      "capability": "cross_chapter_complete_set"
+    },
+    {
+      "source_kind": "real_code_workflow",
+      "operation": [
+        "merged_files_union",
+        "largest_changed_file_set",
+        "common_successful_ci_checks",
+        "approved_merge_files",
+        "recovered_ci_checks",
+        "shared_changed_files"
+      ],
+      "capability": "code_workflow_comparison"
+    },
+    {
+      "source_kind": "real_code_workflow",
+      "operation": [
+        "added_line_cross_pr_complete_set"
+      ],
+      "capability": "code_content_complete_set"
+    },
+    {
+      "source_kind": "real_code_workflow",
+      "operation": [
+        "reviewed_final_diff_paths"
+      ],
+      "capability": "code_review_diff_join"
+    },
+    {
+      "source_kind": "real_finance",
+      "operation": [
+        "lookup"
+      ],
+      "capability": "locate"
+    },
+    {
+      "source_kind": "real_finance",
+      "operation": [
+        "filter",
+        "four_filing_complete_set_threshold"
+      ],
+      "capability": "complete_set_scan"
+    },
+    {
+      "source_kind": "real_finance",
+      "operation": [
+        "delta",
+        "aggregate",
+        "maximum",
+        "filtered_aggregate",
+        "ratio",
+        "cash_reconciliation",
+        "conditional_cross_metric_sum",
+        "max_margin_selected_cashflow",
+        "margin_extremes_cashflow_difference",
+        "middle_margin_then_cash",
+        "largest_cash_jump_then_revenue",
+        "max_revenue_growth_then_cash",
+        "largest_margin_swing_then_cash"
+      ],
+      "capability": "aggregate_compare"
+    },
+    {
+      "source_kind": "real_finance",
+      "operation_prefix": [
+        "min_value:",
+        "max_value:",
+        "max_ratio:",
+        "min_ratio:",
+        "median_ratio:",
+        "max_growth:",
+        "max_abs_delta:",
+        "max_abs_delta_ratio:"
+      ],
+      "capability": "aggregate_compare"
+    },
+    {
+      "source_kind": "real_paper_revision",
+      "operation": [
+        "revision_alignment",
+        "cross_file_revision_alignment"
+      ],
+      "capability": "paper_revision_alignment"
+    },
+    {
+      "source_kind": "real_paper_source",
+      "operation": [
+        "cross_file_caption_reference",
+        "cross_file_section_reference",
+        "same_file_section_or_caption_reference"
+      ],
+      "capability": "paper_reference_trace"
+    },
+    {
+      "source_kind": "real_wiki",
+      "operation": [
+        "table_cell_lookup"
+      ],
+      "capability": "locate"
+    },
+    {
+      "source_kind": "real_wiki",
+      "operation": [
+        "closed_categorical_table_scan",
+        "html_complete_categorical_table_scan",
+        "dense_table_interval_scan",
+        "closed_year_table_interval",
+        "closed_numeric_table_interval"
+      ],
+      "capability": "complete_set_scan"
+    },
+    {
+      "source_kind": "real_wiki",
+      "operation": [
+        "cross_document_table_join",
+        "list_selector_linked_article_attribute",
+        "remote_selector_closed_categorical_scan"
+      ],
+      "capability": "relational_join"
+    },
+    {
+      "source_kind": "real_wiki",
+      "operation": [
+        "table_pair_earlier_year"
+      ],
+      "capability": "compare"
+    },
+    {
+      "source_kind": "real_paper_source",
+      "source_name": "p146_real_paper_source_reference",
+      "evidence_profile": "raw_tex_reference_target_dual_text_deletion",
+      "operation": [
+        "source_reference_target_text"
+      ],
+      "capability": "paper_reference_trace"
+    },
+    {
+      "source_kind": "real_wiki",
+      "source_name": "p150_wiki_html_numeric_interval",
+      "evidence_profile": "p122_html_grid_numeric_row_header_unit",
+      "operation": [
+        "html_numeric_interval_count"
+      ],
+      "capability": "complete_set_scan"
+    }
+  ]
+}
