@@ -1,0 +1,21 @@
+{
+  "schema": "longworld.p148-wiki-category-catalog.v1.config",
+  "api": "https://en.wikipedia.org/w/api.php",
+  "index_category": "Category:Lists",
+  "index_subcategory_limit": 50,
+  "branch_subcategory_limit": 100,
+  "minimum_direct_pages": 8,
+  "scheduled_roots": 12,
+  "pages_per_root": 2,
+  "p119_subcategories_per_root": 2,
+  "p119_pages_per_category": 12,
+  "requests_per_second": 0.5,
+  "max_429_retries": 2,
+  "prior_roots_config": {"path": "configs/p119_wiki_structural_discovery_v1.json", "sha256": "62b2efdaf296e8a6333f2dfcb2fa2c42725c760f4ca3317770d6fbe044874c79"},
+  "prior_pools": [
+    {"path": "data/capability_records/p114_wiki_scale_prior_v1/source_pool.json", "sha256": "57efc48c29941b80139e62c530945c60429f2cf4523418e7dda83f678dff9271"},
+    {"path": "data/capability_records/p114_wiki_scale_campaign_sharded_v1/gate/source_pool.json", "sha256": "00edb46fcd656a8053737cf9a4a0a5ec2cace936e2631323894f2868498f0289"},
+    {"path": "data/candidates/p117_wiki_shape_intake_v9/source_pool.json", "sha256": "12e283f4cd2534d62f845b4985da22fd58fe893383e21298e182c000dbeb2556"},
+    {"path": "data/candidates/p119_wiki_structural_intake_v2/source_pool.json", "sha256": "82b95cbd1a1de9726b82e43703a757e8f13ee5e3481e712c5106b848373d4464"}
+  ]
+}
