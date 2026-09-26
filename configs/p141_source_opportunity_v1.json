@@ -1,0 +1,9 @@
+{
+  "schema": "longworld.p141-source-opportunity.v1.config",
+  "wiki_campaign": {"path": "data/candidates/p131_wiki_html_campaign_v1/manifest.json", "sha256": "0a1c207092bd983650bcb1b34522c8352990ee2d918a5ac11f51ab8f01123bc6"},
+  "wiki_pool": {"path": "data/candidates/p119_wiki_structural_intake_v2/source_pool.json", "sha256": "82b95cbd1a1de9726b82e43703a757e8f13ee5e3481e712c5106b848373d4464"},
+  "finance_shape": {"path": "data/candidates/p115_real_source_shape_v8/manifest.json", "sha256": "9ced4cafcd690fd964c4f6bee0d9e42cf5a7cfd5355748d0f5039984cb775823"},
+  "paper_reference": {"path": "data/candidates/p127_same_file_paper_reference_v5/manifest.json", "sha256": "4cb425da04d8f9814d7987d7826b7a1aa93bb60123e0b2f529a383e2b4889e62"},
+  "capability_matrix": {"path": "data/candidates/p139_capability_coverage_v1/report.json", "sha256": "af2f80e27388f37b6df755741662cb01bcaf69f40ab022ea44a30c6b7362ca00"},
+  "workers": 4
+}
